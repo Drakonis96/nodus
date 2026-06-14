@@ -49,7 +49,12 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
-            rollupOptions: { external: mainExternals },
+            rollupOptions: {
+              external: mainExternals,
+              // Emit a CommonJS .cjs preload: Electron loads it unambiguously as CJS,
+              // which is far more reliable in packaged apps than an ESM (.mjs) preload.
+              output: { format: 'cjs', entryFileNames: 'preload.cjs', inlineDynamicImports: true },
+            },
           },
         },
       },

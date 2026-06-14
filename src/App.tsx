@@ -25,13 +25,23 @@ export function App() {
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reloadSettings = useCallback(async () => {
-    const s = await window.nodus.getSettings();
-    setSettings(s);
-    document.documentElement.classList.toggle('light', s.theme === 'light');
-    document.documentElement.classList.toggle('dark', s.theme === 'dark');
-    return s;
+    if (!window.nodus) {
+      setLoadError('El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.');
+      return undefined;
+    }
+    try {
+      const s = await window.nodus.getSettings();
+      setSettings(s);
+      document.documentElement.classList.toggle('light', s.theme === 'light');
+      document.documentElement.classList.toggle('dark', s.theme === 'dark');
+      return s;
+    } catch (e) {
+      setLoadError(`No se pudieron cargar los ajustes: ${(e as Error).message}`);
+      return undefined;
+    }
   }, []);
 
   useEffect(() => {
@@ -46,6 +56,18 @@ export function App() {
       setSyncing(false);
     }
   };
+
+  if (loadError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="text-red-400 font-semibold">No se pudo iniciar Nodus</div>
+        <div className="text-neutral-400 text-sm max-w-md">{loadError}</div>
+        <button className="btn btn-primary" onClick={() => { setLoadError(null); void reloadSettings(); }}>
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
   if (!settings) {
     return <div className="h-full flex items-center justify-center text-neutral-500">Cargando Nodus…</div>;
