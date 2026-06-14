@@ -401,7 +401,7 @@ export function buildAuthorGraph(): GraphData {
     };
   });
 
-  const relRows = db.prepare('SELECT * FROM author_relations').all() as {
+  const relRows = db.prepare('SELECT * FROM author_relations WHERE from_author <> to_author').all() as {
     from_author: string;
     to_author: string;
     type: string;

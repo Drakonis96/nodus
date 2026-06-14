@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nodus">
+  <defs>
+    <linearGradient id="nodusMark" x1="13" y1="12" x2="52" y2="53" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c4b5fd"/>
+      <stop offset="0.52" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 24c7.8-7.6 18.8-7.6 26 0 7.2 7.6 7.2 18.4 0 26" fill="none" stroke="url(#nodusMark)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M18 40c7.6 7.2 18.4 7.2 26 0" fill="none" stroke="url(#nodusMark)" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="18" cy="24" r="6" fill="#c4b5fd"/>
+  <circle cx="46" cy="24" r="6" fill="#8b5cf6"/>
+  <circle cx="18" cy="40" r="6" fill="#8b5cf6"/>
+  <circle cx="46" cy="40" r="6" fill="#7c3aed"/>
+</svg>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
-import { Badge, EDGE_LABELS } from '../components/ui';
+import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
 
 const KIND_LABELS: Record<GapKind, string> = {
@@ -35,6 +35,7 @@ export function GapsView() {
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="flex items-center gap-3 mb-4">
+        <Icon name="gap" size={22} className="text-indigo-300" />
         <h1 className="text-xl font-semibold">Huecos de investigación</h1>
       </div>
       <p className="text-sm text-neutral-400 mb-4">

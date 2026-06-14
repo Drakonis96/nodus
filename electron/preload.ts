@@ -36,6 +36,7 @@ const api: NodusApi = {
   pauseQueue: () => ipcRenderer.invoke('queue:pause'),
   resumeQueue: () => ipcRenderer.invoke('queue:resume'),
   cancelQueueItem: (id) => ipcRenderer.invoke('queue:cancelItem', id),
+  moveQueueItemToTop: (id) => ipcRenderer.invoke('queue:moveToTop', id),
   clearQueue: () => ipcRenderer.invoke('queue:clear'),
   retryFailed: () => ipcRenderer.invoke('queue:retryFailed'),
   onQueueProgress: (cb) => {

@@ -90,6 +90,17 @@ class ScanQueue {
     this.emit();
   }
 
+  moveToTop(id: string): void {
+    const idx = this.items.findIndex((i) => i.id === id);
+    if (idx < 0 || this.items[idx].state !== 'queued') return;
+    const [item] = this.items.splice(idx, 1);
+    const firstQueued = this.items.findIndex((i) => i.state === 'queued');
+    const insertAt = firstQueued >= 0 ? firstQueued : this.items.length;
+    this.items.splice(insertAt, 0, item);
+    this.lastKind = item.kind === 'deep' ? 'light' : 'deep';
+    this.emit();
+  }
+
   clear(): void {
     for (const item of this.items) {
       if (item.state === 'queued' || item.state === 'cancelled' || item.state === 'paused') {

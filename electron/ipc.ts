@@ -184,6 +184,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   h('queue:pause', async () => scanQueue.pause());
   h('queue:resume', async () => scanQueue.resume());
   h('queue:cancelItem', async (_e, id: string) => scanQueue.cancelItem(id));
+  h('queue:moveToTop', async (_e, id: string) => scanQueue.moveToTop(id));
   h('queue:clear', async () => scanQueue.clear());
   h('queue:retryFailed', async () => scanQueue.retryFailed());
 

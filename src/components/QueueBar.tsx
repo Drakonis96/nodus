@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { QueueProgress } from '@shared/types';
+import { Icon } from './ui';
 
 export function QueueBar() {
   const [progress, setProgress] = useState<QueueProgress | null>(null);
@@ -113,9 +114,21 @@ export function QueueBar() {
                   >
                     {it.state}
                   </span>
+                  {it.state === 'queued' && (
+                    <button
+                      className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-indigo-300"
+                      title="Mover al principio de la cola"
+                      aria-label={`Mover al principio de la cola: ${it.title}`}
+                      onClick={() => window.nodus.moveQueueItemToTop(it.id)}
+                    >
+                      <Icon name="arrowUp" size={13} />
+                    </button>
+                  )}
                   {(it.state === 'queued' || it.state === 'paused') && (
                     <button
-                      className="ml-2 text-neutral-500 hover:text-red-400"
+                      className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
+                      title="Cancelar"
+                      aria-label={`Cancelar: ${it.title}`}
                       onClick={() => window.nodus.cancelQueueItem(it.id)}
                     >
                       ✕

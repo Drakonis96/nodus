@@ -10,15 +10,16 @@ import { CollectionsModal } from './views/CollectionsModal';
 import { QueueBar } from './components/QueueBar';
 import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
+import nodusLogo from './assets/nodus-logo.svg';
 
 type View = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
 
 const NAV: { id: View; label: string; icon: string }[] = [
-  { id: 'graph', label: 'Grafo', icon: '◈' },
-  { id: 'library', label: 'Biblioteca', icon: '▤' },
-  { id: 'gaps', label: 'Huecos', icon: '◌' },
-  { id: 'reading', label: 'Ruta de lectura', icon: '➜' },
-  { id: 'settings', label: 'Ajustes', icon: '⚙' },
+  { id: 'graph', label: 'Grafo', icon: 'layers' },
+  { id: 'library', label: 'Biblioteca', icon: 'book' },
+  { id: 'gaps', label: 'Huecos', icon: 'gap' },
+  { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
+  { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 
 export function App() {
@@ -83,7 +84,10 @@ export function App() {
     <div className="h-full flex flex-col">
       {/* Top bar */}
       <header className="flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
-        <div className="font-semibold text-lg tracking-tight">Nodus</div>
+        <div className="flex items-center gap-2 font-semibold text-lg tracking-tight">
+          <img src={nodusLogo} alt="" className="h-7 w-7" />
+          <span>Nodus</span>
+        </div>
         <div className="flex-1" />
         {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
         {settings.favorites.length > 0 && (
@@ -132,7 +136,7 @@ export function App() {
                 view === n.id ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900'
               }`}
             >
-              <span className="opacity-70">{n.icon}</span>
+              <Icon name={n.icon} className="opacity-70" />
               {n.label}
             </button>
           ))}
