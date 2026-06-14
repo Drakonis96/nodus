@@ -1,0 +1,188 @@
+import { getDb } from './database';
+import type { Work, WorkView, WorkFilter, DeepTrigger } from '@shared/types';
+
+function toView(row: Work, themes: string[]): WorkView {
+  const { authors_json, ...rest } = row;
+  let authors: string[] = [];
+  try {
+    authors = JSON.parse(authors_json || '[]');
+  } catch {
+    authors = [];
+  }
+  return { ...rest, authors, themes };
+}
+
+export function getWork(nodusId: string): WorkView | null {
+  const db = getDb();
+  const row = db.prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as Work | undefined;
+  if (!row) return null;
+  return toView(row, themesFor(nodusId));
+}
+
+export function getWorkByZoteroKey(zoteroKey: string): Work | null {
+  const db = getDb();
+  return (db.prepare('SELECT * FROM works WHERE zotero_key = ?').get(zoteroKey) as Work) ?? null;
+}
+
+export function getWorkByDoi(doi: string): Work | null {
+  const db = getDb();
+  if (!doi) return null;
+  return (db.prepare('SELECT * FROM works WHERE doi = ? AND doi IS NOT NULL').get(doi) as Work) ?? null;
+}
+
+function themesFor(nodusId: string): string[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT t.label FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id WHERE wt.nodus_id = ? ORDER BY t.label`
+    )
+    .all(nodusId) as { label: string }[];
+  return rows.map((r) => r.label);
+}
+
+export function listWorks(filter: WorkFilter = {}): WorkView[] {
+  const db = getDb();
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (!filter.includeArchived) clauses.push('archived = 0');
+  if (filter.lightStatus && filter.lightStatus !== 'all') {
+    clauses.push('light_status = @lightStatus');
+    params.lightStatus = filter.lightStatus;
+  }
+  if (filter.deepStatus && filter.deepStatus !== 'all') {
+    clauses.push('deep_status = @deepStatus');
+    params.deepStatus = filter.deepStatus;
+  }
+  if (filter.yearMin != null) {
+    clauses.push('year >= @yearMin');
+    params.yearMin = filter.yearMin;
+  }
+  if (filter.yearMax != null) {
+    clauses.push('year <= @yearMax');
+    params.yearMax = filter.yearMax;
+  }
+  if (filter.search) {
+    clauses.push('(LOWER(title) LIKE @q OR LOWER(authors_json) LIKE @q)');
+    params.q = `%${filter.search.toLowerCase()}%`;
+  }
+  if (filter.theme) {
+    clauses.push(
+      'nodus_id IN (SELECT wt.nodus_id FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id WHERE t.label = @theme)'
+    );
+    params.theme = filter.theme;
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = db.prepare(`SELECT * FROM works ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
+  return rows.map((r) => toView(r, themesFor(r.nodus_id)));
+}
+
+export interface UpsertWorkInput {
+  nodus_id: string;
+  zotero_key: string;
+  zotero_version: number | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  item_type: string;
+  doi: string | null;
+  read_tag: boolean;
+}
+
+/** Insert a new work or update mutable Zotero-sourced fields of an existing one. */
+export function upsertWork(input: UpsertWorkInput): void {
+  const db = getDb();
+  const existing = getWorkByZoteroKey(input.zotero_key);
+  if (!existing) {
+    db.prepare(
+      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, year, item_type, doi, read_tag)
+       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @year, @item_type, @doi, @read_tag)`
+    ).run({
+      ...input,
+      authors_json: JSON.stringify(input.authors),
+      read_tag: input.read_tag ? 1 : 0,
+    });
+  } else {
+    db.prepare(
+      `UPDATE works SET zotero_version=@zotero_version, title=@title, authors_json=@authors_json,
+       year=@year, item_type=@item_type, doi=@doi, read_tag=@read_tag, archived=0 WHERE zotero_key=@zotero_key`
+    ).run({
+      zotero_key: input.zotero_key,
+      zotero_version: input.zotero_version,
+      title: input.title,
+      authors_json: JSON.stringify(input.authors),
+      year: input.year,
+      item_type: input.item_type,
+      doi: input.doi,
+      read_tag: input.read_tag ? 1 : 0,
+    });
+  }
+  recomputeDeepTrigger(getWorkByZoteroKey(input.zotero_key)!.nodus_id);
+}
+
+export function addAlias(nodusId: string, zoteroKey: string): void {
+  getDb().prepare('INSERT OR IGNORE INTO work_aliases (nodus_id, zotero_key) VALUES (?, ?)').run(nodusId, zoteroKey);
+}
+
+export function setManualDeep(nodusId: string, value: boolean): void {
+  getDb().prepare('UPDATE works SET manual_deep = ? WHERE nodus_id = ?').run(value ? 1 : 0, nodusId);
+  recomputeDeepTrigger(nodusId);
+}
+
+export function setReadTag(nodusId: string, value: boolean): void {
+  getDb().prepare('UPDATE works SET read_tag = ? WHERE nodus_id = ?').run(value ? 1 : 0, nodusId);
+  recomputeDeepTrigger(nodusId);
+}
+
+/** Derive deep_trigger from the two triggers, and downgrade deep_status if no longer eligible. */
+export function recomputeDeepTrigger(nodusId: string): DeepTrigger {
+  const db = getDb();
+  const w = db.prepare('SELECT read_tag, manual_deep, deep_status FROM works WHERE nodus_id = ?').get(nodusId) as
+    | { read_tag: number; manual_deep: number; deep_status: string }
+    | undefined;
+  if (!w) return null;
+  let trigger: DeepTrigger = null;
+  if (w.read_tag && w.manual_deep) trigger = 'both';
+  else if (w.read_tag) trigger = 'tag';
+  else if (w.manual_deep) trigger = 'manual';
+  db.prepare('UPDATE works SET deep_trigger = ? WHERE nodus_id = ?').run(trigger, nodusId);
+  return trigger;
+}
+
+export function setLightResult(nodusId: string, status: string, hash: string | null, notes?: string | null): void {
+  getDb()
+    .prepare('UPDATE works SET light_status=?, light_at=?, light_hash=?, notes=COALESCE(?, notes) WHERE nodus_id=?')
+    .run(status, new Date().toISOString(), hash, notes ?? null, nodusId);
+}
+
+export function setDeepResult(
+  nodusId: string,
+  status: string,
+  hash: string | null,
+  sourceType: string | null,
+  notes?: string | null
+): void {
+  getDb()
+    .prepare(
+      'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=COALESCE(?, source_type), notes=COALESCE(?, notes) WHERE nodus_id=?'
+    )
+    .run(status, new Date().toISOString(), hash, sourceType ?? null, notes ?? null, nodusId);
+}
+
+export function setArchived(nodusId: string, value: boolean): void {
+  getDb().prepare('UPDATE works SET archived = ? WHERE nodus_id = ?').run(value ? 1 : 0, nodusId);
+}
+
+/** Works eligible for deep scan: tag OR manual, not archived. */
+export function deepEligible(): Work[] {
+  return getDb()
+    .prepare('SELECT * FROM works WHERE archived = 0 AND (read_tag = 1 OR manual_deep = 1)')
+    .all() as Work[];
+}
+
+export function pendingLight(): Work[] {
+  return getDb()
+    .prepare("SELECT * FROM works WHERE archived = 0 AND light_status = 'pending'")
+    .all() as Work[];
+}

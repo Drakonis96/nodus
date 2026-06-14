@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+}
+
+.light body {
+  @apply bg-neutral-50 text-neutral-900;
+}
+
+/* Subtle, minimalist scrollbars. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-700 rounded-full;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.card {
+  @apply bg-neutral-900/60 border border-neutral-800 rounded-xl;
+}
+.light .card {
+  @apply bg-white border-neutral-200;
+}
+
+.btn {
+  @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
+}
+.btn-primary {
+  @apply bg-indigo-600 hover:bg-indigo-500 text-white;
+}
+.btn-ghost {
+  @apply hover:bg-neutral-800 text-neutral-300;
+}
+.light .btn-ghost {
+  @apply hover:bg-neutral-100 text-neutral-700;
+}
+
+.input {
+  @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;
+}
+.light .input {
+  @apply bg-white border-neutral-300;
+}
