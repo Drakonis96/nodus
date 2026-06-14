@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AppSettings } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
+import { Icon } from '../components/ui';
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [saved, setSaved] = useState<string | null>(null);
@@ -165,7 +166,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             className="btn btn-ghost border border-neutral-700"
             onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
           >
-            Ver de nuevo
+            <Icon name="help" /> Ver de nuevo
           </button>
         </div>
       </Section>
@@ -173,13 +174,13 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       <Section title="Datos">
         <div className="flex gap-2">
           <button className="btn btn-ghost border border-neutral-700" onClick={() => window.nodus.exportData().then((r) => r && flash(`Exportado: ${r.path}`))}>
-            Exportar (.nodus)
+            <Icon name="download" /> Exportar (.nodus)
           </button>
           <button
             className="btn btn-ghost border border-neutral-700"
             onClick={() => window.nodus.importData().then((r) => flash(r.message))}
           >
-            Importar (.nodus)
+            <Icon name="upload" /> Importar (.nodus)
           </button>
         </div>
       </Section>
@@ -195,7 +196,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </p>
           </div>
           <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
-            Reinicializar…
+            <Icon name="trash" /> Reinicializar…
           </button>
         </div>
       </section>

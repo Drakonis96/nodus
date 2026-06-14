@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef } from '@shared/types';
-import { Badge } from '../components/ui';
+import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 
 function lightBadge(s: LightStatus) {
@@ -67,6 +67,11 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
     await load();
   };
 
+  const analyzeBoth = async (w: WorkView) => {
+    await window.nodus.analyzeBoth(w.nodus_id, scanModel);
+    await load();
+  };
+
   const analyzeSelectedThemes = async () => {
     for (const id of selected) {
       await window.nodus.rescan(id, 'light', scanModel);
@@ -79,6 +84,22 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
     await window.nodus.setManualDeepBulk(Array.from(selected), true, scanModel);
     setSelected(new Set());
     await load();
+  };
+
+  const analyzeSelectedBoth = async () => {
+    await window.nodus.analyzeBothBulk(Array.from(selected), scanModel);
+    setSelected(new Set());
+    await load();
+  };
+
+  const reassignThemes = async () => {
+    const ok = window.confirm(
+      'Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?'
+    );
+    if (!ok) return;
+    const n = await window.nodus.reassignThemes(scanModel);
+    await load();
+    window.alert(`Reasignación de temas en cola para ${n} obra(s). Verás el progreso en la cola.`);
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -103,15 +124,25 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
           <>
             <span className="text-xs text-neutral-500">{selected.size} seleccionadas</span>
             <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
-              Analizar temas
+              <Icon name="tag" /> Analizar temas
             </button>
-            <button className="btn btn-primary" onClick={analyzeSelectedIdeas}>
-              Analizar ideas
+            <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
+              <Icon name="bulb" /> Analizar ideas
+            </button>
+            <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
+              <Icon name="layers" /> Analizar ambos
             </button>
           </>
         )}
+        <button
+          className="btn btn-ghost border border-neutral-700"
+          title="Re-ejecuta el análisis ligero en toda la biblioteca para reconstruir los temas padre"
+          onClick={reassignThemes}
+        >
+          <Icon name="wand" /> Reasignar temas
+        </button>
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
-          Modal de Colecciones
+          <Icon name="folder" /> Colecciones
         </button>
       </div>
 
@@ -204,22 +235,31 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
                   </td>
                   <td className="p-2 whitespace-nowrap">
                     <button
-                      className="text-xs text-neutral-400 hover:text-white mr-2"
+                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
+                      title="Analizar temas (ligero)"
                       onClick={() => analyzeThemes(w)}
                     >
-                      temas
+                      <Icon name="tag" size={13} /> temas
                     </button>
                     <button
-                      className="text-xs text-neutral-400 hover:text-white mr-2"
+                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
+                      title="Analizar ideas (profundo)"
                       onClick={() => analyzeIdeas(w)}
                     >
-                      {w.deep_status === 'done' ? 'reanalizar ideas' : 'analizar ideas'}
+                      <Icon name="bulb" size={13} /> {w.deep_status === 'done' ? 'reanalizar' : 'ideas'}
                     </button>
                     <button
-                      className="text-xs text-indigo-400 hover:text-indigo-300"
+                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
+                      title="Analizar temas y luego ideas"
+                      onClick={() => analyzeBoth(w)}
+                    >
+                      <Icon name="layers" size={13} /> ambos
+                    </button>
+                    <button
+                      className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300"
                       onClick={() => window.nodus.openInZotero(w.zotero_key)}
                     >
-                      Zotero
+                      <Icon name="external" size={13} /> Zotero
                     </button>
                   </td>
                 </tr>

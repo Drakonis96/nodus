@@ -7,7 +7,12 @@ import type {
   EdgeDetail,
   ReadingPathEntry,
 } from '@shared/types';
-import { getEdgeDetail } from '../db/ideasRepo';
+import { getEdgeDetail, ideasWithEmbeddings, cosineSimilarity } from '../db/ideasRepo';
+
+// Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
+// cluster centroid). Conservative so unrelated ideas aren't pulled in.
+const THEME_SIM_THRESHOLD = 0.6;
+const MAX_INFERRED_THEMES_PER_IDEA = 2;
 
 interface IdeaRow {
   global_id: string;
@@ -153,9 +158,79 @@ export function buildIdeaGraph(): GraphData {
     }))
     .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
 
-  const edges = [...themeEdges, ...ideaEdges];
+  // Attach ideas that predate their parent theme. Themes only "contain" an idea when
+  // the same work carries both, so ideas analysed before a broad theme existed end up
+  // orphaned. Here we link an idea to a theme when it's semantically close to that
+  // theme's existing idea cluster (centroid of member embeddings), so the backlog of
+  // ideas gets folded under the right parent without re-scanning.
+  const inferredThemeEdges = buildSemanticThemeEdges(themeEdges, nodeIds);
+
+  const edges = [...themeEdges, ...inferredThemeEdges, ...ideaEdges];
 
   return { nodes, edges };
+}
+
+/** Mean of equal-length vectors; null if there are none. */
+function centroid(vectors: number[][]): number[] | null {
+  if (vectors.length === 0) return null;
+  const dim = vectors[0].length;
+  const sum = new Array<number>(dim).fill(0);
+  for (const v of vectors) for (let i = 0; i < dim; i++) sum[i] += v[i] ?? 0;
+  for (let i = 0; i < dim; i++) sum[i] /= vectors.length;
+  return sum;
+}
+
+/**
+ * Derive extra theme→idea "contains" edges by meaning. For each theme we average the
+ * embeddings of the ideas it already contains, then link any other embedded idea whose
+ * cosine to that centroid clears the threshold (capped per idea). Pairs that already
+ * have an explicit same-work edge are skipped. No-op when ideas lack embeddings.
+ */
+function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): GraphEdge[] {
+  const embByIdea = new Map<string, number[]>();
+  for (const i of ideasWithEmbeddings()) embByIdea.set(i.global_id, i.embedding);
+  if (embByIdea.size === 0) return [];
+
+  // Existing theme→idea membership and per-theme member ideas.
+  const connected = new Set<string>();
+  const membersByTheme = new Map<string, string[]>();
+  for (const e of themeEdges) {
+    connected.add(`${e.source}|${e.target}`);
+    const list = membersByTheme.get(e.source) ?? [];
+    list.push(e.target);
+    membersByTheme.set(e.source, list);
+  }
+
+  const centroids = new Map<string, number[]>();
+  for (const [themeId, members] of membersByTheme) {
+    const c = centroid(members.map((m) => embByIdea.get(m)).filter((v): v is number[] => !!v));
+    if (c) centroids.set(themeId, c);
+  }
+  if (centroids.size === 0) return [];
+
+  const out: GraphEdge[] = [];
+  for (const [ideaId, emb] of embByIdea) {
+    if (!nodeIds.has(ideaId)) continue;
+    const scored: { themeId: string; sim: number }[] = [];
+    for (const [themeId, c] of centroids) {
+      if (connected.has(`${themeId}|${ideaId}`)) continue;
+      if (!nodeIds.has(themeId)) continue;
+      const sim = cosineSimilarity(emb, c);
+      if (sim >= THEME_SIM_THRESHOLD) scored.push({ themeId, sim });
+    }
+    scored.sort((a, b) => b.sim - a.sim);
+    for (const { themeId, sim } of scored.slice(0, MAX_INFERRED_THEMES_PER_IDEA)) {
+      out.push({
+        id: `theme-sim:${themeId}:${ideaId}`,
+        source: themeId,
+        target: ideaId,
+        type: 'contains',
+        basis: 'inferred',
+        confidence: Number(sim.toFixed(3)),
+      });
+    }
+  }
+  return out;
 }
 
 /** Build the authors-lens graph from the derived author_relations table. */

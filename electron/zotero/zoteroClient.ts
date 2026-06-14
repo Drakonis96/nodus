@@ -1,4 +1,4 @@
-import type { ZoteroCollection, ZoteroItem } from '@shared/types';
+import type { ZoteroCollection, ZoteroItem, WorkMeta } from '@shared/types';
 
 // Read-only client for the Zotero 7 local API. Never writes to Zotero, never
 // touches zotero.sqlite directly.
@@ -150,6 +150,40 @@ export async function getItem(userId: string, itemKey: string): Promise<ZoteroIt
   const res = await zfetch(`${BASE}/users/${userId}/items/${itemKey}`);
   if (!res.ok) return null;
   return mapItem(await res.json());
+}
+
+function creatorName(c: any): string {
+  if (c.name) return c.name;
+  return [c.firstName, c.lastName].filter(Boolean).join(' ').trim() || c.lastName || '';
+}
+
+/** Full bibliographic metadata for one item — used by the graph detail panel. */
+export async function getItemMeta(userId: string, itemKey: string): Promise<WorkMeta | null> {
+  const res = await zfetch(`${BASE}/users/${userId}/items/${itemKey}`);
+  if (!res.ok) return null;
+  const d = ((await res.json()) as any).data ?? {};
+  const authors = (d.creators ?? [])
+    .filter((c: any) => !c.creatorType || c.creatorType === 'author' || c.creatorType === 'editor')
+    .map(creatorName)
+    .filter(Boolean);
+  const numPages = d.numPages ? parseInt(String(d.numPages), 10) : null;
+  return {
+    itemType: d.itemType ?? 'other',
+    authors,
+    year: yearFromDate(d.date),
+    container:
+      d.publicationTitle || d.bookTitle || d.proceedingsTitle || d.encyclopediaTitle || d.dictionaryTitle || d.seriesTitle || null,
+    publisher: d.publisher || null,
+    pages: d.pages || null,
+    numPages: Number.isFinite(numPages as number) ? (numPages as number) : null,
+    volume: d.volume || null,
+    issue: d.issue || null,
+    edition: d.edition || null,
+    place: d.place || null,
+    doi: d.DOI || null,
+    url: d.url || null,
+    language: d.language || null,
+  };
 }
 
 export interface ZoteroAttachment {

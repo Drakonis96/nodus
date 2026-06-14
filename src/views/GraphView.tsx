@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-import type { GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType } from '@shared/types';
-import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge } from '../components/ui';
+import type { GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta } from '@shared/types';
+import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
@@ -155,13 +155,18 @@ export function GraphView() {
               'background-color': (ele: any) =>
                 ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888',
               label: 'data(label)',
-              color: '#e5e5e5',
-              'font-size': 9,
+              color: '#ededed',
+              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 11 : 9),
+              'font-weight': (ele: any) => (ele.data('type') === 'theme' ? 700 : 400),
               'text-wrap': 'wrap',
-              'text-max-width': '84px',
+              'text-max-width': '90px',
               'text-valign': 'bottom',
               'text-margin-y': 4,
               'min-zoomed-font-size': 5,
+              // Dark outline keeps labels legible where they cross edges or other nodes.
+              'text-outline-width': 2.5,
+              'text-outline-color': '#0a0a0a',
+              'text-outline-opacity': 0.9,
               width: 'data(size)',
               height: 'data(size)',
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
@@ -209,8 +214,32 @@ export function GraphView() {
     const cy = cyRef.current;
     cy.elements().remove();
     cy.add(elements);
+    // Always frame the whole graph after laying out, so it neither overflows the
+    // viewport nor sits as a tiny clump regardless of how cose spread the nodes.
+    cy.one('layoutstop', () => cy.fit(undefined, 48));
     cy.layout(COSE_LAYOUT as any).run();
   }, [elements, lens]);
+
+  // Keep the graph framed when the window or panels resize.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const cy = cyRef.current;
+      if (!cy || cy.elements().length === 0) return;
+      cy.resize();
+      cy.fit(undefined, 48);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const zoomBy = (factor: number) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
+  };
+  const fitGraph = () => cyRef.current?.fit(undefined, 48);
 
   const setF = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
   const toggleIn = (key: 'nodeTypes' | 'edgeTypes' | 'authors', val: string) =>
@@ -289,6 +318,19 @@ export function GraphView() {
       <div className="flex-1 flex min-h-0 relative">
         <div ref={containerRef} className="flex-1 min-w-0" />
 
+        {/* Zoom / fit controls */}
+        <div className="absolute top-3 right-3 flex flex-col gap-1">
+          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Acercar" onClick={() => zoomBy(1.25)}>
+            <Icon name="plus" size={16} />
+          </button>
+          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Alejar" onClick={() => zoomBy(0.8)}>
+            <Icon name="minus" size={16} />
+          </button>
+          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Ajustar a la pantalla" onClick={fitGraph}>
+            <Icon name="fit" size={16} />
+          </button>
+        </div>
+
         {/* Legend */}
         <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90">
           {GRAPH_NODE_TYPES.map((t) => (
@@ -344,11 +386,15 @@ function DetailPanel({
               <div key={o.nodus_id} className="card p-2 mb-2">
                 <div className="flex justify-between items-start gap-2">
                   <div className="font-medium text-xs">{o.work.title}</div>
-                  <button className="text-indigo-400 text-xs" onClick={() => window.nodus.openInZotero(o.work.zotero_key)}>
-                    Zotero
+                  <button
+                    className="inline-flex items-center gap-1 text-indigo-400 text-xs shrink-0"
+                    onClick={() => window.nodus.openInZotero(o.work.zotero_key)}
+                  >
+                    <Icon name="external" size={12} /> Zotero
                   </button>
                 </div>
-                <div className="text-xs text-neutral-500">
+                <OccurrenceMeta work={o.work} />
+                <div className="text-[11px] text-neutral-500 mt-1">
                   {o.role} · conf {o.confidence.toFixed(2)}
                 </div>
                 <p className="text-xs text-neutral-400 mt-1">{o.development}</p>
@@ -386,6 +432,66 @@ function DetailPanel({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+const ITEM_TYPE_ES: Record<string, string> = {
+  journalArticle: 'artículo de revista',
+  magazineArticle: 'artículo de revista',
+  newspaperArticle: 'artículo de periódico',
+  bookSection: 'capítulo de libro',
+  book: 'libro',
+  conferencePaper: 'ponencia',
+  thesis: 'tesis',
+  report: 'informe',
+  preprint: 'preprint',
+  manuscript: 'manuscrito',
+  webpage: 'página web',
+  document: 'documento',
+  encyclopediaArticle: 'entrada de enciclopedia',
+};
+
+function itemTypeEs(t?: string | null): string | null {
+  return t ? ITEM_TYPE_ES[t] ?? t : null;
+}
+
+/** Bibliographic detail for one occurrence — authors, venue, pages — read live from Zotero. */
+function OccurrenceMeta({ work }: { work: WorkView }) {
+  const [meta, setMeta] = useState<WorkMeta | null>(null);
+  useEffect(() => {
+    let on = true;
+    void window.nodus.getWorkMeta(work.nodus_id).then((m) => {
+      if (on) setMeta(m);
+    });
+    return () => {
+      on = false;
+    };
+  }, [work.nodus_id]);
+
+  const authors = meta?.authors?.length ? meta.authors : work.authors;
+  const type = itemTypeEs(meta?.itemType ?? work.item_type);
+  const year = work.year ?? meta?.year ?? null;
+  const venue: string[] = [];
+  if (meta?.container) venue.push(meta.container);
+  if (meta?.publisher) venue.push(meta.publisher);
+  if (meta?.volume) venue.push(`vol. ${meta.volume}${meta.issue ? `(${meta.issue})` : ''}`);
+  else if (meta?.issue) venue.push(`n.º ${meta.issue}`);
+  if (meta?.pages) venue.push(`pp. ${meta.pages}`);
+  else if (meta?.numPages) venue.push(`${meta.numPages} pp.`);
+  if (meta?.place) venue.push(meta.place);
+
+  return (
+    <div className="text-[11px] text-neutral-500 mt-1 space-y-0.5">
+      {authors.length > 0 && (
+        <div className="text-neutral-400">
+          {authors.slice(0, 4).join('; ')}
+          {authors.length > 4 ? ' et al.' : ''}
+        </div>
+      )}
+      {(type || year) && <div>{[type, year].filter(Boolean).join(' · ')}</div>}
+      {venue.length > 0 && <div className="text-neutral-400">{venue.join(' · ')}</div>}
+      {meta?.doi && <div className="font-mono truncate">doi:{meta.doi}</div>}
     </div>
   );
 }

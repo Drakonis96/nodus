@@ -50,6 +50,27 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
   tx();
 }
 
+/**
+ * Add themes to a work without dropping the ones it already has. The light scan finds
+ * broad "research line" parents (e.g. "literatura de viajes") and the deep scan finds
+ * finer families; neither should clobber the other, or sibling ideas end up orphaned
+ * from their parent theme node. New labels are prioritised, then existing ones, deduped
+ * by normalized label and capped.
+ */
+export function unionWorkThemes(nodusId: string, newLabels: string[], cap = 8): void {
+  const existing = getWorkThemeLabels(nodusId);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const label of [...newLabels, ...existing]) {
+    if (!label || !label.trim()) continue;
+    const norm = normalizeThemeLabel(label);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(label);
+  }
+  if (out.length > 0) setWorkThemes(nodusId, out.slice(0, cap));
+}
+
 export function getWorkThemeLabels(nodusId: string): string[] {
   const rows = getDb()
     .prepare(

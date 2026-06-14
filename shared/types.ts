@@ -209,6 +209,24 @@ export interface ZoteroCollection {
   subCount: number; // number of subcollections (Zotero meta.numCollections)
 }
 
+/** Rich bibliographic metadata for one work, read live from Zotero for the detail panel. */
+export interface WorkMeta {
+  itemType: string;
+  authors: string[];
+  year: number | null;
+  container: string | null; // journal / book / proceedings the item appears in
+  publisher: string | null;
+  pages: string | null; // page range, e.g. "12-34"
+  numPages: number | null;
+  volume: string | null;
+  issue: string | null;
+  edition: string | null;
+  place: string | null;
+  doi: string | null;
+  url: string | null;
+  language: string | null;
+}
+
 export interface ZoteroItem {
   key: string;
   version: number;
@@ -354,7 +372,14 @@ export interface NodusApi {
   ingestZoteroItems(items: ZoteroItem[]): Promise<WorkView[]>;
   setManualDeep(nodusId: string, value: boolean, model?: ModelRef | null): Promise<void>;
   setManualDeepBulk(nodusIds: string[], value: boolean, model?: ModelRef | null): Promise<void>;
+  /** Analyse themes (light) and then ideas (deep) for one work, as two queue jobs. */
+  analyzeBoth(nodusId: string, model?: ModelRef | null): Promise<void>;
+  analyzeBothBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
+  /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
+  reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
+  /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
+  getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 

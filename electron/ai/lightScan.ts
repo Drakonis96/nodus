@@ -1,6 +1,6 @@
 import { AiError, completeJson } from './aiClient';
 import { PROMPT_LIGHT } from './prompts';
-import { setWorkThemes } from '../db/themesRepo';
+import { unionWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
 import type { Work, ModelRef } from '@shared/types';
 import crypto from 'node:crypto';
@@ -42,7 +42,8 @@ export async function runLightScan(work: Work, abstract: string | null, model?: 
       model
     );
     const labels = result.themes.map((t) => t.label).filter(Boolean);
-    setWorkThemes(work.nodus_id, labels);
+    // Union, not replace: keep any broad parent themes a previous scan already found.
+    unionWorkThemes(work.nodus_id, labels);
     setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
   } catch (e) {
     if (e instanceof AiError && e.config) throw e;

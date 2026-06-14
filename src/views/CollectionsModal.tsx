@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings, ModelRef } from '@shared/types';
-import { Badge } from '../components/ui';
+import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 
 const ITEM_TYPES = ['journalArticle', 'book', 'bookSection', 'conferencePaper', 'thesis', 'preprint', 'report'];
@@ -156,6 +156,13 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
     await refreshWorks();
   };
 
+  const analyzeFilteredBoth = async () => {
+    const nextWorks = await ensureWorks(filtered);
+    const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
+    if (ids.length) await window.nodus.analyzeBothBulk(ids, scanModel);
+    await refreshWorks();
+  };
+
   const deselectAllFiltered = async () => {
     const ids = filtered.map((it) => worksByKey.get(it.key)?.nodus_id).filter((x): x is string => !!x);
     if (ids.length) await window.nodus.setManualDeepBulk(ids, false);
@@ -239,15 +246,18 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
                   </button>
                 ))}
                 <div className="flex-1" />
-                <button className="btn btn-ghost text-xs" onClick={analyzeFiltered}>
-                  Analizar filtrados
+                <button className="btn btn-ghost text-xs" title="Analizar ideas de los ítems filtrados" onClick={analyzeFiltered}>
+                  <Icon name="bulb" size={14} /> Ideas
+                </button>
+                <button className="btn btn-primary text-xs" title="Analizar temas y luego ideas de los ítems filtrados" onClick={analyzeFilteredBoth}>
+                  <Icon name="layers" size={14} /> Ambos
                 </button>
                 <button className="btn btn-ghost text-xs" onClick={deselectAllFiltered}>
-                  Deseleccionar
+                  <Icon name="x" size={14} /> Deseleccionar
                 </button>
                 {selected && (
-                  <button className="btn btn-ghost text-xs" onClick={() => loadItems(selected, true)}>
-                    ↻
+                  <button className="btn btn-ghost text-xs" title="Recargar ítems" onClick={() => loadItems(selected, true)}>
+                    <Icon name="refresh" size={14} />
                   </button>
                 )}
               </div>

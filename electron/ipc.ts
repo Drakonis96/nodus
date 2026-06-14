@@ -102,6 +102,51 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       }
     }
   });
+  h('works:analyzeBoth', async (_e, nodusId: string, model?: ModelRef | null) => {
+    const w = works.getWork(nodusId);
+    if (!w) return;
+    // Themes first, then ideas — each as its own queue job so progress is visible.
+    works.setLightPending(nodusId);
+    scanQueue.enqueue(nodusId, w.title, 'light', model);
+    if (w.deep_status === 'done') ideas.purgeDeepData(nodusId);
+    works.setManualDeep(nodusId, true);
+    works.setDeepPending(nodusId);
+    scanQueue.enqueue(nodusId, w.title, 'deep', model);
+  });
+  h('works:analyzeBothBulk', async (_e, nodusIds: string[], model?: ModelRef | null) => {
+    for (const id of nodusIds) {
+      const w = works.getWork(id);
+      if (!w) continue;
+      works.setLightPending(id);
+      scanQueue.enqueue(id, w.title, 'light', model);
+      if (w.deep_status === 'done') ideas.purgeDeepData(id);
+      works.setManualDeep(id, true);
+      works.setDeepPending(id);
+      scanQueue.enqueue(id, w.title, 'deep', model);
+    }
+  });
+  h('works:reassignThemes', async (_e, model?: ModelRef | null) => {
+    // Re-run the cheap (title+abstract) theme scan for every work so older works pick
+    // up the broad parent themes that group their ideas in the graph. Themes union, so
+    // existing finer themes are kept.
+    const all = getDb().prepare('SELECT nodus_id, title FROM works WHERE archived = 0').all() as {
+      nodus_id: string;
+      title: string;
+    }[];
+    for (const w of all) {
+      works.setLightPending(w.nodus_id);
+      scanQueue.enqueue(w.nodus_id, w.title, 'light', model);
+    }
+    return all.length;
+  });
+  h('works:meta', async (_e, nodusId: string) => {
+    const w = works.getWork(nodusId);
+    if (!w) return null;
+    const { zoteroUserId } = getSettings();
+    const meta = await zotero.getItemMeta(zoteroUserId, w.zotero_key).catch(() => null);
+    if (!meta) return null;
+    return meta;
+  });
   h('works:rescan', async (_e, nodusId: string, kind: QueueKind, model?: ModelRef | null) => {
     const w = works.getWork(nodusId);
     if (!w) return;

@@ -9,6 +9,7 @@ import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { QueueBar } from './components/QueueBar';
 import { Tour } from './views/Tour';
+import { Icon } from './components/ui';
 
 type View = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
 
@@ -107,15 +108,15 @@ export function App() {
           </select>
         )}
         {!settings.defaultModel && (
-          <button data-tour="model" className="btn btn-ghost text-amber-400" onClick={() => setView('settings')}>
-            ⚠ Configura un modelo de IA
+          <button data-tour="model" className="btn btn-ghost text-amber-400 gap-1.5" onClick={() => setView('settings')}>
+            <Icon name="alert" /> Configura un modelo de IA
           </button>
         )}
-        <button data-tour="collections" className="btn btn-ghost" onClick={() => setCollectionsOpen(true)}>
-          Colecciones
+        <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
+          <Icon name="folder" /> Colecciones
         </button>
-        <button data-tour="sync" className="btn btn-primary" onClick={onSync} disabled={syncing}>
-          {syncing ? 'Actualizando…' : 'Actualizar'}
+        <button data-tour="sync" className="btn btn-primary gap-1.5" onClick={onSync} disabled={syncing}>
+          <Icon name="sync" className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Actualizando…' : 'Actualizar'}
         </button>
       </header>
 

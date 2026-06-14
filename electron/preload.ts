@@ -21,7 +21,11 @@ const api: NodusApi = {
   ingestZoteroItems: (items) => ipcRenderer.invoke('works:ingestZoteroItems', items),
   setManualDeep: (nodusId, value, model) => ipcRenderer.invoke('works:setManualDeep', nodusId, value, model),
   setManualDeepBulk: (nodusIds, value, model) => ipcRenderer.invoke('works:setManualDeepBulk', nodusIds, value, model),
+  analyzeBoth: (nodusId, model) => ipcRenderer.invoke('works:analyzeBoth', nodusId, model).then(() => undefined),
+  analyzeBothBulk: (nodusIds, model) => ipcRenderer.invoke('works:analyzeBothBulk', nodusIds, model).then(() => undefined),
+  reassignThemes: (model) => ipcRenderer.invoke('works:reassignThemes', model),
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
+  getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
