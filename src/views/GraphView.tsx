@@ -29,9 +29,9 @@ const COSE_LAYOUT = {
 } as const;
 
 /**
- * Deterministic radial layout: theme hubs sit in a regular polygon at the centre
- * (a circle for 1, a line for 2, a triangle for 3, a square for 4, …) and each
- * theme's ideas bloom outward in rings within its angular sector — a clean "tree".
+ * Deterministic radial layout: theme hubs sit in a compact regular polygon and
+ * each theme's ideas form a local spiral cluster just outside its hub. This keeps
+ * the graph readable without turning each theme into a rigid straight branch.
  * Ideas with no theme go on an outer ring. Returns a positions map, or null when
  * there are no theme nodes (caller falls back to a force layout).
  */
@@ -44,7 +44,7 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   const pos: Record<string, { x: number; y: number }> = {};
   const themeAngle: Record<string, number> = {};
 
-  const Rt = N === 1 ? 0 : 160 + N * 18; // central polygon radius grows with theme count
+  const Rt = N === 1 ? 0 : Math.min(460, 170 + N * 18);
   themeNodes.forEach((t, i) => {
     const ang = ((-90 + (i * 360) / N) * Math.PI) / 180;
     themeAngle[t.id()] = ang;
@@ -73,44 +73,40 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
     else orphans.push(n.id());
   });
 
-  const ringStep = 135;
-  const baseR = Rt + 165;
-  const minSpacing = 135;
-  const half = ((N === 1 ? 175 : (360 / N) / 2 * 0.82) * Math.PI) / 180;
-  let maxR = baseR;
+  const hashUnit = (s: string) => {
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return ((h >>> 0) % 10000) / 10000;
+  };
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const clusterStep = 54;
+  let maxR = Rt + 220;
 
   for (const [themeId, list] of Object.entries(groups)) {
     const A = themeAngle[themeId];
-    let placed = 0;
-    let ring = 0;
-    while (placed < list.length) {
-      const ringR = baseR + ring * ringStep;
-      const cap = Math.max(1, Math.floor((2 * half * ringR) / minSpacing));
-      const count = Math.min(cap, list.length - placed);
-      for (let m = 0; m < count; m++) {
-        const frac = count === 1 ? 0.5 : m / (count - 1);
-        const ang = A - half + frac * (2 * half);
-        pos[list[placed + m]] = { x: ringR * Math.cos(ang), y: ringR * Math.sin(ang) };
-      }
-      maxR = Math.max(maxR, ringR);
-      placed += count;
-      ring++;
+    const themePos = pos[themeId];
+    const clusterDistance = 190 + Math.min(190, Math.sqrt(list.length) * 34);
+    const cx = themePos.x + clusterDistance * Math.cos(A);
+    const cy0 = themePos.y + clusterDistance * Math.sin(A);
+    for (let m = 0; m < list.length; m++) {
+      const id = list[m];
+      const jitter = (hashUnit(id) - 0.5) * 0.7;
+      const r = list.length === 1 ? 0 : 42 + clusterStep * Math.sqrt(m + 1);
+      const ang = A + m * goldenAngle + jitter;
+      pos[id] = { x: cx + r * Math.cos(ang), y: cy0 + r * Math.sin(ang) };
+      maxR = Math.max(maxR, Math.hypot(pos[id].x, pos[id].y));
     }
   }
 
   if (orphans.length) {
-    let placed = 0;
-    let ring = 0;
-    while (placed < orphans.length) {
-      const ringR = maxR + ringStep * (ring + 1);
-      const cap = Math.max(1, Math.floor((2 * Math.PI * ringR) / minSpacing));
-      const count = Math.min(cap, orphans.length - placed);
-      for (let m = 0; m < count; m++) {
-        const ang = (m / count) * 2 * Math.PI;
-        pos[orphans[placed + m]] = { x: ringR * Math.cos(ang), y: ringR * Math.sin(ang) };
-      }
-      placed += count;
-      ring++;
+    const startR = maxR + 190;
+    for (let m = 0; m < orphans.length; m++) {
+      const r = startR + 34 * Math.sqrt(m);
+      const ang = m * goldenAngle;
+      pos[orphans[m]] = { x: r * Math.cos(ang), y: r * Math.sin(ang) };
     }
   }
 
@@ -164,6 +160,7 @@ export function GraphView() {
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
+  const [themesLoaded, setThemesLoaded] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
   const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
@@ -174,7 +171,10 @@ export function GraphView() {
 
   const reload = useCallback(() => {
     void window.nodus.getGraph(lens).then(setData);
-    void window.nodus.getThemes().then((t) => setThemes(t.map((x) => x.label)));
+    void window.nodus.getThemes().then((t) => {
+      setThemes(t.map((x) => x.label));
+      setThemesLoaded(true);
+    });
   }, [lens]);
 
   useEffect(() => {
@@ -403,6 +403,11 @@ export function GraphView() {
       const arr = f[key];
       return { ...f, [key]: arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val] };
     });
+
+  useEffect(() => {
+    if (!themesLoaded) return;
+    setFilters((f) => (f.theme && !themes.includes(f.theme) ? { ...f, theme: '' } : f));
+  }, [themes, themesLoaded]);
 
   return (
     <div className="h-full flex flex-col min-h-0">

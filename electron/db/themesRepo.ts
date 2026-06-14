@@ -2,12 +2,21 @@ import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import type { Theme } from '@shared/types';
 
+export const MIN_GRAPH_THEME_WORKS = 2;
+export const MAX_GRAPH_THEMES = 24;
+
 const THEME_ALIASES: Record<string, string> = {
   'francoist spain': 'franquismo',
   gender: 'género',
+  'gender studies': 'género',
+  'estudios de género': 'género',
   representation: 'representación',
   spain: 'españa',
   'travel writing': 'escritura de viajes',
+  'relatos de viaje': 'literatura de viajes',
+  'relato de viaje': 'literatura de viajes',
+  'guías de viaje': 'literatura de viajes',
+  viajes: 'literatura de viajes',
   'women travellers': 'viajeras',
   ethics: 'ética',
   'ethics of travel': 'ética del viaje',
@@ -15,11 +24,19 @@ const THEME_ALIASES: Record<string, string> = {
   'rural andalusia': 'andalucía rural',
   'national identity': 'identidad nacional',
   tourism: 'turismo',
+  'turismo y viajes': 'turismo',
+  'viajes y turismo': 'turismo',
   colonialism: 'colonialismo',
+  'historia contemporánea de españa': 'historia de españa',
+  'historia social de españa': 'historia de españa',
 };
 
 export function normalizeThemeLabel(label: string): string {
-  const norm = label.trim().toLowerCase().replace(/\s+/g, ' ');
+  const norm = label
+    .trim()
+    .toLowerCase()
+    .replace(/[“”"'.:;]+/g, '')
+    .replace(/\s+/g, ' ');
   return THEME_ALIASES[norm] ?? norm;
 }
 
@@ -46,16 +63,15 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
       const theme_id = getOrCreateTheme(normalizeThemeLabel(label));
       db.prepare('INSERT OR IGNORE INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run(nodusId, theme_id);
     }
+    db.prepare('DELETE FROM themes WHERE theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)').run();
   });
   tx();
 }
 
 /**
- * Add themes to a work without dropping the ones it already has. The light scan finds
- * broad "research line" parents (e.g. "literatura de viajes") and the deep scan finds
- * finer families; neither should clobber the other, or sibling ideas end up orphaned
- * from their parent theme node. New labels are prioritised, then existing ones, deduped
- * by normalized label and capped.
+ * Add a small number of deep-scan families without dropping the broad light-scan
+ * parents already assigned to the work. New labels are prioritised, then existing
+ * ones, deduped by normalized label and capped.
  */
 export function unionWorkThemes(nodusId: string, newLabels: string[], cap = 8): void {
   const existing = getWorkThemeLabels(nodusId);
@@ -82,4 +98,46 @@ export function getWorkThemeLabels(nodusId: string): string[] {
 
 export function listThemes(): Theme[] {
   return getDb().prepare('SELECT * FROM themes ORDER BY label').all() as Theme[];
+}
+
+export interface GraphTheme extends Theme {
+  work_count: number;
+  idea_count: number;
+}
+
+/**
+ * Themes used as visible graph hubs. Once the idea layer exists, only themes that
+ * actually group ideas are promoted to graph nodes; before that, show supported
+ * light-scan themes so a new library still has a coarse map.
+ */
+export function listGraphThemes(): GraphTheme[] {
+  const db = getDb();
+  const hasIdeas = ((db.prepare('SELECT COUNT(*) as c FROM ideas').get() as { c: number }).c ?? 0) > 0;
+  const supportClause = hasIdeas ? 'idea_count > 0' : 'work_count >= @minWorks';
+  const stmt = db.prepare(
+    `
+      SELECT * FROM (
+        SELECT
+          t.theme_id,
+          t.label,
+          t.created_at,
+          COUNT(DISTINCT CASE WHEN w.archived = 0 THEN wt.nodus_id END) AS work_count,
+          COUNT(DISTINCT CASE WHEN w.archived = 0 THEN io.global_id END) AS idea_count
+        FROM themes t
+        LEFT JOIN work_themes wt ON wt.theme_id = t.theme_id
+        LEFT JOIN works w ON w.nodus_id = wt.nodus_id
+        LEFT JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id
+        GROUP BY t.theme_id
+      )
+      WHERE ${supportClause}
+      ORDER BY idea_count DESC, work_count DESC, label ASC
+      LIMIT @maxThemes
+      `
+  );
+  const params = hasIdeas
+    ? { maxThemes: MAX_GRAPH_THEMES }
+    : { minWorks: MIN_GRAPH_THEME_WORKS, maxThemes: MAX_GRAPH_THEMES };
+  const rows = stmt.all(params) as GraphTheme[];
+
+  return rows;
 }

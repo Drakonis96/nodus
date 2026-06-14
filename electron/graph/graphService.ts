@@ -8,11 +8,12 @@ import type {
   ReadingPathEntry,
 } from '@shared/types';
 import { getEdgeDetail, ideasWithEmbeddings, cosineSimilarity } from '../db/ideasRepo';
+import { listGraphThemes } from '../db/themesRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
 // cluster centroid). Conservative so unrelated ideas aren't pulled in.
-const THEME_SIM_THRESHOLD = 0.6;
-const MAX_INFERRED_THEMES_PER_IDEA = 2;
+const THEME_SIM_THRESHOLD = 0.72;
+const MAX_INFERRED_THEMES_PER_IDEA = 1;
 
 interface IdeaRow {
   global_id: string;
@@ -21,16 +22,11 @@ interface IdeaRow {
   statement: string;
 }
 
-interface ThemeRow {
-  theme_id: string;
-  label: string;
-}
-
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export function buildIdeaGraph(): GraphData {
   const db = getDb();
   const ideas = db.prepare('SELECT global_id, type, label, statement FROM ideas').all() as IdeaRow[];
-  const themeRows = db.prepare('SELECT theme_id, label FROM themes ORDER BY label').all() as ThemeRow[];
+  const themeRows = listGraphThemes();
 
   const ideaNodes: GraphNode[] = ideas.map((idea) => {
     const works = db
@@ -108,7 +104,7 @@ export function buildIdeaGraph(): GraphData {
       label: theme.label.toUpperCase(),
       type: 'theme',
       statement: `Familia temática: ${theme.label}`,
-      workCount: works.length,
+      workCount: theme.work_count,
       read,
       themes: [theme.label],
       years,

@@ -127,8 +127,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   });
   h('works:reassignThemes', async (_e, model?: ModelRef | null) => {
     // Re-run the cheap (title+abstract) theme scan for every work so older works pick
-    // up the broad parent themes that group their ideas in the graph. Themes union, so
-    // existing finer themes are kept.
+    // up the broad parent themes that group their ideas in the graph. Each light scan
+    // replaces that work's broad themes so stale one-off labels disappear over time.
     const all = getDb().prepare('SELECT nodus_id, title FROM works WHERE archived = 0').all() as {
       nodus_id: string;
       title: string;
@@ -192,7 +192,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   );
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
-  h('graph:themes', async () => themes.listThemes());
+  h('graph:themes', async () => themes.listGraphThemes());
 
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());

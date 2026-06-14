@@ -177,14 +177,14 @@ export async function runDeepScan(
   purgeDeepData(work.nodus_id);
 
   const merged = mergeByLabel(results);
-  // Union (not replace) so the broad "research line" parent the light scan found
-  // (e.g. "literatura de viajes") survives alongside the deep scan's finer families;
-  // replacing would orphan sibling ideas from their parent theme node.
+  // Keep only a small number of well-supported deep families. The prompt runs per
+  // chunk, so accepting every family it mentions turns sections into graph hubs.
   const deepThemeLabels = Array.from(merged.themes.values())
+    .filter((t) => t.confidence >= 0.65)
     .sort((a, b) => themeScore(b) - themeScore(a))
-    .slice(0, 6)
+    .slice(0, 2)
     .map((t) => t.label);
-  unionWorkThemes(work.nodus_id, deepThemeLabels);
+  unionWorkThemes(work.nodus_id, deepThemeLabels, 4);
 
   // Resolve each merged idea against the global graph (Prompt 2 / fusion).
   const labelToGlobal = new Map<string, string>();

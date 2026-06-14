@@ -47,19 +47,18 @@ Separa siempre "claim" de "finding": un claim puede estar apoyado por varios
 findings y refutado por otros.
 
 ═══ NODOS TEMÁTICOS / FAMILIAS ("theme_nodes") ═══
-Además de ideas concretas, extrae OBLIGATORIAMENTE al menos 1 (idealmente 1-2) tema
-padre AMPLIO: la "línea de investigación" o gran conversación del campo a la que
-pertenece la obra y bajo la cual cuelgan todas sus ideas concretas. Son nodos de
-familia, no ideas: etiquetas muy generales, en español, reutilizables entre obras y
-aptas para aparecer grandes en el grafo (p. ej. "turismo", "franquismo",
-"literatura de viajes", "memoria histórica", "política cultural"). Si una obra trata
-de "turismo en el franquismo", incluye al menos "turismo" y, si está sustentado,
-"franquismo"; si trata de relatos o literatura de viajes, incluye "literatura de
-viajes". Prefiere la familia AMPLIA y compartible antes que una específica del
-artículo: varias obras de la misma línea deben coincidir en este tema padre para que
-sus ideas queden agrupadas bajo un mismo nodo mayor. Nunca devuelvas "theme_nodes"
-vacío salvo que el texto sea ilegible o no académico. No inventes familias que el
-texto no sostenga.
+Además de ideas concretas, puedes extraer 0-2 temas padre AMPLIOS: la "línea de
+investigación" o gran conversación del campo a la que pertenece la obra y bajo la
+cual cuelgan sus ideas concretas. Son nodos de familia, no ideas: etiquetas muy
+generales, en español, reutilizables entre obras y aptas para aparecer grandes en el
+grafo (p. ej. "turismo", "franquismo", "literatura de viajes", "memoria histórica",
+"política cultural"). Si procesas un fragmento, NO crees una familia nueva para
+cada sección: devuelve solo familias amplias que organicen la obra completa y estén
+sustentadas por el fragmento. Ante la duda, repite una familia amplia obvia o deja
+"theme_nodes" vacío. Prefiere la familia AMPLIA y compartible antes que una
+específica del artículo: varias obras de la misma línea deben coincidir en este tema
+padre para que sus ideas queden agrupadas bajo un mismo nodo mayor. No inventes
+familias que el texto no sostenga.
 
 Para cada tema:
 - "id": identificador local.
