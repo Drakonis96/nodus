@@ -72,8 +72,14 @@
         "releaseType": "release"
       }
     ],
+    "afterPack": "build/afterPack.cjs",
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
       "category": "public.app-category.education",
       "identity": null
     },
