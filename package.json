@@ -64,12 +64,25 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "drakonis96",
+        "repo": "nodus",
+        "releaseType": "release"
+      }
+    ],
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.education"
+      "category": "public.app-category.education",
+      "identity": null
     },
     "win": {
       "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

@@ -1,0 +1,48 @@
+name: Release
+
+# Builds the macOS .dmg and Windows .exe (NSIS) and attaches them to the GitHub
+# Release for the pushed tag. Native modules (better-sqlite3, @napi-rs/canvas) are
+# compiled on each OS runner — this is why a dmg cannot be built on Linux.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: '--mac'
+          - os: windows-latest
+            platform: '--win'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer + main
+        run: npm run build
+
+      - name: Build and publish installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No signing certificates in CI — produce unsigned artifacts.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: npx electron-builder ${{ matrix.platform }} --publish always
