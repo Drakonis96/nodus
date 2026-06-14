@@ -28,6 +28,95 @@ const COSE_LAYOUT = {
   initialTemp: 220,
 } as const;
 
+/**
+ * Deterministic radial layout: theme hubs sit in a regular polygon at the centre
+ * (a circle for 1, a line for 2, a triangle for 3, a square for 4, …) and each
+ * theme's ideas bloom outward in rings within its angular sector — a clean "tree".
+ * Ideas with no theme go on an outer ring. Returns a positions map, or null when
+ * there are no theme nodes (caller falls back to a force layout).
+ */
+function computeRadialPositions(cy: Core): Record<string, { x: number; y: number }> | null {
+  const themeNodes = cy.nodes().filter((n) => n.data('type') === 'theme');
+  const N = themeNodes.length;
+  if (N === 0) return null;
+
+  const ideaNodes = cy.nodes().filter((n) => n.data('type') !== 'theme');
+  const pos: Record<string, { x: number; y: number }> = {};
+  const themeAngle: Record<string, number> = {};
+
+  const Rt = N === 1 ? 0 : 160 + N * 18; // central polygon radius grows with theme count
+  themeNodes.forEach((t, i) => {
+    const ang = ((-90 + (i * 360) / N) * Math.PI) / 180;
+    themeAngle[t.id()] = ang;
+    pos[t.id()] = { x: Rt * Math.cos(ang), y: Rt * Math.sin(ang) };
+  });
+
+  // Which themes contain each idea (theme→idea "contains" edges).
+  const ideaThemes: Record<string, string[]> = {};
+  cy.edges().forEach((e) => {
+    if (e.data('type') !== 'contains') return;
+    const src = cy.getElementById(e.data('source'));
+    const tgt = cy.getElementById(e.data('target'));
+    if (src.nonempty() && src.data('type') === 'theme' && tgt.nonempty() && tgt.data('type') !== 'theme') {
+      (ideaThemes[tgt.id()] ??= []).push(src.id());
+    }
+  });
+
+  const groups: Record<string, string[]> = {};
+  themeNodes.forEach((t) => {
+    groups[t.id()] = [];
+  });
+  const orphans: string[] = [];
+  ideaNodes.forEach((n) => {
+    const ts = (ideaThemes[n.id()] || []).filter((id) => themeAngle[id] !== undefined);
+    if (ts.length) groups[ts[0]].push(n.id());
+    else orphans.push(n.id());
+  });
+
+  const ringStep = 135;
+  const baseR = Rt + 165;
+  const minSpacing = 135;
+  const half = ((N === 1 ? 175 : (360 / N) / 2 * 0.82) * Math.PI) / 180;
+  let maxR = baseR;
+
+  for (const [themeId, list] of Object.entries(groups)) {
+    const A = themeAngle[themeId];
+    let placed = 0;
+    let ring = 0;
+    while (placed < list.length) {
+      const ringR = baseR + ring * ringStep;
+      const cap = Math.max(1, Math.floor((2 * half * ringR) / minSpacing));
+      const count = Math.min(cap, list.length - placed);
+      for (let m = 0; m < count; m++) {
+        const frac = count === 1 ? 0.5 : m / (count - 1);
+        const ang = A - half + frac * (2 * half);
+        pos[list[placed + m]] = { x: ringR * Math.cos(ang), y: ringR * Math.sin(ang) };
+      }
+      maxR = Math.max(maxR, ringR);
+      placed += count;
+      ring++;
+    }
+  }
+
+  if (orphans.length) {
+    let placed = 0;
+    let ring = 0;
+    while (placed < orphans.length) {
+      const ringR = maxR + ringStep * (ring + 1);
+      const cap = Math.max(1, Math.floor((2 * Math.PI * ringR) / minSpacing));
+      const count = Math.min(cap, orphans.length - placed);
+      for (let m = 0; m < count; m++) {
+        const ang = (m / count) * 2 * Math.PI;
+        pos[orphans[placed + m]] = { x: ringR * Math.cos(ang), y: ringR * Math.sin(ang) };
+      }
+      placed += count;
+      ring++;
+    }
+  }
+
+  return pos;
+}
+
 interface Filters {
   search: string;
   nodeTypes: string[];
@@ -71,6 +160,7 @@ function loadFilters(): Filters {
 export function GraphView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const clearFocusRef = useRef<() => void>(() => {});
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
@@ -156,10 +246,10 @@ export function GraphView() {
                 ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888',
               label: 'data(label)',
               color: '#ededed',
-              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 11 : 9),
+              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 12 : 9),
               'font-weight': (ele: any) => (ele.data('type') === 'theme' ? 700 : 400),
               'text-wrap': 'wrap',
-              'text-max-width': '90px',
+              'text-max-width': '92px',
               'text-valign': 'bottom',
               'text-margin-y': 4,
               'min-zoomed-font-size': 5,
@@ -172,7 +262,15 @@ export function GraphView() {
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
               'border-color': '#737373',
               'border-style': 'dashed',
-            },
+              'transition-property': 'opacity, border-width, border-color',
+              'transition-duration': '0.2s',
+              'transition-timing-function': 'ease-in-out',
+            } as any,
+          },
+          // Theme hubs get a soft solid halo so the centre reads as the backbone.
+          {
+            selector: 'node[type="theme"]',
+            style: { 'border-width': 3, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.5 } as any,
           },
           {
             selector: 'edge',
@@ -184,31 +282,74 @@ export function GraphView() {
               'target-arrow-shape': 'triangle',
               'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' ? '#ef4444' : '#525252'),
               'curve-style': 'bezier',
-            },
+              'transition-property': 'opacity, line-color, width',
+              'transition-duration': '0.2s',
+              'transition-timing-function': 'ease-in-out',
+            } as any,
           },
-          { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid' } },
+          // Theme→idea "contains" links are structural branches: faint, solid, no arrow.
+          {
+            selector: 'edge[type="contains"]',
+            style: {
+              'line-style': 'solid',
+              'line-color': '#3f3f46',
+              width: 1.2,
+              opacity: 0.22,
+              'target-arrow-shape': 'none',
+            } as any,
+          },
+          { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
+          // Focus mode: everything not in the tapped node's neighbourhood fades back.
+          { selector: '.faded', style: { opacity: 0.08, 'text-opacity': 0.05 } as any },
+          { selector: 'node.spotlight', style: { 'border-width': 4, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
         ],
         layout: COSE_LAYOUT as any,
       });
 
+      const focusOn = (eles: any) => {
+        const cy = cyRef.current!;
+        const keep = eles.closedNeighborhood ? eles.closedNeighborhood() : eles.connectedNodes().add(eles);
+        cy.batch(() => {
+          cy.elements().addClass('faded');
+          keep.removeClass('faded');
+          cy.nodes().removeClass('spotlight');
+          eles.nodes && eles.nodes().addClass('spotlight');
+        });
+      };
+      const clearFocus = () => {
+        cyRef.current?.batch(() => {
+          cyRef.current!.elements().removeClass('faded');
+          cyRef.current!.nodes().removeClass('spotlight');
+        });
+      };
+      clearFocusRef.current = clearFocus;
+
       cyRef.current.on('tap', 'node', async (evt) => {
-        setIdeaDetail(null);
+        const node = evt.target;
+        focusOn(node);
         setEdgeDetail(null);
-        if (lens === 'ideas' && !evt.target.id().startsWith('theme:')) {
-          setIdeaDetail(await window.nodus.getIdeaDetail(evt.target.id()));
+        if (lens === 'ideas' && !node.id().startsWith('theme:')) {
+          setIdeaDetail(await window.nodus.getIdeaDetail(node.id()));
+        } else {
+          setIdeaDetail(null);
         }
       });
-      cyRef.current.on('dbltap', 'node', (evt) => {
-        const neighborhood = evt.target.closedNeighborhood();
-        cyRef.current?.elements().not(neighborhood).style('opacity', 0.08);
-        neighborhood.style('opacity', 1);
-      });
       cyRef.current.on('tap', 'edge', async (evt) => {
+        const edge = evt.target;
+        cyRef.current?.batch(() => {
+          cyRef.current!.elements().addClass('faded');
+          edge.connectedNodes().add(edge).removeClass('faded');
+          cyRef.current!.nodes().removeClass('spotlight');
+        });
         setIdeaDetail(null);
-        setEdgeDetail(await window.nodus.getEdgeDetail(evt.target.id()));
+        setEdgeDetail(await window.nodus.getEdgeDetail(edge.id()));
       });
       cyRef.current.on('tap', (evt) => {
-        if (evt.target === cyRef.current) cyRef.current?.elements().style('opacity', '');
+        if (evt.target === cyRef.current) {
+          clearFocus();
+          setIdeaDetail(null);
+          setEdgeDetail(null);
+        }
       });
     }
     const cy = cyRef.current;
@@ -216,8 +357,23 @@ export function GraphView() {
     cy.add(elements);
     // Always frame the whole graph after laying out, so it neither overflows the
     // viewport nor sits as a tiny clump regardless of how cose spread the nodes.
-    cy.one('layoutstop', () => cy.fit(undefined, 48));
-    cy.layout(COSE_LAYOUT as any).run();
+    cy.one('layoutstop', () => cy.fit(undefined, 60));
+    // Ideas lens with theme hubs → deterministic radial tree (themes centred in a
+    // polygon, ideas blooming outward). Otherwise (authors, or no themes) → force.
+    const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
+    if (positions) {
+      cy.layout({
+        name: 'preset',
+        positions,
+        fit: true,
+        padding: 60,
+        animate: true,
+        animationDuration: 600,
+        animationEasing: 'ease-in-out-cubic',
+      } as any).run();
+    } else {
+      cy.layout(COSE_LAYOUT as any).run();
+    }
   }, [elements, lens]);
 
   // Keep the graph framed when the window or panels resize.
@@ -351,6 +507,7 @@ export function GraphView() {
             onClose={() => {
               setIdeaDetail(null);
               setEdgeDetail(null);
+              clearFocusRef.current();
             }}
           />
         )}
