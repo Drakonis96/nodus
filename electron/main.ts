@@ -1,10 +1,14 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { getDb, closeDb } from './db/database';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+
+const require = createRequire(__filename);
+const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
 
 // Vite injects these env vars for the dev server / built output locations.
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -17,6 +21,11 @@ if (process.env.NODUS_USERDATA) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let updateCheckTimer: NodeJS.Timeout | null = null;
+let installingUpdate = false;
+
+const UPDATE_CHECK_DELAY_MS = 10_000;
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -45,6 +54,44 @@ function createWindow(): void {
   });
 }
 
+function checkForUpdates(reason: string): void {
+  if (!app.isPackaged || process.env.NODUS_DISABLE_AUTO_UPDATE === '1') return;
+  console.log(`[updates] checking (${reason})`);
+  void autoUpdater.checkForUpdates().catch((e) => {
+    console.error(`[updates] check failed: ${e instanceof Error ? e.message : String(e)}`);
+  });
+}
+
+function setupAutoUpdates(): void {
+  if (!app.isPackaged || process.env.NODUS_DISABLE_AUTO_UPDATE === '1') {
+    console.log('[updates] disabled outside packaged app');
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowPrerelease = false;
+
+  autoUpdater.on('checking-for-update', () => console.log('[updates] checking for update'));
+  autoUpdater.on('update-available', (info) => console.log(`[updates] update available: ${info.version}`));
+  autoUpdater.on('update-not-available', (info) => console.log(`[updates] up to date: ${info.version}`));
+  autoUpdater.on('download-progress', (p) =>
+    console.log(`[updates] downloading ${Math.round(p.percent)}% (${Math.round(p.bytesPerSecond / 1024)} KiB/s)`)
+  );
+  autoUpdater.on('update-downloaded', (info) => {
+    if (installingUpdate) return;
+    installingUpdate = true;
+    console.log(`[updates] downloaded ${info.version}; installing and restarting`);
+    setTimeout(() => autoUpdater.quitAndInstall(false, true), 1500);
+  });
+  autoUpdater.on('error', (e) => {
+    console.error(`[updates] error: ${e instanceof Error ? e.message : String(e)}`);
+  });
+
+  setTimeout(() => checkForUpdates('startup'), UPDATE_CHECK_DELAY_MS);
+  updateCheckTimer = setInterval(() => checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
+}
+
 app.whenReady().then(() => {
   getDb(); // open + migrate before anything touches data
   registerIpc(() => mainWindow);
@@ -55,6 +102,7 @@ app.whenReady().then(() => {
   if (settings.autoResumeQueue) scanQueue.resumePending();
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
+  setupAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -70,6 +118,14 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
+  stopRealtimeSync();
+  closeDb();
+});
+
+const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update', listener: () => void): typeof app };
+updateAwareApp.on('before-quit-for-update', () => {
+  if (updateCheckTimer) clearInterval(updateCheckTimer);
   stopRealtimeSync();
   closeDb();
 });

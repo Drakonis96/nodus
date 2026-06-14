@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type { SourceType, PdfAnalysis } from '@shared/types';
+import type { DeepContextMode, SourceType, PdfAnalysis } from '@shared/types';
 import { itemChildren, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
 import { analyzePdf } from './pdfAnalyzer';
 import { ocrPdfPages } from './ocr';
+import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
+import { perfLog, startPerf, type PerfContext } from '../perf';
 
 export interface ExtractedDoc {
   text: string;
@@ -28,22 +30,86 @@ export interface OcrOptions {
 }
 
 const MIN_CHARS_TEXT_PAGE = 50;
-const CHUNK_WORDS = 1800;
-const OVERLAP_WORDS = 100;
+const STANDARD_CHUNK_WORDS = 1800;
+const STANDARD_OVERLAP_WORDS = 100;
+const LONG_CHUNK_WORDS = 30000;
+
+export interface ChunkOptions {
+  mode?: DeepContextMode;
+  standardChunkWords?: number;
+  longChunkWords?: number;
+}
+
+export interface ChunkPlan {
+  chunks: string[];
+  mode: DeepContextMode;
+  wordCount: number;
+  chunkWords: number;
+  overlapWords: number;
+  maxIdeasPerChunk: number;
+  maxRelationsPerChunk: number;
+  maxGapsPerChunk: number;
+}
+
+function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function chunkConfig(opts: ChunkOptions = {}): {
+  mode: DeepContextMode;
+  chunkWords: number;
+  overlapWords: number;
+  maxIdeasPerChunk: number;
+  maxRelationsPerChunk: number;
+  maxGapsPerChunk: number;
+} {
+  const mode = opts.mode === 'long' ? 'long' : 'standard';
+  if (mode === 'long') {
+    const chunkWords = clampInt(opts.longChunkWords, LONG_CHUNK_WORDS, 5000, 50000);
+    const overlapWords = clampInt(Math.round(chunkWords * 0.02), 600, 200, 1000);
+    const maxIdeasPerChunk = clampInt(Math.ceil(chunkWords / 4000), 8, 6, 16);
+    return {
+      mode,
+      chunkWords,
+      overlapWords,
+      maxIdeasPerChunk,
+      maxRelationsPerChunk: Math.max(8, Math.round(maxIdeasPerChunk * 1.5)),
+      maxGapsPerChunk: Math.min(4, Math.max(2, Math.ceil(maxIdeasPerChunk / 4))),
+    };
+  }
+  const chunkWords = clampInt(opts.standardChunkWords, STANDARD_CHUNK_WORDS, 500, 5000);
+  return {
+    mode,
+    chunkWords,
+    overlapWords: STANDARD_OVERLAP_WORDS,
+    maxIdeasPerChunk: 4,
+    maxRelationsPerChunk: 5,
+    maxGapsPerChunk: 2,
+  };
+}
 
 /** Split long text into bounded chunks with a small overlap for reliable LLM JSON output. */
-export function chunkText(text: string): string[] {
+export function chunkText(text: string, opts: ChunkOptions = {}): string[] {
+  return planTextChunks(text, opts).chunks;
+}
+
+export function planTextChunks(text: string, opts: ChunkOptions = {}): ChunkPlan {
+  const config = chunkConfig(opts);
   const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= CHUNK_WORDS) return [text];
+  if (words.length <= config.chunkWords) {
+    return { ...config, chunks: [text], wordCount: words.length };
+  }
   const chunks: string[] = [];
   let start = 0;
   while (start < words.length) {
-    const end = Math.min(start + CHUNK_WORDS, words.length);
+    const end = Math.min(start + config.chunkWords, words.length);
     chunks.push(words.slice(start, end).join(' '));
     if (end >= words.length) break;
-    start = end - OVERLAP_WORDS;
+    start = end - config.overlapWords;
   }
-  return chunks;
+  return { ...config, chunks, wordCount: words.length };
 }
 
 // ── PDF: streaming extraction with page markers + optional OCR ────────────────
@@ -55,12 +121,15 @@ export function chunkText(text: string): string[] {
  */
 export async function extractPdfStreaming(
   filePath: string,
-  opts: { ocr: OcrOptions; onProgress?: OnExtractProgress; analysis?: PdfAnalysis }
+  opts: { ocr: OcrOptions; onProgress?: OnExtractProgress; analysis?: PdfAnalysis; perf?: PerfContext }
 ): Promise<ExtractedDoc> {
+  const analysisDone = opts.analysis ? null : startPerf('PDF analysis', opts.perf, { file: path.basename(filePath) });
   const analysis = opts.analysis ?? (await analyzePdf(filePath));
+  analysisDone?.({ strategy: analysis.strategy, pages: analysis.pageCount });
 
   // Fast exit: a scanned PDF with OCR disabled — don't read hundreds of blank pages.
   if (analysis.strategy === 'scanned' && !opts.ocr.enabled) {
+    perfLog('OCR', 0, opts.perf, { status: 'disabled', pages: analysis.pageCount });
     return {
       text: '',
       sourceType: 'pdf',
@@ -72,6 +141,7 @@ export async function extractPdfStreaming(
     return { text: '', sourceType: 'pdf', analysis, notes: 'PDF sin páginas legibles.' };
   }
 
+  const extractionDone = startPerf('PDF extraction', opts.perf, { file: path.basename(filePath), pages: analysis.pageCount });
   const pdf = await openPdf(filePath);
   const total: number = pdf.numPages;
   const pageTexts = new Map<number, string>();
@@ -85,11 +155,13 @@ export async function extractPdfStreaming(
     if (txt.length >= MIN_CHARS_TEXT_PAGE) pageTexts.set(p, txt);
     else blanks.push(p);
   }
+  extractionDone({ textPages: pageTexts.size, blankPages: blanks.length });
 
   let ocredPages = 0;
   let skippedPages = blanks.length;
   if (opts.ocr.enabled && blanks.length) {
     const toOcr = blanks.slice(0, opts.ocr.maxPages);
+    const ocrDone = startPerf('OCR', opts.perf, { pages: toOcr.length, languages: opts.ocr.languages });
     try {
       const map = await ocrPdfPages(pdf, toOcr, opts.ocr.languages, ({ page, totalPages }) =>
         opts.onProgress?.({ phase: 'ocr', detail: `OCR p. ${page}/${totalPages}`, pct: page / totalPages })
@@ -101,10 +173,14 @@ export async function extractPdfStreaming(
         }
       }
       skippedPages = blanks.length - ocredPages;
+      ocrDone({ recoveredPages: ocredPages, skippedPages });
     } catch (e) {
       // OCR deps missing or failed — keep whatever digital text we have.
       skippedPages = blanks.length;
+      ocrDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
+  } else if (blanks.length) {
+    perfLog('OCR', 0, opts.perf, { status: opts.ocr.enabled ? 'no_pages' : 'disabled', blankPages: blanks.length });
   }
 
   await pdf.destroy?.();
@@ -140,15 +216,43 @@ export function extractTextFile(filePath: string): string {
 
 export async function extractFromPath(
   filePath: string,
-  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress } = {}
+  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext } = {}
 ): Promise<ExtractedDoc> {
   const ext = path.extname(filePath).toLowerCase();
   const ocr = opts.ocr ?? { enabled: false, languages: 'spa+eng', maxPages: 300 };
-  if (ext === '.pdf') return extractPdfStreaming(filePath, { ocr, onProgress: opts.onProgress });
-  if (ext === '.docx') return { text: await extractDocx(filePath), sourceType: 'upload', notes: null };
-  if (ext === '.md' || ext === '.markdown') return { text: extractTextFile(filePath), sourceType: 'markdown', notes: null };
-  if (ext === '.txt') return { text: extractTextFile(filePath), sourceType: 'upload', notes: null };
-  throw new Error(`Tipo de archivo no soportado: ${ext}`);
+  const stat = fs.statSync(filePath);
+  const cacheKey = { filePath, fileSize: stat.size, fileMtimeMs: stat.mtimeMs, ocr };
+  const cacheLookupDone = startPerf('extraction cache lookup', opts.perf, { file: path.basename(filePath) });
+  const cached = getExtractionCache(cacheKey);
+  cacheLookupDone({ hit: Boolean(cached), size: stat.size });
+  if (cached) return cached;
+
+  let doc: ExtractedDoc;
+  if (ext === '.pdf') {
+    opts.onProgress?.({ phase: 'analyze', detail: 'Analizando PDF…', pct: null });
+    const analysisDone = startPerf('PDF analysis', opts.perf, { file: path.basename(filePath) });
+    const analysis = await analyzePdf(filePath);
+    analysisDone({ strategy: analysis.strategy, pages: analysis.pageCount });
+    doc = await extractPdfStreaming(filePath, { ocr, onProgress: opts.onProgress, analysis, perf: opts.perf });
+  } else if (ext === '.docx') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'docx' });
+    doc = { text: await extractDocx(filePath), sourceType: 'upload', notes: null };
+    done({ chars: doc.text.length });
+  } else if (ext === '.md' || ext === '.markdown') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'markdown' });
+    doc = { text: extractTextFile(filePath), sourceType: 'markdown', notes: null };
+    done({ chars: doc.text.length });
+  } else if (ext === '.txt') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'txt' });
+    doc = { text: extractTextFile(filePath), sourceType: 'upload', notes: null };
+    done({ chars: doc.text.length });
+  } else {
+    throw new Error(`Tipo de archivo no soportado: ${ext}`);
+  }
+
+  upsertExtractionCache(cacheKey, doc);
+  perfLog('extraction cache write', 0, opts.perf, { file: path.basename(filePath), chars: doc.text.length });
+  return doc;
 }
 
 /** Best-effort default Zotero storage folder, used when the user left the path blank. */
@@ -184,6 +288,7 @@ export interface ResolveOptions {
   preferZoteroFulltext: boolean;
   ocr: OcrOptions;
   onProgress?: OnExtractProgress;
+  perf?: PerfContext;
 }
 
 /**
@@ -201,7 +306,14 @@ export async function resolveWorkText(
   doi: string | null,
   opts: ResolveOptions
 ): Promise<ExtractedDoc> {
-  const children = await itemChildren(userId, zoteroKey).catch(() => [] as ZoteroAttachment[]);
+  let children: ZoteroAttachment[] = [];
+  const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey });
+  try {
+    children = await itemChildren(userId, zoteroKey);
+    metadataDone({ attachments: children.length });
+  } catch (e) {
+    metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+  }
   const textAttachments = children.filter(isTextAttachment);
   // Fall back to the standard Zotero storage location when the user left it blank,
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
@@ -209,13 +321,17 @@ export async function resolveWorkText(
 
   // (1) Reuse Zotero's indexed full text when it's substantial and reasonably complete.
   if (opts.preferZoteroFulltext) {
+    const fulltextDone = startPerf('Zotero fulltext', opts.perf, { attachments: textAttachments.length });
+    let checked = 0;
     for (const att of textAttachments) {
+      checked++;
       opts.onProgress?.({ phase: 'fulltext', detail: 'Comprobando índice de Zotero…', pct: null });
       const ft = await getFulltext(userId, att.key).catch(() => null);
       if (ft && ft.content.trim().length > 500) {
         const complete =
           ft.totalPages == null || ft.indexedPages == null || ft.indexedPages >= Math.floor(ft.totalPages * 0.9);
         if (complete) {
+          fulltextDone({ checked, hit: true, chars: ft.content.length });
           return {
             text: ft.content,
             sourceType: 'pdf',
@@ -224,6 +340,7 @@ export async function resolveWorkText(
         }
       }
     }
+    fulltextDone({ checked, hit: false });
   }
 
   // (2) Parse the PDF/text file from the storage folder ourselves.
@@ -232,11 +349,8 @@ export async function resolveWorkText(
     if (!att.filename || !effectiveStorage) continue;
     const filePath = path.join(effectiveStorage, att.key, att.filename);
     if (!fs.existsSync(filePath)) continue;
-    if (/\.pdf$/i.test(att.filename)) {
-      opts.onProgress?.({ phase: 'analyze', detail: 'Analizando PDF…', pct: null });
-    }
     try {
-      docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress }));
+      docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf }));
     } catch {
       /* skip unreadable attachment */
     }
@@ -254,7 +368,12 @@ export async function resolveWorkText(
   // (3) Unpaywall fallback by DOI.
   if (doi && opts.unpaywallEmail) {
     opts.onProgress?.({ phase: 'download', detail: 'Buscando texto abierto (Unpaywall)…', pct: null });
-    const oa = await tryUnpaywall(doi, opts.unpaywallEmail, opts.ocr, opts.onProgress).catch(() => null);
+    const unpaywallDone = startPerf('Unpaywall', opts.perf, { doi });
+    const oa = await tryUnpaywall(doi, opts.unpaywallEmail, opts.ocr, opts.onProgress, opts.perf).catch((e) => {
+      unpaywallDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return null;
+    });
+    unpaywallDone({ hit: Boolean(oa), chars: oa?.text.length ?? 0 });
     if (oa && oa.text.trim()) return oa;
   }
 
@@ -270,7 +389,8 @@ async function tryUnpaywall(
   doi: string,
   email: string,
   ocr: OcrOptions,
-  onProgress?: OnExtractProgress
+  onProgress?: OnExtractProgress,
+  perf?: PerfContext
 ): Promise<ExtractedDoc | null> {
   const res = await fetch(`https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${encodeURIComponent(email)}`);
   if (!res.ok) return null;
@@ -283,7 +403,7 @@ async function tryUnpaywall(
   const tmp = path.join(os.tmpdir(), `nodus-${Date.now()}.pdf`);
   fs.writeFileSync(tmp, buf);
   try {
-    const doc = await extractPdfStreaming(tmp, { ocr, onProgress });
+    const doc = await extractPdfStreaming(tmp, { ocr, onProgress, perf });
     return { ...doc, notes: `Texto recuperado vía Unpaywall.${doc.notes ? ' ' + doc.notes : ''}` };
   } finally {
     fs.unlinkSync(tmp);

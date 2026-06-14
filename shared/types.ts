@@ -141,6 +141,7 @@ export interface ExternalRef {
 export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini';
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
+export type DeepContextMode = 'standard' | 'long';
 
 /** A concrete model selection: which provider + which model id. */
 export interface ModelRef {
@@ -184,6 +185,10 @@ export interface AppSettings {
   ocrEnabled: boolean;
   ocrLanguages: string;
   ocrMaxPages: number;
+  // Deep scan chunking strategy. Standard preserves the legacy chunk size.
+  deepContextMode: DeepContextMode;
+  deepStandardChunkWords: number;
+  deepLongChunkWords: number;
 }
 
 export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';

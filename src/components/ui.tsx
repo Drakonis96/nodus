@@ -1,5 +1,5 @@
 import React from 'react';
-import type { IdeaType, EdgeType, AiProvider, ModelRef, GraphNodeType } from '@shared/types';
+import type { EdgeType, AiProvider, ModelRef, GraphNodeType } from '@shared/types';
 
 export const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
 

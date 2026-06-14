@@ -68,3 +68,16 @@ body {
 .light .input {
   @apply bg-white border-neutral-300;
 }
+
+.graph-detail-panel {
+  font-size: var(--detail-font-size, 14px);
+}
+.graph-detail-panel .text-sm {
+  font-size: var(--detail-font-size, 14px);
+}
+.graph-detail-panel .text-xs {
+  font-size: calc(var(--detail-font-size, 14px) * 0.86);
+}
+.graph-detail-panel .text-\[11px\] {
+  font-size: calc(var(--detail-font-size, 14px) * 0.79);
+}

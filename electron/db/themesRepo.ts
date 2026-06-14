@@ -96,6 +96,31 @@ export function getWorkThemeLabels(nodusId: string): string[] {
   return rows.map((r) => r.label);
 }
 
+export function setIdeaThemeLinks(
+  nodusId: string,
+  globalId: string,
+  labels: string[],
+  confidence: number,
+  basis: 'explicit' | 'inferred' = 'explicit'
+): void {
+  const db = getDb();
+  const seen = new Set<string>();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM idea_theme_links WHERE nodus_id = ? AND global_id = ?').run(nodusId, globalId);
+    for (const label of labels) {
+      const norm = normalizeThemeLabel(label);
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      const themeId = getOrCreateTheme(norm);
+      db.prepare(
+        `INSERT OR REPLACE INTO idea_theme_links (nodus_id, global_id, theme_id, confidence, basis)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(nodusId, globalId, themeId, confidence, basis);
+    }
+  });
+  tx();
+}
+
 export function listThemes(): Theme[] {
   return getDb().prepare('SELECT * FROM themes ORDER BY label').all() as Theme[];
 }

@@ -9,6 +9,7 @@ import {
   getIdea,
 } from '../db/ideasRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
+import { perfLog, startPerf, type PerfContext } from '../perf';
 
 export interface ExtractedIdea {
   localId: string;
@@ -24,6 +25,12 @@ interface FusionResult {
   edge_to_existing: { type: EdgeType; basis: EdgeBasis; confidence: number } | null;
   rationale: string;
   confidence: number;
+}
+
+export interface FuseIdeaOptions {
+  model?: ModelRef | null;
+  perf?: PerfContext;
+  embedding?: number[] | null;
 }
 
 function isFusionResult(v: unknown): v is FusionResult {
@@ -93,13 +100,25 @@ function lexicalSimilarity(a: ExtractedIdea, b: { label: string; statement: stri
  * Resolve one extracted idea against the global graph.
  * Returns the global_id this idea maps to (existing or newly created).
  */
-export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: ModelRef | null): Promise<string> {
-  const embedding = await embed(`${idea.label}. ${idea.statement}`);
+export async function fuseIdea(
+  idea: ExtractedIdea,
+  sourceWork: string,
+  optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
+): Promise<string> {
+  const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
+  const embeddingDone = opts.embedding === undefined ? startPerf('embedding', opts.perf, { idea: idea.label }) : null;
+  const embedding = opts.embedding === undefined ? await embed(`${idea.label}. ${idea.statement}`) : opts.embedding;
+  embeddingDone?.({ hit: Boolean(embedding) });
 
   // Retrieve candidates by cosine similarity (in-memory fallback if no sqlite-vec).
   let candidates: { global_id: string; type: string; label: string; statement: string; similarity: number }[] = [];
+  const retrievalDone = startPerf('candidate retrieval', opts.perf, {
+    idea: idea.label,
+    mode: embedding ? 'embedding' : 'lexical',
+  });
   if (embedding) {
-    candidates = ideasWithEmbeddings()
+    const pool = ideasWithEmbeddings();
+    candidates = pool
       .map((i) => ({
         global_id: i.global_id,
         type: i.type,
@@ -110,8 +129,10 @@ export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: 
       .filter((c) => c.similarity >= SIM_THRESHOLD)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, MAX_CANDIDATES);
+    retrievalDone({ pool: pool.length, candidates: candidates.length });
   } else {
-    candidates = allIdeaCandidates()
+    const pool = allIdeaCandidates();
+    candidates = pool
       .map((i) => ({
         global_id: i.global_id,
         type: i.type,
@@ -122,10 +143,12 @@ export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: 
       .filter((c) => c.similarity >= LEXICAL_THRESHOLD)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, MAX_CANDIDATES);
+    retrievalDone({ pool: pool.length, candidates: candidates.length });
   }
 
   // No candidates → straight to a new idea, no model call needed.
   if (candidates.length === 0) {
+    perfLog('LLM fusion', 0, opts.perf, { idea: idea.label, status: 'skipped', candidates: 0 });
     return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding }).global_id;
   }
 
@@ -141,14 +164,17 @@ export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: 
   };
 
   let result: FusionResult;
+  const fusionDone = startPerf('LLM fusion', opts.perf, { idea: idea.label, candidates: candidates.length });
   try {
     result = await completeJson<FusionResult>(
-      { system: PROMPT_FUSION, user: JSON.stringify(input), temperature: 0.1, maxTokens: 800 },
+      { system: PROMPT_FUSION, user: JSON.stringify(input), temperature: 0.1, maxTokens: 800, perf: opts.perf },
       isFusionResult,
-      model
+      opts.model
     );
+    fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
   } catch {
     // On fusion failure, be conservative: treat as new (avoid wrong merges).
+    fusionDone({ status: 'error' });
     return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding }).global_id;
   }
 

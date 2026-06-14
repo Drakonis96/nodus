@@ -106,8 +106,7 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
   // Reload the selected collection's items when the recursive toggle changes.
   useEffect(() => {
     if (selected) void loadItems(selected, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recursive]);
+  }, [recursive, selected, loadItems]);
 
   const statusOf = (key: string): 'unscanned' | 'light' | 'deep' => {
     const w = worksByKey.get(key);
@@ -235,7 +234,8 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
                     key={t}
                     onClick={() => {
                       const next = new Set(types);
-                      next.has(t) ? next.delete(t) : next.add(t);
+                      if (next.has(t)) next.delete(t);
+                      else next.add(t);
                       setTypes(next);
                     }}
                     className={`text-[11px] px-2 py-0.5 rounded ${

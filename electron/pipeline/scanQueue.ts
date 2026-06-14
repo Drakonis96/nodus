@@ -1,7 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
-import { getWorkByZoteroKey } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
 import { runDeepScan } from '../ai/deepScan';
@@ -9,6 +8,7 @@ import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
 import { setDeepResult } from '../db/worksRepo';
 import { AiError } from '../ai/aiClient';
+import { startPerf } from '../perf';
 
 type ProgressListener = (p: QueueProgress) => void;
 
@@ -212,17 +212,22 @@ class ScanQueue {
 
   private async doDeep(work: Work, queueItem: QueueItem): Promise<void> {
     const settings = getSettings();
+    const perf = { nodusId: work.nodus_id, title: work.title };
     let abstract: string | null = null;
+    const metadataDone = startPerf('abstract/Zotero metadata', perf);
     try {
       const item = await getItem(settings.zoteroUserId, work.zotero_key);
       abstract = item?.abstract ?? null;
-    } catch {
+      metadataDone({ abstract: Boolean(abstract) });
+    } catch (e) {
+      metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       /* offline: rely on stored attachments */
     }
     const doc = await resolveWorkText(settings.zoteroUserId, work.zotero_key, settings.zoteroStoragePath, abstract, work.doi, {
       unpaywallEmail: settings.unpaywallEmail,
       preferZoteroFulltext: settings.preferZoteroFulltext,
       ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+      perf,
       onProgress: (p) => {
         queueItem.detail = p.detail;
         queueItem.subPct = p.pct;

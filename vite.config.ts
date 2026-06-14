@@ -15,6 +15,7 @@ const mainExternals = [
   '@napi-rs/canvas',
   '@anthropic-ai/sdk',
   'openai',
+  'electron-updater',
 ];
 
 export default defineConfig({

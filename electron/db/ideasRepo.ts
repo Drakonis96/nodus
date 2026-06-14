@@ -185,6 +185,7 @@ export function resetGraphData(): void {
       DELETE FROM evidence;
       DELETE FROM edges;
       DELETE FROM ideas;
+      DELETE FROM idea_theme_links;
       DELETE FROM gaps;
       DELETE FROM external_refs;
       DELETE FROM work_authors;
@@ -208,6 +209,7 @@ export function purgeDeepData(nodusId: string): void {
     db.prepare('DELETE FROM idea_occurrences WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM evidence WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM edges WHERE source_work = ?').run(nodusId);
+    db.prepare('DELETE FROM idea_theme_links WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM gaps WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM external_refs WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM work_authors WHERE nodus_id = ?').run(nodusId);

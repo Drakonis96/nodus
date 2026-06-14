@@ -74,9 +74,15 @@ Reutiliza etiquetas canónicas ya obvias entre fragmentos: "turismo", "franquism
 - "id", "type", "label" (canónico corto, minúsculas, sin años ni autores),
   "statement" (UNA frase en español), "role" ("principal"|"secondary"),
   "development" (1-3 frases en español sobre cómo ESTA obra la desarrolla),
-  "evidence" (mínimo uno), "confidence" (0.0-1.0),
+  "evidence" (mínimo uno), "theme_labels" (0-3 etiquetas temáticas pertinentes),
+  "confidence" (0.0-1.0),
   "uncertainty_reason" (string en español SOLO si confidence < 0.6).
-- Máximo 4 ideas por fragmento. Prioriza las ideas centrales y mejor evidenciadas.
+- Respeta "analysis_limits.max_ideas" de la entrada. Si no está presente, máximo 4
+  ideas por fragmento. Prioriza las ideas centrales y mejor evidenciadas.
+- "theme_labels" NO es la lista de todos los temas de la obra. Incluye solo las
+  familias realmente pertinentes para ESA idea concreta, usando etiquetas de
+  "theme_nodes" o de "available_theme_labels" cuando encajen. Si una idea no trata
+  un tema disponible, no lo incluyas.
 
 ═══ EVIDENCIA ═══
 - "quote": pasaje VERBATIM (idioma original), máx ~30 palabras. Nunca parafrasees.
@@ -87,7 +93,8 @@ Reutiliza etiquetas canónicas ya obvias entre fragmentos: "turismo", "franquism
 from/to (ids locales), type (extends|contradicts|applies_to|shares_method|
 precondition_of|measures_same|supports|refutes), basis ("explicit"|"inferred"),
 evidence (un anclaje), confidence. "inferred" solo si es muy clara y con confianza baja.
-Máximo 5 relaciones internas por fragmento.
+Respeta "analysis_limits.max_internal_relations" de la entrada. Si no está presente,
+máximo 5 relaciones internas por fragmento.
 
 ═══ REFERENCIAS EXTERNAS ("external_references") ═══
 from (id local), cited_work (referencia tal como aparece), type, basis (casi
@@ -96,7 +103,8 @@ siempre "explicit"), evidence, confidence. No inventes citas.
 ═══ HUECOS ("gaps") ═══
 kind ("future_work"|"limitation"|"open_question"|"unresolved_contradiction"),
 statement (español), related_idea (id local o null), evidence, confidence.
-Máximo 2 huecos por fragmento.
+Respeta "analysis_limits.max_gaps" de la entrada. Si no está presente, máximo 2 huecos
+por fragmento.
 
 ═══ AUTORES ("authors_detail") ═══
 name, affiliation (o null), stance_notes (español, solo si es explícito; si no, null).
@@ -117,7 +125,10 @@ Datos faltantes → null. Nunca supongas.
 
 ═══ CONTRATO DE ENTRADA ═══
 { "zotero_key", "title", "authors", "year", "container", "item_type",
-  "has_fulltext", "language_hint", "chunk": { "index", "total", "text" } }
+  "has_fulltext", "language_hint", "available_theme_labels", "context_mode",
+  "analysis_limits": { "max_ideas", "max_internal_relations", "max_gaps",
+    "target_chunk_words", "overlap_words" },
+  "chunk": { "index", "total", "word_count", "text" } }
 
 ═══ SALIDA — UN ÚNICO objeto JSON válido, sin vallas de código ═══
 {
@@ -128,7 +139,8 @@ Datos faltantes → null. Nunca supongas.
   "theme_nodes": [ { "id","label","statement","role",
     "evidence":[{"quote","location","kind"}],"confidence" } ],
   "ideas": [ { "id","type","label","statement","role","development",
-    "evidence":[{"quote","location","kind"}],"confidence","uncertainty_reason" } ],
+    "evidence":[{"quote","location","kind"}],"theme_labels":[],
+    "confidence","uncertainty_reason" } ],
   "internal_relations": [ { "from","to","type","basis",
     "evidence":{"quote","location","kind"},"confidence" } ],
   "external_references": [ { "from","cited_work","type","basis",

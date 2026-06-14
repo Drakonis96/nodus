@@ -21,6 +21,19 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     setTimeout(() => setSaved(null), 2000);
   };
 
+  const activeChunkWords =
+    settings.deepContextMode === 'long' ? settings.deepLongChunkWords : settings.deepStandardChunkWords;
+  const patchActiveChunkWords = (value: string) => {
+    const min = settings.deepContextMode === 'long' ? 5000 : 500;
+    const max = settings.deepContextMode === 'long' ? 50000 : 5000;
+    const parsed = Math.min(max, Math.max(min, parseInt(value, 10) || min));
+    void patch(
+      settings.deepContextMode === 'long'
+        ? { deepLongChunkWords: parsed }
+        : { deepStandardChunkWords: parsed }
+    );
+  };
+
   const startReset = () => {
     const ok = window.confirm(
       'Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?'
@@ -65,6 +78,27 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
         </Row>
         <Row label="Email Unpaywall (fallback de texto)">
           <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
+        </Row>
+        <Row label="Modo de contexto deep scan">
+          <select
+            className="input"
+            value={settings.deepContextMode}
+            onChange={(e) => patch({ deepContextMode: e.target.value as AppSettings['deepContextMode'] })}
+          >
+            <option value="standard">Estándar</option>
+            <option value="long">Contexto largo</option>
+          </select>
+        </Row>
+        <Row label="Palabras por fragmento">
+          <input
+            type="number"
+            min={settings.deepContextMode === 'long' ? 5000 : 500}
+            max={settings.deepContextMode === 'long' ? 50000 : 5000}
+            step={settings.deepContextMode === 'long' ? 1000 : 100}
+            className="input w-28"
+            value={activeChunkWords}
+            onChange={(e) => patchActiveChunkWords(e.target.value)}
+          />
         </Row>
       </Section>
 

@@ -118,7 +118,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                     checked={selected.has(c.key)}
                     onChange={(e) => {
                       const next = new Set(selected);
-                      e.target.checked ? next.add(c.key) : next.delete(c.key);
+                      if (e.target.checked) next.add(c.key);
+                      else next.delete(c.key);
                       setSelected(next);
                     }}
                   />

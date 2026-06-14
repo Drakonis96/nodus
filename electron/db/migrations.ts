@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 export const migrations: Migration[] = [
   {
@@ -158,6 +158,45 @@ export const migrations: Migration[] = [
     up: /* sql */ `
       UPDATE works SET light_status = 'none' WHERE light_status = 'pending';
       UPDATE works SET deep_status = 'none' WHERE deep_status = 'pending';
+    `,
+  },
+  {
+    version: 3,
+    up: /* sql */ `
+      CREATE TABLE extraction_cache (
+        file_path      TEXT PRIMARY KEY,
+        file_size      INTEGER NOT NULL,
+        file_mtime_ms  REAL NOT NULL,
+        ocr_enabled    INTEGER NOT NULL,
+        ocr_languages  TEXT NOT NULL,
+        ocr_max_pages  INTEGER NOT NULL,
+        cache_version  INTEGER NOT NULL,
+        source_type    TEXT NOT NULL,
+        text           TEXT NOT NULL,
+        notes          TEXT,
+        analysis_json  TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_extraction_cache_key
+        ON extraction_cache(file_path, file_size, file_mtime_ms, ocr_enabled, ocr_languages, ocr_max_pages, cache_version);
+    `,
+  },
+  {
+    version: 4,
+    up: /* sql */ `
+      CREATE TABLE idea_theme_links (
+        nodus_id   TEXT NOT NULL,
+        global_id  TEXT NOT NULL,
+        theme_id   TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        basis      TEXT NOT NULL,
+        PRIMARY KEY (nodus_id, global_id, theme_id)
+      );
+
+      CREATE INDEX idx_idea_theme_links_global ON idea_theme_links(global_id);
+      CREATE INDEX idx_idea_theme_links_theme ON idea_theme_links(theme_id);
     `,
   },
 ];

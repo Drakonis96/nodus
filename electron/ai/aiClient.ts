@@ -3,6 +3,7 @@ import { getApiKey } from '../secrets/secretStore';
 import { openAiCompatBase, supportsJsonMode } from './providers';
 import type { AiProvider, ModelRef } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
+import { startPerf, type PerfContext } from '../perf';
 
 export class AiError extends Error {
   /**
@@ -20,6 +21,7 @@ interface CallOpts {
   user: string;
   temperature?: number;
   maxTokens?: number;
+  perf?: PerfContext;
 }
 
 /** Resolve which model to use: explicit override, else the configured default. */
@@ -115,8 +117,10 @@ async function repairJson<T>(
   model: ModelRef,
   rawText: string,
   parseError: unknown,
-  guard: (v: unknown) => v is T
+  guard: (v: unknown) => v is T,
+  perf?: PerfContext
 ): Promise<T | null> {
+  const repairDone = startPerf('JSON repair', perf, { rawChars: rawText.length });
   const clipped = rawText.length > 60_000 ? rawText.slice(0, 60_000) : rawText;
   const system =
     'Eres un reparador estricto de JSON. Recibes una salida JSON mal formada. Devuelve únicamente el mismo objeto como JSON válido, sin añadir campos, sin inventar datos y sin vallas de código.';
@@ -136,8 +140,11 @@ async function repairJson<T>(
       false
     );
     const parsed = extractJson(repaired);
-    return guard(parsed) ? parsed : null;
-  } catch {
+    const ok = guard(parsed);
+    repairDone({ status: ok ? 'ok' : 'schema_mismatch' });
+    return ok ? parsed : null;
+  } catch (e) {
+    repairDone({ status: 'error', error: errorMessage(e) });
     return null;
   }
 }
@@ -145,14 +152,15 @@ async function repairJson<T>(
 async function parseOrRepair<T>(
   model: ModelRef,
   text: string,
-  guard: (v: unknown) => v is T
+  guard: (v: unknown) => v is T,
+  perf?: PerfContext
 ): Promise<T> {
   try {
     const parsed = extractJson(text);
     if (guard(parsed)) return parsed;
     throw new AiError('El JSON no cumple el esquema esperado');
   } catch (e) {
-    const repaired = await repairJson(model, text, e, guard);
+    const repaired = await repairJson(model, text, e, guard, perf);
     if (repaired) return repaired;
     throw e;
   }
@@ -174,11 +182,16 @@ export async function completeJson<T>(
     { temperature: 0, jsonMode: true },
     { temperature: 0, jsonMode: false },
   ];
-  for (const attempt of attempts) {
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    const retryDone = startPerf('JSON retry', opts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
     try {
       const text = await rawComplete(resolved, { ...opts, temperature: attempt.temperature }, attempt.jsonMode);
-      return await parseOrRepair(resolved, text, guard);
+      const parsed = await parseOrRepair(resolved, text, guard, opts.perf);
+      if (i > 0) retryDone({ status: 'ok' });
+      return parsed;
     } catch (e) {
+      retryDone({ status: 'error', error: errorMessage(e), retry: i < attempts.length - 1 });
       lastErr = e;
       if (e instanceof AiError && (e.retriable || e.config)) throw e;
     }
@@ -191,6 +204,16 @@ const EMBED_MODELS: Partial<Record<AiProvider, string>> = {
   gemini: 'text-embedding-004',
 };
 
+async function requestEmbeddings(provider: AiProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
+  const baseURL = openAiCompatBase(provider) ?? undefined;
+  const OpenAI = (await import('openai')).default;
+  const client = new OpenAI({ apiKey: key, baseURL });
+  const res = await client.embeddings.create({ model: modelId, input });
+  return [...res.data]
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+    .map((d) => d.embedding);
+}
+
 /**
  * Embeddings for idea fusion. Uses whichever embedding-capable provider has a key
  * (OpenAI or Gemini). Returns null when none is available — fusion then stays
@@ -201,16 +224,34 @@ export async function embed(text: string): Promise<number[] | null> {
   for (const provider of ['openai', 'gemini'] as AiProvider[]) {
     const key = getApiKey(provider);
     if (!key) continue;
-    const baseURL = openAiCompatBase(provider) ?? undefined;
     const modelId = (provider === 'openai' && settings.embeddingModel) || EMBED_MODELS[provider]!;
     try {
-      const OpenAI = (await import('openai')).default;
-      const client = new OpenAI({ apiKey: key, baseURL });
-      const res = await client.embeddings.create({ model: modelId, input: text.slice(0, 8000) });
-      return res.data[0]?.embedding ?? null;
+      const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
+      return vectors[0] ?? null;
     } catch {
       /* try next provider */
     }
   }
   return null;
+}
+
+export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
+  if (texts.length === 0) return [];
+  const settings = getSettings();
+  const clipped = texts.map((t) => t.slice(0, 8000));
+  let sawEmbeddingKey = false;
+  for (const provider of ['openai', 'gemini'] as AiProvider[]) {
+    const key = getApiKey(provider);
+    if (!key) continue;
+    sawEmbeddingKey = true;
+    const modelId = (provider === 'openai' && settings.embeddingModel) || EMBED_MODELS[provider]!;
+    try {
+      const vectors = await requestEmbeddings(provider, key, modelId, clipped);
+      if (vectors.length === clipped.length) return vectors;
+    } catch {
+      /* try next provider or fall back below */
+    }
+  }
+  if (!sawEmbeddingKey) return texts.map(() => null);
+  return Promise.all(texts.map((t) => embed(t)));
 }

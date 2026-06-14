@@ -24,6 +24,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',
   ocrMaxPages: 300,
+  deepContextMode: 'standard',
+  deepStandardChunkWords: 1800,
+  deepLongChunkWords: 30000,
 };
 
 function readRaw(key: string): string | undefined {

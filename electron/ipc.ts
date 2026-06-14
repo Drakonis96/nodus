@@ -169,6 +169,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const s = getSettings();
     const doc = await extractFromPath(filePath, {
       ocr: { enabled: s.ocrEnabled, languages: s.ocrLanguages, maxPages: s.ocrMaxPages },
+      perf: { nodusId, title: w.title },
     });
     works.setDeepPending(nodusId);
     await runDeepScan(w, doc);

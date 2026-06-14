@@ -140,6 +140,15 @@ const DEFAULT_FILTERS: Filters = {
 };
 
 const FILTER_KEY = 'nodus.graph.filters';
+const DETAIL_WIDTH_KEY = 'nodus.graph.detailWidth';
+const DETAIL_FONT_KEY = 'nodus.graph.detailFontSize';
+
+const DETAIL_MIN_WIDTH = 320;
+const DETAIL_MAX_WIDTH = 720;
+const DETAIL_DEFAULT_WIDTH = 384;
+const DETAIL_MIN_FONT = 12;
+const DETAIL_MAX_FONT = 20;
+const DETAIL_DEFAULT_FONT = 14;
 
 function loadFilters(): Filters {
   try {
@@ -164,10 +173,20 @@ export function GraphView() {
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
   const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
+  const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
+  const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
   }, [filters]);
+
+  useEffect(() => {
+    localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
+  }, [detailWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(DETAIL_FONT_KEY, String(detailFontSize));
+  }, [detailFontSize]);
 
   const reload = useCallback(() => {
     void window.nodus.getGraph(lens).then(setData);
@@ -184,12 +203,6 @@ export function GraphView() {
   // Refresh the graph when scans finish so freshly analysed works appear without
   // having to leave and re-open the view.
   useScanComplete(reload);
-
-  const allAuthors = useMemo(() => {
-    const set = new Set<string>();
-    for (const n of data.nodes) for (const a of n.authors) set.add(a);
-    return Array.from(set).sort();
-  }, [data]);
 
   const elements = useMemo<ElementDefinition[]>(() => {
     const f = filters;
@@ -313,7 +326,7 @@ export function GraphView() {
           cy.elements().addClass('faded');
           keep.removeClass('faded');
           cy.nodes().removeClass('spotlight');
-          eles.nodes && eles.nodes().addClass('spotlight');
+          if (eles.nodes) eles.nodes().addClass('spotlight');
         });
       };
       const clearFocus = () => {
@@ -396,6 +409,9 @@ export function GraphView() {
     cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
   };
   const fitGraph = () => cyRef.current?.fit(undefined, 48);
+  const changeDetailFont = (delta: number) => {
+    setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
+  };
 
   const setF = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
   const toggleIn = (key: 'nodeTypes' | 'edgeTypes' | 'authors', val: string) =>
@@ -477,31 +493,33 @@ export function GraphView() {
       </div>
 
       <div className="flex-1 flex min-h-0 relative">
-        <div ref={containerRef} className="flex-1 min-w-0" />
+        <div className="flex-1 min-w-0 relative">
+          <div ref={containerRef} className="absolute inset-0" />
 
-        {/* Zoom / fit controls */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1">
-          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Acercar" onClick={() => zoomBy(1.25)}>
-            <Icon name="plus" size={16} />
-          </button>
-          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Alejar" onClick={() => zoomBy(0.8)}>
-            <Icon name="minus" size={16} />
-          </button>
-          <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Ajustar a la pantalla" onClick={fitGraph}>
-            <Icon name="fit" size={16} />
-          </button>
-        </div>
+          {/* Zoom / fit controls */}
+          <div className="absolute top-3 right-3 flex flex-col gap-1">
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Acercar" onClick={() => zoomBy(1.25)}>
+              <Icon name="plus" size={16} />
+            </button>
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Alejar" onClick={() => zoomBy(0.8)}>
+              <Icon name="minus" size={16} />
+            </button>
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Ajustar a la pantalla" onClick={fitGraph}>
+              <Icon name="fit" size={16} />
+            </button>
+          </div>
 
-        {/* Legend */}
-        <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90">
-          {GRAPH_NODE_TYPES.map((t) => (
-            <div key={t} className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
-              {NODE_LABELS[t]}
-            </div>
-          ))}
-          <div className="pt-1 border-t border-neutral-800 text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
-          <div className="text-neutral-500">○ borde punteado: no leída</div>
+          {/* Legend */}
+          <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90">
+            {GRAPH_NODE_TYPES.map((t) => (
+              <div key={t} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
+                {NODE_LABELS[t]}
+              </div>
+            ))}
+            <div className="pt-1 border-t border-neutral-800 text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
+            <div className="text-neutral-500">○ borde punteado: no leída</div>
+          </div>
         </div>
 
         {/* Detail panel */}
@@ -509,6 +527,10 @@ export function GraphView() {
           <DetailPanel
             ideaDetail={ideaDetail}
             edgeDetail={edgeDetail}
+            width={detailWidth}
+            fontSize={detailFontSize}
+            onWidthChange={setDetailWidth}
+            onFontChange={changeDetailFont}
             onClose={() => {
               setIdeaDetail(null);
               setEdgeDetail(null);
@@ -521,20 +543,64 @@ export function GraphView() {
   );
 }
 
+function loadNumber(key: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(localStorage.getItem(key));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 function DetailPanel({
   ideaDetail,
   edgeDetail,
+  width,
+  fontSize,
+  onWidthChange,
+  onFontChange,
   onClose,
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
+  width: number;
+  fontSize: number;
+  onWidthChange: (width: number) => void;
+  onFontChange: (delta: number) => void;
   onClose: () => void;
 }) {
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    const onMove = (evt: PointerEvent) => {
+      onWidthChange(Math.min(DETAIL_MAX_WIDTH, Math.max(DETAIL_MIN_WIDTH, startWidth + startX - evt.clientX)));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+  };
+
   return (
-    <div className="w-96 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4 text-sm">
-      <button className="float-right text-neutral-500 hover:text-white" onClick={onClose}>
-        ✕
-      </button>
+    <div className="relative shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4 graph-detail-panel" style={{ width, '--detail-font-size': `${fontSize}px` } as React.CSSProperties}>
+      <div
+        className="absolute left-0 top-0 h-full w-2 -translate-x-1/2 cursor-col-resize hover:bg-indigo-500/25"
+        role="separator"
+        aria-orientation="vertical"
+        title="Ajustar ancho"
+        onPointerDown={startResize}
+      />
+      <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-end gap-1 border-b border-neutral-800 bg-neutral-900/95 px-4 py-2">
+        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-xs" title="Disminuir texto" onClick={() => onFontChange(-1)}>
+          a
+        </button>
+        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-sm font-semibold" title="Aumentar texto" onClick={() => onFontChange(1)}>
+          A
+        </button>
+        <button className="ml-2 text-neutral-500 hover:text-white" title="Cerrar" onClick={onClose}>
+          ✕
+        </button>
+      </div>
       {ideaDetail && (
         <div className="space-y-3">
           <div>

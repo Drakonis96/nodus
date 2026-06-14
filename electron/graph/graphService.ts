@@ -8,12 +8,53 @@ import type {
   ReadingPathEntry,
 } from '@shared/types';
 import { getEdgeDetail, ideasWithEmbeddings, cosineSimilarity } from '../db/ideasRepo';
-import { listGraphThemes } from '../db/themesRepo';
+import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
 // cluster centroid). Conservative so unrelated ideas aren't pulled in.
 const THEME_SIM_THRESHOLD = 0.72;
 const MAX_INFERRED_THEMES_PER_IDEA = 1;
+
+const THEME_KEYWORD_ALIASES: Record<string, string[]> = {
+  franquismo: ['franquismo', 'franco', 'franquista', 'franquistas', 'dictadura', 'posguerra'],
+  turismo: ['turismo', 'turista', 'turistas', 'turistico', 'turistica', 'tourism', 'tourist', 'tourists'],
+  'literatura de viajes': ['literatura viajes', 'relato viaje', 'relatos viaje', 'escritura viajes', 'travel writing', 'travel literature'],
+  'escritura de viajes': ['literatura viajes', 'relato viaje', 'relatos viaje', 'travel writing', 'travel literature'],
+  género: ['genero', 'gender', 'mujeres', 'femenino', 'feminismo', 'viajeras'],
+  'identidad nacional': ['identidad nacional', 'national identity', 'nacion', 'nacionalismo'],
+  colonialismo: ['colonialismo', 'colonial', 'colonialism', 'imperialismo', 'imperial'],
+};
+
+const STOPWORDS = new Set([
+  'a',
+  'al',
+  'and',
+  'ante',
+  'by',
+  'con',
+  'de',
+  'del',
+  'el',
+  'en',
+  'for',
+  'in',
+  'la',
+  'las',
+  'lo',
+  'los',
+  'of',
+  'on',
+  'or',
+  'para',
+  'por',
+  'que',
+  'se',
+  'the',
+  'to',
+  'un',
+  'una',
+  'y',
+]);
 
 interface IdeaRow {
   global_id: string;
@@ -22,11 +63,18 @@ interface IdeaRow {
   statement: string;
 }
 
+interface ThemeMembership {
+  edges: GraphEdge[];
+  labelsByIdea: Map<string, Set<string>>;
+}
+
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export function buildIdeaGraph(): GraphData {
   const db = getDb();
   const ideas = db.prepare('SELECT global_id, type, label, statement FROM ideas').all() as IdeaRow[];
   const themeRows = listGraphThemes();
+  const memberships = buildThemeMemberships();
+  const themeNodeIdsWithEdges = new Set(memberships.edges.map((e) => e.source));
 
   const ideaNodes: GraphNode[] = ideas.map((idea) => {
     const works = db
@@ -36,15 +84,6 @@ export function buildIdeaGraph(): GraphData {
          WHERE io.global_id = ?`
       )
       .all(idea.global_id) as { nodus_id: string; year: number | null; authors_json: string; deep_status: string }[];
-
-    const themes = db
-      .prepare(
-        `SELECT DISTINCT t.label FROM idea_occurrences io
-         JOIN work_themes wt ON wt.nodus_id = io.nodus_id
-         JOIN themes t ON t.theme_id = wt.theme_id
-         WHERE io.global_id = ?`
-      )
-      .all(idea.global_id) as { label: string }[];
 
     const maxConf = db
       .prepare('SELECT MAX(confidence) as c FROM idea_occurrences WHERE global_id = ?')
@@ -70,14 +109,15 @@ export function buildIdeaGraph(): GraphData {
       statement: idea.statement,
       workCount: works.length,
       read,
-      themes: themes.map((t) => t.label),
+      themes: Array.from(memberships.labelsByIdea.get(idea.global_id) ?? []).sort(),
       years,
       authors: Array.from(authors),
       maxConfidence: maxConf.c ?? 0,
     };
   });
 
-  const themeNodes: GraphNode[] = themeRows.map((theme) => {
+  const visibleThemeRows = ideas.length === 0 ? themeRows : themeRows.filter((theme) => themeNodeIdsWithEdges.has(`theme:${theme.theme_id}`));
+  const themeNodes: GraphNode[] = visibleThemeRows.map((theme) => {
     const works = db
       .prepare(
         `SELECT DISTINCT w.nodus_id, w.year, w.authors_json, w.deep_status
@@ -135,24 +175,7 @@ export function buildIdeaGraph(): GraphData {
       confidence: e.confidence,
     }));
 
-  const themeEdgeRows = db
-    .prepare(
-      `SELECT DISTINCT t.theme_id, io.global_id
-       FROM work_themes wt
-       JOIN themes t ON t.theme_id = wt.theme_id
-       JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id`
-    )
-    .all() as { theme_id: string; global_id: string }[];
-  const themeEdges: GraphEdge[] = themeEdgeRows
-    .map((r) => ({
-      id: `theme-edge:${r.theme_id}:${r.global_id}`,
-      source: `theme:${r.theme_id}`,
-      target: r.global_id,
-      type: 'contains',
-      basis: 'inferred' as const,
-      confidence: 0.9,
-    }))
-    .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+  const themeEdges = memberships.edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
 
   // Attach ideas that predate their parent theme. Themes only "contain" an idea when
   // the same work carries both, so ideas analysed before a broad theme existed end up
@@ -164,6 +187,129 @@ export function buildIdeaGraph(): GraphData {
   const edges = [...themeEdges, ...inferredThemeEdges, ...ideaEdges];
 
   return { nodes, edges };
+}
+
+function buildThemeMemberships(): ThemeMembership {
+  const db = getDb();
+  const edges = new Map<string, GraphEdge>();
+  const labelsByIdea = new Map<string, Set<string>>();
+
+  const add = (
+    themeId: string,
+    themeLabel: string,
+    ideaId: string,
+    confidence: number,
+    basis: 'explicit' | 'inferred',
+    idPrefix: string
+  ) => {
+    const source = `theme:${themeId}`;
+    const key = `${source}|${ideaId}`;
+    const existing = edges.get(key);
+    if (existing && (existing.basis === 'explicit' || existing.confidence >= confidence)) return;
+    edges.set(key, {
+      id: `${idPrefix}:${themeId}:${ideaId}`,
+      source,
+      target: ideaId,
+      type: 'contains',
+      basis,
+      confidence,
+    });
+    const labels = labelsByIdea.get(ideaId) ?? new Set<string>();
+    labels.add(themeLabel);
+    labelsByIdea.set(ideaId, labels);
+  };
+
+  const explicit = db
+    .prepare(
+      `SELECT it.theme_id, t.label, it.global_id, MAX(it.confidence) AS confidence
+       FROM idea_theme_links it
+       JOIN themes t ON t.theme_id = it.theme_id
+       JOIN works w ON w.nodus_id = it.nodus_id
+       WHERE w.archived = 0
+       GROUP BY it.theme_id, it.global_id`
+    )
+    .all() as { theme_id: string; label: string; global_id: string; confidence: number }[];
+  for (const row of explicit) add(row.theme_id, row.label, row.global_id, row.confidence, 'explicit', 'theme-link');
+
+  const fallback = db
+    .prepare(
+      `SELECT
+         wt.nodus_id,
+         t.theme_id,
+         t.label AS theme_label,
+         io.global_id,
+         i.label AS idea_label,
+         i.statement,
+         io.development,
+         COALESCE(GROUP_CONCAT(e.quote, ' '), '') AS evidence_text,
+         (SELECT COUNT(*) FROM work_themes wt2 WHERE wt2.nodus_id = wt.nodus_id) AS theme_count
+       FROM work_themes wt
+       JOIN themes t ON t.theme_id = wt.theme_id
+       JOIN works w ON w.nodus_id = wt.nodus_id
+       JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id
+       JOIN ideas i ON i.global_id = io.global_id
+       LEFT JOIN evidence e ON e.nodus_id = io.nodus_id AND e.global_id = io.global_id
+       WHERE w.archived = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM idea_theme_links it
+           WHERE it.nodus_id = io.nodus_id AND it.global_id = io.global_id
+         )
+       GROUP BY wt.nodus_id, t.theme_id, io.global_id`
+    )
+    .all() as {
+      nodus_id: string;
+      theme_id: string;
+      theme_label: string;
+      global_id: string;
+      idea_label: string;
+      statement: string;
+      development: string;
+      evidence_text: string;
+      theme_count: number;
+    }[];
+
+  for (const row of fallback) {
+    const text = `${row.idea_label}. ${row.statement}. ${row.development}. ${row.evidence_text}`;
+    const score = row.theme_count <= 1 ? 0.72 : themeRelevance(row.theme_label, text);
+    if (score >= 0.62) add(row.theme_id, row.theme_label, row.global_id, Number(score.toFixed(3)), 'inferred', 'theme-edge');
+  }
+
+  return { edges: Array.from(edges.values()), labelsByIdea };
+}
+
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9ñ]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenize(text: string): Set<string> {
+  return new Set(normalizeText(text).split(' ').filter((t) => t.length > 2 && !STOPWORDS.has(t)));
+}
+
+function themeRelevance(themeLabel: string, ideaText: string): number {
+  const theme = normalizeThemeLabel(themeLabel);
+  const normalizedIdea = normalizeText(ideaText);
+  const normalizedTheme = normalizeText(theme);
+  if (!normalizedTheme) return 0;
+  if (normalizedIdea.includes(normalizedTheme)) return 1;
+
+  const themeTokens = Array.from(tokenize(theme));
+  const ideaTokens = tokenize(ideaText);
+  const direct = themeTokens.length
+    ? themeTokens.filter((token) => ideaTokens.has(token)).length / themeTokens.length
+    : 0;
+
+  const aliases = THEME_KEYWORD_ALIASES[theme] ?? [];
+  const aliasHit = aliases.some((alias) => normalizedIdea.includes(normalizeText(alias)));
+  const aliasScore = aliasHit ? (themeTokens.length <= 1 ? 1 : 0.72) : 0;
+  const thresholdedDirect = themeTokens.length <= 1 ? (direct >= 1 ? 1 : 0) : direct;
+
+  return Math.max(thresholdedDirect, aliasScore);
 }
 
 /** Mean of equal-length vectors; null if there are none. */
