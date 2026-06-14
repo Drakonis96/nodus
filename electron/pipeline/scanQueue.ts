@@ -135,10 +135,12 @@ class ScanQueue {
       if (item.kind === 'light') {
         await this.doLight(work);
       } else {
-        await this.doDeep(work);
+        await this.doDeep(work, item);
       }
       item.state = 'done';
       item.error = null;
+      item.detail = null;
+      item.subPct = null;
     } catch (e) {
       const retriable = e instanceof AiError && e.retriable;
       const attempts = (this.retries.get(item.id) ?? 0) + 1;
@@ -169,7 +171,7 @@ class ScanQueue {
     await runLightScan(work, abstract);
   }
 
-  private async doDeep(work: Work): Promise<void> {
+  private async doDeep(work: Work, queueItem: QueueItem): Promise<void> {
     const settings = getSettings();
     let abstract: string | null = null;
     try {
@@ -178,14 +180,19 @@ class ScanQueue {
     } catch {
       /* offline: rely on stored attachments */
     }
-    const doc = await resolveWorkText(
-      settings.zoteroUserId,
-      work.zotero_key,
-      settings.zoteroStoragePath,
-      abstract,
-      work.doi,
-      settings.unpaywallEmail
-    );
+    const doc = await resolveWorkText(settings.zoteroUserId, work.zotero_key, settings.zoteroStoragePath, abstract, work.doi, {
+      unpaywallEmail: settings.unpaywallEmail,
+      preferZoteroFulltext: settings.preferZoteroFulltext,
+      ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+      onProgress: (p) => {
+        queueItem.detail = p.detail;
+        queueItem.subPct = p.pct;
+        this.emit();
+      },
+    });
+    queueItem.detail = 'Analizando con IA…';
+    queueItem.subPct = null;
+    this.emit();
     await runDeepScan(work, doc);
   }
 

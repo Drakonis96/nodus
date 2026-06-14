@@ -16,6 +16,10 @@ const DEFAULTS: Omit<AppSettings, 'hasApiKey'> = {
   concurrency: 1,
   unpaywallEmail: '',
   onboardingComplete: false,
+  preferZoteroFulltext: true,
+  ocrEnabled: false,
+  ocrLanguages: 'spa+eng',
+  ocrMaxPages: 300,
 };
 
 function readRaw(key: string): string | undefined {

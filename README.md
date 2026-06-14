@@ -95,6 +95,42 @@ npm run dist       # current platform
 Manual (button) or realtime (polls the Zotero library version every ~25s and diffs
 with `?since=`). Each sync writes a `sync_log` entry.
 
+### Large-PDF handling (detector chain)
+Deep-scan text resolution escalates only as far as needed, so big/scanned PDFs stay
+cheap and memory-safe:
+
+1. **Zotero's own indexed full text** (`/items/{key}/fulltext`) — if Zotero already
+   extracted the text, reuse it (no parsing). Used only when it's substantial and
+   reasonably complete (≥90% of pages indexed).
+2. **PDF analyzer** (`pdfAnalyzer.ts`) samples evenly-spaced pages to estimate
+   text-layer coverage and classifies the document: `digital` / `hybrid` / `scanned`.
+3. **Streaming extraction** (`extractPdfStreaming`) parses page-by-page (never loads
+   all page text up front), prefixing each page with a `[[p. N]]` marker so the model
+   can cite accurate `location`s.
+4. **OCR** (opt-in, `ocrEnabled`) — only the image pages of `scanned`/`hybrid` PDFs are
+   OCR-ed locally with Tesseract, with a per-work page cap (`ocrMaxPages`) and live
+   per-page progress. A `scanned` PDF with OCR disabled exits fast (no full read) and
+   is marked `skipped_no_text` with an explanatory badge.
+5. **Fallbacks** — Unpaywall (by DOI) → abstract-only → none.
+
+We deliberately do **not** pre-convert PDFs to Markdown: a separate conversion pass
+adds cost and risks precision (priority #1). Preserving page markers + paragraph
+breaks gives the model better `location` grounding at lower risk.
+
+All phases report progress through the queue (`Extrayendo p. 8/22`, `OCR p. 12/340`),
+shown live in the queue bar.
+
+> OCR is local but Tesseract downloads its language data on first use (cached
+> afterwards). It is **off by default**; enable it in Settings → *Extracción de texto*.
+
+### Zotero API conformance
+Verified against the Zotero 7 local API: base `http://localhost:23119/api/`, the
+library is always addressed as **`users/0`** (the real numeric userID is not used
+locally), and every request sends **`Zotero-Allowed-Request: 1`** — required because
+Electron's `User-Agent` starts with `Mozilla/`, which Zotero otherwise rejects.
+Pagination uses `limit`/`start` with the `Total-Results` and `Last-Modified-Version`
+headers; incremental sync uses `?since=`. The client is strictly read-only.
+
 ### Traceability
 Every idea, edge, and gap stores its `evidence` (verbatim quote + location +
 `zotero_key`), so you can jump from any node or edge to the exact passage in Zotero.

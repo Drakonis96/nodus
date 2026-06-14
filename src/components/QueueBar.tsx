@@ -15,6 +15,7 @@ export function QueueBar() {
   const { done, failed, total, current, paused, items } = progress;
   const pct = total ? Math.round(((done + failed) / total) * 100) : 0;
   const active = done + failed < total;
+  const running = items.find((i) => i.state === 'running');
 
   return (
     <div className="border-t border-neutral-800 bg-neutral-900/80 backdrop-blur px-4 py-2 text-sm">
@@ -29,6 +30,12 @@ export function QueueBar() {
                 <>
                   {done + failed} / {total} — Procesando: <span className="text-neutral-200">{current.title}</span>{' '}
                   <span className="uppercase text-[10px] tracking-wide">({current.kind})</span>
+                  {running?.detail && (
+                    <span className="text-indigo-300 ml-1">
+                      · {running.detail}
+                      {running.subPct != null ? ` (${Math.round(running.subPct * 100)}%)` : ''}
+                    </span>
+                  )}
                 </>
               ) : paused ? (
                 'Cola en pausa'

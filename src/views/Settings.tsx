@@ -105,6 +105,40 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
         </Row>
       </Section>
 
+      <Section title="Extracción de texto (PDFs grandes)">
+        <Row label="Reusar texto indexado por Zotero">
+          <input
+            type="checkbox"
+            checked={settings.preferZoteroFulltext}
+            onChange={(e) => patch({ preferZoteroFulltext: e.target.checked })}
+          />
+        </Row>
+        <Row label="OCR para PDFs escaneados">
+          <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => patch({ ocrEnabled: e.target.checked })} />
+        </Row>
+        <Row label="Idiomas de OCR (Tesseract)">
+          <input
+            className="input"
+            value={settings.ocrLanguages}
+            onChange={(e) => patch({ ocrLanguages: e.target.value })}
+            placeholder="spa+eng"
+          />
+        </Row>
+        <Row label="Máx. páginas a OCR por obra">
+          <input
+            type="number"
+            min={1}
+            max={2000}
+            className="input w-24"
+            value={settings.ocrMaxPages}
+            onChange={(e) => patch({ ocrMaxPages: parseInt(e.target.value) || 1 })}
+          />
+        </Row>
+        <p className="text-xs text-neutral-500">
+          El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.
+        </p>
+      </Section>
+
       <Section title="Apariencia">
         <Row label="Tema">
           <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>

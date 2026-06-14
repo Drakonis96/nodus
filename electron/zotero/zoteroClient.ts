@@ -5,8 +5,13 @@ import type { ZoteroCollection, ZoteroItem } from '@shared/types';
 
 const BASE = 'http://localhost:23119/api';
 
+// The Zotero 7 local API always addresses the local library as `users/0`,
+// regardless of the account's real numeric userID.
+export const LOCAL_USER_ID = '0';
+
 const HEADERS: Record<string, string> = {
-  // Required by some Zotero 7 builds to allow local API requests.
+  // Required: Zotero rejects requests with a Mozilla/* User-Agent (Electron's) unless
+  // this header is present. https://www.zotero.org/support/dev/web_api/v3/basics
   'Zotero-Allowed-Request': '1',
 };
 
@@ -14,15 +19,22 @@ async function zfetch(url: string): Promise<Response> {
   return fetch(url, { headers: HEADERS });
 }
 
-/** Resolve the local user id and library version. Tries /api/ then falls back to 0. */
+/**
+ * Verify the local API is reachable. The local API has no auth and uses users/0,
+ * so we just confirm a 200 and read the library version header.
+ */
 export async function ping(): Promise<{ ok: boolean; userId?: string; version?: number; message?: string }> {
   try {
-    const res = await zfetch(`${BASE}/`);
-    if (!res.ok) return { ok: false, message: `HTTP ${res.status}` };
-    const body = (await res.json().catch(() => ({}))) as { userID?: number | string; username?: string };
-    const userId = body.userID != null ? String(body.userID) : '0';
-    const version = await libraryVersion(userId);
-    return { ok: true, userId, version };
+    const res = await zfetch(`${BASE}/users/${LOCAL_USER_ID}/items?limit=1`);
+    if (!res.ok) {
+      const hint =
+        res.status === 403
+          ? 'Habilita "Permitir que otras aplicaciones se comuniquen con Zotero" en Ajustes › Avanzado.'
+          : `HTTP ${res.status}`;
+      return { ok: false, message: hint };
+    }
+    const v = res.headers.get('Last-Modified-Version');
+    return { ok: true, userId: LOCAL_USER_ID, version: v ? parseInt(v, 10) : 0 };
   } catch (e) {
     return { ok: false, message: (e as Error).message };
   }
@@ -120,6 +132,27 @@ export interface ZoteroAttachment {
   contentType: string | null;
   linkMode: string | null;
   filename: string | null;
+}
+
+export interface ZoteroFulltext {
+  content: string;
+  indexedPages?: number;
+  totalPages?: number;
+  indexedChars?: number;
+  totalChars?: number;
+}
+
+/**
+ * Zotero's own indexed full text for an attachment item (PDFs are indexed on import).
+ * Returns null when the item has no indexed text (404 / empty). This lets us reuse
+ * Zotero's extraction instead of re-parsing the PDF ourselves.
+ */
+export async function getFulltext(userId: string, attachmentKey: string): Promise<ZoteroFulltext | null> {
+  const res = await zfetch(`${BASE}/users/${userId}/items/${attachmentKey}/fulltext`);
+  if (!res.ok) return null;
+  const data = (await res.json().catch(() => null)) as ZoteroFulltext | null;
+  if (!data || !data.content || !data.content.trim()) return null;
+  return data;
 }
 
 export async function itemChildren(userId: string, itemKey: string): Promise<ZoteroAttachment[]> {

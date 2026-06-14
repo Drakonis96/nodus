@@ -36,7 +36,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // zotero
   h('zotero:ping', async () => {
     const res = await zotero.ping();
-    if (res.ok && res.userId) updateSettings({ zoteroUserId: res.userId });
+    // Local API always uses users/0; persist that so all later calls address it correctly.
+    if (res.ok) updateSettings({ zoteroUserId: zotero.LOCAL_USER_ID });
     return res;
   });
   h('zotero:collections', async () => {
@@ -92,8 +93,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   h('works:uploadText', async (_e, nodusId: string, filePath: string) => {
     const w = getDb().prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as any;
     if (!w) return;
-    const doc = await extractFromPath(filePath);
-    doc.sourceType = 'upload';
+    const s = getSettings();
+    const doc = await extractFromPath(filePath, {
+      ocr: { enabled: s.ocrEnabled, languages: s.ocrLanguages, maxPages: s.ocrMaxPages },
+    });
     markDeepPending(nodusId);
     await runDeepScan(w, doc);
   });
