@@ -77,6 +77,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const w = works.getWork(nodusId);
     if (value && w) {
       works.setDeepPending(nodusId);
+      // A light scan first captures the broad "research line" parent themes that group
+      // sibling ideas in the graph; the deep scan then preserves them.
+      if (w.light_status !== 'done') {
+        works.setLightPending(nodusId);
+        scanQueue.enqueue(nodusId, w.title, 'light', model);
+      }
       scanQueue.enqueue(nodusId, w.title, 'deep', model);
     }
   });
@@ -87,6 +93,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
         const w = works.getWork(id);
         if (w) {
           works.setDeepPending(id);
+          if (w.light_status !== 'done') {
+            works.setLightPending(id);
+            scanQueue.enqueue(id, w.title, 'light', model);
+          }
           scanQueue.enqueue(id, w.title, 'deep', model);
         }
       }
@@ -147,6 +157,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // export / import
   h('data:export', async () => exportData());
   h('data:import', async () => importData());
+  h('data:resetGraph', async () => {
+    // Stop any pending scans first so a finishing job can't repopulate after the wipe.
+    scanQueue.clear();
+    ideas.resetGraphData();
+  });
 
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {

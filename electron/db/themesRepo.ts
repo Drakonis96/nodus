@@ -50,6 +50,15 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
   tx();
 }
 
+export function getWorkThemeLabels(nodusId: string): string[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT t.label FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id WHERE wt.nodus_id = ? ORDER BY t.label`
+    )
+    .all(nodusId) as { label: string }[];
+  return rows.map((r) => r.label);
+}
+
 export function listThemes(): Theme[] {
   return getDb().prepare('SELECT * FROM themes ORDER BY label').all() as Theme[];
 }

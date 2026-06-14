@@ -171,6 +171,36 @@ export function addEdge(input: NewEdgeInput): string {
   return id;
 }
 
+/**
+ * Reinitialise the whole graph: drop every piece of derived analysis (ideas, themes,
+ * edges, authors, gaps, evidence) and reset each work's scan status to 'none' so it can
+ * be analysed again from scratch. The Zotero-sourced library (works) and the user's
+ * settings are kept — only the graph is wiped.
+ */
+export function resetGraphData(): void {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.exec(`
+      DELETE FROM idea_occurrences;
+      DELETE FROM evidence;
+      DELETE FROM edges;
+      DELETE FROM ideas;
+      DELETE FROM gaps;
+      DELETE FROM external_refs;
+      DELETE FROM work_authors;
+      DELETE FROM author_relations;
+      DELETE FROM authors;
+      DELETE FROM work_themes;
+      DELETE FROM themes;
+      UPDATE works SET
+        light_status = 'none', light_at = NULL, light_hash = NULL,
+        deep_status = 'none', deep_at = NULL, deep_hash = NULL,
+        source_type = NULL, notes = NULL;
+    `);
+  });
+  tx();
+}
+
 /** Remove all derived deep-scan data for a work, so it can be cleanly re-scanned. */
 export function purgeDeepData(nodusId: string): void {
   const db = getDb();

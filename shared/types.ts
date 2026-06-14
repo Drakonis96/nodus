@@ -385,6 +385,9 @@ export interface NodusApi {
   // export / import
   exportData(): Promise<{ path: string } | null>;
   importData(): Promise<{ ok: boolean; message: string }>;
+  /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
+   *  status on every work. The library and settings are kept. */
+  resetGraph(): Promise<void>;
 }
 
 export interface WorkFilter {

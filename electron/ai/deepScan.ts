@@ -11,7 +11,7 @@ import {
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
 import { setDeepResult } from '../db/worksRepo';
-import { setWorkThemes } from '../db/themesRepo';
+import { setWorkThemes, getWorkThemeLabels, normalizeThemeLabel } from '../db/themesRepo';
 import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { chunkText, ExtractedDoc } from '../extraction/textExtractor';
 
@@ -177,12 +177,26 @@ export async function runDeepScan(
   purgeDeepData(work.nodus_id);
 
   const merged = mergeByLabel(results);
-  if (merged.themes.size > 0) {
-    const labels = Array.from(merged.themes.values())
-      .sort((a, b) => themeScore(b) - themeScore(a))
-      .slice(0, 6)
-      .map((t) => t.label);
-    setWorkThemes(work.nodus_id, labels);
+  // Merge the deep scan's theme families with the broad themes the light scan already
+  // assigned, instead of replacing them. The light scan tends to capture the wide
+  // "research line" parent (e.g. "literatura de viajes") that groups sibling ideas;
+  // the deep scan adds finer families. Replacing would drop the parent and leave the
+  // ideas orphaned in the graph.
+  const deepThemeLabels = Array.from(merged.themes.values())
+    .sort((a, b) => themeScore(b) - themeScore(a))
+    .slice(0, 6)
+    .map((t) => t.label);
+  const existingThemeLabels = getWorkThemeLabels(work.nodus_id);
+  const unionThemes: string[] = [];
+  const seenThemes = new Set<string>();
+  for (const label of [...existingThemeLabels, ...deepThemeLabels]) {
+    const norm = normalizeThemeLabel(label);
+    if (!norm || seenThemes.has(norm)) continue;
+    seenThemes.add(norm);
+    unionThemes.push(label);
+  }
+  if (unionThemes.length > 0) {
+    setWorkThemes(work.nodus_id, unionThemes.slice(0, 8));
   }
 
   // Resolve each merged idea against the global graph (Prompt 2 / fusion).

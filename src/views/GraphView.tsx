@@ -1,11 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import type { GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge } from '../components/ui';
+import { useScanComplete } from '../hooks';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
+
+// Force-directed layout tuned to keep nodes and their (bottom-aligned) labels from
+// overlapping: strong repulsion, generous component spacing so disconnected nodes
+// don't pile on top of each other, and enough iterations to settle.
+const COSE_LAYOUT = {
+  name: 'cose',
+  animate: false,
+  randomize: true,
+  fit: true,
+  padding: 60,
+  nodeRepulsion: () => 24000,
+  nodeOverlap: 32,
+  idealEdgeLength: () => 130,
+  edgeElasticity: () => 120,
+  componentSpacing: 170,
+  gravity: 0.2,
+  numIter: 1500,
+  coolingFactor: 0.95,
+  initialTemp: 220,
+} as const;
 
 interface Filters {
   search: string;
@@ -61,10 +82,18 @@ export function GraphView() {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
   }, [filters]);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     void window.nodus.getGraph(lens).then(setData);
     void window.nodus.getThemes().then((t) => setThemes(t.map((x) => x.label)));
   }, [lens]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Refresh the graph when scans finish so freshly analysed works appear without
+  // having to leave and re-open the view.
+  useScanComplete(reload);
 
   const allAuthors = useMemo(() => {
     const set = new Set<string>();
@@ -129,8 +158,10 @@ export function GraphView() {
               color: '#e5e5e5',
               'font-size': 9,
               'text-wrap': 'wrap',
-              'text-max-width': '90px',
+              'text-max-width': '84px',
               'text-valign': 'bottom',
+              'text-margin-y': 4,
+              'min-zoomed-font-size': 5,
               width: 'data(size)',
               height: 'data(size)',
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
@@ -152,7 +183,7 @@ export function GraphView() {
           },
           { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid' } },
         ],
-        layout: { name: 'cose', animate: false },
+        layout: COSE_LAYOUT as any,
       });
 
       cyRef.current.on('tap', 'node', async (evt) => {
@@ -178,7 +209,7 @@ export function GraphView() {
     const cy = cyRef.current;
     cy.elements().remove();
     cy.add(elements);
-    cy.layout({ name: 'cose', animate: false, nodeRepulsion: () => 8000 } as any).run();
+    cy.layout(COSE_LAYOUT as any).run();
   }, [elements, lens]);
 
   const setF = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));

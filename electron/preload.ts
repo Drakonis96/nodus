@@ -51,6 +51,7 @@ const api: NodusApi = {
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: () => ipcRenderer.invoke('data:import'),
+  resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 };
 
 contextBridge.exposeInMainWorld('nodus', api);

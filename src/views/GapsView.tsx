@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
 import { Badge, EDGE_LABELS } from '../components/ui';
+import { useScanComplete } from '../hooks';
 
 const KIND_LABELS: Record<GapKind, string> = {
   future_work: 'trabajo futuro',
@@ -21,10 +22,15 @@ export function GapsView() {
   const [contradictions, setContradictions] = useState<EdgeDetail[]>([]);
   const [tab, setTab] = useState<'mined' | 'contradictions'>('mined');
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     void window.nodus.getGaps().then(setGaps);
     void window.nodus.getContradictions().then(setContradictions);
   }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+  useScanComplete(reload);
 
   return (
     <div className="h-full overflow-y-auto p-6">

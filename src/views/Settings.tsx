@@ -4,6 +4,11 @@ import { ProvidersSettings } from './ProvidersSettings';
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [saved, setSaved] = useState<string | null>(null);
+  // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
+  // freshly generated 4-digit code so it can't be triggered by accident.
+  const [resetCode, setResetCode] = useState<string | null>(null);
+  const [resetInput, setResetInput] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const patch = async (p: Partial<AppSettings>) => {
     await window.nodus.updateSettings(p);
@@ -15,8 +20,30 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     setTimeout(() => setSaved(null), 2000);
   };
 
+  const startReset = () => {
+    const ok = window.confirm(
+      'Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?'
+    );
+    if (!ok) return;
+    setResetInput('');
+    setResetCode(String(Math.floor(1000 + Math.random() * 9000)));
+  };
+
+  const confirmReset = async () => {
+    if (resetInput !== resetCode) return;
+    setResetting(true);
+    try {
+      await window.nodus.resetGraph();
+      setResetCode(null);
+      setResetInput('');
+      flash('Grafo reinicializado. Vuelve a analizar tus obras para reconstruirlo.');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-6 max-w-2xl">
+    <div className="h-full overflow-y-auto p-6">
       <h1 className="text-xl font-semibold mb-6">Ajustes</h1>
 
       <ProvidersSettings settings={settings} onChange={onChange} />
@@ -156,6 +183,60 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           </button>
         </div>
       </Section>
+
+      <section className="card p-4 mb-4 border border-red-900/60">
+        <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">Zona de peligro</h2>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <label className="text-sm text-neutral-300">Reinicializar grafo</label>
+            <p className="text-xs text-neutral-500 mt-0.5">
+              Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La
+              biblioteca y los ajustes se conservan.
+            </p>
+          </div>
+          <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
+            Reinicializar…
+          </button>
+        </div>
+      </section>
+
+      {resetCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => !resetting && setResetCode(null)}>
+          <div className="card p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-semibold text-red-400">Confirmación final</h3>
+            <p className="text-sm text-neutral-300">
+              Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:
+            </p>
+            <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-100 bg-neutral-950 rounded-lg py-3 select-none">
+              {resetCode}
+            </div>
+            <input
+              autoFocus
+              inputMode="numeric"
+              maxLength={4}
+              className="input w-full text-center text-xl tracking-[0.4em] font-mono"
+              placeholder="····"
+              value={resetInput}
+              onChange={(e) => setResetInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && resetInput === resetCode) void confirmReset();
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <button className="btn btn-ghost" disabled={resetting} onClick={() => setResetCode(null)}>
+                Cancelar
+              </button>
+              <button
+                className="btn border border-red-800 text-red-300 hover:bg-red-950/50 disabled:opacity-40"
+                disabled={resetInput !== resetCode || resetting}
+                onClick={() => void confirmReset()}
+              >
+                {resetting ? 'Borrando…' : 'Borrar grafo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {saved && <div className="fixed bottom-20 right-6 card px-4 py-2 text-sm text-emerald-400">{saved}</div>}
     </div>

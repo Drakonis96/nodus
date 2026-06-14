@@ -1,16 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { ReadingPathEntry } from '@shared/types';
 import { Badge } from '../components/ui';
+import { useScanComplete } from '../hooks';
 
 export function ReadingPathView() {
   const [path, setPath] = useState<ReadingPathEntry[]>([]);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     void window.nodus.getReadingPath().then(setPath);
   }, []);
 
+  useEffect(() => {
+    reload();
+  }, [reload]);
+  useScanComplete(reload);
+
   return (
-    <div className="h-full overflow-y-auto p-6 max-w-3xl">
+    <div className="h-full overflow-y-auto p-6">
       <h1 className="text-xl font-semibold mb-1">Ruta de lectura</h1>
       <p className="text-sm text-neutral-400 mb-5">
         Orden recomendado: lo más seminal primero, resaltando lo que aún no has leído. ¿Por dónde empiezo?
