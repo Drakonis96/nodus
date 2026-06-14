@@ -5,8 +5,10 @@ import type { NodusApi, QueueProgress } from '@shared/types';
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
-  setApiKey: (key) => ipcRenderer.invoke('settings:setApiKey', key),
-  clearApiKey: () => ipcRenderer.invoke('settings:clearApiKey'),
+  setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
+  clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
+
+  listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
@@ -16,9 +18,9 @@ const api: NodusApi = {
 
   listWorks: (filter) => ipcRenderer.invoke('works:list', filter),
   getWork: (nodusId) => ipcRenderer.invoke('works:get', nodusId),
-  setManualDeep: (nodusId, value) => ipcRenderer.invoke('works:setManualDeep', nodusId, value),
-  setManualDeepBulk: (nodusIds, value) => ipcRenderer.invoke('works:setManualDeepBulk', nodusIds, value),
-  rescan: (nodusId, kind) => ipcRenderer.invoke('works:rescan', nodusId, kind),
+  setManualDeep: (nodusId, value, model) => ipcRenderer.invoke('works:setManualDeep', nodusId, value, model),
+  setManualDeepBulk: (nodusIds, value, model) => ipcRenderer.invoke('works:setManualDeepBulk', nodusIds, value, model),
+  rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 

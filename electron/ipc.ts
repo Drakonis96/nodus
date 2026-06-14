@@ -1,7 +1,8 @@
 import { ipcMain, shell, BrowserWindow } from 'electron';
-import type { AppSettings, QueueKind, WorkFilter } from '@shared/types';
+import type { AppSettings, QueueKind, WorkFilter, AiProvider, ModelRef } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
-import { setApiKey, clearApiKey } from './secrets/secretStore';
+import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
+import { listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import * as ideas from './db/ideasRepo';
@@ -30,8 +31,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     return next;
   });
-  h('settings:setApiKey', async (_e, key: string) => setApiKey(key));
-  h('settings:clearApiKey', async () => clearApiKey());
+  h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
+  h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
+
+  // AI model discovery (OpenRouter needs no key; others use the stored key).
+  h('ai:listModels', async (_e, provider: AiProvider) => listModels(provider, getApiKey(provider)));
 
   // zotero
   h('zotero:ping', async () => {
@@ -48,42 +52,44 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const { zoteroUserId } = getSettings();
     return zotero.childCollections(zoteroUserId, parentKey);
   });
-  h('zotero:collectionItems', async (_e, collectionKey: string, opts?: { query?: string }) => {
+  h('zotero:collectionItems', async (_e, collectionKey: string, opts?: { query?: string; recursive?: boolean }) => {
     const { zoteroUserId } = getSettings();
-    return zotero.collectionItems(zoteroUserId, collectionKey, opts);
+    return opts?.recursive
+      ? zotero.collectionItemsRecursive(zoteroUserId, collectionKey, opts)
+      : zotero.collectionItems(zoteroUserId, collectionKey, opts);
   });
 
   // works / library
   h('works:list', async (_e, filter?: WorkFilter) => works.listWorks(filter));
   h('works:get', async (_e, nodusId: string) => works.getWork(nodusId));
-  h('works:setManualDeep', async (_e, nodusId: string, value: boolean) => {
+  h('works:setManualDeep', async (_e, nodusId: string, value: boolean, model?: ModelRef | null) => {
     works.setManualDeep(nodusId, value);
     const w = works.getWork(nodusId);
     if (value && w) {
       markDeepPending(nodusId);
-      scanQueue.enqueue(nodusId, w.title, 'deep');
+      scanQueue.enqueue(nodusId, w.title, 'deep', model);
     }
   });
-  h('works:setManualDeepBulk', async (_e, nodusIds: string[], value: boolean) => {
+  h('works:setManualDeepBulk', async (_e, nodusIds: string[], value: boolean, model?: ModelRef | null) => {
     for (const id of nodusIds) {
       works.setManualDeep(id, value);
       if (value) {
         const w = works.getWork(id);
         if (w) {
           markDeepPending(id);
-          scanQueue.enqueue(id, w.title, 'deep');
+          scanQueue.enqueue(id, w.title, 'deep', model);
         }
       }
     }
   });
-  h('works:rescan', async (_e, nodusId: string, kind: QueueKind) => {
+  h('works:rescan', async (_e, nodusId: string, kind: QueueKind, model?: ModelRef | null) => {
     const w = works.getWork(nodusId);
     if (!w) return;
     if (kind === 'deep') {
       ideas.purgeDeepData(nodusId);
       markDeepPending(nodusId);
     }
-    scanQueue.enqueue(nodusId, w.title, kind);
+    scanQueue.enqueue(nodusId, w.title, kind, model);
   });
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();

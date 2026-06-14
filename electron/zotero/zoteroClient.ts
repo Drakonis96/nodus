@@ -52,7 +52,9 @@ function mapCollection(raw: any): ZoteroCollection {
     key: raw.key ?? raw.data?.key,
     name: raw.data?.name ?? raw.name ?? '(sin nombre)',
     parentCollection: raw.data?.parentCollection ?? false,
+    // meta.numItems counts ONLY items directly in the collection (not subcollections).
     itemCount: raw.meta?.numItems ?? 0,
+    subCount: raw.meta?.numCollections ?? 0,
   };
 }
 
@@ -119,6 +121,29 @@ export async function collectionItems(
     if (data.length < limit || start >= total) break;
   }
   return out;
+}
+
+/**
+ * Items in a collection AND all its descendant subcollections, de-duplicated by key.
+ * The Zotero API has no reliable recursive parameter, so we traverse the tree.
+ */
+export async function collectionItemsRecursive(
+  userId: string,
+  collectionKey: string,
+  opts: { query?: string } = {}
+): Promise<ZoteroItem[]> {
+  const seen = new Map<string, ZoteroItem>();
+  const visited = new Set<string>();
+  const visit = async (key: string): Promise<void> => {
+    if (visited.has(key)) return;
+    visited.add(key);
+    const items = await collectionItems(userId, key, opts).catch(() => [] as ZoteroItem[]);
+    for (const it of items) if (!seen.has(it.key)) seen.set(it.key, it);
+    const children = await childCollections(userId, key).catch(() => [] as ZoteroCollection[]);
+    for (const c of children) await visit(c.key);
+  };
+  await visit(collectionKey);
+  return Array.from(seen.values());
 }
 
 export async function getItem(userId: string, itemKey: string): Promise<ZoteroItem | null> {

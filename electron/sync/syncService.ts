@@ -9,7 +9,7 @@ import {
   setReadTag,
   recomputeDeepTrigger,
 } from '../db/worksRepo';
-import { collectionItems, libraryVersion, getItem } from '../zotero/zoteroClient';
+import { collectionItemsRecursive, libraryVersion } from '../zotero/zoteroClient';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, ZoteroItem } from '@shared/types';
 import { getDb } from '../db/database';
@@ -73,7 +73,8 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   for (const collectionKey of settings.monitoredCollections) {
     let items: ZoteroItem[] = [];
     try {
-      items = await collectionItems(userId, collectionKey);
+      // Recurse into subcollections so monitoring a parent captures everything under it.
+      items = await collectionItemsRecursive(userId, collectionKey);
     } catch {
       continue; // collection unavailable; skip without aborting the whole sync
     }

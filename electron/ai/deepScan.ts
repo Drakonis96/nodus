@@ -11,7 +11,7 @@ import {
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
 import { setDeepResult } from '../db/worksRepo';
-import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind } from '@shared/types';
+import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { chunkText, ExtractedDoc } from '../extraction/textExtractor';
 
 // ── Prompt 1 output shapes ────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ function mergeByLabel(results: DeepResult[]): {
  * Deep scan: extract ideas per chunk, merge within the work, fuse against the
  * global graph, and persist all derived data with traceable evidence.
  */
-export async function runDeepScan(work: Work, doc: ExtractedDoc): Promise<void> {
+export async function runDeepScan(work: Work, doc: ExtractedDoc, model?: ModelRef | null): Promise<void> {
   const text = doc.text;
   const hash = crypto.createHash('sha1').update(text).digest('hex');
 
@@ -128,7 +128,8 @@ export async function runDeepScan(work: Work, doc: ExtractedDoc): Promise<void> 
     };
     const result = await completeJson<DeepResult>(
       { system: PROMPT_DEEP, user: JSON.stringify(input), temperature: 0.15, maxTokens: 8000 },
-      isDeepResult
+      isDeepResult,
+      model
     );
     results.push(result);
   }
@@ -147,7 +148,7 @@ export async function runDeepScan(work: Work, doc: ExtractedDoc): Promise<void> 
       label: idea.label,
       statement: idea.statement,
     };
-    const globalId = await fuseIdea(ext, work.nodus_id);
+    const globalId = await fuseIdea(ext, work.nodus_id, model);
     labelToGlobal.set(labelKey, globalId);
 
     upsertOccurrence(globalId, work.nodus_id, idea.role, idea.development, idea.confidence);

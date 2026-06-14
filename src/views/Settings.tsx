@@ -1,22 +1,13 @@
 import { useState } from 'react';
 import type { AppSettings } from '@shared/types';
+import { ProvidersSettings } from './ProvidersSettings';
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
-  const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState<string | null>(null);
 
   const patch = async (p: Partial<AppSettings>) => {
     await window.nodus.updateSettings(p);
     await onChange();
-  };
-
-  const saveKey = async () => {
-    if (apiKey.trim()) {
-      await window.nodus.setApiKey(apiKey.trim());
-      setApiKey('');
-      await onChange();
-      flash('Clave guardada');
-    }
   };
 
   const flash = (m: string) => {
@@ -28,44 +19,11 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     <div className="h-full overflow-y-auto p-6 max-w-2xl">
       <h1 className="text-xl font-semibold mb-6">Ajustes</h1>
 
-      <Section title="Proveedor de IA">
-        <Row label="Proveedor">
-          <select className="input" value={settings.aiProvider} onChange={(e) => patch({ aiProvider: e.target.value as any })}>
-            <option value="anthropic">Anthropic</option>
-            <option value="openai">OpenAI</option>
-          </select>
-        </Row>
-        <Row label="Modelo">
-          <input className="input" value={settings.aiModel} onChange={(e) => patch({ aiModel: e.target.value })} />
-        </Row>
-        <Row label="Modelo de embeddings">
-          <input
-            className="input"
-            value={settings.embeddingModel}
-            onChange={(e) => patch({ embeddingModel: e.target.value })}
-          />
-        </Row>
-        <Row label="Clave de IA">
-          <div className="flex gap-2 items-center">
-            <input
-              type="password"
-              className="input flex-1"
-              placeholder={settings.hasApiKey ? '•••••••• (guardada)' : 'introduce la clave'}
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-            <button className="btn btn-primary" onClick={saveKey}>
-              Guardar
-            </button>
-            {settings.hasApiKey && (
-              <button
-                className="btn btn-ghost text-red-400"
-                onClick={() => window.nodus.clearApiKey().then(onChange)}
-              >
-                Borrar
-              </button>
-            )}
-          </div>
+      <ProvidersSettings settings={settings} onChange={onChange} />
+
+      <Section title="IA (avanzado)">
+        <Row label="Modelo de embeddings (OpenAI)">
+          <input className="input" value={settings.embeddingModel} onChange={(e) => patch({ embeddingModel: e.target.value })} />
         </Row>
         <Row label="Llamadas simultáneas">
           <input
@@ -78,11 +36,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           />
         </Row>
         <Row label="Email Unpaywall (fallback de texto)">
-          <input
-            className="input"
-            value={settings.unpaywallEmail}
-            onChange={(e) => patch({ unpaywallEmail: e.target.value })}
-          />
+          <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
         </Row>
       </Section>
 

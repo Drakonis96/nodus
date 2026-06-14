@@ -1,5 +1,7 @@
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
+import { openAiCompatBase, supportsJsonMode } from './providers';
+import type { AiProvider, ModelRef } from '@shared/types';
 
 export class AiError extends Error {
   constructor(message: string, public retriable = false) {
@@ -14,18 +16,26 @@ interface CallOpts {
   maxTokens?: number;
 }
 
-/** Low-level chat completion returning raw text, provider-agnostic. */
-async function rawComplete(opts: CallOpts): Promise<string> {
-  const settings = getSettings();
-  const key = getApiKey();
-  if (!key) throw new AiError('Falta la clave de IA. Configúrala en Ajustes.', false);
+/** Resolve which model to use: explicit override, else the configured default. */
+function resolveModel(override?: ModelRef | null): ModelRef {
+  if (override?.provider && override.model) return override;
+  const def = getSettings().defaultModel;
+  if (!def?.provider || !def.model) {
+    throw new AiError('No hay un modelo de IA configurado. Elige uno en Ajustes.', false);
+  }
+  return def;
+}
 
-  if (settings.aiProvider === 'anthropic') {
+async function rawComplete(model: ModelRef, opts: CallOpts): Promise<string> {
+  const key = getApiKey(model.provider);
+  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false);
+
+  if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
     try {
       const res = await client.messages.create({
-        model: settings.aiModel,
+        model: model.model,
         max_tokens: opts.maxTokens ?? 8000,
         temperature: opts.temperature ?? 0.15,
         system: opts.system,
@@ -38,15 +48,16 @@ async function rawComplete(opts: CallOpts): Promise<string> {
     }
   }
 
-  // OpenAI
+  // OpenAI-compatible providers: openai, openrouter, deepseek, gemini.
+  const baseURL = openAiCompatBase(model.provider);
   const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey: key });
+  const client = new OpenAI({ apiKey: key, baseURL: baseURL ?? undefined });
   try {
     const res = await client.chat.completions.create({
-      model: settings.aiModel,
+      model: model.model,
       temperature: opts.temperature ?? 0.15,
       max_tokens: opts.maxTokens ?? 8000,
-      response_format: { type: 'json_object' },
+      ...(supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
       messages: [
         { role: 'system', content: opts.system },
         { role: 'user', content: opts.user },
@@ -62,7 +73,7 @@ function wrapProviderError(e: any): AiError {
   const status = e?.status ?? e?.response?.status;
   if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true);
   if (status >= 500) return new AiError(`Error del proveedor (${status})`, true);
-  if (status === 401) return new AiError('Clave de IA inválida', false);
+  if (status === 401 || status === 403) return new AiError('Clave de IA inválida', false);
   return new AiError(e?.message ?? 'Error de IA', false);
 }
 
@@ -77,38 +88,55 @@ function extractJson(text: string): unknown {
 }
 
 /**
- * JSON completion with one retry at temperature 0 if parsing fails (per spec).
- * Validates with the provided guard before returning.
+ * JSON completion with one retry at temperature 0 if parsing fails.
+ * Uses the given model override or the configured default model.
  */
-export async function completeJson<T>(opts: CallOpts, guard: (v: unknown) => v is T): Promise<T> {
+export async function completeJson<T>(
+  opts: CallOpts,
+  guard: (v: unknown) => v is T,
+  model?: ModelRef | null
+): Promise<T> {
+  const resolved = resolveModel(model);
   let lastErr: unknown;
   for (const temperature of [opts.temperature ?? 0.15, 0]) {
     try {
-      const text = await rawComplete({ ...opts, temperature });
+      const text = await rawComplete(resolved, { ...opts, temperature });
       const parsed = extractJson(text);
       if (guard(parsed)) return parsed;
       lastErr = new AiError('El JSON no cumple el esquema esperado');
     } catch (e) {
       lastErr = e;
-      if (e instanceof AiError && e.retriable) throw e; // rate-limit: let the queue back off
+      if (e instanceof AiError && e.retriable) throw e;
     }
   }
   throw lastErr instanceof Error ? lastErr : new AiError('Fallo de parseo JSON');
 }
 
-/** Embeddings via OpenAI embeddings endpoint (works for both providers' keys when OpenAI selected). */
+const EMBED_MODELS: Partial<Record<AiProvider, string>> = {
+  openai: 'text-embedding-3-small',
+  gemini: 'text-embedding-004',
+};
+
+/**
+ * Embeddings for idea fusion. Uses whichever embedding-capable provider has a key
+ * (OpenAI or Gemini). Returns null when none is available — fusion then stays
+ * conservative (treats ideas as new).
+ */
 export async function embed(text: string): Promise<number[] | null> {
   const settings = getSettings();
-  const key = getApiKey();
-  if (!key) return null;
-  // Embeddings require an OpenAI-compatible endpoint; only attempt when using OpenAI.
-  if (settings.aiProvider !== 'openai') return null;
-  const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey: key });
-  try {
-    const res = await client.embeddings.create({ model: settings.embeddingModel, input: text.slice(0, 8000) });
-    return res.data[0]?.embedding ?? null;
-  } catch {
-    return null;
+  for (const provider of ['openai', 'gemini'] as AiProvider[]) {
+    const key = getApiKey(provider);
+    if (!key) continue;
+    const baseURL = openAiCompatBase(provider) ?? undefined;
+    const modelId = (provider === 'openai' && settings.embeddingModel) || EMBED_MODELS[provider]!;
+    try {
+      const OpenAI = (await import('openai')).default;
+      const client = new OpenAI({ apiKey: key, baseURL });
+      const res = await client.embeddings.create({ model: modelId, input: text.slice(0, 8000) });
+      return res.data[0]?.embedding ?? null;
+    } catch {
+      /* try next provider */
+    }
   }
+  return null;
 }

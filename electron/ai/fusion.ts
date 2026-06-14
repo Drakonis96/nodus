@@ -7,7 +7,7 @@ import {
   addEdge,
   getIdea,
 } from '../db/ideasRepo';
-import type { IdeaType, EdgeType, EdgeBasis } from '@shared/types';
+import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
 
 export interface ExtractedIdea {
   localId: string;
@@ -38,7 +38,7 @@ const MAX_CANDIDATES = 6;
  * Resolve one extracted idea against the global graph.
  * Returns the global_id this idea maps to (existing or newly created).
  */
-export async function fuseIdea(idea: ExtractedIdea, sourceWork: string): Promise<string> {
+export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: ModelRef | null): Promise<string> {
   const embedding = await embed(`${idea.label}. ${idea.statement}`);
 
   // Retrieve candidates by cosine similarity (in-memory fallback if no sqlite-vec).
@@ -77,7 +77,8 @@ export async function fuseIdea(idea: ExtractedIdea, sourceWork: string): Promise
   try {
     result = await completeJson<FusionResult>(
       { system: PROMPT_FUSION, user: JSON.stringify(input), temperature: 0.1, maxTokens: 800 },
-      isFusionResult
+      isFusionResult,
+      model
     );
   } catch {
     // On fusion failure, be conservative: treat as new (avoid wrong merges).
