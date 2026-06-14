@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, ZoteroCollection } from '@shared/types';
+import type { AiProvider, ZoteroCollection, ModelInfo } from '@shared/types';
+import { AI_PROVIDERS, PROVIDER_LABELS } from '../components/ui';
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
@@ -9,8 +10,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [readTag, setReadTag] = useState('leído');
   const [provider, setProvider] = useState<AiProvider>('anthropic');
-  const [model, setModel] = useState('claude-sonnet-4-6');
   const [apiKey, setApiKey] = useState('');
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [modelError, setModelError] = useState<string | null>(null);
+  const [loadingModels, setLoadingModels] = useState(false);
   const [storagePath, setStoragePath] = useState('');
 
   const checkZotero = async () => {
@@ -26,13 +30,30 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     void checkZotero();
   }, []);
 
+  const loadModels = async () => {
+    setLoadingModels(true);
+    setModelError(null);
+    try {
+      if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
+      const list = await window.nodus.listModels(provider);
+      setModels(list);
+      if (list[0]) setSelectedModel(list[0].id);
+    } catch (e) {
+      setModelError((e as Error).message);
+      setModels([]);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
   const finish = async () => {
-    if (apiKey.trim()) await window.nodus.setApiKey(apiKey.trim());
+    if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
+    const ref = selectedModel ? { provider, model: selectedModel } : null;
     await window.nodus.updateSettings({
       monitoredCollections: Array.from(selected),
       readTag,
-      aiProvider: provider,
-      aiModel: model,
+      defaultModel: ref,
+      favorites: ref ? [ref] : [],
       zoteroStoragePath: storagePath,
       onboardingComplete: true,
     });
@@ -86,7 +107,9 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
 
         {step === 1 && (
           <div className="space-y-3">
-            <p className="text-sm text-neutral-400">Elige las colecciones a monitorizar (escaneo ligero).</p>
+            <p className="text-sm text-neutral-400">
+              Elige las colecciones a monitorizar (escaneo ligero). Se incluyen automáticamente sus subcolecciones.
+            </p>
             <div className="max-h-64 overflow-y-auto space-y-1">
               {collections.map((c) => (
                 <label key={c.key} className="flex items-center gap-2 text-sm py-1">
@@ -99,7 +122,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                       setSelected(next);
                     }}
                   />
-                  {c.name} <span className="text-neutral-600">({c.itemCount})</span>
+                  {c.name}{' '}
+                  <span className="text-neutral-600">
+                    ({c.itemCount} ítems{c.subCount ? `, ${c.subCount} subcol.` : ''})
+                  </span>
                 </label>
               ))}
               {collections.length === 0 && <div className="text-neutral-500 text-sm">No hay colecciones cargadas.</div>}
@@ -133,21 +159,23 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 className="input w-full mt-1"
                 value={provider}
                 onChange={(e) => {
-                  const p = e.target.value as AiProvider;
-                  setProvider(p);
-                  setModel(p === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o');
+                  setProvider(e.target.value as AiProvider);
+                  setModels([]);
+                  setSelectedModel('');
                 }}
               >
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
+                {AI_PROVIDERS.map((p) => (
+                  <option key={p} value={p}>
+                    {PROVIDER_LABELS[p]}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block text-sm">
-              Modelo
-              <input className="input w-full mt-1" value={model} onChange={(e) => setModel(e.target.value)} />
-            </label>
-            <label className="block text-sm">
               Clave de IA (se guarda cifrada, nunca se exporta)
+              {provider === 'openrouter' && (
+                <span className="text-neutral-500"> — opcional para listar, necesaria para escanear</span>
+              )}
               <input
                 type="password"
                 className="input w-full mt-1"
@@ -155,6 +183,26 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 onChange={(e) => setApiKey(e.target.value)}
               />
             </label>
+            <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loadingModels}>
+              {loadingModels ? 'Cargando modelos…' : 'Cargar modelos'}
+            </button>
+            {modelError && <div className="text-sm text-red-400">{modelError}</div>}
+            {models.length > 0 && (
+              <label className="block text-sm">
+                Modelo predeterminado ({models.length} disponibles)
+                <select className="input w-full mt-1" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.group ? `[${m.group}] ` : ''}
+                      {m.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p className="text-xs text-neutral-500">
+              Podrás añadir más proveedores y marcar favoritos en Ajustes.
+            </p>
           </div>
         )}
 

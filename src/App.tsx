@@ -84,9 +84,29 @@ export function App() {
         <div className="font-semibold text-lg tracking-tight">Nodus</div>
         <div className="flex-1" />
         {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
-        {!settings.hasApiKey && (
+        {settings.favorites.length > 0 && (
+          <select
+            className="input text-xs py-1"
+            title="Modelo predeterminado para escaneos"
+            value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
+            onChange={async (e) => {
+              if (!e.target.value) return;
+              const [provider, model] = e.target.value.split('::');
+              await window.nodus.updateSettings({ defaultModel: { provider: provider as any, model } });
+              void reloadSettings();
+            }}
+          >
+            {!settings.defaultModel && <option value="">Modelo: sin configurar</option>}
+            {settings.favorites.map((m) => (
+              <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>
+                {m.provider} · {m.model}
+              </option>
+            ))}
+          </select>
+        )}
+        {!settings.defaultModel && (
           <button className="btn btn-ghost text-amber-400" onClick={() => setView('settings')}>
-            ⚠ Falta clave de IA
+            ⚠ Configura un modelo de IA
           </button>
         )}
         <button className="btn btn-ghost" onClick={() => setCollectionsOpen(true)}>
@@ -116,7 +136,7 @@ export function App() {
 
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">
-          {view === 'library' && <Library onOpenCollections={() => setCollectionsOpen(true)} />}
+          {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
           {view === 'graph' && <GraphView />}
           {view === 'gaps' && <GapsView />}
           {view === 'reading' && <ReadingPathView />}
@@ -126,9 +146,7 @@ export function App() {
 
       <QueueBar />
 
-      {collectionsOpen && (
-        <CollectionsModal readTag={settings.readTag} onClose={() => setCollectionsOpen(false)} />
-      )}
+      {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
     </div>
   );
 }

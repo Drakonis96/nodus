@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { QueueItem, QueueKind, QueueProgress, Work } from '@shared/types';
+import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
 import { getWorkByZoteroKey } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
@@ -44,7 +44,7 @@ class ScanQueue {
     };
   }
 
-  enqueue(nodusId: string, title: string, kind: QueueKind): void {
+  enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null): void {
     // Avoid duplicate pending/running jobs for the same work+kind.
     if (this.items.some((i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running'))) {
       return;
@@ -57,6 +57,7 @@ class ScanQueue {
       state: 'queued',
       error: null,
       enqueued_at: new Date().toISOString(),
+      model: model ?? null,
     });
     this.sort();
     this.emit();
@@ -133,7 +134,7 @@ class ScanQueue {
     }
     try {
       if (item.kind === 'light') {
-        await this.doLight(work);
+        await this.doLight(work, item.model ?? null);
       } else {
         await this.doDeep(work, item);
       }
@@ -159,7 +160,7 @@ class ScanQueue {
     this.emit();
   }
 
-  private async doLight(work: Work): Promise<void> {
+  private async doLight(work: Work, model: ModelRef | null): Promise<void> {
     const settings = getSettings();
     let abstract: string | null = null;
     try {
@@ -168,7 +169,7 @@ class ScanQueue {
     } catch {
       abstract = null;
     }
-    await runLightScan(work, abstract);
+    await runLightScan(work, abstract, model);
   }
 
   private async doDeep(work: Work, queueItem: QueueItem): Promise<void> {
@@ -193,7 +194,7 @@ class ScanQueue {
     queueItem.detail = 'Analizando con IA…';
     queueItem.subPct = null;
     this.emit();
-    await runDeepScan(work, doc);
+    await runDeepScan(work, doc, queueItem.model ?? null);
   }
 
   /** Re-enqueue any work left in a pending state, so scans resume after restart. */

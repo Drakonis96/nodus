@@ -1,36 +1,36 @@
 import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { AiProvider } from '@shared/types';
 
-// AI API key is stored encrypted-at-rest via Electron safeStorage, never in the
-// renderer and never in plaintext on disk. The key never crosses IPC to the UI.
+// AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
+// never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
 
-function keyFile(): string {
-  return path.join(app.getPath('userData'), 'ai_key.bin');
+const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+
+function keyFile(provider: AiProvider): string {
+  return path.join(app.getPath('userData'), `ai_key_${provider}.bin`);
 }
 
-export function setApiKey(key: string): void {
+export function setApiKey(provider: AiProvider, key: string): void {
   if (!key) {
-    clearApiKey();
+    clearApiKey(provider);
     return;
   }
+  const file = keyFile(provider);
   if (!safeStorage.isEncryptionAvailable()) {
-    // Fallback: still avoid plaintext by base64; on most desktops encryption is available.
-    fs.writeFileSync(keyFile(), Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
     return;
   }
-  const enc = safeStorage.encryptString(key);
-  fs.writeFileSync(keyFile(), enc);
+  fs.writeFileSync(file, safeStorage.encryptString(key));
 }
 
-export function getApiKey(): string | null {
-  const f = keyFile();
-  if (!fs.existsSync(f)) return null;
-  const buf = fs.readFileSync(f);
+export function getApiKey(provider: AiProvider): string | null {
+  const file = keyFile(provider);
+  if (!fs.existsSync(file)) return null;
+  const buf = fs.readFileSync(file);
   const asStr = buf.toString('utf8');
-  if (asStr.startsWith('b64:')) {
-    return Buffer.from(asStr.slice(4), 'base64').toString('utf8');
-  }
+  if (asStr.startsWith('b64:')) return Buffer.from(asStr.slice(4), 'base64').toString('utf8');
   if (!safeStorage.isEncryptionAvailable()) return null;
   try {
     return safeStorage.decryptString(buf);
@@ -39,11 +39,16 @@ export function getApiKey(): string | null {
   }
 }
 
-export function hasApiKey(): boolean {
-  return getApiKey() !== null;
+export function hasApiKey(provider: AiProvider): boolean {
+  return getApiKey(provider) !== null;
 }
 
-export function clearApiKey(): void {
-  const f = keyFile();
-  if (fs.existsSync(f)) fs.unlinkSync(f);
+export function clearApiKey(provider: AiProvider): void {
+  const file = keyFile(provider);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+/** Map of provider -> whether a key is stored, for the renderer (no keys exposed). */
+export function providerKeyMap(): Record<AiProvider, boolean> {
+  return Object.fromEntries(PROVIDERS.map((p) => [p, hasApiKey(p)])) as Record<AiProvider, boolean>;
 }

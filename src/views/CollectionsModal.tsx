@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import type { ZoteroCollection, ZoteroItem, WorkView } from '@shared/types';
+import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings, ModelRef } from '@shared/types';
 import { Badge } from '../components/ui';
+import { ModelPicker } from '../components/ModelPicker';
 
 const ITEM_TYPES = ['journalArticle', 'book', 'bookSection', 'conferencePaper', 'thesis', 'preprint', 'report'];
 
@@ -46,7 +47,10 @@ function CollectionNode({
         <span className="flex-1 truncate" onClick={() => onSelect(col)}>
           {col.name}
         </span>
-        <span className="text-[10px] text-neutral-600">{col.itemCount}</span>
+        <span className="text-[10px] text-neutral-600" title="ítems directos · subcolecciones">
+          {col.itemCount}
+          {col.subCount ? ` · ${col.subCount}▸` : ''}
+        </span>
       </div>
       {open &&
         children?.map((c) => (
@@ -56,12 +60,15 @@ function CollectionNode({
   );
 }
 
-export function CollectionsModal({ readTag, onClose }: { readTag: string; onClose: () => void }) {
+export function CollectionsModal({ settings, onClose }: { settings: AppSettings; onClose: () => void }) {
+  const readTag = settings.readTag;
   const [roots, setRoots] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<ZoteroCollection | null>(null);
   const [items, setItems] = useState<ZoteroItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [worksByKey, setWorksByKey] = useState<Map<string, WorkView>>(new Map());
+  const [recursive, setRecursive] = useState(true);
+  const [scanModel, setScanModel] = useState<ModelRef | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -78,18 +85,29 @@ export function CollectionsModal({ readTag, onClose }: { readTag: string; onClos
     });
   }, []);
 
-  const loadItems = useCallback(async (col: ZoteroCollection, force = false) => {
-    setSelected(col);
-    if (!force && itemCache.has(col.key)) {
-      setItems(itemCache.get(col.key)!);
-      return;
-    }
-    setLoadingItems(true);
-    const data = await window.nodus.zoteroCollectionItems(col.key).catch(() => []);
-    itemCache.set(col.key, data);
-    setItems(data);
-    setLoadingItems(false);
-  }, []);
+  const loadItems = useCallback(
+    async (col: ZoteroCollection, force = false) => {
+      setSelected(col);
+      const cacheKey = `${col.key}:${recursive ? 'r' : 'd'}`;
+      if (!force && itemCache.has(cacheKey)) {
+        setItems(itemCache.get(cacheKey)!);
+        return;
+      }
+      setLoadingItems(true);
+      // Include subcollection items by default so a parent collection isn't shown empty.
+      const data = await window.nodus.zoteroCollectionItems(col.key, { recursive }).catch(() => []);
+      itemCache.set(cacheKey, data);
+      setItems(data);
+      setLoadingItems(false);
+    },
+    [recursive]
+  );
+
+  // Reload the selected collection's items when the recursive toggle changes.
+  useEffect(() => {
+    if (selected) void loadItems(selected, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recursive]);
 
   const statusOf = (key: string): 'unscanned' | 'light' | 'deep' => {
     const w = worksByKey.get(key);
@@ -124,7 +142,7 @@ export function CollectionsModal({ readTag, onClose }: { readTag: string; onClos
 
   const selectAllFiltered = async () => {
     const ids = filtered.map((it) => worksByKey.get(it.key)?.nodus_id).filter((x): x is string => !!x);
-    if (ids.length) await window.nodus.setManualDeepBulk(ids, true);
+    if (ids.length) await window.nodus.setManualDeepBulk(ids, true, scanModel);
     await refreshWorks();
   };
 
@@ -137,7 +155,7 @@ export function CollectionsModal({ readTag, onClose }: { readTag: string; onClos
   const toggleItem = async (it: ZoteroItem) => {
     const w = worksByKey.get(it.key);
     if (!w) return; // not yet ingested into Nodus
-    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep);
+    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
     await refreshWorks();
   };
 
@@ -187,6 +205,11 @@ export function CollectionsModal({ readTag, onClose }: { readTag: string; onClos
                 <label className="text-xs flex items-center gap-1 text-neutral-400">
                   <input type="checkbox" checked={onlyTag} onChange={(e) => setOnlyTag(e.target.checked)} /> solo tag
                 </label>
+                <label className="text-xs flex items-center gap-1 text-neutral-400" title="Incluir ítems de subcolecciones">
+                  <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} /> subcolecciones
+                </label>
+                <span className="text-xs text-neutral-500">Escanear con:</span>
+                <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
               </div>
               <div className="flex gap-1 flex-wrap">
                 {ITEM_TYPES.map((t) => (

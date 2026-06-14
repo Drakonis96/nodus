@@ -1,11 +1,11 @@
 import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
-import { hasApiKey } from '../secrets/secretStore';
+import { providerKeyMap } from '../secrets/secretStore';
 
-const DEFAULTS: Omit<AppSettings, 'hasApiKey'> = {
-  aiProvider: 'anthropic',
-  aiModel: 'claude-sonnet-4-6',
+const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   embeddingModel: 'text-embedding-3-small',
+  favorites: [],
+  defaultModel: null,
   syncMode: 'manual',
   readTag: 'leído',
   zoteroUserId: '0',
@@ -43,13 +43,13 @@ export function getSettings(): AppSettings {
       parsed = {};
     }
   }
-  return { ...DEFAULTS, ...parsed, hasApiKey: hasApiKey() };
+  return { ...DEFAULTS, ...parsed, providerKeys: providerKeyMap() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const current = getSettings();
-  // hasApiKey is derived, never persisted.
-  const { hasApiKey: _ignore, ...rest } = { ...current, ...patch };
+  // providerKeys is derived from the secret store, never persisted.
+  const { providerKeys: _ignore, ...rest } = { ...current, ...patch };
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
 }

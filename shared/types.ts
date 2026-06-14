@@ -136,15 +136,31 @@ export interface ExternalRef {
 // Settings
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AiProvider = 'anthropic' | 'openai';
+export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini';
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
 
+/** A concrete model selection: which provider + which model id. */
+export interface ModelRef {
+  provider: AiProvider;
+  model: string;
+}
+
+/** One model as returned by a provider's model-list endpoint. */
+export interface ModelInfo {
+  id: string;
+  name?: string;
+  /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */
+  group?: string;
+}
+
 export interface AppSettings {
-  aiProvider: AiProvider;
-  aiModel: string;
   embeddingModel: string;
-  hasApiKey: boolean; // never expose the key itself to the renderer
+  // Per-provider key presence (the keys themselves never cross IPC).
+  providerKeys: Record<AiProvider, boolean>;
+  // Favorite models the user pinned, and the one used by default for scans.
+  favorites: ModelRef[];
+  defaultModel: ModelRef | null;
   syncMode: SyncMode;
   readTag: string; // tag that triggers deep scan
   zoteroUserId: string;
@@ -156,10 +172,10 @@ export interface AppSettings {
   unpaywallEmail: string;
   onboardingComplete: boolean;
   // Large-PDF / extraction strategy
-  preferZoteroFulltext: boolean; // reuse Zotero's own indexed full text when available
-  ocrEnabled: boolean; // OCR scanned PDFs that lack a text layer
-  ocrLanguages: string; // Tesseract langs, e.g. "spa+eng"
-  ocrMaxPages: number; // safety cap on pages to OCR per work
+  preferZoteroFulltext: boolean;
+  ocrEnabled: boolean;
+  ocrLanguages: string;
+  ocrMaxPages: number;
 }
 
 export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';
@@ -181,7 +197,8 @@ export interface ZoteroCollection {
   key: string;
   name: string;
   parentCollection: string | false;
-  itemCount: number;
+  itemCount: number; // direct items only (Zotero meta.numItems)
+  subCount: number; // number of subcollections (Zotero meta.numCollections)
 }
 
 export interface ZoteroItem {
@@ -216,6 +233,8 @@ export interface QueueItem {
   detail?: string | null;
   /** 0..1 progress within the current item (extraction/OCR), when known. */
   subPct?: number | null;
+  /** Optional model override for this job; falls back to the default model when null. */
+  model?: ModelRef | null;
 }
 
 export interface QueueProgress {
@@ -304,8 +323,11 @@ export interface NodusApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
-  setApiKey(key: string): Promise<void>;
-  clearApiKey(): Promise<void>;
+  setApiKey(provider: AiProvider, key: string): Promise<void>;
+  clearApiKey(provider: AiProvider): Promise<void>;
+
+  // AI model discovery
+  listModels(provider: AiProvider): Promise<ModelInfo[]>;
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;
@@ -313,15 +335,15 @@ export interface NodusApi {
   zoteroChildCollections(parentKey: string): Promise<ZoteroCollection[]>;
   zoteroCollectionItems(
     collectionKey: string,
-    opts?: { query?: string }
+    opts?: { query?: string; recursive?: boolean }
   ): Promise<ZoteroItem[]>;
 
   // works / library
   listWorks(filter?: WorkFilter): Promise<WorkView[]>;
   getWork(nodusId: string): Promise<WorkView | null>;
-  setManualDeep(nodusId: string, value: boolean): Promise<void>;
-  setManualDeepBulk(nodusIds: string[], value: boolean): Promise<void>;
-  rescan(nodusId: string, kind: QueueKind): Promise<void>;
+  setManualDeep(nodusId: string, value: boolean, model?: ModelRef | null): Promise<void>;
+  setManualDeepBulk(nodusIds: string[], value: boolean, model?: ModelRef | null): Promise<void>;
+  rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
   openInZotero(zoteroKey: string): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 

@@ -34,7 +34,7 @@ export async function exportData(): Promise<{ path: string } | null> {
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
-  const { hasApiKey, ...nonSecret } = settings; // strip derived/secret flags
+  const { providerKeys, ...nonSecret } = settings; // strip derived key-presence flags
 
   const zip = new AdmZip();
   zip.addLocalFile(dbPath(), '', 'database.sqlite');

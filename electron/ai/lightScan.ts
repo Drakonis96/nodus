@@ -2,7 +2,7 @@ import { completeJson } from './aiClient';
 import { PROMPT_LIGHT } from './prompts';
 import { setWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
-import type { Work } from '@shared/types';
+import type { Work, ModelRef } from '@shared/types';
 import crypto from 'node:crypto';
 
 interface LightResult {
@@ -19,7 +19,7 @@ function isLightResult(v: unknown): v is LightResult {
 }
 
 /** Light scan: title + abstract only → coarse themes. Cheap, incremental, includes unread works. */
-export async function runLightScan(work: Work, abstract: string | null): Promise<void> {
+export async function runLightScan(work: Work, abstract: string | null, model?: ModelRef | null): Promise<void> {
   const hash = crypto
     .createHash('sha1')
     .update(`${work.title}\n${abstract ?? ''}`)
@@ -38,7 +38,8 @@ export async function runLightScan(work: Work, abstract: string | null): Promise
   try {
     const result = await completeJson<LightResult>(
       { system: PROMPT_LIGHT, user: JSON.stringify(input), temperature: 0.15, maxTokens: 1500 },
-      isLightResult
+      isLightResult,
+      model
     );
     const labels = result.themes.map((t) => t.label).filter(Boolean);
     setWorkThemes(work.nodus_id, labels);

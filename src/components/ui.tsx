@@ -1,5 +1,23 @@
 import React from 'react';
-import type { IdeaType, EdgeType } from '@shared/types';
+import type { IdeaType, EdgeType, AiProvider, ModelRef } from '@shared/types';
+
+export const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+
+export const PROVIDER_LABELS: Record<AiProvider, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  deepseek: 'DeepSeek',
+  gemini: 'Google Gemini',
+};
+
+export function modelLabel(m: ModelRef): string {
+  return `${PROVIDER_LABELS[m.provider]} · ${m.model}`;
+}
+
+export function sameModel(a: ModelRef | null | undefined, b: ModelRef | null | undefined): boolean {
+  return !!a && !!b && a.provider === b.provider && a.model === b.model;
+}
 
 export const NODE_COLORS: Record<IdeaType, string> = {
   claim: '#6366f1',

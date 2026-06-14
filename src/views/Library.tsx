@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { WorkView, WorkFilter, DeepStatus, LightStatus } from '@shared/types';
+import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef } from '@shared/types';
 import { Badge } from '../components/ui';
+import { ModelPicker } from '../components/ModelPicker';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">ligero ✓</Badge>;
@@ -34,10 +35,11 @@ function triggerBadge(w: WorkView) {
   );
 }
 
-export function Library({ onOpenCollections }: { onOpenCollections: () => void }) {
+export function Library({ settings, onOpenCollections }: { settings: AppSettings; onOpenCollections: () => void }) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
   const [loading, setLoading] = useState(true);
+  const [scanModel, setScanModel] = useState<ModelRef | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +52,7 @@ export function Library({ onOpenCollections }: { onOpenCollections: () => void }
   }, [load]);
 
   const toggleManual = async (w: WorkView) => {
-    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep);
+    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
     await load();
   };
 
@@ -60,6 +62,8 @@ export function Library({ onOpenCollections }: { onOpenCollections: () => void }
         <h1 className="text-xl font-semibold">Biblioteca</h1>
         <span className="text-sm text-neutral-500">{works.length} obras</span>
         <div className="flex-1" />
+        <span className="text-xs text-neutral-500">Escanear con:</span>
+        <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
           Modal de Colecciones
         </button>
@@ -143,7 +147,7 @@ export function Library({ onOpenCollections }: { onOpenCollections: () => void }
                     </button>
                     <button
                       className="text-xs text-neutral-400 hover:text-white mr-2"
-                      onClick={() => window.nodus.rescan(w.nodus_id, 'deep')}
+                      onClick={() => window.nodus.rescan(w.nodus_id, 'deep', scanModel)}
                     >
                       re-scan
                     </button>
