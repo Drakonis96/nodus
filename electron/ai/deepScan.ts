@@ -122,6 +122,8 @@ export async function runDeepScan(work: Work, doc: ExtractedDoc): Promise<void> 
       item_type: work.item_type,
       has_fulltext: doc.sourceType !== 'abstract_only',
       language_hint: 'unknown',
+      // The extractor prefixes each page with a [[p. N]] marker; use it for `location`.
+      format_note: 'El texto puede incluir marcadores [[p. N]] con el número de página; úsalos en el campo location (p. ej. "p. 12"). No inventes páginas si no hay marcador.',
       chunk: { index: i, total: chunks.length, text: chunks[i] },
     };
     const result = await completeJson<DeepResult>(

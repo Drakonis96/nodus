@@ -155,6 +155,22 @@ export interface AppSettings {
   concurrency: number;
   unpaywallEmail: string;
   onboardingComplete: boolean;
+  // Large-PDF / extraction strategy
+  preferZoteroFulltext: boolean; // reuse Zotero's own indexed full text when available
+  ocrEnabled: boolean; // OCR scanned PDFs that lack a text layer
+  ocrLanguages: string; // Tesseract langs, e.g. "spa+eng"
+  ocrMaxPages: number; // safety cap on pages to OCR per work
+}
+
+export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';
+
+export interface PdfAnalysis {
+  pageCount: number;
+  sampledPages: number;
+  textPages: number;
+  textCoverage: number; // 0..1 ratio of sampled pages with a usable text layer
+  avgCharsPerTextPage: number;
+  strategy: ExtractStrategy;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,6 +212,10 @@ export interface QueueItem {
   state: QueueState;
   error: string | null;
   enqueued_at: string;
+  /** Sub-step detail for the running item, e.g. "OCR p. 12/340" or "Extrayendo p. 8/22". */
+  detail?: string | null;
+  /** 0..1 progress within the current item (extraction/OCR), when known. */
+  subPct?: number | null;
 }
 
 export interface QueueProgress {

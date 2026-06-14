@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@napi-rs/canvas": "^0.1.65",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.5.0",
     "cytoscape": "^3.30.2",
@@ -28,6 +29,7 @@
     "pdfjs-dist": "^4.8.69",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tesseract.js": "^5.1.1",
     "uuid": "^11.0.3"
   },
   "devDependencies": {

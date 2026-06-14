@@ -11,6 +11,8 @@ const mainExternals = [
   'pdfjs-dist',
   'mammoth',
   'adm-zip',
+  'tesseract.js',
+  '@napi-rs/canvas',
   '@anthropic-ai/sdk',
   'openai',
 ];
