@@ -10,6 +10,12 @@ import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
 
+// Optional userData override (separate profile / isolated testing). Must run
+// before app is ready, i.e. before anything reads getPath('userData').
+if (process.env.NODUS_USERDATA) {
+  app.setPath('userData', process.env.NODUS_USERDATA);
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
@@ -44,10 +50,11 @@ app.whenReady().then(() => {
   registerIpc(() => mainWindow);
   createWindow();
 
-  // Resume any scans that were pending when the app last closed.
-  scanQueue.resumePending();
+  const settings = getSettings();
+  // Queue resume is opt-in: pending DB state may come from previous automatic versions.
+  if (settings.autoResumeQueue) scanQueue.resumePending();
 
-  if (getSettings().syncMode === 'realtime') startRealtimeSync();
+  if (settings.syncMode === 'realtime') startRealtimeSync();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

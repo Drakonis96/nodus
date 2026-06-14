@@ -11,6 +11,7 @@ import {
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
 import { setDeepResult } from '../db/worksRepo';
+import { setWorkThemes } from '../db/themesRepo';
 import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { chunkText, ExtractedDoc } from '../extraction/textExtractor';
 
@@ -32,13 +33,31 @@ interface DeepIdea {
   confidence: number;
   uncertainty_reason: string | null;
 }
+interface DeepTheme {
+  id: string;
+  label: string;
+  statement: string;
+  role: 'primary' | 'secondary';
+  evidence: EvidenceObj[];
+  confidence: number;
+}
 interface DeepResult {
   document: { processing_status: string; type: string; language: string; notes: string | null };
+  theme_nodes?: DeepTheme[];
   ideas: DeepIdea[];
   internal_relations: { from: string; to: string; type: EdgeType; basis: EdgeBasis; evidence: EvidenceObj; confidence: number }[];
   external_references: { from: string; cited_work: string; type: EdgeType; basis: EdgeBasis; evidence: EvidenceObj; confidence: number }[];
   gaps: { kind: GapKind; statement: string; related_idea: string | null; evidence: EvidenceObj; confidence: number }[];
   authors_detail: { name: string; affiliation: string | null; stance_notes: string | null }[];
+}
+
+function themeScore(theme: DeepTheme): number {
+  return theme.confidence + (theme.role === 'primary' ? 0.5 : 0) + Math.min(0.3, (theme.evidence?.length ?? 0) * 0.05);
+}
+
+export interface DeepScanProgress {
+  detail: string;
+  pct: number | null;
 }
 
 function isDeepResult(v: unknown): v is DeepResult {
@@ -50,12 +69,14 @@ function isDeepResult(v: unknown): v is DeepResult {
 /** Merge ideas sharing the same canonical label across chunks of the same work. */
 function mergeByLabel(results: DeepResult[]): {
   ideas: Map<string, DeepIdea>;
+  themes: Map<string, DeepTheme>;
   internal: DeepResult['internal_relations'];
   external: DeepResult['external_references'];
   gaps: DeepResult['gaps'];
   authors: DeepResult['authors_detail'];
 } {
   const ideas = new Map<string, DeepIdea>();
+  const themes = new Map<string, DeepTheme>();
   const localToLabel = new Map<string, string>();
   const internal: DeepResult['internal_relations'] = [];
   const external: DeepResult['external_references'] = [];
@@ -63,6 +84,18 @@ function mergeByLabel(results: DeepResult[]): {
   const authors: DeepResult['authors_detail'] = [];
 
   for (const r of results) {
+    for (const theme of r.theme_nodes ?? []) {
+      const key = theme.label.trim().toLowerCase();
+      if (!key) continue;
+      const existing = themes.get(key);
+      if (existing) {
+        existing.evidence.push(...(theme.evidence ?? []));
+        if (theme.role === 'primary') existing.role = 'primary';
+        existing.confidence = Math.max(existing.confidence, theme.confidence);
+      } else {
+        themes.set(key, { ...theme, label: key, evidence: [...(theme.evidence ?? [])] });
+      }
+    }
     for (const idea of r.ideas) {
       const key = idea.label.trim().toLowerCase();
       localToLabel.set(idea.id, key);
@@ -75,10 +108,10 @@ function mergeByLabel(results: DeepResult[]): {
         ideas.set(key, { ...idea, evidence: [...idea.evidence] });
       }
     }
-    internal.push(...r.internal_relations);
-    external.push(...r.external_references);
-    gaps.push(...r.gaps);
-    authors.push(...r.authors_detail);
+    internal.push(...(r.internal_relations ?? []));
+    external.push(...(r.external_references ?? []));
+    gaps.push(...(r.gaps ?? []));
+    authors.push(...(r.authors_detail ?? []));
   }
 
   // Rewrite internal relation endpoints from local ids to label keys.
@@ -90,14 +123,19 @@ function mergeByLabel(results: DeepResult[]): {
   for (const ref of external) ref.from = remap(ref.from);
   for (const g of gaps) if (g.related_idea) g.related_idea = remap(g.related_idea);
 
-  return { ideas, internal, external, gaps, authors };
+  return { ideas, themes, internal, external, gaps, authors };
 }
 
 /**
  * Deep scan: extract ideas per chunk, merge within the work, fuse against the
  * global graph, and persist all derived data with traceable evidence.
  */
-export async function runDeepScan(work: Work, doc: ExtractedDoc, model?: ModelRef | null): Promise<void> {
+export async function runDeepScan(
+  work: Work,
+  doc: ExtractedDoc,
+  model?: ModelRef | null,
+  onProgress?: (p: DeepScanProgress) => void
+): Promise<void> {
   const text = doc.text;
   const hash = crypto.createHash('sha1').update(text).digest('hex');
 
@@ -113,6 +151,7 @@ export async function runDeepScan(work: Work, doc: ExtractedDoc, model?: ModelRe
   const results: DeepResult[] = [];
 
   for (let i = 0; i < chunks.length; i++) {
+    onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
     const input = {
       zotero_key: work.zotero_key,
       title: work.title,
@@ -138,10 +177,23 @@ export async function runDeepScan(work: Work, doc: ExtractedDoc, model?: ModelRe
   purgeDeepData(work.nodus_id);
 
   const merged = mergeByLabel(results);
+  if (merged.themes.size > 0) {
+    const labels = Array.from(merged.themes.values())
+      .sort((a, b) => themeScore(b) - themeScore(a))
+      .slice(0, 6)
+      .map((t) => t.label);
+    setWorkThemes(work.nodus_id, labels);
+  }
 
   // Resolve each merged idea against the global graph (Prompt 2 / fusion).
   const labelToGlobal = new Map<string, string>();
-  for (const [labelKey, idea] of merged.ideas) {
+  const ideaEntries = Array.from(merged.ideas);
+  for (let i = 0; i < ideaEntries.length; i++) {
+    const [labelKey, idea] = ideaEntries[i];
+    onProgress?.({
+      detail: `Fusionando idea ${i + 1}/${ideaEntries.length}…`,
+      pct: ideaEntries.length ? i / ideaEntries.length : null,
+    });
     const ext: ExtractedIdea = {
       localId: labelKey,
       type: idea.type,

@@ -6,8 +6,9 @@ import {
   getWorkByZoteroKey,
   getWorkByDoi,
   addAlias,
-  setReadTag,
   recomputeDeepTrigger,
+  setLightPending,
+  setDeepPending,
 } from '../db/worksRepo';
 import { collectionItemsRecursive, libraryVersion } from '../zotero/zoteroClient';
 import { scanQueue } from '../pipeline/scanQueue';
@@ -23,8 +24,8 @@ function authorsOf(item: ZoteroItem): string[] {
   });
 }
 
-/** Ingest a single Zotero item into Nodus, returning whether a deep scan should be (re)queued. */
-function ingestItem(item: ZoteroItem, readTagName: string): { nodusId: string; isNew: boolean; deepEligible: boolean } {
+/** Ingest a single Zotero item into Nodus. Analysis is enqueued separately by explicit settings. */
+export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodusId: string; isNew: boolean; hasReadTag: boolean } {
   const existing = getWorkByZoteroKey(item.key);
 
   // Duplicate detection by DOI: union under the same nodus_id via alias.
@@ -51,12 +52,13 @@ function ingestItem(item: ZoteroItem, readTagName: string): { nodusId: string; i
   });
 
   const trigger = recomputeDeepTrigger(nodusId);
-  return { nodusId, isNew: !existing, deepEligible: trigger !== null };
+  return { nodusId, isNew: !existing, hasReadTag: trigger === 'tag' || trigger === 'both' };
 }
 
 export interface SyncResult {
   added: number;
   changed: number;
+  lightQueued: number;
   deepQueued: number;
 }
 
@@ -66,6 +68,7 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   const userId = settings.zoteroUserId;
   let added = 0;
   let changed = 0;
+  let lightQueued = 0;
   let deepQueued = 0;
 
   const seen = new Set<string>();
@@ -81,16 +84,28 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     for (const item of items) {
       seen.add(item.key);
       const before = getWorkByZoteroKey(item.key);
-      const { nodusId, isNew, deepEligible } = ingestItem(item, settings.readTag);
+      const { nodusId, isNew, hasReadTag } = ingestZoteroItem(item, settings.readTag);
+      const didChange = !!before && before.zotero_version !== item.version;
       if (isNew) {
         added++;
-        scanQueue.enqueue(nodusId, item.title, 'light');
-      } else if (before && before.zotero_version !== item.version) {
+      } else if (didChange) {
         changed++;
-        scanQueue.enqueue(nodusId, item.title, 'light');
       }
-      if (deepEligible) {
-        markDeepPending(nodusId);
+      if (settings.autoLightScan && (isNew || didChange)) {
+        setLightPending(nodusId);
+        scanQueue.enqueue(nodusId, item.title, 'light');
+        lightQueued++;
+      }
+      const after = getWorkByZoteroKey(item.key);
+      const needsDeep =
+        !!after &&
+        (isNew ||
+          didChange ||
+          after.deep_status === 'none' ||
+          after.deep_status === 'failed' ||
+          after.deep_status === 'skipped_no_text');
+      if (settings.autoDeepScanOnReadTag && hasReadTag && needsDeep) {
+        setDeepPending(nodusId);
         scanQueue.enqueue(nodusId, item.title, 'deep');
         deepQueued++;
       }
@@ -105,14 +120,8 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     /* ignore */
   }
 
-  const summary = `${added} altas, ${changed} cambios, ${deepQueued} profundos encolados`;
+  const summary = `${added} altas, ${changed} cambios, ${lightQueued} temas encolados, ${deepQueued} profundos encolados`;
   return addSyncLog(mode, summary);
-}
-
-function markDeepPending(nodusId: string): void {
-  getDb()
-    .prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ? AND deep_status IN ('none','failed')")
-    .run(nodusId);
 }
 
 function setLibraryVersion(version: number): void {

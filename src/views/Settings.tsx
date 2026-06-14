@@ -47,7 +47,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             <option value="realtime">Tiempo real</option>
           </select>
         </Row>
-        <Row label="Tag de escaneo profundo">
+        <Row label="Tag de lectura">
           <input className="input" value={settings.readTag} onChange={(e) => patch({ readTag: e.target.value })} />
         </Row>
         <Row label="Ruta de storage de Zotero">
@@ -57,6 +57,25 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             onChange={(e) => patch({ zoteroStoragePath: e.target.value })}
           />
         </Row>
+      </Section>
+
+      <Section title="Automatización de análisis">
+        <Row label="Analizar temas al sincronizar">
+          <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />
+        </Row>
+        <Row label="Analizar a fondo obras con tag">
+          <input
+            type="checkbox"
+            checked={settings.autoDeepScanOnReadTag}
+            onChange={(e) => patch({ autoDeepScanOnReadTag: e.target.checked })}
+          />
+        </Row>
+        <Row label="Reanudar cola al abrir">
+          <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
+        </Row>
+        <p className="text-xs text-neutral-500">
+          Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.
+        </p>
       </Section>
 
       <Section title="Extracción de texto (PDFs grandes)">
@@ -110,6 +129,18 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
           />
         </Row>
+      </Section>
+
+      <Section title="Ayuda">
+        <div className="flex items-center justify-between gap-4">
+          <label className="text-sm text-neutral-300">Tutorial de uso</label>
+          <button
+            className="btn btn-ghost border border-neutral-700"
+            onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
+          >
+            Ver de nuevo
+          </button>
+        </div>
       </Section>
 
       <Section title="Datos">

@@ -1,4 +1,4 @@
-import { completeJson } from './aiClient';
+import { AiError, completeJson } from './aiClient';
 import { PROMPT_LIGHT } from './prompts';
 import { setWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
@@ -45,6 +45,7 @@ export async function runLightScan(work: Work, abstract: string | null, model?: 
     setWorkThemes(work.nodus_id, labels);
     setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
   } catch (e) {
+    if (e instanceof AiError && e.config) throw e;
     setLightResult(work.nodus_id, 'failed', hash, (e as Error).message);
     throw e;
   }

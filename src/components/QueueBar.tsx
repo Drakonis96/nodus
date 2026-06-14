@@ -12,13 +12,21 @@ export function QueueBar() {
   }, []);
 
   if (!progress || progress.total === 0) return null;
-  const { done, failed, total, current, paused, items } = progress;
+  const { done, failed, total, current, paused, pausedReason, items } = progress;
   const pct = total ? Math.round(((done + failed) / total) * 100) : 0;
   const active = done + failed < total;
   const running = items.find((i) => i.state === 'running');
 
   return (
     <div className="border-t border-neutral-800 bg-neutral-900/80 backdrop-blur px-4 py-2 text-sm">
+      {pausedReason && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-950/60 border border-amber-800/60 px-3 py-1.5 text-amber-300 text-xs">
+          <span>⚠</span>
+          <span className="flex-1">
+            Escaneo en pausa: {pausedReason} Corrígelo en Ajustes y pulsa <b>Reanudar</b>.
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button className="btn-ghost btn" onClick={() => setExpanded((e) => !e)}>
           {expanded ? '▾' : '▸'} Cola
@@ -65,6 +73,15 @@ export function QueueBar() {
               Pausar
             </button>
           ))}
+        {failed > 0 && (
+          <button
+            className="btn btn-ghost text-amber-300"
+            title="Reencola las obras cuyo escaneo falló"
+            onClick={() => window.nodus.retryFailed()}
+          >
+            Reintentar fallidos ({failed})
+          </button>
+        )}
         <button className="btn btn-ghost" onClick={() => window.nodus.clearQueue()}>
           Limpiar
         </button>

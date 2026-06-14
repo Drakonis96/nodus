@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-import type { GraphData, IdeaType, IdeaDetail, EdgeDetail } from '@shared/types';
+import type { GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge } from '../components/ui';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
+const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
 
 interface Filters {
@@ -21,7 +22,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
-  nodeTypes: [...IDEA_TYPES],
+  nodeTypes: [...GRAPH_NODE_TYPES],
   edgeTypes: [...EDGE_TYPES],
   theme: '',
   authors: [],
@@ -36,7 +37,11 @@ const FILTER_KEY = 'nodus.graph.filters';
 
 function loadFilters(): Filters {
   try {
-    return { ...DEFAULT_FILTERS, ...JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') };
+    const parsed = JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>;
+    const merged = { ...DEFAULT_FILTERS, ...parsed };
+    merged.nodeTypes = Array.from(new Set([...(merged.nodeTypes ?? []), 'theme']));
+    merged.edgeTypes = Array.from(new Set([...(merged.edgeTypes ?? []), 'contains']));
+    return merged;
   } catch {
     return DEFAULT_FILTERS;
   }
@@ -98,7 +103,7 @@ export function GraphView() {
           id: n.id,
           label: n.label,
           type: n.type,
-          size: 18 + Math.min(40, n.workCount * 6),
+          size: n.type === 'theme' ? 38 + Math.min(56, n.workCount * 10) : 18 + Math.min(40, n.workCount * 6),
           read: n.read,
         },
       })),
@@ -119,7 +124,7 @@ export function GraphView() {
             selector: 'node',
             style: {
               'background-color': (ele: any) =>
-                ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as IdeaType] ?? '#888',
+                ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888',
               label: 'data(label)',
               color: '#e5e5e5',
               'font-size': 9,
@@ -151,8 +156,9 @@ export function GraphView() {
       });
 
       cyRef.current.on('tap', 'node', async (evt) => {
+        setIdeaDetail(null);
         setEdgeDetail(null);
-        if (lens === 'ideas') {
+        if (lens === 'ideas' && !evt.target.id().startsWith('theme:')) {
           setIdeaDetail(await window.nodus.getIdeaDetail(evt.target.id()));
         }
       });
@@ -197,7 +203,7 @@ export function GraphView() {
         <input className="input" placeholder="Buscar…" value={filters.search} onChange={(e) => setF({ search: e.target.value })} />
         {lens === 'ideas' && (
           <div className="flex gap-1">
-            {IDEA_TYPES.map((t) => (
+            {GRAPH_NODE_TYPES.map((t) => (
               <button
                 key={t}
                 onClick={() => toggleIn('nodeTypes', t)}
@@ -254,7 +260,7 @@ export function GraphView() {
 
         {/* Legend */}
         <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90">
-          {IDEA_TYPES.map((t) => (
+          {GRAPH_NODE_TYPES.map((t) => (
             <div key={t} className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
               {NODE_LABELS[t]}

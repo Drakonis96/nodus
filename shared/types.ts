@@ -2,6 +2,7 @@
 // Keep this file free of any runtime imports from either side.
 
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
+export type GraphNodeType = IdeaType | 'theme' | 'author';
 
 export type EdgeType =
   | 'extends'
@@ -11,12 +12,13 @@ export type EdgeType =
   | 'precondition_of'
   | 'measures_same'
   | 'supports'
-  | 'refutes';
+  | 'refutes'
+  | 'contains';
 
 export type EdgeBasis = 'explicit' | 'inferred';
 export type EvidenceKind = 'explicit' | 'paraphrased';
 
-export type LightStatus = 'pending' | 'done' | 'failed';
+export type LightStatus = 'none' | 'pending' | 'done' | 'failed';
 export type DeepStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
 export type DeepTrigger = 'tag' | 'manual' | 'both' | null;
 export type SourceType = 'pdf' | 'markdown' | 'upload' | 'abstract_only' | 'none';
@@ -162,7 +164,11 @@ export interface AppSettings {
   favorites: ModelRef[];
   defaultModel: ModelRef | null;
   syncMode: SyncMode;
-  readTag: string; // tag that triggers deep scan
+  readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
+  // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
+  autoLightScan: boolean;
+  autoDeepScanOnReadTag: boolean;
+  autoResumeQueue: boolean;
   zoteroUserId: string;
   zoteroStoragePath: string;
   monitoredCollections: string[]; // collection keys
@@ -171,6 +177,8 @@ export interface AppSettings {
   concurrency: number;
   unpaywallEmail: string;
   onboardingComplete: boolean;
+  // First-run usage tour (distinct from the setup onboarding above).
+  tourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -239,6 +247,8 @@ export interface QueueItem {
 
 export interface QueueProgress {
   paused: boolean;
+  /** When the queue auto-paused on a misconfiguration (no model / invalid key), why. */
+  pausedReason: string | null;
   total: number;
   done: number;
   failed: number;
@@ -260,7 +270,7 @@ export interface SyncLogEntry {
 export interface GraphNode {
   id: string; // global_id (idea) or author_id (author lens)
   label: string;
-  type: IdeaType | 'author';
+  type: GraphNodeType;
   statement?: string;
   workCount: number;
   read: boolean; // true if any developing work is deep-scanned
@@ -341,6 +351,7 @@ export interface NodusApi {
   // works / library
   listWorks(filter?: WorkFilter): Promise<WorkView[]>;
   getWork(nodusId: string): Promise<WorkView | null>;
+  ingestZoteroItems(items: ZoteroItem[]): Promise<WorkView[]>;
   setManualDeep(nodusId: string, value: boolean, model?: ModelRef | null): Promise<void>;
   setManualDeepBulk(nodusIds: string[], value: boolean, model?: ModelRef | null): Promise<void>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
@@ -357,6 +368,7 @@ export interface NodusApi {
   resumeQueue(): Promise<void>;
   cancelQueueItem(id: string): Promise<void>;
   clearQueue(): Promise<void>;
+  retryFailed(): Promise<void>;
   onQueueProgress(cb: (p: QueueProgress) => void): () => void;
 
   // graph

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { IdeaType, EdgeType, AiProvider, ModelRef } from '@shared/types';
+import type { IdeaType, EdgeType, AiProvider, ModelRef, GraphNodeType } from '@shared/types';
 
 export const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
 
@@ -19,7 +19,8 @@ export function sameModel(a: ModelRef | null | undefined, b: ModelRef | null | u
   return !!a && !!b && a.provider === b.provider && a.model === b.model;
 }
 
-export const NODE_COLORS: Record<IdeaType, string> = {
+export const NODE_COLORS: Record<Exclude<GraphNodeType, 'author'>, string> = {
+  theme: '#f97316',
   claim: '#6366f1',
   finding: '#10b981',
   construct: '#f59e0b',
@@ -27,7 +28,8 @@ export const NODE_COLORS: Record<IdeaType, string> = {
   framework: '#06b6d4',
 };
 
-export const NODE_LABELS: Record<IdeaType, string> = {
+export const NODE_LABELS: Record<Exclude<GraphNodeType, 'author'>, string> = {
+  theme: 'tema',
   claim: 'afirmación',
   finding: 'hallazgo',
   construct: 'constructo',
@@ -36,6 +38,7 @@ export const NODE_LABELS: Record<IdeaType, string> = {
 };
 
 export const EDGE_LABELS: Record<EdgeType, string> = {
+  contains: 'contiene',
   extends: 'extiende',
   contradicts: 'contradice',
   applies_to: 'aplica a',
@@ -79,7 +82,7 @@ export function Spinner({ label }: { label?: string }) {
   );
 }
 
-export function TypeDot({ type }: { type: IdeaType | 'author' }) {
+export function TypeDot({ type }: { type: GraphNodeType }) {
   const color = type === 'author' ? '#a3a3a3' : NODE_COLORS[type];
   return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />;
 }

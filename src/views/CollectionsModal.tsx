@@ -140,8 +140,18 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
     setWorksByKey(new Map(ws.map((w) => [w.zotero_key, w])));
   };
 
-  const selectAllFiltered = async () => {
-    const ids = filtered.map((it) => worksByKey.get(it.key)?.nodus_id).filter((x): x is string => !!x);
+  const ensureWorks = async (itemsToEnsure: ZoteroItem[]) => {
+    const missing = itemsToEnsure.filter((it) => !worksByKey.has(it.key));
+    if (missing.length) await window.nodus.ingestZoteroItems(missing);
+    const ws = await window.nodus.listWorks({ includeArchived: true });
+    const next = new Map(ws.map((w) => [w.zotero_key, w]));
+    setWorksByKey(next);
+    return next;
+  };
+
+  const analyzeFiltered = async () => {
+    const nextWorks = await ensureWorks(filtered);
+    const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
     if (ids.length) await window.nodus.setManualDeepBulk(ids, true, scanModel);
     await refreshWorks();
   };
@@ -153,8 +163,9 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
   };
 
   const toggleItem = async (it: ZoteroItem) => {
-    const w = worksByKey.get(it.key);
-    if (!w) return; // not yet ingested into Nodus
+    const nextWorks = worksByKey.has(it.key) ? worksByKey : await ensureWorks([it]);
+    const w = nextWorks.get(it.key);
+    if (!w) return;
     await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
     await refreshWorks();
   };
@@ -228,8 +239,8 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
                   </button>
                 ))}
                 <div className="flex-1" />
-                <button className="btn btn-ghost text-xs" onClick={selectAllFiltered}>
-                  Seleccionar filtrados ✦
+                <button className="btn btn-ghost text-xs" onClick={analyzeFiltered}>
+                  Analizar filtrados
                 </button>
                 <button className="btn btn-ghost text-xs" onClick={deselectAllFiltered}>
                   Deseleccionar
@@ -256,10 +267,9 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
                     <div key={it.key} className="flex items-center gap-3 px-4 py-2 border-b border-neutral-800/60">
                       <input
                         type="checkbox"
-                        disabled={!w}
                         checked={!!w?.manual_deep}
                         onChange={() => toggleItem(it)}
-                        title={w ? 'Marcar para escaneo profundo manual' : 'Aún no incorporado a Nodus'}
+                        title={w ? 'Analizar ideas de esta obra' : 'Incorporar a Nodus y analizar ideas'}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="truncate text-sm">{it.title}</div>

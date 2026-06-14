@@ -57,12 +57,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       zoteroStoragePath: storagePath,
       onboardingComplete: true,
     });
-    // First full ingest of the chosen collections.
+    // With automatic analysis disabled by default, the first sync only ingests Zotero metadata.
     void window.nodus.syncNow();
     onDone();
   };
 
-  const steps = ['Conectar Zotero', 'Colecciones', 'Escaneo profundo', 'Proveedor de IA'];
+  const steps = ['Conectar Zotero', 'Colecciones', 'Lecturas', 'Proveedor de IA'];
 
   return (
     <div className="h-full flex items-center justify-center p-8">
@@ -108,7 +108,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {step === 1 && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-400">
-              Elige las colecciones a monitorizar (escaneo ligero). Se incluyen automáticamente sus subcolecciones.
+              Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.
             </p>
             <div className="max-h-64 overflow-y-auto space-y-1">
               {collections.map((c) => (
@@ -136,7 +136,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {step === 2 && (
           <div className="space-y-4">
             <label className="block text-sm">
-              Tag que dispara el escaneo profundo
+              Tag de lectura
               <input className="input w-full mt-1" value={readTag} onChange={(e) => setReadTag(e.target.value)} />
             </label>
             <label className="block text-sm">
@@ -203,6 +203,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             <p className="text-xs text-neutral-500">
               Podrás añadir más proveedores y marcar favoritos en Ajustes.
             </p>
+            {!selectedModel && (
+              <p className="text-xs text-amber-400">
+                ⚠ Sin un modelo seleccionado podrás sincronizar metadatos, pero no analizar temas ni ideas hasta configurarlo.
+              </p>
+            )}
           </div>
         )}
 

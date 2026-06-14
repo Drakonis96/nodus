@@ -16,12 +16,18 @@ interface IdeaRow {
   statement: string;
 }
 
+interface ThemeRow {
+  theme_id: string;
+  label: string;
+}
+
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export function buildIdeaGraph(): GraphData {
   const db = getDb();
   const ideas = db.prepare('SELECT global_id, type, label, statement FROM ideas').all() as IdeaRow[];
+  const themeRows = db.prepare('SELECT theme_id, label FROM themes ORDER BY label').all() as ThemeRow[];
 
-  const nodes: GraphNode[] = ideas.map((idea) => {
+  const ideaNodes: GraphNode[] = ideas.map((idea) => {
     const works = db
       .prepare(
         `SELECT w.nodus_id, w.year, w.authors_json, w.deep_status
@@ -70,6 +76,44 @@ export function buildIdeaGraph(): GraphData {
     };
   });
 
+  const themeNodes: GraphNode[] = themeRows.map((theme) => {
+    const works = db
+      .prepare(
+        `SELECT DISTINCT w.nodus_id, w.year, w.authors_json, w.deep_status
+         FROM work_themes wt JOIN works w ON w.nodus_id = wt.nodus_id
+         WHERE wt.theme_id = ? AND w.archived = 0`
+      )
+      .all(theme.theme_id) as { nodus_id: string; year: number | null; authors_json: string; deep_status: string }[];
+
+    const authors = new Set<string>();
+    const years: number[] = [];
+    let read = false;
+    for (const w of works) {
+      if (w.year != null) years.push(w.year);
+      if (w.deep_status === 'done') read = true;
+      try {
+        for (const a of JSON.parse(w.authors_json || '[]')) authors.add(a);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return {
+      id: `theme:${theme.theme_id}`,
+      label: theme.label.toUpperCase(),
+      type: 'theme',
+      statement: `Familia temática: ${theme.label}`,
+      workCount: works.length,
+      read,
+      themes: [theme.label],
+      years,
+      authors: Array.from(authors),
+      maxConfidence: 1,
+    };
+  });
+
+  const nodes = [...themeNodes, ...ideaNodes];
+
   const edgeRows = db.prepare('SELECT * FROM edges').all() as {
     id: string;
     from_id: string;
@@ -79,7 +123,7 @@ export function buildIdeaGraph(): GraphData {
     confidence: number;
   }[];
   const nodeIds = new Set(nodes.map((n) => n.id));
-  const edges: GraphEdge[] = edgeRows
+  const ideaEdges: GraphEdge[] = edgeRows
     .filter((e) => nodeIds.has(e.from_id) && nodeIds.has(e.to_id))
     .map((e) => ({
       id: e.id,
@@ -89,6 +133,27 @@ export function buildIdeaGraph(): GraphData {
       basis: e.basis,
       confidence: e.confidence,
     }));
+
+  const themeEdgeRows = db
+    .prepare(
+      `SELECT DISTINCT t.theme_id, io.global_id
+       FROM work_themes wt
+       JOIN themes t ON t.theme_id = wt.theme_id
+       JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id`
+    )
+    .all() as { theme_id: string; global_id: string }[];
+  const themeEdges: GraphEdge[] = themeEdgeRows
+    .map((r) => ({
+      id: `theme-edge:${r.theme_id}:${r.global_id}`,
+      source: `theme:${r.theme_id}`,
+      target: r.global_id,
+      type: 'contains',
+      basis: 'inferred' as const,
+      confidence: 0.9,
+    }))
+    .filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
+
+  const edges = [...themeEdges, ...ideaEdges];
 
   return { nodes, edges };
 }

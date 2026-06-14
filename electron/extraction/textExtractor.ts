@@ -28,10 +28,10 @@ export interface OcrOptions {
 }
 
 const MIN_CHARS_TEXT_PAGE = 50;
-const CHUNK_WORDS = 6000;
-const OVERLAP_WORDS = 200;
+const CHUNK_WORDS = 1800;
+const OVERLAP_WORDS = 100;
 
-/** Split long text into ~6k-word chunks with ~200-word overlap. */
+/** Split long text into bounded chunks with a small overlap for reliable LLM JSON output. */
 export function chunkText(text: string): string[] {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= CHUNK_WORDS) return [text];
@@ -151,6 +151,22 @@ export async function extractFromPath(
   throw new Error(`Tipo de archivo no soportado: ${ext}`);
 }
 
+/** Best-effort default Zotero storage folder, used when the user left the path blank. */
+export function defaultZoteroStorage(): string {
+  const candidates = [
+    path.join(os.homedir(), 'Zotero', 'storage'),
+    path.join(os.homedir(), 'Documents', 'Zotero', 'storage'),
+  ];
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c)) return c;
+    } catch {
+      /* ignore */
+    }
+  }
+  return '';
+}
+
 /** Only PDFs and plain text are legitimate full-text sources. HTML snapshots and images are excluded. */
 function isTextAttachment(att: ZoteroAttachment): boolean {
   const ct = att.contentType ?? '';
@@ -187,6 +203,9 @@ export async function resolveWorkText(
 ): Promise<ExtractedDoc> {
   const children = await itemChildren(userId, zoteroKey).catch(() => [] as ZoteroAttachment[]);
   const textAttachments = children.filter(isTextAttachment);
+  // Fall back to the standard Zotero storage location when the user left it blank,
+  // so deep scans can still find local PDFs instead of degrading to abstract-only.
+  const effectiveStorage = storagePath || defaultZoteroStorage();
 
   // (1) Reuse Zotero's indexed full text when it's substantial and reasonably complete.
   if (opts.preferZoteroFulltext) {
@@ -210,8 +229,8 @@ export async function resolveWorkText(
   // (2) Parse the PDF/text file from the storage folder ourselves.
   const docs: ExtractedDoc[] = [];
   for (const att of textAttachments) {
-    if (!att.filename || !storagePath) continue;
-    const filePath = path.join(storagePath, att.key, att.filename);
+    if (!att.filename || !effectiveStorage) continue;
+    const filePath = path.join(effectiveStorage, att.key, att.filename);
     if (!fs.existsSync(filePath)) continue;
     if (/\.pdf$/i.test(att.filename)) {
       opts.onProgress?.({ phase: 'analyze', detail: 'Analizando PDF…', pct: null });

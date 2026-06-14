@@ -3,6 +3,7 @@ import { PROMPT_FUSION } from './prompts';
 import {
   createIdea,
   ideasWithEmbeddings,
+  allIdeaCandidates,
   cosineSimilarity,
   addEdge,
   getIdea,
@@ -32,7 +33,61 @@ function isFusionResult(v: unknown): v is FusionResult {
 }
 
 const SIM_THRESHOLD = 0.78;
+const LEXICAL_THRESHOLD = 0.18;
 const MAX_CANDIDATES = 6;
+
+const STOPWORDS = new Set([
+  'a',
+  'al',
+  'ante',
+  'bajo',
+  'con',
+  'contra',
+  'de',
+  'del',
+  'desde',
+  'el',
+  'en',
+  'entre',
+  'es',
+  'la',
+  'las',
+  'lo',
+  'los',
+  'para',
+  'por',
+  'que',
+  'se',
+  'sin',
+  'sobre',
+  'su',
+  'sus',
+  'un',
+  'una',
+  'y',
+]);
+
+function tokens(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .split(/[^a-z0-9]+/i)
+      .filter((t) => t.length > 2 && !STOPWORDS.has(t))
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let overlap = 0;
+  for (const t of a) if (b.has(t)) overlap++;
+  return overlap / (a.size + b.size - overlap);
+}
+
+function lexicalSimilarity(a: ExtractedIdea, b: { label: string; statement: string }): number {
+  return 0.65 * jaccard(tokens(a.label), tokens(b.label)) + 0.35 * jaccard(tokens(a.statement), tokens(b.statement));
+}
 
 /**
  * Resolve one extracted idea against the global graph.
@@ -53,6 +108,18 @@ export async function fuseIdea(idea: ExtractedIdea, sourceWork: string, model?: 
         similarity: cosineSimilarity(embedding, i.embedding),
       }))
       .filter((c) => c.similarity >= SIM_THRESHOLD)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, MAX_CANDIDATES);
+  } else {
+    candidates = allIdeaCandidates()
+      .map((i) => ({
+        global_id: i.global_id,
+        type: i.type,
+        label: i.label,
+        statement: i.statement,
+        similarity: lexicalSimilarity(idea, i),
+      }))
+      .filter((c) => c.similarity >= LEXICAL_THRESHOLD)
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, MAX_CANDIDATES);
   }

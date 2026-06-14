@@ -7,6 +7,7 @@ import { runLightScan } from '../ai/lightScan';
 import { runDeepScan } from '../ai/deepScan';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
+import { setDeepResult } from '../db/worksRepo';
 import { AiError } from '../ai/aiClient';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -16,9 +17,13 @@ const MAX_RETRIES = 4;
 class ScanQueue {
   private items: QueueItem[] = [];
   private paused = false;
+  /** Set when the queue auto-paused on a misconfiguration; cleared on resume. */
+  private pausedReason: string | null = null;
   private running = false;
   private listeners = new Set<ProgressListener>();
   private retries = new Map<string, number>();
+  /** Last kind dequeued, used to interleave light/deep so neither starves. */
+  private lastKind: QueueKind | null = null;
 
   onProgress(cb: ProgressListener): () => void {
     this.listeners.add(cb);
@@ -36,6 +41,7 @@ class ScanQueue {
     const current = this.items.find((i) => i.state === 'running');
     return {
       paused: this.paused,
+      pausedReason: this.pausedReason,
       total: this.items.length,
       done,
       failed,
@@ -59,15 +65,8 @@ class ScanQueue {
       enqueued_at: new Date().toISOString(),
       model: model ?? null,
     });
-    this.sort();
     this.emit();
     void this.run();
-  }
-
-  /** Deep jobs run before pending light jobs. */
-  private sort(): void {
-    const rank = (i: QueueItem) => (i.kind === 'deep' ? 0 : 1);
-    this.items.sort((a, b) => rank(a) - rank(b));
   }
 
   pause(): void {
@@ -77,6 +76,7 @@ class ScanQueue {
 
   resume(): void {
     this.paused = false;
+    this.pausedReason = null;
     this.emit();
     void this.run();
   }
@@ -85,17 +85,38 @@ class ScanQueue {
     const item = this.items.find((i) => i.id === id);
     if (item && (item.state === 'queued' || item.state === 'paused')) {
       item.state = 'cancelled';
+      this.resetPendingStatus(item);
     }
     this.emit();
   }
 
   clear(): void {
+    for (const item of this.items) {
+      if (item.state === 'queued' || item.state === 'cancelled' || item.state === 'paused') {
+        this.resetPendingStatus(item);
+      }
+    }
     this.items = this.items.filter((i) => i.state === 'running');
     this.emit();
   }
 
+  private resetPendingStatus(item: QueueItem): void {
+    const column = item.kind === 'deep' ? 'deep_status' : 'light_status';
+    getDb().prepare(`UPDATE works SET ${column} = 'none' WHERE nodus_id = ? AND ${column} = 'pending'`).run(item.nodus_id);
+  }
+
+  /**
+   * Pick the next job, alternating light/deep so neither layer starves the other.
+   * Deep jobs build the idea graph (nodes); light jobs populate themes. Interleaving
+   * means the user sees both appear early instead of waiting for one whole layer.
+   */
   private nextQueued(): QueueItem | undefined {
-    return this.items.find((i) => i.state === 'queued');
+    const queued = this.items.filter((i) => i.state === 'queued');
+    if (queued.length === 0) return undefined;
+    const want: QueueKind = this.lastKind === 'deep' ? 'light' : 'deep';
+    const pick = queued.find((i) => i.kind === want) ?? queued[0];
+    this.lastKind = pick.kind;
+    return pick;
   }
 
   private async run(): Promise<void> {
@@ -143,6 +164,17 @@ class ScanQueue {
       item.detail = null;
       item.subPct = null;
     } catch (e) {
+      // A misconfiguration (no model / no key / invalid key) fails identically for
+      // every job, so pause the queue once and surface it instead of marking the
+      // entire library as failed. The job stays queued and resumes after the fix.
+      if (e instanceof AiError && e.config) {
+        item.state = 'queued';
+        item.error = null;
+        this.pausedReason = (e as Error).message;
+        console.error(`[scanQueue] configuración: ${this.pausedReason} — cola en pausa`);
+        this.pause();
+        return;
+      }
       const retriable = e instanceof AiError && e.retriable;
       const attempts = (this.retries.get(item.id) ?? 0) + 1;
       this.retries.set(item.id, attempts);
@@ -155,6 +187,12 @@ class ScanQueue {
       } else {
         item.state = 'failed';
         item.error = (e as Error).message;
+        console.error(`[scanQueue] ${item.kind} falló: ${item.title} -> ${(e as Error).message}`);
+        // Persist deep-scan failure so it's visible in the library and not
+        // re-enqueued forever by resumePending(). (Light scans already persist.)
+        if (item.kind === 'deep') {
+          setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
+        }
       }
     }
     this.emit();
@@ -194,7 +232,34 @@ class ScanQueue {
     queueItem.detail = 'Analizando con IA…';
     queueItem.subPct = null;
     this.emit();
-    await runDeepScan(work, doc, queueItem.model ?? null);
+    await runDeepScan(work, doc, queueItem.model ?? null, (p) => {
+      queueItem.detail = p.detail;
+      queueItem.subPct = p.pct;
+      this.emit();
+    });
+  }
+
+  /**
+   * Re-enqueue works whose last scan failed — manual recovery after the user fixes
+   * the configuration (e.g. selects a model). Resets them to pending and resumes.
+   */
+  retryFailed(): void {
+    const db = getDb();
+    const failedLight = db
+      .prepare("SELECT nodus_id, title FROM works WHERE light_status = 'failed' AND archived = 0")
+      .all() as { nodus_id: string; title: string }[];
+    const failedDeep = db
+      .prepare(
+        "SELECT nodus_id, title FROM works WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
+      )
+      .all() as { nodus_id: string; title: string }[];
+    db.prepare("UPDATE works SET light_status = 'pending' WHERE light_status = 'failed' AND archived = 0").run();
+    db.prepare(
+      "UPDATE works SET deep_status = 'pending' WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
+    ).run();
+    for (const w of failedDeep) this.enqueue(w.nodus_id, w.title, 'deep');
+    for (const w of failedLight) this.enqueue(w.nodus_id, w.title, 'light');
+    this.resume();
   }
 
   /** Re-enqueue any work left in a pending state, so scans resume after restart. */

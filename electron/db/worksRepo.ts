@@ -96,8 +96,8 @@ export function upsertWork(input: UpsertWorkInput): void {
   const existing = getWorkByZoteroKey(input.zotero_key);
   if (!existing) {
     db.prepare(
-      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, year, item_type, doi, read_tag)
-       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @year, @item_type, @doi, @read_tag)`
+      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, year, item_type, doi, read_tag, light_status)
+       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @year, @item_type, @doi, @read_tag, 'none')`
     ).run({
       ...input,
       authors_json: JSON.stringify(input.authors),
@@ -148,6 +148,14 @@ export function recomputeDeepTrigger(nodusId: string): DeepTrigger {
   else if (w.manual_deep) trigger = 'manual';
   db.prepare('UPDATE works SET deep_trigger = ? WHERE nodus_id = ?').run(trigger, nodusId);
   return trigger;
+}
+
+export function setLightPending(nodusId: string): void {
+  getDb().prepare("UPDATE works SET light_status = 'pending' WHERE nodus_id = ?").run(nodusId);
+}
+
+export function setDeepPending(nodusId: string): void {
+  getDb().prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ?").run(nodusId);
 }
 
 export function setLightResult(nodusId: string, status: string, hash: string | null, notes?: string | null): void {

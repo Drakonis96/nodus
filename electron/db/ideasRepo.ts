@@ -100,6 +100,15 @@ export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; labe
   return rows.map((r) => ({ ...r, embedding: decodeEmbedding(r.embedding) }));
 }
 
+export function allIdeaCandidates(): { global_id: string; type: IdeaType; label: string; statement: string }[] {
+  return getDb().prepare('SELECT global_id, type, label, statement FROM ideas').all() as {
+    global_id: string;
+    type: IdeaType;
+    label: string;
+    statement: string;
+  }[];
+}
+
 export function upsertOccurrence(
   globalId: string,
   nodusId: string,

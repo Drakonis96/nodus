@@ -18,6 +18,7 @@ const api: NodusApi = {
 
   listWorks: (filter) => ipcRenderer.invoke('works:list', filter),
   getWork: (nodusId) => ipcRenderer.invoke('works:get', nodusId),
+  ingestZoteroItems: (items) => ipcRenderer.invoke('works:ingestZoteroItems', items),
   setManualDeep: (nodusId, value, model) => ipcRenderer.invoke('works:setManualDeep', nodusId, value, model),
   setManualDeepBulk: (nodusIds, value, model) => ipcRenderer.invoke('works:setManualDeepBulk', nodusIds, value, model),
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
@@ -32,6 +33,7 @@ const api: NodusApi = {
   resumeQueue: () => ipcRenderer.invoke('queue:resume'),
   cancelQueueItem: (id) => ipcRenderer.invoke('queue:cancelItem', id),
   clearQueue: () => ipcRenderer.invoke('queue:clear'),
+  retryFailed: () => ipcRenderer.invoke('queue:retryFailed'),
   onQueueProgress: (cb) => {
     const listener = (_e: unknown, p: QueueProgress) => cb(p);
     ipcRenderer.on('queue:progress', listener);

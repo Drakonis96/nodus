@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const migrations: Migration[] = [
   {
@@ -151,6 +151,13 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_edges_to ON edges(to_id);
       CREATE INDEX idx_gaps_nodus ON gaps(nodus_id);
       CREATE INDEX idx_work_themes_theme ON work_themes(theme_id);
+    `,
+  },
+  {
+    version: 2,
+    up: /* sql */ `
+      UPDATE works SET light_status = 'none' WHERE light_status = 'pending';
+      UPDATE works SET deep_status = 'none' WHERE deep_status = 'pending';
     `,
   },
 ];

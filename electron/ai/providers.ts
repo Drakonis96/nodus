@@ -32,7 +32,7 @@ export function openAiCompatBase(provider: AiProvider): string | null {
 
 /** Providers whose chat models reliably honor OpenAI's response_format: json_object. */
 export function supportsJsonMode(provider: AiProvider): boolean {
-  return provider === 'openai' || provider === 'deepseek';
+  return provider === 'openai';
 }
 
 function byId(a: ModelInfo, b: ModelInfo): number {

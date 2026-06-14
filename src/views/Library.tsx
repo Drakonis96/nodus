@@ -5,6 +5,7 @@ import { ModelPicker } from '../components/ModelPicker';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">ligero ✓</Badge>;
+  if (s === 'none') return <Badge color="neutral">—</Badge>;
   if (s === 'failed') return <Badge color="red">ligero ✕</Badge>;
   return <Badge color="neutral">ligero…</Badge>;
 }
@@ -40,6 +41,7 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
   const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
   const [loading, setLoading] = useState(true);
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,10 +53,43 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
     void load();
   }, [load]);
 
-  const toggleManual = async (w: WorkView) => {
-    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
+  const analyzeThemes = async (w: WorkView) => {
+    await window.nodus.rescan(w.nodus_id, 'light', scanModel);
     await load();
   };
+
+  const analyzeIdeas = async (w: WorkView) => {
+    if (w.deep_status === 'done') {
+      await window.nodus.rescan(w.nodus_id, 'deep', scanModel);
+    } else {
+      await window.nodus.setManualDeep(w.nodus_id, true, scanModel);
+    }
+    await load();
+  };
+
+  const analyzeSelectedThemes = async () => {
+    for (const id of selected) {
+      await window.nodus.rescan(id, 'light', scanModel);
+    }
+    setSelected(new Set());
+    await load();
+  };
+
+  const analyzeSelectedIdeas = async () => {
+    await window.nodus.setManualDeepBulk(Array.from(selected), true, scanModel);
+    setSelected(new Set());
+    await load();
+  };
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      checked ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected = works.length > 0 && works.every((w) => selected.has(w.nodus_id));
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -64,6 +99,17 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
         <div className="flex-1" />
         <span className="text-xs text-neutral-500">Escanear con:</span>
         <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
+        {selected.size > 0 && (
+          <>
+            <span className="text-xs text-neutral-500">{selected.size} seleccionadas</span>
+            <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
+              Analizar temas
+            </button>
+            <button className="btn btn-primary" onClick={analyzeSelectedIdeas}>
+              Analizar ideas
+            </button>
+          </>
+        )}
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
           Modal de Colecciones
         </button>
@@ -81,6 +127,7 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
           onChange={(e) => setFilter((f) => ({ ...f, lightStatus: e.target.value as any }))}
         >
           <option value="all">Ligero: todos</option>
+          <option value="none">Ligero: ninguno</option>
           <option value="done">Ligero: hecho</option>
           <option value="pending">Ligero: pendiente</option>
           <option value="failed">Ligero: fallido</option>
@@ -102,19 +149,29 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-neutral-900 text-neutral-400 text-left">
             <tr>
+              <th className="p-2 font-medium w-8">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) setSelected(new Set(works.map((w) => w.nodus_id)));
+                    else setSelected(new Set());
+                  }}
+                />
+              </th>
               <th className="p-2 font-medium">Título</th>
               <th className="p-2 font-medium">Autores</th>
               <th className="p-2 font-medium">Año</th>
               <th className="p-2 font-medium">Tema(s)</th>
               <th className="p-2 font-medium">Ligero</th>
               <th className="p-2 font-medium">Profundo</th>
-              <th className="p-2 font-medium">Acciones</th>
+              <th className="p-2 font-medium" data-tour="library-actions">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td className="p-4 text-neutral-500" colSpan={7}>
+                <td className="p-4 text-neutral-500" colSpan={8}>
                   Cargando…
                 </td>
               </tr>
@@ -122,6 +179,13 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
             {!loading &&
               works.map((w) => (
                 <tr key={w.nodus_id} className="border-t border-neutral-800 hover:bg-neutral-900/50">
+                  <td className="p-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(w.nodus_id)}
+                      onChange={(e) => toggleSelected(w.nodus_id, e.target.checked)}
+                    />
+                  </td>
                   <td className="p-2 max-w-md">
                     <div className="truncate" title={w.title}>
                       {w.title}
@@ -141,15 +205,15 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
                   <td className="p-2 whitespace-nowrap">
                     <button
                       className="text-xs text-neutral-400 hover:text-white mr-2"
-                      onClick={() => toggleManual(w)}
+                      onClick={() => analyzeThemes(w)}
                     >
-                      {w.manual_deep ? 'quitar ✦' : 'marcar ✦'}
+                      temas
                     </button>
                     <button
                       className="text-xs text-neutral-400 hover:text-white mr-2"
-                      onClick={() => window.nodus.rescan(w.nodus_id, 'deep', scanModel)}
+                      onClick={() => analyzeIdeas(w)}
                     >
-                      re-scan
+                      {w.deep_status === 'done' ? 'reanalizar ideas' : 'analizar ideas'}
                     </button>
                     <button
                       className="text-xs text-indigo-400 hover:text-indigo-300"

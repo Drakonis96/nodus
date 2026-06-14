@@ -46,12 +46,31 @@ dudosas.
 Separa siempre "claim" de "finding": un claim puede estar apoyado por varios
 findings y refutado por otros.
 
+═══ NODOS TEMÁTICOS / FAMILIAS ("theme_nodes") ═══
+Además de ideas concretas, extrae 1-2 temas padre amplios que organicen ESTE fragmento.
+Son nodos de familia, no ideas: etiquetas muy generales, en español, reutilizables
+entre obras y aptas para aparecer grandes en el grafo (p. ej. "turismo",
+"franquismo", "memoria histórica", "política cultural"). Si una obra trata de
+"turismo en el franquismo", incluye al menos "turismo" y, si está sustentado,
+"franquismo". No inventes familias que el texto no sostenga.
+
+Para cada tema:
+- "id": identificador local.
+- "label": etiqueta canónica corta, en minúsculas, singular cuando sea natural.
+- "statement": UNA frase en español sobre por qué este tema organiza la obra.
+- "role": "primary" si es paraguas central, "secondary" si contextual.
+- "evidence": mínimo uno, con las mismas reglas de evidencia.
+- "confidence": 0.0-1.0.
+Reutiliza etiquetas canónicas ya obvias entre fragmentos: "turismo", "franquismo",
+"género", "identidad nacional", etc. No traduzcas al inglés aunque el texto esté en inglés.
+
 ═══ PARA CADA IDEA ═══
 - "id", "type", "label" (canónico corto, minúsculas, sin años ni autores),
   "statement" (UNA frase en español), "role" ("principal"|"secondary"),
-  "development" (2-4 frases en español sobre cómo ESTA obra la desarrolla),
+  "development" (1-3 frases en español sobre cómo ESTA obra la desarrolla),
   "evidence" (mínimo uno), "confidence" (0.0-1.0),
   "uncertainty_reason" (string en español SOLO si confidence < 0.6).
+- Máximo 4 ideas por fragmento. Prioriza las ideas centrales y mejor evidenciadas.
 
 ═══ EVIDENCIA ═══
 - "quote": pasaje VERBATIM (idioma original), máx ~30 palabras. Nunca parafrasees.
@@ -62,6 +81,7 @@ findings y refutado por otros.
 from/to (ids locales), type (extends|contradicts|applies_to|shares_method|
 precondition_of|measures_same|supports|refutes), basis ("explicit"|"inferred"),
 evidence (un anclaje), confidence. "inferred" solo si es muy clara y con confianza baja.
+Máximo 5 relaciones internas por fragmento.
 
 ═══ REFERENCIAS EXTERNAS ("external_references") ═══
 from (id local), cited_work (referencia tal como aparece), type, basis (casi
@@ -70,6 +90,7 @@ siempre "explicit"), evidence, confidence. No inventes citas.
 ═══ HUECOS ("gaps") ═══
 kind ("future_work"|"limitation"|"open_question"|"unresolved_contradiction"),
 statement (español), related_idea (id local o null), evidence, confidence.
+Máximo 2 huecos por fragmento.
 
 ═══ AUTORES ("authors_detail") ═══
 name, affiliation (o null), stance_notes (español, solo si es explícito; si no, null).
@@ -98,6 +119,8 @@ Datos faltantes → null. Nunca supongas.
     "empirical"|"review"|"theoretical"|"book"|"other", "language",
     "processing_status": "ok"|"partial_no_fulltext"|"unreadable"|"out_of_scope",
     "notes": string|null },
+  "theme_nodes": [ { "id","label","statement","role",
+    "evidence":[{"quote","location","kind"}],"confidence" } ],
   "ideas": [ { "id","type","label","statement","role","development",
     "evidence":[{"quote","location","kind"}],"confidence","uncertainty_reason" } ],
   "internal_relations": [ { "from","to","type","basis",
@@ -138,6 +161,7 @@ entre "variant_of" y "new", elige "new". La similitud es una pista, NO una decis
 ═══ CONTRATO DE ENTRADA ═══
 { "new_idea": { /* idea del Prompt 1 */ },
   "candidates": [ { "global_id","type","label","statement","similarity" } ] }
+La similitud puede venir de embeddings o de recuperación textual conservadora.
 Lista vacía → "new". Varios same_as válidos → el statement más general.
 
 ═══ SALIDA — JSON válido, sin vallas de código ═══

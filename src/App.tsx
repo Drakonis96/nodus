@@ -8,6 +8,7 @@ import { ReadingPathView } from './views/ReadingPathView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { QueueBar } from './components/QueueBar';
+import { Tour } from './views/Tour';
 
 type View = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
 
@@ -86,6 +87,7 @@ export function App() {
         {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
         {settings.favorites.length > 0 && (
           <select
+            data-tour="model"
             className="input text-xs py-1"
             title="Modelo predeterminado para escaneos"
             value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
@@ -105,14 +107,14 @@ export function App() {
           </select>
         )}
         {!settings.defaultModel && (
-          <button className="btn btn-ghost text-amber-400" onClick={() => setView('settings')}>
+          <button data-tour="model" className="btn btn-ghost text-amber-400" onClick={() => setView('settings')}>
             ⚠ Configura un modelo de IA
           </button>
         )}
-        <button className="btn btn-ghost" onClick={() => setCollectionsOpen(true)}>
+        <button data-tour="collections" className="btn btn-ghost" onClick={() => setCollectionsOpen(true)}>
           Colecciones
         </button>
-        <button className="btn btn-primary" onClick={onSync} disabled={syncing}>
+        <button data-tour="sync" className="btn btn-primary" onClick={onSync} disabled={syncing}>
           {syncing ? 'Actualizando…' : 'Actualizar'}
         </button>
       </header>
@@ -123,6 +125,7 @@ export function App() {
           {NAV.map((n) => (
             <button
               key={n.id}
+              data-tour={`nav-${n.id}`}
               onClick={() => setView(n.id)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
                 view === n.id ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900'
@@ -144,9 +147,21 @@ export function App() {
         </main>
       </div>
 
-      <QueueBar />
+      <div data-tour="queue">
+        <QueueBar />
+      </div>
 
       {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
+
+      {settings.onboardingComplete && !settings.tourComplete && (
+        <Tour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
     </div>
   );
 }

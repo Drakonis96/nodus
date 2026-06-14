@@ -1,5 +1,5 @@
 import { ipcMain, shell, BrowserWindow } from 'electron';
-import type { AppSettings, QueueKind, WorkFilter, AiProvider, ModelRef } from '@shared/types';
+import type { AppSettings, QueueKind, WorkFilter, AiProvider, ModelRef, ZoteroItem } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listModels } from './ai/providers';
@@ -9,7 +9,7 @@ import * as ideas from './db/ideasRepo';
 import * as themes from './db/themesRepo';
 import { aggregateGaps } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
-import { fullSync, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { scanQueue } from './pipeline/scanQueue';
 import { buildIdeaGraph, buildAuthorGraph, getContradictions, buildReadingPath } from './graph/graphService';
 import { exportData, importData } from './export/exportImport';
@@ -62,11 +62,21 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // works / library
   h('works:list', async (_e, filter?: WorkFilter) => works.listWorks(filter));
   h('works:get', async (_e, nodusId: string) => works.getWork(nodusId));
+  h('works:ingestZoteroItems', async (_e, items: ZoteroItem[]) => {
+    const { readTag } = getSettings();
+    const out = [];
+    for (const item of items) {
+      const { nodusId } = ingestZoteroItem(item, readTag);
+      const w = works.getWork(nodusId);
+      if (w) out.push(w);
+    }
+    return out;
+  });
   h('works:setManualDeep', async (_e, nodusId: string, value: boolean, model?: ModelRef | null) => {
     works.setManualDeep(nodusId, value);
     const w = works.getWork(nodusId);
     if (value && w) {
-      markDeepPending(nodusId);
+      works.setDeepPending(nodusId);
       scanQueue.enqueue(nodusId, w.title, 'deep', model);
     }
   });
@@ -76,7 +86,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       if (value) {
         const w = works.getWork(id);
         if (w) {
-          markDeepPending(id);
+          works.setDeepPending(id);
           scanQueue.enqueue(id, w.title, 'deep', model);
         }
       }
@@ -87,7 +97,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     if (!w) return;
     if (kind === 'deep') {
       ideas.purgeDeepData(nodusId);
-      markDeepPending(nodusId);
+      works.setDeepPending(nodusId);
+    } else {
+      works.setLightPending(nodusId);
     }
     scanQueue.enqueue(nodusId, w.title, kind, model);
   });
@@ -103,7 +115,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     const doc = await extractFromPath(filePath, {
       ocr: { enabled: s.ocrEnabled, languages: s.ocrLanguages, maxPages: s.ocrMaxPages },
     });
-    markDeepPending(nodusId);
+    works.setDeepPending(nodusId);
     await runDeepScan(w, doc);
   });
 
@@ -117,6 +129,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   h('queue:resume', async () => scanQueue.resume());
   h('queue:cancelItem', async (_e, id: string) => scanQueue.cancelItem(id));
   h('queue:clear', async () => scanQueue.clear());
+  h('queue:retryFailed', async () => scanQueue.retryFailed());
 
   // graph
   h('graph:get', async (_e, lens: 'ideas' | 'authors') =>
@@ -139,10 +152,4 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   scanQueue.onProgress((p) => {
     getWindow()?.webContents.send('queue:progress', p);
   });
-}
-
-function markDeepPending(nodusId: string): void {
-  getDb()
-    .prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ? AND deep_status IN ('none','failed','skipped_no_text')")
-    .run(nodusId);
 }
