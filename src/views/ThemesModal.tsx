@@ -313,13 +313,16 @@ export function ThemesModal({
               </span>
             </label>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-neutral-500">Modelo:</span>
-            <ModelPicker settings={settings} value={model} onChange={setModel} compact />
-            <div className="flex-1" />
-            {reprocessing && <span className="text-xs text-neutral-500">Reprocesando con el modelo…</span>}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="text-xs text-neutral-500 shrink-0">Modelo:</span>
+              <div className="min-w-0 max-w-full">
+                <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+              </div>
+            </div>
+            {reprocessing && <span className="text-xs text-neutral-500 sm:ml-auto">Reprocesando con el modelo…</span>}
             <button
-              className="btn btn-primary gap-1.5"
+              className="btn btn-primary w-full shrink-0 gap-1.5 sm:w-auto"
               title="Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)"
               onClick={() => void reprocess()}
               disabled={busy}

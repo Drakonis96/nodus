@@ -35,6 +35,7 @@ import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { reprocessConnections } from './ai/reprocessConnections';
 import * as chat from './db/chatRepo';
+import * as tutorRoutes from './db/tutorRepo';
 import { getDb } from './db/database';
 
 /** Register every IPC channel backing the window.nodus API. */
@@ -270,6 +271,9 @@ export function registerIpc(
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));
+  h('tutor:routes:list', async () => tutorRoutes.listTutorRoutes());
+  h('tutor:routes:rate', async (_e, routeId: string, rating: number | null) => tutorRoutes.rateTutorRoute(routeId, rating));
+  h('tutor:routes:played', async (_e, routeId: string) => tutorRoutes.markTutorRoutePlayed(routeId));
   h('tutor:step', async (_e, request: TutorStepRequest) => answerTutorStep(request));
   h('tutor:stepStream', async (e, requestId: string, request: TutorStepRequest) =>
     streamTutorStep(request, (delta) => {

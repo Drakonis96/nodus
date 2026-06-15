@@ -81,6 +81,9 @@ const api: NodusApi = {
   },
 
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
+  listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
+  rateTutorRoute: (routeId, rating) => ipcRenderer.invoke('tutor:routes:rate', routeId, rating),
+  markTutorRoutePlayed: (routeId) => ipcRenderer.invoke('tutor:routes:played', routeId),
   tutorStep: (request) => ipcRenderer.invoke('tutor:step', request),
   tutorStepStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

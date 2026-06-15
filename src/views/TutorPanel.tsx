@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorStop } from '@shared/types';
+import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorSavedRoute, TutorStop } from '@shared/types';
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 
 type Phase = 'setup' | 'routes' | 'touring';
+type SetupTab = 'generate' | 'saved';
+type TourOrigin = 'generated' | 'saved';
 
 interface StepState {
   text: string;
@@ -30,14 +32,20 @@ export function TutorPanel({
 }) {
   const [phase, setPhase] = useState<Phase>('setup');
   const [mode, setMode] = useState<TutorMode>('overview');
+  const [setupTab, setSetupTab] = useState<SetupTab>('generate');
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [generating, setGenerating] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [plan, setPlan] = useState<TutorPlan | null>(null);
   const [route, setRoute] = useState<TutorRoute | null>(null);
+  const [tourOrigin, setTourOrigin] = useState<TourOrigin>('generated');
+  const [tourOverview, setTourOverview] = useState('');
+  const [tourModel, setTourModel] = useState<ModelRef | null>(selectedModel);
   const [stopIndex, setStopIndex] = useState(0);
   const [steps, setSteps] = useState<Record<string, StepState>>({});
+  const [savedRoutes, setSavedRoutes] = useState<TutorSavedRoute[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
   // Guards against duplicate in-flight requests for the same stop.
   const inFlight = useRef<Set<string>>(new Set());
 
@@ -56,6 +64,19 @@ export function TutorPanel({
 
   const stepKey = (routeId: string, index: number) => `${routeId}:${index}`;
 
+  const loadSavedRoutes = useCallback(async () => {
+    setSavedLoading(true);
+    try {
+      setSavedRoutes(await window.nodus.listTutorRoutes());
+    } finally {
+      setSavedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSavedRoutes();
+  }, [loadSavedRoutes]);
+
   const loadStep = useCallback(
     async (activeRoute: TutorRoute, index: number) => {
       const key = stepKey(activeRoute.id, index);
@@ -67,7 +88,7 @@ export function TutorPanel({
         const history = activeRoute.stops.slice(0, index).map((s) => s.title);
         const previousText = index > 0 ? steps[stepKey(activeRoute.id, index - 1)]?.text : undefined;
         const response = await window.nodus.tutorStepStream(
-          { route: activeRoute, stopIndex: index, overview: plan?.overview ?? '', history, previousText, model: selectedModel },
+          { route: activeRoute, stopIndex: index, overview: tourOverview, history, previousText, model: tourModel },
           {
             onDelta: (delta) => {
               setSteps((cur) => {
@@ -87,7 +108,7 @@ export function TutorPanel({
         inFlight.current.delete(key);
       }
     },
-    [plan?.overview, selectedModel, steps]
+    [steps, tourModel, tourOverview]
   );
 
   // Spotlight the current stop on the real graph and ensure its narration is loaded.
@@ -127,6 +148,7 @@ export function TutorPanel({
       });
       setPlan(result);
       setSteps({});
+      await loadSavedRoutes();
       setPhase('routes');
     } catch (e) {
       setPlanError(e instanceof Error ? e.message : String(e));
@@ -135,16 +157,38 @@ export function TutorPanel({
     }
   };
 
-  const startRoute = (r: TutorRoute) => {
+  const startRoute = async (
+    r: TutorRoute,
+    origin: TourOrigin = 'generated',
+    overview = plan?.overview ?? '',
+    model: ModelRef | null = selectedModel
+  ) => {
     setRoute(r);
+    setTourOrigin(origin);
+    setTourOverview(overview);
+    setTourModel(model);
     setStopIndex(0);
     setPhase('touring');
+    const saved = await window.nodus.markTutorRoutePlayed(r.id).catch(() => null);
+    if (saved) {
+      setSavedRoutes((cur) => [saved, ...cur.filter((item) => item.id !== saved.id)]);
+    }
   };
 
   const backToRoutes = () => {
-    setPhase('routes');
+    setPhase(tourOrigin === 'generated' && plan ? 'routes' : 'setup');
+    if (tourOrigin === 'saved') setSetupTab('saved');
     setRoute(null);
     onClearFocus();
+  };
+
+  const rateRoute = async (routeId: string, rating: number | null) => {
+    const saved = await window.nodus.rateTutorRoute(routeId, rating);
+    if (!saved) return;
+    setSavedRoutes((cur) => {
+      const next = [saved, ...cur.filter((item) => item.id !== saved.id)];
+      return next.sort((a, b) => (b.lastPlayedAt ?? b.generatedAt).localeCompare(a.lastPlayedAt ?? a.generatedAt));
+    });
   };
 
   const close = () => {
@@ -165,7 +209,7 @@ export function TutorPanel({
         <div className="flex-1" />
         {phase === 'touring' && (
           <button className="btn btn-ghost text-xs px-2 py-1 gap-1" onClick={backToRoutes} title="Volver a las rutas">
-            <Icon name="chevronLeft" size={14} /> Rutas
+            <Icon name="stop" size={14} /> Parar
           </button>
         )}
         {phase === 'routes' && (
@@ -187,22 +231,42 @@ export function TutorPanel({
 
       <div className="flex-1 min-h-0 overflow-y-auto">
         {phase === 'setup' && (
-          <SetupPanel
-            mode={mode}
-            setMode={setMode}
-            prompt={prompt}
-            setPrompt={setPrompt}
-            availableModels={availableModels}
-            serializedModel={serializedModel}
-            onModelChange={(v) => setSelectedModel(v ? parseModel(v) : null)}
-            generating={generating}
-            planError={planError}
-            onGenerate={() => void generate()}
-            hasModel={!!selectedModel}
-          />
+          <>
+            <TutorTabs value={setupTab} onChange={setSetupTab} savedCount={savedRoutes.length} />
+            {setupTab === 'generate' ? (
+              <SetupPanel
+                mode={mode}
+                setMode={setMode}
+                prompt={prompt}
+                setPrompt={setPrompt}
+                availableModels={availableModels}
+                serializedModel={serializedModel}
+                onModelChange={(v) => setSelectedModel(v ? parseModel(v) : null)}
+                generating={generating}
+                planError={planError}
+                onGenerate={() => void generate()}
+                hasModel={!!selectedModel}
+              />
+            ) : (
+              <SavedRoutesPanel
+                routes={savedRoutes}
+                loading={savedLoading}
+                onStart={(saved) => void startRoute(saved.route, 'saved', saved.overview, saved.model ?? selectedModel)}
+                onRate={(routeId, rating) => void rateRoute(routeId, rating)}
+                onRefresh={() => void loadSavedRoutes()}
+              />
+            )}
+          </>
         )}
 
-        {phase === 'routes' && plan && <RoutesPanel plan={plan} onStart={startRoute} />}
+        {phase === 'routes' && plan && (
+          <RoutesPanel
+            plan={plan}
+            savedRoutes={savedRoutes}
+            onStart={(r) => void startRoute(r, 'generated', plan.overview, selectedModel)}
+            onRate={(routeId, rating) => void rateRoute(routeId, rating)}
+          />
+        )}
 
         {phase === 'touring' && route && currentStop && (
           <TourPanel
@@ -238,6 +302,35 @@ export function TutorPanel({
         </footer>
       )}
     </aside>
+  );
+}
+
+function TutorTabs({
+  value,
+  onChange,
+  savedCount,
+}: {
+  value: SetupTab;
+  onChange: (tab: SetupTab) => void;
+  savedCount: number;
+}) {
+  return (
+    <div className="px-4 pt-4">
+      <div className="grid grid-cols-2 rounded-lg border border-neutral-800 bg-neutral-900/50 p-1">
+        <button
+          className={`rounded-md px-3 py-1.5 text-sm transition-colors ${value === 'generate' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+          onClick={() => onChange('generate')}
+        >
+          Generar
+        </button>
+        <button
+          className={`rounded-md px-3 py-1.5 text-sm transition-colors ${value === 'saved' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+          onClick={() => onChange('saved')}
+        >
+          Guardados{savedCount > 0 ? ` (${savedCount})` : ''}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -352,7 +445,18 @@ function ModeCard({
   );
 }
 
-function RoutesPanel({ plan, onStart }: { plan: TutorPlan; onStart: (route: TutorRoute) => void }) {
+function RoutesPanel({
+  plan,
+  savedRoutes,
+  onStart,
+  onRate,
+}: {
+  plan: TutorPlan;
+  savedRoutes: TutorSavedRoute[];
+  onStart: (route: TutorRoute) => void;
+  onRate: (routeId: string, rating: number | null) => void;
+}) {
+  const ratingByRoute = new Map(savedRoutes.map((saved) => [saved.id, saved.rating]));
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
@@ -370,27 +474,119 @@ function RoutesPanel({ plan, onStart }: { plan: TutorPlan; onStart: (route: Tuto
       <div className="space-y-2">
         <div className="text-xs uppercase text-neutral-500">Rutas propuestas</div>
         {plan.routes.map((route) => (
-          <button
+          <div
             key={route.id}
-            onClick={() => onStart(route)}
-            className="w-full text-left rounded-lg border border-neutral-800 hover:border-indigo-700 hover:bg-neutral-900 px-3 py-2.5 transition-colors group"
+            className="rounded-lg border border-neutral-800 hover:border-indigo-700 hover:bg-neutral-900 px-3 py-2.5 transition-colors group"
           >
-            <div className="flex items-center gap-2">
-              <WeightDots weight={route.weight} />
-              <span className="text-sm font-medium flex-1 min-w-0">{route.title}</span>
-              <Icon name="chevronRight" size={15} className="text-neutral-600 group-hover:text-indigo-300" />
+            <button className="w-full text-left" onClick={() => onStart(route)}>
+              <div className="flex items-center gap-2">
+                <WeightDots weight={route.weight} />
+                <span className="text-sm font-medium flex-1 min-w-0">{route.title}</span>
+                <Icon name="chevronRight" size={15} className="text-neutral-600 group-hover:text-indigo-300" />
+              </div>
+              <div className="text-[11px] text-neutral-500 mt-1 flex flex-wrap gap-1.5">
+                <span className="text-indigo-300/80">{route.weightLabel}</span>
+                <span>· {route.stops.length} paradas</span>
+                {route.themes.length > 0 && <span>· {route.themes.slice(0, 3).join(', ')}</span>}
+              </div>
+              {route.description && <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{route.description}</p>}
+            </button>
+            <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-800/70 pt-2">
+              <span className="text-[11px] text-neutral-500">Valoración</span>
+              <RatingStars rating={ratingByRoute.get(route.id) ?? null} onChange={(rating) => onRate(route.id, rating)} />
             </div>
-            <div className="text-[11px] text-neutral-500 mt-1 flex flex-wrap gap-1.5">
-              <span className="text-indigo-300/80">{route.weightLabel}</span>
-              <span>· {route.stops.length} paradas</span>
-              {route.themes.length > 0 && <span>· {route.themes.slice(0, 3).join(', ')}</span>}
-            </div>
-            {route.description && <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{route.description}</p>}
-          </button>
+          </div>
         ))}
       </div>
     </div>
   );
+}
+
+function SavedRoutesPanel({
+  routes,
+  loading,
+  onStart,
+  onRate,
+  onRefresh,
+}: {
+  routes: TutorSavedRoute[];
+  loading: boolean;
+  onStart: (route: TutorSavedRoute) => void;
+  onRate: (routeId: string, rating: number | null) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs uppercase text-neutral-500">Recorridos guardados</div>
+        <button className="btn btn-ghost text-xs px-2 py-1 gap-1" onClick={onRefresh} disabled={loading}>
+          <Icon name="refresh" size={13} className={loading ? 'animate-spin' : ''} /> Actualizar
+        </button>
+      </div>
+
+      {loading ? (
+        <Spinner label="Cargando recorridos…" />
+      ) : routes.length === 0 ? (
+        <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-500">
+          Todavía no hay recorridos guardados. Genera uno con el Tutor y aparecerá aquí para repetirlo sin volver a llamar al modelo.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {routes.map((saved) => (
+            <div key={saved.id} className="rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate">{saved.route.title}</div>
+                  <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
+                    <span>{saved.mode === 'overview' ? 'Completo' : 'Objetivo'}</span>
+                    <span>· {saved.route.stops.length} paradas</span>
+                    <span>· {formatDate(saved.generatedAt)}</span>
+                    {saved.lastPlayedAt && <span>· visto {formatDate(saved.lastPlayedAt)}</span>}
+                  </div>
+                  {saved.prompt && <p className="mt-1 text-xs text-neutral-500 line-clamp-2">{saved.prompt}</p>}
+                </div>
+                <button className="btn btn-primary px-2 py-1 gap-1 shrink-0" onClick={() => onStart(saved)} title="Iniciar recorrido">
+                  <Icon name="play" size={14} /> Play
+                </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-800/70 pt-2">
+                <span className="text-[11px] text-neutral-500">Valoración</span>
+                <RatingStars rating={saved.rating} onChange={(rating) => onRate(saved.id, rating)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RatingStars({ rating, onChange }: { rating: number | null; onChange: (rating: number | null) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((value) => (
+        <button
+          key={value}
+          className={value <= (rating ?? 0) ? 'text-amber-300' : 'text-neutral-600 hover:text-neutral-300'}
+          title={`${value}/5`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange(rating === value ? null : value);
+          }}
+        >
+          <Icon name="star" size={15} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function formatDate(value: string): string {
+  try {
+    return new Intl.DateTimeFormat('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+  } catch {
+    return value.slice(0, 10);
+  }
 }
 
 function TourPanel({

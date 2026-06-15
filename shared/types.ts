@@ -556,6 +556,23 @@ export interface TutorPlan {
   truncated: boolean;
 }
 
+export interface TutorSavedRoute {
+  id: string;
+  planId: string;
+  generatedAt: string;
+  updatedAt: string;
+  lastPlayedAt: string | null;
+  mode: TutorMode;
+  prompt: string;
+  model: ModelRef | null;
+  overview: string;
+  totalThemes: number;
+  totalIdeas: number;
+  totalConnections: number;
+  route: TutorRoute;
+  rating: number | null;
+}
+
 export interface TutorPlanRequest {
   mode: TutorMode;
   prompt?: string;
@@ -733,6 +750,9 @@ export interface NodusApi {
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */
   tutorPlan(request: TutorPlanRequest): Promise<TutorPlan>;
+  listTutorRoutes(): Promise<TutorSavedRoute[]>;
+  rateTutorRoute(routeId: string, rating: number | null): Promise<TutorSavedRoute | null>;
+  markTutorRoutePlayed(routeId: string): Promise<TutorSavedRoute | null>;
   /** Narrate one stop of a route, grounded in that node's ideas/evidence. */
   tutorStep(request: TutorStepRequest): Promise<TutorStepResponse>;
   tutorStepStream(request: TutorStepRequest, handlers: TutorStepStreamHandlers): Promise<TutorStepResponse>;

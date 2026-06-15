@@ -222,6 +222,7 @@ export function resetGraphData(): void {
       DELETE FROM idea_theme_links;
       DELETE FROM gaps;
       DELETE FROM external_refs;
+      DELETE FROM tutor_saved_routes;
       DELETE FROM work_authors;
       DELETE FROM author_relations;
       DELETE FROM authors;

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const migrations: Migration[] = [
   {
@@ -260,6 +260,32 @@ export const migrations: Migration[] = [
         'refines',
         'contains'
       );
+    `,
+  },
+  {
+    version: 8,
+    up: /* sql */ `
+      CREATE TABLE tutor_saved_routes (
+        route_id          TEXT PRIMARY KEY,
+        plan_id           TEXT NOT NULL,
+        generated_at      TEXT NOT NULL,
+        updated_at        TEXT NOT NULL,
+        last_played_at    TEXT,
+        mode              TEXT NOT NULL,
+        prompt            TEXT NOT NULL,
+        model_json        TEXT,
+        overview          TEXT NOT NULL,
+        total_themes      INTEGER NOT NULL DEFAULT 0,
+        total_ideas       INTEGER NOT NULL DEFAULT 0,
+        total_connections INTEGER NOT NULL DEFAULT 0,
+        route_json        TEXT NOT NULL,
+        rating            INTEGER CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5))
+      );
+
+      CREATE INDEX idx_tutor_saved_routes_generated
+        ON tutor_saved_routes(generated_at DESC);
+      CREATE INDEX idx_tutor_saved_routes_rating
+        ON tutor_saved_routes(rating DESC, updated_at DESC);
     `,
   },
 ];

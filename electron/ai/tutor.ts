@@ -14,6 +14,7 @@ import type {
 import { getDb } from '../db/database';
 import { aggregateGaps } from '../db/gapsRepo';
 import { getEdgeDetail, getIdeaDetail } from '../db/ideasRepo';
+import { saveTutorPlan } from '../db/tutorRepo';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { completeJson, completeText, completeTextStream } from './aiClient';
 
@@ -26,6 +27,7 @@ const MAX_CONNECTIONS = 900;
 const MAX_GAPS = 30;
 const MAX_CONTRADICTIONS = 30;
 const STEP_MEMBER_IDEAS = 24;
+const MAX_PLAN_REPAIR_ATTEMPTS = 2;
 
 const EDGE_TYPE_LABELS: Record<string, string> = {
   contains: 'contiene',
@@ -144,11 +146,27 @@ seleccionando del grafo TODAS las ideas, temas y conexiones pertinentes (no solo
 encadenándolas como un discurso continuo. Si el objetivo toca muchas ideas conectadas, haz una
 ruta larga que las recorra todas. La "overview" debe explicar cómo has interpretado su petición.`;
 
-const OVERVIEW_MODE_RULE = `\n\nMODO PANORÁMICO: ofrece de 2 a 6 rutas que, EN CONJUNTO, cubran todo el grafo (la unión de sus
-paradas debe alcanzar la inmensa mayoría de ideas y temas). Empieza por la(s) ruta(s) de mayor
-peso (las líneas centrales del corpus) y sigue con ramas secundarias, debates (contradicciones) y
-huecos. Cada ruta debe ser tan extensa como haga falta para recorrer sus nodos relevantes; no
-resumas dejando ideas fuera. La "overview" debe mencionar todo lo importante a vista de pájaro.`;
+const OVERVIEW_MODE_RULE = `\n\nMODO PANORÁMICO: ofrece varias rutas (normalmente 3-9, según el tamaño real del grafo) que,
+EN CONJUNTO, cubran todo el grafo. La unión de sus paradas debe alcanzar la inmensa mayoría de
+ideas y temas enviados. Empieza por la(s) ruta(s) de mayor peso (las líneas centrales del corpus) y
+sigue con ramas secundarias, debates (contradicciones) y huecos. Cada ruta debe ser tan extensa
+como haga falta para recorrer sus nodos relevantes; no resumas dejando ideas fuera. La "overview"
+debe mencionar todo lo importante a vista de pájaro.`;
+
+const PLAN_REPAIR_SYSTEM = `${PLAN_SYSTEM}
+
+TAREA DE REVISIÓN:
+El plan anterior dejó fuera nodos que Nodus ha auditado como relevantes. Debes devolver un PLAN COMPLETO NUEVO,
+no un parche. Integra los nodos omitidos dentro de rutas argumentales con sentido de principio a fin: puedes
+alargar rutas existentes, partir una ruta comprimida en varias o crear nuevas rutas temáticas. No crees una ruta
+llamada "cobertura", "restante", "auditoría" ni una lista residual. Todo debe estar integrado como itinerarios
+interpretativos de la IA.
+
+OBLIGATORIO:
+- Usa los ids de "nodos_omitidos" como paradas normales dentro de rutas coherentes.
+- Mantén las reglas estrictas de ids y conexiones.
+- Prefiere varias rutas largas con sentido antes que pocas rutas comprimidas.
+- Devuelve EXCLUSIVAMENTE el JSON completo con overview y routes.`;
 
 /** Compact, id-stable projection of the idea graph for the planner. */
 function buildPlanContext(graph: GraphData): {
@@ -338,87 +356,7 @@ function routeCoverage(routes: TutorRoute[]): { ideas: Set<string>; themes: Set<
   return { ideas, themes };
 }
 
-function appendCoverageRoutes(
-  routes: TutorRoute[],
-  graph: GraphData,
-  plannedIdeaIds: Set<string>,
-  plannedThemeIds: Set<string>
-): void {
-  const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
-  const covered = routeCoverage(routes);
-  const stops: TutorStop[] = [];
-
-  for (const id of plannedThemeIds) {
-    if (covered.themes.has(id)) continue;
-    const node = nodeById.get(id);
-    if (!node) continue;
-    stops.push({
-      id: uuid(),
-      kind: 'theme',
-      title: node.label,
-      focus:
-        node.workCount > 0
-          ? `Línea temática con ${node.workCount} obra(s), incluida para que el mapa panorámico no omita zonas aún poco desarrolladas.`
-          : 'Línea temática incluida para completar el mapa panorámico.',
-      nodeIds: [id],
-      edgeId: null,
-    });
-  }
-
-  for (const id of plannedIdeaIds) {
-    if (covered.ideas.has(id)) continue;
-    const node = nodeById.get(id);
-    if (!node || node.type === 'theme') continue;
-    stops.push({
-      id: uuid(),
-      kind: 'idea',
-      title: node.label,
-      focus: clip(node.statement ?? `Idea ${node.label}`, 240),
-      nodeIds: [id],
-      edgeId: null,
-    });
-  }
-
-  if (stops.length === 0) return;
-  const chunkSize = 28;
-  for (let i = 0; i < stops.length; i += chunkSize) {
-    const part = stops.slice(i, i + chunkSize);
-    routes.push({
-      id: uuid(),
-      title: i === 0 ? 'Cobertura restante del mapa' : 'Cobertura restante del mapa II',
-      description:
-        'Ruta generada por Nodus para cubrir temas o ideas que el plan del modelo dejó fuera. Sirve como cierre de auditoría del recorrido panorámico.',
-      weight: 1,
-      weightLabel: 'cobertura de apoyo',
-      themes: [],
-      stops: part,
-    });
-  }
-}
-
-export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPlan> {
-  const graph = buildIdeaGraph();
-  if (graph.nodes.length === 0) {
-    throw new Error('El grafo aún no tiene ideas. Analiza algunas obras antes de iniciar el modo Tutor.');
-  }
-
-  const { payload, validNodeIds, edgesById, plannedIdeaIds, plannedThemeIds, truncated, totals } = buildPlanContext(graph);
-  const mode = request.mode === 'prompt' ? 'prompt' : 'overview';
-  const prompt = (request.prompt ?? '').trim().slice(0, 2000);
-  const system = `${PLAN_SYSTEM}${mode === 'prompt' ? PROMPT_MODE_RULE : OVERVIEW_MODE_RULE}`;
-
-  const user = JSON.stringify(
-    mode === 'prompt' ? { objetivo_del_usuario: prompt, grafo: payload } : { grafo: payload },
-    null,
-    0
-  );
-
-  const result = await completeJson<PlanResult>(
-    { system, user, temperature: 0.3, maxTokens: 8000 },
-    isPlanResult,
-    request.model
-  );
-
+function sanitizeRoutes(result: PlanResult, validNodeIds: Set<string>, edgesById: Map<string, GraphEdge>): TutorRoute[] {
   const routes: TutorRoute[] = [];
   for (const rawRoute of result.routes ?? []) {
     const stops = (rawRoute.stops ?? [])
@@ -438,11 +376,142 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
       stops,
     });
   }
-  routes.sort((a, b) => b.weight - a.weight);
+  return routes.sort((a, b) => b.weight - a.weight);
+}
+
+function routesAsPlanResult(overview: string, routes: TutorRoute[]): PlanResult {
+  return {
+    overview,
+    routes: routes.map((route) => ({
+      title: route.title,
+      description: route.description,
+      weight: route.weight,
+      weightLabel: route.weightLabel,
+      themes: route.themes,
+      stops: route.stops.map((stop) => ({
+        kind: stop.kind,
+        title: stop.title,
+        focus: stop.focus,
+        nodeIds: stop.nodeIds,
+        edgeId: stop.edgeId,
+      })),
+    })),
+  };
+}
+
+function missingCoverage(
+  routes: TutorRoute[],
+  graph: GraphData,
+  plannedIdeaIds: Set<string>,
+  plannedThemeIds: Set<string>
+): { missingIdeas: GraphNode[]; missingThemes: GraphNode[] } {
+  const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+  const covered = routeCoverage(routes);
+  const missingIdeas = [...plannedIdeaIds]
+    .filter((id) => !covered.ideas.has(id))
+    .map((id) => nodeById.get(id))
+    .filter((node): node is GraphNode => node !== undefined && node.type !== 'theme');
+  const missingThemes = [...plannedThemeIds]
+    .filter((id) => !covered.themes.has(id))
+    .map((id) => nodeById.get(id))
+    .filter((node): node is GraphNode => node !== undefined && node.type === 'theme');
+  return { missingIdeas, missingThemes };
+}
+
+function compactMissingNode(node: GraphNode): Record<string, unknown> {
+  return {
+    id: node.id,
+    type: node.type,
+    label: node.label,
+    statement: clip(node.statement ?? '', 180),
+    themes: node.themes.slice(0, 4),
+    works: node.workCount,
+    authors: node.authors.slice(0, 3),
+  };
+}
+
+async function repairPlanCoverage(params: {
+  graphPayload: Record<string, unknown>;
+  previous: PlanResult;
+  missingIdeas: GraphNode[];
+  missingThemes: GraphNode[];
+  request: TutorPlanRequest;
+}): Promise<PlanResult> {
+  const user = JSON.stringify(
+    {
+      objetivo_del_usuario: params.request.mode === 'prompt' ? params.request.prompt ?? '' : null,
+      grafo: params.graphPayload,
+      plan_anterior: params.previous,
+      nodos_omitidos: {
+        temas: params.missingThemes.map(compactMissingNode),
+        ideas: params.missingIdeas.map(compactMissingNode),
+      },
+    },
+    null,
+    0
+  );
+
+  return completeJson<PlanResult>(
+    { system: PLAN_REPAIR_SYSTEM, user, temperature: 0.2, maxTokens: 14000 },
+    isPlanResult,
+    params.request.model
+  );
+}
+
+export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPlan> {
+  const graph = buildIdeaGraph();
+  if (graph.nodes.length === 0) {
+    throw new Error('El grafo aún no tiene ideas. Analiza algunas obras antes de iniciar el modo Tutor.');
+  }
+
+  const { payload, validNodeIds, edgesById, plannedIdeaIds, plannedThemeIds, truncated, totals } = buildPlanContext(graph);
+  const mode = request.mode === 'prompt' ? 'prompt' : 'overview';
+  const prompt = (request.prompt ?? '').trim().slice(0, 2000);
+  const system = `${PLAN_SYSTEM}${mode === 'prompt' ? PROMPT_MODE_RULE : OVERVIEW_MODE_RULE}`;
+
+  const user = JSON.stringify(
+    mode === 'prompt'
+      ? { objetivo_del_usuario: prompt, grafo: payload }
+      : {
+          grafo: payload,
+          auditoria_cobertura: {
+            temas_a_integrar: plannedThemeIds.size,
+            ideas_a_integrar: plannedIdeaIds.size,
+            minimo_orientativo_de_paradas: Math.min(120, plannedThemeIds.size + plannedIdeaIds.size),
+            criterio:
+              'Si tu respuesta queda muy por debajo de este mínimo, faltarán nodos y deberás rediseñar rutas más largas antes de responder.',
+          },
+        },
+    null,
+    0
+  );
+
+  const result = await completeJson<PlanResult>(
+    { system, user, temperature: 0.3, maxTokens: 14000 },
+    isPlanResult,
+    request.model
+  );
+
+  let finalResult = result;
+  let routes = sanitizeRoutes(finalResult, validNodeIds, edgesById);
 
   if (mode === 'overview') {
-    appendCoverageRoutes(routes, graph, plannedIdeaIds, plannedThemeIds);
-    routes.sort((a, b) => b.weight - a.weight);
+    for (let attempt = 0; attempt < MAX_PLAN_REPAIR_ATTEMPTS; attempt++) {
+      const missing = missingCoverage(routes, graph, plannedIdeaIds, plannedThemeIds);
+      if (missing.missingIdeas.length === 0 && missing.missingThemes.length === 0) break;
+      const repaired = await repairPlanCoverage({
+        graphPayload: payload,
+        previous: routesAsPlanResult(finalResult.overview ?? '', routes),
+        missingIdeas: missing.missingIdeas,
+        missingThemes: missing.missingThemes,
+        request,
+      });
+      const repairedRoutes = sanitizeRoutes(repaired, validNodeIds, edgesById);
+      if (repairedRoutes.length > 0) {
+        finalResult = repaired;
+        routes = repairedRoutes;
+      }
+    }
   }
 
   if (routes.length === 0) {
@@ -451,11 +520,11 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
 
   const coveredIdeas = routeCoverage(routes).ideas;
 
-  return {
+  const plan: TutorPlan = {
     generatedAt: new Date().toISOString(),
     mode,
     prompt,
-    overview: (result.overview ?? '').trim() || 'Recorrido guiado por tu grafo de ideas.',
+    overview: (finalResult.overview ?? '').trim() || 'Recorrido guiado por tu grafo de ideas.',
     totalThemes: totals.themes,
     totalIdeas: totals.ideas,
     totalConnections: totals.connections,
@@ -463,6 +532,8 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
     routes,
     truncated,
   };
+  saveTutorPlan(plan, request.model ?? null);
+  return plan;
 }
 
 // ── Step narration ───────────────────────────────────────────────────────────
