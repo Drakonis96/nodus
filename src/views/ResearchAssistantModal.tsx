@@ -10,19 +10,36 @@ import type {
 import { Icon, modelLabel } from '../components/ui';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
+  ideas: false,
+  themes: false,
+  contradictions: false,
+  gaps: false,
+  readingPath: false,
+  authors: false,
+  documents: false,
+  graph: false,
+  graphParts: {
+    ideaNodes: false,
+    themeNodes: false,
+    ideaEdges: false,
+    authorGraph: false,
+  },
+};
+
+const ALL_SELECTION: ResearchContextSelection = {
   ideas: true,
   themes: true,
   contradictions: true,
   gaps: true,
-  readingPath: false,
+  readingPath: true,
   authors: true,
-  documents: false,
-  graph: false,
+  documents: true,
+  graph: true,
   graphParts: {
     ideaNodes: true,
     themeNodes: true,
     ideaEdges: true,
-    authorGraph: false,
+    authorGraph: true,
   },
 };
 
@@ -162,6 +179,14 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold">Contexto</h2>
               <span className="text-xs text-neutral-500">{selectedCount}</span>
+            </div>
+            <div className="mb-3 flex gap-2">
+              <button className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1" onClick={() => setSelection(ALL_SELECTION)}>
+                Todo
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1" onClick={() => setSelection(DEFAULT_SELECTION)}>
+                Nada
+              </button>
             </div>
 
             <div className="space-y-2">

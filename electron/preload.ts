@@ -9,6 +9,7 @@ const api: NodusApi = {
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
+  listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
@@ -72,6 +73,8 @@ const api: NodusApi = {
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: () => ipcRenderer.invoke('data:import'),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
+
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
 };
 
 contextBridge.exposeInMainWorld('nodus', api);

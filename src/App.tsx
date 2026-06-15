@@ -142,7 +142,7 @@ export function App() {
               data-tour={`nav-${n.id}`}
               onClick={() => setView(n.id)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                view === n.id ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
               }`}
             >
               <Icon name={n.icon} className="opacity-70" />

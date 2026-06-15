@@ -8,6 +8,10 @@
   color-scheme: dark;
 }
 
+.light {
+  color-scheme: light;
+}
+
 html,
 body,
 #root {
@@ -23,6 +27,109 @@ body {
   @apply bg-neutral-50 text-neutral-900;
 }
 
+.light .text-neutral-100,
+.light .text-neutral-200 {
+  color: #171717;
+}
+.light .text-neutral-300 {
+  color: #262626;
+}
+.light .text-neutral-400,
+.light .text-neutral-500 {
+  color: #525252;
+}
+.light .text-neutral-600 {
+  color: #737373;
+}
+.light .text-indigo-300,
+.light .text-indigo-400 {
+  color: #4f46e5;
+}
+.light .text-emerald-300,
+.light .text-emerald-400 {
+  color: #047857;
+}
+.light .text-amber-300,
+.light .text-amber-400 {
+  color: #b45309;
+}
+.light .text-red-300,
+.light .text-red-400 {
+  color: #dc2626;
+}
+.light .text-cyan-300 {
+  color: #0891b2;
+}
+.light .hover\:text-white:hover,
+.light .hover\:text-neutral-200:hover {
+  color: #111827;
+}
+.light .hover\:text-indigo-300:hover {
+  color: #4338ca;
+}
+.light .hover\:text-red-400:hover {
+  color: #b91c1c;
+}
+
+.light .border-neutral-700,
+.light .border-neutral-800,
+.light .border-neutral-800\/60 {
+  border-color: #d4d4d4;
+}
+.light .border-red-800,
+.light .border-red-900\/60 {
+  border-color: #fecaca;
+}
+
+.light .bg-neutral-950 {
+  background-color: #f8fafc;
+}
+.light .bg-neutral-950\/35 {
+  background-color: rgba(248, 250, 252, 0.86);
+}
+.light .bg-neutral-900,
+.light .bg-neutral-900\/95,
+.light .bg-neutral-900\/90,
+.light .bg-neutral-900\/80,
+.light .bg-neutral-900\/60 {
+  background-color: rgba(255, 255, 255, 0.96);
+}
+.light .bg-neutral-900\/50,
+.light .bg-neutral-900\/40 {
+  background-color: rgba(250, 250, 250, 0.92);
+}
+.light .bg-neutral-800,
+.light .bg-neutral-800\/60 {
+  background-color: #e5e7eb;
+}
+.light .bg-indigo-900\/50 {
+  background-color: #e0e7ff;
+}
+.light .bg-emerald-900\/50 {
+  background-color: #d1fae5;
+}
+.light .bg-amber-900\/50 {
+  background-color: #fef3c7;
+}
+.light .bg-red-900\/50,
+.light .bg-red-950\/40 {
+  background-color: #fee2e2;
+}
+.light .bg-cyan-900\/50 {
+  background-color: #cffafe;
+}
+.light .hover\:bg-neutral-900:hover,
+.light .hover\:bg-neutral-900\/50:hover,
+.light .hover\:bg-neutral-900\/60:hover {
+  background-color: #f5f5f5;
+}
+.light .hover\:bg-neutral-800:hover {
+  background-color: #e5e7eb;
+}
+.light .hover\:bg-red-950\/50:hover {
+  background-color: #fee2e2;
+}
+
 /* Subtle, minimalist scrollbars. */
 ::-webkit-scrollbar {
   width: 8px;
@@ -30,6 +137,9 @@ body {
 }
 ::-webkit-scrollbar-thumb {
   @apply bg-neutral-700 rounded-full;
+}
+.light ::-webkit-scrollbar-thumb {
+  @apply bg-neutral-300;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -66,7 +176,7 @@ body {
   @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;
 }
 .light .input {
-  @apply bg-white border-neutral-300;
+  @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
 }
 
 .graph-detail-panel {

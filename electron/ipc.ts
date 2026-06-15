@@ -8,10 +8,12 @@ import type {
   ZoteroItem,
   ResearchChatRequest,
   ReadingPathRequest,
+  EmbeddingProvider,
+  UpdateCheckResponse,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
-import { listModels } from './ai/providers';
+import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import * as ideas from './db/ideasRepo';
@@ -28,7 +30,10 @@ import { answerResearchChat, streamResearchChat } from './ai/researchAssistant';
 import { getDb } from './db/database';
 
 /** Register every IPC channel backing the window.nodus API. */
-export function registerIpc(getWindow: () => BrowserWindow | null): void {
+export function registerIpc(
+  getWindow: () => BrowserWindow | null,
+  checkForUpdates: () => Promise<UpdateCheckResponse>
+): void {
   const h = ipcMain.handle.bind(ipcMain);
 
   // settings + secrets
@@ -46,6 +51,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
 
   // AI model discovery (OpenRouter needs no key; others use the stored key).
   h('ai:listModels', async (_e, provider: AiProvider) => listModels(provider, getApiKey(provider)));
+  h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
+    listEmbeddingModels(provider, getApiKey(provider))
+  );
 
   // zotero
   h('zotero:ping', async () => {
@@ -227,6 +235,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     scanQueue.clear();
     ideas.resetGraphData();
   });
+
+  h('updates:check', async () => checkForUpdates());
 
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {

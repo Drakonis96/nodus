@@ -1,8 +1,16 @@
 import { useState } from 'react';
-import type { AppSettings } from '@shared/types';
+import type { AppSettings, EmbeddingProvider, ModelInfo } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
-import { Icon } from '../components/ui';
+import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+
+const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
+
+const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
+  openai: 'text-embedding-3-small',
+  gemini: 'gemini-embedding-001',
+  openrouter: 'baai/bge-m3',
+};
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [saved, setSaved] = useState<string | null>(null);
@@ -11,6 +19,8 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [resetCode, setResetCode] = useState<string | null>(null);
   const [resetInput, setResetInput] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null);
 
   const patch = async (p: Partial<AppSettings>) => {
     await window.nodus.updateSettings(p);
@@ -57,6 +67,17 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     }
   };
 
+  const checkForUpdates = async () => {
+    setCheckingUpdate(true);
+    setUpdateMessage(null);
+    try {
+      const result = await window.nodus.checkForUpdates();
+      setUpdateMessage(result.message);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto p-6">
       <h1 className="text-xl font-semibold mb-6">Ajustes</h1>
@@ -64,14 +85,14 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       <ProvidersSettings settings={settings} onChange={onChange} />
 
       <Section title="IA (avanzado)">
-        <Row label="Modelo de extracción">
+        <Row label="Modelo de extracción (extrae temas, ideas, evidencias y huecos)">
           <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
         </Row>
-        <Row label="Modelo de síntesis/fusión">
+        <Row label="Modelo de síntesis/fusión (deduplica, relaciona y fusiona ideas)">
           <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
         </Row>
-        <Row label="Modelo de embeddings (OpenAI)">
-          <input className="input" value={settings.embeddingModel} onChange={(e) => patch({ embeddingModel: e.target.value })} />
+        <Row label="Modelo de embeddings (similitud semántica multilingüe)">
+          <EmbeddingModelControl settings={settings} onPatch={patch} />
         </Row>
         <Row label="Llamadas simultáneas">
           <input
@@ -210,6 +231,16 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             <Icon name="help" /> Ver de nuevo
           </button>
         </div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <label className="text-sm text-neutral-300">Actualizaciones</label>
+            {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
+          </div>
+          <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate}>
+            <Icon name="sync" className={checkingUpdate ? 'animate-spin' : ''} />
+            {checkingUpdate ? 'Buscando…' : 'Buscar actualización'}
+          </button>
+        </div>
       </Section>
 
       <Section title="Datos">
@@ -299,6 +330,82 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     <div className="flex items-center justify-between gap-4">
       <label className="text-sm text-neutral-300">{label}</label>
       <div>{children}</div>
+    </div>
+  );
+}
+
+function EmbeddingModelControl({
+  settings,
+  onPatch,
+}: {
+  settings: AppSettings;
+  onPatch: (patch: Partial<AppSettings>) => Promise<void>;
+}) {
+  const [models, setModels] = useState<ModelInfo[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const provider = settings.embeddingProvider ?? 'openai';
+
+  const setProvider = (next: EmbeddingProvider) => {
+    setModels(null);
+    setError(null);
+    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODEL[next] });
+  };
+
+  const loadModels = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setModels(await window.nodus.listEmbeddingModels(provider));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shown = (models ?? []).slice(0, 300);
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
+        <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as EmbeddingProvider)}>
+          {EMBEDDING_PROVIDERS.map((p) => (
+            <option key={p} value={p}>
+              {PROVIDER_LABELS[p]}
+            </option>
+          ))}
+        </select>
+        <input
+          className="input w-64"
+          value={settings.embeddingModel}
+          onChange={(e) => onPatch({ embeddingModel: e.target.value })}
+          placeholder={DEFAULT_EMBEDDING_MODEL[provider]}
+        />
+        <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
+          {loading ? 'Cargando…' : 'Cargar modelos'}
+        </button>
+      </div>
+      {models && (
+        <select
+          className="input w-full max-w-md"
+          value={settings.embeddingModel}
+          onChange={(e) => onPatch({ embeddingModel: e.target.value })}
+        >
+          {!shown.some((m) => m.id === settings.embeddingModel) && (
+            <option value={settings.embeddingModel}>{settings.embeddingModel}</option>
+          )}
+          {shown.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name ? `${m.name} · ${m.id}` : m.id}
+            </option>
+          ))}
+        </select>
+      )}
+      {error && <div className="text-xs text-red-400 max-w-md text-right">{error}</div>}
+      <p className="text-xs text-neutral-500 max-w-md text-right">
+        OpenRouter acepta IDs como baai/bge-m3; si escribes BAAI:bge-m3 se normaliza automáticamente.
+      </p>
     </div>
   );
 }

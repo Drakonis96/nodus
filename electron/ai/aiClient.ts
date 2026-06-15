@@ -1,7 +1,7 @@
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
 import { openAiCompatBase, supportsJsonMode } from './providers';
-import type { AiProvider, ModelRef } from '@shared/types';
+import type { EmbeddingProvider, ModelRef } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -279,15 +279,44 @@ async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextD
   return full;
 }
 
-const EMBED_MODELS: Partial<Record<AiProvider, string>> = {
+const EMBED_MODELS: Record<EmbeddingProvider, string> = {
   openai: 'text-embedding-3-small',
-  gemini: 'text-embedding-004',
+  openrouter: 'baai/bge-m3',
+  gemini: 'gemini-embedding-001',
 };
 
-async function requestEmbeddings(provider: AiProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
+function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
+  const trimmed = modelId.trim() || EMBED_MODELS[provider];
+  if (provider === 'openrouter' && !trimmed.includes('/') && trimmed.includes(':')) {
+    const [author, slug] = trimmed.split(':', 2);
+    if (author && slug) return `${author.toLowerCase()}/${slug}`;
+  }
+  return trimmed;
+}
+
+function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
+  const settings = getSettings();
+  const provider = settings.embeddingProvider ?? 'openai';
+  return {
+    provider,
+    modelId: normalizeEmbeddingModel(provider, settings.embeddingModel || EMBED_MODELS[provider]),
+  };
+}
+
+async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
   const baseURL = openAiCompatBase(provider) ?? undefined;
   const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey: key, baseURL });
+  const client = new OpenAI({
+    apiKey: key,
+    baseURL,
+    defaultHeaders:
+      provider === 'openrouter'
+        ? {
+            'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
+            'X-Title': 'Nodus',
+          }
+        : undefined,
+  });
   const res = await client.embeddings.create({ model: modelId, input });
   return [...res.data]
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
@@ -295,43 +324,40 @@ async function requestEmbeddings(provider: AiProvider, key: string, modelId: str
 }
 
 /**
- * Embeddings for idea fusion. Uses whichever embedding-capable provider has a key
- * (OpenAI or Gemini). Returns null when none is available — fusion then stays
- * conservative (treats ideas as new).
+ * Embeddings for idea fusion. Uses the embedding provider selected in Settings.
+ * Returns null when unavailable — fusion then stays conservative (treats ideas
+ * as new).
  */
 export async function embed(text: string): Promise<number[] | null> {
-  const settings = getSettings();
-  for (const provider of ['openai', 'gemini'] as AiProvider[]) {
-    const key = getApiKey(provider);
-    if (!key) continue;
-    const modelId = (provider === 'openai' && settings.embeddingModel) || EMBED_MODELS[provider]!;
-    try {
-      const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
-      return vectors[0] ?? null;
-    } catch {
-      /* try next provider */
-    }
+  const { provider, modelId } = embeddingConfig();
+  const key = getApiKey(provider);
+  if (!key) return null;
+  try {
+    const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
+    return vectors[0] ?? null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
   if (texts.length === 0) return [];
-  const settings = getSettings();
   const clipped = texts.map((t) => t.slice(0, 8000));
-  let sawEmbeddingKey = false;
-  for (const provider of ['openai', 'gemini'] as AiProvider[]) {
-    const key = getApiKey(provider);
-    if (!key) continue;
-    sawEmbeddingKey = true;
-    const modelId = (provider === 'openai' && settings.embeddingModel) || EMBED_MODELS[provider]!;
-    try {
-      const vectors = await requestEmbeddings(provider, key, modelId, clipped);
-      if (vectors.length === clipped.length) return vectors;
-    } catch {
-      /* try next provider or fall back below */
-    }
+  const { provider, modelId } = embeddingConfig();
+  const key = getApiKey(provider);
+  if (!key) return texts.map(() => null);
+
+  // Gemini Embedding 2's native API aggregates multiple inputs; the OpenAI
+  // compatibility endpoint can evolve, so keep this path one-text-per-call.
+  if (provider === 'gemini' && /embedding-2/i.test(modelId)) {
+    return Promise.all(clipped.map((text) => embed(text)));
   }
-  if (!sawEmbeddingKey) return texts.map(() => null);
-  return Promise.all(texts.map((t) => embed(t)));
+
+  try {
+    const vectors = await requestEmbeddings(provider, key, modelId, clipped);
+    if (vectors.length === clipped.length) return vectors;
+  } catch {
+    /* fall back below */
+  }
+  return Promise.all(clipped.map((text) => embed(text)));
 }

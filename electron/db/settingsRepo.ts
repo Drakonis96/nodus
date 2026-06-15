@@ -1,8 +1,9 @@
 import { getDb } from './database';
-import type { AppSettings } from '@shared/types';
+import type { AppSettings, EmbeddingProvider } from '@shared/types';
 import { providerKeyMap } from '../secrets/secretStore';
 
 const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
+  embeddingProvider: 'openai',
   embeddingModel: 'text-embedding-3-small',
   favorites: [],
   defaultModel: null,
@@ -52,7 +53,10 @@ export function getSettings(): AppSettings {
       parsed = {};
     }
   }
-  return { ...DEFAULTS, ...parsed, providerKeys: providerKeyMap() };
+  const merged = { ...DEFAULTS, ...parsed };
+  merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
+  if (!merged.embeddingModel?.trim()) merged.embeddingModel = defaultEmbeddingModel(merged.embeddingProvider);
+  return { ...merged, providerKeys: providerKeyMap() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
@@ -61,4 +65,19 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const { providerKeys: _ignore, ...rest } = { ...current, ...patch };
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
+}
+
+function normalizeEmbeddingProvider(provider: unknown): EmbeddingProvider {
+  return provider === 'openai' || provider === 'openrouter' || provider === 'gemini' ? provider : 'openai';
+}
+
+function defaultEmbeddingModel(provider: EmbeddingProvider): string {
+  switch (provider) {
+    case 'openrouter':
+      return 'baai/bge-m3';
+    case 'gemini':
+      return 'gemini-embedding-001';
+    case 'openai':
+      return 'text-embedding-3-small';
+  }
 }

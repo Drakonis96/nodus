@@ -17,15 +17,16 @@ const COSE_LAYOUT = {
   randomize: true,
   fit: true,
   padding: 60,
-  nodeRepulsion: () => 24000,
-  nodeOverlap: 32,
-  idealEdgeLength: () => 130,
+  nodeRepulsion: () => 36000,
+  nodeOverlap: 48,
+  nodeDimensionsIncludeLabels: true,
+  idealEdgeLength: () => 170,
   edgeElasticity: () => 120,
-  componentSpacing: 170,
-  gravity: 0.2,
-  numIter: 1500,
+  componentSpacing: 220,
+  gravity: 0.14,
+  numIter: 2200,
   coolingFactor: 0.95,
-  initialTemp: 220,
+  initialTemp: 260,
 } as const;
 
 /**
@@ -44,7 +45,7 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   const pos: Record<string, { x: number; y: number }> = {};
   const themeAngle: Record<string, number> = {};
 
-  const Rt = N === 1 ? 0 : Math.min(460, 170 + N * 18);
+  const Rt = N === 1 ? 0 : Math.min(760, 240 + N * 32);
   themeNodes.forEach((t, i) => {
     const ang = ((-90 + (i * 360) / N) * Math.PI) / 180;
     themeAngle[t.id()] = ang;
@@ -82,13 +83,13 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
     return ((h >>> 0) % 10000) / 10000;
   };
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const clusterStep = 54;
+  const clusterStep = 92;
   let maxR = Rt + 220;
 
   for (const [themeId, list] of Object.entries(groups)) {
     const A = themeAngle[themeId];
     const themePos = pos[themeId];
-    const clusterDistance = 190 + Math.min(190, Math.sqrt(list.length) * 34);
+    const clusterDistance = 280 + Math.min(260, Math.sqrt(list.length) * 52);
     const cx = themePos.x + clusterDistance * Math.cos(A);
     const cy0 = themePos.y + clusterDistance * Math.sin(A);
     for (let m = 0; m < list.length; m++) {
@@ -102,7 +103,7 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   }
 
   if (orphans.length) {
-    const startR = maxR + 190;
+    const startR = maxR + 260;
     for (let m = 0; m < orphans.length; m++) {
       const r = startR + 34 * Math.sqrt(m);
       const ang = m * goldenAngle;
@@ -111,6 +112,7 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   }
 
   relaxRelatedIdeaEdges(cy, pos);
+  separateLabelBoxes(cy, pos);
   return pos;
 }
 
@@ -167,6 +169,84 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
       b.y -= moveY;
     }
   }
+}
+
+function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number }>): void {
+  const nodes = cy.nodes().toArray();
+  if (nodes.length < 2 || nodes.length > 450) return;
+
+  const boxes = nodes
+    .map((node) => {
+      const p = pos[node.id()];
+      if (!p) return null;
+      const type = node.data('type') as GraphNodeType;
+      const size = Number(node.data('size') ?? 32);
+      const font = type === 'theme' ? 13 : 10;
+      const maxWidth = type === 'theme' ? 190 : 160;
+      const label = String(node.data('label') ?? '');
+      const charsPerLine = Math.max(8, Math.floor(maxWidth / (font * 0.55)));
+      const lines = Math.max(1, Math.ceil(label.length / charsPerLine));
+      const labelWidth = Math.min(maxWidth, Math.max(44, Math.min(label.length, charsPerLine) * font * 0.58));
+      const labelHeight = lines * (font + 4);
+      return {
+        id: node.id(),
+        type,
+        width: Math.max(size + 22, labelWidth + 28),
+        height: size + 12 + labelHeight + 18,
+        nodeBias: type === 'theme' ? 0.28 : 0.5,
+      };
+    })
+    .filter((box): box is NonNullable<typeof box> => !!box);
+
+  const boxFor = (box: (typeof boxes)[number]) => {
+    const p = pos[box.id];
+    const top = p.y - box.height * 0.34;
+    return {
+      left: p.x - box.width / 2,
+      right: p.x + box.width / 2,
+      top,
+      bottom: top + box.height,
+    };
+  };
+
+  for (let iter = 0; iter < 120; iter++) {
+    let moved = false;
+    for (let i = 0; i < boxes.length; i++) {
+      const a = boxes[i];
+      const pa = pos[a.id];
+      const ba = boxFor(a);
+      for (let j = i + 1; j < boxes.length; j++) {
+        const b = boxes[j];
+        const pb = pos[b.id];
+        const bb = boxFor(b);
+        const overlapX = Math.min(ba.right, bb.right) - Math.max(ba.left, bb.left);
+        const overlapY = Math.min(ba.bottom, bb.bottom) - Math.max(ba.top, bb.top);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+
+        const dx = pb.x - pa.x || stableUnit(`${a.id}|${b.id}`) - 0.5;
+        const dy = pb.y - pa.y || stableUnit(`${b.id}|${a.id}`) - 0.5;
+        const dist = Math.max(1, Math.hypot(dx, dy));
+        const push = Math.min(44, Math.min(overlapX, overlapY) / 2 + 8);
+        const ux = dx / dist;
+        const uy = dy / dist;
+        pa.x -= ux * push * a.nodeBias;
+        pa.y -= uy * push * a.nodeBias;
+        pb.x += ux * push * b.nodeBias;
+        pb.y += uy * push * b.nodeBias;
+        moved = true;
+      }
+    }
+    if (!moved) return;
+  }
+}
+
+function stableUnit(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10000) / 10000;
 }
 
 interface Filters {
@@ -304,6 +384,7 @@ export function GraphView() {
   useEffect(() => {
     if (!containerRef.current) return;
     if (!cyRef.current) {
+      const lightTheme = document.documentElement.classList.contains('light');
       cyRef.current = cytoscape({
         container: containerRef.current,
         elements: [],
@@ -314,18 +395,18 @@ export function GraphView() {
               'background-color': (ele: any) =>
                 ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888',
               label: 'data(label)',
-              color: '#ededed',
-              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 12 : 9),
+              color: lightTheme ? '#171717' : '#ededed',
+              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 13 : 10),
               'font-weight': (ele: any) => (ele.data('type') === 'theme' ? 700 : 400),
               'text-wrap': 'wrap',
-              'text-max-width': '92px',
+              'text-max-width': '150px',
               'text-valign': 'bottom',
-              'text-margin-y': 4,
+              'text-margin-y': 6,
               'min-zoomed-font-size': 5,
-              // Dark outline keeps labels legible where they cross edges or other nodes.
+              // Outline keeps labels legible where they cross edges or other nodes.
               'text-outline-width': 2.5,
-              'text-outline-color': '#0a0a0a',
-              'text-outline-opacity': 0.9,
+              'text-outline-color': lightTheme ? '#ffffff' : '#0a0a0a',
+              'text-outline-opacity': lightTheme ? 0.95 : 0.9,
               width: 'data(size)',
               height: 'data(size)',
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),

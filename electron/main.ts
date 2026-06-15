@@ -6,6 +6,7 @@ import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import type { UpdateCheckResponse } from '@shared/types';
 
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
@@ -54,12 +55,45 @@ function createWindow(): void {
   });
 }
 
-function checkForUpdates(reason: string): void {
-  if (!app.isPackaged || process.env.NODUS_DISABLE_AUTO_UPDATE === '1') return;
+async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
+  if (!app.isPackaged || process.env.NODUS_DISABLE_AUTO_UPDATE === '1') {
+    return {
+      status: 'disabled',
+      message: 'Las actualizaciones solo están disponibles en la app empaquetada.',
+      version: app.getVersion(),
+    };
+  }
+  if (installingUpdate) {
+    return {
+      status: 'available',
+      message: 'Actualización descargada. Nodus se está cerrando para instalarla.',
+      version: app.getVersion(),
+    };
+  }
   console.log(`[updates] checking (${reason})`);
-  void autoUpdater.checkForUpdates().catch((e) => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const version = result?.updateInfo?.version;
+    if (version && version !== app.getVersion()) {
+      return {
+        status: 'available',
+        message: `Actualización ${version} encontrada. La descarga empezará automáticamente.`,
+        version,
+      };
+    }
+    return {
+      status: 'not-available',
+      message: `Nodus ${app.getVersion()} ya está actualizado.`,
+      version: app.getVersion(),
+    };
+  } catch (e) {
     console.error(`[updates] check failed: ${e instanceof Error ? e.message : String(e)}`);
-  });
+    return {
+      status: 'error',
+      message: e instanceof Error ? e.message : String(e),
+      version: app.getVersion(),
+    };
+  }
 }
 
 function setupAutoUpdates(): void {
@@ -88,13 +122,13 @@ function setupAutoUpdates(): void {
     console.error(`[updates] error: ${e instanceof Error ? e.message : String(e)}`);
   });
 
-  setTimeout(() => checkForUpdates('startup'), UPDATE_CHECK_DELAY_MS);
-  updateCheckTimer = setInterval(() => checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
+  setTimeout(() => void checkForUpdates('startup'), UPDATE_CHECK_DELAY_MS);
+  updateCheckTimer = setInterval(() => void checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
 }
 
 app.whenReady().then(() => {
   getDb(); // open + migrate before anything touches data
-  registerIpc(() => mainWindow);
+  registerIpc(() => mainWindow, () => checkForUpdates('manual'));
   createWindow();
 
   const settings = getSettings();

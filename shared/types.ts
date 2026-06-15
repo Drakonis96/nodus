@@ -139,6 +139,7 @@ export interface ExternalRef {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini';
+export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini'>;
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
 export type DeepContextMode = 'standard' | 'long';
@@ -158,6 +159,7 @@ export interface ModelInfo {
 }
 
 export interface AppSettings {
+  embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).
   providerKeys: Record<AiProvider, boolean>;
@@ -473,6 +475,18 @@ export interface ResearchChatStreamHandlers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Updates
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type UpdateCheckStatus = 'disabled' | 'checking' | 'not-available' | 'available' | 'error';
+
+export interface UpdateCheckResponse {
+  status: UpdateCheckStatus;
+  message: string;
+  version?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -485,6 +499,7 @@ export interface NodusApi {
 
   // AI model discovery
   listModels(provider: AiProvider): Promise<ModelInfo[]>;
+  listEmbeddingModels(provider: EmbeddingProvider): Promise<ModelInfo[]>;
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;
@@ -547,6 +562,9 @@ export interface NodusApi {
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
+
+  // app updates
+  checkForUpdates(): Promise<UpdateCheckResponse>;
 }
 
 export interface WorkFilter {
