@@ -189,6 +189,12 @@ export function registerIpc(
     await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);
     return zoteroUserId;
   });
+  h('shell:openExternal', async (_e, url: string) => {
+    // Only follow web/mail links rendered from Markdown — never arbitrary schemes.
+    if (typeof url === 'string' && /^(https?:|mailto:)/i.test(url.trim())) {
+      await shell.openExternal(url.trim());
+    }
+  });
   h('works:uploadText', async (_e, nodusId: string, filePath: string) => {
     const w = getDb().prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as any;
     if (!w) return;

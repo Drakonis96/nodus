@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorStop } from '@shared/types';
 import { Icon, Spinner, modelLabel } from '../components/ui';
+import { Markdown } from '../components/Markdown';
 
 type Phase = 'setup' | 'routes' | 'touring';
 
@@ -18,12 +19,12 @@ const STOP_KIND_LABEL: Record<TutorStop['kind'], string> = {
 
 export function TutorPanel({
   settings,
-  onFocusNodes,
+  onFocusStop,
   onClearFocus,
   onClose,
 }: {
   settings: AppSettings;
-  onFocusNodes: (nodeIds: string[], edgeId?: string | null) => void;
+  onFocusStop: (stop: TutorStop) => void;
   onClearFocus: () => void;
   onClose: () => void;
 }) {
@@ -64,8 +65,9 @@ export function TutorPanel({
       setSteps((cur) => ({ ...cur, [key]: { text: '', loading: true, error: false } }));
       try {
         const history = activeRoute.stops.slice(0, index).map((s) => s.title);
+        const previousText = index > 0 ? steps[stepKey(activeRoute.id, index - 1)]?.text : undefined;
         const response = await window.nodus.tutorStepStream(
-          { route: activeRoute, stopIndex: index, overview: plan?.overview ?? '', history, model: selectedModel },
+          { route: activeRoute, stopIndex: index, overview: plan?.overview ?? '', history, previousText, model: selectedModel },
           {
             onDelta: (delta) => {
               setSteps((cur) => {
@@ -93,7 +95,7 @@ export function TutorPanel({
     if (phase !== 'touring' || !route) return;
     const stop = route.stops[stopIndex];
     if (!stop) return;
-    onFocusNodes(stop.nodeIds, stop.edgeId);
+    onFocusStop(stop);
     void loadStep(route, stopIndex);
   }, [phase, route, stopIndex]);
 
@@ -355,7 +357,7 @@ function RoutesPanel({ plan, onStart }: { plan: TutorPlan; onStart: (route: Tuto
     <div className="p-4 space-y-4">
       <div className="space-y-2">
         <div className="text-xs uppercase text-neutral-500">Panorama</div>
-        <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-relaxed">{plan.overview}</p>
+        <Markdown content={plan.overview} className="text-sm text-neutral-300" />
         <div className="flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
           <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.totalThemes} temas</span>
           <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.totalIdeas} ideas</span>
@@ -438,7 +440,7 @@ function TourPanel({
         {stop.focus && <p className="text-xs text-neutral-400 mt-1.5">{stop.focus}</p>}
       </div>
 
-      <div className="text-sm text-neutral-200 leading-relaxed whitespace-pre-wrap min-h-[3rem]">
+      <div className="text-sm text-neutral-200 min-h-[3rem]">
         {step?.error ? (
           <div className="text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-sm">
             <div>{step.text}</div>
@@ -447,7 +449,7 @@ function TourPanel({
             </button>
           </div>
         ) : step?.text ? (
-          step.text
+          <Markdown content={step.text} />
         ) : (
           <Spinner label="El Tutor está preparando la explicación…" />
         )}

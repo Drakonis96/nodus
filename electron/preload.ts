@@ -28,6 +28,7 @@ const api: NodusApi = {
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
   syncNow: () => ipcRenderer.invoke('sync:now'),

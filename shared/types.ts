@@ -567,6 +567,8 @@ export interface TutorStepRequest {
   overview: string;
   /** Titles of stops already visited, for narrative continuity. */
   history: string[];
+  /** Tail of the immediately previous stop's narration, so the discourse continues without repeating. */
+  previousText?: string;
   model?: ModelRef | null;
 }
 
@@ -660,6 +662,8 @@ export interface NodusApi {
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
+  /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
+  openExternal(url: string): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
 
   // sync

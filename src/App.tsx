@@ -26,6 +26,7 @@ const NAV: { id: View; label: string; icon: string }[] = [
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [view, setView] = useState<View>('graph');
+  const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -52,6 +53,13 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  const toggleNav = () => {
+    setNavCollapsed((v) => {
+      localStorage.setItem('nodus.navCollapsed', v ? '0' : '1');
+      return !v;
+    });
+  };
 
   const onSync = async () => {
     setSyncing(true);
@@ -86,10 +94,15 @@ export function App() {
     <div className="h-full flex flex-col">
       {/* Top bar */}
       <header className="flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
-        <div className="flex items-center gap-2 font-semibold text-lg tracking-tight">
+        <button
+          className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
+          onClick={toggleNav}
+          title={navCollapsed ? 'Mostrar el menú lateral' : 'Ocultar el menú lateral (más espacio para el grafo)'}
+        >
           <img src={nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
-        </div>
+          <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
+        </button>
         <div className="flex-1" />
         {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
         {settings.favorites.length > 0 && (
@@ -134,7 +147,8 @@ export function App() {
       </header>
 
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar */}
+        {/* Sidebar (collapsible via the Nodus logo) */}
+        {!navCollapsed && (
         <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
           {NAV.map((n) => (
             <button
@@ -150,6 +164,7 @@ export function App() {
             </button>
           ))}
         </nav>
+        )}
 
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">

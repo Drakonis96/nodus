@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta } from '@shared/types';
+import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
@@ -305,6 +305,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const cyRef = useRef<Core | null>(null);
   const clearFocusRef = useRef<() => void>(() => {});
   const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
+  // When the Tutor is driving the camera, a container resize should re-apply this focus
+  // instead of fitting the whole graph (the node detail panel opening would steal it).
+  const lastTutorFocusRef = useRef<{ nodeIds: string[]; edgeId?: string | null } | null>(null);
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
@@ -477,14 +480,19 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           cyRef.current!.nodes().removeClass('spotlight');
         });
       };
-      clearFocusRef.current = clearFocus;
+      clearFocusRef.current = () => {
+        lastTutorFocusRef.current = null;
+        clearFocus();
+      };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
-      // connection), fade the rest, and smoothly frame them so the user watches the
-      // tour move across the real graph.
+      // connection), fade the rest, and smoothly frame them with a slightly wide
+      // perspective — close enough to read the node label, wide enough to show its
+      // immediate neighbourhood — so the user watches the tour move across the graph.
       focusByIdRef.current = (nodeIds: string[], edgeId?: string | null) => {
         const cy = cyRef.current;
         if (!cy) return;
+        lastTutorFocusRef.current = { nodeIds, edgeId };
         let eles = cy.collection();
         for (const id of nodeIds) {
           const node = cy.getElementById(id);
@@ -506,7 +514,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           cy.nodes().removeClass('spotlight');
           targetNodes.addClass('spotlight');
         });
-        cy.animate({ fit: { eles: targetNodes, padding: 170 } }, { duration: 450, easing: 'ease-in-out-cubic' });
+        // Center on the stop node(s); pick a zoom that frames the immediate
+        // neighbourhood, clamped so it is never too tight nor too far.
+        const pad = 110;
+        const bb = keep.boundingBox();
+        const fitZoom = Math.min(
+          (cy.width() - pad * 2) / Math.max(bb.w, 1),
+          (cy.height() - pad * 2) / Math.max(bb.h, 1)
+        );
+        const zoom = Math.max(0.85, Math.min(1.2, fitZoom));
+        cy.animate({ center: { eles: targetNodes }, zoom }, { duration: 500, easing: 'ease-in-out-cubic' });
       };
 
       cyRef.current.on('tap', 'node', async (evt) => {
@@ -569,7 +586,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const cy = cyRef.current;
       if (!cy || cy.elements().length === 0) return;
       cy.resize();
-      cy.fit(undefined, 48);
+      const tf = lastTutorFocusRef.current;
+      if (tf) focusByIdRef.current(tf.nodeIds, tf.edgeId);
+      else cy.fit(undefined, 48);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -584,6 +603,30 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const changeDetailFont = (delta: number) => {
     setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
   };
+
+  // Tutor stop → frame the node on the graph and open its info in the right sidebar so
+  // it can be read alongside the narration. A sequence token avoids a stale async detail
+  // landing after the user has already advanced to the next stop.
+  const tutorDetailSeq = useRef(0);
+  const showTutorStop = useCallback(async (stop: TutorStop) => {
+    focusByIdRef.current(stop.nodeIds, stop.edgeId);
+    const seq = ++tutorDetailSeq.current;
+    const apply = (idea: IdeaDetail | null, edge: EdgeDetail | null) => {
+      if (seq !== tutorDetailSeq.current) return;
+      setIdeaDetail(idea);
+      setEdgeDetail(edge);
+    };
+    if (stop.kind === 'connection' && stop.edgeId) {
+      apply(null, await window.nodus.getEdgeDetail(stop.edgeId));
+      return;
+    }
+    const ideaId = stop.nodeIds.find((id) => !id.startsWith('theme:'));
+    if (ideaId) {
+      apply(await window.nodus.getIdeaDetail(ideaId), null);
+      return;
+    }
+    apply(null, null); // theme stop — no dedicated detail panel
+  }, []);
 
   const setF = (patch: Partial<Filters>) => setFilters((f) => ({ ...f, ...patch }));
   const toggleIn = (key: 'nodeTypes' | 'edgeTypes' | 'authors', val: string) =>
@@ -686,8 +729,12 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         {lens === 'ideas' && tutorOpen && (
           <TutorPanel
             settings={settings}
-            onFocusNodes={(nodeIds, edgeId) => focusByIdRef.current(nodeIds, edgeId)}
-            onClearFocus={() => clearFocusRef.current()}
+            onFocusStop={(stop) => void showTutorStop(stop)}
+            onClearFocus={() => {
+              clearFocusRef.current();
+              setIdeaDetail(null);
+              setEdgeDetail(null);
+            }}
             onClose={() => setTutorOpen(false)}
           />
         )}

@@ -95,16 +95,26 @@ npm run dist       # current platform
 A guided, step-by-step walkthrough of your own idea graph (`electron/ai/tutor.ts`,
 launched from the graph toolbar). A long-context model you choose analyses **all**
 ideas, themes and connections and proposes guided **routes**:
-- **Recorrido completo** — several routes ordered by weight that, together, cover the
-  whole graph (so a single pass surfaces everything important and which lines weigh
-  most).
+- **Recorrido completo** — several routes ordered by weight whose union covers the whole
+  graph (so a single pass surfaces everything important and which lines weigh most).
 - **Desde un objetivo** — you describe what you want to review and the Tutor traces a
   route through only the relevant ideas and connections.
 
-You move with **previous/next** arrows (or ←/→). Each stop is narrated on demand,
-grounded in that node's ideas, occurrences and verbatim evidence, while the real graph
-spotlights and frames the current node(s) so you literally watch the tour move across
-your map. The plan is one structured JSON call; each stop's explanation is streamed.
+There is **no artificial cap on stops**: the planner is told to traverse every relevant,
+connected node and only skip what's clearly redundant — long, well-connected lines get
+long routes rather than over-summarised ones.
+
+You move with **previous/next** arrows (or ←/→). The narration is written as **one
+continuous, progressive discourse** (each stop receives the tail of the previous one and
+is told to avoid navigation filler like "stop 4" / "welcome" / "to finish"), grounded in
+that node's ideas, occurrences and verbatim evidence and rendered as **Markdown**. As you
+move, the real graph spotlights and frames the current node(s) with a slightly wide
+perspective (close enough to read the label, wide enough to show the neighbourhood), and
+the node's detail opens in the right sidebar so you can read it alongside the explanation.
+The plan is one structured JSON call; each stop's explanation is streamed.
+
+The left navigation collapses by clicking the **Nodus logo**, freeing space for the graph
+and the tutor/detail panels. The research-assistant chat answers also render as Markdown.
 
 ### Sync
 Manual (button) or realtime (polls the Zotero library version every ~25s and diffs

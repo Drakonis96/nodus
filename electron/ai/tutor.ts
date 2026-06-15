@@ -82,16 +82,27 @@ const PLAN_SYSTEM = `Eres el Tutor de Nodus: un compañero de investigación que
 por su propio grafo de ideas y temas extraído de sus lecturas. Recibes el grafo COMPLETO
 (temas, ideas tipadas, conexiones reales entre ideas, contradicciones y huecos) y diseñas
 RECORRIDOS GUIADOS (rutas) para que, avanzando con flechas anterior/siguiente, el usuario
-comprenda todo su mapa con sentido.
+comprenda todo su mapa como una LECTURA GUIADA, no como una lista de puntos sueltos.
 
 OBJETIVO:
-- Diseña rutas que recorran las ideas siguiendo una LÓGICA real: de lo más central/fundacional
-  a lo más específico, encadenando paradas a través de las conexiones que existen en el grafo.
+- Cada ruta es un HILO ARGUMENTAL continuo: una secuencia de paradas que se explican luego como
+  un discurso progresivo de principio a fin. Ordena las paradas para que cada una prepare la
+  siguiente, encadenándolas a través de las conexiones REALES del grafo (sigue las aristas:
+  extiende, apoya, contradice, aplica a, precondición de…). Empieza por lo más central/fundacional
+  y avanza hacia lo más específico o hacia los debates y huecos.
 - Indica el PESO de cada ruta (1 a 5) y una etiqueta corta ("línea principal", "debate central",
   "rama secundaria"…). Ordena las rutas de mayor a menor peso.
-- COBERTURA: entre todas las rutas debéis mencionar la inmensa mayoría de ideas y temas
-  importantes. No dejes fuera lo relevante; reparte las ideas entre rutas sin repetir en exceso.
-- Cada parada (stop) se ancla a nodos REALES del grafo mediante sus ids.
+
+COBERTURA (prioridad máxima):
+- Prioriza la cobertura COMPLETA y significativa del grafo. Recorre TODOS los nodos relevantes y
+  conectados que hagan falta para explicar bien la estructura, las conexiones y los temas. Incluye
+  paradas de conexión cuando una relación sea importante para entender el encadenamiento.
+- NO hay número máximo de paradas. Si una línea tiene muchas ideas relacionadas, haz una ruta
+  LARGA con todas ellas en vez de resumir. Es un error grave dejar fuera ideas o conexiones
+  relevantes por brevedad: prefiere una ruta extensa y exhaustiva.
+- Solo omite un nodo cuando sea claramente redundante (otra idea casi idéntica ya incluida),
+  irrelevante o no aporte nada nuevo. Entre todas las rutas, la unión de paradas debe cubrir la
+  inmensa mayoría de las ideas y temas; reparte sin repetir el mismo nodo en exceso.
 
 REGLAS DE IDS (estrictas):
 - "nodeIds" debe contener ids que aparezcan EXACTAMENTE en el grafo recibido. Las ideas usan su
@@ -102,10 +113,10 @@ REGLAS DE IDS (estrictas):
 - No inventes ids ni conexiones. Si dudas de una conexión, usa una parada de idea normal.
 
 ESTILO:
-- Todo en español. "overview" es una bienvenida (1-2 párrafos) que describe el mapa, cuántos
-  temas/ideas hay, qué líneas pesan más y qué rutas se ofrecen.
-- "title"/"focus" breves; la explicación larga se generará después, parada a parada.
-- Cada ruta: entre 4 y 16 paradas.
+- Todo en español. "overview" describe el mapa a vista de pájaro (cuántos temas/ideas hay, qué
+  líneas pesan más y qué rutas se ofrecen), en 1-2 párrafos. Puede usar Markdown ligero.
+- "title"/"focus" son breves y NO deben mencionar números de parada ni fórmulas de navegación; la
+  explicación larga y fluida se generará después, parada a parada.
 
 SALIDA: EXCLUSIVAMENTE JSON válido con esta forma:
 {
@@ -127,12 +138,15 @@ SALIDA: EXCLUSIVAMENTE JSON válido con esta forma:
 
 const PROMPT_MODE_RULE = `\n\nMODO DIRIGIDO: el usuario ha indicado QUÉ quiere repasar (ver "objetivo_del_usuario").
 Genera 1-3 rutas centradas en ese objetivo (la primera, la más ajustada y con mayor peso),
-seleccionando del grafo SOLO las ideas, temas y conexiones pertinentes y encadenándolas con
-lógica. La "overview" debe explicar cómo has interpretado su petición y qué recorrido propones.`;
+seleccionando del grafo TODAS las ideas, temas y conexiones pertinentes (no solo unas pocas) y
+encadenándolas como un discurso continuo. Si el objetivo toca muchas ideas conectadas, haz una
+ruta larga que las recorra todas. La "overview" debe explicar cómo has interpretado su petición.`;
 
-const OVERVIEW_MODE_RULE = `\n\nMODO PANORÁMICO: ofrece 2-5 rutas que, en conjunto, cubran todo el grafo. Empieza por la(s)
-ruta(s) de mayor peso (las líneas centrales del corpus) y sigue con ramas secundarias, debates
-(contradicciones) y huecos. La "overview" debe mencionar todo lo importante a vista de pájaro.`;
+const OVERVIEW_MODE_RULE = `\n\nMODO PANORÁMICO: ofrece de 2 a 6 rutas que, EN CONJUNTO, cubran todo el grafo (la unión de sus
+paradas debe alcanzar la inmensa mayoría de ideas y temas). Empieza por la(s) ruta(s) de mayor
+peso (las líneas centrales del corpus) y sigue con ramas secundarias, debates (contradicciones) y
+huecos. Cada ruta debe ser tan extensa como haga falta para recorrer sus nodos relevantes; no
+resumas dejando ideas fuera. La "overview" debe mencionar todo lo importante a vista de pájaro.`;
 
 /** Compact, id-stable projection of the idea graph for the planner. */
 function buildPlanContext(graph: GraphData): {
@@ -300,7 +314,7 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
   );
 
   const result = await completeJson<PlanResult>(
-    { system, user, temperature: 0.3, maxTokens: 5000 },
+    { system, user, temperature: 0.3, maxTokens: 8000 },
     isPlanResult,
     request.model
   );
@@ -426,27 +440,42 @@ function buildStepPrompt(request: TutorStepRequest): { system: string; user: str
 
   const system = [
     'Eres el Tutor de Nodus, un compañero de investigación que guía al usuario por su grafo de ideas.',
-    'Explica en español, con rigor académico y tono cercano y didáctico, la PARADA ACTUAL del recorrido.',
-    'Apóyate únicamente en el contexto recibido (ideas, obras, evidencia, conexiones); no inventes datos.',
-    'Conecta con la parada anterior cuando exista y anticipa brevemente la siguiente cuando aporte continuidad.',
-    'Sé conciso pero sustancioso: 1-3 párrafos. No uses encabezados markdown grandes (#). Puedes usar negritas o citas.',
+    'Estás narrando UN ÚNICO recorrido como un discurso continuo, fluido y progresivo de principio a fin,',
+    'no una lista de puntos sueltos. Ahora te toca redactar el fragmento que corresponde al nodo actual.',
+    'Apóyate ÚNICAMENTE en el contexto recibido (ideas, obras, evidencia, conexiones); no inventes datos.',
+    '',
+    'CONTINUIDAD (muy importante):',
+    '- Retoma el hilo desde donde quedó el fragmento anterior ("texto_previo") y enlaza esta idea con',
+    '  lo ya explicado mediante el SENTIDO (conceptos, relaciones del grafo), avanzando el argumento.',
+    '- NO repitas lo ya dicho ni vuelvas a presentar ideas anteriores; añade algo nuevo.',
+    '- PROHIBIDO usar fórmulas de navegación o meta-comentarios sobre el recorrido. No escribas',
+    '  "bienvenido", "empecemos", "en esta parada", "la primera/segunda/última parada", "seguimos con",',
+    '  "a continuación veremos", "para terminar", "como vimos antes", ni números de parada. Habla SIEMPRE',
+    '  del contenido (los conceptos), nunca de la mecánica del recorrido.',
+    '- Las transiciones deben ser naturales y argumentales (p. ej. "esta distinción permite…",',
+    '  "frente a ello…", "de ahí se sigue…"), no anuncios de cambio de parada.',
     stopIndex === 0
-      ? 'Es la primera parada: enmarca de qué trata este recorrido antes de entrar en la idea.'
+      ? 'Es el ARRANQUE del hilo: entra directamente en la materia y deja encuadrado el tema sin saludos ni preámbulos.'
+      : 'Es un tramo INTERMEDIO del hilo: continúa con naturalidad desde "texto_previo".',
+    stopIndex === total - 1
+      ? 'Es el CIERRE del hilo: integra y cierra el argumento de forma natural, sin anunciar que es el final.'
       : '',
-    stopIndex === total - 1 ? 'Es la última parada: cierra con una síntesis breve de lo recorrido.' : '',
+    '',
+    'FORMATO: redacta en Markdown válido (puedes usar negritas, cursivas, listas, citas con ">",',
+    'enlaces y código en línea cuando aporten). Evita encabezados de nivel 1 (#). 1-3 párrafos sustanciosos.',
   ]
-    .filter(Boolean)
+    .filter((line) => line !== undefined)
     .join('\n');
 
   const user = JSON.stringify(
     {
-      recorrido: { titulo: route.title, descripcion: route.description, peso: route.weight },
+      recorrido: { titulo: route.title, descripcion: route.description },
       panorama: clip(request.overview, 600),
-      posicion: `Parada ${stopIndex + 1} de ${total}`,
-      paradas_previas: (request.history ?? []).slice(-8),
-      parada_anterior: prev ? prev.title : null,
-      parada_actual: { titulo: stop.title, foco: stop.focus, contexto: resolveStopContext(stop) },
-      parada_siguiente: next ? next.title : null,
+      texto_previo: request.previousText ? clip(request.previousText, 900) : null,
+      ya_tratado: (request.history ?? []).slice(-12),
+      nodo_anterior: prev ? prev.title : null,
+      nodo_actual: { titulo: stop.title, foco: stop.focus, contexto: resolveStopContext(stop) },
+      nodo_siguiente: next ? next.title : null,
     },
     null,
     0

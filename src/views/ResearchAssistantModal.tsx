@@ -9,6 +9,7 @@ import type {
   ResearchGraphPartsSelection,
 } from '@shared/types';
 import { Icon, modelLabel } from '../components/ui';
+import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
@@ -361,15 +362,19 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[78%] rounded-lg border px-3 py-2 text-sm whitespace-pre-wrap ${
+                    className={`max-w-[78%] rounded-lg border px-3 py-2 text-sm ${
                       message.role === 'user'
-                        ? 'bg-indigo-600 border-indigo-500 text-white'
+                        ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
                         : message.error
-                          ? 'bg-red-950/40 border-red-800 text-red-200'
+                          ? 'bg-red-950/40 border-red-800 text-red-200 whitespace-pre-wrap'
                           : 'bg-neutral-900 border-neutral-800 text-neutral-200'
                     }`}
                   >
-                    {message.content || (message.role === 'assistant' && sending ? '...' : '')}
+                    {message.role === 'assistant' && !message.error && message.content ? (
+                      <Markdown content={message.content} />
+                    ) : (
+                      message.content || (message.role === 'assistant' && sending ? '...' : '')
+                    )}
                     {message.stats && (
                       <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
                         {message.stats.sections.join(', ') || 'Sin secciones'} · {message.stats.works} obras ·{' '}
