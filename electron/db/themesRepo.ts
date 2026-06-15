@@ -279,16 +279,15 @@ export interface GraphTheme extends Theme {
 }
 
 /**
- * Themes used as visible graph hubs. Once the idea layer exists, only themes that
- * actually group ideas are promoted to graph nodes; before that, show supported
- * light-scan themes so a new library still has a coarse map.
+ * Themes used as visible graph hubs. Light-scan themes stay visible even before
+ * any deep-scan idea hangs from them, so unread/unanalysed areas of the library
+ * remain on the map instead of disappearing behind the idea layer.
  */
 export function listGraphThemes(): GraphTheme[] {
   const db = getDb();
-  const hasIdeas = ((db.prepare('SELECT COUNT(*) as c FROM ideas').get() as { c: number }).c ?? 0) > 0;
   // Curated (pinned) themes are always graph-hub candidates so the user's chosen main
   // themes never get capped out by auto-themes.
-  const supportClause = `(pinned = 1 OR ${hasIdeas ? 'idea_count > 0' : 'work_count >= @minWorks'})`;
+  const supportClause = `(pinned = 1 OR idea_count > 0 OR work_count >= @minWorks)`;
   const stmt = db.prepare(
     `
       SELECT * FROM (
@@ -310,10 +309,7 @@ export function listGraphThemes(): GraphTheme[] {
       LIMIT @maxThemes
       `
   );
-  const params = hasIdeas
-    ? { maxThemes: MAX_GRAPH_THEMES }
-    : { minWorks: MIN_GRAPH_THEME_WORKS, maxThemes: MAX_GRAPH_THEMES };
-  const rows = stmt.all(params) as GraphTheme[];
+  const rows = stmt.all({ minWorks: MIN_GRAPH_THEME_WORKS, maxThemes: MAX_GRAPH_THEMES }) as GraphTheme[];
 
   return rows;
 }

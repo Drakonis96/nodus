@@ -40,7 +40,8 @@ import { getDb } from './db/database';
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
-  checkForUpdates: () => Promise<UpdateCheckResponse>
+  checkForUpdates: () => Promise<UpdateCheckResponse>,
+  installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
   const h = ipcMain.handle.bind(ipcMain);
 
@@ -312,6 +313,7 @@ export function registerIpc(
   });
 
   h('updates:check', async () => checkForUpdates());
+  h('updates:install', async () => installUpdate());
 
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {

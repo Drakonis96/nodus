@@ -13,6 +13,8 @@ export type EdgeType =
   | 'measures_same'
   | 'supports'
   | 'refutes'
+  | 'variant_of'
+  | 'refines'
   | 'contains';
 
 export type EdgeBasis = 'explicit' | 'inferred';
@@ -615,12 +617,28 @@ export interface ChatConversation extends ChatConversationSummary {
 // Updates
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type UpdateCheckStatus = 'disabled' | 'checking' | 'not-available' | 'available' | 'error';
+export type UpdateCheckStatus =
+  | 'disabled'
+  | 'checking'
+  | 'not-available'
+  | 'available'
+  | 'downloading'
+  | 'downloaded'
+  | 'installing'
+  | 'error';
 
 export interface UpdateCheckResponse {
   status: UpdateCheckStatus;
   message: string;
   version?: string;
+  progress?: number | null;
+  bytesPerSecond?: number | null;
+  transferred?: number | null;
+  total?: number | null;
+}
+
+export interface UpdateProgressEvent extends UpdateCheckResponse {
+  at: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -746,6 +764,8 @@ export interface NodusApi {
 
   // app updates
   checkForUpdates(): Promise<UpdateCheckResponse>;
+  installUpdate(): Promise<UpdateCheckResponse>;
+  onUpdateProgress(cb: (event: UpdateProgressEvent) => void): () => void;
 }
 
 export interface WorkFilter {

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NodusApi, QueueProgress } from '@shared/types';
+import type { NodusApi, QueueProgress, UpdateProgressEvent } from '@shared/types';
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -110,6 +110,12 @@ const api: NodusApi = {
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+  onUpdateProgress: (cb) => {
+    const listener = (_e: unknown, event: UpdateProgressEvent) => cb(event);
+    ipcRenderer.on('updates:progress', listener);
+    return () => ipcRenderer.removeListener('updates:progress', listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('nodus', api);

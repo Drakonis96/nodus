@@ -91,7 +91,7 @@ Reutiliza etiquetas canónicas ya obvias entre fragmentos: "turismo", "franquism
 
 ═══ RELACIONES INTERNAS ("internal_relations") ═══
 from/to (ids locales), type (extends|contradicts|applies_to|shares_method|
-precondition_of|measures_same|supports|refutes), basis ("explicit"|"inferred"),
+precondition_of|measures_same|supports|refutes|variant_of|refines), basis ("explicit"|"inferred"),
 evidence (un anclaje), confidence. "inferred" solo si es muy clara y con confianza baja.
 Respeta "analysis_limits.max_internal_relations" de la entrada. Si no está presente,
 máximo 5 relaciones internas por fragmento.
@@ -171,7 +171,9 @@ entre "variant_of" y "new", elige "new". La similitud es una pista, NO una decis
 - "matched_id": global_id del candidato si same_as/variant_of; null si new.
 - "merged_label": mejor formulación canónica corta y neutra.
 - "edge_to_existing": SOLO si variant_of (o relación clara aun siendo new); null si no.
-  Usa el vocabulario de tipos, "basis" y "confidence".
+  Usa el vocabulario de tipos, "basis" y "confidence". Si la relación es una variante
+  conceptual, usa type "variant_of"; si la nueva idea especifica o estrecha otra,
+  usa "refines".
 - CONTRADICCIONES: si afirma lo contrario sobre el mismo objeto, NO es "same_as";
   es "variant_of"/"new" con edge "contradicts". No lo pierdas.
 - "rationale": 1-2 frases en español. "confidence": 0.0-1.0.

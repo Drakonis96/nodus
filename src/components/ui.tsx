@@ -47,6 +47,8 @@ export const EDGE_LABELS: Record<EdgeType, string> = {
   measures_same: 'mide lo mismo',
   supports: 'apoya',
   refutes: 'refuta',
+  variant_of: 'variante de',
+  refines: 'refina',
 };
 
 // ── Inline icon set (feather-style strokes) ─────────────────────────────────

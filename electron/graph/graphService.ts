@@ -74,22 +74,38 @@ interface ThemeMembership {
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export function buildIdeaGraph(): GraphData {
   const db = getDb();
-  const ideas = db.prepare('SELECT global_id, type, label, statement FROM ideas').all() as IdeaRow[];
+  const ideas = db
+    .prepare(
+      `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
+       FROM ideas i
+       JOIN idea_occurrences io ON io.global_id = i.global_id
+       JOIN works w ON w.nodus_id = io.nodus_id
+       WHERE w.archived = 0
+         AND w.deep_status = 'done'`
+    )
+    .all() as IdeaRow[];
   const themeRows = listGraphThemes();
   const memberships = buildThemeMemberships();
-  const themeNodeIdsWithEdges = new Set(memberships.edges.map((e) => e.source));
 
   const ideaNodes: GraphNode[] = ideas.map((idea) => {
     const works = db
       .prepare(
         `SELECT w.nodus_id, w.year, w.authors_json, w.deep_status
          FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-         WHERE io.global_id = ?`
+         WHERE io.global_id = ?
+           AND w.archived = 0
+           AND w.deep_status = 'done'`
       )
       .all(idea.global_id) as { nodus_id: string; year: number | null; authors_json: string; deep_status: string }[];
 
     const maxConf = db
-      .prepare('SELECT MAX(confidence) as c FROM idea_occurrences WHERE global_id = ?')
+      .prepare(
+        `SELECT MAX(io.confidence) as c
+         FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
+         WHERE io.global_id = ?
+           AND w.archived = 0
+           AND w.deep_status = 'done'`
+      )
       .get(idea.global_id) as { c: number | null };
 
     const authors = new Set<string>();
@@ -119,7 +135,7 @@ export function buildIdeaGraph(): GraphData {
     };
   });
 
-  const visibleThemeRows = ideas.length === 0 ? themeRows : themeRows.filter((theme) => themeNodeIdsWithEdges.has(`theme:${theme.theme_id}`));
+  const visibleThemeRows = themeRows;
   const themeNodes: GraphNode[] = visibleThemeRows.map((theme) => {
     const works = db
       .prepare(
@@ -158,7 +174,15 @@ export function buildIdeaGraph(): GraphData {
 
   const nodes = [...themeNodes, ...ideaNodes];
 
-  const edgeRows = db.prepare('SELECT * FROM edges').all() as {
+  const edgeRows = db
+    .prepare(
+      `SELECT e.*
+       FROM edges e
+       LEFT JOIN works w ON w.nodus_id = e.source_work
+       WHERE e.source_work IS NULL
+          OR (w.archived = 0 AND w.deep_status = 'done')`
+    )
+    .all() as {
     id: string;
     from_id: string;
     to_id: string;
@@ -229,6 +253,7 @@ function buildThemeMemberships(): ThemeMembership {
        JOIN themes t ON t.theme_id = it.theme_id
        JOIN works w ON w.nodus_id = it.nodus_id
        WHERE w.archived = 0
+         AND w.deep_status = 'done'
        GROUP BY it.theme_id, it.global_id`
     )
     .all() as { theme_id: string; label: string; global_id: string; confidence: number }[];
@@ -253,6 +278,7 @@ function buildThemeMemberships(): ThemeMembership {
        JOIN ideas i ON i.global_id = io.global_id
        LEFT JOIN evidence e ON e.nodus_id = io.nodus_id AND e.global_id = io.global_id
        WHERE w.archived = 0
+         AND w.deep_status = 'done'
          AND NOT EXISTS (
            SELECT 1 FROM idea_theme_links it
            WHERE it.nodus_id = io.nodus_id AND it.global_id = io.global_id

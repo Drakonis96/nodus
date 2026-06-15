@@ -30,6 +30,8 @@ const STEP_MEMBER_IDEAS = 24;
 const EDGE_TYPE_LABELS: Record<string, string> = {
   contains: 'contiene',
   extends: 'extiende',
+  variant_of: 'variante de',
+  refines: 'refina',
   contradicts: 'contradice',
   applies_to: 'aplica a',
   shares_method: 'comparte método',
@@ -153,6 +155,8 @@ function buildPlanContext(graph: GraphData): {
   payload: Record<string, unknown>;
   validNodeIds: Set<string>;
   edgesById: Map<string, GraphEdge>;
+  plannedIdeaIds: Set<string>;
+  plannedThemeIds: Set<string>;
   truncated: boolean;
   totals: { themes: number; ideas: number; connections: number };
 } {
@@ -182,12 +186,15 @@ function buildPlanContext(graph: GraphData): {
   const connectionsTruncated = connections.length > cappedConnections.length;
 
   const edgesById = new Map<string, GraphEdge>(cappedConnections.map((e) => [e.id, e]));
+  const plannedIdeaIds = new Set(cappedIdeas.map((n) => n.id));
+  const plannedThemeIds = new Set(themeNodes.map((n) => n.id));
 
   const themes = themeNodes.map((t) => ({
     id: t.id,
     label: t.label,
     work_count: t.workCount,
     idea_ids: (ideasByTheme.get(t.id) ?? []).slice(0, 40),
+    sample_works: themeSampleWorks(t.id),
   }));
 
   const ideas = cappedIdeas.map((n: GraphNode) => ({
@@ -243,9 +250,30 @@ function buildPlanContext(graph: GraphData): {
     },
     validNodeIds,
     edgesById,
+    plannedIdeaIds,
+    plannedThemeIds,
     truncated: ideasTruncated || connectionsTruncated,
     totals: { themes: themeNodes.length, ideas: ideaNodes.length, connections: connections.length },
   };
+}
+
+function themeSampleWorks(themeNodeId: string): { title: string; year: number | null; status: string }[] {
+  const themeId = themeNodeId.startsWith('theme:') ? themeNodeId.slice('theme:'.length) : themeNodeId;
+  const rows = getDb()
+    .prepare(
+      `SELECT w.title, w.year, w.deep_status AS status
+       FROM work_themes wt
+       JOIN works w ON w.nodus_id = wt.nodus_id
+       WHERE wt.theme_id = ?
+         AND w.archived = 0
+       ORDER BY
+         CASE w.deep_status WHEN 'done' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+         w.year DESC,
+         w.title ASC
+       LIMIT 6`
+    )
+    .all(themeId) as { title: string; year: number | null; status: string }[];
+  return rows.map((r) => ({ title: clip(r.title, 120), year: r.year, status: r.status }));
 }
 
 function weightLabelFor(weight: number): string {
@@ -296,13 +324,85 @@ function sanitizeStop(
   };
 }
 
+function routeCoverage(routes: TutorRoute[]): { ideas: Set<string>; themes: Set<string> } {
+  const ideas = new Set<string>();
+  const themes = new Set<string>();
+  for (const route of routes) {
+    for (const stop of route.stops) {
+      for (const id of stop.nodeIds) {
+        if (id.startsWith('theme:')) themes.add(id);
+        else ideas.add(id);
+      }
+    }
+  }
+  return { ideas, themes };
+}
+
+function appendCoverageRoutes(
+  routes: TutorRoute[],
+  graph: GraphData,
+  plannedIdeaIds: Set<string>,
+  plannedThemeIds: Set<string>
+): void {
+  const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
+  const covered = routeCoverage(routes);
+  const stops: TutorStop[] = [];
+
+  for (const id of plannedThemeIds) {
+    if (covered.themes.has(id)) continue;
+    const node = nodeById.get(id);
+    if (!node) continue;
+    stops.push({
+      id: uuid(),
+      kind: 'theme',
+      title: node.label,
+      focus:
+        node.workCount > 0
+          ? `Línea temática con ${node.workCount} obra(s), incluida para que el mapa panorámico no omita zonas aún poco desarrolladas.`
+          : 'Línea temática incluida para completar el mapa panorámico.',
+      nodeIds: [id],
+      edgeId: null,
+    });
+  }
+
+  for (const id of plannedIdeaIds) {
+    if (covered.ideas.has(id)) continue;
+    const node = nodeById.get(id);
+    if (!node || node.type === 'theme') continue;
+    stops.push({
+      id: uuid(),
+      kind: 'idea',
+      title: node.label,
+      focus: clip(node.statement ?? `Idea ${node.label}`, 240),
+      nodeIds: [id],
+      edgeId: null,
+    });
+  }
+
+  if (stops.length === 0) return;
+  const chunkSize = 28;
+  for (let i = 0; i < stops.length; i += chunkSize) {
+    const part = stops.slice(i, i + chunkSize);
+    routes.push({
+      id: uuid(),
+      title: i === 0 ? 'Cobertura restante del mapa' : 'Cobertura restante del mapa II',
+      description:
+        'Ruta generada por Nodus para cubrir temas o ideas que el plan del modelo dejó fuera. Sirve como cierre de auditoría del recorrido panorámico.',
+      weight: 1,
+      weightLabel: 'cobertura de apoyo',
+      themes: [],
+      stops: part,
+    });
+  }
+}
+
 export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPlan> {
   const graph = buildIdeaGraph();
   if (graph.nodes.length === 0) {
     throw new Error('El grafo aún no tiene ideas. Analiza algunas obras antes de iniciar el modo Tutor.');
   }
 
-  const { payload, validNodeIds, edgesById, truncated, totals } = buildPlanContext(graph);
+  const { payload, validNodeIds, edgesById, plannedIdeaIds, plannedThemeIds, truncated, totals } = buildPlanContext(graph);
   const mode = request.mode === 'prompt' ? 'prompt' : 'overview';
   const prompt = (request.prompt ?? '').trim().slice(0, 2000);
   const system = `${PLAN_SYSTEM}${mode === 'prompt' ? PROMPT_MODE_RULE : OVERVIEW_MODE_RULE}`;
@@ -340,16 +440,16 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
   }
   routes.sort((a, b) => b.weight - a.weight);
 
+  if (mode === 'overview') {
+    appendCoverageRoutes(routes, graph, plannedIdeaIds, plannedThemeIds);
+    routes.sort((a, b) => b.weight - a.weight);
+  }
+
   if (routes.length === 0) {
     throw new Error('El Tutor no pudo trazar un recorrido válido sobre el grafo actual. Inténtalo de nuevo.');
   }
 
-  const coveredIdeas = new Set<string>();
-  for (const route of routes) {
-    for (const stop of route.stops) {
-      for (const id of stop.nodeIds) if (!id.startsWith('theme:')) coveredIdeas.add(id);
-    }
-  }
+  const coveredIdeas = routeCoverage(routes).ideas;
 
   return {
     generatedAt: new Date().toISOString(),
@@ -367,24 +467,44 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
 
 // ── Step narration ───────────────────────────────────────────────────────────
 
-function themeMembers(themeNodeId: string): { label: string; members: { label: string; statement: string }[]; works: number } {
+function themeMembers(themeNodeId: string): {
+  label: string;
+  members: { label: string; statement: string }[];
+  works: number;
+  sampleWorks: { title: string; year: number | null; status: string }[];
+} {
   const themeId = themeNodeId.startsWith('theme:') ? themeNodeId.slice('theme:'.length) : themeNodeId;
   const db = getDb();
   const theme = db.prepare('SELECT label FROM themes WHERE theme_id = ?').get(themeId) as { label: string } | undefined;
   const members = db
     .prepare(
       `SELECT DISTINCT i.label, i.statement
-       FROM idea_theme_links it JOIN ideas i ON i.global_id = it.global_id
+       FROM idea_theme_links it
+       JOIN ideas i ON i.global_id = it.global_id
+       JOIN works w ON w.nodus_id = it.nodus_id
        WHERE it.theme_id = ?
+         AND w.archived = 0
+         AND w.deep_status = 'done'
        ORDER BY i.label ASC
        LIMIT ?`
     )
     .all(themeId, STEP_MEMBER_IDEAS) as { label: string; statement: string }[];
-  const works = (db.prepare('SELECT COUNT(*) AS c FROM work_themes WHERE theme_id = ?').get(themeId) as { c: number }).c;
+  const works = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS c
+         FROM work_themes wt
+         JOIN works w ON w.nodus_id = wt.nodus_id
+         WHERE wt.theme_id = ?
+           AND w.archived = 0`
+      )
+      .get(themeId) as { c: number }
+  ).c;
   return {
     label: theme?.label ?? themeNodeId,
     members: members.map((m) => ({ label: m.label, statement: clip(m.statement, 160) })),
     works,
+    sampleWorks: themeSampleWorks(themeNodeId),
   };
 }
 
@@ -414,19 +534,26 @@ function resolveStopContext(stop: TutorStop): Record<string, unknown> {
     .filter((id) => !id.startsWith('theme:'))
     .map((id) => getIdeaDetail(id))
     .filter((d): d is NonNullable<typeof d> => d !== null)
-    .map((d) => ({
-      tipo_idea: d.idea.type,
-      etiqueta: d.idea.label,
-      enunciado: clip(d.idea.statement, 360),
-      obras: d.occurrences.slice(0, 4).map((o) => ({
-        titulo: o.work.title,
-        autores: o.work.authors.slice(0, 3),
-        anio: o.work.year,
-        rol: o.role,
-        desarrollo: clip(o.development, 280),
-      })),
-      evidencia: d.evidence.slice(0, 4).map((e) => ({ cita: clip(e.quote, 280), ubicacion: e.location })),
-    }));
+    .map((d) => {
+      const occurrences = d.occurrences.filter((o) => o.work.archived === 0 && o.work.deep_status === 'done');
+      const doneWorkIds = new Set(occurrences.map((o) => o.nodus_id));
+      return {
+        tipo_idea: d.idea.type,
+        etiqueta: d.idea.label,
+        enunciado: clip(d.idea.statement, 360),
+        obras: occurrences.slice(0, 4).map((o) => ({
+          titulo: o.work.title,
+          autores: o.work.authors.slice(0, 3),
+          anio: o.work.year,
+          rol: o.role,
+          desarrollo: clip(o.development, 280),
+        })),
+        evidencia: d.evidence
+          .filter((e) => doneWorkIds.has(e.nodus_id))
+          .slice(0, 4)
+          .map((e) => ({ cita: clip(e.quote, 280), ubicacion: e.location })),
+      };
+    });
   return { tipo: 'idea', ideas };
 }
 

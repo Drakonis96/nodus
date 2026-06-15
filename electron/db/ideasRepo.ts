@@ -13,6 +13,36 @@ import type {
 } from '@shared/types';
 import { getWork } from './worksRepo';
 
+const EDGE_TYPES = new Set<EdgeType>([
+  'extends',
+  'contradicts',
+  'applies_to',
+  'shares_method',
+  'precondition_of',
+  'measures_same',
+  'supports',
+  'refutes',
+  'variant_of',
+  'refines',
+  'contains',
+]);
+
+export function normalizeEdgeType(type: string | null | undefined): EdgeType | null {
+  const raw = (type ?? '').trim().toLowerCase();
+  if (EDGE_TYPES.has(raw as EdgeType)) return raw as EdgeType;
+  if (raw === 'has_variant') return 'variant_of';
+  return null;
+}
+
+export function normalizeEdgeBasis(basis: string | null | undefined): EdgeBasis {
+  return basis === 'explicit' ? 'explicit' : 'inferred';
+}
+
+function clampConfidence(value: number): number {
+  if (!Number.isFinite(value)) return 0.5;
+  return Math.max(0, Math.min(1, value));
+}
+
 // ── Embedding (de)serialization: store float32 array as BLOB ────────────────
 
 export function encodeEmbedding(vec: number[]): Buffer {
@@ -142,23 +172,27 @@ export function addEvidence(
 export interface NewEdgeInput {
   from_id: string;
   to_id: string;
-  type: EdgeType;
-  basis: EdgeBasis;
+  type: string;
+  basis: string;
   confidence: number;
   source_work: string | null;
 }
 
 /** Insert an edge, de-duplicating on (from, to, type); keeps the higher confidence. */
-export function addEdge(input: NewEdgeInput): string {
+export function addEdge(input: NewEdgeInput): string | null {
+  const type = normalizeEdgeType(input.type);
+  if (!type) return null;
+  const basis = normalizeEdgeBasis(input.basis);
+  const confidence = clampConfidence(input.confidence);
   const db = getDb();
   const existing = db
     .prepare('SELECT id, confidence FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
-    .get(input.from_id, input.to_id, input.type) as { id: string; confidence: number } | undefined;
+    .get(input.from_id, input.to_id, type) as { id: string; confidence: number } | undefined;
   if (existing) {
-    if (input.confidence > existing.confidence) {
+    if (confidence > existing.confidence) {
       db.prepare('UPDATE edges SET confidence = ?, basis = ? WHERE id = ?').run(
-        input.confidence,
-        input.basis,
+        confidence,
+        basis,
         existing.id
       );
     }
@@ -167,7 +201,7 @@ export function addEdge(input: NewEdgeInput): string {
   const id = uuid();
   db.prepare(
     'INSERT INTO edges (id, from_id, to_id, type, basis, confidence, source_work) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, input.from_id, input.to_id, input.type, input.basis, input.confidence, input.source_work);
+  ).run(id, input.from_id, input.to_id, type, basis, confidence, input.source_work);
   return id;
 }
 
@@ -216,6 +250,11 @@ export function purgeDeepData(nodusId: string): void {
     // Drop ideas that no longer have any occurrence.
     db.prepare(
       'DELETE FROM ideas WHERE global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)'
+    ).run();
+    db.prepare(
+      `DELETE FROM edges
+       WHERE from_id NOT IN (SELECT global_id FROM ideas)
+          OR to_id NOT IN (SELECT global_id FROM ideas)`
     ).run();
   });
   tx();

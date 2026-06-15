@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { AppSettings, EmbeddingProvider, ModelInfo } from '@shared/types';
+import { useEffect, useState } from 'react';
+import type { AppSettings, EmbeddingProvider, ModelInfo, UpdateProgressEvent } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -21,6 +21,15 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [resetting, setResetting] = useState(false);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgressEvent | null>(null);
+
+  useEffect(() => {
+    return window.nodus.onUpdateProgress((event) => {
+      setUpdateProgress(event);
+      setUpdateMessage(event.message);
+      setCheckingUpdate(event.status === 'checking');
+    });
+  }, []);
 
   const patch = async (p: Partial<AppSettings>) => {
     await window.nodus.updateSettings(p);
@@ -72,11 +81,23 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     setUpdateMessage(null);
     try {
       const result = await window.nodus.checkForUpdates();
+      setUpdateProgress({ ...result, at: new Date().toISOString() });
       setUpdateMessage(result.message);
     } finally {
       setCheckingUpdate(false);
     }
   };
+
+  const installUpdate = async () => {
+    const result = await window.nodus.installUpdate();
+    setUpdateProgress({ ...result, at: new Date().toISOString() });
+    setUpdateMessage(result.message);
+  };
+
+  const updatePct =
+    updateProgress?.progress != null ? Math.max(0, Math.min(100, updateProgress.progress)) : null;
+  const updateBusy = updateProgress?.status === 'downloading' || updateProgress?.status === 'installing';
+  const updateDownloaded = updateProgress?.status === 'downloaded';
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -235,11 +256,33 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           <div>
             <label className="text-sm text-neutral-300">Actualizaciones</label>
             {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
+            {(updatePct != null || updateBusy) && (
+              <div className="mt-2 w-72 max-w-full">
+                <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500 transition-all duration-300"
+                    style={{ width: `${updatePct ?? 100}%` }}
+                  />
+                </div>
+                {updateProgress?.bytesPerSecond != null && updateProgress.status === 'downloading' && (
+                  <p className="mt-1 text-[11px] text-neutral-500">
+                    {Math.round(updateProgress.bytesPerSecond / 1024)} KiB/s
+                  </p>
+                )}
+              </div>
+            )}
           </div>
-          <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate}>
-            <Icon name="sync" className={checkingUpdate ? 'animate-spin' : ''} />
-            {checkingUpdate ? 'Buscando…' : 'Buscar actualización'}
-          </button>
+          <div className="flex gap-2">
+            {updateDownloaded && (
+              <button className="btn btn-primary" onClick={installUpdate}>
+                <Icon name="refresh" /> Reiniciar
+              </button>
+            )}
+            <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
+              <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
+              {checkingUpdate ? 'Buscando…' : updateBusy ? 'Actualizando…' : 'Buscar actualización'}
+            </button>
+          </div>
         </div>
       </Section>
 

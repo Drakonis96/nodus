@@ -14,6 +14,7 @@ import {
   replaceIdeaThemeLinks,
   setWorkThemes,
 } from '../db/themesRepo';
+import { normalizeEdgeType } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 
 const THEME_BATCH = 30;
@@ -31,6 +32,8 @@ const RELATION_TYPES = new Set<EdgeType>([
   'measures_same',
   'supports',
   'refutes',
+  'variant_of',
+  'refines',
 ]);
 
 interface IdeaRow {
@@ -77,7 +80,7 @@ const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes un grupo 
 comparten un tema. Propón, EXCLUSIVAMENTE en JSON válido, relaciones entre ellas.
 
 TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
-measures_same, supports, refutes.
+measures_same, supports, refutes, variant_of, refines.
 
 REGLAS:
 - Propón solo relaciones claras y plausibles a partir del enunciado de las ideas.
@@ -113,7 +116,19 @@ export async function reprocessConnections(
   const locked = getSettings().themesLocked;
 
   const ideas = db
-    .prepare('SELECT global_id, type, label, statement FROM ideas ORDER BY global_id')
+    .prepare(
+      `SELECT i.global_id, i.type, i.label, i.statement
+       FROM ideas i
+       WHERE EXISTS (
+         SELECT 1
+         FROM idea_occurrences io
+         JOIN works w ON w.nodus_id = io.nodus_id
+         WHERE io.global_id = i.global_id
+           AND w.archived = 0
+           AND w.deep_status = 'done'
+       )
+       ORDER BY i.global_id`
+    )
     .all() as IdeaRow[];
 
   // idea → works it appears in (non-archived only), and work → its ideas.
@@ -121,7 +136,8 @@ export async function reprocessConnections(
     .prepare(
       `SELECT io.global_id, io.nodus_id
        FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-       WHERE w.archived = 0`
+       WHERE w.archived = 0
+         AND w.deep_status = 'done'`
     )
     .all() as { global_id: string; nodus_id: string }[];
   const worksByIdea = new Map<string, string[]>();
@@ -277,8 +293,8 @@ async function reprocessRelations(
     for (const relation of result.relations) {
       if (!relation || relation.from === relation.to) continue;
       if (!inCluster.has(relation.from) || !inCluster.has(relation.to)) continue;
-      const type = relation.type as EdgeType;
-      if (!RELATION_TYPES.has(type)) continue;
+      const type = normalizeEdgeType(relation.type);
+      if (!type || !RELATION_TYPES.has(type)) continue;
       const confidence = Math.max(0.1, Math.min(0.7, Number(relation.confidence) || 0.5));
       const key = `${relation.from}|${relation.to}|${type}`;
       const existing = proposed.get(key);

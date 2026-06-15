@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const migrations: Migration[] = [
   {
@@ -232,6 +232,34 @@ export const migrations: Migration[] = [
     version: 6,
     up: /* sql */ `
       ALTER TABLE themes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 7,
+    up: /* sql */ `
+      UPDATE edges
+      SET basis = 'inferred'
+      WHERE basis NOT IN ('explicit', 'inferred');
+
+      UPDATE edges
+      SET type = 'variant_of'
+      WHERE type = 'has_variant';
+
+      UPDATE edges
+      SET type = 'extends'
+      WHERE type NOT IN (
+        'extends',
+        'contradicts',
+        'applies_to',
+        'shares_method',
+        'precondition_of',
+        'measures_same',
+        'supports',
+        'refutes',
+        'variant_of',
+        'refines',
+        'contains'
+      );
     `,
   },
 ];

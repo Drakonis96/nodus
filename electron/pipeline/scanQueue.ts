@@ -8,6 +8,7 @@ import { listThemeLabels } from '../db/themesRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
 import { setDeepResult } from '../db/worksRepo';
+import { purgeDeepData } from '../db/ideasRepo';
 import { AiError } from '../ai/aiClient';
 import { startPerf } from '../perf';
 
@@ -232,6 +233,7 @@ class ScanQueue {
         // Persist deep-scan failure so it's visible in the library and not
         // re-enqueued forever by resumePending(). (Light scans already persist.)
         if (item.kind === 'deep') {
+          purgeDeepData(work.nodus_id);
           setDeepResult(work.nodus_id, 'failed', null, null, (e as Error).message);
         }
       }
@@ -305,7 +307,10 @@ class ScanQueue {
     db.prepare(
       "UPDATE works SET deep_status = 'pending' WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
     ).run();
-    for (const w of failedDeep) this.enqueue(w.nodus_id, w.title, 'deep');
+    for (const w of failedDeep) {
+      purgeDeepData(w.nodus_id);
+      this.enqueue(w.nodus_id, w.title, 'deep');
+    }
     for (const w of failedLight) this.enqueue(w.nodus_id, w.title, 'light');
     this.resume();
   }
@@ -321,7 +326,10 @@ class ScanQueue {
         "SELECT nodus_id, title FROM works WHERE deep_status = 'pending' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
       )
       .all() as { nodus_id: string; title: string }[];
-    for (const w of pendingDeep) this.enqueue(w.nodus_id, w.title, 'deep');
+    for (const w of pendingDeep) {
+      purgeDeepData(w.nodus_id);
+      this.enqueue(w.nodus_id, w.title, 'deep');
+    }
     for (const w of pendingLight) this.enqueue(w.nodus_id, w.title, 'light');
   }
 }
