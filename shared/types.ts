@@ -536,8 +536,10 @@ export interface NodusApi {
   pauseQueue(): Promise<void>;
   resumeQueue(): Promise<void>;
   cancelQueueItem(id: string): Promise<void>;
+  removeQueueItem(id: string): Promise<void>;
   moveQueueItemToTop(id: string): Promise<void>;
   clearQueue(): Promise<void>;
+  stopQueue(): Promise<void>;
   retryFailed(): Promise<void>;
   onQueueProgress(cb: (p: QueueProgress) => void): () => void;
 

@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { QueueProgress } from '@shared/types';
 import { Icon } from './ui';
+import { ConfirmModal } from './ConfirmModal';
 
 export function QueueBar() {
   const [progress, setProgress] = useState<QueueProgress | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [confirm, setConfirm] = useState<null | 'clear' | 'stop'>(null);
 
   useEffect(() => {
     void window.nodus.getQueue().then(setProgress);
@@ -66,26 +68,52 @@ export function QueueBar() {
         </div>
         {active &&
           (paused ? (
-            <button className="btn btn-ghost" onClick={() => window.nodus.resumeQueue()}>
-              Reanudar
+            <button
+              className="btn btn-ghost"
+              title="Reanudar la cola"
+              aria-label="Reanudar la cola"
+              onClick={() => window.nodus.resumeQueue()}
+            >
+              <Icon name="play" size={16} />
             </button>
           ) : (
-            <button className="btn btn-ghost" onClick={() => window.nodus.pauseQueue()}>
-              Pausar
+            <button
+              className="btn btn-ghost"
+              title="Pausar la cola"
+              aria-label="Pausar la cola"
+              onClick={() => window.nodus.pauseQueue()}
+            >
+              <Icon name="pause" size={16} />
             </button>
           ))}
         {failed > 0 && (
           <button
             className="btn btn-ghost text-amber-300"
-            title="Reencola las obras cuyo escaneo falló"
+            title={`Reencolar ${failed} obra(s) cuyo escaneo falló`}
+            aria-label={`Reintentar ${failed} fallidos`}
             onClick={() => window.nodus.retryFailed()}
           >
-            Reintentar fallidos ({failed})
+            <Icon name="refresh" size={15} /> {failed}
           </button>
         )}
-        <button className="btn btn-ghost" onClick={() => window.nodus.clearQueue()}>
-          Limpiar
+        <button
+          className="btn btn-ghost"
+          title="Limpiar la cola (quita los elementos pendientes y terminados)"
+          aria-label="Limpiar la cola"
+          onClick={() => setConfirm('clear')}
+        >
+          <Icon name="trash" size={16} />
         </button>
+        {active && (
+          <button
+            className="btn btn-ghost text-red-400 hover:text-red-300"
+            title="Detener y eliminar todos los elementos de la cola"
+            aria-label="Detener y vaciar la cola"
+            onClick={() => setConfirm('stop')}
+          >
+            <Icon name="stop" size={16} />
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -124,14 +152,14 @@ export function QueueBar() {
                       <Icon name="arrowUp" size={13} />
                     </button>
                   )}
-                  {(it.state === 'queued' || it.state === 'paused') && (
+                  {(it.state === 'queued' || it.state === 'paused' || it.state === 'running') && (
                     <button
                       className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
-                      title="Cancelar"
-                      aria-label={`Cancelar: ${it.title}`}
-                      onClick={() => window.nodus.cancelQueueItem(it.id)}
+                      title={it.state === 'running' ? 'Detener y eliminar de la cola' : 'Eliminar de la cola'}
+                      aria-label={`${it.state === 'running' ? 'Detener y eliminar' : 'Eliminar'} de la cola: ${it.title}`}
+                      onClick={() => window.nodus.removeQueueItem(it.id)}
                     >
-                      ✕
+                      <Icon name={it.state === 'running' ? 'stop' : 'x'} size={13} />
                     </button>
                   )}
                 </div>
@@ -140,6 +168,33 @@ export function QueueBar() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {confirm === 'clear' && (
+        <ConfirmModal
+          title="Limpiar la cola"
+          message="Se quitarán de la cola los elementos pendientes y los ya terminados. El elemento en curso seguirá procesándose."
+          confirmLabel="Limpiar"
+          onConfirm={() => {
+            void window.nodus.clearQueue();
+            setConfirm(null);
+          }}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
+
+      {confirm === 'stop' && (
+        <ConfirmModal
+          title="Detener y vaciar la cola"
+          message="Se detendrá el escaneo en curso y se eliminarán todos los elementos de la cola. Esta acción no se puede deshacer."
+          confirmLabel="Detener y vaciar"
+          danger
+          onConfirm={() => {
+            void window.nodus.stopQueue();
+            setConfirm(null);
+          }}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   );
 }

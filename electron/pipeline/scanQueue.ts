@@ -111,6 +111,35 @@ class ScanQueue {
     this.emit();
   }
 
+  /**
+   * Stop and remove a single item — including one that's currently running. The
+   * in-flight scan can't be truly aborted, so it's abandoned: we detach the item
+   * from the list and reset its pending status so it isn't resumed on restart.
+   */
+  removeItem(id: string): void {
+    const item = this.items.find((i) => i.id === id);
+    if (!item) return;
+    this.resetPendingStatus(item);
+    this.retries.delete(item.id);
+    this.items = this.items.filter((i) => i.id !== id);
+    this.emit();
+  }
+
+  /**
+   * Stop everything and empty the queue, including the running job. Resets the
+   * paused state so future enqueues run, and clears pending DB statuses so the
+   * abandoned work isn't auto-resumed.
+   */
+  stopAll(): void {
+    for (const item of this.items) this.resetPendingStatus(item);
+    this.items = [];
+    this.retries.clear();
+    this.lastKind = null;
+    this.paused = false;
+    this.pausedReason = null;
+    this.emit();
+  }
+
   private resetPendingStatus(item: QueueItem): void {
     const column = item.kind === 'deep' ? 'deep_status' : 'light_status';
     getDb().prepare(`UPDATE works SET ${column} = 'none' WHERE nodus_id = ? AND ${column} = 'pending'`).run(item.nodus_id);

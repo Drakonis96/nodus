@@ -202,8 +202,10 @@ export function registerIpc(
   h('queue:pause', async () => scanQueue.pause());
   h('queue:resume', async () => scanQueue.resume());
   h('queue:cancelItem', async (_e, id: string) => scanQueue.cancelItem(id));
+  h('queue:removeItem', async (_e, id: string) => scanQueue.removeItem(id));
   h('queue:moveToTop', async (_e, id: string) => scanQueue.moveToTop(id));
   h('queue:clear', async () => scanQueue.clear());
+  h('queue:stopAll', async () => scanQueue.stopAll());
   h('queue:retryFailed', async () => scanQueue.retryFailed());
 
   // graph
