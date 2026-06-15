@@ -260,6 +260,21 @@ export function getEdgeDetail(edgeId: string): EdgeDetail | null {
     edge,
     fromLabel: from?.label ?? edge.from_id,
     toLabel: to?.label ?? edge.to_id,
+    explanation: contradictionExplanation(edge, from, to),
     evidence,
   };
+}
+
+function contradictionExplanation(edge: Edge, from: Idea | null, to: Idea | null): string | null {
+  if (edge.type !== 'contradicts' && edge.type !== 'refutes') return null;
+  const left = shortText(from?.statement || from?.label || edge.from_id);
+  const right = shortText(to?.statement || to?.label || edge.to_id);
+  const noun = edge.type === 'refutes' ? 'refutación' : 'contradicción';
+  return `La ${noun} detectada es que "${left}" entra en tensión con "${right}".`;
+}
+
+function shortText(value: string, max = 180): string {
+  const clean = value.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1).trim()}...`;
 }

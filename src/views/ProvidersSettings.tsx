@@ -20,6 +20,8 @@ export function ProvidersSettings({
     const patch: Partial<AppSettings> = { favorites: next };
     // Removing the model that is the current default clears the default too.
     if (currentlyFav && sameModel(settings.defaultModel, m)) patch.defaultModel = null;
+    if (currentlyFav && sameModel(settings.extractionModel, m)) patch.extractionModel = null;
+    if (currentlyFav && sameModel(settings.synthesisModel, m)) patch.synthesisModel = null;
     await window.nodus.updateSettings(patch);
     await onChange();
   };

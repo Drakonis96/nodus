@@ -8,6 +8,7 @@ import {
   addEdge,
   getIdea,
 } from '../db/ideasRepo';
+import { getSettings } from '../db/settingsRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 
@@ -106,6 +107,7 @@ export async function fuseIdea(
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
 ): Promise<string> {
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
+  const fusionModel = opts.model ?? getSettings().synthesisModel ?? null;
   const embeddingDone = opts.embedding === undefined ? startPerf('embedding', opts.perf, { idea: idea.label }) : null;
   const embedding = opts.embedding === undefined ? await embed(`${idea.label}. ${idea.statement}`) : opts.embedding;
   embeddingDone?.({ hit: Boolean(embedding) });
@@ -169,7 +171,7 @@ export async function fuseIdea(
     result = await completeJson<FusionResult>(
       { system: PROMPT_FUSION, user: JSON.stringify(input), temperature: 0.1, maxTokens: 800, perf: opts.perf },
       isFusionResult,
-      opts.model
+      fusionModel
     );
     fusionDone({ resolution: result.resolution, matched: Boolean(result.matched_id) });
   } catch {

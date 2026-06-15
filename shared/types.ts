@@ -164,6 +164,8 @@ export interface AppSettings {
   // Favorite models the user pinned, and the one used by default for scans.
   favorites: ModelRef[];
   defaultModel: ModelRef | null;
+  extractionModel: ModelRef | null;
+  synthesisModel: ModelRef | null;
   syncMode: SyncMode;
   readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
@@ -327,6 +329,7 @@ export interface EdgeDetail {
   edge: Edge;
   fromLabel: string;
   toLabel: string;
+  explanation?: string | null;
   evidence: Evidence[];
 }
 
@@ -337,15 +340,136 @@ export interface GapAggregate {
   works: { nodus_id: string; title: string; zotero_key: string }[];
 }
 
+export type ReadingPathStrategy =
+  | 'research_relevance'
+  | 'gaps'
+  | 'foundational'
+  | 'recent'
+  | 'connected_authors'
+  | 'bridges';
+
+export interface ReadingPathRequest {
+  strategy?: ReadingPathStrategy;
+  researchBrief?: string;
+  limit?: number;
+  includeRead?: boolean;
+}
+
+export interface ReadingAnalysisStatus {
+  lightStatus: LightStatus;
+  deepStatus: DeepStatus;
+  hasThemes: boolean;
+  hasIdeas: boolean;
+  hasContradictions: boolean;
+  hasGaps: boolean;
+  hasExternalRefs: boolean;
+  themeCount: number;
+  ideaCount: number;
+  relationCount: number;
+  contradictionCount: number;
+  gapCount: number;
+  externalRefCount: number;
+}
+
 export interface ReadingPathEntry {
   nodus_id: string;
   title: string;
   authors: string[];
   year: number | null;
   themes: string[];
+  readTag: boolean;
   read: boolean;
+  analysis: ReadingAnalysisStatus;
   score: number;
+  priority: number;
+  phase: string;
+  strategyScore: number;
+  gapScore: number;
+  foundationalScore: number;
+  recencyScore: number;
+  authorConnectivityScore: number;
+  bridgeScore: number;
+  interestScore: number;
+  diversityKey: string | null;
+  relatedGaps: string[];
+  relatedIdeas: string[];
+  connectedAuthors: string[];
   reason: string;
+}
+
+export interface ReadingPathPhase {
+  id: string;
+  title: string;
+  objective: string;
+  entries: ReadingPathEntry[];
+  totalCandidates: number;
+  omitted: number;
+}
+
+export interface ReadingPathPlan {
+  strategy: ReadingPathStrategy;
+  researchBrief: string;
+  generatedAt: string;
+  totalWorks: number;
+  shownWorks: number;
+  readCount: number;
+  unreadCount: number;
+  analyzedCount: number;
+  pendingAnalysisCount: number;
+  summary: string;
+  phases: ReadingPathPhase[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Research assistant
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ResearchGraphPartsSelection {
+  ideaNodes: boolean;
+  themeNodes: boolean;
+  ideaEdges: boolean;
+  authorGraph: boolean;
+}
+
+export interface ResearchContextSelection {
+  ideas: boolean;
+  themes: boolean;
+  contradictions: boolean;
+  gaps: boolean;
+  readingPath: boolean;
+  authors: boolean;
+  documents: boolean;
+  graph: boolean;
+  graphParts: ResearchGraphPartsSelection;
+}
+
+export interface ResearchChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ResearchChatRequest {
+  messages: ResearchChatMessage[];
+  selection: ResearchContextSelection;
+  model?: ModelRef | null;
+}
+
+export interface ResearchContextStats {
+  sections: string[];
+  works: number;
+  documents: number;
+  contextChars: number;
+  truncated: boolean;
+}
+
+export interface ResearchChatResponse {
+  answer: string;
+  stats: ResearchContextStats;
+}
+
+export interface ResearchChatStreamHandlers {
+  onDelta(delta: string): void;
+  onStats?(stats: ResearchContextStats): void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -411,7 +535,11 @@ export interface NodusApi {
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
   getContradictions(): Promise<EdgeDetail[]>;
-  getReadingPath(): Promise<ReadingPathEntry[]>;
+  getReadingPath(request?: ReadingPathRequest): Promise<ReadingPathPlan>;
+
+  // research assistant
+  researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
+  researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
 
   // export / import
   exportData(): Promise<{ path: string } | null>;

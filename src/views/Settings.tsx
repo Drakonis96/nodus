@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AppSettings } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { Icon } from '../components/ui';
+import { ModelPicker } from '../components/ModelPicker';
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [saved, setSaved] = useState<string | null>(null);
@@ -63,6 +64,12 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       <ProvidersSettings settings={settings} onChange={onChange} />
 
       <Section title="IA (avanzado)">
+        <Row label="Modelo de extracción">
+          <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
+        </Row>
+        <Row label="Modelo de síntesis/fusión">
+          <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
+        </Row>
         <Row label="Modelo de embeddings (OpenAI)">
           <input className="input" value={settings.embeddingModel} onChange={(e) => patch({ embeddingModel: e.target.value })} />
         </Row>

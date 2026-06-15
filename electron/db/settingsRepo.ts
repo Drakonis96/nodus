@@ -6,6 +6,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   embeddingModel: 'text-embedding-3-small',
   favorites: [],
   defaultModel: null,
+  extractionModel: null,
+  synthesisModel: null,
   syncMode: 'manual',
   readTag: 'leído',
   autoLightScan: false,

@@ -52,7 +52,22 @@ const api: NodusApi = {
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
-  getReadingPath: () => ipcRenderer.invoke('reading:path'),
+  getReadingPath: (request) => ipcRenderer.invoke('reading:path', request),
+  researchChat: (request) => ipcRenderer.invoke('research:chat', request),
+  researchChatStream: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('research:chatStream:delta', onDelta);
+    try {
+      const response = await ipcRenderer.invoke('research:chatStream', requestId, request);
+      handlers.onStats?.(response.stats);
+      return response;
+    } finally {
+      ipcRenderer.removeListener('research:chatStream:delta', onDelta);
+    }
+  },
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: () => ipcRenderer.invoke('data:import'),

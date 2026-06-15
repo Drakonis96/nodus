@@ -110,7 +110,63 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
     }
   }
 
+  relaxRelatedIdeaEdges(cy, pos);
   return pos;
+}
+
+/**
+ * Keep theme hubs as the visual scaffold, then let idea→idea relations pull their
+ * endpoints together. This gives an Obsidian-like local density without turning
+ * the whole graph into an unreadable hairball.
+ */
+function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: number }>): void {
+  const links = cy
+    .edges()
+    .filter((edge) => {
+      if (edge.data('type') === 'contains') return false;
+      const source = cy.getElementById(edge.data('source'));
+      const target = cy.getElementById(edge.data('target'));
+      return source.nonempty() && target.nonempty() && source.data('type') !== 'theme' && target.data('type') !== 'theme';
+    })
+    .map((edge) => ({
+      source: edge.data('source') as string,
+      target: edge.data('target') as string,
+      type: edge.data('type') as string,
+      confidence: Number(edge.data('confidence') ?? 0.5),
+    }));
+
+  if (links.length === 0) return;
+
+  const strengthByType: Record<string, number> = {
+    contradicts: 0.42,
+    refutes: 0.42,
+    supports: 0.38,
+    extends: 0.34,
+    applies_to: 0.3,
+    shares_method: 0.26,
+    measures_same: 0.26,
+    precondition_of: 0.3,
+  };
+
+  for (let iter = 0; iter < 90; iter++) {
+    for (const link of links) {
+      const a = pos[link.source];
+      const b = pos[link.target];
+      if (!a || !b) continue;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const confidence = Math.min(1, Math.max(0.1, link.confidence));
+      const ideal = link.type === 'contradicts' || link.type === 'refutes' ? 118 : 96 + (1 - confidence) * 54;
+      const pull = ((distance - ideal) / distance) * (strengthByType[link.type] ?? 0.24) * confidence * 0.08;
+      const moveX = dx * pull;
+      const moveY = dy * pull;
+      a.x += moveX;
+      a.y += moveY;
+      b.x -= moveX;
+      b.y -= moveY;
+    }
+  }
 }
 
 interface Filters {
@@ -611,29 +667,14 @@ function DetailPanel({
           <div>
             <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
             {ideaDetail.occurrences.map((o) => (
-              <div key={o.nodus_id} className="card p-2 mb-2">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="font-medium text-xs">{o.work.title}</div>
-                  <button
-                    className="inline-flex items-center gap-1 text-indigo-400 text-xs shrink-0"
-                    onClick={() => window.nodus.openInZotero(o.work.zotero_key)}
-                  >
-                    <Icon name="external" size={12} /> Zotero
-                  </button>
-                </div>
-                <OccurrenceMeta work={o.work} />
-                <div className="text-[11px] text-neutral-500 mt-1">
-                  {o.role} · conf {o.confidence.toFixed(2)}
-                </div>
-                <p className="text-xs text-neutral-400 mt-1">{o.development}</p>
-              </div>
+              <OccurrenceCard key={o.nodus_id} occurrence={o} />
             ))}
           </div>
           {ideaDetail.evidence.length > 0 && (
             <div>
               <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
               {ideaDetail.evidence.map((ev) => (
-                <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-2 my-1 text-xs text-neutral-300 italic">
+                <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
                   “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
                 </blockquote>
               ))}
@@ -646,6 +687,7 @@ function DetailPanel({
           <h3 className="font-semibold">
             {EDGE_LABELS[edgeDetail.edge.type as keyof typeof EDGE_LABELS] ?? edgeDetail.edge.type}
           </h3>
+          {edgeDetail.explanation && <p className="text-neutral-300">{edgeDetail.explanation}</p>}
           <div className="text-neutral-400">
             <span className="text-neutral-200">{edgeDetail.fromLabel}</span> → <span className="text-neutral-200">{edgeDetail.toLabel}</span>
           </div>
@@ -654,7 +696,7 @@ function DetailPanel({
             <Badge>conf {edgeDetail.edge.confidence.toFixed(2)}</Badge>
           </div>
           {edgeDetail.evidence.map((ev) => (
-            <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-2 my-1 text-xs text-neutral-300 italic">
+            <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
               “{ev.quote}” <span className="text-neutral-500">{ev.location ?? ''}</span>
             </blockquote>
           ))}
@@ -682,6 +724,48 @@ const ITEM_TYPE_ES: Record<string, string> = {
 
 function itemTypeEs(t?: string | null): string | null {
   return t ? ITEM_TYPE_ES[t] ?? t : null;
+}
+
+function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurrences'][number] }) {
+  const [open, setOpen] = useState(false);
+  const work = occurrence.work;
+  const author = work.authors[0] ?? 'Autor desconocido';
+  const year = work.year ?? 's.f.';
+
+  return (
+    <div className="card p-3 mb-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-medium text-xs truncate">{work.title}</div>
+          <div className="text-[11px] text-neutral-400 mt-0.5">
+            {author}
+            {work.authors.length > 1 ? ' et al.' : ''} ({year})
+          </div>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            className="inline-flex items-center justify-center text-neutral-500 hover:text-neutral-200 p-1"
+            title={open ? 'Ocultar metadatos' : 'Mostrar metadatos'}
+            onClick={() => setOpen((v) => !v)}
+          >
+            <Icon name="info" size={14} />
+          </button>
+          <button
+            className="inline-flex items-center gap-1 text-indigo-400 text-xs p-1 hover:text-indigo-300"
+            title="Abrir en Zotero"
+            onClick={() => window.nodus.openInZotero(work.zotero_key)}
+          >
+            <Icon name="external" size={13} /> Zotero
+          </button>
+        </div>
+      </div>
+      {open && <OccurrenceMeta work={work} />}
+      <div className="text-[11px] text-neutral-500 mt-2">
+        {occurrence.role} · conf {occurrence.confidence.toFixed(2)}
+      </div>
+      <p className="text-xs text-neutral-400 mt-1 leading-relaxed">{occurrence.development}</p>
+    </div>
+  );
 }
 
 /** Bibliographic detail for one occurrence — authors, venue, pages — read live from Zotero. */

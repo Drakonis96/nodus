@@ -24,6 +24,8 @@ interface CallOpts {
   perf?: PerfContext;
 }
 
+type TextDeltaHandler = (delta: string) => void;
+
 /** Resolve which model to use: explicit override, else the configured default. */
 function resolveModel(override?: ModelRef | null): ModelRef {
   if (override?.provider && override.model) return override;
@@ -197,6 +199,84 @@ export async function completeJson<T>(
     }
   }
   throw lastErr instanceof Error ? lastErr : new AiError('Fallo de parseo JSON');
+}
+
+/** Plain-text completion for conversational assistant responses. */
+export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
+  const resolved = resolveModel(model);
+  return rawComplete(resolved, opts, false);
+}
+
+/** Plain-text streaming completion. The returned string is the full accumulated answer. */
+export async function completeTextStream(
+  opts: CallOpts,
+  onDelta: TextDeltaHandler,
+  model?: ModelRef | null
+): Promise<string> {
+  const resolved = resolveModel(model);
+  return rawCompleteStream(resolved, opts, onDelta);
+}
+
+async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextDeltaHandler): Promise<string> {
+  const key = getApiKey(model.provider);
+  if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
+
+  let full = '';
+  const emit = (delta: string | null | undefined) => {
+    if (!delta) return;
+    full += delta;
+    onDelta(delta);
+  };
+
+  if (model.provider === 'anthropic') {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default;
+    const client = new Anthropic({ apiKey: key });
+    try {
+      const stream = await (client.messages.create as any)({
+        model: model.model,
+        max_tokens: opts.maxTokens ?? 8000,
+        temperature: opts.temperature ?? 0.15,
+        system: opts.system,
+        stream: true,
+        messages: [{ role: 'user', content: opts.user }],
+      });
+      for await (const event of stream as AsyncIterable<any>) {
+        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emit(event.delta.text);
+        else if (event?.type === 'text') emit(event.text);
+      }
+    } catch (e: any) {
+      throw wrapProviderError(e);
+    }
+    if (!full.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+    return full;
+  }
+
+  const baseURL = openAiCompatBase(model.provider);
+  const OpenAI = (await import('openai')).default;
+  const client = new OpenAI({ apiKey: key, baseURL: baseURL ?? undefined, timeout: 180_000, maxRetries: 0 });
+  try {
+    const stream = await client.chat.completions.create({
+      model: model.model,
+      temperature: opts.temperature ?? 0.15,
+      max_tokens: opts.maxTokens ?? 8000,
+      stream: true,
+      messages: [
+        { role: 'system', content: opts.system },
+        { role: 'user', content: opts.user },
+      ],
+    });
+    for await (const chunk of stream as any) {
+      if (chunk?.error) {
+        throw new AiError(chunk.error.message ?? 'Error del proveedor durante el streaming.', false);
+      }
+      emit(chunk?.choices?.[0]?.delta?.content);
+    }
+  } catch (e: any) {
+    if (e instanceof AiError) throw e;
+    throw wrapProviderError(e);
+  }
+  if (!full.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  return full;
 }
 
 const EMBED_MODELS: Partial<Record<AiProvider, string>> = {

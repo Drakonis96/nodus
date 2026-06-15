@@ -170,6 +170,8 @@ export async function runDeepScan(
     }
 
     const settings = getSettings();
+    const extractionModel = model ?? settings.extractionModel ?? null;
+    const synthesisModel = model ?? settings.synthesisModel ?? null;
     const chunkPlan = planTextChunks(text, {
       mode: settings.deepContextMode,
       standardChunkWords: settings.deepStandardChunkWords,
@@ -229,7 +231,7 @@ export async function runDeepScan(
             perf,
           },
           isDeepResult,
-          model
+          extractionModel
         );
         chunkDone({ ideas: result.ideas.length, themes: result.theme_nodes?.length ?? 0 });
         results.push(result);
@@ -275,7 +277,7 @@ export async function runDeepScan(
           label: idea.label,
           statement: idea.statement,
         };
-        const globalId = await fuseIdea(ext, work.nodus_id, { model, perf, embedding: embeddings[i] ?? null });
+        const globalId = await fuseIdea(ext, work.nodus_id, { model: synthesisModel, perf, embedding: embeddings[i] ?? null });
         labelToGlobal.set(labelKey, globalId);
         const ideaThemeLabels = mergeThemeLabels(idea.theme_labels, [])
           .map((label) => allowedThemeLabels.get(normalizeThemeLabel(label)))

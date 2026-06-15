@@ -7,6 +7,7 @@ import { GapsView } from './views/GapsView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
+import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
@@ -26,6 +27,7 @@ export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [view, setView] = useState<View>('graph');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [researchOpen, setResearchOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -116,6 +118,13 @@ export function App() {
             <Icon name="alert" /> Configura un modelo de IA
           </button>
         )}
+        <button
+          className="btn btn-ghost gap-1.5"
+          title={settings.defaultModel ? 'Abrir asistente de investigación' : 'Configura un modelo de IA'}
+          onClick={() => (settings.defaultModel ? setResearchOpen(true) : setView('settings'))}
+        >
+          <Icon name="wand" /> Asistente
+        </button>
         <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
           <Icon name="folder" /> Colecciones
         </button>
@@ -157,6 +166,7 @@ export function App() {
       </div>
 
       {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
+      {researchOpen && <ResearchAssistantModal settings={settings} onClose={() => setResearchOpen(false)} />}
 
       {settings.onboardingComplete && !settings.tourComplete && (
         <Tour

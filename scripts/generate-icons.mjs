@@ -48,25 +48,17 @@ function drawIcon(size) {
   ctx.lineJoin = 'round';
 
   ctx.beginPath();
-  ctx.moveTo(300 * s, 356 * s);
-  ctx.bezierCurveTo(418 * s, 232 * s, 606 * s, 232 * s, 724 * s, 356 * s);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(300 * s, 668 * s);
-  ctx.bezierCurveTo(420 * s, 792 * s, 604 * s, 792 * s, 724 * s, 668 * s);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(300 * s, 356 * s);
-  ctx.bezierCurveTo(404 * s, 500 * s, 596 * s, 524 * s, 724 * s, 668 * s);
+  ctx.moveTo(300 * s, 724 * s);
+  ctx.lineTo(300 * s, 300 * s);
+  ctx.lineTo(724 * s, 724 * s);
+  ctx.lineTo(724 * s, 300 * s);
   ctx.stroke();
 
   const nodes = [
-    [300, 356, '#c4b5fd'],
-    [724, 356, '#a78bfa'],
-    [300, 668, '#a78bfa'],
-    [724, 668, '#7c3aed'],
+    [300, 300, '#ddd6fe'],
+    [300, 724, '#a78bfa'],
+    [724, 724, '#8b5cf6'],
+    [724, 300, '#7c3aed'],
   ];
 
   for (const [x, y, color] of nodes) {

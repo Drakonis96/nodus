@@ -1,5 +1,14 @@
 import { ipcMain, shell, BrowserWindow } from 'electron';
-import type { AppSettings, QueueKind, WorkFilter, AiProvider, ModelRef, ZoteroItem } from '@shared/types';
+import type {
+  AppSettings,
+  QueueKind,
+  WorkFilter,
+  AiProvider,
+  ModelRef,
+  ZoteroItem,
+  ResearchChatRequest,
+  ReadingPathRequest,
+} from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listModels } from './ai/providers';
@@ -15,6 +24,7 @@ import { buildIdeaGraph, buildAuthorGraph, getContradictions, buildReadingPath }
 import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
+import { answerResearchChat, streamResearchChat } from './ai/researchAssistant';
 import { getDb } from './db/database';
 
 /** Register every IPC channel backing the window.nodus API. */
@@ -199,7 +209,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());
   h('gaps:contradictions', async () => getContradictions());
-  h('reading:path', async () => buildReadingPath());
+  h('reading:path', async (_e, request?: ReadingPathRequest) => buildReadingPath(request));
+
+  // research assistant
+  h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
+  h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) =>
+    streamResearchChat(request, (delta) => {
+      e.sender.send('research:chatStream:delta', requestId, delta);
+    })
+  );
 
   // export / import
   h('data:export', async () => exportData());

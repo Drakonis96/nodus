@@ -5,6 +5,9 @@ import type {
   GraphEdge,
   IdeaType,
   EdgeDetail,
+  ReadingPathPlan,
+  ReadingPathRequest,
+  ReadingPathStrategy,
   ReadingPathEntry,
 } from '@shared/types';
 import { getEdgeDetail, ideasWithEmbeddings, cosineSimilarity } from '../db/ideasRepo';
@@ -428,65 +431,626 @@ export function getContradictions(): EdgeDetail[] {
   return rows.map((r) => getEdgeDetail(r.id)).filter((x): x is EdgeDetail => x !== null);
 }
 
+const DEFAULT_READING_LIMIT = 72;
+const MIN_READING_LIMIT = 18;
+const MAX_READING_LIMIT = 180;
+
+interface ReadingWorkRow {
+  nodus_id: string;
+  zotero_key: string;
+  title: string;
+  authors_json: string;
+  year: number | null;
+  item_type: string;
+  doi: string | null;
+  read_tag: number;
+  light_status: string;
+  deep_status: string;
+  theme_count: number;
+  theme_labels: string | null;
+  idea_count: number;
+  idea_ids: string | null;
+  idea_labels: string | null;
+  relation_count: number;
+  contradiction_count: number;
+  gap_count: number;
+  gap_statements: string | null;
+  external_ref_count: number;
+  author_relation_count: number;
+  author_weight: number;
+  dependency_count: number;
+}
+
+interface GapSignals {
+  ideaIds: Set<string>;
+  themeLabels: Set<string>;
+  statementsByTheme: Map<string, string[]>;
+}
+
+const STRATEGY_LABELS: Record<ReadingPathStrategy, string> = {
+  research_relevance: 'relevancia para la investigación',
+  gaps: 'cobertura de huecos detectados',
+  foundational: 'textos fundamentales',
+  recent: 'actualidad',
+  connected_authors: 'autores conectados',
+  bridges: 'documentos puente entre líneas temáticas',
+};
+
 /**
- * Reading path: seminal works first (most-developed ideas, most cited), then by
- * cluster. Unread works are surfaced — answering "where do I start?".
+ * Reading path: a compact, phase-based research plan. It separates "read" from
+ * "analysed" state and ranks documents by strategy-specific signals instead of
+ * returning the whole library as one flat list.
  */
-export function buildReadingPath(): ReadingPathEntry[] {
+export function buildReadingPath(request: ReadingPathRequest = {}): ReadingPathPlan {
   const db = getDb();
-  const works = db
-    .prepare('SELECT nodus_id, title, authors_json, year, deep_status FROM works WHERE archived = 0')
-    .all() as { nodus_id: string; title: string; authors_json: string; year: number | null; deep_status: string }[];
+  const strategy = request.strategy ?? 'research_relevance';
+  const limit = clampInt(request.limit ?? DEFAULT_READING_LIMIT, MIN_READING_LIMIT, MAX_READING_LIMIT);
+  const includeRead = request.includeRead ?? true;
+  const researchBrief = (request.researchBrief ?? '').trim().slice(0, 4000);
+  const rows = readPathRows(db);
+  const years = rows.map((r) => r.year).filter((y): y is number => y != null);
+  const minYear = years.length ? Math.min(...years) : new Date().getFullYear();
+  const maxYear = years.length ? Math.max(...years) : new Date().getFullYear();
+  const maxAuthorWeight = Math.max(1, ...rows.map((r) => r.author_weight + r.author_relation_count));
+  const maxDependency = Math.max(1, ...rows.map((r) => r.dependency_count));
+  const gapSignals = collectGapSignals();
+  const coreThemes = collectCoreThemes(rows, gapSignals, researchBrief);
+  const citedWorks = collectCitedWorks();
 
-  const entries: ReadingPathEntry[] = works.map((w) => {
-    const ideaCount = (
-      db.prepare('SELECT COUNT(*) as c FROM idea_occurrences WHERE nodus_id = ?').get(w.nodus_id) as { c: number }
-    ).c;
-    // Rough "seminal" signal: how often other works cite something matching this title/year.
-    const firstAuthor = (() => {
-      try {
-        return (JSON.parse(w.authors_json || '[]')[0] as string | undefined)?.split(',')[0] ?? '';
-      } catch {
-        return '';
-      }
-    })();
-    const citedBy = firstAuthor
-      ? (
-          db
-            .prepare("SELECT COUNT(*) as c FROM external_refs WHERE cited_work LIKE '%' || ? || '%'")
-            .get(firstAuthor) as { c: number }
-        ).c
-      : 0;
-    const themes = (
-      db
-        .prepare(
-          `SELECT t.label FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id WHERE wt.nodus_id = ?`
-        )
-        .all(w.nodus_id) as { label: string }[]
-    ).map((t) => t.label);
+  const entries = rows.map((row) =>
+    toReadingEntry(row, {
+      strategy,
+      researchBrief,
+      minYear,
+      maxYear,
+      maxAuthorWeight,
+      maxDependency,
+      gapSignals,
+      coreThemes,
+      citedWorks,
+    })
+  );
 
-    const read = w.deep_status === 'done';
-    // Seminal = many ideas developed; older + foundational ranked first; unread boosted for visibility.
-    const score = ideaCount * 3 + citedBy + (read ? 0 : 2);
-    let authors: string[] = [];
-    try {
-      authors = JSON.parse(w.authors_json || '[]');
-    } catch {
-      authors = [];
-    }
-    return {
-      nodus_id: w.nodus_id,
-      title: w.title,
-      authors,
-      year: w.year,
-      themes,
-      read,
-      score,
-      reason: read
-        ? `${ideaCount} ideas desarrolladas`
-        : `No leída · ${ideaCount} ideas detectadas en escaneo ligero`,
-    };
+  const candidates = includeRead ? entries : entries.filter((e) => !e.read);
+  const phases = buildReadingPhases(candidates, limit);
+  const shownWorks = phases.reduce((sum, phase) => sum + phase.entries.length, 0);
+  const readCount = entries.filter((e) => e.read).length;
+  const analyzedCount = entries.filter((e) => isAnalysed(e)).length;
+  const pendingAnalysisCount = entries.length - analyzedCount;
+
+  return {
+    strategy,
+    researchBrief,
+    generatedAt: new Date().toISOString(),
+    totalWorks: entries.length,
+    shownWorks,
+    readCount,
+    unreadCount: entries.length - readCount,
+    analyzedCount,
+    pendingAnalysisCount,
+    summary: `Ruta optimizada por ${STRATEGY_LABELS[strategy]}: ${shownWorks} lecturas priorizadas de ${entries.length} obras, agrupadas en fases manejables.`,
+    phases,
+  };
+}
+
+function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
+  return db
+    .prepare(
+      `
+      WITH theme_stats AS (
+        SELECT wt.nodus_id, COUNT(DISTINCT wt.theme_id) AS theme_count, GROUP_CONCAT(DISTINCT t.label) AS theme_labels
+        FROM work_themes wt
+        JOIN themes t ON t.theme_id = wt.theme_id
+        GROUP BY wt.nodus_id
+      ),
+      idea_stats AS (
+        SELECT io.nodus_id, COUNT(DISTINCT io.global_id) AS idea_count,
+               GROUP_CONCAT(DISTINCT io.global_id) AS idea_ids,
+               GROUP_CONCAT(DISTINCT i.label) AS idea_labels
+        FROM idea_occurrences io
+        JOIN ideas i ON i.global_id = io.global_id
+        GROUP BY io.nodus_id
+      ),
+      edge_stats AS (
+        SELECT source_work AS nodus_id,
+               COUNT(*) AS relation_count,
+               SUM(CASE WHEN type IN ('contradicts','refutes') THEN 1 ELSE 0 END) AS contradiction_count
+        FROM edges
+        WHERE source_work IS NOT NULL
+        GROUP BY source_work
+      ),
+      gap_stats AS (
+        SELECT nodus_id, COUNT(*) AS gap_count, GROUP_CONCAT(statement, char(31)) AS gap_statements
+        FROM gaps
+        GROUP BY nodus_id
+      ),
+      external_stats AS (
+        SELECT nodus_id, COUNT(*) AS external_ref_count
+        FROM external_refs
+        GROUP BY nodus_id
+      ),
+      author_stats AS (
+        SELECT wa.nodus_id,
+               COUNT(ar.type) AS author_relation_count,
+               COALESCE(SUM(ar.weight), 0) AS author_weight
+        FROM work_authors wa
+        LEFT JOIN (
+          SELECT from_author AS author_id, type, weight FROM author_relations
+          UNION ALL
+          SELECT to_author AS author_id, type, weight FROM author_relations
+        ) ar ON ar.author_id = wa.author_id
+        GROUP BY wa.nodus_id
+      ),
+      dependency_stats AS (
+        SELECT io.nodus_id, COUNT(DISTINCT e.id) AS dependency_count
+        FROM idea_occurrences io
+        JOIN edges e ON e.to_id = io.global_id
+        WHERE e.type IN ('extends','supports','precondition_of')
+        GROUP BY io.nodus_id
+      )
+      SELECT
+        w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi,
+        w.read_tag, w.light_status, w.deep_status,
+        COALESCE(ts.theme_count, 0) AS theme_count,
+        ts.theme_labels,
+        COALESCE(ist.idea_count, 0) AS idea_count,
+        ist.idea_ids,
+        ist.idea_labels,
+        COALESCE(es.relation_count, 0) AS relation_count,
+        COALESCE(es.contradiction_count, 0) AS contradiction_count,
+        COALESCE(gs.gap_count, 0) AS gap_count,
+        gs.gap_statements,
+        COALESCE(exs.external_ref_count, 0) AS external_ref_count,
+        COALESCE(ast.author_relation_count, 0) AS author_relation_count,
+        COALESCE(ast.author_weight, 0) AS author_weight,
+        COALESCE(ds.dependency_count, 0) AS dependency_count
+      FROM works w
+      LEFT JOIN theme_stats ts ON ts.nodus_id = w.nodus_id
+      LEFT JOIN idea_stats ist ON ist.nodus_id = w.nodus_id
+      LEFT JOIN edge_stats es ON es.nodus_id = w.nodus_id
+      LEFT JOIN gap_stats gs ON gs.nodus_id = w.nodus_id
+      LEFT JOIN external_stats exs ON exs.nodus_id = w.nodus_id
+      LEFT JOIN author_stats ast ON ast.nodus_id = w.nodus_id
+      LEFT JOIN dependency_stats ds ON ds.nodus_id = w.nodus_id
+      WHERE w.archived = 0
+      `
+    )
+    .all() as ReadingWorkRow[];
+}
+
+function toReadingEntry(
+  row: ReadingWorkRow,
+  opts: {
+    strategy: ReadingPathStrategy;
+    researchBrief: string;
+    minYear: number;
+    maxYear: number;
+    maxAuthorWeight: number;
+    maxDependency: number;
+    gapSignals: GapSignals;
+    coreThemes: Set<string>;
+    citedWorks: string[];
+  }
+): ReadingPathEntry {
+  const authors = parseAuthors(row.authors_json);
+  const themes = splitConcat(row.theme_labels);
+  const ideaIds = splitConcat(row.idea_ids);
+  const ideaLabels = splitConcat(row.idea_labels);
+  const gapStatements = splitGapStatements(row.gap_statements);
+  const read = row.read_tag === 1;
+  const analysis = {
+    lightStatus: row.light_status as any,
+    deepStatus: row.deep_status as any,
+    hasThemes: row.theme_count > 0,
+    hasIdeas: row.idea_count > 0,
+    hasContradictions: row.contradiction_count > 0,
+    hasGaps: row.gap_count > 0,
+    hasExternalRefs: row.external_ref_count > 0,
+    themeCount: row.theme_count,
+    ideaCount: row.idea_count,
+    relationCount: row.relation_count,
+    contradictionCount: row.contradiction_count,
+    gapCount: row.gap_count,
+    externalRefCount: row.external_ref_count,
+  };
+  const diversityKey = themes[0] ?? null;
+  const gapThemes = themes.filter((theme) => opts.gapSignals.themeLabels.has(normalizeThemeLabel(theme)));
+  const relatedGaps = unique([
+    ...gapStatements,
+    ...gapThemes.flatMap((theme) => opts.gapSignals.statementsByTheme.get(normalizeThemeLabel(theme)) ?? []),
+  ]).slice(0, 3);
+  const gapIdeaHit = ideaIds.some((id) => opts.gapSignals.ideaIds.has(id));
+  const gapScore = clamp01(
+    (row.gap_count > 0 ? 0.36 : 0) +
+      (gapIdeaHit ? 0.28 : 0) +
+      Math.min(0.24, gapThemes.length * 0.08) +
+      Math.min(0.12, row.contradiction_count * 0.04)
+  );
+  const coreThemeScore = themes.length
+    ? themes.filter((theme) => opts.coreThemes.has(normalizeThemeLabel(theme))).length / Math.max(1, Math.min(3, themes.length))
+    : 0;
+  const citedBy = approximateCitationCount(row, opts.citedWorks);
+  const olderScore = row.year == null || opts.maxYear === opts.minYear ? 0.35 : 1 - (row.year - opts.minYear) / (opts.maxYear - opts.minYear);
+  const foundationalScore = clamp01(
+    Math.min(0.34, row.idea_count * 0.035) +
+      Math.min(0.22, citedBy * 0.055) +
+      Math.min(0.22, (row.dependency_count / opts.maxDependency) * 0.22) +
+      olderScore * 0.22
+  );
+  const recencyScore = row.year == null || opts.maxYear === opts.minYear ? 0.2 : clamp01((row.year - opts.minYear) / (opts.maxYear - opts.minYear));
+  const authorConnectivityScore = clamp01((row.author_weight + row.author_relation_count) / opts.maxAuthorWeight);
+  const bridgeScore = clamp01(
+    Math.min(0.36, row.theme_count * 0.09) +
+      Math.min(0.28, row.relation_count * 0.035) +
+      authorConnectivityScore * 0.2 +
+      Math.min(0.16, row.external_ref_count * 0.04)
+  );
+  const interestScore = opts.researchBrief
+    ? textRelevance(opts.researchBrief, [row.title, authors.join(' '), themes.join(' '), ideaLabels.join(' '), gapStatements.join(' ')].join(' '))
+    : coreThemeScore;
+  const unreadBoost = read ? 0 : 0.08;
+  const pendingAnalysisBoost = isPendingAnalysis(analysis) ? 0.08 : 0;
+  const strategyScore = scoreForStrategy(opts.strategy, {
+    interestScore,
+    gapScore,
+    foundationalScore,
+    recencyScore,
+    authorConnectivityScore,
+    bridgeScore,
+    coreThemeScore,
+    unreadBoost,
+    pendingAnalysisBoost,
   });
+  const score = Number((strategyScore * 100).toFixed(1));
 
-  return entries.sort((a, b) => b.score - a.score);
+  return {
+    nodus_id: row.nodus_id,
+    title: row.title,
+    authors,
+    year: row.year,
+    themes,
+    readTag: read,
+    read,
+    analysis,
+    score,
+    priority: Math.round(score),
+    phase: '',
+    strategyScore,
+    gapScore,
+    foundationalScore,
+    recencyScore,
+    authorConnectivityScore,
+    bridgeScore,
+    interestScore,
+    diversityKey,
+    relatedGaps,
+    relatedIdeas: ideaLabels.slice(0, 4),
+    connectedAuthors: authors.slice(0, 4),
+    reason: readingReason({
+      read,
+      analysis,
+      gapScore,
+      foundationalScore,
+      recencyScore,
+      authorConnectivityScore,
+      bridgeScore,
+      interestScore,
+      relatedGaps,
+      citedBy,
+    }),
+  };
+}
+
+function buildReadingPhases(entries: ReadingPathEntry[], limit: number) {
+  const used = new Set<string>();
+  const phaseCap = Math.max(6, Math.ceil(limit / 6));
+  let remaining = limit;
+  const defs = [
+    {
+      id: 'foundational',
+      title: 'Lecturas fundamentales',
+      objective: 'Base conceptual y dependencias intelectuales que conviene leer antes de avanzar.',
+      filter: (e: ReadingPathEntry) => !isReadUnmapped(e) && e.foundationalScore >= 0.32,
+      score: (e: ReadingPathEntry) => e.foundationalScore * 0.7 + e.strategyScore * 0.3,
+    },
+    {
+      id: 'gaps',
+      title: 'Huecos de investigación',
+      objective: 'Textos más útiles para cubrir o delimitar huecos detectados en el corpus.',
+      filter: (e: ReadingPathEntry) => !isReadUnmapped(e) && e.gapScore >= 0.16,
+      score: (e: ReadingPathEntry) => e.gapScore * 0.7 + e.strategyScore * 0.3,
+    },
+    {
+      id: 'secondary_themes',
+      title: 'Ampliación de temas secundarios',
+      objective: 'Lecturas que amplían temas del proyecto sin saturar una sola línea temática.',
+      filter: (e: ReadingPathEntry) => !isReadUnmapped(e) && e.themes.length > 0 && e.gapScore < 0.5,
+      score: (e: ReadingPathEntry) => e.interestScore * 0.4 + e.bridgeScore * 0.3 + e.strategyScore * 0.3,
+    },
+    {
+      id: 'contrasts',
+      title: 'Contrastar ideas o contradicciones',
+      objective: 'Documentos conectados con relaciones, refutaciones o contradicciones ya analizadas.',
+      filter: (e: ReadingPathEntry) => !isReadUnmapped(e) && (e.analysis.hasContradictions || e.analysis.relationCount > 0),
+      score: (e: ReadingPathEntry) => Math.min(1, e.analysis.contradictionCount * 0.18 + e.analysis.relationCount * 0.04) + e.strategyScore * 0.25,
+    },
+    {
+      id: 'pending_analysis',
+      title: 'Lecturas pendientes de análisis',
+      objective: 'Ítems no leídos o poco procesados que conviene analizar para decidir si entran al mapa.',
+      filter: (e: ReadingPathEntry) => !e.read && isPendingAnalysis(e.analysis),
+      score: (e: ReadingPathEntry) => e.strategyScore + (isPendingAnalysis(e.analysis) ? 0.2 : 0),
+    },
+    {
+      id: 'read_unmapped',
+      title: 'Leídas sin incorporar al mapa',
+      objective: 'Obras marcadas como leídas en Zotero pero todavía sin análisis profundo suficiente.',
+      filter: isReadUnmapped,
+      score: (e: ReadingPathEntry) => e.strategyScore + 0.25,
+    },
+  ];
+
+  const phases = [];
+  for (const def of defs) {
+    if (remaining <= 0) break;
+    const candidates = entries.filter((e) => def.filter(e) && !used.has(e.nodus_id));
+    const selected = pickDiverse(candidates, Math.min(phaseCap, remaining), def.score).map((entry) => ({
+      ...entry,
+      phase: def.id,
+    }));
+    for (const entry of selected) used.add(entry.nodus_id);
+    remaining -= selected.length;
+    phases.push({
+      id: def.id,
+      title: def.title,
+      objective: def.objective,
+      entries: selected,
+      totalCandidates: candidates.length,
+      omitted: Math.max(0, candidates.length - selected.length),
+    });
+  }
+
+  if (remaining > 0) {
+    const candidates = entries.filter((e) => !used.has(e.nodus_id));
+    const selected = pickDiverse(candidates, remaining, (e) => e.strategyScore).map((entry) => ({
+      ...entry,
+      phase: 'next_best',
+    }));
+    phases.push({
+      id: 'next_best',
+      title: 'Siguientes mejores opciones',
+      objective: 'Lecturas restantes que todavía aportan señales relevantes para el criterio elegido.',
+      entries: selected,
+      totalCandidates: candidates.length,
+      omitted: Math.max(0, candidates.length - selected.length),
+    });
+  }
+
+  return phases.filter((phase) => phase.entries.length > 0 || phase.totalCandidates > 0);
+}
+
+function pickDiverse(entries: ReadingPathEntry[], limit: number, score: (entry: ReadingPathEntry) => number): ReadingPathEntry[] {
+  const selected: ReadingPathEntry[] = [];
+  const pool = [...entries];
+  const themeUse = new Map<string, number>();
+  while (selected.length < limit && pool.length > 0) {
+    let bestIndex = 0;
+    let bestScore = -Infinity;
+    for (let i = 0; i < pool.length; i++) {
+      const key = pool[i].diversityKey ? normalizeThemeLabel(pool[i].diversityKey!) : '';
+      const penalty = key ? (themeUse.get(key) ?? 0) * 0.08 : 0;
+      const s = score(pool[i]) - penalty;
+      if (s > bestScore) {
+        bestScore = s;
+        bestIndex = i;
+      }
+    }
+    const [picked] = pool.splice(bestIndex, 1);
+    selected.push(picked);
+    if (picked.diversityKey) {
+      const key = normalizeThemeLabel(picked.diversityKey);
+      themeUse.set(key, (themeUse.get(key) ?? 0) + 1);
+    }
+  }
+  return selected;
+}
+
+function collectGapSignals(): GapSignals {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT g.statement, g.related_idea, t.label AS theme_label
+       FROM gaps g
+       LEFT JOIN work_themes wt ON wt.nodus_id = g.nodus_id
+       LEFT JOIN themes t ON t.theme_id = wt.theme_id`
+    )
+    .all() as { statement: string; related_idea: string | null; theme_label: string | null }[];
+  const ideaThemeRows = db
+    .prepare(
+      `SELECT g.statement, g.related_idea, t.label AS theme_label
+       FROM gaps g
+       JOIN idea_theme_links it ON it.global_id = g.related_idea
+       JOIN themes t ON t.theme_id = it.theme_id
+       WHERE g.related_idea IS NOT NULL`
+    )
+    .all() as { statement: string; related_idea: string | null; theme_label: string | null }[];
+  const ideaIds = new Set<string>();
+  const themeLabels = new Set<string>();
+  const statementsByTheme = new Map<string, string[]>();
+  for (const row of [...rows, ...ideaThemeRows]) {
+    if (row.related_idea) ideaIds.add(row.related_idea);
+    if (!row.theme_label) continue;
+    const theme = normalizeThemeLabel(row.theme_label);
+    themeLabels.add(theme);
+    const list = statementsByTheme.get(theme) ?? [];
+    if (!list.includes(row.statement)) list.push(row.statement);
+    statementsByTheme.set(theme, list.slice(0, 5));
+  }
+  return { ideaIds, themeLabels, statementsByTheme };
+}
+
+function collectCoreThemes(rows: ReadingWorkRow[], gapSignals: GapSignals, researchBrief: string): Set<string> {
+  const scores = new Map<string, number>();
+  const briefTokens = tokenize(researchBrief);
+  for (const row of rows) {
+    for (const theme of splitConcat(row.theme_labels)) {
+      const norm = normalizeThemeLabel(theme);
+      const directInterest = Array.from(tokenize(norm)).some((token) => briefTokens.has(token)) ? 4 : 0;
+      scores.set(norm, (scores.get(norm) ?? 0) + 1 + directInterest + (gapSignals.themeLabels.has(norm) ? 2 : 0));
+    }
+  }
+  return new Set(
+    [...scores.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([theme]) => theme)
+  );
+}
+
+function collectCitedWorks(): string[] {
+  const rows = getDb().prepare('SELECT cited_work FROM external_refs').all() as { cited_work: string }[];
+  return rows.map((r) => normalizeText(r.cited_work));
+}
+
+function approximateCitationCount(row: ReadingWorkRow, citedWorks: string[]): number {
+  if (citedWorks.length === 0) return 0;
+  const title = normalizeText(row.title).slice(0, 80);
+  const firstAuthor = parseAuthors(row.authors_json)[0]?.split(/[,\s]/)[0] ?? '';
+  const author = normalizeText(firstAuthor);
+  if (!author && !title) return 0;
+  return citedWorks.filter((ref) => (author && ref.includes(author)) || (title.length > 20 && ref.includes(title))).length;
+}
+
+function scoreForStrategy(
+  strategy: ReadingPathStrategy,
+  s: {
+    interestScore: number;
+    gapScore: number;
+    foundationalScore: number;
+    recencyScore: number;
+    authorConnectivityScore: number;
+    bridgeScore: number;
+    coreThemeScore: number;
+    unreadBoost: number;
+    pendingAnalysisBoost: number;
+  }
+): number {
+  const base =
+    strategy === 'gaps'
+      ? s.gapScore * 0.54 + s.interestScore * 0.18 + s.bridgeScore * 0.12 + s.foundationalScore * 0.08
+      : strategy === 'foundational'
+        ? s.foundationalScore * 0.54 + s.authorConnectivityScore * 0.14 + s.coreThemeScore * 0.12 + s.bridgeScore * 0.1
+        : strategy === 'recent'
+          ? s.recencyScore * 0.56 + s.interestScore * 0.16 + s.gapScore * 0.12 + s.bridgeScore * 0.08
+          : strategy === 'connected_authors'
+            ? s.authorConnectivityScore * 0.52 + s.bridgeScore * 0.18 + s.foundationalScore * 0.12 + s.interestScore * 0.1
+            : strategy === 'bridges'
+              ? s.bridgeScore * 0.52 + s.gapScore * 0.18 + s.authorConnectivityScore * 0.12 + s.interestScore * 0.1
+              : s.interestScore * 0.28 + s.gapScore * 0.22 + s.foundationalScore * 0.16 + s.bridgeScore * 0.14 + s.coreThemeScore * 0.12;
+  return clamp01(base + s.unreadBoost + s.pendingAnalysisBoost);
+}
+
+function readingReason(input: {
+  read: boolean;
+  analysis: ReadingPathEntry['analysis'];
+  gapScore: number;
+  foundationalScore: number;
+  recencyScore: number;
+  authorConnectivityScore: number;
+  bridgeScore: number;
+  interestScore: number;
+  relatedGaps: string[];
+  citedBy: number;
+}): string {
+  const parts: string[] = [];
+  parts.push(input.read ? 'Marcada como leída por la etiqueta de Zotero.' : 'Pendiente de lectura.');
+  if (input.analysis.hasIdeas) parts.push(`${input.analysis.ideaCount} idea(s) extraída(s).`);
+  if (input.analysis.hasThemes) parts.push(`${input.analysis.themeCount} tema(s) detectado(s).`);
+  if (input.analysis.hasContradictions) parts.push(`${input.analysis.contradictionCount} contradicción(es) o refutación(es).`);
+  if (input.analysis.hasGaps) parts.push(`${input.analysis.gapCount} hueco(s) asociado(s).`);
+  if (input.relatedGaps.length > 0 || input.gapScore >= 0.2) parts.push('Alta conexión con huecos de investigación.');
+  if (input.foundationalScore >= 0.45) parts.push(input.citedBy > 0 ? `Posible texto de base (${input.citedBy} cita(s) internas aproximadas).` : 'Posible texto de base.');
+  if (input.bridgeScore >= 0.45) parts.push('Conecta varias líneas temáticas o relaciones del grafo.');
+  if (input.authorConnectivityScore >= 0.45) parts.push('Autoría conectada con otros nodos del corpus.');
+  if (input.recencyScore >= 0.72) parts.push('Aporta actualización reciente.');
+  if (input.interestScore >= 0.4) parts.push('Coincide con las prioridades indicadas.');
+  if (isPendingAnalysis(input.analysis)) parts.push('Conviene completar análisis antes de decidir su papel en el mapa.');
+  return parts.join(' ');
+}
+
+function isAnalysed(entry: ReadingPathEntry): boolean {
+  return (
+    entry.analysis.lightStatus === 'done' ||
+    entry.analysis.deepStatus === 'done' ||
+    entry.analysis.hasThemes ||
+    entry.analysis.hasIdeas ||
+    entry.analysis.hasGaps ||
+    entry.analysis.hasContradictions
+  );
+}
+
+function isPendingAnalysis(analysis: ReadingPathEntry['analysis']): boolean {
+  return analysis.lightStatus !== 'done' || analysis.deepStatus !== 'done' || !analysis.hasIdeas;
+}
+
+function isReadUnmapped(entry: ReadingPathEntry): boolean {
+  return entry.read && (entry.analysis.deepStatus !== 'done' || !entry.analysis.hasIdeas);
+}
+
+function textRelevance(query: string, target: string): number {
+  const q = tokenize(query);
+  if (q.size === 0) return 0;
+  const t = tokenize(target);
+  let hits = 0;
+  for (const token of q) if (t.has(token)) hits++;
+  return clamp01(hits / Math.min(q.size, 16));
+}
+
+function parseAuthors(authorsJson: string): string[] {
+  try {
+    const parsed = JSON.parse(authorsJson || '[]');
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function splitConcat(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function splitGapStatements(value: string | null): string[] {
+  if (!value) return [];
+  return unique(
+    value
+      .split('\u001f')
+      .map((x) => x.trim())
+      .filter(Boolean)
+  );
+}
+
+function unique(values: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const key = normalizeText(value);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+  return out;
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
 }

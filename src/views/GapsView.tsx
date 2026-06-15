@@ -95,6 +95,7 @@ export function GapsView() {
                 <Badge color={c.edge.basis === 'explicit' ? 'green' : 'amber'}>{c.edge.basis}</Badge>
                 <Badge>conf {c.edge.confidence.toFixed(2)}</Badge>
               </div>
+              {c.explanation && <p className="text-sm text-neutral-300 mb-2">{c.explanation}</p>}
               <div className="text-sm">
                 <span className="text-neutral-200">{c.fromLabel}</span> ✕{' '}
                 <span className="text-neutral-200">{c.toLabel}</span>

@@ -1,0 +1,604 @@
+import type {
+  Author,
+  Evidence,
+  Gap,
+  Idea,
+  ResearchChatRequest,
+  ResearchChatResponse,
+  ResearchContextSelection,
+  ResearchContextStats,
+  Work,
+} from '@shared/types';
+import { getDb } from '../db/database';
+import { getSettings } from '../db/settingsRepo';
+import { buildAuthorGraph, buildIdeaGraph, buildReadingPath, getContradictions } from '../graph/graphService';
+import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
+import { resolveWorkText } from '../extraction/textExtractor';
+import { completeText, completeTextStream } from './aiClient';
+
+const MAX_HISTORY_MESSAGES = 12;
+const MAX_DOCUMENTS = 30;
+const MAX_DOCUMENT_CHARS = 45_000;
+const MAX_DOCUMENT_TOTAL_CHARS = 800_000;
+
+type SectionPayload = Record<string, unknown>;
+
+interface BuildResult {
+  context: SectionPayload;
+  stats: ResearchContextStats;
+}
+
+type WorkRow = Work;
+
+type IdeaRow = Omit<Idea, 'embedding'>;
+
+interface WorkSummary {
+  nodus_id: string;
+  zotero_key: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  item_type: string;
+  doi: string | null;
+  source_type: string | null;
+}
+
+interface PromptBuild {
+  system: string;
+  user: string;
+  stats: ResearchContextStats;
+}
+
+export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
+  const { system, user, stats } = await buildResearchChatPrompt(request);
+  const answer = await completeText(
+    {
+      system,
+      user,
+      temperature: 0.2,
+      maxTokens: 6000,
+    },
+    request.model
+  );
+
+  return { answer: answer.trim(), stats };
+}
+
+export async function streamResearchChat(
+  request: ResearchChatRequest,
+  onDelta: (delta: string) => void
+): Promise<ResearchChatResponse> {
+  const { system, user, stats } = await buildResearchChatPrompt(request);
+  const answer = await completeTextStream(
+    {
+      system,
+      user,
+      temperature: 0.2,
+      maxTokens: 6000,
+    },
+    onDelta,
+    request.model
+  );
+
+  return { answer: answer.trim(), stats };
+}
+
+async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<PromptBuild> {
+  const messages = request.messages
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim())
+    .slice(-MAX_HISTORY_MESSAGES);
+
+  if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
+    throw new Error('El chat necesita una pregunta del usuario.');
+  }
+
+  const { context, stats } = await buildResearchContext(request.selection);
+  const system = [
+    'Eres el asistente de investigacion avanzado de Nodus.',
+    'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
+    'Si el contexto seleccionado no contiene la seccion necesaria, dilo de forma concreta y explica que seccion convendria activar.',
+    'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
+    'Cuando uses evidencia, cita titulos, autores, ids de ideas/documentos o ubicaciones disponibles.',
+    'No inventes contenido de documentos que no aparezca en el contexto.',
+  ].join('\n');
+
+  const user = JSON.stringify(
+    {
+      contexto_modular_seleccionado: context,
+      conversacion: messages,
+    },
+    null,
+    2
+  );
+
+  return { system, user, stats };
+}
+
+async function buildResearchContext(selection: ResearchContextSelection): Promise<BuildResult> {
+  const context: SectionPayload = {
+    generated_at: new Date().toISOString(),
+    note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario en el modal.',
+  };
+  const sections: string[] = [];
+  const linkedWorkIds = new Set<string>();
+  let truncated = false;
+
+  if (selection.ideas) {
+    context.ideas_generadas = listIdeas(linkedWorkIds);
+    sections.push('Ideas generadas');
+  }
+
+  if (selection.themes) {
+    context.temas_principales = listThemes(linkedWorkIds);
+    sections.push('Temas principales');
+  }
+
+  if (selection.contradictions) {
+    context.contradicciones = listContradictions(linkedWorkIds);
+    sections.push('Contradicciones');
+  }
+
+  if (selection.gaps) {
+    context.huecos_de_investigacion = listGaps(linkedWorkIds);
+    sections.push('Huecos de investigacion');
+  }
+
+  if (selection.readingPath) {
+    const plan = buildReadingPath();
+    for (const phase of plan.phases) {
+      for (const entry of phase.entries) linkedWorkIds.add(entry.nodus_id);
+    }
+    context.rutas_de_lectura = plan;
+    sections.push('Rutas de lectura');
+  }
+
+  if (selection.authors) {
+    context.autores = listAuthors(linkedWorkIds);
+    sections.push('Autores');
+  }
+
+  if (selection.graph) {
+    context.grafo = listGraph(selection, linkedWorkIds);
+    sections.push('Grafo');
+  }
+
+  if (selection.documents) {
+    const documentContext = await listDocuments(linkedWorkIds);
+    context.documentos_relacionados = documentContext.documents;
+    if (documentContext.omitted > 0) {
+      context.documentos_relacionados_omitidos = documentContext.omitted;
+    }
+    sections.push('Documentos relacionados');
+    truncated = truncated || documentContext.truncated;
+  }
+
+  const contextChars = JSON.stringify(context).length;
+  return {
+    context,
+    stats: {
+      sections,
+      works: linkedWorkIds.size,
+      documents: selection.documents && Array.isArray(context.documentos_relacionados)
+        ? context.documentos_relacionados.length
+        : 0,
+      contextChars,
+      truncated,
+    },
+  };
+}
+
+function listIdeas(linkedWorkIds: Set<string>) {
+  const db = getDb();
+  const ideas = db
+    .prepare('SELECT global_id, type, label, statement, created_at FROM ideas ORDER BY created_at ASC')
+    .all() as IdeaRow[];
+  const occurrences = db
+    .prepare(
+      `SELECT io.global_id, io.nodus_id, io.role, io.development, io.confidence,
+              w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
+       FROM idea_occurrences io
+       JOIN works w ON w.nodus_id = io.nodus_id
+       WHERE w.archived = 0
+       ORDER BY w.year DESC, w.title ASC`
+    )
+    .all() as Array<{
+      global_id: string;
+      nodus_id: string;
+      role: string;
+      development: string;
+      confidence: number;
+      zotero_key: string;
+      title: string;
+      authors_json: string;
+      year: number | null;
+      item_type: string;
+      doi: string | null;
+      source_type: string | null;
+    }>;
+  const evidence = db.prepare('SELECT * FROM evidence ORDER BY nodus_id ASC').all() as Evidence[];
+
+  const occByIdea = groupBy(occurrences, (o) => o.global_id);
+  const evidenceByIdea = groupBy(evidence, (e) => e.global_id);
+
+  return ideas.map((idea) => {
+    const occs = occByIdea.get(idea.global_id) ?? [];
+    for (const occurrence of occs) linkedWorkIds.add(occurrence.nodus_id);
+    return {
+      id: idea.global_id,
+      type: idea.type,
+      label: idea.label,
+      statement: idea.statement,
+      occurrences: occs.map((o) => ({
+        role: o.role,
+        development: o.development,
+        confidence: o.confidence,
+        work: workSummary(o),
+      })),
+      evidence: (evidenceByIdea.get(idea.global_id) ?? []).slice(0, 5).map(evidenceSummary),
+    };
+  });
+}
+
+function listThemes(linkedWorkIds: Set<string>) {
+  const db = getDb();
+  const themes = db
+    .prepare(
+      `SELECT t.theme_id, t.label, t.created_at,
+              COUNT(DISTINCT wt.nodus_id) AS work_count,
+              COUNT(DISTINCT it.global_id) AS idea_count
+       FROM themes t
+       LEFT JOIN work_themes wt ON wt.theme_id = t.theme_id
+       LEFT JOIN idea_theme_links it ON it.theme_id = t.theme_id
+       GROUP BY t.theme_id
+       ORDER BY idea_count DESC, work_count DESC, t.label ASC`
+    )
+    .all() as Array<{ theme_id: string; label: string; created_at: string; work_count: number; idea_count: number }>;
+
+  return themes.map((theme) => {
+    const works = db
+      .prepare(
+        `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
+         FROM work_themes wt
+         JOIN works w ON w.nodus_id = wt.nodus_id
+         WHERE wt.theme_id = ? AND w.archived = 0
+         ORDER BY w.year DESC, w.title ASC`
+      )
+      .all(theme.theme_id) as Array<WorkRow & { authors_json: string }>;
+    const ideas = db
+      .prepare(
+        `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
+         FROM idea_theme_links it
+         JOIN ideas i ON i.global_id = it.global_id
+         WHERE it.theme_id = ?
+         ORDER BY i.label ASC`
+      )
+      .all(theme.theme_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+    for (const work of works) linkedWorkIds.add(work.nodus_id);
+    return {
+      id: theme.theme_id,
+      label: theme.label,
+      work_count: theme.work_count,
+      idea_count: theme.idea_count,
+      works: works.map(workSummary),
+      ideas: ideas.map((idea) => ({
+        id: idea.global_id,
+        type: idea.type,
+        label: idea.label,
+        statement: idea.statement,
+      })),
+    };
+  });
+}
+
+function listContradictions(linkedWorkIds: Set<string>) {
+  const db = getDb();
+  return getContradictions().map((detail) => {
+    if (detail.edge.source_work) linkedWorkIds.add(detail.edge.source_work);
+    for (const ev of detail.evidence) linkedWorkIds.add(ev.nodus_id);
+    const from = db.prepare('SELECT global_id, type, label, statement FROM ideas WHERE global_id = ?').get(detail.edge.from_id) as
+      | { global_id: string; type: string; label: string; statement: string }
+      | undefined;
+    const to = db.prepare('SELECT global_id, type, label, statement FROM ideas WHERE global_id = ?').get(detail.edge.to_id) as
+      | { global_id: string; type: string; label: string; statement: string }
+      | undefined;
+    return {
+      id: detail.edge.id,
+      type: detail.edge.type,
+      basis: detail.edge.basis,
+      confidence: detail.edge.confidence,
+      explanation: detail.explanation,
+      from: from
+        ? { id: from.global_id, type: from.type, label: from.label, statement: from.statement }
+        : { id: detail.edge.from_id, label: detail.fromLabel },
+      to: to ? { id: to.global_id, type: to.type, label: to.label, statement: to.statement } : { id: detail.edge.to_id, label: detail.toLabel },
+      source_work: detail.edge.source_work ? getWorkSummary(detail.edge.source_work) : null,
+      evidence: detail.evidence.map(evidenceSummary),
+    };
+  });
+}
+
+function listGaps(linkedWorkIds: Set<string>) {
+  const rows = getDb()
+    .prepare(
+      `SELECT g.*, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type,
+              i.label AS idea_label, i.statement AS idea_statement,
+              e.quote AS evidence_quote, e.location AS evidence_location, e.kind AS evidence_kind
+       FROM gaps g
+       JOIN works w ON w.nodus_id = g.nodus_id
+       LEFT JOIN ideas i ON i.global_id = g.related_idea
+       LEFT JOIN evidence e ON e.id = g.evidence_id
+       WHERE w.archived = 0
+       ORDER BY g.confidence DESC, w.year DESC`
+    )
+    .all() as Array<Gap & {
+      zotero_key: string;
+      title: string;
+      authors_json: string;
+      year: number | null;
+      item_type: string;
+      doi: string | null;
+      source_type: string | null;
+      idea_label: string | null;
+      idea_statement: string | null;
+      evidence_quote: string | null;
+      evidence_location: string | null;
+      evidence_kind: string | null;
+    }>;
+
+  return rows.map((row) => {
+    linkedWorkIds.add(row.nodus_id);
+    return {
+      id: row.id,
+      kind: row.kind,
+      statement: row.statement,
+      confidence: row.confidence,
+      related_idea: row.related_idea
+        ? {
+            id: row.related_idea,
+            label: row.idea_label,
+            statement: row.idea_statement,
+          }
+        : null,
+      work: workSummary(row),
+      evidence: row.evidence_quote
+        ? {
+            quote: row.evidence_quote,
+            location: row.evidence_location,
+            kind: row.evidence_kind,
+          }
+        : null,
+    };
+  });
+}
+
+function listAuthors(linkedWorkIds: Set<string>) {
+  const db = getDb();
+  const authors = db.prepare('SELECT * FROM authors ORDER BY name ASC').all() as Author[];
+  const relations = db
+    .prepare(
+      `SELECT ar.from_author, fa.name AS from_name, ar.to_author, ta.name AS to_name, ar.type, ar.weight
+       FROM author_relations ar
+       JOIN authors fa ON fa.author_id = ar.from_author
+       JOIN authors ta ON ta.author_id = ar.to_author
+       ORDER BY ar.weight DESC`
+    )
+    .all() as Array<{
+      from_author: string;
+      from_name: string;
+      to_author: string;
+      to_name: string;
+      type: string;
+      weight: number;
+    }>;
+
+  return {
+    authors: authors.map((author) => {
+      const works = db
+        .prepare(
+          `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
+           FROM work_authors wa
+           JOIN works w ON w.nodus_id = wa.nodus_id
+           WHERE wa.author_id = ? AND w.archived = 0
+           ORDER BY w.year DESC, w.title ASC`
+        )
+        .all(author.author_id) as Array<WorkRow & { authors_json: string }>;
+      const ideas = db
+        .prepare(
+          `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
+           FROM work_authors wa
+           JOIN idea_occurrences io ON io.nodus_id = wa.nodus_id
+           JOIN ideas i ON i.global_id = io.global_id
+           WHERE wa.author_id = ?
+           ORDER BY i.label ASC`
+        )
+        .all(author.author_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+      for (const work of works) linkedWorkIds.add(work.nodus_id);
+      return {
+        id: author.author_id,
+        name: author.name,
+        affiliation: author.affiliation,
+        works: works.map(workSummary),
+        ideas: ideas.map((idea) => ({
+          id: idea.global_id,
+          type: idea.type,
+          label: idea.label,
+          statement: idea.statement,
+        })),
+      };
+    }),
+    relations,
+  };
+}
+
+function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>) {
+  const parts = selection.graphParts;
+  const out: SectionPayload = {};
+  const ideaGraph = buildIdeaGraph();
+
+  if (parts.ideaNodes) {
+    out.nodos_de_ideas = ideaGraph.nodes.filter((node) => node.type !== 'theme');
+    for (const node of ideaGraph.nodes) {
+      if (node.type !== 'theme') addIdeaWorkIds(node.id, linkedWorkIds);
+    }
+  }
+  if (parts.themeNodes) {
+    out.nodos_de_temas = ideaGraph.nodes.filter((node) => node.type === 'theme');
+    for (const node of ideaGraph.nodes) {
+      if (node.type === 'theme' && node.id.startsWith('theme:')) addThemeWorkIds(node.id.slice('theme:'.length), linkedWorkIds);
+    }
+  }
+  if (parts.ideaEdges) {
+    out.relaciones_de_ideas = ideaGraph.edges;
+    for (const edge of ideaGraph.edges) {
+      addIdeaWorkIds(edge.source, linkedWorkIds);
+      addIdeaWorkIds(edge.target, linkedWorkIds);
+    }
+  }
+  if (parts.authorGraph) {
+    const authorGraph = buildAuthorGraph();
+    out.grafo_de_autores = authorGraph;
+    for (const node of authorGraph.nodes) addAuthorWorkIds(node.id, linkedWorkIds);
+  }
+  return out;
+}
+
+async function listDocuments(linkedWorkIds: Set<string>): Promise<{ documents: unknown[]; omitted: number; truncated: boolean }> {
+  const candidateWorks = selectDocumentWorks(linkedWorkIds);
+  const works = candidateWorks.slice(0, MAX_DOCUMENTS);
+  const omitted = Math.max(0, candidateWorks.length - works.length);
+  const settings = getSettings();
+  const userId = settings.zoteroUserId || LOCAL_USER_ID;
+  const documents: unknown[] = [];
+  let totalChars = 0;
+  let truncated = omitted > 0;
+
+  for (const work of works) {
+    linkedWorkIds.add(work.nodus_id);
+    const item = await getItem(userId, work.zotero_key).catch(() => null);
+    const doc = await resolveWorkText(userId, work.zotero_key, settings.zoteroStoragePath, item?.abstract ?? null, work.doi, {
+      unpaywallEmail: settings.unpaywallEmail,
+      preferZoteroFulltext: settings.preferZoteroFulltext,
+      ocr: {
+        enabled: settings.ocrEnabled,
+        languages: settings.ocrLanguages,
+        maxPages: settings.ocrMaxPages,
+      },
+    }).catch((e) => ({
+      text: '',
+      sourceType: work.source_type ?? 'none',
+      notes: e instanceof Error ? e.message : String(e),
+    }));
+    const remaining = Math.max(0, MAX_DOCUMENT_TOTAL_CHARS - totalChars);
+    const clipped = clipText(doc.text, Math.min(MAX_DOCUMENT_CHARS, remaining));
+    totalChars += clipped.text.length;
+    truncated = truncated || clipped.truncated;
+    documents.push({
+      work: workSummary(work),
+      source_type: doc.sourceType,
+      notes: doc.notes,
+      text: clipped.text,
+      truncated: clipped.truncated,
+      original_chars: doc.text.length,
+    });
+    if (totalChars >= MAX_DOCUMENT_TOTAL_CHARS) {
+      truncated = true;
+      break;
+    }
+  }
+
+  return { documents, omitted, truncated };
+}
+
+function selectDocumentWorks(linkedWorkIds: Set<string>): WorkRow[] {
+  const db = getDb();
+  if (linkedWorkIds.size > 0) {
+    const all = Array.from(linkedWorkIds)
+      .map((id) => db.prepare('SELECT * FROM works WHERE nodus_id = ? AND archived = 0').get(id) as WorkRow | undefined)
+      .filter((work): work is WorkRow => Boolean(work));
+    return all.sort((a, b) => Number(b.deep_status === 'done') - Number(a.deep_status === 'done') || (b.year ?? 0) - (a.year ?? 0));
+  }
+  return db
+    .prepare("SELECT * FROM works WHERE archived = 0 ORDER BY deep_status = 'done' DESC, year DESC, title ASC")
+    .all() as WorkRow[];
+}
+
+function getWorkSummary(nodusId: string): WorkSummary | null {
+  const row = getDb().prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as WorkRow | undefined;
+  return row ? workSummary(row) : null;
+}
+
+function workSummary(row: {
+  nodus_id: string;
+  zotero_key: string;
+  title: string;
+  authors_json: string;
+  year: number | null;
+  item_type: string;
+  doi: string | null;
+  source_type: string | null;
+}): WorkSummary {
+  return {
+    nodus_id: row.nodus_id,
+    zotero_key: row.zotero_key,
+    title: row.title,
+    authors: parseAuthors(row.authors_json),
+    year: row.year,
+    item_type: row.item_type,
+    doi: row.doi,
+    source_type: row.source_type,
+  };
+}
+
+function parseAuthors(authorsJson: string): string[] {
+  try {
+    const parsed = JSON.parse(authorsJson || '[]');
+    return Array.isArray(parsed) ? parsed.filter((a): a is string => typeof a === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function evidenceSummary(e: Evidence) {
+  return {
+    quote: e.quote,
+    location: e.location,
+    kind: e.kind,
+    work_id: e.nodus_id,
+  };
+}
+
+function groupBy<T, K>(items: T[], keyFn: (item: T) => K): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const item of items) {
+    const key = keyFn(item);
+    const bucket = map.get(key);
+    if (bucket) bucket.push(item);
+    else map.set(key, [item]);
+  }
+  return map;
+}
+
+function addIdeaWorkIds(globalId: string, out: Set<string>): void {
+  if (globalId.startsWith('theme:')) return;
+  const rows = getDb()
+    .prepare('SELECT nodus_id FROM idea_occurrences WHERE global_id = ?')
+    .all(globalId) as { nodus_id: string }[];
+  for (const row of rows) out.add(row.nodus_id);
+}
+
+function addThemeWorkIds(themeId: string, out: Set<string>): void {
+  const rows = getDb().prepare('SELECT nodus_id FROM work_themes WHERE theme_id = ?').all(themeId) as { nodus_id: string }[];
+  for (const row of rows) out.add(row.nodus_id);
+}
+
+function addAuthorWorkIds(authorId: string, out: Set<string>): void {
+  const rows = getDb().prepare('SELECT nodus_id FROM work_authors WHERE author_id = ?').all(authorId) as { nodus_id: string }[];
+  for (const row of rows) out.add(row.nodus_id);
+}
+
+function clipText(text: string, max: number): { text: string; truncated: boolean } {
+  const clean = text.replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return { text: clean, truncated: false };
+  if (max <= 0) return { text: '', truncated: true };
+  return { text: `${clean.slice(0, max).trim()}...`, truncated: true };
+}
