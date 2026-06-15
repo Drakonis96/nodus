@@ -11,7 +11,13 @@ import {
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
 import { setDeepResult } from '../db/worksRepo';
-import { getWorkThemeLabels, normalizeThemeLabel, setIdeaThemeLinks, unionWorkThemes } from '../db/themesRepo';
+import {
+  getWorkThemeLabels,
+  listThemeLabels,
+  normalizeThemeLabel,
+  setIdeaThemeLinks,
+  unionWorkThemes,
+} from '../db/themesRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { planTextChunks, ExtractedDoc } from '../extraction/textExtractor';
@@ -249,11 +255,18 @@ export async function runDeepScan(
     const merged = mergeByLabel(results);
     // Keep only a small number of well-supported deep families. The prompt runs per
     // chunk, so accepting every family it mentions turns sections into graph hubs.
-    const deepThemeLabels = Array.from(merged.themes.values())
+    let deepThemeLabels = Array.from(merged.themes.values())
       .filter((t) => t.confidence >= 0.65)
       .sort((a, b) => themeScore(b) - themeScore(a))
       .slice(0, 2)
       .map((t) => t.label);
+    if (getSettings().themesLocked) {
+      // Locked main themes: never coin new families; keep only matches of the curated set.
+      const allowed = new Map(listThemeLabels().map((label) => [normalizeThemeLabel(label), label]));
+      deepThemeLabels = deepThemeLabels
+        .map((label) => allowed.get(normalizeThemeLabel(label)))
+        .filter((label): label is string => Boolean(label));
+    }
     unionWorkThemes(work.nodus_id, deepThemeLabels, 4);
     const allowedThemeLabels = new Map(getWorkThemeLabels(work.nodus_id).map((label) => [normalizeThemeLabel(label), label]));
 

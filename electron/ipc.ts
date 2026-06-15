@@ -10,6 +10,8 @@ import type {
   ReadingPathRequest,
   EmbeddingProvider,
   UpdateCheckResponse,
+  ChatMessageRecord,
+  ResearchContextSelection,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -26,7 +28,8 @@ import { buildIdeaGraph, buildAuthorGraph, getContradictions, buildReadingPath }
 import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
-import { answerResearchChat, streamResearchChat } from './ai/researchAssistant';
+import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
+import * as chat from './db/chatRepo';
 import { getDb } from './db/database';
 
 /** Register every IPC channel backing the window.nodus API. */
@@ -216,6 +219,38 @@ export function registerIpc(
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
   h('graph:themes', async () => themes.listGraphThemes());
 
+  // main-theme management ("temas principales")
+  h('themes:listManaged', async () => themes.listManagedThemes());
+  h('themes:add', async (_e, label: string) => {
+    themes.addManualTheme(label);
+    return themes.listManagedThemes();
+  });
+  h('themes:rename', async (_e, themeId: string, label: string) => {
+    themes.renameTheme(themeId, label);
+    return themes.listManagedThemes();
+  });
+  h('themes:setPinned', async (_e, themeId: string, pinned: boolean) => {
+    themes.setThemePinned(themeId, pinned);
+    return themes.listManagedThemes();
+  });
+  h('themes:delete', async (_e, themeId: string) => {
+    themes.deleteTheme(themeId);
+    return themes.listManagedThemes();
+  });
+  h('themes:reprocess', async (_e, model?: ModelRef | null) => {
+    // Re-run the cheap theme assignment over every work so node↔theme connections are
+    // rebuilt. Ideas are untouched. Honours the locked-themes setting via the queue.
+    const all = getDb().prepare('SELECT nodus_id, title FROM works WHERE archived = 0').all() as {
+      nodus_id: string;
+      title: string;
+    }[];
+    for (const w of all) {
+      works.setLightPending(w.nodus_id);
+      scanQueue.enqueue(w.nodus_id, w.title, 'light', model);
+    }
+    return all.length;
+  });
+
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());
   h('gaps:contradictions', async () => getContradictions());
@@ -228,6 +263,32 @@ export function registerIpc(
       e.sender.send('research:chatStream:delta', requestId, delta);
     })
   );
+
+  // research chat history
+  h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
+  h('chat:get', async (_e, id: string) => chat.getConversation(id));
+  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
+    chat.createConversation(input ?? {})
+  );
+  h(
+    'chat:saveMessages',
+    async (
+      _e,
+      id: string,
+      messages: ChatMessageRecord[],
+      meta?: { model?: ModelRef | null; selection?: ResearchContextSelection | null }
+    ) => chat.saveMessages(id, messages, meta)
+  );
+  h('chat:generateTitle', async (_e, id: string, model?: ModelRef | null) => {
+    const conversation = chat.getConversation(id);
+    if (!conversation) return '';
+    const title = await generateChatTitle(conversation.messages, model ?? conversation.model);
+    chat.renameConversation(id, title);
+    return title;
+  });
+  h('chat:rename', async (_e, id: string, title: string) => chat.renameConversation(id, title));
+  h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
+  h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
 
   // export / import
   h('data:export', async () => exportData());

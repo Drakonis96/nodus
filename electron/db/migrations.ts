@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 6;
 
 export const migrations: Migration[] = [
   {
@@ -197,6 +197,41 @@ export const migrations: Migration[] = [
 
       CREATE INDEX idx_idea_theme_links_global ON idea_theme_links(global_id);
       CREATE INDEX idx_idea_theme_links_theme ON idea_theme_links(theme_id);
+    `,
+  },
+  {
+    version: 5,
+    up: /* sql */ `
+      CREATE TABLE chat_conversations (
+        id             TEXT PRIMARY KEY,
+        title          TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        archived       INTEGER NOT NULL DEFAULT 0,
+        model_json     TEXT,
+        selection_json TEXT
+      );
+
+      CREATE TABLE chat_messages (
+        id              TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        seq             INTEGER NOT NULL,
+        role            TEXT NOT NULL,
+        content         TEXT NOT NULL,
+        selection_key   TEXT,
+        stats_json      TEXT,
+        error           INTEGER NOT NULL DEFAULT 0,
+        created_at      TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_chat_messages_conv ON chat_messages(conversation_id, seq);
+      CREATE INDEX idx_chat_conversations_updated ON chat_conversations(archived, updated_at DESC);
+    `,
+  },
+  {
+    version: 6,
+    up: /* sql */ `
+      ALTER TABLE themes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
     `,
   },
 ];

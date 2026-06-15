@@ -30,6 +30,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   deepContextMode: 'standard',
   deepStandardChunkWords: 1800,
   deepLongChunkWords: 30000,
+  themesLocked: false,
 };
 
 function readRaw(key: string): string | undefined {

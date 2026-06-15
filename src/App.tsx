@@ -154,7 +154,7 @@ export function App() {
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">
           {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
-          {view === 'graph' && <GraphView />}
+          {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'gaps' && <GapsView />}
           {view === 'reading' && <ReadingPathView />}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}

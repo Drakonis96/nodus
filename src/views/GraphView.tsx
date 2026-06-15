@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-import type { GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta } from '@shared/types';
+import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
+import { ThemesModal } from './ThemesModal';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
@@ -298,11 +299,12 @@ function loadFilters(): Filters {
   }
 }
 
-export function GraphView() {
+export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const clearFocusRef = useRef<() => void>(() => {});
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
+  const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
@@ -625,6 +627,15 @@ export function GraphView() {
         <button className="btn btn-ghost" onClick={() => setFilters(DEFAULT_FILTERS)}>
           Limpiar filtros
         </button>
+        {lens === 'ideas' && (
+          <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5"
+            title="Gestionar los temas principales y reprocesar las conexiones de los nodos"
+            onClick={() => setThemesModalOpen(true)}
+          >
+            <Icon name="tag" /> Temas principales
+          </button>
+        )}
         <div className="flex-1" />
         <span className="text-neutral-500">{elements.filter((e) => !(e.data as any).source).length} nodos</span>
       </div>
@@ -676,6 +687,18 @@ export function GraphView() {
           />
         )}
       </div>
+
+      {themesModalOpen && (
+        <ThemesModal
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+          onReprocessed={reload}
+          onClose={() => {
+            setThemesModalOpen(false);
+            reload();
+          }}
+        />
+      )}
     </div>
   );
 }

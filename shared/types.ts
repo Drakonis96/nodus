@@ -62,6 +62,17 @@ export interface Theme {
   theme_id: string;
   label: string;
   created_at: string;
+  pinned?: number; // 0|1 — user-curated "main theme", protected from auto-pruning
+}
+
+/** A theme as shown in the "Temas principales" manager: label + usage counts + curated flag. */
+export interface ManagedTheme {
+  theme_id: string;
+  label: string;
+  created_at: string;
+  pinned: boolean;
+  work_count: number;
+  idea_count: number;
 }
 
 export interface Idea {
@@ -193,6 +204,9 @@ export interface AppSettings {
   deepContextMode: DeepContextMode;
   deepStandardChunkWords: number;
   deepLongChunkWords: number;
+  // When true, light/deep scans only assign works to the existing curated themes and
+  // never invent new ones. Toggled from the "Temas principales" manager.
+  themesLocked: boolean;
 }
 
 export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';
@@ -475,6 +489,37 @@ export interface ResearchChatStreamHandlers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Research chat history (persisted conversations)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One persisted chat message. `stats`/`selectionKey`/`error` mirror the in-memory UI message. */
+export interface ChatMessageRecord {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  selectionKey?: string | null;
+  stats?: ResearchContextStats | null;
+  error?: boolean;
+}
+
+/** Conversation list entry (no messages) for the history sidebar. */
+export interface ChatConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  archived: boolean;
+  model: ModelRef | null;
+  messageCount: number;
+}
+
+/** A full conversation with its messages and the context selection it was using. */
+export interface ChatConversation extends ChatConversationSummary {
+  selection: ResearchContextSelection | null;
+  messages: ChatMessageRecord[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Updates
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -549,6 +594,15 @@ export interface NodusApi {
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
   getThemes(): Promise<Theme[]>;
 
+  // main-theme management ("temas principales")
+  listManagedThemes(): Promise<ManagedTheme[]>;
+  addManualTheme(label: string): Promise<ManagedTheme[]>;
+  renameTheme(themeId: string, label: string): Promise<ManagedTheme[]>;
+  setThemePinned(themeId: string, pinned: boolean): Promise<ManagedTheme[]>;
+  deleteTheme(themeId: string): Promise<ManagedTheme[]>;
+  /** Re-run the cheap theme assignment over the library to rebuild node connections. */
+  reprocessThemeConnections(model?: ModelRef | null): Promise<number>;
+
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
   getContradictions(): Promise<EdgeDetail[]>;
@@ -557,6 +611,24 @@ export interface NodusApi {
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
+
+  // research chat history
+  listConversations(includeArchived?: boolean): Promise<ChatConversationSummary[]>;
+  getConversation(id: string): Promise<ChatConversation | null>;
+  createConversation(input: {
+    model?: ModelRef | null;
+    selection?: ResearchContextSelection | null;
+  }): Promise<ChatConversation>;
+  saveConversationMessages(
+    id: string,
+    messages: ChatMessageRecord[],
+    meta?: { model?: ModelRef | null; selection?: ResearchContextSelection | null }
+  ): Promise<void>;
+  /** Ask the model for a short title from the conversation so far; persists + returns it. */
+  generateConversationTitle(id: string, model?: ModelRef | null): Promise<string>;
+  renameConversation(id: string, title: string): Promise<void>;
+  archiveConversation(id: string, archived: boolean): Promise<void>;
+  deleteConversation(id: string): Promise<void>;
 
   // export / import
   exportData(): Promise<{ path: string } | null>;

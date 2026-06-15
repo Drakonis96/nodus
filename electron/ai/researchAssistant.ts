@@ -1,8 +1,10 @@
 import type {
   Author,
+  ChatMessageRecord,
   Evidence,
   Gap,
   Idea,
+  ModelRef,
   ResearchChatRequest,
   ResearchChatResponse,
   ResearchContextSelection,
@@ -81,6 +83,51 @@ export async function streamResearchChat(
   );
 
   return { answer: answer.trim(), stats };
+}
+
+/**
+ * Ask the chat model for a short title summarising the conversation so far. The model
+ * that powered the conversation names it, per the product spec. Falls back to a trimmed
+ * first user message when the model is unavailable or returns nothing usable.
+ */
+export async function generateChatTitle(messages: ChatMessageRecord[], model?: ModelRef | null): Promise<string> {
+  const relevant = messages
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim() && !m.error)
+    .slice(0, 6)
+    .map((m) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content.trim().slice(0, 600)}`);
+  const firstUser = messages.find((m) => m.role === 'user' && m.content.trim())?.content.trim() ?? '';
+  const fallback = firstUser ? truncateTitle(firstUser) : 'Conversación sin título';
+  if (relevant.length === 0) return fallback;
+
+  try {
+    const raw = await completeText(
+      {
+        system:
+          'Eres un asistente que pone títulos. Devuelve EXCLUSIVAMENTE un título breve (máximo 6 palabras), ' +
+          'en español, sin comillas, sin punto final y sin prefijos como "Título:". Resume el tema de la conversación.',
+        user: relevant.join('\n'),
+        temperature: 0.2,
+        maxTokens: 40,
+      },
+      model
+    );
+    const title = truncateTitle(raw);
+    return title || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function truncateTitle(text: string): string {
+  const clean = text
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/^t[íi]tulo\s*:?\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.\s]+$/, '')
+    .trim();
+  if (!clean) return '';
+  if (clean.length <= 60) return clean;
+  return `${clean.slice(0, 57).trim()}…`;
 }
 
 async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<PromptBuild> {

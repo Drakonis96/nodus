@@ -1,13 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
+  ChatConversationSummary,
+  ChatMessageRecord,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
-  ResearchContextStats,
   ResearchGraphPartsSelection,
 } from '@shared/types';
 import { Icon, modelLabel } from '../components/ui';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -43,11 +45,8 @@ const ALL_SELECTION: ResearchContextSelection = {
   },
 };
 
-interface UiMessage extends ResearchChatMessage {
+interface UiMessage extends ChatMessageRecord {
   id: string;
-  selectionKey?: string;
-  stats?: ResearchContextStats;
-  error?: boolean;
 }
 
 export function ResearchAssistantModal({ settings, onClose }: { settings: AppSettings; onClose: () => void }) {
@@ -56,7 +55,15 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [sending, setSending] = useState(false);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Mirrors `messages` so async stream callbacks can persist the final array without
+  // racing React state updates.
+  const messagesRef = useRef<UiMessage[]>([]);
+  messagesRef.current = messages;
 
   const availableModels = useMemo(() => {
     const models: ModelRef[] = [];
@@ -66,9 +73,18 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
     };
     add(settings.synthesisModel);
     add(settings.defaultModel);
+    add(selectedModel);
     for (const model of settings.favorites ?? []) add(model);
     return models;
-  }, [settings.defaultModel, settings.favorites, settings.synthesisModel]);
+  }, [settings.defaultModel, settings.favorites, settings.synthesisModel, selectedModel]);
+
+  const refreshConversations = useCallback(async () => {
+    setConversations(await window.nodus.listConversations(true));
+  }, []);
+
+  useEffect(() => {
+    void refreshConversations();
+  }, [refreshConversations]);
 
   const selectedCount = useMemo(
     () =>
@@ -93,14 +109,78 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
     setSelection((current) => ({ ...current, graphParts: { ...current.graphParts, [key]: value } }));
   };
 
+  const startNewConversation = () => {
+    setActiveId(null);
+    setMessages([]);
+    setInput('');
+  };
+
+  const loadConversation = async (id: string) => {
+    if (sending) return;
+    const conversation = await window.nodus.getConversation(id);
+    if (!conversation) {
+      await refreshConversations();
+      return;
+    }
+    setActiveId(conversation.id);
+    setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
+    if (conversation.selection) setSelection(conversation.selection);
+    if (conversation.model) setSelectedModel(conversation.model);
+    setInput('');
+    window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 0);
+  };
+
+  const archiveConversation = async (conversation: ChatConversationSummary) => {
+    await window.nodus.archiveConversation(conversation.id, !conversation.archived);
+    await refreshConversations();
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    await window.nodus.deleteConversation(pendingDelete.id);
+    if (pendingDelete.id === activeId) startNewConversation();
+    setPendingDelete(null);
+    await refreshConversations();
+  };
+
+  const persist = useCallback(
+    async (conversationId: string, finalMessages: UiMessage[], shouldTitle: boolean) => {
+      const records: ChatMessageRecord[] = finalMessages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        selectionKey: m.selectionKey ?? null,
+        stats: m.stats ?? null,
+        error: m.error ?? false,
+      }));
+      await window.nodus.saveConversationMessages(conversationId, records, { model: selectedModel, selection });
+      if (shouldTitle) {
+        await window.nodus.generateConversationTitle(conversationId, selectedModel).catch(() => '');
+      }
+      await refreshConversations();
+    },
+    [refreshConversations, selectedModel, selection]
+  );
+
   const send = async () => {
     const content = input.trim();
     if (!content || sending || !selectedModel) return;
+
+    // Lazily create the conversation on the first message so empty chats never clutter history.
+    let conversationId = activeId;
+    const isFirstExchange = messagesRef.current.length === 0;
+    if (!conversationId) {
+      const created = await window.nodus.createConversation({ model: selectedModel, selection });
+      conversationId = created.id;
+      setActiveId(created.id);
+    }
+
     const selectionKey = serializeSelection(selection);
+    const priorMessages = messagesRef.current;
     const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
-      ...messages.filter((m) => m.selectionKey === selectionKey && m.content.trim()),
+      ...priorMessages.filter((m) => m.selectionKey === selectionKey && m.content.trim()),
       userMessage,
     ].map((m) => ({ role: m.role, content: m.content }));
 
@@ -122,26 +202,33 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
           },
         }
       );
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === assistantId ? { ...message, content: response.answer, stats: response.stats } : message
-        )
-      );
+      const finalMessages: UiMessage[] = [
+        ...priorMessages,
+        userMessage,
+        { id: assistantId, role: 'assistant', content: response.answer, selectionKey, stats: response.stats },
+      ];
+      setMessages(finalMessages);
       window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0);
+      await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === assistantId
-            ? { ...message, content: e instanceof Error ? e.message : String(e), error: true }
-            : message
-        )
-      );
+      const errorMessage: UiMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: e instanceof Error ? e.message : String(e),
+        selectionKey,
+        error: true,
+      };
+      const finalMessages = [...priorMessages, userMessage, errorMessage];
+      setMessages(finalMessages);
+      await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);
     }
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
+  const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
+  const archivedCount = conversations.filter((c) => c.archived).length;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
@@ -175,7 +262,43 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
         </header>
 
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
-          <aside className="w-full md:w-72 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 p-4 overflow-y-auto max-h-64 md:max-h-none">
+          {/* Conversation history */}
+          <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
+            <div className="p-3 border-b border-neutral-800">
+              <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
+                <Icon name="plus" /> Nueva conversación
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
+              {visibleConversations.length === 0 && (
+                <div className="text-xs text-neutral-600 text-center py-6 px-2">
+                  Aún no hay conversaciones. Escribe abajo para empezar.
+                </div>
+              )}
+              {visibleConversations.map((conversation) => (
+                <ConversationRow
+                  key={conversation.id}
+                  conversation={conversation}
+                  active={conversation.id === activeId}
+                  onOpen={() => void loadConversation(conversation.id)}
+                  onArchive={() => void archiveConversation(conversation)}
+                  onDelete={() => setPendingDelete(conversation)}
+                />
+              ))}
+            </div>
+            {archivedCount > 0 && (
+              <button
+                className="text-xs text-neutral-500 hover:text-neutral-300 px-3 py-2 border-t border-neutral-800 text-left flex items-center gap-1.5"
+                onClick={() => setShowArchived((v) => !v)}
+              >
+                <Icon name="archive" size={13} />
+                {showArchived ? 'Ocultar archivadas' : `Ver archivadas (${archivedCount})`}
+              </button>
+            )}
+          </aside>
+
+          {/* Context selection */}
+          <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 p-4 overflow-y-auto max-h-56 md:max-h-none">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold">Contexto</h2>
               <span className="text-xs text-neutral-500">{selectedCount}</span>
@@ -286,6 +409,77 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
           </section>
         </div>
       </div>
+
+      {pendingDelete && (
+        <ConfirmModal
+          title="Eliminar conversación"
+          message={
+            <>
+              Se eliminará <span className="text-neutral-200">«{pendingDelete.title}»</span> y todo su historial de mensajes.
+              Esta acción no se puede deshacer.
+            </>
+          }
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConversationRow({
+  conversation,
+  active,
+  onOpen,
+  onArchive,
+  onDelete,
+}: {
+  conversation: ChatConversationSummary;
+  active: boolean;
+  onOpen: () => void;
+  onArchive: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div
+      className={`group rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
+        active ? 'bg-indigo-600/15 border-indigo-700' : 'border-transparent hover:bg-neutral-900'
+      }`}
+      onClick={onOpen}
+    >
+      <div className="flex items-center gap-1.5">
+        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'text-indigo-300' : 'text-neutral-500'}`} />
+        <span className={`flex-1 min-w-0 truncate text-sm ${conversation.archived ? 'text-neutral-500 italic' : ''}`}>
+          {conversation.title}
+        </span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
+            title={conversation.archived ? 'Desarchivar' : 'Archivar'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive();
+            }}
+          >
+            <Icon name="archive" size={13} />
+          </button>
+          <button
+            className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
+            title="Eliminar"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Icon name="trash" size={13} />
+          </button>
+        </div>
+      </div>
+      <div className="text-[10px] text-neutral-600 mt-0.5 pl-5">
+        {formatRelative(conversation.updated_at)} · {conversation.messageCount} mensaje(s)
+      </div>
     </div>
   );
 }
@@ -332,6 +526,20 @@ function formatChars(chars: number): string {
   if (chars >= 1_000_000) return `${(chars / 1_000_000).toFixed(1)}M chars`;
   if (chars >= 1000) return `${Math.round(chars / 1000)}k chars`;
   return `${chars} chars`;
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return '';
+  const diff = Date.now() - then;
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 1) return 'ahora';
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `hace ${days} d`;
+  return new Date(iso).toLocaleDateString();
 }
 
 function serializeSelection(selection: ResearchContextSelection): string {

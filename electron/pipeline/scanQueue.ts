@@ -4,6 +4,7 @@ import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
 import { runDeepScan } from '../ai/deepScan';
+import { listThemeLabels } from '../db/themesRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
 import { setDeepResult } from '../db/worksRepo';
@@ -247,7 +248,9 @@ class ScanQueue {
     } catch {
       abstract = null;
     }
-    await runLightScan(work, abstract, model);
+    // When the user has locked the main themes, constrain assignment to that set.
+    const lockedLabels = settings.themesLocked ? listThemeLabels() : null;
+    await runLightScan(work, abstract, model, { lockedLabels });
   }
 
   private async doDeep(work: Work, queueItem: QueueItem): Promise<void> {

@@ -53,6 +53,13 @@ const api: NodusApi = {
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
   getThemes: () => ipcRenderer.invoke('graph:themes'),
 
+  listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
+  addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),
+  renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),
+  setThemePinned: (themeId, pinned) => ipcRenderer.invoke('themes:setPinned', themeId, pinned),
+  deleteTheme: (themeId) => ipcRenderer.invoke('themes:delete', themeId),
+  reprocessThemeConnections: (model) => ipcRenderer.invoke('themes:reprocess', model),
+
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
   getReadingPath: (request) => ipcRenderer.invoke('reading:path', request),
@@ -71,6 +78,16 @@ const api: NodusApi = {
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
     }
   },
+
+  listConversations: (includeArchived) => ipcRenderer.invoke('chat:list', includeArchived),
+  getConversation: (id) => ipcRenderer.invoke('chat:get', id),
+  createConversation: (input) => ipcRenderer.invoke('chat:create', input),
+  saveConversationMessages: (id, messages, meta) =>
+    ipcRenderer.invoke('chat:saveMessages', id, messages, meta).then(() => undefined),
+  generateConversationTitle: (id, model) => ipcRenderer.invoke('chat:generateTitle', id, model),
+  renameConversation: (id, title) => ipcRenderer.invoke('chat:rename', id, title).then(() => undefined),
+  archiveConversation: (id, archived) => ipcRenderer.invoke('chat:archive', id, archived).then(() => undefined),
+  deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: () => ipcRenderer.invoke('data:import'),

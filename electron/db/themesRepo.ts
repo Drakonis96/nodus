@@ -1,6 +1,6 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
-import type { Theme } from '@shared/types';
+import type { ManagedTheme, Theme } from '@shared/types';
 
 export const MIN_GRAPH_THEME_WORKS = 2;
 export const MAX_GRAPH_THEMES = 24;
@@ -63,7 +63,11 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
       const theme_id = getOrCreateTheme(normalizeThemeLabel(label));
       db.prepare('INSERT OR IGNORE INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run(nodusId, theme_id);
     }
-    db.prepare('DELETE FROM themes WHERE theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)').run();
+    // Prune orphan auto-themes, but keep user-curated (pinned) ones so they survive a
+    // reprocess even before any work is assigned to them.
+    db.prepare(
+      'DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)'
+    ).run();
   });
   tx();
 }
@@ -125,6 +129,108 @@ export function listThemes(): Theme[] {
   return getDb().prepare('SELECT * FROM themes ORDER BY label').all() as Theme[];
 }
 
+/** Every theme label currently known — the curated universe used when scans are locked. */
+export function listThemeLabels(): string[] {
+  return (getDb().prepare('SELECT label FROM themes ORDER BY label').all() as { label: string }[]).map((r) => r.label);
+}
+
+/**
+ * All themes with their usage counts and curated flag, for the "Temas principales"
+ * manager. Includes pinned themes that have no works/ideas yet.
+ */
+export function listManagedThemes(): ManagedTheme[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT
+         t.theme_id,
+         t.label,
+         t.created_at,
+         t.pinned,
+         COUNT(DISTINCT CASE WHEN w.archived = 0 THEN wt.nodus_id END) AS work_count,
+         COUNT(DISTINCT CASE WHEN w.archived = 0 THEN io.global_id END) AS idea_count
+       FROM themes t
+       LEFT JOIN work_themes wt ON wt.theme_id = t.theme_id
+       LEFT JOIN works w ON w.nodus_id = wt.nodus_id
+       LEFT JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id
+       GROUP BY t.theme_id
+       ORDER BY t.pinned DESC, idea_count DESC, work_count DESC, t.label ASC`
+    )
+    .all() as { theme_id: string; label: string; created_at: string; pinned: number; work_count: number; idea_count: number }[];
+  return rows.map((r) => ({
+    theme_id: r.theme_id,
+    label: r.label,
+    created_at: r.created_at,
+    pinned: r.pinned === 1,
+    work_count: r.work_count,
+    idea_count: r.idea_count,
+  }));
+}
+
+/** Create (or pin an existing) user-curated main theme. Returns its id. */
+export function addManualTheme(label: string): string {
+  const db = getDb();
+  const norm = normalizeThemeLabel(label);
+  if (!norm) throw new Error('El tema no puede estar vacío.');
+  const existing = db.prepare('SELECT theme_id FROM themes WHERE label = ?').get(norm) as { theme_id: string } | undefined;
+  if (existing) {
+    db.prepare('UPDATE themes SET pinned = 1 WHERE theme_id = ?').run(existing.theme_id);
+    return existing.theme_id;
+  }
+  const theme_id = uuid();
+  db.prepare('INSERT INTO themes (theme_id, label, created_at, pinned) VALUES (?, ?, ?, 1)').run(
+    theme_id,
+    norm,
+    new Date().toISOString()
+  );
+  return theme_id;
+}
+
+export function setThemePinned(themeId: string, pinned: boolean): void {
+  getDb().prepare('UPDATE themes SET pinned = ? WHERE theme_id = ?').run(pinned ? 1 : 0, themeId);
+  if (!pinned) {
+    // An unpinned theme with no works is just clutter — drop it like an auto-theme.
+    getDb()
+      .prepare(
+        'DELETE FROM themes WHERE theme_id = ? AND pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)'
+      )
+      .run(themeId);
+  }
+}
+
+export function renameTheme(themeId: string, label: string): void {
+  const db = getDb();
+  const norm = normalizeThemeLabel(label);
+  if (!norm) throw new Error('El tema no puede estar vacío.');
+  const clash = db.prepare('SELECT theme_id FROM themes WHERE label = ? AND theme_id <> ?').get(norm, themeId) as
+    | { theme_id: string }
+    | undefined;
+  const tx = db.transaction(() => {
+    if (clash) {
+      // Merge into the existing theme with that label: move links, then drop this one.
+      db.prepare('UPDATE OR IGNORE work_themes SET theme_id = ? WHERE theme_id = ?').run(clash.theme_id, themeId);
+      db.prepare('DELETE FROM work_themes WHERE theme_id = ?').run(themeId);
+      db.prepare('UPDATE OR IGNORE idea_theme_links SET theme_id = ? WHERE theme_id = ?').run(clash.theme_id, themeId);
+      db.prepare('DELETE FROM idea_theme_links WHERE theme_id = ?').run(themeId);
+      db.prepare('UPDATE themes SET pinned = 1 WHERE theme_id = ?').run(clash.theme_id);
+      db.prepare('DELETE FROM themes WHERE theme_id = ?').run(themeId);
+    } else {
+      db.prepare('UPDATE themes SET label = ? WHERE theme_id = ?').run(norm, themeId);
+    }
+  });
+  tx();
+}
+
+/** Delete a theme and all of its node connections (work + idea links). Ideas are untouched. */
+export function deleteTheme(themeId: string): void {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM work_themes WHERE theme_id = ?').run(themeId);
+    db.prepare('DELETE FROM idea_theme_links WHERE theme_id = ?').run(themeId);
+    db.prepare('DELETE FROM themes WHERE theme_id = ?').run(themeId);
+  });
+  tx();
+}
+
 export interface GraphTheme extends Theme {
   work_count: number;
   idea_count: number;
@@ -138,7 +244,9 @@ export interface GraphTheme extends Theme {
 export function listGraphThemes(): GraphTheme[] {
   const db = getDb();
   const hasIdeas = ((db.prepare('SELECT COUNT(*) as c FROM ideas').get() as { c: number }).c ?? 0) > 0;
-  const supportClause = hasIdeas ? 'idea_count > 0' : 'work_count >= @minWorks';
+  // Curated (pinned) themes are always graph-hub candidates so the user's chosen main
+  // themes never get capped out by auto-themes.
+  const supportClause = `(pinned = 1 OR ${hasIdeas ? 'idea_count > 0' : 'work_count >= @minWorks'})`;
   const stmt = db.prepare(
     `
       SELECT * FROM (
@@ -146,6 +254,7 @@ export function listGraphThemes(): GraphTheme[] {
           t.theme_id,
           t.label,
           t.created_at,
+          t.pinned,
           COUNT(DISTINCT CASE WHEN w.archived = 0 THEN wt.nodus_id END) AS work_count,
           COUNT(DISTINCT CASE WHEN w.archived = 0 THEN io.global_id END) AS idea_count
         FROM themes t
@@ -155,7 +264,7 @@ export function listGraphThemes(): GraphTheme[] {
         GROUP BY t.theme_id
       )
       WHERE ${supportClause}
-      ORDER BY idea_count DESC, work_count DESC, label ASC
+      ORDER BY pinned DESC, idea_count DESC, work_count DESC, label ASC
       LIMIT @maxThemes
       `
   );
