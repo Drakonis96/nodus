@@ -177,7 +177,9 @@ export async function runDeepScan(
 
     const settings = getSettings();
     const extractionModel = model ?? settings.extractionModel ?? null;
-    const synthesisModel = model ?? settings.synthesisModel ?? null;
+    // Fusion runs many small dedup/relate calls; let it use a dedicated (often faster)
+    // model, falling back to the synthesis model to preserve prior behavior.
+    const fusionModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
     const chunkPlan = planTextChunks(text, {
       mode: settings.deepContextMode,
       standardChunkWords: settings.deepStandardChunkWords,
@@ -290,7 +292,7 @@ export async function runDeepScan(
           label: idea.label,
           statement: idea.statement,
         };
-        const globalId = await fuseIdea(ext, work.nodus_id, { model: synthesisModel, perf, embedding: embeddings[i] ?? null });
+        const globalId = await fuseIdea(ext, work.nodus_id, { model: fusionModel, perf, embedding: embeddings[i] ?? null });
         labelToGlobal.set(labelKey, globalId);
         const ideaThemeLabels = mergeThemeLabels(idea.theme_labels, [])
           .map((label) => allowedThemeLabels.get(normalizeThemeLabel(label)))

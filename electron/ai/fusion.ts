@@ -107,7 +107,8 @@ export async function fuseIdea(
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
 ): Promise<string> {
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
-  const fusionModel = opts.model ?? getSettings().synthesisModel ?? null;
+  const settings = getSettings();
+  const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
   const embeddingDone = opts.embedding === undefined ? startPerf('embedding', opts.perf, { idea: idea.label }) : null;
   const embedding = opts.embedding === undefined ? await embed(`${idea.label}. ${idea.statement}`) : opts.embedding;
   embeddingDone?.({ hit: Boolean(embedding) });

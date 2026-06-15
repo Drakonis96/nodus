@@ -169,7 +169,9 @@ async function parseOrRepair<T>(
 }
 
 /**
- * JSON completion with one retry at temperature 0 if parsing fails.
+ * JSON completion that retries (lower temperature, then no JSON mode) only when text
+ * came back but failed to parse. A provider/transport failure (timeout, empty, etc.)
+ * aborts on the first attempt so a hung provider can't stall for minutes.
  * Uses the given model override or the configured default model.
  */
 export async function completeJson<T>(
@@ -187,15 +189,24 @@ export async function completeJson<T>(
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
     const retryDone = startPerf('JSON retry', opts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
+    let text: string;
     try {
-      const text = await rawComplete(resolved, { ...opts, temperature: attempt.temperature }, attempt.jsonMode);
+      text = await rawComplete(resolved, { ...opts, temperature: attempt.temperature }, attempt.jsonMode);
+    } catch (e) {
+      // Provider/transport failure (timeout, empty response, rate limit, 5xx, bad key).
+      // Each call can burn the full 180s timeout, so looping here would let a hung
+      // provider stall for minutes. The JSON retries below only help when text DID come
+      // back but failed to parse — so on a transport failure, abort immediately.
+      retryDone({ status: 'error', error: errorMessage(e), retry: false });
+      throw e;
+    }
+    try {
       const parsed = await parseOrRepair(resolved, text, guard, opts.perf);
       if (i > 0) retryDone({ status: 'ok' });
       return parsed;
     } catch (e) {
       retryDone({ status: 'error', error: errorMessage(e), retry: i < attempts.length - 1 });
       lastErr = e;
-      if (e instanceof AiError && (e.retriable || e.config)) throw e;
     }
   }
   throw lastErr instanceof Error ? lastErr : new AiError('Fallo de parseo JSON');

@@ -22,6 +22,7 @@ export function ProvidersSettings({
     if (currentlyFav && sameModel(settings.defaultModel, m)) patch.defaultModel = null;
     if (currentlyFav && sameModel(settings.extractionModel, m)) patch.extractionModel = null;
     if (currentlyFav && sameModel(settings.synthesisModel, m)) patch.synthesisModel = null;
+    if (currentlyFav && sameModel(settings.fusionModel, m)) patch.fusionModel = null;
     await window.nodus.updateSettings(patch);
     await onChange();
   };

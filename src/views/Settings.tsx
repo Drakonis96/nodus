@@ -109,8 +109,11 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
         <Row label="Modelo de extracción (extrae temas, ideas, evidencias y huecos)">
           <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
         </Row>
-        <Row label="Modelo de síntesis/fusión (deduplica, relaciona y fusiona ideas)">
+        <Row label="Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)">
           <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
+        </Row>
+        <Row label="Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)">
+          <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
         </Row>
         <Row label="Modelo de embeddings (similitud semántica multilingüe)">
           <EmbeddingModelControl settings={settings} onPatch={patch} />

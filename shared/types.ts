@@ -197,7 +197,12 @@ export interface AppSettings {
   favorites: ModelRef[];
   defaultModel: ModelRef | null;
   extractionModel: ModelRef | null;
+  // Synthesis/tutor: long-form answers (research assistant, tutor narrative).
   synthesisModel: ModelRef | null;
+  // Fusion: the many small dedup/relate calls during deep scan. Kept separate from
+  // synthesisModel so a fast model can be used here without slowing long-form output.
+  // Falls back to synthesisModel when unset.
+  fusionModel: ModelRef | null;
   syncMode: SyncMode;
   readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
