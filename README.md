@@ -34,7 +34,7 @@ leaves your computer are the calls to the AI provider you configure.
 electron/                Main process (Node)
   db/                    better-sqlite3, versioned migrations, repository pattern
   zotero/                Read-only Zotero 7 local API client (pagination + diff)
-  ai/                    aiClient, the 3 core prompts, light/deep scan, fusion
+  ai/                    aiClient, the 3 core prompts, light/deep scan, fusion, research assistant, tutor
   extraction/            Clean text extraction (PDF/MD/docx) + chunking + Unpaywall
   pipeline/              Priority queue, retries w/ backoff, resume-after-restart
   sync/                  Full + realtime incremental sync with Zotero
@@ -90,6 +90,21 @@ npm run dist       # current platform
   to exact passages (Prompt 1), then fuses each idea against the global graph
   (Prompt 2). The author layer is **derived** post-process from edges and external
   references — the model is never asked to infer global author relations.
+
+### Tutor mode
+A guided, step-by-step walkthrough of your own idea graph (`electron/ai/tutor.ts`,
+launched from the graph toolbar). A long-context model you choose analyses **all**
+ideas, themes and connections and proposes guided **routes**:
+- **Recorrido completo** — several routes ordered by weight that, together, cover the
+  whole graph (so a single pass surfaces everything important and which lines weigh
+  most).
+- **Desde un objetivo** — you describe what you want to review and the Tutor traces a
+  route through only the relevant ideas and connections.
+
+You move with **previous/next** arrows (or ←/→). Each stop is narrated on demand,
+grounded in that node's ideas, occurrences and verbatim evidence, while the real graph
+spotlights and frames the current node(s) so you literally watch the tour move across
+your map. The plan is one structured JSON call; each stop's explanation is streamed.
 
 ### Sync
 Manual (button) or realtime (polls the Zotero library version every ~25s and diffs

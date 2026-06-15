@@ -4,6 +4,7 @@ import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNod
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
+import { TutorPanel } from './TutorPanel';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
@@ -303,8 +304,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const clearFocusRef = useRef<() => void>(() => {});
+  const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
@@ -476,6 +479,36 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       };
       clearFocusRef.current = clearFocus;
 
+      // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
+      // connection), fade the rest, and smoothly frame them so the user watches the
+      // tour move across the real graph.
+      focusByIdRef.current = (nodeIds: string[], edgeId?: string | null) => {
+        const cy = cyRef.current;
+        if (!cy) return;
+        let eles = cy.collection();
+        for (const id of nodeIds) {
+          const node = cy.getElementById(id);
+          if (node.nonempty()) eles = eles.union(node);
+        }
+        if (edgeId) {
+          const edge = cy.getElementById(edgeId);
+          if (edge.nonempty()) eles = eles.union(edge);
+        }
+        const targetNodes = eles.nodes();
+        if (targetNodes.empty()) {
+          clearFocus();
+          return;
+        }
+        const keep = targetNodes.closedNeighborhood();
+        cy.batch(() => {
+          cy.elements().addClass('faded');
+          keep.removeClass('faded');
+          cy.nodes().removeClass('spotlight');
+          targetNodes.addClass('spotlight');
+        });
+        cy.animate({ fit: { eles: targetNodes, padding: 170 } }, { duration: 450, easing: 'ease-in-out-cubic' });
+      };
+
       cyRef.current.on('tap', 'node', async (evt) => {
         const node = evt.target;
         focusOn(node);
@@ -636,11 +669,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             <Icon name="tag" /> Temas principales
           </button>
         )}
+        {lens === 'ideas' && (
+          <button
+            className={`btn border border-neutral-700 gap-1.5 ${tutorOpen ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
+            title="Recorrido guiado por la IA a través de tus ideas y conexiones"
+            onClick={() => setTutorOpen((v) => !v)}
+          >
+            <Icon name="compass" /> Modo Tutor
+          </button>
+        )}
         <div className="flex-1" />
         <span className="text-neutral-500">{elements.filter((e) => !(e.data as any).source).length} nodos</span>
       </div>
 
       <div className="flex-1 flex min-h-0 relative">
+        {lens === 'ideas' && tutorOpen && (
+          <TutorPanel
+            settings={settings}
+            onFocusNodes={(nodeIds, edgeId) => focusByIdRef.current(nodeIds, edgeId)}
+            onClearFocus={() => clearFocusRef.current()}
+            onClose={() => setTutorOpen(false)}
+          />
+        )}
         <div className="flex-1 min-w-0 relative">
           <div ref={containerRef} className="absolute inset-0" />
 

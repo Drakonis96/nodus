@@ -13,6 +13,8 @@ import type {
   ChatMessageRecord,
   ResearchContextSelection,
   ReprocessConnectionsOptions,
+  TutorPlanRequest,
+  TutorStepRequest,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -30,6 +32,7 @@ import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
+import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { reprocessConnections } from './ai/reprocessConnections';
 import * as chat from './db/chatRepo';
 import { getDb } from './db/database';
@@ -255,6 +258,15 @@ export function registerIpc(
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) =>
     streamResearchChat(request, (delta) => {
       e.sender.send('research:chatStream:delta', requestId, delta);
+    })
+  );
+
+  // tutor mode (AI-guided graph walkthrough)
+  h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));
+  h('tutor:step', async (_e, request: TutorStepRequest) => answerTutorStep(request));
+  h('tutor:stepStream', async (e, requestId: string, request: TutorStepRequest) =>
+    streamTutorStep(request, (delta) => {
+      e.sender.send('tutor:stepStream:delta', requestId, delta);
     })
   );
 

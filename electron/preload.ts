@@ -79,6 +79,21 @@ const api: NodusApi = {
     }
   },
 
+  tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
+  tutorStep: (request) => ipcRenderer.invoke('tutor:step', request),
+  tutorStepStream: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('tutor:stepStream:delta', onDelta);
+    try {
+      return await ipcRenderer.invoke('tutor:stepStream', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('tutor:stepStream:delta', onDelta);
+    }
+  },
+
   listConversations: (includeArchived) => ipcRenderer.invoke('chat:list', includeArchived),
   getConversation: (id) => ipcRenderer.invoke('chat:get', id),
   createConversation: (input) => ipcRenderer.invoke('chat:create', input),

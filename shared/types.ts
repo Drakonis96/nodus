@@ -506,6 +506,79 @@ export interface ResearchChatStreamHandlers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Tutor mode — AI-guided, step-by-step walkthrough of the idea graph
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TutorMode = 'overview' | 'prompt';
+
+/** What a tour stop is anchored to in the graph. */
+export type TutorStopKind = 'theme' | 'idea' | 'connection';
+
+export interface TutorStop {
+  id: string;
+  kind: TutorStopKind;
+  title: string;
+  /** One line: why we pause here / what to notice. */
+  focus: string;
+  /** Graph node ids to spotlight: an idea `global_id` or `theme:<id>`. A connection lists both endpoints. */
+  nodeIds: string[];
+  /** Edge id when the stop is a connection between two ideas. */
+  edgeId: string | null;
+}
+
+export interface TutorRoute {
+  id: string;
+  title: string;
+  description: string;
+  /** 1..5 — relative weight/centrality of this route in the corpus. */
+  weight: number;
+  /** Short human label for the weight, e.g. "línea principal". */
+  weightLabel: string;
+  themes: string[];
+  stops: TutorStop[];
+}
+
+export interface TutorPlan {
+  generatedAt: string;
+  mode: TutorMode;
+  prompt: string;
+  /** Map-level welcome that mentions everything important before the routes. */
+  overview: string;
+  totalThemes: number;
+  totalIdeas: number;
+  totalConnections: number;
+  /** Distinct idea nodes referenced by at least one route stop. */
+  coveredIdeas: number;
+  routes: TutorRoute[];
+  /** True when the graph was too large to send whole (some nodes/edges omitted). */
+  truncated: boolean;
+}
+
+export interface TutorPlanRequest {
+  mode: TutorMode;
+  prompt?: string;
+  model?: ModelRef | null;
+}
+
+export interface TutorStepRequest {
+  /** The route being toured (sent on each call so the backend stays stateless). */
+  route: TutorRoute;
+  stopIndex: number;
+  overview: string;
+  /** Titles of stops already visited, for narrative continuity. */
+  history: string[];
+  model?: ModelRef | null;
+}
+
+export interface TutorStepResponse {
+  explanation: string;
+}
+
+export interface TutorStepStreamHandlers {
+  onDelta(delta: string): void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Research chat history (persisted conversations)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -634,6 +707,13 @@ export interface NodusApi {
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
+
+  // tutor mode (AI-guided graph walkthrough)
+  /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */
+  tutorPlan(request: TutorPlanRequest): Promise<TutorPlan>;
+  /** Narrate one stop of a route, grounded in that node's ideas/evidence. */
+  tutorStep(request: TutorStepRequest): Promise<TutorStepResponse>;
+  tutorStepStream(request: TutorStepRequest, handlers: TutorStepStreamHandlers): Promise<TutorStepResponse>;
 
   // research chat history
   listConversations(includeArchived?: boolean): Promise<ChatConversationSummary[]>;
