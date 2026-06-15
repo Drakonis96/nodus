@@ -12,6 +12,7 @@ import type {
   UpdateCheckResponse,
   ChatMessageRecord,
   ResearchContextSelection,
+  ReprocessConnectionsOptions,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -29,6 +30,7 @@ import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
+import { reprocessConnections } from './ai/reprocessConnections';
 import * as chat from './db/chatRepo';
 import { getDb } from './db/database';
 
@@ -237,19 +239,11 @@ export function registerIpc(
     themes.deleteTheme(themeId);
     return themes.listManagedThemes();
   });
-  h('themes:reprocess', async (_e, model?: ModelRef | null) => {
-    // Re-run the cheap theme assignment over every work so node↔theme connections are
-    // rebuilt. Ideas are untouched. Honours the locked-themes setting via the queue.
-    const all = getDb().prepare('SELECT nodus_id, title FROM works WHERE archived = 0').all() as {
-      nodus_id: string;
-      title: string;
-    }[];
-    for (const w of all) {
-      works.setLightPending(w.nodus_id);
-      scanQueue.enqueue(w.nodus_id, w.title, 'light', model);
-    }
-    return all.length;
-  });
+  h('themes:reprocess', async (_e, options: ReprocessConnectionsOptions, model?: ModelRef | null) =>
+    // Re-group the already-extracted ideas under the curated/existing themes (and
+    // optionally re-trace idea↔idea relations) with the model. No document re-reading.
+    reprocessConnections(options ?? { relations: false }, model)
+  );
 
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());

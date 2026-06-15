@@ -75,6 +75,23 @@ export interface ManagedTheme {
   idea_count: number;
 }
 
+/** Options for the graph-level reprocess of already-extracted ideas. */
+export interface ReprocessConnectionsOptions {
+  /** Also re-trace idea↔idea relations (stored as inferred edges) in addition to idea↔theme. */
+  relations: boolean;
+}
+
+export interface ReprocessConnectionsResult {
+  /** Ideas considered (those occurring in at least one non-archived work). */
+  ideas: number;
+  /** How many of those ideas ended up assigned to at least one theme. */
+  themedIdeas: number;
+  /** New theme labels the model proposed (only possible when not locked). */
+  newThemes: number;
+  /** Inferred idea↔idea relations added (0 when the relations option is off). */
+  relationsAdded: number;
+}
+
 export interface Idea {
   global_id: string;
   type: IdeaType;
@@ -600,8 +617,14 @@ export interface NodusApi {
   renameTheme(themeId: string, label: string): Promise<ManagedTheme[]>;
   setThemePinned(themeId: string, pinned: boolean): Promise<ManagedTheme[]>;
   deleteTheme(themeId: string): Promise<ManagedTheme[]>;
-  /** Re-run the cheap theme assignment over the library to rebuild node connections. */
-  reprocessThemeConnections(model?: ModelRef | null): Promise<number>;
+  /**
+   * Re-group the already-extracted ideas under the curated/existing themes using the
+   * model (no document re-reading). Optionally also re-traces idea↔idea relations.
+   */
+  reprocessThemeConnections(
+    options: ReprocessConnectionsOptions,
+    model?: ModelRef | null
+  ): Promise<ReprocessConnectionsResult>;
 
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;

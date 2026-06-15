@@ -30,6 +30,8 @@ export function ThemesModal({
   const [pendingDelete, setPendingDelete] = useState<ManagedTheme | null>(null);
   const [model, setModel] = useState<ModelRef | null>(settings.extractionModel ?? null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [includeRelations, setIncludeRelations] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
   const locked = settings.themesLocked;
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -123,17 +125,25 @@ export function ThemesModal({
 
   const reprocess = async () => {
     setBusy(true);
+    setReprocessing(true);
     setNotice(null);
     try {
-      const n = await window.nodus.reprocessThemeConnections(model);
-      setNotice(
-        n > 0
-          ? `Reproceso en cola para ${n} obra(s). Verás el progreso en la barra de cola y el grafo se actualizará al terminar.`
-          : 'No hay obras para reprocesar.'
-      );
+      const result = await window.nodus.reprocessThemeConnections({ relations: includeRelations }, model);
+      if (result.ideas === 0) {
+        setNotice('No hay ideas extraídas que reprocesar. Analiza primero algunas obras (escaneo profundo).');
+      } else {
+        const parts = [`${result.themedIdeas}/${result.ideas} ideas agrupadas en temas`];
+        if (result.newThemes > 0) parts.push(`${result.newThemes} tema(s) nuevo(s)`);
+        if (includeRelations) parts.push(`${result.relationsAdded} relación(es) idea↔idea inferida(s)`);
+        setNotice(`Listo: ${parts.join(' · ')}.`);
+      }
+      setThemes(await window.nodus.listManagedThemes());
       onReprocessed?.();
+    } catch (e) {
+      setNotice(`Error al reprocesar: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
+      setReprocessing(false);
     }
   };
 
@@ -158,8 +168,10 @@ export function ThemesModal({
         <div className="p-4 overflow-y-auto space-y-4">
           <p className="text-xs text-neutral-400 leading-relaxed">
             Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para
-            controlarlos manualmente; mientras estén bloqueados, los escaneos solo conectarán las obras a estos temas y no
-            generarán otros nuevos. Reprocesar reconstruye únicamente las conexiones entre nodos: no vuelve a extraer ideas.
+            controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros
+            nuevos. <span className="text-neutral-300">Reprocesar</span> coge las ideas ya extraídas (afirmaciones, hallazgos…)
+            y las vuelve a agrupar bajo estos temas con el modelo seleccionado, sin volver a leer los documentos ni
+            re-extraer ideas.
           </p>
 
           {/* Add a manual theme */}
@@ -269,18 +281,52 @@ export function ThemesModal({
           {notice && <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-md px-3 py-2">{notice}</div>}
         </div>
 
-        <footer className="border-t border-neutral-800 p-3 flex items-center gap-2">
-          <span className="text-xs text-neutral-500">Modelo:</span>
-          <ModelPicker settings={settings} value={model} onChange={setModel} compact />
-          <div className="flex-1" />
-          <button
-            className="btn btn-primary gap-1.5"
-            title="Reconstruye las conexiones entre obras/ideas y los temas (no re-extrae ideas)"
-            onClick={() => void reprocess()}
-            disabled={busy}
-          >
-            <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} /> Reprocesar conexiones
-          </button>
+        <footer className="border-t border-neutral-800 p-3 space-y-2.5">
+          <div className="flex flex-col gap-1">
+            <span className="text-xs uppercase text-neutral-500">Qué reprocesar</span>
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                className="mt-0.5 accent-indigo-500"
+                checked={!includeRelations}
+                onChange={() => setIncludeRelations(false)}
+                disabled={busy}
+              />
+              <span>
+                Solo temas <span className="text-emerald-400 text-xs">(recomendado)</span>
+                <span className="block text-xs text-neutral-500">Reasigna las ideas a los temas principales. No toca las relaciones idea↔idea.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                className="mt-0.5 accent-indigo-500"
+                checked={includeRelations}
+                onChange={() => setIncludeRelations(true)}
+                disabled={busy}
+              />
+              <span>
+                Temas + relaciones entre ideas
+                <span className="block text-xs text-neutral-500">
+                  Además vuelve a trazar relaciones idea↔idea. Al no haber cita textual, se marcan como inferidas.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500">Modelo:</span>
+            <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+            <div className="flex-1" />
+            {reprocessing && <span className="text-xs text-neutral-500">Reprocesando con el modelo…</span>}
+            <button
+              className="btn btn-primary gap-1.5"
+              title="Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)"
+              onClick={() => void reprocess()}
+              disabled={busy}
+            >
+              <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} /> Reprocesar conexiones
+            </button>
+          </div>
         </footer>
       </div>
 

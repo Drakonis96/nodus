@@ -129,6 +129,48 @@ export function listThemes(): Theme[] {
   return getDb().prepare('SELECT * FROM themes ORDER BY label').all() as Theme[];
 }
 
+/**
+ * Replace one idea's theme membership across ALL of its occurrences. Used by the
+ * graph-level reprocess that re-groups already-extracted ideas under themes without
+ * re-reading documents.
+ */
+export function replaceIdeaThemeLinks(
+  globalId: string,
+  occurrenceNodusIds: string[],
+  labels: string[],
+  confidence: number,
+  basis: 'explicit' | 'inferred' = 'explicit'
+): void {
+  const db = getDb();
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM idea_theme_links WHERE global_id = ?').run(globalId);
+    const seen = new Set<string>();
+    const themeIds: string[] = [];
+    for (const label of labels) {
+      const norm = normalizeThemeLabel(label);
+      if (!norm || seen.has(norm)) continue;
+      seen.add(norm);
+      themeIds.push(getOrCreateTheme(norm));
+    }
+    for (const nodusId of occurrenceNodusIds) {
+      for (const themeId of themeIds) {
+        db.prepare(
+          `INSERT OR REPLACE INTO idea_theme_links (nodus_id, global_id, theme_id, confidence, basis)
+           VALUES (?, ?, ?, ?, ?)`
+        ).run(nodusId, globalId, themeId, confidence, basis);
+      }
+    }
+  });
+  tx();
+}
+
+/** Drop themes that are neither pinned nor referenced by any work. */
+export function pruneOrphanThemes(): void {
+  getDb()
+    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes)')
+    .run();
+}
+
 /** Every theme label currently known — the curated universe used when scans are locked. */
 export function listThemeLabels(): string[] {
   return (getDb().prepare('SELECT label FROM themes ORDER BY label').all() as { label: string }[]).map((r) => r.label);

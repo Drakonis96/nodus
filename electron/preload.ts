@@ -58,7 +58,7 @@ const api: NodusApi = {
   renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),
   setThemePinned: (themeId, pinned) => ipcRenderer.invoke('themes:setPinned', themeId, pinned),
   deleteTheme: (themeId) => ipcRenderer.invoke('themes:delete', themeId),
-  reprocessThemeConnections: (model) => ipcRenderer.invoke('themes:reprocess', model),
+  reprocessThemeConnections: (options, model) => ipcRenderer.invoke('themes:reprocess', options, model),
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
