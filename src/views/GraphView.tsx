@@ -1,36 +1,52 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
+// @ts-ignore – no official types for this extension
+import coseBilkent from 'cytoscape-cose-bilkent';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, WorkView, WorkMeta, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Badge, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { TutorPanel } from './TutorPanel';
 
+// Register the cose-bilkent layout extension once.
+try { cytoscape.use(coseBilkent); } catch { /* already registered */ }
+
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
 const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 
-// Force-directed layout tuned to keep nodes and their (bottom-aligned) labels from
-// overlapping: strong repulsion, generous component spacing so disconnected nodes
-// don't pile on top of each other, and enough iterations to settle.
-const COSE_LAYOUT = {
-  name: 'cose',
-  animate: false,
-  randomize: true,
+// Force-directed layout via cose-bilkent: produces much cleaner clusters than the
+// built-in cose, with automatic edge bundling and better compaction.
+const COSE_BILKENT_LAYOUT = {
+  name: 'cose-bilkent',
+  animate: 'end',
+  animationDuration: 600,
+  animationEasing: 'ease-in-out-cubic',
   fit: true,
-  padding: 90,
-  nodeRepulsion: () => 62000,
-  nodeOverlap: 90,
-  nodeDimensionsIncludeLabels: true,
-  idealEdgeLength: () => 230,
-  edgeElasticity: () => 95,
-  componentSpacing: 340,
-  gravity: 0.08,
-  numIter: 2800,
-  coolingFactor: 0.95,
-  initialTemp: 360,
-} as const;
+  padding: 60,
+  randomize: false,
+  nodeRepulsion: 8500,
+  idealEdgeLength: 200,
+  edgeElasticity: 0.45,
+  nestingFactor: 0.1,
+  gravity: 0.25,
+  numIter: 3000,
+  tile: true,
+  tilingPaddingVertical: 20,
+  tilingPaddingHorizontal: 20,
+  gravityRangeCompound: 1.5,
+  gravityCompound: 1.0,
+  gravityRange: 3.8,
+  initialEnergyOnIncremental: 0.8,
+} as any;
+
+// Semantic zoom thresholds: at low zoom only dots are visible, progressively
+// more labels appear as the user zooms in.
+const ZOOM_LABEL_THRESHOLD = 0.3;   // below this, hide all idea labels
+const ZOOM_IDEAS_THRESHOLD = 0.65;  // above this, show all idea labels
+
+const LAYOUT_KEY = 'nodus.graph.layout';
 
 /**
  * Deterministic radial layout: theme hubs sit in a compact regular polygon and
@@ -432,10 +448,15 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
   const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
+  const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(LAYOUT_KEY) as 'force' | 'radial') || 'force');
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
   }, [filters]);
+
+  useEffect(() => {
+    localStorage.setItem(LAYOUT_KEY, layoutMode);
+  }, [layoutMode]);
 
   useEffect(() => {
     localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
@@ -576,6 +597,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             } as any,
           },
           { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
+          // Semantic zoom: hide labels at low zoom for clarity. These come before
+          // focus styles so that focus-node/context-node override them.
+          { selector: 'node.zoom-label-hidden', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
+          { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
           // Focus mode: everything not in the tapped traversal fades back.
           { selector: '.faded', style: { opacity: 0.22, 'text-opacity': 0.18 } as any },
           {
@@ -627,7 +652,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           },
           { selector: 'node.spotlight', style: { 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.16 } as any },
         ],
-        layout: COSE_LAYOUT as any,
+        layout: COSE_BILKENT_LAYOUT,
       });
 
       const removeFocusClasses = () => {
@@ -748,6 +773,47 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         hoverActiveRef.current = false;
         if (!lastUserFocusRef.current) clearFocus();
       });
+
+      // ── Semantic zoom: progressively reveal labels ─────────────────────────
+      // • zoom < ZOOM_LABEL_THRESHOLD → only theme labels (ideas are just dots)
+      // • zoom < ZOOM_IDEAS_THRESHOLD → themes + high-degree ideas (top 25%)
+      // • zoom ≥ ZOOM_IDEAS_THRESHOLD → everything visible
+      const applySemanticZoom = (cy: Core) => {
+        const z = cy.zoom();
+        cy.batch(() => {
+          // Never hide labels on focused / spotlighted / context nodes.
+          const protectedNodes = cy.nodes('.focus-node, .spotlight, .context-node');
+          const protectedSet = new Set(protectedNodes.map((n: any) => n.id()));
+          const ideas = cy.nodes('[type!="theme"]').filter((n: any) => !protectedSet.has(n.id()));
+          const themes = cy.nodes('[type="theme"]').filter((n: any) => !protectedSet.has(n.id()));
+
+          if (z < ZOOM_LABEL_THRESHOLD) {
+            // Far zoom: hide all idea labels, keep theme labels
+            ideas.addClass('zoom-label-hidden');
+            ideas.removeClass('zoom-label-mid');
+            themes.removeClass('zoom-label-hidden zoom-label-mid');
+          } else if (z < ZOOM_IDEAS_THRESHOLD) {
+            // Mid zoom: themes always visible, only high-degree ideas shown
+            themes.removeClass('zoom-label-hidden zoom-label-mid');
+            ideas.removeClass('zoom-label-hidden');
+            ideas.addClass('zoom-label-mid');
+            // Show top 25% ideas by degree
+            if (ideas.length > 0) {
+              const degrees = ideas.map((n: any) => n.degree(false)).sort((a: number, b: number) => b - a);
+              const cutoff = degrees[Math.max(0, Math.floor(degrees.length * 0.25))] ?? 1;
+              ideas.forEach((n: any) => {
+                if (n.degree(false) >= cutoff) n.removeClass('zoom-label-mid');
+                else n.addClass('zoom-label-mid');
+              });
+            }
+          } else {
+            // Close zoom: everything visible
+            ideas.removeClass('zoom-label-hidden zoom-label-mid');
+            themes.removeClass('zoom-label-hidden zoom-label-mid');
+          }
+        });
+      };
+      cyRef.current.on('zoom', () => applySemanticZoom(cyRef.current!));
     }
     const cy = cyRef.current;
     cy.elements().remove();
@@ -755,23 +821,26 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     // Always frame the whole graph after laying out, so it neither overflows the
     // viewport nor sits as a tiny clump regardless of how cose spread the nodes.
     cy.one('layoutstop', () => cy.fit(undefined, 60));
-    // Ideas lens with theme hubs → deterministic radial tree (themes centred in a
-    // polygon, ideas blooming outward). Otherwise (authors, or no themes) → force.
-    const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
-    if (positions) {
-      cy.layout({
-        name: 'preset',
-        positions,
-        fit: true,
-        padding: 60,
-        animate: true,
-        animationDuration: 600,
-        animationEasing: 'ease-in-out-cubic',
-      } as any).run();
+    // Layout selection: force-directed (cose-bilkent) or deterministic radial.
+    if (layoutMode === 'radial') {
+      const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
+      if (positions) {
+        cy.layout({
+          name: 'preset',
+          positions,
+          fit: true,
+          padding: 60,
+          animate: true,
+          animationDuration: 600,
+          animationEasing: 'ease-in-out-cubic',
+        } as any).run();
+      } else {
+        cy.layout({ ...COSE_BILKENT_LAYOUT, animate: false }).run();
+      }
     } else {
-      cy.layout(COSE_LAYOUT as any).run();
+      cy.layout(COSE_BILKENT_LAYOUT).run();
     }
-  }, [elements, lens]);
+  }, [elements, lens, layoutMode]);
 
   // Keep the graph framed when the window or panels resize.
   useEffect(() => {
@@ -856,6 +925,22 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           </button>
           <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('authors')}>
             Autores
+          </button>
+        </div>
+        <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+          <button
+            className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
+            title="Layout dirigido por fuerzas: agrupa ideas conectadas"
+            onClick={() => setLayoutMode('force')}
+          >
+            Grafo
+          </button>
+          <button
+            className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
+            title="Layout radial: temas en polígono, ideas alrededor"
+            onClick={() => setLayoutMode('radial')}
+          >
+            Radial
           </button>
         </div>
         <input className="input" placeholder="Buscar…" value={filters.search} onChange={(e) => setF({ search: e.target.value })} />
