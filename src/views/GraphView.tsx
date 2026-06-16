@@ -418,6 +418,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   // When the Tutor is driving the camera, a container resize should re-apply this focus
   // instead of fitting the whole graph (the node detail panel opening would steal it).
   const lastTutorFocusRef = useRef<{ nodeIds: string[]; edgeId?: string | null } | null>(null);
+  // Track whether the current highlight came from a hover (so tap can override it).
+  const hoverActiveRef = useRef(false);
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
@@ -575,7 +577,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           },
           { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
           // Focus mode: everything not in the tapped traversal fades back.
-          { selector: '.faded', style: { opacity: 0.08, 'text-opacity': 0.05 } as any },
+          { selector: '.faded', style: { opacity: 0.22, 'text-opacity': 0.18 } as any },
           {
             selector: 'node.focus-node',
             style: {
@@ -707,6 +709,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       cyRef.current.on('tap', 'node', async (evt) => {
         const node = evt.target;
         lastTutorFocusRef.current = null;
+        hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
         focusOnNode(node);
         setEdgeDetail(null);
@@ -719,6 +722,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       cyRef.current.on('tap', 'edge', async (evt) => {
         const edge = evt.target;
         lastTutorFocusRef.current = null;
+        hoverActiveRef.current = false;
         lastUserFocusRef.current = null;
         applyFocus(edge.connectedNodes().add(edge), undefined, edge.connectedNodes());
         setIdeaDetail(null);
@@ -726,10 +730,23 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       });
       cyRef.current.on('tap', (evt) => {
         if (evt.target === cyRef.current) {
+          hoverActiveRef.current = false;
           clearFocus();
           setIdeaDetail(null);
           setEdgeDetail(null);
         }
+      });
+      // Hover highlight: show the node's neighbourhood while hovering, unless the
+      // user has already clicked a node (tap-focus takes priority).
+      cyRef.current.on('mouseover', 'node', (evt) => {
+        if (lastUserFocusRef.current) return; // tap-focus active → skip hover
+        hoverActiveRef.current = true;
+        focusOnNode(evt.target);
+      });
+      cyRef.current.on('mouseout', 'node', () => {
+        if (!hoverActiveRef.current) return;
+        hoverActiveRef.current = false;
+        if (!lastUserFocusRef.current) clearFocus();
       });
     }
     const cy = cyRef.current;
@@ -765,8 +782,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       if (!cy || cy.elements().length === 0) return;
       cy.resize();
       const tf = lastTutorFocusRef.current;
-      if (tf) focusByIdRef.current(tf.nodeIds, tf.edgeId);
-      else cy.fit(undefined, 48);
+      if (tf) { focusByIdRef.current(tf.nodeIds, tf.edgeId); return; }
+      // When the user has focused a node (click), preserve the current zoom/pan
+      // instead of resetting to fit — the detail panel resize should not steal the view.
+      if (lastUserFocusRef.current) return;
+      cy.fit(undefined, 48);
     });
     ro.observe(el);
     return () => ro.disconnect();

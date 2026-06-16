@@ -18,9 +18,8 @@ import { normalizeEdgeType } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 
 const THEME_BATCH = 30;
-const RELATION_CLUSTER_CAP = 18;
-const MAX_RELATION_CLUSTERS = 24;
-const STATEMENT_CLIP = 320;
+const RELATION_BATCH_SIZE = 80;
+const STATEMENT_CLIP = 2000;
 const REPROC_EDGE_PREFIX = 'reproc:';
 
 const RELATION_TYPES = new Set<EdgeType>([
@@ -87,18 +86,28 @@ const THEME_LOCKED_RULE =
 const THEME_OPEN_RULE =
   '\n- Si varias ideas comparten un tema amplio que NO está en la lista, puedes proponer una etiqueta nueva (corta, en minúsculas, reutilizable). Sé MUY conservador: prioriza reutilizar los temas existentes.';
 
-const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes un grupo de IDEAS ya extraídas que
-comparten un tema. Propón, EXCLUSIVAMENTE en JSON válido, relaciones entre ellas.
+const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes un conjunto amplio de IDEAS ya
+extraídas (afirmaciones, hallazgos, constructos, métodos, marcos) de múltiples
+obras y temas. Cada idea incluye su etiqueta temática. Tu tarea es proponer,
+EXCLUSIVAMENTE en JSON válido, TODAS las relaciones pertinentes entre ellas.
 
 TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
 measures_same, supports, refutes, variant_of, refines.
 
-REGLAS:
-- Propón solo relaciones claras y plausibles a partir del enunciado de las ideas.
-- No dispones del texto original, así que TODA relación es inferida: confidence ≤ 0.7.
-  Ante la duda, omite. Es preferible pocas relaciones sólidas que muchas dudosas.
-- No relaciones una idea consigo misma. Máximo ~2 relaciones por idea.
+═══ REGLAS ═══
+- Examina TODA la lista en busca de conexiones. No te limites a ideas vecinas o
+  del mismo tema: las relaciones entre temas distintos son igualmente valiosas.
+- Propón todas las relaciones que identifiques con claridad razonable. No hay
+  límite de relaciones por idea — una idea puede estar conectada con muchas otras
+  si el contenido lo justifica.
+- La confianza refleja cuán evidente es la relación a partir de los enunciados:
+  0.7–1.0 si la relación es clara y directa, 0.4–0.7 si es plausible pero
+  requiere inferencia, < 0.4 solo si hay indicios débiles.
+- No relaciones una idea consigo misma.
+- No inventes relaciones que los enunciados no sustenten.
 - Usa los ids tal cual aparecen en la entrada.
+- Las ideas están ordenadas por tema temático. Pueden pertenecer a distintos
+  temas; no asumas que solo las del mismo tema están relacionadas.
 
 SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0 } ] }`;
 
@@ -191,7 +200,7 @@ export async function reprocessConnections(
       })),
     };
     const result = await completeJson<ThemeAssignmentResult>(
-      { system, user: JSON.stringify(input), temperature: 0.1, maxTokens: 2500 },
+      { system, user: JSON.stringify(input), temperature: 0.1 },
       isThemeAssignmentResult,
       model
     );
@@ -265,10 +274,13 @@ export async function reprocessConnections(
 }
 
 /**
- * Re-derive idea↔idea relations within each theme cluster of already-extracted ideas.
- * These are model-inferred (no source text), so they're stored as 'inferred' edges with
- * a recognisable id prefix and cleared/rebuilt on each run. Deep-scan edges are never
- * touched, and an inferred edge is skipped if a stronger edge for that pair already exists.
+ * Re-derive idea↔idea relations across ALL active ideas. Ideas are grouped into
+ * batches (ordered by theme so the model sees related ideas together) and every
+ * idea participates — no theme cap, no per-idea relation limit. The model sees
+ * each idea's theme labels so it can draw cross-theme connections. Results are
+ * stored as 'inferred' edges with a recognisable id prefix; previous reproc
+ * edges are cleared first. Deep-scan edges are never touched, and an inferred
+ * edge is skipped if a stronger edge for that pair+type already exists.
  */
 async function reprocessRelations(
   ideas: IdeaRow[],
@@ -279,51 +291,57 @@ async function reprocessRelations(
   const db = getDb();
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
 
-  // Group ideas by theme; only clusters with ≥2 ideas can carry relations.
-  const clusters = new Map<string, string[]>();
-  for (const idea of ideas) {
-    for (const label of themesByIdea.get(idea.global_id) ?? []) {
-      const norm = normalizeThemeLabel(label);
-      (clusters.get(norm) ?? clusters.set(norm, []).get(norm)!).push(idea.global_id);
-    }
-  }
-  const candidateClusters = [...clusters.values()]
-    .filter((ids) => ids.length >= 2)
-    .sort((a, b) => b.length - a.length)
-    .slice(0, MAX_RELATION_CLUSTERS)
-    .map((ids) => ids.slice(0, RELATION_CLUSTER_CAP));
+  // Sort ideas by their first theme so the model sees them in thematic groups.
+  // Ideas with no theme go at the end.
+  const themeOrder = new Map<string, number>();
+  const allThemeLabels = [...new Set(ideas.flatMap((i) => themesByIdea.get(i.global_id) ?? []))];
+  allThemeLabels.forEach((label, idx) => themeOrder.set(normalizeThemeLabel(label), idx));
+
+  const sorted = [...ideas].sort((a, b) => {
+    const aThemes = themesByIdea.get(a.global_id) ?? [];
+    const bThemes = themesByIdea.get(b.global_id) ?? [];
+    const aOrder = aThemes.length ? (themeOrder.get(normalizeThemeLabel(aThemes[0])) ?? 999) : 999;
+    const bOrder = bThemes.length ? (themeOrder.get(normalizeThemeLabel(bThemes[0])) ?? 999) : 999;
+    if (aOrder !== bOrder) return aOrder - bOrder;
+    return a.global_id.localeCompare(b.global_id);
+  });
+
+  const batches = chunk(sorted, RELATION_BATCH_SIZE);
 
   // Refresh: drop only previously reprocess-added inferred edges.
   db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
-  if (candidateClusters.length === 0) return 0;
+  if (batches.length === 0) return 0;
 
   const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
-  for (let ci = 0; ci < candidateClusters.length; ci++) {
-    const cluster = candidateClusters[ci];
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
     onProgress?.({
       phase: 'relations',
       label: 'Trazando relaciones entre ideas',
-      current: ci + 1,
-      total: candidateClusters.length,
+      current: bi + 1,
+      total: batches.length,
     });
     const input = {
-      ideas: cluster.map((id) => {
-        const idea = ideaById.get(id)!;
-        return { id, type: idea.type, label: idea.label, statement: clip(idea.statement) };
-      }),
+      ideas: batch.map((idea) => ({
+        id: idea.global_id,
+        type: idea.type,
+        label: idea.label,
+        statement: clip(idea.statement),
+        themes: themesByIdea.get(idea.global_id) ?? [],
+      })),
     };
     const result = await completeJson<RelationExtractionResult>(
-      { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: 1800 },
+      { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
       isRelationExtractionResult,
       model
     );
-    const inCluster = new Set(cluster);
+    const inBatch = new Set(batch.map((i) => i.global_id));
     for (const relation of result.relations) {
       if (!relation || relation.from === relation.to) continue;
-      if (!inCluster.has(relation.from) || !inCluster.has(relation.to)) continue;
+      if (!inBatch.has(relation.from) || !inBatch.has(relation.to)) continue;
       const type = normalizeEdgeType(relation.type);
       if (!type || !RELATION_TYPES.has(type)) continue;
-      const confidence = Math.max(0.1, Math.min(0.7, Number(relation.confidence) || 0.5));
+      const confidence = Math.max(0.1, Math.min(1, Number(relation.confidence) || 0.5));
       const key = `${relation.from}|${relation.to}|${type}`;
       const existing = proposed.get(key);
       if (!existing || confidence > existing.confidence) {
