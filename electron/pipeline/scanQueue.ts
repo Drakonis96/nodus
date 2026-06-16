@@ -4,6 +4,7 @@ import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
 import { runDeepScan } from '../ai/deepScan';
+import { reprocessConnections } from '../ai/reprocessConnections';
 import { listThemeLabels } from '../db/themesRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
@@ -26,6 +27,10 @@ class ScanQueue {
   private retries = new Map<string, number>();
   /** Last kind dequeued, used to interleave light/deep so neither starves. */
   private lastKind: QueueKind | null = null;
+  /** True if at least one deep scan completed since the last reprocess run. */
+  private deepSinceReprocess = false;
+  /** Guards against concurrent reprocess runs. */
+  private reprocessing = false;
 
   onProgress(cb: ProgressListener): () => void {
     this.listeners.add(cb);
@@ -182,7 +187,33 @@ class ScanQueue {
     } finally {
       this.running = false;
     }
-    if (!this.paused && this.nextQueued()) void this.run();
+    if (!this.paused && this.nextQueued()) {
+      void this.run();
+    } else if (!this.paused && this.deepSinceReprocess && !this.reprocessing) {
+      // Queue drained after deep scans → re-trace inter-work idea relations and
+      // theme memberships automatically so the global graph stays connected.
+      void this.autoReprocessConnections();
+    }
+  }
+
+  /**
+   * Automatically re-run connection reprocessing (themes + inter-work idea
+   * relations) after a batch of deep scans completes. Runs once per drain cycle;
+   * failures are logged but never block the queue.
+   */
+  private async autoReprocessConnections(): Promise<void> {
+    if (this.reprocessing) return;
+    this.reprocessing = true;
+    try {
+      const settings = getSettings();
+      const model = settings.synthesisModel ?? settings.defaultModel ?? null;
+      await reprocessConnections({ relations: true }, model);
+    } catch (e) {
+      console.error('[scanQueue] reprocess automático falló:', e instanceof Error ? e.message : String(e));
+    } finally {
+      this.deepSinceReprocess = false;
+      this.reprocessing = false;
+    }
   }
 
   private async process(item: QueueItem): Promise<void> {
@@ -200,6 +231,7 @@ class ScanQueue {
         await this.doLight(work, item.model ?? null);
       } else {
         await this.doDeep(work, item);
+        this.deepSinceReprocess = true;
       }
       item.state = 'done';
       item.error = null;

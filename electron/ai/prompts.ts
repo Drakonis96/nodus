@@ -158,9 +158,13 @@ si la idea nueva es la misma que alguna existente, una variante, o algo nuevo; y
 qué relación las une.
 
 ═══ PRINCIPIO RECTOR ═══
-Fusionar de más colapsa ideas distintas; fusionar de menos llena de duplicados.
-Ante la duda entre "same_as" y "variant_of", elige "variant_of". Ante la duda
-entre "variant_of" y "new", elige "new". La similitud es una pista, NO una decisión.
+Fusionar de más colapsa ideas distintas; fusionar de menos llena de duplicados y
+aisla el grafo en islas por obra. Ante la duda entre "same_as" y "variant_of",
+elige "variant_of". Ante la duda entre "variant_of" y "new", considera si la
+similitud es alta y hay un núcleo conceptual compartido: en ese caso prefiere
+"variant_of" con un edge; solo elige "new" cuando la idea trate un objeto o
+afirmación claramente distinta. La similitud es una pista, NO una decisión, pero
+no la ignores: dos ideas con similarity ≥ 0.7 rara vez son "new".
 
 ═══ DECISIÓN ("resolution") ═══
 - "same_as": misma afirmación esencial que un candidato (mismo sujeto, relación y sentido).

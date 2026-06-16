@@ -40,7 +40,7 @@ function isFusionResult(v: unknown): v is FusionResult {
   return o.resolution === 'same_as' || o.resolution === 'variant_of' || o.resolution === 'new';
 }
 
-const SIM_THRESHOLD = 0.78;
+const SIM_THRESHOLD = 0.7;
 const LEXICAL_THRESHOLD = 0.18;
 const MAX_CANDIDATES = 6;
 
