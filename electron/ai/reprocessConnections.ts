@@ -51,6 +51,17 @@ interface RelationExtractionResult {
   relations: { from: string; to: string; type: string; confidence?: number }[];
 }
 
+export interface ReprocessProgress {
+  /** Current phase: 'themes' (idea→theme assignment) or 'relations' (idea↔idea). */
+  phase: 'themes' | 'relations';
+  /** Human-readable label for the current phase. */
+  label: string;
+  /** Batch index within the current phase (1-based). */
+  current: number;
+  /** Total batches in the current phase. */
+  total: number;
+}
+
 function isThemeAssignmentResult(v: unknown): v is ThemeAssignmentResult {
   return typeof v === 'object' && v !== null && Array.isArray((v as ThemeAssignmentResult).assignments);
 }
@@ -110,7 +121,8 @@ function chunk<T>(items: T[], size: number): T[][] {
  */
 export async function reprocessConnections(
   options: ReprocessConnectionsOptions,
-  model?: ModelRef | null
+  model?: ModelRef | null,
+  onProgress?: (p: ReprocessProgress) => void
 ): Promise<ReprocessConnectionsResult> {
   const db = getDb();
   const locked = getSettings().themesLocked;
@@ -159,7 +171,15 @@ export async function reprocessConnections(
   // ── Phase 1: reassign ideas to themes ──────────────────────────────────────
   const themesByIdea = new Map<string, string[]>();
   const newThemeNorms = new Set<string>();
-  for (const batch of chunk(activeIdeas, THEME_BATCH)) {
+  const themeBatches = chunk(activeIdeas, THEME_BATCH);
+  for (let bi = 0; bi < themeBatches.length; bi++) {
+    const batch = themeBatches[bi];
+    onProgress?.({
+      phase: 'themes',
+      label: 'Agrupando ideas en temas',
+      current: bi + 1,
+      total: themeBatches.length,
+    });
     const input = {
       locked,
       available_themes: existingLabels,
@@ -277,7 +297,14 @@ async function reprocessRelations(
   if (candidateClusters.length === 0) return 0;
 
   const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
-  for (const cluster of candidateClusters) {
+  for (let ci = 0; ci < candidateClusters.length; ci++) {
+    const cluster = candidateClusters[ci];
+    onProgress?.({
+      phase: 'relations',
+      label: 'Trazando relaciones entre ideas',
+      current: ci + 1,
+      total: candidateClusters.length,
+    });
     const input = {
       ideas: cluster.map((id) => {
         const idea = ideaById.get(id)!;

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NodusApi, QueueProgress, UpdateProgressEvent } from '@shared/types';
+import type { NodusApi, QueueProgress, UpdateProgressEvent, ReprocessProgress } from '@shared/types';
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -59,7 +59,15 @@ const api: NodusApi = {
   renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),
   setThemePinned: (themeId, pinned) => ipcRenderer.invoke('themes:setPinned', themeId, pinned),
   deleteTheme: (themeId) => ipcRenderer.invoke('themes:delete', themeId),
-  reprocessThemeConnections: (options, model) => ipcRenderer.invoke('themes:reprocess', options, model),
+  reprocessThemeConnections: async (options, model, onProgress) => {
+    const listener = (_e: unknown, p: ReprocessProgress) => onProgress?.(p);
+    ipcRenderer.on('themes:reprocess:progress', listener);
+    try {
+      return await ipcRenderer.invoke('themes:reprocess', options, model);
+    } finally {
+      ipcRenderer.removeListener('themes:reprocess:progress', listener);
+    }
+  },
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),

@@ -250,10 +250,12 @@ export function registerIpc(
     themes.deleteTheme(themeId);
     return themes.listManagedThemes();
   });
-  h('themes:reprocess', async (_e, options: ReprocessConnectionsOptions, model?: ModelRef | null) =>
+  h('themes:reprocess', async (e, options: ReprocessConnectionsOptions, model?: ModelRef | null) =>
     // Re-group the already-extracted ideas under the curated/existing themes (and
     // optionally re-trace idea↔idea relations) with the model. No document re-reading.
-    reprocessConnections(options ?? { relations: false }, model)
+    reprocessConnections(options ?? { relations: false }, model, (p) => {
+      e.sender.send('themes:reprocess:progress', p);
+    })
   );
 
   // gaps + reading path

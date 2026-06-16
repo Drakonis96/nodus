@@ -83,6 +83,18 @@ export interface ReprocessConnectionsOptions {
   relations: boolean;
 }
 
+/** Progress event emitted during reprocessConnections. */
+export interface ReprocessProgress {
+  /** Current phase: 'themes' (idea→theme assignment) or 'relations' (idea↔idea). */
+  phase: 'themes' | 'relations';
+  /** Human-readable label for the current phase. */
+  label: string;
+  /** Batch index within the current phase (1-based). */
+  current: number;
+  /** Total batches in the current phase. */
+  total: number;
+}
+
 export interface ReprocessConnectionsResult {
   /** Ideas considered (those occurring in at least one non-archived work). */
   ideas: number;
@@ -740,7 +752,8 @@ export interface NodusApi {
    */
   reprocessThemeConnections(
     options: ReprocessConnectionsOptions,
-    model?: ModelRef | null
+    model?: ModelRef | null,
+    onProgress?: (p: ReprocessProgress) => void
   ): Promise<ReprocessConnectionsResult>;
 
   // gaps + reading path

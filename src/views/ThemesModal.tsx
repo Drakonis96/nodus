@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettings, ManagedTheme, ModelRef } from '@shared/types';
+import type { AppSettings, ManagedTheme, ModelRef, ReprocessProgress } from '@shared/types';
 import { Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -32,6 +32,7 @@ export function ThemesModal({
   const [notice, setNotice] = useState<string | null>(null);
   const [includeRelations, setIncludeRelations] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
+  const [progress, setProgress] = useState<ReprocessProgress | null>(null);
   const locked = settings.themesLocked;
   const editRef = useRef<HTMLInputElement>(null);
 
@@ -127,8 +128,13 @@ export function ThemesModal({
     setBusy(true);
     setReprocessing(true);
     setNotice(null);
+    setProgress(null);
     try {
-      const result = await window.nodus.reprocessThemeConnections({ relations: includeRelations }, model);
+      const result = await window.nodus.reprocessThemeConnections(
+        { relations: includeRelations },
+        model,
+        (p) => setProgress(p)
+      );
       if (result.ideas === 0) {
         setNotice('No hay ideas extraídas que reprocesar. Analiza primero algunas obras (escaneo profundo).');
       } else {
@@ -144,6 +150,7 @@ export function ThemesModal({
     } finally {
       setBusy(false);
       setReprocessing(false);
+      setProgress(null);
     }
   };
 
@@ -281,8 +288,8 @@ export function ThemesModal({
           {notice && <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-md px-3 py-2">{notice}</div>}
         </div>
 
-        <footer className="border-t border-neutral-800 p-3 space-y-2.5">
-          <div className="flex flex-col gap-1">
+        <footer className="border-t border-neutral-800 p-3 space-y-3">
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs uppercase text-neutral-500">Qué reprocesar</span>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input
@@ -313,21 +320,43 @@ export function ThemesModal({
               </span>
             </label>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+
+          {/* Progress bar */}
+          {reprocessing && progress && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-neutral-400">
+                <span className="flex items-center gap-1.5">
+                  <Icon name="sync" size={12} className="animate-spin text-indigo-400" />
+                  {progress.label}…
+                </span>
+                <span className="tabular-nums text-neutral-500">
+                  {progress.current}/{progress.total}
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+                <div
+                  className="h-full bg-indigo-500 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-neutral-500 shrink-0">Modelo:</span>
-              <div className="min-w-0 max-w-full">
+              <div className="min-w-0 flex-1">
                 <ModelPicker settings={settings} value={model} onChange={setModel} compact />
               </div>
             </div>
-            {reprocessing && <span className="text-xs text-neutral-500 sm:ml-auto">Reprocesando con el modelo…</span>}
             <button
-              className="btn btn-primary w-full shrink-0 gap-1.5 sm:w-auto"
+              className="btn btn-primary w-full gap-1.5"
               title="Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)"
               onClick={() => void reprocess()}
               disabled={busy}
             >
-              <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} /> Reprocesar conexiones
+              <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} />
+              {reprocessing ? 'Reprocesando…' : 'Reprocesar conexiones'}
             </button>
           </div>
         </footer>
