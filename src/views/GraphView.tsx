@@ -9,7 +9,7 @@ import { TutorPanel } from './TutorPanel';
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
-const DEFAULT_LIMITED_HIGHLIGHT_DEPTH = 3;
+const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 
 // Force-directed layout tuned to keep nodes and their (bottom-aligned) labels from
 // overlapping: strong repulsion, generous component spacing so disconnected nodes
@@ -309,7 +309,7 @@ const DEFAULT_FILTERS: Filters = {
 const FILTER_KEY = 'nodus.graph.filters';
 const DETAIL_WIDTH_KEY = 'nodus.graph.detailWidth';
 const DETAIL_FONT_KEY = 'nodus.graph.detailFontSize';
-const HIGHLIGHT_DEPTH_KEY = 'nodus.graph.highlightDepth';
+const LOCAL_GRAPH_DEPTH_KEY = 'nodus.graph.localDepth.v2';
 
 const DETAIL_MIN_WIDTH = 320;
 const DETAIL_MAX_WIDTH = 720;
@@ -331,39 +331,80 @@ function loadFilters(): Filters {
 }
 
 function loadHighlightDepth(): number | null {
-  const raw = localStorage.getItem(HIGHLIGHT_DEPTH_KEY);
-  if (!raw || raw === 'unlimited') return null;
+  const raw = localStorage.getItem(LOCAL_GRAPH_DEPTH_KEY);
+  if (!raw) return DEFAULT_LOCAL_GRAPH_DEPTH;
+  if (raw === 'unlimited') return null;
   const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return null;
-  return Math.min(99, Math.max(1, Math.round(parsed)));
+  if (!Number.isFinite(parsed)) return DEFAULT_LOCAL_GRAPH_DEPTH;
+  return Math.min(8, Math.max(1, Math.round(parsed)));
 }
 
-function collectReachableNeighborhood(startNode: any, maxDepth: number | null): any {
+function collectLocalGraph(startNode: any, maxDepth: number | null): { primary: any; context: any } {
   const cy = startNode.cy();
+  if (startNode.data('type') === 'theme') {
+    const memberEdges = startNode.connectedEdges().filter((edge: any) => edge.data('type') === 'contains');
+    const members = memberEdges.connectedNodes().filter((node: any) => node.id() !== startNode.id());
+    const memberIds = new Set(members.map((node: any) => node.id()));
+    const memberLinks = cy.edges().filter((edge: any) => {
+      if (edge.data('type') === 'contains') return false;
+      const nodes = edge.connectedNodes().toArray();
+      return nodes.every((node: any) => memberIds.has(node.id()));
+    });
+    return { primary: cy.collection(startNode).union(members).union(memberLinks), context: memberEdges };
+  }
+
   const visited = new Set<string>([startNode.id()]);
-  let focus = cy.collection(startNode);
+  let primary = cy.collection(startNode);
   let frontier = [startNode];
   let depth = 0;
 
   while (frontier.length > 0 && (maxDepth == null || depth < maxDepth)) {
     const next: any[] = [];
     for (const node of frontier) {
-      node.connectedEdges().forEach((edge: any) => {
-        focus = focus.union(edge);
-        edge.connectedNodes().forEach((neighbor: any) => {
-          focus = focus.union(neighbor);
-          if (!visited.has(neighbor.id())) {
-            visited.add(neighbor.id());
-            next.push(neighbor);
-          }
+      node
+        .connectedEdges()
+        .filter((edge: any) => edge.data('type') !== 'contains')
+        .forEach((edge: any) => {
+          const neighbors = edge.connectedNodes().filter((neighbor: any) => neighbor.id() !== node.id() && neighbor.data('type') !== 'theme');
+          neighbors.forEach((neighbor: any) => {
+            primary = primary.union(edge).union(neighbor);
+            if (!visited.has(neighbor.id())) {
+              visited.add(neighbor.id());
+              next.push(neighbor);
+            }
+          });
         });
-      });
     }
     frontier = next;
     depth += 1;
   }
 
-  return focus;
+  let context = cy.collection();
+  primary.nodes().forEach((node: any) => {
+    if (node.data('type') === 'theme') return;
+    node.connectedEdges().filter((edge: any) => edge.data('type') === 'contains').forEach((edge: any) => {
+      context = context.union(edge).union(edge.connectedNodes().filter((neighbor: any) => neighbor.data('type') === 'theme'));
+    });
+  });
+
+  return { primary, context };
+}
+
+function primaryThemeEdges(edges: GraphData['edges']): GraphData['edges'] {
+  const containsByTarget = new Map<string, GraphData['edges'][number]>();
+  const semantic = edges.filter((edge) => {
+    if (edge.type !== 'contains') return true;
+    const existing = containsByTarget.get(edge.target);
+    if (!existing || themeEdgeScore(edge) > themeEdgeScore(existing)) {
+      containsByTarget.set(edge.target, edge);
+    }
+    return false;
+  });
+  return [...semantic, ...containsByTarget.values()];
+}
+
+function themeEdgeScore(edge: GraphData['edges'][number]): number {
+  return (edge.basis === 'explicit' ? 2 : 0) + edge.confidence;
 }
 
 export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
@@ -404,7 +445,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
 
   useEffect(() => {
     highlightDepthRef.current = highlightDepth;
-    localStorage.setItem(HIGHLIGHT_DEPTH_KEY, highlightDepth == null ? 'unlimited' : String(highlightDepth));
+    localStorage.setItem(LOCAL_GRAPH_DEPTH_KEY, highlightDepth == null ? 'unlimited' : String(highlightDepth));
     if (lastUserFocusRef.current) focusNodeByIdRef.current(lastUserFocusRef.current);
   }, [highlightDepth]);
 
@@ -442,13 +483,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       return true;
     });
     const nodeIds = new Set(visibleNodes.map((n) => n.id));
-    const visibleEdges = data.edges.filter((e) => {
+    const visibleEdges = primaryThemeEdges(data.edges.filter((e) => {
       if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) return false;
       if (lens === 'ideas' && !f.edgeTypes.includes(e.type)) return false;
       if (f.minConfidence > 0 && e.confidence < f.minConfidence) return false;
       if (f.basis === 'explicit' && e.basis !== 'explicit') return false;
       return true;
-    });
+    }));
     return [
       ...visibleNodes.map((n) => ({
         data: {
@@ -509,10 +550,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           {
             selector: 'edge',
             style: {
-              width: (ele: any) => 1 + ele.data('confidence') * 2,
+              width: (ele: any) => 0.7 + ele.data('confidence') * 1.4,
               'line-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#ef4444' : '#525252'),
               'line-style': (ele: any) => (ele.data('basis') === 'inferred' ? 'dashed' : 'solid'),
-              opacity: (ele: any) => 0.3 + ele.data('confidence') * 0.6,
+              opacity: (ele: any) => 0.14 + ele.data('confidence') * 0.34,
               'target-arrow-shape': 'triangle',
               'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' ? '#ef4444' : '#525252'),
               'curve-style': 'bezier',
@@ -527,8 +568,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             style: {
               'line-style': 'solid',
               'line-color': '#3f3f46',
-              width: 1.2,
-              opacity: 0.22,
+              width: 0.8,
+              opacity: 0.1,
               'target-arrow-shape': 'none',
             } as any,
           },
@@ -560,6 +601,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
               'z-index': 30,
             } as any,
           },
+          {
+            selector: 'node.context-node',
+            style: {
+              opacity: 0.85,
+              'text-opacity': 0.85,
+              'border-width': 2,
+              'border-color': '#f59e0b',
+              'border-style': 'solid',
+              'border-opacity': 0.55,
+              'z-index': 12,
+            } as any,
+          },
+          {
+            selector: 'edge.context-edge',
+            style: {
+              width: 1.2,
+              'line-color': '#f59e0b',
+              opacity: 0.34,
+              'target-arrow-shape': 'none',
+              'z-index': 10,
+            } as any,
+          },
           { selector: 'node.spotlight', style: { 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.16 } as any },
         ],
         layout: COSE_LAYOUT as any,
@@ -568,25 +631,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const removeFocusClasses = () => {
         const cy = cyRef.current!;
         cy.batch(() => {
-          cy.elements().removeClass('faded focus-node focus-edge');
+          cy.elements().removeClass('faded focus-node focus-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
         });
       };
-      const applyFocus = (keep: any, spotlightNodes?: any) => {
+      const applyFocus = (primary: any, context?: any, spotlightNodes?: any) => {
         const cy = cyRef.current!;
         cy.batch(() => {
-          cy.elements().removeClass('focus-node focus-edge');
+          cy.elements().removeClass('focus-node focus-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
           cy.elements().addClass('faded');
-          keep.removeClass('faded');
-          keep.nodes().addClass('focus-node');
-          keep.edges().addClass('focus-edge');
+          context?.removeClass('faded');
+          context?.nodes().addClass('context-node');
+          context?.edges().addClass('context-edge');
+          primary.removeClass('faded');
+          primary.nodes().addClass('focus-node');
+          primary.edges().addClass('focus-edge');
           spotlightNodes?.addClass('spotlight');
         });
       };
       const focusOnNode = (node: any) => {
-        const keep = collectReachableNeighborhood(node, highlightDepthRef.current);
-        applyFocus(keep, node);
+        const focus = collectLocalGraph(node, highlightDepthRef.current);
+        applyFocus(focus.primary, focus.context, node);
       };
       const clearFocus = () => {
         removeFocusClasses();
@@ -625,7 +691,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         }
         const keep = targetNodes.closedNeighborhood();
         lastUserFocusRef.current = null;
-        applyFocus(keep, targetNodes);
+        applyFocus(keep, undefined, targetNodes);
         // Center on the stop node(s); pick a zoom that frames the immediate
         // neighbourhood, clamped so it is never too tight nor too far.
         const pad = 110;
@@ -654,7 +720,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         const edge = evt.target;
         lastTutorFocusRef.current = null;
         lastUserFocusRef.current = null;
-        applyFocus(edge.connectedNodes().add(edge), edge.connectedNodes());
+        applyFocus(edge.connectedNodes().add(edge), undefined, edge.connectedNodes());
         setIdeaDetail(null);
         setEdgeDetail(await window.nodus.getEdgeDetail(edge.id()));
       });
@@ -746,9 +812,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const arr = f[key];
       return { ...f, [key]: arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val] };
     });
-  const setLimitedHighlightDepth = (value: string) => {
+  const setLocalGraphDepth = (value: string) => {
+    if (value === 'unlimited') {
+      setHighlightDepth(null);
+      return;
+    }
     const parsed = Number(value);
-    setHighlightDepth(Number.isFinite(parsed) ? Math.min(99, Math.max(1, Math.round(parsed))) : DEFAULT_LIMITED_HIGHLIGHT_DEPTH);
+    setHighlightDepth(Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.round(parsed))) : DEFAULT_LOCAL_GRAPH_DEPTH);
   };
 
   useEffect(() => {
@@ -814,27 +884,19 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             onChange={(e) => setF({ minConfidence: parseFloat(e.target.value) })}
           />
         </label>
-        <label className="flex items-center gap-1 text-neutral-400" title="Número de conexiones sucesivas que se resaltan al clicar un nodo">
-          Resaltar
+        <label className="flex items-center gap-1 text-neutral-400" title="Profundidad de la ruta local al clicar un nodo">
+          Ruta
           <select
-            className="input w-28"
-            value={highlightDepth == null ? 'unlimited' : 'limited'}
-            onChange={(e) => setHighlightDepth(e.target.value === 'unlimited' ? null : DEFAULT_LIMITED_HIGHLIGHT_DEPTH)}
+            className="input w-24"
+            value={highlightDepth == null ? 'unlimited' : String(highlightDepth)}
+            onChange={(e) => setLocalGraphDepth(e.target.value)}
           >
+            <option value="1">1 salto</option>
+            <option value="2">2 saltos</option>
+            <option value="3">3 saltos</option>
+            <option value="4">4 saltos</option>
             <option value="unlimited">Sin límite</option>
-            <option value="limited">Con límite</option>
           </select>
-          {highlightDepth != null && (
-            <input
-              className="input w-16"
-              type="number"
-              min={1}
-              max={99}
-              value={highlightDepth}
-              onChange={(e) => setLimitedHighlightDepth(e.target.value)}
-              title="Conexiones sucesivas a destacar"
-            />
-          )}
         </label>
         <input className="input w-16" placeholder="año≥" onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })} />
         <input className="input w-16" placeholder="año≤" onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })} />
