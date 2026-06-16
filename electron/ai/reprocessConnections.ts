@@ -18,9 +18,10 @@ import { normalizeEdgeType } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 
 const THEME_BATCH = 30;
-const RELATION_BATCH_SIZE = 80;
+const RELATION_BATCH_SIZE = 40;
 const STATEMENT_CLIP = 2000;
 const REPROC_EDGE_PREFIX = 'reproc:';
+const RELATION_MAX_TOKENS = 128_000;
 
 const RELATION_TYPES = new Set<EdgeType>([
   'extends',
@@ -307,9 +308,6 @@ async function reprocessRelations(
   });
 
   const batches = chunk(sorted, RELATION_BATCH_SIZE);
-
-  // Refresh: drop only previously reprocess-added inferred edges.
-  db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
   if (batches.length === 0) return 0;
 
   const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
@@ -330,11 +328,17 @@ async function reprocessRelations(
         themes: themesByIdea.get(idea.global_id) ?? [],
       })),
     };
-    const result = await completeJson<RelationExtractionResult>(
-      { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
-      isRelationExtractionResult,
-      model
-    );
+    let result: RelationExtractionResult;
+    try {
+      result = await completeJson<RelationExtractionResult>(
+        { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: RELATION_MAX_TOKENS },
+        isRelationExtractionResult,
+        model
+      );
+    } catch {
+      // If a single batch fails (e.g. output too large), skip it and continue.
+      continue;
+    }
     const inBatch = new Set(batch.map((i) => i.global_id));
     for (const relation of result.relations) {
       if (!relation || relation.from === relation.to) continue;
@@ -352,6 +356,8 @@ async function reprocessRelations(
 
   let added = 0;
   const insert = db.transaction(() => {
+    // Clear old reproc edges only now — after all batches completed successfully.
+    db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
     for (const edge of proposed.values()) {
       // Don't duplicate an edge already established for this exact pair+type.
       const clash = db
