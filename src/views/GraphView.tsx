@@ -9,6 +9,7 @@ import { TutorPanel } from './TutorPanel';
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
+const DEFAULT_LIMITED_HIGHLIGHT_DEPTH = 3;
 
 // Force-directed layout tuned to keep nodes and their (bottom-aligned) labels from
 // overlapping: strong repulsion, generous component spacing so disconnected nodes
@@ -18,17 +19,17 @@ const COSE_LAYOUT = {
   animate: false,
   randomize: true,
   fit: true,
-  padding: 60,
-  nodeRepulsion: () => 36000,
-  nodeOverlap: 48,
+  padding: 90,
+  nodeRepulsion: () => 62000,
+  nodeOverlap: 90,
   nodeDimensionsIncludeLabels: true,
-  idealEdgeLength: () => 170,
-  edgeElasticity: () => 120,
-  componentSpacing: 220,
-  gravity: 0.14,
-  numIter: 2200,
+  idealEdgeLength: () => 230,
+  edgeElasticity: () => 95,
+  componentSpacing: 340,
+  gravity: 0.08,
+  numIter: 2800,
   coolingFactor: 0.95,
-  initialTemp: 260,
+  initialTemp: 360,
 } as const;
 
 /**
@@ -47,7 +48,7 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   const pos: Record<string, { x: number; y: number }> = {};
   const themeAngle: Record<string, number> = {};
 
-  const Rt = N === 1 ? 0 : Math.min(760, 240 + N * 32);
+  const Rt = N === 1 ? 0 : Math.min(1040, 320 + N * 44);
   themeNodes.forEach((t, i) => {
     const ang = ((-90 + (i * 360) / N) * Math.PI) / 180;
     themeAngle[t.id()] = ang;
@@ -85,13 +86,13 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
     return ((h >>> 0) % 10000) / 10000;
   };
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const clusterStep = 92;
+  const clusterStep = 134;
   let maxR = Rt + 220;
 
   for (const [themeId, list] of Object.entries(groups)) {
     const A = themeAngle[themeId];
     const themePos = pos[themeId];
-    const clusterDistance = 280 + Math.min(260, Math.sqrt(list.length) * 52);
+    const clusterDistance = 360 + Math.min(420, Math.sqrt(list.length) * 76);
     const cx = themePos.x + clusterDistance * Math.cos(A);
     const cy0 = themePos.y + clusterDistance * Math.sin(A);
     for (let m = 0; m < list.length; m++) {
@@ -105,9 +106,9 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   }
 
   if (orphans.length) {
-    const startR = maxR + 260;
+    const startR = maxR + 340;
     for (let m = 0; m < orphans.length; m++) {
-      const r = startR + 34 * Math.sqrt(m);
+      const r = startR + 58 * Math.sqrt(m);
       const ang = m * goldenAngle;
       pos[orphans[m]] = { x: r * Math.cos(ang), y: r * Math.sin(ang) };
     }
@@ -152,7 +153,7 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
     precondition_of: 0.3,
   };
 
-  for (let iter = 0; iter < 90; iter++) {
+  for (let iter = 0; iter < 70; iter++) {
     for (const link of links) {
       const a = pos[link.source];
       const b = pos[link.target];
@@ -161,8 +162,8 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
       const dy = b.y - a.y;
       const distance = Math.max(1, Math.hypot(dx, dy));
       const confidence = Math.min(1, Math.max(0.1, link.confidence));
-      const ideal = link.type === 'contradicts' || link.type === 'refutes' ? 118 : 96 + (1 - confidence) * 54;
-      const pull = ((distance - ideal) / distance) * (strengthByType[link.type] ?? 0.24) * confidence * 0.08;
+      const ideal = link.type === 'contradicts' || link.type === 'refutes' ? 190 : 145 + (1 - confidence) * 70;
+      const pull = ((distance - ideal) / distance) * (strengthByType[link.type] ?? 0.24) * confidence * 0.045;
       const moveX = dx * pull;
       const moveY = dy * pull;
       a.x += moveX;
@@ -175,7 +176,7 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
 
 function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number }>): void {
   const nodes = cy.nodes().toArray();
-  if (nodes.length < 2 || nodes.length > 450) return;
+  if (nodes.length < 2 || nodes.length > 900) return;
 
   const boxes = nodes
     .map((node) => {
@@ -184,17 +185,20 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
       const type = node.data('type') as GraphNodeType;
       const size = Number(node.data('size') ?? 32);
       const font = type === 'theme' ? 13 : 10;
-      const maxWidth = type === 'theme' ? 190 : 160;
+      const maxWidth = type === 'theme' ? 190 : 150;
       const label = String(node.data('label') ?? '');
       const charsPerLine = Math.max(8, Math.floor(maxWidth / (font * 0.55)));
-      const lines = Math.max(1, Math.ceil(label.length / charsPerLine));
-      const labelWidth = Math.min(maxWidth, Math.max(44, Math.min(label.length, charsPerLine) * font * 0.58));
+      const wrapped = wrapEstimate(label, charsPerLine);
+      const lines = Math.max(1, wrapped.lines);
+      const labelWidth = Math.min(maxWidth, Math.max(44, wrapped.maxLineLength * font * 0.58));
       const labelHeight = lines * (font + 4);
       return {
         id: node.id(),
         type,
-        width: Math.max(size + 22, labelWidth + 28),
-        height: size + 12 + labelHeight + 18,
+        width: Math.max(size + 34, labelWidth + 42),
+        height: size + labelHeight + 34,
+        nodeRadius: size / 2,
+        labelHeight,
         nodeBias: type === 'theme' ? 0.28 : 0.5,
       };
     })
@@ -202,24 +206,24 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
 
   const boxFor = (box: (typeof boxes)[number]) => {
     const p = pos[box.id];
-    const top = p.y - box.height * 0.34;
     return {
       left: p.x - box.width / 2,
       right: p.x + box.width / 2,
-      top,
-      bottom: top + box.height,
+      top: p.y - box.nodeRadius - 10,
+      bottom: p.y + box.nodeRadius + box.labelHeight + 24,
     };
   };
 
-  for (let iter = 0; iter < 120; iter++) {
+  const iterations = nodes.length > 450 ? 80 : 150;
+  for (let iter = 0; iter < iterations; iter++) {
     let moved = false;
     for (let i = 0; i < boxes.length; i++) {
       const a = boxes[i];
       const pa = pos[a.id];
-      const ba = boxFor(a);
       for (let j = i + 1; j < boxes.length; j++) {
         const b = boxes[j];
         const pb = pos[b.id];
+        const ba = boxFor(a);
         const bb = boxFor(b);
         const overlapX = Math.min(ba.right, bb.right) - Math.max(ba.left, bb.left);
         const overlapY = Math.min(ba.bottom, bb.bottom) - Math.max(ba.top, bb.top);
@@ -227,19 +231,44 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
 
         const dx = pb.x - pa.x || stableUnit(`${a.id}|${b.id}`) - 0.5;
         const dy = pb.y - pa.y || stableUnit(`${b.id}|${a.id}`) - 0.5;
-        const dist = Math.max(1, Math.hypot(dx, dy));
-        const push = Math.min(44, Math.min(overlapX, overlapY) / 2 + 8);
-        const ux = dx / dist;
-        const uy = dy / dist;
-        pa.x -= ux * push * a.nodeBias;
-        pa.y -= uy * push * a.nodeBias;
-        pb.x += ux * push * b.nodeBias;
-        pb.y += uy * push * b.nodeBias;
+        if (overlapX < overlapY) {
+          const dir = dx >= 0 ? 1 : -1;
+          const push = Math.min(72, overlapX / 2 + 12);
+          pa.x -= dir * push * a.nodeBias;
+          pb.x += dir * push * b.nodeBias;
+        } else {
+          const dir = dy >= 0 ? 1 : -1;
+          const push = Math.min(72, overlapY / 2 + 12);
+          pa.y -= dir * push * a.nodeBias;
+          pb.y += dir * push * b.nodeBias;
+        }
         moved = true;
       }
     }
     if (!moved) return;
   }
+}
+
+function wrapEstimate(label: string, charsPerLine: number): { lines: number; maxLineLength: number } {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return { lines: 1, maxLineLength: 1 };
+  let lines = 1;
+  let current = 0;
+  let maxLineLength = 0;
+  for (const word of words) {
+    const length = word.length;
+    if (current === 0) {
+      current = length;
+    } else if (current + 1 + length <= charsPerLine) {
+      current += 1 + length;
+    } else {
+      maxLineLength = Math.max(maxLineLength, current);
+      lines += Math.max(1, Math.ceil(length / charsPerLine));
+      current = length % charsPerLine || Math.min(length, charsPerLine);
+    }
+  }
+  maxLineLength = Math.max(maxLineLength, Math.min(current, charsPerLine));
+  return { lines, maxLineLength };
 }
 
 function stableUnit(s: string): number {
@@ -280,6 +309,7 @@ const DEFAULT_FILTERS: Filters = {
 const FILTER_KEY = 'nodus.graph.filters';
 const DETAIL_WIDTH_KEY = 'nodus.graph.detailWidth';
 const DETAIL_FONT_KEY = 'nodus.graph.detailFontSize';
+const HIGHLIGHT_DEPTH_KEY = 'nodus.graph.highlightDepth';
 
 const DETAIL_MIN_WIDTH = 320;
 const DETAIL_MAX_WIDTH = 720;
@@ -300,10 +330,49 @@ function loadFilters(): Filters {
   }
 }
 
+function loadHighlightDepth(): number | null {
+  const raw = localStorage.getItem(HIGHLIGHT_DEPTH_KEY);
+  if (!raw || raw === 'unlimited') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(99, Math.max(1, Math.round(parsed)));
+}
+
+function collectReachableNeighborhood(startNode: any, maxDepth: number | null): any {
+  const cy = startNode.cy();
+  const visited = new Set<string>([startNode.id()]);
+  let focus = cy.collection(startNode);
+  let frontier = [startNode];
+  let depth = 0;
+
+  while (frontier.length > 0 && (maxDepth == null || depth < maxDepth)) {
+    const next: any[] = [];
+    for (const node of frontier) {
+      node.connectedEdges().forEach((edge: any) => {
+        focus = focus.union(edge);
+        edge.connectedNodes().forEach((neighbor: any) => {
+          focus = focus.union(neighbor);
+          if (!visited.has(neighbor.id())) {
+            visited.add(neighbor.id());
+            next.push(neighbor);
+          }
+        });
+      });
+    }
+    frontier = next;
+    depth += 1;
+  }
+
+  return focus;
+}
+
 export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const clearFocusRef = useRef<() => void>(() => {});
+  const focusNodeByIdRef = useRef<(nodeId: string) => void>(() => {});
+  const highlightDepthRef = useRef<number | null>(null);
+  const lastUserFocusRef = useRef<string | null>(null);
   const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
   // When the Tutor is driving the camera, a container resize should re-apply this focus
   // instead of fitting the whole graph (the node detail panel opening would steal it).
@@ -319,6 +388,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
   const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
+  const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
@@ -331,6 +401,12 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   useEffect(() => {
     localStorage.setItem(DETAIL_FONT_KEY, String(detailFontSize));
   }, [detailFontSize]);
+
+  useEffect(() => {
+    highlightDepthRef.current = highlightDepth;
+    localStorage.setItem(HIGHLIGHT_DEPTH_KEY, highlightDepth == null ? 'unlimited' : String(highlightDepth));
+    if (lastUserFocusRef.current) focusNodeByIdRef.current(lastUserFocusRef.current);
+  }, [highlightDepth]);
 
   const reload = useCallback(() => {
     void window.nodus.getGraph(lens).then(setData);
@@ -420,7 +496,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
               'border-color': '#737373',
               'border-style': 'dashed',
-              'transition-property': 'opacity, border-width, border-color',
+              'transition-property': 'opacity, border-width, border-color, overlay-opacity',
               'transition-duration': '0.2s',
               'transition-timing-function': 'ease-in-out',
             } as any,
@@ -440,7 +516,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
               'target-arrow-shape': 'triangle',
               'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' ? '#ef4444' : '#525252'),
               'curve-style': 'bezier',
-              'transition-property': 'opacity, line-color, width',
+              'transition-property': 'opacity, line-color, width, target-arrow-color',
               'transition-duration': '0.2s',
               'transition-timing-function': 'ease-in-out',
             } as any,
@@ -457,32 +533,72 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             } as any,
           },
           { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
-          // Focus mode: everything not in the tapped node's neighbourhood fades back.
+          // Focus mode: everything not in the tapped traversal fades back.
           { selector: '.faded', style: { opacity: 0.08, 'text-opacity': 0.05 } as any },
-          { selector: 'node.spotlight', style: { 'border-width': 4, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
+          {
+            selector: 'node.focus-node',
+            style: {
+              opacity: 1,
+              'text-opacity': 1,
+              'border-width': 3,
+              'border-color': '#a5b4fc',
+              'border-style': 'solid',
+              'border-opacity': 0.95,
+              'overlay-color': '#818cf8',
+              'overlay-opacity': 0.08,
+              'overlay-padding': 7,
+              'z-index': 20,
+            } as any,
+          },
+          {
+            selector: 'edge.focus-edge',
+            style: {
+              width: (ele: any) => 2.6 + ele.data('confidence') * 3.4,
+              'line-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#f87171' : '#a5b4fc'),
+              'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#f87171' : '#a5b4fc'),
+              opacity: 0.98,
+              'z-index': 30,
+            } as any,
+          },
+          { selector: 'node.spotlight', style: { 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.16 } as any },
         ],
         layout: COSE_LAYOUT as any,
       });
 
-      const focusOn = (eles: any) => {
+      const removeFocusClasses = () => {
         const cy = cyRef.current!;
-        const keep = eles.closedNeighborhood ? eles.closedNeighborhood() : eles.connectedNodes().add(eles);
         cy.batch(() => {
-          cy.elements().addClass('faded');
-          keep.removeClass('faded');
+          cy.elements().removeClass('faded focus-node focus-edge');
           cy.nodes().removeClass('spotlight');
-          if (eles.nodes) eles.nodes().addClass('spotlight');
         });
       };
-      const clearFocus = () => {
-        cyRef.current?.batch(() => {
-          cyRef.current!.elements().removeClass('faded');
-          cyRef.current!.nodes().removeClass('spotlight');
+      const applyFocus = (keep: any, spotlightNodes?: any) => {
+        const cy = cyRef.current!;
+        cy.batch(() => {
+          cy.elements().removeClass('focus-node focus-edge');
+          cy.nodes().removeClass('spotlight');
+          cy.elements().addClass('faded');
+          keep.removeClass('faded');
+          keep.nodes().addClass('focus-node');
+          keep.edges().addClass('focus-edge');
+          spotlightNodes?.addClass('spotlight');
         });
+      };
+      const focusOnNode = (node: any) => {
+        const keep = collectReachableNeighborhood(node, highlightDepthRef.current);
+        applyFocus(keep, node);
+      };
+      const clearFocus = () => {
+        removeFocusClasses();
       };
       clearFocusRef.current = () => {
         lastTutorFocusRef.current = null;
+        lastUserFocusRef.current = null;
         clearFocus();
+      };
+      focusNodeByIdRef.current = (nodeId: string) => {
+        const node = cyRef.current?.getElementById(nodeId);
+        if (node?.nonempty()) focusOnNode(node);
       };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
@@ -508,12 +624,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           return;
         }
         const keep = targetNodes.closedNeighborhood();
-        cy.batch(() => {
-          cy.elements().addClass('faded');
-          keep.removeClass('faded');
-          cy.nodes().removeClass('spotlight');
-          targetNodes.addClass('spotlight');
-        });
+        lastUserFocusRef.current = null;
+        applyFocus(keep, targetNodes);
         // Center on the stop node(s); pick a zoom that frames the immediate
         // neighbourhood, clamped so it is never too tight nor too far.
         const pad = 110;
@@ -528,7 +640,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
 
       cyRef.current.on('tap', 'node', async (evt) => {
         const node = evt.target;
-        focusOn(node);
+        lastTutorFocusRef.current = null;
+        lastUserFocusRef.current = node.id();
+        focusOnNode(node);
         setEdgeDetail(null);
         if (lens === 'ideas' && !node.id().startsWith('theme:')) {
           setIdeaDetail(await window.nodus.getIdeaDetail(node.id()));
@@ -538,11 +652,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       });
       cyRef.current.on('tap', 'edge', async (evt) => {
         const edge = evt.target;
-        cyRef.current?.batch(() => {
-          cyRef.current!.elements().addClass('faded');
-          edge.connectedNodes().add(edge).removeClass('faded');
-          cyRef.current!.nodes().removeClass('spotlight');
-        });
+        lastTutorFocusRef.current = null;
+        lastUserFocusRef.current = null;
+        applyFocus(edge.connectedNodes().add(edge), edge.connectedNodes());
         setIdeaDetail(null);
         setEdgeDetail(await window.nodus.getEdgeDetail(edge.id()));
       });
@@ -634,6 +746,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const arr = f[key];
       return { ...f, [key]: arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val] };
     });
+  const setLimitedHighlightDepth = (value: string) => {
+    const parsed = Number(value);
+    setHighlightDepth(Number.isFinite(parsed) ? Math.min(99, Math.max(1, Math.round(parsed))) : DEFAULT_LIMITED_HIGHLIGHT_DEPTH);
+  };
 
   useEffect(() => {
     if (!themesLoaded) return;
@@ -697,6 +813,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             value={filters.minConfidence}
             onChange={(e) => setF({ minConfidence: parseFloat(e.target.value) })}
           />
+        </label>
+        <label className="flex items-center gap-1 text-neutral-400" title="Número de conexiones sucesivas que se resaltan al clicar un nodo">
+          Resaltar
+          <select
+            className="input w-28"
+            value={highlightDepth == null ? 'unlimited' : 'limited'}
+            onChange={(e) => setHighlightDepth(e.target.value === 'unlimited' ? null : DEFAULT_LIMITED_HIGHLIGHT_DEPTH)}
+          >
+            <option value="unlimited">Sin límite</option>
+            <option value="limited">Con límite</option>
+          </select>
+          {highlightDepth != null && (
+            <input
+              className="input w-16"
+              type="number"
+              min={1}
+              max={99}
+              value={highlightDepth}
+              onChange={(e) => setLimitedHighlightDepth(e.target.value)}
+              title="Conexiones sucesivas a destacar"
+            />
+          )}
         </label>
         <input className="input w-16" placeholder="año≥" onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })} />
         <input className="input w-16" placeholder="año≤" onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })} />
