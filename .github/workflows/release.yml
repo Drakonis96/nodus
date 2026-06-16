@@ -17,6 +17,9 @@ jobs:
   release:
     strategy:
       fail-fast: false
+      # electron-builder creates the GitHub Release as part of publishing. Running
+      # both OS jobs at once can race on release creation for the same tag.
+      max-parallel: 1
       matrix:
         include:
           - os: macos-latest
