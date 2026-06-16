@@ -435,6 +435,120 @@ function themeEdgeScore(edge: GraphData['edges'][number]): number {
   return (edge.basis === 'explicit' ? 2 : 0) + edge.confidence;
 }
 
+// ── Louvain community detection (simplified) ────────────────────────────────
+// Returns a map of node id → community id. Works on undirected weighted edges.
+function louvain(cy: Core): Map<string, number> {
+  const nodes = cy.nodes().filter((n) => !n.isParent()); // skip compound parents
+  const adj = new Map<string, Map<string, number>>();
+  let totalWeight = 0;
+
+  // Build adjacency (undirected, weighted by confidence).
+  nodes.forEach((n) => { adj.set(n.id(), new Map()); });
+  cy.edges().forEach((e) => {
+    const s = e.data('source') as string;
+    const t = e.data('target') as string;
+    if (!adj.has(s) || !adj.has(t)) return;
+    const w = Math.max(0.1, Number(e.data('confidence') ?? 0.5));
+    const a = adj.get(s)!;
+    a.set(t, (a.get(t) ?? 0) + w);
+    const b = adj.get(t)!;
+    b.set(s, (b.get(s) ?? 0) + w);
+    totalWeight += w;
+  });
+  if (totalWeight === 0 || nodes.length === 0) return new Map();
+
+  const m2 = 2 * totalWeight;
+  // Each node starts in its own community.
+  const community = new Map<string, number>();
+  const nodeIds: string[] = [];
+  nodes.forEach((n) => {
+    nodeIds.push(n.id());
+    community.set(n.id(), nodeIds.length - 1);
+  });
+
+  // k_i = weighted degree of node i
+  const k = new Map<string, number>();
+  for (const id of nodeIds) {
+    let sum = 0;
+    for (const w of adj.get(id)!.values()) sum += w;
+    k.set(id, sum);
+  }
+
+  // Sum of weights inside each community.
+  const sigmaIn = new Map<number, number>();
+  const sigmaTot = new Map<number, number>();
+  for (const id of nodeIds) {
+    const c = community.get(id)!;
+    sigmaIn.set(c, 0);
+    sigmaTot.set(c, k.get(id)!);
+  }
+
+  // Iterate until no improvement.
+  let improved = true;
+  let iter = 0;
+  while (improved && iter < 20) {
+    improved = false;
+    iter++;
+    for (const id of nodeIds) {
+      const currentC = community.get(id)!;
+      const ki = k.get(id)!;
+      const neighbors = adj.get(id)!;
+
+      // Remove node from its community.
+      let kiIn = 0;
+      for (const [nb, w] of neighbors) {
+        if (community.get(nb) === currentC) kiIn += w;
+      }
+      sigmaTot.set(currentC, (sigmaTot.get(currentC) ?? 0) - ki);
+      sigmaIn.set(currentC, (sigmaIn.get(currentC) ?? 0) - 2 * kiIn);
+
+      // Find best community among neighbors.
+      const neighborComms = new Map<number, number>(); // comm → ki_in
+      for (const [nb, w] of neighbors) {
+        const nc = community.get(nb)!;
+        neighborComms.set(nc, (neighborComms.get(nc) ?? 0) + w);
+      }
+
+      let bestC = currentC;
+      let bestGain = 0;
+      for (const [nc, kiInNew] of neighborComms) {
+        const sigmaTotNc = sigmaTot.get(nc) ?? 0;
+        const gain = kiInNew / totalWeight - (ki * sigmaTotNc) / (totalWeight * totalWeight);
+        if (gain > bestGain) {
+          bestGain = gain;
+          bestC = nc;
+        }
+      }
+
+      // Move node to best community.
+      community.set(id, bestC);
+      const kiInBest = neighborComms.get(bestC) ?? 0;
+      sigmaTot.set(bestC, (sigmaTot.get(bestC) ?? 0) + ki);
+      sigmaIn.set(bestC, (sigmaIn.get(bestC) ?? 0) + 2 * kiInBest);
+
+      if (bestC !== currentC) improved = true;
+    }
+  }
+
+  // Renumber communities to 0..N-1.
+  const renumber = new Map<number, number>();
+  let next = 0;
+  const result = new Map<string, number>();
+  for (const id of nodeIds) {
+    const c = community.get(id)!;
+    if (!renumber.has(c)) renumber.set(c, next++);
+    result.set(id, renumber.get(c)!);
+  }
+  return result;
+}
+
+// Community colors (deterministic from community id).
+const COMMUNITY_COLORS = [
+  '#6366f1', '#f97316', '#22c55e', '#eab308', '#ec4899',
+  '#06b6d4', '#a78bfa', '#f472b6', '#14b8a6', '#ef4444',
+  '#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#d946ef',
+];
+
 export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -461,6 +575,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
   const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
   const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(LAYOUT_KEY) as 'force' | 'radial') || 'force');
+  const [communitiesCollapsed, setCommunitiesCollapsed] = useState(false);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
+  const communitiesRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
@@ -591,6 +708,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           {
             selector: 'node[type="theme"]',
             style: { 'border-width': 3, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.5 } as any,
+          },
+          // Community compound nodes (collapsed clusters).
+          {
+            selector: 'node[type="community"]',
+            style: {
+              'background-color': 'rgba(99,102,241,0.08)',
+              'background-opacity': 1,
+              'border-width': 2,
+              'border-color': '#6366f1',
+              'border-style': 'dashed',
+              'border-opacity': 0.4,
+              shape: 'round-rectangle',
+              'text-valign': 'top',
+              'text-margin-y': 8,
+              'font-size': 11,
+              'font-weight': 700,
+              color: '#a5b4fc',
+              'text-outline-width': 2,
+              'text-outline-color': '#0a0a0a',
+              'text-outline-opacity': 0.8,
+              padding: 20,
+            } as any,
           },
           {
             selector: 'edge',
@@ -840,6 +979,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     const cy = cyRef.current;
     cy.elements().remove();
     cy.add(elements);
+    // Reset community state when elements are rebuilt.
+    setCommunitiesCollapsed(false);
     // Always frame the whole graph after laying out, so it neither overflows the
     // viewport nor sits as a tiny clump regardless of how cose spread the nodes.
     cy.one('layoutstop', () => cy.fit(undefined, 60));
@@ -892,6 +1033,163 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const changeDetailFont = (delta: number) => {
     setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
   };
+
+  // ── Minimap ────────────────────────────────────────────────────────────────
+  const drawMinimap = useCallback(() => {
+    const cy = cyRef.current;
+    const canvas = minimapRef.current;
+    if (!cy || !canvas || cy.elements().length === 0) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width;
+    const H = canvas.height;
+    const bb = cy.elements().boundingBox();
+    const pad = 20;
+    const scaleX = (W - pad * 2) / Math.max(bb.w, 1);
+    const scaleY = (H - pad * 2) / Math.max(bb.h, 1);
+    const scale = Math.min(scaleX, scaleY);
+    const offX = pad + (W - pad * 2 - bb.w * scale) / 2;
+    const offY = pad + (H - pad * 2 - bb.h * scale) / 2;
+
+    const toMini = (x: number, y: number) => ({
+      x: offX + (x - bb.x1) * scale,
+      y: offY + (y - bb.y1) * scale,
+    });
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(10,10,10,0.85)';
+    ctx.fillRect(0, 0, W, H);
+
+    // Draw edges as faint lines.
+    ctx.strokeStyle = 'rgba(100,100,100,0.25)';
+    ctx.lineWidth = 0.5;
+    cy.edges().forEach((e) => {
+      const sp = toMini(e.sourceEndpoint().x, e.sourceEndpoint().y);
+      const tp = toMini(e.targetEndpoint().x, e.targetEndpoint().y);
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(tp.x, tp.y);
+      ctx.stroke();
+    });
+
+    // Draw nodes as colored dots.
+    cy.nodes().forEach((n) => {
+      if (n.isParent()) return;
+      const p = toMini(n.position().x, n.position().y);
+      const color = n.data('type') === 'theme'
+        ? '#f97316'
+        : (NODE_COLORS[n.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888');
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, n.data('type') === 'theme' ? 3 : 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw viewport rectangle.
+    const ext = cy.extent();
+    const tl = toMini(ext.x1, ext.y1);
+    const br = toMini(ext.x2, ext.y2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  }, []);
+
+  // Redraw minimap on every Cytoscape render.
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const handler = () => drawMinimap();
+    cy.on('render', handler);
+    return () => { cy.off('render', handler); };
+  }, [drawMinimap]);
+
+  // Minimap click → pan the graph.
+  const handleMinimapClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const cy = cyRef.current;
+    const canvas = minimapRef.current;
+    if (!cy || !canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    const bb = cy.elements().boundingBox();
+    const pad = 20;
+    const W = canvas.width;
+    const H = canvas.height;
+    const scaleX = (W - pad * 2) / Math.max(bb.w, 1);
+    const scaleY = (H - pad * 2) / Math.max(bb.h, 1);
+    const scale = Math.min(scaleX, scaleY);
+    const offX = pad + (W - pad * 2 - bb.w * scale) / 2;
+    const offY = pad + (H - pad * 2 - bb.h * scale) / 2;
+
+    const gx = bb.x1 + (mx - offX) / scale;
+    const gy = bb.y1 + (my - offY) / scale;
+    cy.animate({ center: { renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }, pan: { x: cy.width() / 2 - gx * cy.zoom(), y: cy.height() / 2 - gy * cy.zoom() } } as any, { duration: 300 });
+  };
+
+  // ── Community collapse/expand ───────────────────────────────────────────────
+  const toggleCommunities = useCallback(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    if (communitiesCollapsed) {
+      // Expand: remove compound parents, restore original elements.
+      cy.batch(() => {
+        const parents = cy.nodes(':parent');
+        // Move children out of parents first.
+        parents.forEach((p) => {
+          p.children().forEach((child) => {
+            child.move({ parent: null });
+          });
+        });
+        parents.remove();
+      });
+      // Re-layout after expand.
+      cy.layout({ ...COSE_BILKENT_LAYOUT, animate: true, animationDuration: 400, randomize: false }).run();
+      setCommunitiesCollapsed(false);
+    } else {
+      // Collapse: detect communities and create compound nodes.
+      const commMap = louvain(cy);
+      communitiesRef.current = commMap;
+
+      // Count community sizes.
+      const commSizes = new Map<number, number>();
+      for (const c of commMap.values()) commSizes.set(c, (commSizes.get(c) ?? 0) + 1);
+      // Only create compound nodes for communities with ≥3 members.
+      const validComms = new Set([...commSizes.entries()].filter(([, s]) => s >= 3).map(([c]) => c));
+      if (validComms.size < 2) {
+        setCommunitiesCollapsed(false);
+        return; // Not enough communities to collapse.
+      }
+
+      cy.batch(() => {
+        for (const commId of validComms) {
+          const parentId = `comm:${commId}`;
+          cy.add({
+            group: 'nodes',
+            data: {
+              id: parentId,
+              label: `Comunidad ${commId + 1}`,
+              type: 'community',
+              size: 60,
+            },
+          });
+        }
+        // Move nodes into their community parent.
+        for (const [nodeId, commId] of commMap) {
+          if (!validComms.has(commId)) continue;
+          const node = cy.getElementById(nodeId);
+          if (node.nonempty() && !node.isParent()) {
+            node.move({ parent: `comm:${commId}` });
+          }
+        }
+      });
+      // Re-layout after collapse.
+      cy.layout({ ...COSE_BILKENT_LAYOUT, animate: true, animationDuration: 400, randomize: false }).run();
+      setCommunitiesCollapsed(true);
+    }
+  }, [communitiesCollapsed]);
 
   // Tutor stop → frame the node on the graph and open its info in the right sidebar so
   // it can be read alongside the narration. A sequence token avoids a stale async detail
@@ -1032,6 +1330,15 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         </button>
         {lens === 'ideas' && (
           <button
+            className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
+            title={communitiesCollapsed ? 'Expandir comunidades' : 'Colapsar en comunidades (Louvain)'}
+            onClick={toggleCommunities}
+          >
+            <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
+          </button>
+        )}
+        {lens === 'ideas' && (
+          <button
             className="btn btn-ghost border border-neutral-700 gap-1.5"
             title="Gestionar los temas principales y reprocesar las conexiones de los nodos"
             onClick={() => setThemesModalOpen(true)}
@@ -1080,6 +1387,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
               <Icon name="fit" size={16} />
             </button>
           </div>
+
+          {/* Minimap */}
+          <canvas
+            ref={minimapRef}
+            width={180}
+            height={120}
+            className="absolute bottom-3 right-3 rounded-lg border border-neutral-700 cursor-pointer opacity-80 hover:opacity-100"
+            title="Mini-mapa · click para navegar"
+            onClick={handleMinimapClick}
+          />
 
           {/* Legend */}
           <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90 max-w-[220px]">
