@@ -253,7 +253,7 @@ export async function reprocessConnections(
 
   let relationsAdded = 0;
   if (options.relations) {
-    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, model);
+    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, model, onProgress);
   }
 
   return {
@@ -273,7 +273,8 @@ export async function reprocessConnections(
 async function reprocessRelations(
   ideas: IdeaRow[],
   themesByIdea: Map<string, string[]>,
-  model?: ModelRef | null
+  model?: ModelRef | null,
+  onProgress?: (p: ReprocessProgress) => void
 ): Promise<number> {
   const db = getDb();
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
