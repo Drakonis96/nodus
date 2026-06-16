@@ -41,8 +41,20 @@ const COSE_BILKENT_LAYOUT = {
   initialEnergyOnIncremental: 0.8,
 } as any;
 
-// Semantic zoom thresholds: at low zoom only dots are visible, progressively
-// more labels appear as the user zooms in.
+// Color palette for edge types — distinct hues for quick visual discrimination.
+const EDGE_TYPE_COLORS: Record<string, string> = {
+  supports: '#22c55e',        // green — positive
+  refutes: '#ef4444',         // red — negative
+  contradicts: '#f97316',     // orange — conflicting
+  extends: '#3b82f6',         // blue — expansion
+  refines: '#8b5cf6',         // violet — refinement
+  applies_to: '#eab308',      // yellow — application
+  shares_method: '#06b6d4',   // cyan — methodological
+  precondition_of: '#f472b6', // pink — causal
+  measures_same: '#14b8a6',   // teal — measurement
+  variant_of: '#a78bfa',      // light purple — variant
+  contains: '#3f3f46',        // dark gray — structural
+};
 const ZOOM_LABEL_THRESHOLD = 0.3;   // below this, hide all idea labels
 const ZOOM_IDEAS_THRESHOLD = 0.65;  // above this, show all idea labels
 
@@ -519,14 +531,24 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           id: n.id,
           label: n.label,
           type: n.type,
-          size: n.type === 'theme' ? 38 + Math.min(56, n.workCount * 10) : 18 + Math.min(40, n.workCount * 6),
+          // Degree is computed below after edges are built.
+          // Placeholder — will be overwritten once we know the edge count per node.
+          _workCount: n.workCount,
+          size: n.type === 'theme' ? 38 + Math.min(56, n.workCount * 10) : 20,
           read: n.read,
         },
       })),
       ...visibleEdges.map((e) => ({
         data: { id: e.id, source: e.source, target: e.target, type: e.type, basis: e.basis, confidence: e.confidence },
       })),
-    ];
+    ].map((el: any) => {
+      // For idea nodes, compute degree from the visible edges and use it for sizing.
+      if (el.data.source) return el; // skip edges
+      if (el.data.type === 'theme') return el; // theme size stays workCount-based
+      const degree = visibleEdges.filter((e) => e.source === el.data.id || e.target === el.data.id).length;
+      el.data.size = 18 + Math.min(48, degree * 5);
+      return el;
+    });
   }, [data, filters, lens]);
 
   useEffect(() => {
@@ -574,11 +596,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             selector: 'edge',
             style: {
               width: (ele: any) => 0.7 + ele.data('confidence') * 1.4,
-              'line-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#ef4444' : '#525252'),
+              'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
               'line-style': (ele: any) => (ele.data('basis') === 'inferred' ? 'dashed' : 'solid'),
               opacity: (ele: any) => 0.14 + ele.data('confidence') * 0.34,
               'target-arrow-shape': 'triangle',
-              'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' ? '#ef4444' : '#525252'),
+              'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
               'curve-style': 'bezier',
               'transition-property': 'opacity, line-color, width, target-arrow-color',
               'transition-duration': '0.2s',
@@ -622,8 +644,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             selector: 'edge.focus-edge',
             style: {
               width: (ele: any) => 2.6 + ele.data('confidence') * 3.4,
-              'line-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#f87171' : '#a5b4fc'),
-              'target-arrow-color': (ele: any) => (ele.data('type') === 'contradicts' || ele.data('type') === 'refutes' ? '#f87171' : '#a5b4fc'),
+              'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
+              'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
               opacity: 0.98,
               'z-index': 30,
             } as any,
@@ -1060,15 +1082,23 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           </div>
 
           {/* Legend */}
-          <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90">
+          <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90 max-w-[220px]">
             {GRAPH_NODE_TYPES.map((t) => (
               <div key={t} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
                 {NODE_LABELS[t]}
               </div>
             ))}
-            <div className="pt-1 border-t border-neutral-800 text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
-            <div className="text-neutral-500">○ borde punteado: no leída</div>
+            <div className="pt-1 border-t border-neutral-800 text-neutral-500">○ borde punteado: no leída</div>
+            <div className="pt-1 border-t border-neutral-800 space-y-0.5">
+              {Object.entries(EDGE_TYPE_COLORS).filter(([t]) => t !== 'contains').map(([type, color]) => (
+                <div key={type} className="flex items-center gap-1.5 text-neutral-400">
+                  <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
+                  {EDGE_LABELS[type as keyof typeof EDGE_LABELS] ?? type}
+                </div>
+              ))}
+            </div>
+            <div className="text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
           </div>
         </div>
 
