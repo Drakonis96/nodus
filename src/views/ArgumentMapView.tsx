@@ -60,7 +60,7 @@ function maxDepth(block: ArgumentBlock, depth = 0): number {
   return Math.max(...block.children.map((c) => maxDepth(c, depth + 1)));
 }
 
-export function ArgumentMapView({ settings }: { settings: AppSettings }) {
+export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; onBack: () => void }) {
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>('auto');
@@ -68,6 +68,8 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [seedId, setSeedId] = useState('');
   const [search, setSearch] = useState('');
+  const [suggestionSearch, setSuggestionSearch] = useState('');
+  const [minConnections, setMinConnections] = useState(0);
   const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [map, setMap] = useState<ArgumentMap | null>(null);
   const [building, setBuilding] = useState(false);
@@ -99,7 +101,8 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     setSuggestionsLoading(true);
     setError(null);
     try {
-      setSuggestions(await window.nodus.discoverArgumentRoutes());
+      const raw = await window.nodus.discoverArgumentRoutes();
+      setSuggestions([...raw].sort((a, b) => b.degree - a.degree));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -143,6 +146,14 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
       : ideaNodes;
     return base.slice(0, 60);
   }, [ideaNodes, search]);
+
+  const filteredSuggestions = useMemo(() => {
+    const q = suggestionSearch.trim().toLowerCase();
+    let base = suggestions;
+    if (q) base = base.filter((s) => s.label.toLowerCase().includes(q) || s.statement.toLowerCase().includes(q));
+    if (minConnections > 1) base = base.filter((s) => s.degree >= minConnections);
+    return base;
+  }, [suggestions, suggestionSearch, minConnections]);
 
   const stopReveal = useCallback(() => {
     if (revealTimerRef.current != null) {
@@ -238,6 +249,13 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     <div className="h-full flex flex-col min-h-0">
       {/* Header / setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
+        <button
+          className="btn btn-ghost text-neutral-400 hover:text-neutral-100 mr-2"
+          title="Volver al grafo"
+          onClick={onBack}
+        >
+          <Icon name="chevronLeft" size={16} />
+        </button>
         <div className="flex rounded-lg overflow-hidden border border-neutral-700">
           <button
             className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
@@ -316,10 +334,29 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
         )}
 
         {isAuto && (
-          <div className="flex-1 flex items-end justify-end gap-2">
+          <div className="flex-1 flex items-end gap-2 flex-wrap">
             <span className="text-neutral-500">
-              {suggestions.length > 0 ? `${suggestions.length} recorridos detectados por conectividad` : 'Detectando recorridos…'}
+              {suggestions.length > 0 ? `${filteredSuggestions.length} de ${suggestions.length} recorridos` : 'Detectando recorridos…'}
             </span>
+            <div className="relative flex-1 min-w-[180px] max-w-xs">
+              <Icon name="search" size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
+              <input
+                className="input w-full pl-7 py-1"
+                placeholder="Buscar recorrido…"
+                value={suggestionSearch}
+                onChange={(e) => setSuggestionSearch(e.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-1.5 text-neutral-400">
+              Mín. conexiones
+              <input
+                type="number"
+                className="input w-16 py-1 text-center"
+                min={0}
+                value={minConnections}
+                onChange={(e) => setMinConnections(Math.max(0, Number(e.target.value)))}
+              />
+            </label>
             <button className="btn btn-ghost gap-1.5" onClick={() => discoverRoutes()} disabled={suggestionsLoading}>
               <Icon name="sync" className={suggestionsLoading ? 'animate-spin' : ''} /> Actualizar
             </button>
@@ -363,7 +400,12 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
                 </div>
               )}
               <div className="space-y-2">
-                {suggestions.map((s, i) => (
+                {filteredSuggestions.length === 0 && !suggestionsLoading && suggestions.length > 0 && (
+                  <div className="text-center text-neutral-500 text-sm py-8">
+                    Ningún recorrido coincide con los filtros actuales.
+                  </div>
+                )}
+                {filteredSuggestions.map((s, i) => (
                   <button
                     key={s.ideaId}
                     className="w-full text-left card p-3 hover:bg-neutral-800/80 transition-colors group"

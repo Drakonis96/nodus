@@ -396,8 +396,7 @@ export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
       const score = d + db * 1.5 + cs * 0.2;
       return { idea: i, d, db, cs, score };
     })
-    .sort((a, b) => b.score - a.score || b.d - a.d)
-    .slice(0, 12);
+    .sort((a, b) => b.score - a.score || b.d - a.d);
 
   return ranked.map(({ idea, d, db, cs }) => {
     const neighbors = adj.get(idea.global_id) ?? [];

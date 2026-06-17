@@ -172,7 +172,7 @@ export function App() {
         <main className="flex-1 min-w-0 overflow-hidden">
           {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} />}
-          {view === 'argument' && <ArgumentMapView settings={settings} />}
+          {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}
           {view === 'gaps' && <GapsView />}
           {view === 'reading' && <ReadingPathView />}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}
