@@ -1397,9 +1397,6 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
         const isIdea = lens === 'ideas' && !node.id().startsWith('theme:');
-        // Issue the IPC fetch FIRST so the main process starts working in
-        // parallel with the synchronous focus work below. Then show an instant
-        // placeholder so the sidebar opens immediately instead of freezing.
         const seq = ++detailSeqRef.current;
         let detailPromise: Promise<IdeaDetail | null> | null = null;
         if (isIdea) {
@@ -1412,12 +1409,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           setEdgeDetail(null);
           setDetailLoading(null);
         }
-        focusOnNode(node);
-        // Keep the tapped node on screen: the detail panel is about to open on
-        // the right and narrow the viewport, which would otherwise push the
-        // node under the panel. Track it so the resize handler re-centers it.
+        const focus = collectLocalGraph(node, highlightDepthRef.current ?? 1);
+        applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
+        const neighbourhood = focus.primary.union(focus.secondary).union(focus.context).union(focus.center);
         focusCenterRef.current = { id: node.id(), kind: 'node' };
-        cyRef.current?.animate({ center: { eles: node } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        cyRef.current?.animate({ center: { eles: neighbourhood } }, { duration: 280, easing: 'ease-in-out-cubic' });
         if (detailPromise) {
           void detailPromise.then(
             (d) => {
@@ -1434,17 +1430,35 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       });
       cyRef.current.on('tap', 'edge', (evt) => {
         const edge = evt.target;
+        if (hoverFocusTimerRef.current != null) {
+          window.clearTimeout(hoverFocusTimerRef.current);
+          hoverFocusTimerRef.current = null;
+        }
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
-        lastUserFocusRef.current = null;
+        lastUserFocusRef.current = edge.id();
         const seq = ++detailSeqRef.current;
         const detailPromise = window.nodus.getEdgeDetail(edge.id());
         setIdeaDetail(null);
         setEdgeDetail(null);
         setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
-        applyFocus({ primary: edge.connectedNodes().add(edge) }, edge.connectedNodes());
+        const endpoints = edge.connectedNodes();
+        const depth = highlightDepthRef.current ?? 1;
+        let mergedPrimary = cyRef.current!.collection();
+        let mergedSecondary = cyRef.current!.collection();
+        let mergedContext = cyRef.current!.collection();
+        endpoints.forEach((ep: any) => {
+          const fg = collectLocalGraph(ep, depth);
+          mergedPrimary = mergedPrimary.union(fg.primary);
+          mergedSecondary = mergedSecondary.union(fg.secondary);
+          mergedContext = mergedContext.union(fg.context);
+        });
+        mergedPrimary = mergedPrimary.union(edge);
+        mergedSecondary = mergedSecondary.difference(mergedPrimary);
+        mergedContext = mergedContext.difference(mergedPrimary).difference(mergedSecondary);
+        applyFocus({ primary: mergedPrimary, secondary: mergedSecondary, context: mergedContext }, endpoints.add(edge));
         focusCenterRef.current = { id: edge.id(), kind: 'edge' };
-        cyRef.current?.animate({ center: { eles: edge.connectedNodes() } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        cyRef.current?.animate({ center: { eles: endpoints } }, { duration: 280, easing: 'ease-in-out-cubic' });
         void detailPromise.then(
           (d) => {
             if (seq !== detailSeqRef.current) return;
