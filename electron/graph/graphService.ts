@@ -18,6 +18,13 @@ import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 const THEME_SIM_THRESHOLD = 0.72;
 const MAX_INFERRED_THEMES_PER_IDEA = 1;
 
+// In-memory cache for the semantic theme edges. These are derived from idea
+// embeddings and don't change between graph renders unless the corpus changes,
+// so we cache them for a short TTL to avoid recomputing O(ideas×themes) cosine
+// similarities on every getGraph call.
+let semanticThemeEdgesCache: { edges: GraphEdge[]; nodeIdsKey: string; ts: number } | null = null;
+const SEMANTIC_EDGES_TTL_MS = 60_000;
+
 const THEME_KEYWORD_ALIASES: Record<string, string[]> = {
   franquismo: ['franquismo', 'franco', 'franquista', 'franquistas', 'dictadura', 'posguerra'],
   turismo: ['turismo', 'turista', 'turistas', 'turistico', 'turistica', 'tourism', 'tourist', 'tourists'],
@@ -87,87 +94,116 @@ export function buildIdeaGraph(): GraphData {
   const themeRows = listGraphThemes();
   const memberships = buildThemeMemberships();
 
-  const ideaNodes: GraphNode[] = ideas.map((idea) => {
-    const works = db
-      .prepare(
-        `SELECT w.nodus_id, w.year, w.authors_json, w.deep_status
-         FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-         WHERE io.global_id = ?
-           AND w.archived = 0
-           AND w.deep_status = 'done'`
-      )
-      .all(idea.global_id) as { nodus_id: string; year: number | null; authors_json: string; deep_status: string }[];
-
-    const maxConf = db
-      .prepare(
-        `SELECT MAX(io.confidence) as c
-         FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
-         WHERE io.global_id = ?
-           AND w.archived = 0
-           AND w.deep_status = 'done'`
-      )
-      .get(idea.global_id) as { c: number | null };
-
-    const authors = new Set<string>();
-    const years: number[] = [];
-    let read = false;
-    for (const w of works) {
-      if (w.year != null) years.push(w.year);
-      if (w.deep_status === 'done') read = true;
-      try {
-        for (const a of JSON.parse(w.authors_json || '[]')) authors.add(a);
-      } catch {
-        /* ignore */
-      }
+  // ── Batched aggregation ─────────────────────────────────────────────────
+  // Previously this ran 2 queries per idea + 1 per theme (N+1). Now we run a
+  // single query for ideas and another for themes, then aggregate in memory.
+  // This is the main reason the graph took ages to load on large corpora.
+  const ideaIds = ideas.map((i) => i.global_id);
+  const ideaWorkRows = ideaIds.length
+    ? (db
+        .prepare(
+          `SELECT io.global_id, w.year, w.authors_json, w.deep_status
+             FROM idea_occurrences io
+             JOIN works w ON w.nodus_id = io.nodus_id
+            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
+              AND w.archived = 0
+              AND w.deep_status = 'done'`
+        )
+        .all(...ideaIds) as { global_id: string; year: number | null; authors_json: string; deep_status: string }[])
+    : [];
+  const ideaAggById = new Map<string, { works: number; maxConf: number; read: boolean; years: number[]; authors: Set<string> }>();
+  // maxConfidence comes from idea_occurrences.confidence; fetch in a second tiny query.
+  const ideaConfRows = ideaIds.length
+    ? (db
+        .prepare(
+          `SELECT io.global_id, MAX(io.confidence) AS c
+             FROM idea_occurrences io
+             JOIN works w ON w.nodus_id = io.nodus_id
+            WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
+              AND w.archived = 0
+              AND w.deep_status = 'done'
+            GROUP BY io.global_id`
+        )
+        .all(...ideaIds) as { global_id: string; c: number | null }[])
+    : [];
+  const ideaConfById = new Map(ideaConfRows.map((r) => [r.global_id, r.c ?? 0]));
+  for (const row of ideaWorkRows) {
+    let agg = ideaAggById.get(row.global_id);
+    if (!agg) {
+      agg = { works: 0, maxConf: 0, read: false, years: [], authors: new Set() };
+      ideaAggById.set(row.global_id, agg);
     }
+    agg.works += 1;
+    if (row.deep_status === 'done') agg.read = true;
+    if (row.year != null) agg.years.push(row.year);
+    try {
+      for (const a of JSON.parse(row.authors_json || '[]')) agg.authors.add(a);
+    } catch {
+      /* ignore */
+    }
+  }
 
+  const ideaNodes: GraphNode[] = ideas.map((idea) => {
+    const agg = ideaAggById.get(idea.global_id);
     return {
       id: idea.global_id,
       label: idea.label,
       type: idea.type,
       statement: idea.statement,
-      workCount: works.length,
-      read,
+      workCount: agg?.works ?? 0,
+      read: agg?.read ?? false,
       themes: Array.from(memberships.labelsByIdea.get(idea.global_id) ?? []).sort(),
-      years,
-      authors: Array.from(authors),
-      maxConfidence: maxConf.c ?? 0,
+      years: agg?.years ?? [],
+      authors: agg ? Array.from(agg.authors) : [],
+      maxConfidence: ideaConfById.get(idea.global_id) ?? 0,
     };
   });
 
   const visibleThemeRows = themeRows;
-  const themeNodes: GraphNode[] = visibleThemeRows.map((theme) => {
-    const works = db
-      .prepare(
-        `SELECT DISTINCT w.nodus_id, w.year, w.authors_json, w.deep_status
-         FROM work_themes wt JOIN works w ON w.nodus_id = wt.nodus_id
-         WHERE wt.theme_id = ? AND w.archived = 0`
-      )
-      .all(theme.theme_id) as { nodus_id: string; year: number | null; authors_json: string; deep_status: string }[];
-
-    const authors = new Set<string>();
-    const years: number[] = [];
-    let read = false;
-    for (const w of works) {
-      if (w.year != null) years.push(w.year);
-      if (w.deep_status === 'done') read = true;
-      try {
-        for (const a of JSON.parse(w.authors_json || '[]')) authors.add(a);
-      } catch {
-        /* ignore */
-      }
+  const themeIds = visibleThemeRows.map((t) => t.theme_id);
+  const themeWorkRows = themeIds.length
+    ? (db
+        .prepare(
+          `SELECT wt.theme_id, w.year, w.authors_json, w.deep_status
+             FROM work_themes wt
+             JOIN works w ON w.nodus_id = wt.nodus_id
+            WHERE wt.theme_id IN (${themeIds.map(() => '?').join(',')})
+              AND w.archived = 0`
+        )
+        .all(...themeIds) as { theme_id: string; year: number | null; authors_json: string; deep_status: string }[])
+    : [];
+  const themeAggById = new Map<string, { works: Set<string>; read: boolean; years: number[]; authors: Set<string> }>();
+  for (const row of themeWorkRows) {
+    let agg = themeAggById.get(row.theme_id);
+    if (!agg) {
+      agg = { works: new Set(), read: false, years: [], authors: new Set() };
+      themeAggById.set(row.theme_id, agg);
     }
+    // DISTINCT nodus_id semantics: dedupe by work id (not available here, so
+    // dedupe by (year+authors) is unnecessary — work_themes already has one
+    // row per (theme, work), so each row is a distinct work).
+    agg.works.add(`${row.theme_id}|${row.year}|${row.authors_json}`);
+    if (row.deep_status === 'done') agg.read = true;
+    if (row.year != null) agg.years.push(row.year);
+    try {
+      for (const a of JSON.parse(row.authors_json || '[]')) agg.authors.add(a);
+    } catch {
+      /* ignore */
+    }
+  }
 
+  const themeNodes: GraphNode[] = visibleThemeRows.map((theme) => {
+    const agg = themeAggById.get(theme.theme_id);
     return {
       id: `theme:${theme.theme_id}`,
       label: theme.label.toUpperCase(),
       type: 'theme',
       statement: `Familia temática: ${theme.label}`,
-      workCount: theme.work_count,
-      read,
+      workCount: agg?.works.size ?? theme.work_count,
+      read: agg?.read ?? false,
       themes: [theme.label],
-      years,
-      authors: Array.from(authors),
+      years: agg?.years ?? [],
+      authors: agg ? Array.from(agg.authors) : [],
       maxConfidence: 1,
     };
   });
@@ -358,9 +394,26 @@ function centroid(vectors: number[][]): number[] | null {
  * have an explicit same-work edge are skipped. No-op when ideas lack embeddings.
  */
 function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): GraphEdge[] {
+  // Cache key: a compact signature of the existing theme→idea memberships plus
+  // the set of visible node ids. If neither changed since the last call (within
+  // TTL), reuse the previously computed edges.
+  const nodeIdsKey = [...nodeIds].sort().join(',');
+  const membershipKey = themeEdges
+    .map((e) => `${e.source}|${e.target}`)
+    .sort()
+    .join(',');
+  const cacheKey = `${membershipKey}::${nodeIdsKey}`;
+  const now = Date.now();
+  if (semanticThemeEdgesCache && semanticThemeEdgesCache.nodeIdsKey === cacheKey && now - semanticThemeEdgesCache.ts < SEMANTIC_EDGES_TTL_MS) {
+    return semanticThemeEdgesCache.edges;
+  }
+
   const embByIdea = new Map<string, number[]>();
   for (const i of ideasWithEmbeddings()) embByIdea.set(i.global_id, i.embedding);
-  if (embByIdea.size === 0) return [];
+  if (embByIdea.size === 0) {
+    semanticThemeEdgesCache = { edges: [], nodeIdsKey: cacheKey, ts: now };
+    return [];
+  }
 
   // Existing theme→idea membership and per-theme member ideas.
   const connected = new Set<string>();
@@ -377,7 +430,10 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
     const c = centroid(members.map((m) => embByIdea.get(m)).filter((v): v is number[] => !!v));
     if (c) centroids.set(themeId, c);
   }
-  if (centroids.size === 0) return [];
+  if (centroids.size === 0) {
+    semanticThemeEdgesCache = { edges: [], nodeIdsKey: cacheKey, ts: now };
+    return [];
+  }
 
   const out: GraphEdge[] = [];
   for (const [ideaId, emb] of embByIdea) {
@@ -401,6 +457,7 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
       });
     }
   }
+  semanticThemeEdgesCache = { edges: out, nodeIdsKey: cacheKey, ts: now };
   return out;
 }
 

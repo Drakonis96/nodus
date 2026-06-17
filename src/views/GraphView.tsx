@@ -22,19 +22,19 @@ const COSE_BILKENT_LAYOUT = {
   name: 'cose-bilkent',
   quality: 'default',
   animate: false,
-  animationDuration: 600,
+  animationDuration: 400,
   animationEasing: 'ease-in-out-cubic',
   fit: false,
   padding: 60,
   nodeDimensionsIncludeLabels: false,
-  refresh: 12,
+  refresh: 16,
   randomize: false,
-  nodeRepulsion: 12000,
-  idealEdgeLength: 160,
+  nodeRepulsion: 6500,
+  idealEdgeLength: 110,
   edgeElasticity: 0.45,
   nestingFactor: 0.1,
-  gravity: 0.32,
-  numIter: 3500,
+  gravity: 0.30,
+  numIter: 1800,
   tile: true,
   tilingPaddingVertical: 20,
   tilingPaddingHorizontal: 20,
@@ -46,29 +46,34 @@ const COSE_BILKENT_LAYOUT = {
 
 function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => void, overrides: Record<string, unknown> = {}) {
   const nodeCount = Math.max(1, cy.nodes().filter((node) => !node.isParent()).length);
-  const spacingScale = Math.min(2.35, 1 + Math.sqrt(nodeCount) / 18);
-  const edgeLengthScale = Math.min(1.85, 1 + Math.sqrt(nodeCount) / 26);
-  const gravityScale = Math.min(2.1, 1 + nodeCount / 140);
-  const padding = Math.round(Math.min(92, 44 + Math.sqrt(nodeCount) * 2.4));
-  const tilingPadding = Math.round(26 + Math.min(32, Math.sqrt(nodeCount) * 2.1));
+  // Keep the graph compact: mild scaling only, so the bounding box stays small
+  // and cy.fit() doesn't have to zoom out to a dot.
+  const spacingScale = Math.min(1.4, 1 + Math.sqrt(nodeCount) / 36);
+  const edgeLengthScale = Math.min(1.3, 1 + Math.sqrt(nodeCount) / 48);
+  const gravityScale = Math.min(1.8, 1 + nodeCount / 200);
+  const padding = Math.round(Math.min(80, 40 + Math.sqrt(nodeCount) * 1.8));
+  const tilingPadding = Math.round(22 + Math.min(24, Math.sqrt(nodeCount) * 1.6));
 
   return {
     ...COSE_BILKENT_LAYOUT,
-    quality: randomize || nodeCount > 180 ? 'proof' : 'default',
-    refresh: randomize ? 8 : nodeCount > 180 ? 10 : 12,
+    // Always use 'default' quality — 'proof' is ~5× slower and the visual gain
+    // is negligible for an interactive overview.
+    quality: 'default',
+    refresh: randomize ? 10 : 16,
     fit: randomize,
     padding,
     nodeDimensionsIncludeLabels: true,
     randomize,
-    nodeRepulsion: Math.round(COSE_BILKENT_LAYOUT.nodeRepulsion * spacingScale * 1.15),
+    nodeRepulsion: Math.round(COSE_BILKENT_LAYOUT.nodeRepulsion * spacingScale),
     idealEdgeLength: Math.round(COSE_BILKENT_LAYOUT.idealEdgeLength * edgeLengthScale),
-    gravity: Math.max(0.14, COSE_BILKENT_LAYOUT.gravity / gravityScale),
-    gravityCompound: Math.max(0.5, COSE_BILKENT_LAYOUT.gravityCompound / Math.min(2, 1 + nodeCount / 180)),
-    gravityRange: Math.max(2.4, COSE_BILKENT_LAYOUT.gravityRange - Math.min(1.2, nodeCount / 240)),
-    gravityRangeCompound: Math.max(1.1, COSE_BILKENT_LAYOUT.gravityRangeCompound - Math.min(0.3, nodeCount / 600)),
+    gravity: Math.max(0.18, COSE_BILKENT_LAYOUT.gravity / gravityScale),
+    gravityCompound: Math.max(0.5, COSE_BILKENT_LAYOUT.gravityCompound / Math.min(2, 1 + nodeCount / 220)),
+    gravityRange: Math.max(2.4, COSE_BILKENT_LAYOUT.gravityRange - Math.min(1.2, nodeCount / 280)),
+    gravityRangeCompound: Math.max(1.1, COSE_BILKENT_LAYOUT.gravityRangeCompound - Math.min(0.3, nodeCount / 700)),
     tilingPaddingVertical: tilingPadding,
     tilingPaddingHorizontal: tilingPadding,
-    initialEnergyOnIncremental: randomize ? 0.78 : Math.min(0.58, 0.4 + nodeCount / 1100),
+    initialEnergyOnIncremental: randomize ? 0.7 : Math.min(0.5, 0.35 + nodeCount / 1400),
+    numIter: randomize ? 1800 : 600,
     stop,
     ...overrides,
   } as any;
@@ -96,8 +101,8 @@ const ZOOM_LABEL_FULL_THRESHOLD = 1.35;
 const LAYOUT_KEY = 'nodus.graph.layout';
 const COMMUNITY_GUIDE_PREFIX = 'guide:comm:';
 const COMMUNITY_GUIDE_MIN_SIZE = 3;
-const DRAG_ELASTIC_DEPTH_PULL = [0.38, 0.16, 0.07];
-const DRAG_ELASTIC_MAX_STEP = 24;
+const DRAG_ELASTIC_DEPTH_PULL = [0.62, 0.30, 0.14];
+const DRAG_ELASTIC_MAX_STEP = 32;
 
 interface DragInfluence {
   id: string;
@@ -133,7 +138,7 @@ function buildDragInfluences(root: any): DragInfluence[] {
         edge.connectedNodes().forEach((neighbor: any) => {
           if (neighbor.id() === item.node.id() || neighbor.id() === root.id()) return;
           const depth = item.depth + 1;
-          const weight = Math.min(0.46, item.strength * DRAG_ELASTIC_DEPTH_PULL[item.depth] * factor);
+          const weight = Math.min(0.7, item.strength * DRAG_ELASTIC_DEPTH_PULL[item.depth] * factor);
           if (weight <= 0.01) return;
           weights.set(neighbor.id(), Math.max(weight, weights.get(neighbor.id()) ?? 0));
           const previousDepth = seenDepth.get(neighbor.id());
@@ -874,7 +879,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     });
   }, [applyElasticDragStep]);
 
-  const runForceRelaxation = useCallback((energy = 0.48) => {
+  const runForceRelaxation = useCallback((energy = 0.85) => {
     const cy = cyRef.current;
     if (!cy || layoutModeRef.current !== 'force') return;
 
@@ -886,16 +891,17 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
       }, {
         fit: false,
-        refresh: 10,
+        refresh: 12,
         initialEnergyOnIncremental: energy,
-        animationDuration: 520,
+        animationDuration: 420,
+        numIter: 500,
       }),
     } as any);
     activeLayoutRef.current = layout;
     layout.run();
   }, [stopActiveLayout]);
 
-  const frameGraph = useCallback((cy: Core, padding = 48) => {
+  const frameGraph = useCallback((cy: Core, padding = 80) => {
     const tutorFocus = lastTutorFocusRef.current;
     if (tutorFocus) {
       focusByIdRef.current(tutorFocus.nodeIds, tutorFocus.edgeId);
@@ -987,6 +993,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       cyRef.current = cytoscape({
         container: containerRef.current,
         elements: [],
+        // Clamp zoom so the graph never feels "super far" nor too tight, and
+        // make wheel zoom feel snappier than the default 1.
+        minZoom: 0.12,
+        maxZoom: 4,
+        wheelSensitivity: 0.35,
         style: [
           {
             selector: 'node',
@@ -1239,7 +1250,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           applyElasticDragStep();
         }
         dragStateRef.current = null;
-        runForceRelaxation(0.48);
+        runForceRelaxation(0.85);
       };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
