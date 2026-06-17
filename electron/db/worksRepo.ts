@@ -19,6 +19,38 @@ export function getWork(nodusId: string): WorkView | null {
   return toView(row, themesFor(nodusId));
 }
 
+/**
+ * Fetch many works by id in two queries (works + themes) instead of N+1.
+ * Returns a Map keyed by nodus_id for O(1) lookup by callers.
+ */
+export function getWorksByIds(nodusIds: string[]): Map<string, WorkView> {
+  const db = getDb();
+  const result = new Map<string, WorkView>();
+  if (nodusIds.length === 0) return result;
+  const placeholders = nodusIds.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM works WHERE nodus_id IN (${placeholders})`).all(...nodusIds) as Work[];
+  if (rows.length === 0) return result;
+  // Batch-load themes for all works in one query.
+  const themeRows = db
+    .prepare(
+      `SELECT wt.nodus_id, t.label
+         FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id
+        WHERE wt.nodus_id IN (${placeholders})
+        ORDER BY wt.nodus_id, t.label`
+    )
+    .all(...nodusIds) as { nodus_id: string; label: string }[];
+  const themesByWork = new Map<string, string[]>();
+  for (const r of themeRows) {
+    const list = themesByWork.get(r.nodus_id) ?? [];
+    list.push(r.label);
+    themesByWork.set(r.nodus_id, list);
+  }
+  for (const row of rows) {
+    result.set(row.nodus_id, toView(row, themesByWork.get(row.nodus_id) ?? []));
+  }
+  return result;
+}
+
 export function getWorkByZoteroKey(zoteroKey: string): Work | null {
   const db = getDb();
   return (db.prepare('SELECT * FROM works WHERE zotero_key = ?').get(zoteroKey) as Work) ?? null;

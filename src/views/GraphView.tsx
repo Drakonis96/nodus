@@ -700,7 +700,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const activeLayoutRef = useRef<any | null>(null);
-  const applySemanticZoomRef = useRef<(cy: Core) => void>(() => {});
+  const applySemanticZoomRef = useRef<(cy: Core, force?: boolean) => void>(() => {});
   const dragStateRef = useRef<DragInteractionState | null>(null);
   const forceLayoutPrimedRef = useRef(false);
   const clearFocusRef = useRef<() => void>(() => {});
@@ -708,6 +708,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const highlightDepthRef = useRef<number | null>(null);
   const lastUserFocusRef = useRef<string | null>(null);
   const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
+  // Track the last semantic-zoom "band" so we only recompute opacities/labels
+  // when the zoom level actually crosses a meaningful threshold, not on every
+  // wheel tick. This is the single biggest perf win for fluidity.
+  const lastZoomBandRef = useRef<number>(-1);
+  // Debounce hover focus so rapid mouse movement across nodes doesn't trigger
+  // a neighbourhood traversal + style recalc on every single element entered.
+  const hoverFocusTimerRef = useRef<number | null>(null);
   // When the Tutor is driving the camera, a container resize should re-apply this focus
   // instead of fitting the whole graph (the node detail panel opening would steal it).
   const lastTutorFocusRef = useRef<{ nodeIds: string[]; edgeId?: string | null } | null>(null);
@@ -1182,6 +1189,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           cy.elements().removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
         });
+        applySemanticZoomRef.current(cy, true);
       };
       const applyFocus = (focus: { primary: any; secondary?: any; context?: any }, spotlightNodes?: any) => {
         const cy = cyRef.current!;
@@ -1200,6 +1208,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           focus.primary.edges().addClass('focus-edge');
           spotlightNodes?.addClass('spotlight');
         });
+        // Protected node set changed → recompute semantic zoom opacities.
+        applySemanticZoomRef.current(cy, true);
       };
       const focusOnNode = (node: any, depthOverride?: number | null) => {
         const focus = collectLocalGraph(node, depthOverride ?? highlightDepthRef.current);
@@ -1302,6 +1312,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
 
       cyRef.current.on('tap', 'node', async (evt) => {
         const node = evt.target;
+        if (hoverFocusTimerRef.current != null) {
+          window.clearTimeout(hoverFocusTimerRef.current);
+          hoverFocusTimerRef.current = null;
+        }
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
@@ -1331,13 +1345,27 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         }
       });
       // Hover highlight: show the node's neighbourhood while hovering, unless the
-      // user has already clicked a node (tap-focus takes priority).
+      // user has already clicked a node (tap-focus takes priority). Debounced so
+      // sweeping the cursor across many nodes doesn't trigger a traversal + style
+      // recalc per element — only the node the cursor actually rests on.
       cyRef.current.on('mouseover', 'node', (evt) => {
         if (lastUserFocusRef.current) return; // tap-focus active → skip hover
-        hoverActiveRef.current = true;
-        focusOnNode(evt.target, 1);
+        if (hoverFocusTimerRef.current != null) {
+          window.clearTimeout(hoverFocusTimerRef.current);
+        }
+        const target = evt.target;
+        hoverFocusTimerRef.current = window.setTimeout(() => {
+          hoverFocusTimerRef.current = null;
+          if (lastUserFocusRef.current) return;
+          hoverActiveRef.current = true;
+          focusOnNode(target, 1);
+        }, 60);
       });
       cyRef.current.on('mouseout', 'node', () => {
+        if (hoverFocusTimerRef.current != null) {
+          window.clearTimeout(hoverFocusTimerRef.current);
+          hoverFocusTimerRef.current = null;
+        }
         if (!hoverActiveRef.current) return;
         hoverActiveRef.current = false;
         if (!lastUserFocusRef.current) clearFocus();
@@ -1347,8 +1375,26 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       // • zoom < ZOOM_LABEL_THRESHOLD → only theme labels (ideas are just dots)
       // • zoom < ZOOM_IDEAS_THRESHOLD → themes + high-degree ideas (top 25%)
       // • zoom ≥ ZOOM_IDEAS_THRESHOLD → everything visible
-      const applySemanticZoom = (cy: Core) => {
+      //
+      // Performance: we quantise the zoom level into discrete bands and only
+      // recompute opacities/label classes when the band changes. This avoids
+      // the O(N+E) style recalc that fired on every single wheel tick, which
+      // was the main reason the graph felt sluggish compared to Obsidian's
+      // WebGL renderer.
+      const ZOOM_BAND_EDGES = [0.18, 0.3, 0.58, 0.65, 0.98, 1.0, 1.35, 1.42];
+      const zoomBand = (z: number) => {
+        let band = 0;
+        for (const edge of ZOOM_BAND_EDGES) {
+          if (z >= edge) band++;
+          else break;
+        }
+        return band;
+      };
+      const applySemanticZoom = (cy: Core, force = false) => {
         const z = cy.zoom();
+        const band = zoomBand(z);
+        if (!force && band === lastZoomBandRef.current) return;
+        lastZoomBandRef.current = band;
         const structurePhase = smoothstep(0.18, 0.58, z);
         const detailPhase = smoothstep(0.6, 1.02, z);
         const fineDetailPhase = smoothstep(1.0, 1.42, z);
@@ -1444,7 +1490,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       });
     }
     applyCommunityGuides(cy);
-    applySemanticZoomRef.current(cy);
+    applySemanticZoomRef.current(cy, true);
     // Reset community state when elements are rebuilt.
     setCommunitiesCollapsed(false);
     let layout: any;

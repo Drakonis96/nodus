@@ -11,7 +11,7 @@ import type {
   IdeaDetail,
   EdgeDetail,
 } from '@shared/types';
-import { getWork } from './worksRepo';
+import { getWorksByIds } from './worksRepo';
 
 const EDGE_TYPES = new Set<EdgeType>([
   'extends',
@@ -274,9 +274,12 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
     development: string;
     confidence: number;
   }[];
+  // Batch-load all works for the occurrences in 2 queries instead of N+1
+  // (previously each occurrence called getWork() → 2 queries each).
+  const worksById = getWorksByIds(occRows.map((o) => o.nodus_id));
   const occurrences = occRows
     .map((o) => {
-      const work = getWork(o.nodus_id);
+      const work = worksById.get(o.nodus_id);
       return work ? { ...o, work } : null;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
