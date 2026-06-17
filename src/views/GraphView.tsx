@@ -20,26 +20,59 @@ const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 // built-in cose, with automatic edge bundling and better compaction.
 const COSE_BILKENT_LAYOUT = {
   name: 'cose-bilkent',
-  animate: 'end',
+  quality: 'default',
+  animate: 'during',
   animationDuration: 600,
   animationEasing: 'ease-in-out-cubic',
   fit: true,
   padding: 60,
+  nodeDimensionsIncludeLabels: false,
+  refresh: 12,
   randomize: false,
-  nodeRepulsion: 8500,
-  idealEdgeLength: 200,
+  nodeRepulsion: 12000,
+  idealEdgeLength: 160,
   edgeElasticity: 0.45,
   nestingFactor: 0.1,
-  gravity: 0.25,
-  numIter: 3000,
+  gravity: 0.32,
+  numIter: 3500,
   tile: true,
   tilingPaddingVertical: 20,
   tilingPaddingHorizontal: 20,
   gravityRangeCompound: 1.5,
   gravityCompound: 1.0,
   gravityRange: 3.8,
-  initialEnergyOnIncremental: 0.8,
+  initialEnergyOnIncremental: 0.6,
 } as any;
+
+function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => void, overrides: Record<string, unknown> = {}) {
+  const nodeCount = Math.max(1, cy.nodes().filter((node) => !node.isParent()).length);
+  const spacingScale = Math.min(2.35, 1 + Math.sqrt(nodeCount) / 18);
+  const edgeLengthScale = Math.min(1.85, 1 + Math.sqrt(nodeCount) / 26);
+  const gravityScale = Math.min(2.1, 1 + nodeCount / 140);
+  const padding = Math.round(Math.min(92, 44 + Math.sqrt(nodeCount) * 2.4));
+  const tilingPadding = Math.round(26 + Math.min(32, Math.sqrt(nodeCount) * 2.1));
+
+  return {
+    ...COSE_BILKENT_LAYOUT,
+    quality: randomize || nodeCount > 180 ? 'proof' : 'default',
+    refresh: randomize ? 8 : nodeCount > 180 ? 10 : 12,
+    fit: randomize,
+    padding,
+    nodeDimensionsIncludeLabels: true,
+    randomize,
+    nodeRepulsion: Math.round(COSE_BILKENT_LAYOUT.nodeRepulsion * spacingScale * 1.15),
+    idealEdgeLength: Math.round(COSE_BILKENT_LAYOUT.idealEdgeLength * edgeLengthScale),
+    gravity: Math.max(0.14, COSE_BILKENT_LAYOUT.gravity / gravityScale),
+    gravityCompound: Math.max(0.5, COSE_BILKENT_LAYOUT.gravityCompound / Math.min(2, 1 + nodeCount / 180)),
+    gravityRange: Math.max(2.4, COSE_BILKENT_LAYOUT.gravityRange - Math.min(1.2, nodeCount / 240)),
+    gravityRangeCompound: Math.max(1.1, COSE_BILKENT_LAYOUT.gravityRangeCompound - Math.min(0.3, nodeCount / 600)),
+    tilingPaddingVertical: tilingPadding,
+    tilingPaddingHorizontal: tilingPadding,
+    initialEnergyOnIncremental: randomize ? 0.78 : Math.min(0.58, 0.4 + nodeCount / 1100),
+    stop,
+    ...overrides,
+  } as any;
+}
 
 // Color palette for edge types — distinct hues for quick visual discrimination.
 const EDGE_TYPE_COLORS: Record<string, string> = {
@@ -57,8 +90,107 @@ const EDGE_TYPE_COLORS: Record<string, string> = {
 };
 const ZOOM_LABEL_THRESHOLD = 0.3;   // below this, hide all idea labels
 const ZOOM_IDEAS_THRESHOLD = 0.65;  // above this, show all idea labels
+const ZOOM_LABEL_DETAIL_THRESHOLD = 0.98;
+const ZOOM_LABEL_FULL_THRESHOLD = 1.35;
 
 const LAYOUT_KEY = 'nodus.graph.layout';
+const COMMUNITY_GUIDE_PREFIX = 'guide:comm:';
+const COMMUNITY_GUIDE_MIN_SIZE = 3;
+const DRAG_ELASTIC_DEPTH_PULL = [0.38, 0.16, 0.07];
+const DRAG_ELASTIC_MAX_STEP = 24;
+
+interface DragInfluence {
+  id: string;
+  weight: number;
+}
+
+interface DragInteractionState {
+  nodeId: string;
+  influences: DragInfluence[];
+  lastPosition: { x: number; y: number };
+  pendingDx: number;
+  pendingDy: number;
+  frameId: number | null;
+}
+
+function edgeElasticFactor(edge: any): number {
+  const confidence = Math.min(1, Math.max(0.15, Number(edge.data('confidence') ?? 0.5)));
+  const structuralDamping = edge.data('type') === 'contains' ? 0.62 : 1;
+  return (0.35 + confidence * 0.65) * structuralDamping;
+}
+
+function buildDragInfluences(root: any): DragInfluence[] {
+  const seenDepth = new Map<string, number>([[root.id(), 0]]);
+  const weights = new Map<string, number>();
+  let frontier = [{ node: root, strength: 1, depth: 0 }];
+
+  while (frontier.length > 0) {
+    const next: Array<{ node: any; strength: number; depth: number }> = [];
+    for (const item of frontier) {
+      if (item.depth >= DRAG_ELASTIC_DEPTH_PULL.length) continue;
+      item.node.connectedEdges().forEach((edge: any) => {
+        const factor = edgeElasticFactor(edge);
+        edge.connectedNodes().forEach((neighbor: any) => {
+          if (neighbor.id() === item.node.id() || neighbor.id() === root.id()) return;
+          const depth = item.depth + 1;
+          const weight = Math.min(0.46, item.strength * DRAG_ELASTIC_DEPTH_PULL[item.depth] * factor);
+          if (weight <= 0.01) return;
+          weights.set(neighbor.id(), Math.max(weight, weights.get(neighbor.id()) ?? 0));
+          const previousDepth = seenDepth.get(neighbor.id());
+          if (previousDepth == null || depth < previousDepth) {
+            seenDepth.set(neighbor.id(), depth);
+            next.push({ node: neighbor, strength: weight, depth });
+          }
+        });
+      });
+    }
+    frontier = next;
+  }
+
+  return [...weights.entries()]
+    .map(([id, weight]) => ({ id, weight }))
+    .sort((a, b) => b.weight - a.weight);
+}
+
+function nodeLabelScore(node: GraphData['nodes'][number], degree: number): number {
+  const workCount = Number(node.workCount ?? 0);
+  const confidence = Number(node.maxConfidence ?? 0);
+  if (node.type === 'theme') return 1000 + workCount * 10 + degree * 12;
+  if (node.type === 'author') return degree * 12 + workCount * 4 + confidence * 2;
+  return degree * 14 + workCount * 3 + confidence * 6;
+}
+
+function themeNodeSize(workCount: number): number {
+  return 30 + Math.min(14, Math.sqrt(Math.max(0, workCount)) * 3.1);
+}
+
+function ideaNodeSize(degree: number): number {
+  return 17 + Math.min(15, Math.sqrt(Math.max(0, degree)) * 3.4);
+}
+
+function clampUnit(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  if (edge0 === edge1) return value < edge0 ? 0 : 1;
+  const t = clampUnit((value - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+function mix(start: number, end: number, amount: number): number {
+  return start + (end - start) * amount;
+}
+
+function snapshotNodePositions(cy: Core): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+  cy.nodes().forEach((node) => {
+    if (node.isParent()) return;
+    const position = node.position();
+    positions.set(node.id(), { x: position.x, y: position.y });
+  });
+  return positions;
+}
 
 /**
  * Deterministic radial layout: theme hubs sit in a compact regular polygon and
@@ -367,8 +499,9 @@ function loadHighlightDepth(): number | null {
   return Math.min(8, Math.max(1, Math.round(parsed)));
 }
 
-function collectLocalGraph(startNode: any, maxDepth: number | null): { primary: any; context: any } {
+function collectLocalGraph(startNode: any, maxDepth: number | null): { center: any; primary: any; secondary: any; context: any } {
   const cy = startNode.cy();
+  const center = cy.collection(startNode);
   if (startNode.data('type') === 'theme') {
     const memberEdges = startNode.connectedEdges().filter((edge: any) => edge.data('type') === 'contains');
     const members = memberEdges.connectedNodes().filter((node: any) => node.id() !== startNode.id());
@@ -378,11 +511,17 @@ function collectLocalGraph(startNode: any, maxDepth: number | null): { primary: 
       const nodes = edge.connectedNodes().toArray();
       return nodes.every((node: any) => memberIds.has(node.id()));
     });
-    return { primary: cy.collection(startNode).union(members).union(memberLinks), context: memberEdges };
+    return {
+      center,
+      primary: center.union(members).union(memberEdges),
+      secondary: memberLinks,
+      context: cy.collection(),
+    };
   }
 
   const visited = new Set<string>([startNode.id()]);
-  let primary = cy.collection(startNode);
+  let primary = center;
+  let secondary = cy.collection();
   let frontier = [startNode];
   let depth = 0;
 
@@ -395,7 +534,8 @@ function collectLocalGraph(startNode: any, maxDepth: number | null): { primary: 
         .forEach((edge: any) => {
           const neighbors = edge.connectedNodes().filter((neighbor: any) => neighbor.id() !== node.id() && neighbor.data('type') !== 'theme');
           neighbors.forEach((neighbor: any) => {
-            primary = primary.union(edge).union(neighbor);
+            if (depth === 0) primary = primary.union(edge).union(neighbor);
+            else secondary = secondary.union(edge).union(neighbor);
             if (!visited.has(neighbor.id())) {
               visited.add(neighbor.id());
               next.push(neighbor);
@@ -408,14 +548,16 @@ function collectLocalGraph(startNode: any, maxDepth: number | null): { primary: 
   }
 
   let context = cy.collection();
-  primary.nodes().forEach((node: any) => {
+  primary.union(secondary).nodes().forEach((node: any) => {
     if (node.data('type') === 'theme') return;
     node.connectedEdges().filter((edge: any) => edge.data('type') === 'contains').forEach((edge: any) => {
       context = context.union(edge).union(edge.connectedNodes().filter((neighbor: any) => neighbor.data('type') === 'theme'));
     });
   });
 
-  return { primary, context };
+  context = context.difference(primary.union(secondary));
+
+  return { center, primary, secondary, context };
 }
 
 function primaryThemeEdges(edges: GraphData['edges']): GraphData['edges'] {
@@ -552,6 +694,10 @@ const COMMUNITY_COLORS = [
 export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const activeLayoutRef = useRef<any | null>(null);
+  const applySemanticZoomRef = useRef<(cy: Core) => void>(() => {});
+  const dragStateRef = useRef<DragInteractionState | null>(null);
+  const forceLayoutPrimedRef = useRef(false);
   const clearFocusRef = useRef<() => void>(() => {});
   const focusNodeByIdRef = useRef<(nodeId: string) => void>(() => {});
   const highlightDepthRef = useRef<number | null>(null);
@@ -578,12 +724,14 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const [communitiesCollapsed, setCommunitiesCollapsed] = useState(false);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const communitiesRef = useRef<Map<string, number>>(new Map());
+  const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
   }, [filters]);
 
   useEffect(() => {
+    layoutModeRef.current = layoutMode;
     localStorage.setItem(LAYOUT_KEY, layoutMode);
   }, [layoutMode]);
 
@@ -617,6 +765,136 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   // having to leave and re-open the view.
   useScanComplete(reload);
 
+  const cancelPendingDragFrame = useCallback(() => {
+    const state = dragStateRef.current;
+    if (!state || state.frameId == null) return;
+    window.cancelAnimationFrame(state.frameId);
+    state.frameId = null;
+  }, []);
+
+  const stopActiveLayout = useCallback(() => {
+    activeLayoutRef.current?.stop?.();
+    activeLayoutRef.current = null;
+  }, []);
+
+  const removeCommunityGuides = useCallback((cy: Core) => {
+    const guides = cy.nodes('[type="community-guide"]');
+    if (guides.empty()) return;
+    cy.batch(() => {
+      guides.forEach((guide) => {
+        guide.children().forEach((child) => {
+          child.move({ parent: null });
+        });
+      });
+      guides.remove();
+    });
+  }, []);
+
+  const applyCommunityGuides = useCallback((cy: Core) => {
+    removeCommunityGuides(cy);
+    if (layoutModeRef.current !== 'force' || lens !== 'ideas') return;
+
+    const commMap = louvain(cy);
+    communitiesRef.current = commMap;
+    const groups = new Map<number, string[]>();
+    for (const [nodeId, commId] of commMap) {
+      const node = cy.getElementById(nodeId);
+      if (node.empty() || node.isParent()) continue;
+      if (!groups.has(commId)) groups.set(commId, []);
+      groups.get(commId)!.push(nodeId);
+    }
+
+    const validGroups = [...groups.entries()].filter(([, nodeIds]) => nodeIds.length >= COMMUNITY_GUIDE_MIN_SIZE);
+    if (validGroups.length < 2) return;
+
+    cy.batch(() => {
+      for (const [commId, nodeIds] of validGroups) {
+        const parentId = `${COMMUNITY_GUIDE_PREFIX}${commId}`;
+        cy.add({
+          group: 'nodes',
+          data: {
+            id: parentId,
+            type: 'community-guide',
+            guidePadding: Math.round(40 + Math.min(56, Math.sqrt(nodeIds.length) * 8)),
+          },
+        });
+      }
+
+      for (const [commId, nodeIds] of validGroups) {
+        const parentId = `${COMMUNITY_GUIDE_PREFIX}${commId}`;
+        for (const nodeId of nodeIds) {
+          const node = cy.getElementById(nodeId);
+          if (node.nonempty() && !node.isParent()) node.move({ parent: parentId });
+        }
+      }
+    });
+
+    cy.nodes('[type="community-guide"]').forEach((guide) => {
+      guide.ungrabify();
+      guide.unselectify();
+    });
+  }, [lens, removeCommunityGuides]);
+
+  const applyElasticDragStep = useCallback(() => {
+    const cy = cyRef.current;
+    const state = dragStateRef.current;
+    if (!cy || !state) return;
+
+    state.frameId = null;
+    const dx = state.pendingDx;
+    const dy = state.pendingDy;
+    state.pendingDx = 0;
+    state.pendingDy = 0;
+
+    const magnitude = Math.hypot(dx, dy);
+    if (magnitude < 0.01) return;
+
+    const scale = magnitude > DRAG_ELASTIC_MAX_STEP ? DRAG_ELASTIC_MAX_STEP / magnitude : 1;
+    const moveX = dx * scale;
+    const moveY = dy * scale;
+
+    cy.batch(() => {
+      for (const influence of state.influences) {
+        const node = cy.getElementById(influence.id);
+        if (node.empty() || node.grabbed()) continue;
+        const position = node.position();
+        node.position({
+          x: position.x + moveX * influence.weight,
+          y: position.y + moveY * influence.weight,
+        });
+      }
+    });
+  }, []);
+
+  const scheduleElasticDragStep = useCallback(() => {
+    const state = dragStateRef.current;
+    if (!state || state.frameId != null) return;
+    state.frameId = window.requestAnimationFrame(() => {
+      applyElasticDragStep();
+    });
+  }, [applyElasticDragStep]);
+
+  const runForceRelaxation = useCallback((energy = 0.48) => {
+    const cy = cyRef.current;
+    if (!cy || layoutModeRef.current !== 'force') return;
+
+    stopActiveLayout();
+    let layout: any;
+    layout = cy.layout({
+      ...createForceLayoutOptions(cy, false, () => {
+        forceLayoutPrimedRef.current = true;
+        if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+      }, {
+        fit: false,
+        refresh: 10,
+        initialEnergyOnIncremental: energy,
+        animationDuration: 520,
+      }),
+    } as any);
+    activeLayoutRef.current = layout;
+    layout.run();
+  }, [stopActiveLayout]);
+
   const elements = useMemo<ElementDefinition[]>(() => {
     const f = filters;
     const q = f.search.toLowerCase();
@@ -642,6 +920,27 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       if (f.basis === 'explicit' && e.basis !== 'explicit') return false;
       return true;
     }));
+
+    const degreeById = new Map<string, number>();
+    for (const node of visibleNodes) degreeById.set(node.id, 0);
+    for (const edge of visibleEdges) {
+      degreeById.set(edge.source, (degreeById.get(edge.source) ?? 0) + 1);
+      degreeById.set(edge.target, (degreeById.get(edge.target) ?? 0) + 1);
+    }
+
+    const rankedNodes = visibleNodes
+      .filter((node) => node.type !== 'theme')
+      .map((node) => ({
+        id: node.id,
+        score: nodeLabelScore(node, degreeById.get(node.id) ?? 0),
+      }))
+      .sort((a, b) => b.score - a.score);
+    const labelRankById = new Map<string, number>();
+    rankedNodes.forEach((node, index) => {
+      const rank = rankedNodes.length <= 1 ? 1 : 1 - index / (rankedNodes.length - 1);
+      labelRankById.set(node.id, rank);
+    });
+
     return [
       ...visibleNodes.map((n) => ({
         data: {
@@ -651,7 +950,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           // Degree is computed below after edges are built.
           // Placeholder — will be overwritten once we know the edge count per node.
           _workCount: n.workCount,
-          size: n.type === 'theme' ? 38 + Math.min(56, n.workCount * 10) : 20,
+          degree: degreeById.get(n.id) ?? 0,
+          labelRank: n.type === 'theme' ? 1.2 : labelRankById.get(n.id) ?? 0,
+          size: n.type === 'theme' ? themeNodeSize(n.workCount) : ideaNodeSize(degreeById.get(n.id) ?? 0),
           read: n.read,
         },
       })),
@@ -659,11 +960,12 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         data: { id: e.id, source: e.source, target: e.target, type: e.type, basis: e.basis, confidence: e.confidence },
       })),
     ].map((el: any) => {
-      // For idea nodes, compute degree from the visible edges and use it for sizing.
+      // For idea nodes, compute degree from the visible edges and use a softer
+      // square-root scale so important nodes stand out without dominating the graph.
       if (el.data.source) return el; // skip edges
       if (el.data.type === 'theme') return el; // theme size stays workCount-based
-      const degree = visibleEdges.filter((e) => e.source === el.data.id || e.target === el.data.id).length;
-      el.data.size = 18 + Math.min(48, degree * 5);
+      const degree = degreeById.get(el.data.id) ?? 0;
+      el.data.size = ideaNodeSize(degree);
       return el;
     });
   }, [data, filters, lens]);
@@ -693,56 +995,70 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
               // Outline keeps labels legible where they cross edges or other nodes.
               'text-outline-width': 2.5,
               'text-outline-color': lightTheme ? '#ffffff' : '#0a0a0a',
-              'text-outline-opacity': lightTheme ? 0.95 : 0.9,
+              'text-outline-opacity': lightTheme ? 0.8 : 0.72,
               width: 'data(size)',
               height: 'data(size)',
+              opacity: 'data(baseOpacity)',
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
               'border-color': '#737373',
               'border-style': 'dashed',
-              'transition-property': 'opacity, border-width, border-color, overlay-opacity',
-              'transition-duration': '0.2s',
+              'transition-property': 'opacity, text-opacity, text-outline-opacity, border-width, border-color, overlay-opacity',
+              'transition-duration': '0.28s',
               'transition-timing-function': 'ease-in-out',
             } as any,
           },
           // Theme hubs get a soft solid halo so the centre reads as the backbone.
           {
             selector: 'node[type="theme"]',
-            style: { 'border-width': 3, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.5 } as any,
+            style: { 'border-width': 2.5, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.34 } as any,
           },
           // Community compound nodes (collapsed clusters).
           {
             selector: 'node[type="community"]',
             style: {
               'background-color': 'rgba(99,102,241,0.08)',
-              'background-opacity': 1,
+              'background-opacity': 0.72,
               'border-width': 2,
               'border-color': '#6366f1',
               'border-style': 'dashed',
-              'border-opacity': 0.4,
+              'border-opacity': 0.24,
               shape: 'round-rectangle',
               'text-valign': 'top',
               'text-margin-y': 8,
               'font-size': 11,
               'font-weight': 700,
-              color: '#a5b4fc',
+              color: '#c7d2fe',
               'text-outline-width': 2,
               'text-outline-color': '#0a0a0a',
-              'text-outline-opacity': 0.8,
+              'text-outline-opacity': 0.55,
               padding: 20,
+            } as any,
+          },
+          {
+            selector: 'node[type="community-guide"]',
+            style: {
+              label: '',
+              'background-opacity': 0,
+              'border-opacity': 0,
+              'text-opacity': 0,
+              'overlay-opacity': 0,
+              padding: (ele: any) => ele.data('guidePadding') ?? 48,
+              events: 'no',
             } as any,
           },
           {
             selector: 'edge',
             style: {
-              width: (ele: any) => 0.7 + ele.data('confidence') * 1.4,
+              width: (ele: any) => 0.45 + ele.data('confidence') * 0.95,
               'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
               'line-style': (ele: any) => (ele.data('basis') === 'inferred' ? 'dashed' : 'solid'),
-              opacity: (ele: any) => 0.14 + ele.data('confidence') * 0.34,
+              opacity: 'data(baseOpacity)',
               'target-arrow-shape': 'triangle',
               'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
+              'arrow-scale': 0.7,
               'curve-style': 'bezier',
-              'transition-property': 'opacity, line-color, width, target-arrow-color',
-              'transition-duration': '0.2s',
+              'transition-property': 'opacity, line-color, width, target-arrow-color, source-arrow-color',
+              'transition-duration': '0.28s',
               'transition-timing-function': 'ease-in-out',
             } as any,
           },
@@ -752,66 +1068,89 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             style: {
               'line-style': 'solid',
               'line-color': '#3f3f46',
-              width: 0.8,
-              opacity: 0.1,
+              width: 0.55,
+              opacity: 'data(baseOpacity)',
               'target-arrow-shape': 'none',
             } as any,
           },
-          { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1 } as any },
+          { selector: 'node:selected', style: { 'border-width': 3, 'border-color': '#818cf8', 'border-style': 'solid', 'border-opacity': 1, 'text-opacity': 1 } as any },
           // Semantic zoom: hide labels at low zoom for clarity. These come before
           // focus styles so that focus-node/context-node override them.
           { selector: 'node.zoom-label-hidden', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
-          { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
+          { selector: 'node.zoom-label-muted', style: { 'text-opacity': 0.08, 'text-outline-opacity': 0.12 } as any },
+          { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0.24, 'text-outline-opacity': 0.28 } as any },
           // Focus mode: everything not in the tapped traversal fades back.
-          { selector: '.faded', style: { opacity: 0.22, 'text-opacity': 0.18 } as any },
+          { selector: 'node.faded', style: { opacity: 0.3, 'text-opacity': 0.12, 'text-outline-opacity': 0.12 } as any },
+          { selector: 'edge.faded', style: { opacity: 0.07 } as any },
           {
             selector: 'node.focus-node',
             style: {
-              opacity: 1,
-              'text-opacity': 1,
-              'border-width': 3,
-              'border-color': '#a5b4fc',
+              opacity: 0.96,
+              'text-opacity': 0.94,
+              'border-width': 2.5,
+              'border-color': '#c7d2fe',
               'border-style': 'solid',
-              'border-opacity': 0.95,
+              'border-opacity': 0.72,
               'overlay-color': '#818cf8',
-              'overlay-opacity': 0.08,
-              'overlay-padding': 7,
-              'z-index': 20,
+              'overlay-opacity': 0.05,
+              'overlay-padding': 5,
+              'z-index': 18,
             } as any,
           },
           {
             selector: 'edge.focus-edge',
             style: {
-              width: (ele: any) => 2.6 + ele.data('confidence') * 3.4,
+              width: (ele: any) => 1.9 + ele.data('confidence') * 2.2,
               'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
               'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
-              opacity: 0.98,
-              'z-index': 30,
+              'arrow-scale': 0.92,
+              opacity: 0.96,
+              'z-index': 26,
+            } as any,
+          },
+          {
+            selector: 'node.secondary-node',
+            style: {
+              opacity: 0.78,
+              'text-opacity': 0.76,
+              'border-width': 2,
+              'border-color': '#93c5fd',
+              'border-style': 'solid',
+              'border-opacity': 0.42,
+              'z-index': 14,
+            } as any,
+          },
+          {
+            selector: 'edge.secondary-edge',
+            style: {
+              width: (ele: any) => 1.0 + ele.data('confidence') * 0.95,
+              opacity: 0.38,
+              'z-index': 16,
             } as any,
           },
           {
             selector: 'node.context-node',
             style: {
-              opacity: 0.85,
-              'text-opacity': 0.85,
-              'border-width': 2,
+              opacity: 0.64,
+              'text-opacity': 0.62,
+              'border-width': 1.5,
               'border-color': '#f59e0b',
               'border-style': 'solid',
-              'border-opacity': 0.55,
-              'z-index': 12,
+              'border-opacity': 0.35,
+              'z-index': 10,
             } as any,
           },
           {
             selector: 'edge.context-edge',
             style: {
-              width: 1.2,
+              width: 0.72,
               'line-color': '#f59e0b',
-              opacity: 0.34,
+              opacity: 0.16,
               'target-arrow-shape': 'none',
-              'z-index': 10,
+              'z-index': 9,
             } as any,
           },
-          { selector: 'node.spotlight', style: { 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.16 } as any },
+          { selector: 'node.spotlight', style: { opacity: 1, 'text-opacity': 1, 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.12, 'overlay-padding': 9, 'z-index': 32 } as any },
         ],
         layout: COSE_BILKENT_LAYOUT,
       });
@@ -819,28 +1158,31 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const removeFocusClasses = () => {
         const cy = cyRef.current!;
         cy.batch(() => {
-          cy.elements().removeClass('faded focus-node focus-edge context-node context-edge');
+          cy.elements().removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
         });
       };
-      const applyFocus = (primary: any, context?: any, spotlightNodes?: any) => {
+      const applyFocus = (focus: { primary: any; secondary?: any; context?: any }, spotlightNodes?: any) => {
         const cy = cyRef.current!;
         cy.batch(() => {
-          cy.elements().removeClass('focus-node focus-edge context-node context-edge');
+          cy.elements().removeClass('focus-node focus-edge secondary-node secondary-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
           cy.elements().addClass('faded');
-          context?.removeClass('faded');
-          context?.nodes().addClass('context-node');
-          context?.edges().addClass('context-edge');
-          primary.removeClass('faded');
-          primary.nodes().addClass('focus-node');
-          primary.edges().addClass('focus-edge');
+          focus.context?.removeClass('faded');
+          focus.context?.nodes().addClass('context-node');
+          focus.context?.edges().addClass('context-edge');
+          focus.secondary?.removeClass('faded');
+          focus.secondary?.nodes().addClass('secondary-node');
+          focus.secondary?.edges().addClass('secondary-edge');
+          focus.primary.removeClass('faded');
+          focus.primary.nodes().addClass('focus-node');
+          focus.primary.edges().addClass('focus-edge');
           spotlightNodes?.addClass('spotlight');
         });
       };
-      const focusOnNode = (node: any) => {
-        const focus = collectLocalGraph(node, highlightDepthRef.current);
-        applyFocus(focus.primary, focus.context, node);
+      const focusOnNode = (node: any, depthOverride?: number | null) => {
+        const focus = collectLocalGraph(node, depthOverride ?? highlightDepthRef.current);
+        applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
       };
       const clearFocus = () => {
         removeFocusClasses();
@@ -853,6 +1195,41 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       focusNodeByIdRef.current = (nodeId: string) => {
         const node = cyRef.current?.getElementById(nodeId);
         if (node?.nonempty()) focusOnNode(node);
+      };
+
+      const beginElasticDrag = (node: any) => {
+        if (layoutModeRef.current !== 'force' || node.isParent()) return;
+        stopActiveLayout();
+        cancelPendingDragFrame();
+        dragStateRef.current = {
+          nodeId: node.id(),
+          influences: buildDragInfluences(node),
+          lastPosition: { ...node.position() },
+          pendingDx: 0,
+          pendingDy: 0,
+          frameId: null,
+        };
+      };
+
+      const updateElasticDrag = (node: any) => {
+        const state = dragStateRef.current;
+        if (!state || state.nodeId !== node.id()) return;
+        const position = node.position();
+        state.pendingDx += position.x - state.lastPosition.x;
+        state.pendingDy += position.y - state.lastPosition.y;
+        state.lastPosition = { ...position };
+        scheduleElasticDragStep();
+      };
+
+      const endElasticDrag = (node: any) => {
+        const state = dragStateRef.current;
+        if (!state || state.nodeId !== node.id()) return;
+        cancelPendingDragFrame();
+        if (Math.abs(state.pendingDx) > 0.01 || Math.abs(state.pendingDy) > 0.01) {
+          applyElasticDragStep();
+        }
+        dragStateRef.current = null;
+        runForceRelaxation(0.48);
       };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
@@ -879,7 +1256,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         }
         const keep = targetNodes.closedNeighborhood();
         lastUserFocusRef.current = null;
-        applyFocus(keep, undefined, targetNodes);
+        applyFocus({ primary: keep }, targetNodes);
         // Center on the stop node(s); pick a zoom that frames the immediate
         // neighbourhood, clamped so it is never too tight nor too far.
         const pad = 110;
@@ -891,6 +1268,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         const zoom = Math.max(0.85, Math.min(1.2, fitZoom));
         cy.animate({ center: { eles: targetNodes }, zoom }, { duration: 500, easing: 'ease-in-out-cubic' });
       };
+
+      cyRef.current.on('grab', 'node', (evt) => {
+        beginElasticDrag(evt.target);
+      });
+      cyRef.current.on('drag', 'node', (evt) => {
+        updateElasticDrag(evt.target);
+      });
+      cyRef.current.on('free', 'node', (evt) => {
+        endElasticDrag(evt.target);
+      });
 
       cyRef.current.on('tap', 'node', async (evt) => {
         const node = evt.target;
@@ -910,7 +1297,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = null;
-        applyFocus(edge.connectedNodes().add(edge), undefined, edge.connectedNodes());
+        applyFocus({ primary: edge.connectedNodes().add(edge) }, edge.connectedNodes());
         setIdeaDetail(null);
         setEdgeDetail(await window.nodus.getEdgeDetail(edge.id()));
       });
@@ -927,7 +1314,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       cyRef.current.on('mouseover', 'node', (evt) => {
         if (lastUserFocusRef.current) return; // tap-focus active → skip hover
         hoverActiveRef.current = true;
-        focusOnNode(evt.target);
+        focusOnNode(evt.target, 1);
       });
       cyRef.current.on('mouseout', 'node', () => {
         if (!hoverActiveRef.current) return;
@@ -941,49 +1328,109 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       // • zoom ≥ ZOOM_IDEAS_THRESHOLD → everything visible
       const applySemanticZoom = (cy: Core) => {
         const z = cy.zoom();
+        const structurePhase = smoothstep(0.18, 0.58, z);
+        const detailPhase = smoothstep(0.6, 1.02, z);
+        const fineDetailPhase = smoothstep(1.0, 1.42, z);
         cy.batch(() => {
           // Never hide labels on focused / spotlighted / context nodes.
-          const protectedNodes = cy.nodes('.focus-node, .spotlight, .context-node');
+          const protectedNodes = cy.nodes('.focus-node, .secondary-node, .spotlight, .context-node, :selected');
           const protectedSet = new Set(protectedNodes.map((n: any) => n.id()));
-          const ideas = cy.nodes('[type!="theme"]').filter((n: any) => !protectedSet.has(n.id()));
-          const themes = cy.nodes('[type="theme"]').filter((n: any) => !protectedSet.has(n.id()));
+          const labelNodes = cy.nodes().filter((n: any) => !n.isParent() && !protectedSet.has(n.id()));
+          const alwaysVisible = labelNodes.filter((n: any) => {
+            const type = n.data('type');
+            return type === 'theme' || type === 'community';
+          });
+          const ranked = labelNodes.filter((n: any) => {
+            const type = n.data('type');
+            return type !== 'theme' && type !== 'community';
+          });
+          const allRenderableNodes = cy.nodes().filter((n: any) => !n.isParent());
+          const protectedEdgeIds = new Set<string>(
+            cy
+              .edges('.focus-edge, .secondary-edge, .context-edge')
+              .map((edge: any) => edge.id())
+          );
 
-          if (z < ZOOM_LABEL_THRESHOLD) {
-            // Far zoom: hide all idea labels, keep theme labels
-            ideas.addClass('zoom-label-hidden');
-            ideas.removeClass('zoom-label-mid');
-            themes.removeClass('zoom-label-hidden zoom-label-mid');
-          } else if (z < ZOOM_IDEAS_THRESHOLD) {
-            // Mid zoom: themes always visible, only high-degree ideas shown
-            themes.removeClass('zoom-label-hidden zoom-label-mid');
-            ideas.removeClass('zoom-label-hidden');
-            ideas.addClass('zoom-label-mid');
-            // Show top 25% ideas by degree
-            if (ideas.length > 0) {
-              const degrees = ideas.map((n: any) => n.degree(false)).sort((a: number, b: number) => b - a);
-              const cutoff = degrees[Math.max(0, Math.floor(degrees.length * 0.25))] ?? 1;
-              ideas.forEach((n: any) => {
-                if (n.degree(false) >= cutoff) n.removeClass('zoom-label-mid');
-                else n.addClass('zoom-label-mid');
-              });
+          labelNodes.removeClass('zoom-label-hidden zoom-label-muted zoom-label-mid');
+          protectedNodes.removeClass('zoom-label-hidden zoom-label-muted zoom-label-mid');
+          alwaysVisible.removeClass('zoom-label-hidden zoom-label-muted zoom-label-mid');
+
+          allRenderableNodes.forEach((node: any) => {
+            const type = node.data('type');
+            const rank = Number(node.data('labelRank') ?? 0);
+            let opacity = 1;
+            if (type === 'theme' || type === 'community') {
+              opacity = mix(0.62, 0.94, structurePhase);
+            } else if (!protectedSet.has(node.id())) {
+              const presence = clampUnit(rank * 0.95 + detailPhase * 0.34 + fineDetailPhase * 0.18);
+              opacity = mix(0.1, 0.9, presence);
             }
-          } else {
-            // Close zoom: everything visible
-            ideas.removeClass('zoom-label-hidden zoom-label-mid');
-            themes.removeClass('zoom-label-hidden zoom-label-mid');
-          }
+            node.data('baseOpacity', opacity);
+          });
+
+          cy.edges().forEach((edge: any) => {
+            const confidence = Math.min(1, Math.max(0, Number(edge.data('confidence') ?? 0.5)));
+            const isStructural = edge.data('type') === 'contains';
+            const importance = isStructural ? 0.12 : 0.26 + confidence * 0.44;
+            const phase = isStructural ? structurePhase : mix(structurePhase, 1, detailPhase * 0.55);
+            const opacity = protectedEdgeIds.has(edge.id())
+              ? edge.hasClass('focus-edge')
+                ? 0.96
+                : edge.hasClass('secondary-edge')
+                  ? 0.42
+                  : 0.18
+              : mix(isStructural ? 0.008 : 0.02, isStructural ? 0.08 : 0.18, clampUnit(importance * phase));
+            edge.data('baseOpacity', opacity);
+          });
+
+          ranked.forEach((node: any) => {
+            const rank = Number(node.data('labelRank') ?? 0);
+            let mode: 'full' | 'mid' | 'muted' | 'hidden' = 'full';
+
+            const reveal = clampUnit(rank * 1.18 + structurePhase * 0.22 + detailPhase * 0.52 + fineDetailPhase * 0.34);
+            const fullCutoff = mix(1.18, 0.28, detailPhase);
+            const midCutoff = mix(0.98, 0.14, fineDetailPhase);
+            const mutedCutoff = mix(0.82, 0.05, detailPhase);
+
+            if (reveal >= fullCutoff || z >= ZOOM_LABEL_FULL_THRESHOLD) mode = 'full';
+            else if (reveal >= midCutoff || z >= ZOOM_LABEL_DETAIL_THRESHOLD) mode = 'mid';
+            else if (reveal >= mutedCutoff || z >= ZOOM_LABEL_THRESHOLD) mode = 'muted';
+            else mode = 'hidden';
+
+            if (mode === 'hidden') node.addClass('zoom-label-hidden');
+            if (mode === 'muted') node.addClass('zoom-label-muted');
+            if (mode === 'mid') node.addClass('zoom-label-mid');
+          });
         });
       };
-      cyRef.current.on('zoom', () => applySemanticZoom(cyRef.current!));
+      applySemanticZoomRef.current = applySemanticZoom;
+      cyRef.current.on('zoom', () => applySemanticZoomRef.current(cyRef.current!));
     }
     const cy = cyRef.current;
+    const previousPositions = snapshotNodePositions(cy);
+    stopActiveLayout();
+    cancelPendingDragFrame();
+    dragStateRef.current = null;
     cy.elements().remove();
     cy.add(elements);
+    if (previousPositions.size > 0) {
+      cy.batch(() => {
+        cy.nodes().forEach((node) => {
+          if (node.isParent()) return;
+          const position = previousPositions.get(node.id());
+          if (position) node.position(position);
+        });
+      });
+    }
+    applyCommunityGuides(cy);
+    applySemanticZoomRef.current(cy);
     // Reset community state when elements are rebuilt.
     setCommunitiesCollapsed(false);
-    // Always frame the whole graph after laying out, so it neither overflows the
-    // viewport nor sits as a tiny clump regardless of how cose spread the nodes.
-    cy.one('layoutstop', () => cy.fit(undefined, 60));
+    let layout: any;
+    const forceLayout = createForceLayoutOptions(cy, !forceLayoutPrimedRef.current || previousPositions.size === 0, () => {
+      forceLayoutPrimedRef.current = true;
+      if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+    });
     // Layout selection: force-directed (cose-bilkent) or deterministic radial.
     if (layoutMode === 'radial') {
       const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
@@ -998,12 +1445,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           animationEasing: 'ease-in-out-cubic',
         } as any).run();
       } else {
-        cy.layout({ ...COSE_BILKENT_LAYOUT, animate: false }).run();
+        layout = cy.layout(forceLayout);
+        activeLayoutRef.current = layout;
+        layout.run();
       }
     } else {
-      cy.layout(COSE_BILKENT_LAYOUT).run();
+      layout = cy.layout(forceLayout);
+      activeLayoutRef.current = layout;
+      layout.run();
     }
-  }, [elements, lens, layoutMode]);
+  }, [applyCommunityGuides, applyElasticDragStep, cancelPendingDragFrame, elements, lens, layoutMode, runForceRelaxation, scheduleElasticDragStep, stopActiveLayout]);
 
   // Keep the graph framed when the window or panels resize.
   useEffect(() => {
@@ -1145,10 +1596,21 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         });
         parents.remove();
       });
+      applyCommunityGuides(cy);
       // Re-layout after expand.
-      cy.layout({ ...COSE_BILKENT_LAYOUT, animate: true, animationDuration: 400, randomize: false }).run();
+      stopActiveLayout();
+      const layout = cy.layout({
+        ...createForceLayoutOptions(cy, false, () => {
+          if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+        }),
+        fit: false,
+        animationDuration: 400,
+      } as any);
+      activeLayoutRef.current = layout;
+      layout.run();
       setCommunitiesCollapsed(false);
     } else {
+      removeCommunityGuides(cy);
       // Collapse: detect communities and create compound nodes.
       const commMap = louvain(cy);
       communitiesRef.current = commMap;
@@ -1186,10 +1648,19 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         }
       });
       // Re-layout after collapse.
-      cy.layout({ ...COSE_BILKENT_LAYOUT, animate: true, animationDuration: 400, randomize: false }).run();
+      stopActiveLayout();
+      const layout = cy.layout({
+        ...createForceLayoutOptions(cy, false, () => {
+          if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+        }),
+        fit: false,
+        animationDuration: 400,
+      } as any);
+      activeLayoutRef.current = layout;
+      layout.run();
       setCommunitiesCollapsed(true);
     }
-  }, [communitiesCollapsed]);
+  }, [applyCommunityGuides, communitiesCollapsed, removeCommunityGuides, stopActiveLayout]);
 
   // Tutor stop → frame the node on the graph and open its info in the right sidebar so
   // it can be read alongside the narration. A sequence token avoids a stale async detail
