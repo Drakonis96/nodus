@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const migrations: Migration[] = [
   {
@@ -286,6 +286,20 @@ export const migrations: Migration[] = [
         ON tutor_saved_routes(generated_at DESC);
       CREATE INDEX idx_tutor_saved_routes_rating
         ON tutor_saved_routes(rating DESC, updated_at DESC);
+    `,
+  },
+  {
+    version: 9,
+    up: /* sql */ `
+      CREATE TABLE scan_checkpoints (
+        nodus_id     TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        kind         TEXT NOT NULL,
+        batch_index  INTEGER NOT NULL,
+        data_json    TEXT NOT NULL,
+        created_at   TEXT NOT NULL,
+        PRIMARY KEY (nodus_id, content_hash, kind, batch_index)
+      );
     `,
   },
 ];

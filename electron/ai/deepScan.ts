@@ -18,6 +18,7 @@ import {
   setIdeaThemeLinks,
   unionWorkThemes,
 } from '../db/themesRepo';
+import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { Work, IdeaType, EdgeType, EdgeBasis, EvidenceKind, GapKind, ModelRef } from '@shared/types';
 import { planTextChunks, ExtractedDoc } from '../extraction/textExtractor';
@@ -198,8 +199,17 @@ export async function runDeepScan(
     const existingThemeLabels = getWorkThemeLabels(work.nodus_id);
     const results: DeepResult[] = [];
 
+    // Load any previously checkpointed chunk results so we can resume after a failure.
+    const checkpoints = loadCheckpoints(work.nodus_id, hash, 'deep_chunk');
+
     const llmDone = startPerf('deep LLM extraction', perf, { chunks: chunks.length, mode: chunkPlan.mode });
     for (let i = 0; i < chunks.length; i++) {
+      // Resume from checkpoint if available.
+      const saved = checkpoints.get(i) as DeepResult | undefined;
+      if (saved && isDeepResult(saved)) {
+        results.push(saved);
+        continue;
+      }
       onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
       const chunkWordCount = chunks[i].split(/\s+/).filter(Boolean).length;
       const input = {
@@ -243,6 +253,8 @@ export async function runDeepScan(
         );
         chunkDone({ ideas: result.ideas.length, themes: result.theme_nodes?.length ?? 0 });
         results.push(result);
+        // Checkpoint this chunk so a later failure doesn't lose the work.
+        saveCheckpoint(work.nodus_id, hash, 'deep_chunk', i, result);
       } catch (e) {
         chunkDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
         llmDone({ status: 'error', chunk: i + 1 });
@@ -356,6 +368,8 @@ export async function runDeepScan(
     const recomputeDone = startPerf('recomputeAuthorRelations', perf);
     recomputeAuthorRelations();
     recomputeDone();
+    // All done — clear checkpoints so a future re-scan starts fresh.
+    clearCheckpoints(work.nodus_id, hash, 'deep_chunk');
     totalDone({ status: 'done', ideas: merged.ideas.size });
   } catch (e) {
     totalDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });

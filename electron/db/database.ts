@@ -10,12 +10,31 @@ export function dbPath(): string {
   return path.join(app.getPath('userData'), 'nodus.sqlite');
 }
 
+/** Cosine similarity between two Float32 BLOBs, computed inside SQLite. */
+function vecCosine(a: Buffer | null, b: Buffer | null): number {
+  if (!a || !b) return 0;
+  const fa = new Float32Array(a.buffer, a.byteOffset, a.byteLength / 4);
+  const fb = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  const n = Math.min(fa.length, fb.length);
+  for (let i = 0; i < n; i++) {
+    dot += fa[i] * fb[i];
+    na += fa[i] * fa[i];
+    nb += fb[i] * fb[i];
+  }
+  if (na === 0 || nb === 0) return 0;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
 export function getDb(): Database.Database {
   if (!db) {
     const dir = app.getPath('userData');
     fs.mkdirSync(dir, { recursive: true });
     db = new Database(dbPath());
     runMigrations(db);
+    db.function('vec_cosine', vecCosine);
   }
   return db;
 }

@@ -1,4 +1,5 @@
 import { v4 as uuid } from 'uuid';
+import crypto from 'node:crypto';
 import type {
   EdgeType,
   ModelRef,
@@ -15,6 +16,7 @@ import {
   setWorkThemes,
 } from '../db/themesRepo';
 import { normalizeEdgeType } from '../db/ideasRepo';
+import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { completeJson } from './aiClient';
 
 const THEME_BATCH = 30;
@@ -178,12 +180,40 @@ export async function reprocessConnections(
   const existingNorm = new Map(existingLabels.map((label) => [normalizeThemeLabel(label), label]));
   const system = `${THEME_SYSTEM}${locked ? THEME_LOCKED_RULE : THEME_OPEN_RULE}`;
 
+  // Content hash for checkpoint scoping — changes when the idea set changes.
+  const contentHash = crypto
+    .createHash('sha1')
+    .update(activeIdeas.map((i) => i.global_id).sort().join(','))
+    .digest('hex');
+
   // ── Phase 1: reassign ideas to themes ──────────────────────────────────────
   const themesByIdea = new Map<string, string[]>();
   const newThemeNorms = new Set<string>();
   const themeBatches = chunk(activeIdeas, THEME_BATCH);
+  const themeCheckpoints = loadCheckpoints('reprocess', contentHash, 'reproc_theme_batch');
   for (let bi = 0; bi < themeBatches.length; bi++) {
     const batch = themeBatches[bi];
+    // Resume from checkpoint if available.
+    const saved = themeCheckpoints.get(bi) as ThemeAssignmentResult | undefined;
+    if (saved && isThemeAssignmentResult(saved)) {
+      const byId = new Map(saved.assignments.map((a) => [a.id, Array.isArray(a.themes) ? a.themes : []]));
+      for (const idea of batch) {
+        const raw = byId.get(idea.global_id) ?? [];
+        const labels: string[] = [];
+        const seen = new Set<string>();
+        for (const candidate of raw) {
+          if (typeof candidate !== 'string' || !candidate.trim()) continue;
+          const norm = normalizeThemeLabel(candidate);
+          if (!norm || seen.has(norm)) continue;
+          const canonical = existingNorm.get(norm);
+          if (canonical) { seen.add(norm); labels.push(canonical); }
+          else if (!locked) { seen.add(norm); newThemeNorms.add(norm); existingNorm.set(norm, candidate.trim()); labels.push(candidate.trim()); }
+          if (labels.length >= 2) break;
+        }
+        themesByIdea.set(idea.global_id, labels);
+      }
+      continue;
+    }
     onProgress?.({
       phase: 'themes',
       label: 'Agrupando ideas en temas',
@@ -205,6 +235,8 @@ export async function reprocessConnections(
       isThemeAssignmentResult,
       model
     );
+    // Checkpoint this batch result.
+    saveCheckpoint('reprocess', contentHash, 'reproc_theme_batch', bi, result);
     const byId = new Map(result.assignments.map((a) => [a.id, Array.isArray(a.themes) ? a.themes : []]));
     for (const idea of batch) {
       const raw = byId.get(idea.global_id) ?? [];
@@ -260,10 +292,12 @@ export async function reprocessConnections(
     pruneOrphanThemes();
   });
   applyThemes();
+  // Theme phase done — clear its checkpoints.
+  clearCheckpoints('reprocess', contentHash, 'reproc_theme_batch');
 
   let relationsAdded = 0;
   if (options.relations) {
-    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, model, onProgress);
+    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, model, contentHash, onProgress);
   }
 
   return {
@@ -287,6 +321,7 @@ async function reprocessRelations(
   ideas: IdeaRow[],
   themesByIdea: Map<string, string[]>,
   model?: ModelRef | null,
+  contentHash?: string,
   onProgress?: (p: ReprocessProgress) => void
 ): Promise<number> {
   const db = getDb();
@@ -311,8 +346,27 @@ async function reprocessRelations(
   if (batches.length === 0) return 0;
 
   const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
+  const relCheckpoints = contentHash ? loadCheckpoints('reprocess', contentHash, 'reproc_relation_batch') : new Map();
   for (let bi = 0; bi < batches.length; bi++) {
     const batch = batches[bi];
+    // Resume from checkpoint if available.
+    const saved = relCheckpoints.get(bi) as RelationExtractionResult | undefined;
+    if (saved && isRelationExtractionResult(saved)) {
+      const inBatch = new Set(batch.map((i) => i.global_id));
+      for (const relation of saved.relations) {
+        if (!relation || relation.from === relation.to) continue;
+        if (!inBatch.has(relation.from) || !inBatch.has(relation.to)) continue;
+        const type = normalizeEdgeType(relation.type);
+        if (!type || !RELATION_TYPES.has(type)) continue;
+        const confidence = Math.max(0.1, Math.min(1, Number(relation.confidence) || 0.5));
+        const key = `${relation.from}|${relation.to}|${type}`;
+        const existing = proposed.get(key);
+        if (!existing || confidence > existing.confidence) {
+          proposed.set(key, { from: relation.from, to: relation.to, type, confidence });
+        }
+      }
+      continue;
+    }
     onProgress?.({
       phase: 'relations',
       label: 'Trazando relaciones entre ideas',
@@ -339,6 +393,8 @@ async function reprocessRelations(
       // If a single batch fails (e.g. output too large), skip it and continue.
       continue;
     }
+    // Checkpoint this batch result.
+    if (contentHash) saveCheckpoint('reprocess', contentHash, 'reproc_relation_batch', bi, result);
     const inBatch = new Set(batch.map((i) => i.global_id));
     for (const relation of result.relations) {
       if (!relation || relation.from === relation.to) continue;
@@ -371,5 +427,7 @@ async function reprocessRelations(
     }
   });
   insert();
+  // Relation phase done — clear its checkpoints.
+  if (contentHash) clearCheckpoints('reprocess', contentHash, 'reproc_relation_batch');
   return added;
 }

@@ -154,6 +154,36 @@ export function allIdeaCandidates(): { global_id: string; type: IdeaType; label:
   }[];
 }
 
+/**
+ * Find ideas whose embedding cosine-similarity to the query vector meets the threshold.
+ * Pushes the computation into SQLite via the vec_cosine() custom function so we never
+ * load all embeddings into JS memory.
+ */
+export function findSimilarIdeas(
+  queryEmbedding: number[],
+  threshold: number,
+  limit: number
+): { global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[] {
+  const buf = encodeEmbedding(queryEmbedding);
+  return getDb()
+    .prepare(
+      `SELECT * FROM (
+         SELECT global_id, type, label, statement, vec_cosine(embedding, ?) AS similarity
+         FROM ideas
+         WHERE embedding IS NOT NULL
+       ) WHERE similarity >= ?
+       ORDER BY similarity DESC
+       LIMIT ?`
+    )
+    .all(buf, threshold, limit) as {
+    global_id: string;
+    type: IdeaType;
+    label: string;
+    statement: string;
+    similarity: number;
+  }[];
+}
+
 export function upsertOccurrence(
   globalId: string,
   nodusId: string,

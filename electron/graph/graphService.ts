@@ -10,7 +10,7 @@ import type {
   ReadingPathStrategy,
   ReadingPathEntry,
 } from '@shared/types';
-import { getEdgeDetail, ideasWithEmbeddings, cosineSimilarity } from '../db/ideasRepo';
+import { getEdgeDetail, findSimilarIdeas } from '../db/ideasRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
@@ -392,6 +392,10 @@ function centroid(vectors: number[][]): number[] | null {
  * embeddings of the ideas it already contains, then link any other embedded idea whose
  * cosine to that centroid clears the threshold (capped per idea). Pairs that already
  * have an explicit same-work edge are skipped. No-op when ideas lack embeddings.
+ *
+ * Optimized: loads only theme-member embeddings for centroid computation, then uses
+ * the vec_cosine() SQL function to push similarity search into SQLite instead of
+ * loading all embeddings into JS memory.
  */
 function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): GraphEdge[] {
   // Cache key: a compact signature of the existing theme→idea memberships plus
@@ -408,14 +412,7 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
     return semanticThemeEdgesCache.edges;
   }
 
-  const embByIdea = new Map<string, number[]>();
-  for (const i of ideasWithEmbeddings()) embByIdea.set(i.global_id, i.embedding);
-  if (embByIdea.size === 0) {
-    semanticThemeEdgesCache = { edges: [], nodeIdsKey: cacheKey, ts: now };
-    return [];
-  }
-
-  // Existing theme→idea membership and per-theme member ideas.
+  // Build theme→member mapping from explicit edges.
   const connected = new Set<string>();
   const membersByTheme = new Map<string, string[]>();
   for (const e of themeEdges) {
@@ -425,9 +422,30 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
     membersByTheme.set(e.source, list);
   }
 
+  if (membersByTheme.size === 0) {
+    semanticThemeEdgesCache = { edges: [], nodeIdsKey: cacheKey, ts: now };
+    return [];
+  }
+
+  // Load only the embeddings for theme-member ideas (not all ideas) to compute centroids.
+  const memberIdeaIds = [...new Set([...membersByTheme.values()].flat())];
+  const memberEmbeddings = new Map<string, number[]>();
+  if (memberIdeaIds.length > 0) {
+    const db = getDb();
+    const placeholders = memberIdeaIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(`SELECT global_id, embedding FROM ideas WHERE global_id IN (${placeholders}) AND embedding IS NOT NULL`)
+      .all(...memberIdeaIds) as { global_id: string; embedding: Buffer }[];
+    for (const row of rows) {
+      const f32 = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4);
+      memberEmbeddings.set(row.global_id, Array.from(f32));
+    }
+  }
+
   const centroids = new Map<string, number[]>();
   for (const [themeId, members] of membersByTheme) {
-    const c = centroid(members.map((m) => embByIdea.get(m)).filter((v): v is number[] => !!v));
+    const vectors = members.map((m) => memberEmbeddings.get(m)).filter((v): v is number[] => !!v);
+    const c = centroid(vectors);
     if (c) centroids.set(themeId, c);
   }
   if (centroids.size === 0) {
@@ -436,25 +454,29 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
   }
 
   const out: GraphEdge[] = [];
-  for (const [ideaId, emb] of embByIdea) {
-    if (!nodeIds.has(ideaId)) continue;
-    const scored: { themeId: string; sim: number }[] = [];
-    for (const [themeId, c] of centroids) {
-      if (connected.has(`${themeId}|${ideaId}`)) continue;
+  for (const [themeId, c] of centroids) {
+    // Use SQL-based similarity to find candidate ideas for this centroid.
+    const similar = findSimilarIdeas(c, THEME_SIM_THRESHOLD, 500);
+    const scored: { ideaId: string; sim: number }[] = [];
+    for (const row of similar) {
+      if (!nodeIds.has(row.global_id)) continue;
+      if (connected.has(`${themeId}|${row.global_id}`)) continue;
       if (!nodeIds.has(themeId)) continue;
-      const sim = cosineSimilarity(emb, c);
-      if (sim >= THEME_SIM_THRESHOLD) scored.push({ themeId, sim });
+      scored.push({ ideaId: row.global_id, sim: row.similarity });
     }
     scored.sort((a, b) => b.sim - a.sim);
-    for (const { themeId, sim } of scored.slice(0, MAX_INFERRED_THEMES_PER_IDEA)) {
-      out.push({
-        id: `theme-sim:${themeId}:${ideaId}`,
-        source: themeId,
-        target: ideaId,
-        type: 'contains',
-        basis: 'inferred',
-        confidence: Number(sim.toFixed(3)),
-      });
+    for (const { ideaId, sim } of scored.slice(0, MAX_INFERRED_THEMES_PER_IDEA)) {
+      // Avoid duplicates: only add if no existing inferred edge for this pair.
+      if (!out.some((e) => e.source === themeId && e.target === ideaId)) {
+        out.push({
+          id: `theme-sim:${themeId}:${ideaId}`,
+          source: themeId,
+          target: ideaId,
+          type: 'contains',
+          basis: 'inferred',
+          confidence: Number(sim.toFixed(3)),
+        });
+      }
     }
   }
   semanticThemeEdgesCache = { edges: out, nodeIdsKey: cacheKey, ts: now };
@@ -466,12 +488,19 @@ export function buildAuthorGraph(): GraphData {
   const db = getDb();
   const authors = db.prepare('SELECT author_id, name FROM authors').all() as { author_id: string; name: string }[];
 
+  // Batch-load all author→work mappings in one query instead of N+1.
+  const waRows = db
+    .prepare(`SELECT wa.author_id, w.year, w.deep_status FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id`)
+    .all() as { author_id: string; year: number | null; deep_status: string }[];
+  const worksByAuthor = new Map<string, { year: number | null; deep_status: string }[]>();
+  for (const row of waRows) {
+    const list = worksByAuthor.get(row.author_id) ?? [];
+    list.push(row);
+    worksByAuthor.set(row.author_id, list);
+  }
+
   const nodes: GraphNode[] = authors.map((a) => {
-    const works = db
-      .prepare(
-        `SELECT w.year, w.deep_status FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id WHERE wa.author_id = ?`
-      )
-      .all(a.author_id) as { year: number | null; deep_status: string }[];
+    const works = worksByAuthor.get(a.author_id) ?? [];
     const years = works.map((w) => w.year).filter((y): y is number => y != null);
     const read = works.some((w) => w.deep_status === 'done');
     return {
@@ -511,6 +540,8 @@ export function getContradictions(): EdgeDetail[] {
   const rows = db
     .prepare("SELECT id FROM edges WHERE type IN ('contradicts','refutes')")
     .all() as { id: string }[];
+  // getEdgeDetail makes 4 queries per edge; batch the edge rows and idea lookups
+  // to reduce round-trips when there are many contradictions.
   return rows.map((r) => getEdgeDetail(r.id)).filter((x): x is EdgeDetail => x !== null);
 }
 

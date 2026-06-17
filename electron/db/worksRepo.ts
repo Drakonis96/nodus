@@ -107,7 +107,27 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = db.prepare(`SELECT * FROM works ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
-  return rows.map((r) => toView(r, themesFor(r.nodus_id)));
+  if (rows.length === 0) return [];
+
+  // Batch-load themes for all works in one query instead of N+1.
+  const ids = rows.map((r) => r.nodus_id);
+  const placeholders = ids.map(() => '?').join(',');
+  const themeRows = db
+    .prepare(
+      `SELECT wt.nodus_id, t.label
+         FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id
+        WHERE wt.nodus_id IN (${placeholders})
+        ORDER BY wt.nodus_id, t.label`
+    )
+    .all(...ids) as { nodus_id: string; label: string }[];
+  const themesByWork = new Map<string, string[]>();
+  for (const r of themeRows) {
+    const list = themesByWork.get(r.nodus_id) ?? [];
+    list.push(r.label);
+    themesByWork.set(r.nodus_id, list);
+  }
+
+  return rows.map((r) => toView(r, themesByWork.get(r.nodus_id) ?? []));
 }
 
 export interface UpsertWorkInput {

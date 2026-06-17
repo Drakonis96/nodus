@@ -465,7 +465,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
-  nodeTypes: [...GRAPH_NODE_TYPES],
+  nodeTypes: [...IDEA_TYPES],
   edgeTypes: [...EDGE_TYPES],
   theme: '',
   authors: [],
@@ -483,7 +483,7 @@ function loadFilters(): Filters {
   try {
     const parsed = JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>;
     const merged = { ...DEFAULT_FILTERS, ...parsed };
-    merged.nodeTypes = Array.from(new Set([...(merged.nodeTypes ?? []), 'theme']));
+    // Ensure 'contains' edge type is always available (structural edges).
     merged.edgeTypes = Array.from(new Set([...(merged.edgeTypes ?? []), 'contains']));
     return merged;
   } catch {

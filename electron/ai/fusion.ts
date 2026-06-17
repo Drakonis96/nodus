@@ -2,9 +2,8 @@ import { completeJson, embed } from './aiClient';
 import { PROMPT_FUSION } from './prompts';
 import {
   createIdea,
-  ideasWithEmbeddings,
+  findSimilarIdeas,
   allIdeaCandidates,
-  cosineSimilarity,
   addEdge,
   getIdea,
 } from '../db/ideasRepo';
@@ -113,26 +112,15 @@ export async function fuseIdea(
   const embedding = opts.embedding === undefined ? await embed(`${idea.label}. ${idea.statement}`) : opts.embedding;
   embeddingDone?.({ hit: Boolean(embedding) });
 
-  // Retrieve candidates by cosine similarity (in-memory fallback if no sqlite-vec).
+  // Retrieve candidates by cosine similarity via SQLite vec_cosine() — no in-memory loading.
   let candidates: { global_id: string; type: string; label: string; statement: string; similarity: number }[] = [];
   const retrievalDone = startPerf('candidate retrieval', opts.perf, {
     idea: idea.label,
     mode: embedding ? 'embedding' : 'lexical',
   });
   if (embedding) {
-    const pool = ideasWithEmbeddings();
-    candidates = pool
-      .map((i) => ({
-        global_id: i.global_id,
-        type: i.type,
-        label: i.label,
-        statement: i.statement,
-        similarity: cosineSimilarity(embedding, i.embedding),
-      }))
-      .filter((c) => c.similarity >= SIM_THRESHOLD)
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, MAX_CANDIDATES);
-    retrievalDone({ pool: pool.length, candidates: candidates.length });
+    candidates = findSimilarIdeas(embedding, SIM_THRESHOLD, MAX_CANDIDATES);
+    retrievalDone({ candidates: candidates.length });
   } else {
     const pool = allIdeaCandidates();
     candidates = pool
