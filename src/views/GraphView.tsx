@@ -506,28 +506,59 @@ function loadHighlightDepth(): number | null {
 
 function collectLocalGraph(startNode: any, maxDepth: number | null): { center: any; primary: any; secondary: any; context: any } {
   const cy = startNode.cy();
+  const startId = startNode.id();
   const center = cy.collection(startNode);
+
+  // Build a Cytoscape collection from id sets in one pass. Repeatedly calling
+  // collection.union() inside the BFS below was O(N·E) — each union copies the
+  // whole collection — and the single biggest cause of the multi-second freeze
+  // when tapping a node on a large graph.
+  const buildCollection = (nodeIds: Set<string>, edgeIds: Set<string>) => {
+    const els: any[] = [];
+    for (const id of nodeIds) {
+      const n = cy.getElementById(id);
+      if (n.nonempty()) els.push(n);
+    }
+    for (const id of edgeIds) {
+      const e = cy.getElementById(id);
+      if (e.nonempty()) els.push(e);
+    }
+    return els.length ? cy.collection(els) : cy.collection();
+  };
+
   if (startNode.data('type') === 'theme') {
-    const memberEdges = startNode.connectedEdges().filter((edge: any) => edge.data('type') === 'contains');
-    const members = memberEdges.connectedNodes().filter((node: any) => node.id() !== startNode.id());
-    const memberIds = new Set(members.map((node: any) => node.id()));
-    const memberLinks = cy.edges().filter((edge: any) => {
-      if (edge.data('type') === 'contains') return false;
-      const nodes = edge.connectedNodes().toArray();
-      return nodes.every((node: any) => memberIds.has(node.id()));
+    const memberNodeIds = new Set<string>();
+    const memberEdgeIds = new Set<string>();
+    startNode.connectedEdges().forEach((edge: any) => {
+      if (edge.data('type') !== 'contains') return;
+      memberEdgeIds.add(edge.id());
+      edge.connectedNodes().forEach((n: any) => {
+        if (n.id() !== startId) memberNodeIds.add(n.id());
+      });
     });
+    // Links between members (non-contains edges whose both endpoints are members).
+    const memberLinkEdgeIds = new Set<string>();
+    cy.edges().forEach((edge: any) => {
+      if (edge.data('type') === 'contains') return;
+      if (memberNodeIds.has(edge.data('source')) && memberNodeIds.has(edge.data('target'))) {
+        memberLinkEdgeIds.add(edge.id());
+      }
+    });
+    const primaryNodeIds = new Set<string>([startId, ...memberNodeIds]);
     return {
       center,
-      primary: center.union(members).union(memberEdges),
-      secondary: memberLinks,
+      primary: buildCollection(primaryNodeIds, memberEdgeIds),
+      secondary: buildCollection(new Set(), memberLinkEdgeIds),
       context: cy.collection(),
     };
   }
 
-  const visited = new Set<string>([startNode.id()]);
-  let primary = center;
-  let secondary = cy.collection();
-  let frontier = [startNode];
+  const primaryNodeIds = new Set<string>([startId]);
+  const primaryEdgeIds = new Set<string>();
+  const secondaryNodeIds = new Set<string>();
+  const secondaryEdgeIds = new Set<string>();
+  const visited = new Set<string>([startId]);
+  let frontier: any[] = [startNode];
   let depth = 0;
 
   while (frontier.length > 0 && (maxDepth == null || depth < maxDepth)) {
@@ -537,10 +568,15 @@ function collectLocalGraph(startNode: any, maxDepth: number | null): { center: a
         .connectedEdges()
         .filter((edge: any) => edge.data('type') !== 'contains')
         .forEach((edge: any) => {
-          const neighbors = edge.connectedNodes().filter((neighbor: any) => neighbor.id() !== node.id() && neighbor.data('type') !== 'theme');
-          neighbors.forEach((neighbor: any) => {
-            if (depth === 0) primary = primary.union(edge).union(neighbor);
-            else secondary = secondary.union(edge).union(neighbor);
+          edge.connectedNodes().forEach((neighbor: any) => {
+            if (neighbor.id() === node.id() || neighbor.data('type') === 'theme') return;
+            if (depth === 0) {
+              primaryNodeIds.add(neighbor.id());
+              primaryEdgeIds.add(edge.id());
+            } else {
+              secondaryNodeIds.add(neighbor.id());
+              secondaryEdgeIds.add(edge.id());
+            }
             if (!visited.has(neighbor.id())) {
               visited.add(neighbor.id());
               next.push(neighbor);
@@ -552,17 +588,37 @@ function collectLocalGraph(startNode: any, maxDepth: number | null): { center: a
     depth += 1;
   }
 
-  let context = cy.collection();
-  primary.union(secondary).nodes().forEach((node: any) => {
-    if (node.data('type') === 'theme') return;
-    node.connectedEdges().filter((edge: any) => edge.data('type') === 'contains').forEach((edge: any) => {
-      context = context.union(edge).union(edge.connectedNodes().filter((neighbor: any) => neighbor.data('type') === 'theme'));
+  // Context: theme hubs linked to the focused ideas via "contains" edges.
+  const ideaNodeIds = new Set<string>([...primaryNodeIds, ...secondaryNodeIds]);
+  const contextNodeIds = new Set<string>();
+  const contextEdgeIds = new Set<string>();
+  for (const id of ideaNodeIds) {
+    const node = cy.getElementById(id);
+    if (node.empty() || node.data('type') === 'theme') continue;
+    node.connectedEdges().forEach((edge: any) => {
+      if (edge.data('type') !== 'contains') return;
+      const eid = edge.id();
+      if (primaryEdgeIds.has(eid) || secondaryEdgeIds.has(eid)) return;
+      contextEdgeIds.add(eid);
+      edge.connectedNodes().forEach((n: any) => {
+        if (n.data('type') === 'theme') contextNodeIds.add(n.id());
+      });
     });
-  });
+  }
+  // The original implementation did context.difference(primary ∪ secondary); we
+  // replicate that by dropping overlapping ids here (cheaper than a set diff on
+  // full collections).
+  for (const id of primaryNodeIds) contextNodeIds.delete(id);
+  for (const id of secondaryNodeIds) contextNodeIds.delete(id);
+  for (const id of primaryEdgeIds) contextEdgeIds.delete(id);
+  for (const id of secondaryEdgeIds) contextEdgeIds.delete(id);
 
-  context = context.difference(primary.union(secondary));
-
-  return { center, primary, secondary, context };
+  return {
+    center,
+    primary: buildCollection(primaryNodeIds, primaryEdgeIds),
+    secondary: buildCollection(secondaryNodeIds, secondaryEdgeIds),
+    context: buildCollection(contextNodeIds, contextEdgeIds),
+  };
 }
 
 function primaryThemeEdges(edges: GraphData['edges']): GraphData['edges'] {
@@ -729,6 +785,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
   const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
+  // Optimistic detail placeholder: shown instantly on tap so the sidebar opens
+  // before the (async) detail fetch resolves. Previously the panel only appeared
+  // after `await getIdeaDetail`, which made every tap feel frozen for seconds.
+  const [detailLoading, setDetailLoading] = useState<{ kind: 'idea' | 'edge'; id: string; label: string; type?: string } | null>(null);
+  // Monotonic token so a stale async detail (e.g. the user tapped another node)
+  // never overwrites the currently-shown one.
+  const detailSeqRef = useRef(0);
   const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
   const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
@@ -1310,7 +1373,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         endElasticDrag(evt.target);
       });
 
-      cyRef.current.on('tap', 'node', async (evt) => {
+      cyRef.current.on('tap', 'node', (evt) => {
         const node = evt.target;
         if (hoverFocusTimerRef.current != null) {
           window.clearTimeout(hoverFocusTimerRef.current);
@@ -1319,29 +1382,68 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
-        focusOnNode(node);
-        setEdgeDetail(null);
-        if (lens === 'ideas' && !node.id().startsWith('theme:')) {
-          setIdeaDetail(await window.nodus.getIdeaDetail(node.id()));
+        const isIdea = lens === 'ideas' && !node.id().startsWith('theme:');
+        // Issue the IPC fetch FIRST so the main process starts working in
+        // parallel with the synchronous focus work below. Then show an instant
+        // placeholder so the sidebar opens immediately instead of freezing.
+        const seq = ++detailSeqRef.current;
+        let detailPromise: Promise<IdeaDetail | null> | null = null;
+        if (isIdea) {
+          detailPromise = window.nodus.getIdeaDetail(node.id());
+          setIdeaDetail(null);
+          setEdgeDetail(null);
+          setDetailLoading({ kind: 'idea', id: node.id(), label: String(node.data('label') ?? ''), type: String(node.data('type') ?? '') });
         } else {
           setIdeaDetail(null);
+          setEdgeDetail(null);
+          setDetailLoading(null);
+        }
+        focusOnNode(node);
+        if (detailPromise) {
+          void detailPromise.then(
+            (d) => {
+              if (seq !== detailSeqRef.current) return;
+              setIdeaDetail(d);
+              setDetailLoading(null);
+            },
+            () => {
+              if (seq !== detailSeqRef.current) return;
+              setDetailLoading(null);
+            }
+          );
         }
       });
-      cyRef.current.on('tap', 'edge', async (evt) => {
+      cyRef.current.on('tap', 'edge', (evt) => {
         const edge = evt.target;
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = null;
-        applyFocus({ primary: edge.connectedNodes().add(edge) }, edge.connectedNodes());
+        const seq = ++detailSeqRef.current;
+        const detailPromise = window.nodus.getEdgeDetail(edge.id());
         setIdeaDetail(null);
-        setEdgeDetail(await window.nodus.getEdgeDetail(edge.id()));
+        setEdgeDetail(null);
+        setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
+        applyFocus({ primary: edge.connectedNodes().add(edge) }, edge.connectedNodes());
+        void detailPromise.then(
+          (d) => {
+            if (seq !== detailSeqRef.current) return;
+            setEdgeDetail(d);
+            setDetailLoading(null);
+          },
+          () => {
+            if (seq !== detailSeqRef.current) return;
+            setDetailLoading(null);
+          }
+        );
       });
       cyRef.current.on('tap', (evt) => {
         if (evt.target === cyRef.current) {
+          detailSeqRef.current++;
           hoverActiveRef.current = false;
           clearFocus();
           setIdeaDetail(null);
           setEdgeDetail(null);
+          setDetailLoading(null);
         }
       });
       // Hover highlight: show the node's neighbourhood while hovering, unless the
@@ -1748,17 +1850,22 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const showTutorStop = useCallback(async (stop: TutorStop) => {
     focusByIdRef.current(stop.nodeIds, stop.edgeId);
     const seq = ++tutorDetailSeq.current;
+    // Invalidate any in-flight tap fetch so it can't overwrite the tutor's panel.
+    detailSeqRef.current++;
+    setDetailLoading(null);
     const apply = (idea: IdeaDetail | null, edge: EdgeDetail | null) => {
       if (seq !== tutorDetailSeq.current) return;
       setIdeaDetail(idea);
       setEdgeDetail(edge);
     };
     if (stop.kind === 'connection' && stop.edgeId) {
+      setIdeaDetail(null);
       apply(null, await window.nodus.getEdgeDetail(stop.edgeId));
       return;
     }
     const ideaId = stop.nodeIds.find((id) => !id.startsWith('theme:'));
     if (ideaId) {
+      setEdgeDetail(null);
       apply(await window.nodus.getIdeaDetail(ideaId), null);
       return;
     }
@@ -1969,18 +2076,22 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           </div>
         </div>
 
-        {/* Detail panel */}
-        {(ideaDetail || edgeDetail) && (
+        {/* Detail panel — opens instantly with a loading skeleton while the
+            detail fetch resolves, so taps never feel frozen. */}
+        {(ideaDetail || edgeDetail || detailLoading) && (
           <DetailPanel
             ideaDetail={ideaDetail}
             edgeDetail={edgeDetail}
+            loading={detailLoading}
             width={detailWidth}
             fontSize={detailFontSize}
             onWidthChange={setDetailWidth}
             onFontChange={changeDetailFont}
             onClose={() => {
+              detailSeqRef.current++;
               setIdeaDetail(null);
               setEdgeDetail(null);
+              setDetailLoading(null);
               clearFocusRef.current();
             }}
           />
@@ -2011,6 +2122,7 @@ function loadNumber(key: string, fallback: number, min: number, max: number): nu
 function DetailPanel({
   ideaDetail,
   edgeDetail,
+  loading,
   width,
   fontSize,
   onWidthChange,
@@ -2019,6 +2131,7 @@ function DetailPanel({
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
+  loading: { kind: 'idea' | 'edge'; id: string; label: string; type?: string } | null;
   width: number;
   fontSize: number;
   onWidthChange: (width: number) => void;
@@ -2060,6 +2173,38 @@ function DetailPanel({
           ✕
         </button>
       </div>
+      {loading && !ideaDetail && !edgeDetail && (
+        <div className="space-y-3 animate-pulse">
+          {loading.kind === 'idea' ? (
+            <>
+              <div>
+                <Badge color="indigo">{NODE_LABELS[loading.type as IdeaType] ?? loading.type ?? ''}</Badge>
+                <h3 className="font-semibold mt-2">{loading.label}</h3>
+                <div className="h-3 bg-neutral-800 rounded mt-2 w-3/4" />
+                <div className="h-3 bg-neutral-800 rounded mt-1.5 w-full" />
+                <div className="h-3 bg-neutral-800 rounded mt-1.5 w-5/6" />
+              </div>
+              <div>
+                <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
+                <div className="card p-3 mb-2">
+                  <div className="h-3 bg-neutral-800 rounded w-2/3" />
+                  <div className="h-2.5 bg-neutral-800 rounded mt-2 w-1/2" />
+                </div>
+                <div className="card p-3 mb-2">
+                  <div className="h-3 bg-neutral-800 rounded w-3/4" />
+                  <div className="h-2.5 bg-neutral-800 rounded mt-2 w-2/5" />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="font-semibold">{EDGE_LABELS[loading.label as keyof typeof EDGE_LABELS] ?? loading.label}</h3>
+              <div className="h-3 bg-neutral-800 rounded w-1/2" />
+              <div className="h-3 bg-neutral-800 rounded mt-2 w-3/4" />
+            </>
+          )}
+        </div>
+      )}
       {ideaDetail && (
         <div className="space-y-3">
           <div>

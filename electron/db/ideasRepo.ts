@@ -117,6 +117,21 @@ export function getIdea(globalId: string): Idea | null {
   return { ...row, embedding: row.embedding ? decodeEmbedding(row.embedding) : null };
 }
 
+/**
+ * Lightweight idea lookup that skips the embedding BLOB. The detail panels and
+ * edge explanations never need the vector, so decoding a 1536-float array on
+ * every tap was pure waste (and the main reason the sidebar felt laggy on big
+ * libraries — each tap re-decoded embeddings for the idea and both endpoints).
+ */
+export function getIdeaSummary(globalId: string): Idea | null {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT global_id, type, label, statement, created_at FROM ideas WHERE global_id = ?')
+    .get(globalId) as Omit<Idea, 'embedding'> | undefined;
+  if (!row) return null;
+  return { ...row, embedding: null };
+}
+
 /** All ideas with an embedding, for in-memory cosine candidate retrieval. */
 export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; label: string; statement: string; embedding: number[] }[] {
   const db = getDb();
@@ -265,7 +280,7 @@ export function purgeDeepData(nodusId: string): void {
 
 export function getIdeaDetail(globalId: string): IdeaDetail | null {
   const db = getDb();
-  const idea = getIdea(globalId);
+  const idea = getIdeaSummary(globalId);
   if (!idea) return null;
   const occRows = db.prepare('SELECT * FROM idea_occurrences WHERE global_id = ?').all(globalId) as {
     global_id: string;
@@ -291,8 +306,8 @@ export function getEdgeDetail(edgeId: string): EdgeDetail | null {
   const db = getDb();
   const edge = db.prepare('SELECT * FROM edges WHERE id = ?').get(edgeId) as Edge | undefined;
   if (!edge) return null;
-  const from = getIdea(edge.from_id);
-  const to = getIdea(edge.to_id);
+  const from = getIdeaSummary(edge.from_id);
+  const to = getIdeaSummary(edge.to_id);
   // Evidence on the source work for either endpoint idea.
   const evidence = edge.source_work
     ? (db
