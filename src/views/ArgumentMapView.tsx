@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AppSettings, ArgumentBlock, ArgumentMap, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType, ModelRef } from '@shared/types';
+import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType, ModelRef } from '@shared/types';
 import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import {
@@ -63,6 +63,9 @@ function maxDepth(block: ArgumentBlock, depth = 0): number {
 export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
   const [graphLoaded, setGraphLoaded] = useState(false);
+  const [mode, setMode] = useState<'auto' | 'ai'>('auto');
+  const [suggestions, setSuggestions] = useState<ArgumentRouteSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [seedId, setSeedId] = useState('');
   const [search, setSearch] = useState('');
   const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
@@ -89,6 +92,36 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
       setGraphLoaded(true);
     });
   }, []);
+
+  // Discover ranked idea hubs for the automatic mode. Cheap (local DB, no AI),
+  // so we run it on mount and whenever the user (re)enters automatic mode.
+  const discoverRoutes = useCallback(async () => {
+    setSuggestionsLoading(true);
+    setError(null);
+    try {
+      setSuggestions(await window.nodus.discoverArgumentRoutes());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mode === 'auto' && suggestions.length === 0 && !suggestionsLoading) {
+      void discoverRoutes();
+    }
+  }, [mode, suggestions.length, suggestionsLoading, discoverRoutes]);
+
+  // Reset the map when switching mode so the user lands on the right setup view.
+  const switchMode = (next: 'auto' | 'ai') => {
+    if (next === mode) return;
+    setMode(next);
+    setMap(null);
+    setError(null);
+    setSeedId('');
+    setSearch('');
+  };
 
   useEffect(() => {
     localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
@@ -136,8 +169,9 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     return stopReveal;
   }, [map, stopReveal]);
 
-  const build = useCallback(async () => {
-    if (!seedId) return;
+  const build = useCallback(async (explicitSeed?: string) => {
+    const sid = explicitSeed ?? seedId;
+    if (!sid) return;
     setBuilding(true);
     setError(null);
     setMap(null);
@@ -145,7 +179,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     setEdgeDetail(null);
     setDetailLoading(null);
     try {
-      const result = await window.nodus.buildArgumentMap({ seedIdeaId: seedId, model });
+      const result = await window.nodus.buildArgumentMap({ seedIdeaId: sid, model, mode });
       setMap(result);
       const ex = new Set<string>();
       collectExpandable(result.root, ex);
@@ -155,7 +189,7 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
     } finally {
       setBuilding(false);
     }
-  }, [seedId, model]);
+  }, [seedId, model, mode]);
 
   const selectBlock = useCallback((block: ArgumentBlock) => {
     if (!block.ideaId) return;
@@ -198,74 +232,107 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   };
 
   const hasModel = !!(settings.defaultModel || model);
+  const isAuto = mode === 'auto';
 
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Header / setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
-        <div className="flex flex-col gap-1 min-w-[260px] flex-1">
-          <label className="text-neutral-500 uppercase tracking-wide">Idea a investigar</label>
-          <div className="relative">
-            <input
-              className="input w-full"
-              placeholder={graphLoaded ? 'Busca una idea…' : 'Cargando ideas…'}
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setSeedId('');
-              }}
-              disabled={!graphLoaded}
-            />
-            {search && (
-              <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto card bg-neutral-900 border border-neutral-700 shadow-xl">
-                {filteredIdeas.length === 0 && (
-                  <div className="px-3 py-2 text-neutral-500">Sin coincidencias</div>
+        <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+          <button
+            className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+            title="Detecta los recorridos por conectividad (sin IA)"
+            onClick={() => switchMode('auto')}
+          >
+            Automático
+          </button>
+          <button
+            className={`px-3 py-1.5 ${!isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+            title="La IA traza el esquema de argumentos desde una idea"
+            onClick={() => switchMode('ai')}
+          >
+            IA
+          </button>
+        </div>
+
+        {!isAuto && (
+          <>
+            <div className="flex flex-col gap-1 min-w-[260px] flex-1">
+              <label className="text-neutral-500 uppercase tracking-wide">Idea a investigar</label>
+              <div className="relative">
+                <input
+                  className="input w-full"
+                  placeholder={graphLoaded ? 'Busca una idea…' : 'Cargando ideas…'}
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setSeedId('');
+                  }}
+                  disabled={!graphLoaded}
+                />
+                {search && (
+                  <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto card bg-neutral-900 border border-neutral-700 shadow-xl">
+                    {filteredIdeas.length === 0 && (
+                      <div className="px-3 py-2 text-neutral-500">Sin coincidencias</div>
+                    )}
+                    {filteredIdeas.map((n) => (
+                      <button
+                        key={n.id}
+                        className="w-full text-left px-3 py-2 hover:bg-neutral-800 border-b border-neutral-800/60 last:border-0"
+                        onClick={() => {
+                          setSeedId(n.id);
+                          setSearch(n.label);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NODE_COLORS[n.type as IdeaType] ?? '#888' }} />
+                          <span className="font-medium truncate">{n.label}</span>
+                        </div>
+                        {n.statement && <div className="text-neutral-500 text-[11px] mt-0.5 line-clamp-2">{n.statement}</div>}
+                      </button>
+                    ))}
+                  </div>
                 )}
-                {filteredIdeas.map((n) => (
-                  <button
-                    key={n.id}
-                    className="w-full text-left px-3 py-2 hover:bg-neutral-800 border-b border-neutral-800/60 last:border-0"
-                    onClick={() => {
-                      setSeedId(n.id);
-                      setSearch(n.label);
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NODE_COLORS[n.type as IdeaType] ?? '#888' }} />
-                      <span className="font-medium truncate">{n.label}</span>
-                    </div>
-                    {n.statement && <div className="text-neutral-500 text-[11px] mt-0.5 line-clamp-2">{n.statement}</div>}
-                  </button>
-                ))}
               </div>
-            )}
-          </div>
-          {seedId && (
-            <div className="text-[11px] text-indigo-400 flex items-center gap-1">
-              <Icon name="check" size={12} /> Idea seleccionada
+              {seedId && (
+                <div className="text-[11px] text-indigo-400 flex items-center gap-1">
+                  <Icon name="check" size={12} /> Idea seleccionada
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-neutral-500 uppercase tracking-wide">Modelo</label>
-          <ModelPicker settings={settings} value={model} onChange={setModel} compact />
-        </div>
-        <button
-          className="btn btn-primary gap-1.5"
-          onClick={build}
-          disabled={!seedId || building || !hasModel}
-          title={!hasModel ? 'Configura un modelo de IA en Ajustes' : 'Trazar el mapa de argumentos'}
-        >
-          <Icon name="map" /> {building ? 'Trazando…' : 'Trazar mapa'}
-        </button>
+            <div className="flex flex-col gap-1">
+              <label className="text-neutral-500 uppercase tracking-wide">Modelo</label>
+              <ModelPicker settings={settings} value={model} onChange={setModel} compact />
+            </div>
+            <button
+              className="btn btn-primary gap-1.5"
+              onClick={() => build()}
+              disabled={!seedId || building || !hasModel}
+              title={!hasModel ? 'Configura un modelo de IA en Ajustes' : 'Trazar el mapa de argumentos'}
+            >
+              <Icon name="map" /> {building ? 'Trazando…' : 'Trazar mapa'}
+            </button>
+          </>
+        )}
+
+        {isAuto && (
+          <div className="flex-1 flex items-end justify-end gap-2">
+            <span className="text-neutral-500">
+              {suggestions.length > 0 ? `${suggestions.length} recorridos detectados por conectividad` : 'Detectando recorridos…'}
+            </span>
+            <button className="btn btn-ghost gap-1.5" onClick={() => discoverRoutes()} disabled={suggestionsLoading}>
+              <Icon name="sync" className={suggestionsLoading ? 'animate-spin' : ''} /> Actualizar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Body */}
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 min-w-0 overflow-y-auto p-4">
-          {!hasModel && (
+          {!isAuto && !hasModel && (
             <div className="card p-4 text-amber-400 text-sm flex items-center gap-2">
-              <Icon name="alert" /> Configura un modelo de IA en Ajustes para trazar mapas de argumentos.
+              <Icon name="alert" /> Configura un modelo de IA en Ajustes para trazar mapas en modo IA, o usa el modo Automático.
             </div>
           )}
           {error && (
@@ -275,10 +342,70 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
           )}
           {building && !map && (
             <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3">
-              <Spinner label="El modelo está trazando el esquema de argumentos…" />
+              <Spinner label={isAuto ? 'Construyendo el esquema…' : 'El modelo está trazando el esquema de argumentos…'} />
             </div>
           )}
-          {!building && !map && !error && (
+
+          {/* Automatic mode: route picker when no map is built yet. */}
+          {isAuto && !building && !map && (
+            <div className="max-w-3xl mx-auto">
+              {!error && suggestions.length === 0 && !suggestionsLoading && (
+                <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3 text-center max-w-md mx-auto py-10">
+                  <Icon name="map" size={40} className="text-neutral-700" />
+                  <div className="text-neutral-400">
+                    No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.
+                  </div>
+                </div>
+              )}
+              {suggestionsLoading && (
+                <div className="flex items-center justify-center h-full text-neutral-500 gap-2">
+                  <Icon name="sync" className="animate-spin" /> Detectando recorridos…
+                </div>
+              )}
+              <div className="space-y-2">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.ideaId}
+                    className="w-full text-left card p-3 hover:bg-neutral-800/80 transition-colors group"
+                    onClick={() => build(s.ideaId)}
+                    title="Trazar el esquema desde esta idea"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 w-7 h-7 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-semibold text-neutral-400">
+                        {i + 1}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NODE_COLORS[s.type as IdeaType] ?? '#888' }} />
+                          <span className="font-medium text-sm text-neutral-100 truncate">{s.label}</span>
+                          {s.debateCount > 0 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">{s.debateCount} debate(s)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500 flex-wrap">
+                          <span>{s.degree} conexiones</span>
+                          <span>conf media {s.avgConfidence.toFixed(2)}</span>
+                          {s.topRelations.slice(0, 3).map((r) => (
+                            <span key={r.type} className="text-neutral-400">
+                              {EDGE_LABELS[r.type as EdgeType] ?? r.type} ×{r.count}
+                            </span>
+                          ))}
+                        </div>
+                        {s.neighborLabels.length > 0 && (
+                          <div className="text-[11px] text-neutral-600 mt-1 truncate">
+                            ↳ {s.neighborLabels.join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                      <Icon name="chevronRight" size={16} className="text-neutral-600 group-hover:text-neutral-300 mt-1" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!isAuto && !building && !map && !error && (
             <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3 text-center max-w-md mx-auto">
               <Icon name="map" size={40} className="text-neutral-700" />
               <div className="text-neutral-400">
@@ -290,10 +417,18 @@ export function ArgumentMapView({ settings }: { settings: AppSettings }) {
           {map && (
             <div className="max-w-4xl mx-auto">
               <div className="card p-4 mb-4 bg-neutral-900/60">
-                <div className="flex items-center gap-2 text-xs text-neutral-500 mb-1">
+                <div className="flex items-center gap-2 text-xs text-neutral-500 mb-1 flex-wrap">
                   <Icon name="map" size={14} /> Mapa desde <span className="text-neutral-300">{map.seedLabel}</span>
                   <span>· {map.ideaCount} ideas</span>
                   {map.truncated && <span className="text-amber-500">· subgrafo recortado</span>}
+                  <span className="text-neutral-600">· {isAuto ? 'modo automático' : 'modo IA'}</span>
+                  <button
+                    className="ml-auto btn btn-ghost text-xs gap-1 py-0.5 px-2"
+                    title="Volver al selector"
+                    onClick={() => setMap(null)}
+                  >
+                    <Icon name="chevronLeft" size={12} /> {isAuto ? 'Recorridos' : 'Empezar de nuevo'}
+                  </button>
                 </div>
                 {map.overview && <p className="text-sm text-neutral-300 leading-relaxed">{map.overview}</p>}
               </div>

@@ -34,7 +34,7 @@ import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
-import { buildArgumentMap } from './ai/argumentMap';
+import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { reprocessConnections } from './ai/reprocessConnections';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
@@ -289,6 +289,7 @@ export function registerIpc(
   h('argumentMap:build', async (_e, request: ArgumentMapRequest) =>
     buildArgumentMap(request, request.model)
   );
+  h('argumentMap:discover', async () => discoverArgumentRoutes());
 
   // research chat history
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));

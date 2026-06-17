@@ -649,6 +649,27 @@ export interface ArgumentMap {
 export interface ArgumentMapRequest {
   seedIdeaId: string;
   model?: ModelRef | null;
+  /** 'ai' traces the tree with the model; 'auto' builds it structurally from the
+   *  real graph edges (no model needed). Defaults to 'ai'. */
+  mode?: 'ai' | 'auto';
+}
+
+/** A ranked seed candidate for the automatic argument-map mode. */
+export interface ArgumentRouteSuggestion {
+  ideaId: string;
+  label: string;
+  statement: string;
+  type: IdeaType;
+  /** Number of idea↔idea connections. */
+  degree: number;
+  /** Connections that are contradictions or refutations (debate hubs surface higher). */
+  debateCount: number;
+  /** Average confidence across the idea's connections. */
+  avgConfidence: number;
+  /** Relation-type breakdown, most frequent first. */
+  topRelations: { type: EdgeType; count: number }[];
+  /** Up to a few neighbour labels, for a quick preview of the route. */
+  neighborLabels: string[];
 }
 
 
@@ -814,6 +835,8 @@ export interface NodusApi {
   // argument map (AI-traced hierarchical outline around a seed idea)
   /** Trace a hierarchical block outline of the ideas connected to a seed idea. */
   buildArgumentMap(request: ArgumentMapRequest): Promise<ArgumentMap>;
+  /** Rank idea hubs by connectivity for the automatic mode (no AI, no model). */
+  discoverArgumentRoutes(): Promise<ArgumentRouteSuggestion[]>;
 
   // research chat history
   listConversations(includeArchived?: boolean): Promise<ChatConversationSummary[]>;

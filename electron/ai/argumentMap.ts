@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, IdeaType, ModelRef } from '@shared/types';
+import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, ArgumentRouteSuggestion, EdgeType, IdeaType, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
 import { getIdeaSummary } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
@@ -234,6 +234,12 @@ function countIdeas(block: ArgumentBlock, set = new Set<string>()): Set<string> 
 }
 
 export async function buildArgumentMap(request: ArgumentMapRequest, model?: ModelRef | null): Promise<ArgumentMap> {
+  // Automatic mode: build the tree structurally from the real graph edges,
+  // no model needed. Falls through to the AI path otherwise.
+  if (request.mode === 'auto') {
+    return buildStructuralArgumentMap(request.seedIdeaId);
+  }
+
   const { seedIdeaId } = request;
   const seed = getIdeaSummary(seedIdeaId);
   if (!seed) throw new Error('La idea indicada no existe en el grafo.');
@@ -319,6 +325,176 @@ export async function buildArgumentMap(request: ArgumentMapRequest, model?: Mode
     seedIdeaId: seed.global_id,
     seedLabel: seed.label,
     overview: clip(result.overview ?? '', 600),
+    root,
+    generatedAt: new Date().toISOString(),
+    truncated,
+    ideaCount: countIdeas(root).size,
+  };
+}
+
+// ── Automatic mode: structural discovery + tree (no AI) ───────────────────────
+
+const STRUCTURAL_MAX_DEPTH = 3;
+const STRUCTURAL_MAX_CHILDREN = 6;
+
+interface AdjEntry {
+  other: string;
+  edge: EdgeRow;
+}
+
+/** Sort priority: surface debates (contradicts/refutes) first, then by confidence. */
+function edgePriority(edge: EdgeRow): number {
+  let p = edge.confidence;
+  if (edge.type === 'contradicts' || edge.type === 'refutes') p += 1.5;
+  else if (edge.type === 'supports' || edge.type === 'extends') p += 0.4;
+  return p;
+}
+
+/** Rank idea hubs by weighted connectivity for the automatic route picker. */
+export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
+  const allIdeas = getDb()
+    .prepare('SELECT global_id, type, label, statement FROM ideas')
+    .all() as IdeaRow[];
+  const ideaById = new Map(allIdeas.map((i) => [i.global_id, i]));
+  if (allIdeas.length === 0) return [];
+
+  const allEdges = getDb()
+    .prepare(
+      `SELECT id, from_id, to_id, type, basis, confidence FROM edges WHERE type != 'contains'`
+    )
+    .all() as EdgeRow[];
+
+  // Adjacency + per-idea metrics.
+  const adj = new Map<string, AdjEntry[]>();
+  const degree = new Map<string, number>();
+  const debate = new Map<string, number>();
+  const confSum = new Map<string, number>();
+  const relationCounts = new Map<string, Map<string, number>>();
+
+  for (const e of allEdges) {
+    if (!ideaById.has(e.from_id) || !ideaById.has(e.to_id)) continue;
+    for (const [a, b] of [
+      [e.from_id, e.to_id],
+      [e.to_id, e.from_id],
+    ] as const) {
+      (adj.get(a) ?? adj.set(a, []).get(a)!).push({ other: b, edge: e });
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      confSum.set(a, (confSum.get(a) ?? 0) + e.confidence);
+      if (e.type === 'contradicts' || e.type === 'refutes') debate.set(a, (debate.get(a) ?? 0) + 1);
+      const rc = relationCounts.get(a) ?? relationCounts.set(a, new Map()).get(a)!;
+      rc.set(e.type, (rc.get(e.type) ?? 0) + 1);
+    }
+  }
+
+  // Rank: weighted degree (debates bonus) → degree → avg confidence.
+  const ranked = allIdeas
+    .filter((i) => (degree.get(i.global_id) ?? 0) > 0)
+    .map((i) => {
+      const d = degree.get(i.global_id) ?? 0;
+      const db = debate.get(i.global_id) ?? 0;
+      const cs = confSum.get(i.global_id) ?? 0;
+      const score = d + db * 1.5 + cs * 0.2;
+      return { idea: i, d, db, cs, score };
+    })
+    .sort((a, b) => b.score - a.score || b.d - a.d)
+    .slice(0, 12);
+
+  return ranked.map(({ idea, d, db, cs }) => {
+    const neighbors = adj.get(idea.global_id) ?? [];
+    const topRelations = [...(relationCounts.get(idea.global_id) ?? new Map()).entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([type, count]) => ({ type: type as EdgeType, count }));
+    const neighborLabels = [...neighbors]
+      .sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge))
+      .slice(0, 4)
+      .map((n) => ideaById.get(n.other)?.label ?? n.other);
+    return {
+      ideaId: idea.global_id,
+      label: idea.label,
+      statement: idea.statement,
+      type: idea.type,
+      degree: d,
+      debateCount: db,
+      avgConfidence: d > 0 ? cs / d : 0,
+      topRelations,
+      neighborLabels,
+    };
+  });
+}
+
+/** Build the block tree structurally from the real graph edges (no model). */
+export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
+  const seed = getIdeaSummary(seedIdeaId);
+  if (!seed) throw new Error('La idea indicada no existe en el grafo.');
+
+  const { ideaById, edges, truncated } = buildLocalSubgraph(seedIdeaId);
+
+  // Adjacency over the kept subgraph.
+  const adj = new Map<string, AdjEntry[]>();
+  for (const e of edges) {
+    if (!ideaById.has(e.from_id) || !ideaById.has(e.to_id)) continue;
+    (adj.get(e.from_id) ?? adj.set(e.from_id, []).get(e.from_id)!).push({ other: e.to_id, edge: e });
+    (adj.get(e.to_id) ?? adj.set(e.to_id, []).get(e.to_id)!).push({ other: e.from_id, edge: e });
+  }
+
+  const seedDegree = adj.get(seed.global_id)?.length ?? 0;
+  const seedDebate =
+    (adj.get(seed.global_id) ?? []).filter((n) => n.edge.type === 'contradicts' || n.edge.type === 'refutes').length;
+
+  let blockCount = 0;
+  const buildNode = (ideaId: string, parentEdge: EdgeRow | null, visited: Set<string>, depth: number): ArgumentBlock => {
+    blockCount++;
+    const idea = ideaById.get(ideaId)!;
+    const relation: ArgumentBlock['relation'] = parentEdge ? (parentEdge.type as ArgumentBlock['relation']) : 'root';
+
+    const neighbors = (adj.get(ideaId) ?? [])
+      .filter((n) => !visited.has(n.other))
+      .sort((a, b) => edgePriority(b.edge) - edgePriority(a.edge))
+      .slice(0, STRUCTURAL_MAX_CHILDREN);
+
+    const children: ArgumentBlock[] = [];
+    for (const { other, edge } of neighbors) {
+      if (blockCount >= MAX_BLOCKS) break;
+      if (depth >= STRUCTURAL_MAX_DEPTH) break;
+      if (visited.has(other)) continue;
+      visited.add(other);
+      children.push(buildNode(other, edge, visited, depth + 1));
+    }
+
+    const childCount = children.length;
+    let summary: string;
+    if (relation === 'root') {
+      summary = `${seedDegree} conexiones${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`;
+    } else {
+      const relLabel = EDGE_TYPE_LABELS[relation] ?? relation;
+      summary = childCount > 0 ? `${relLabel} · ${childCount} derivación(es)` : `${relLabel} · conf ${parentEdge!.confidence.toFixed(2)}`;
+    }
+
+    return {
+      id: uuid(),
+      ideaId,
+      label: idea.label,
+      statement: idea.statement,
+      type: idea.type,
+      summary,
+      relation,
+      children,
+    };
+  };
+
+  const root = buildNode(seed.global_id, null, new Set([seed.global_id]), 0);
+  const overview =
+    seedDegree === 0
+      ? 'La idea seleccionada no tiene conexiones directas con otras ideas.'
+      : `Recorrido automático: la idea central articula ${seedDegree} conexiones${
+          seedDebate ? `, de las cuales ${seedDebate} son debates (contradicciones/refutaciones)` : ''
+        }. Despliega las ramas para explorar la argumentación.`;
+
+  return {
+    seedIdeaId: seed.global_id,
+    seedLabel: seed.label,
+    overview,
     root,
     generatedAt: new Date().toISOString(),
     truncated,
