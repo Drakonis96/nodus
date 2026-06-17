@@ -36,6 +36,8 @@ import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { reprocessConnections } from './ai/reprocessConnections';
+import { startEmbedding, pauseEmbedding, resumeEmbedding, stopEmbedding, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
+import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import { getDb } from './db/database';
@@ -317,6 +319,18 @@ export function registerIpc(
   h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
 
+  // embedding pipeline
+  h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));
+  h('embeddings:pause', async () => pauseEmbedding());
+  h('embeddings:resume', async () => resumeEmbedding());
+  h('embeddings:stop', async () => stopEmbedding());
+  h('embeddings:status', async () => getEmbeddingSnapshot());
+  h('embeddings:workStatuses', async (_e, nodusIds?: string[]) => getWorkEmbeddingStatuses(nodusIds));
+
+  // semantic bridge discovery
+  h('bridges:discover', async (_e, model?: ModelRef | null) => discoverSemanticBridges(model));
+  h('bridges:isRunning', async () => isSemanticBridgeRunning());
+
   // export / import
   h('data:export', async () => exportData());
   h('data:import', async () => importData());
@@ -332,5 +346,15 @@ export function registerIpc(
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {
     getWindow()?.webContents.send('queue:progress', p);
+  });
+
+  // Stream embedding pipeline progress to the renderer.
+  onEmbeddingProgress((p) => {
+    getWindow()?.webContents.send('embeddings:progress', p);
+  });
+
+  // Stream semantic bridge progress to the renderer.
+  onSemanticBridgeProgress((p) => {
+    getWindow()?.webContents.send('bridges:progress', p);
   });
 }

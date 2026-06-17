@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef } from '@shared/types';
+import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus, SemanticBridgeProgress } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 
@@ -36,16 +36,32 @@ function triggerBadge(w: WorkView) {
   );
 }
 
+function embeddingBadge(status: WorkEmbeddingStatus | undefined) {
+  if (!status || status.totalIdeas === 0) return <Badge color="neutral">—</Badge>;
+  if (status.complete) return <Badge color="cyan">✓ {status.embeddedIdeas}</Badge>;
+  return (
+    <Badge color="amber" title={`${status.embeddedIdeas}/${status.totalIdeas} ideas indexadas`}>
+      {status.embeddedIdeas}/{status.totalIdeas}
+    </Badge>
+  );
+}
+
 export function Library({ settings, onOpenCollections }: { settings: AppSettings; onOpenCollections: () => void }) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
   const [loading, setLoading] = useState(true);
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
+  const [bridgeProgress, setBridgeProgress] = useState<SemanticBridgeProgress | null>(null);
+  const [bridgeRunning, setBridgeRunning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    setWorks(await window.nodus.listWorks(filter));
+    const w = await window.nodus.listWorks(filter);
+    setWorks(w);
+    const statuses = await window.nodus.getWorkEmbeddingStatuses();
+    setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
     setLoading(false);
   }, [filter]);
 
@@ -102,6 +118,50 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
     window.alert(`Reasignación de temas en cola para ${n} obra(s). Verás el progreso en la cola.`);
   };
 
+  const embedWork = async (nodusId: string) => {
+    await window.nodus.startEmbedding([nodusId]);
+  };
+
+  const embedSelected = async () => {
+    await window.nodus.startEmbedding(Array.from(selected));
+    setSelected(new Set());
+  };
+
+  const embedAll = async () => {
+    const ok = window.confirm(
+      'Se generarán embeddings para todas las ideas de las obras con análisis profundo. Esto consume tokens del proveedor de embeddings configurado. ¿Continuar?'
+    );
+    if (!ok) return;
+    await window.nodus.startEmbedding();
+  };
+
+  const needsEmbedding = (w: WorkView) => {
+    const s = embeddingStatuses.get(w.nodus_id);
+    return w.deep_status === 'done' && s && !s.complete && s.totalIdeas > 0;
+  };
+
+  const discoverBridges = async () => {
+    setBridgeRunning(true);
+    setBridgeProgress(null);
+    try {
+      const result = await window.nodus.discoverSemanticBridges(scanModel);
+      window.alert(
+        `${result.candidatesScanned} candidatos escaneados (${result.crossThemeCandidates} cross-tema)\n` +
+        `${result.validated} validados por IA → ${result.added} nuevas relaciones`
+      );
+    } catch (e) {
+      window.alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBridgeRunning(false);
+      setBridgeProgress(null);
+      await load();
+    }
+  };
+
+  useEffect(() => {
+    return window.nodus.onSemanticBridgeProgress(setBridgeProgress);
+  }, []);
+
   const toggleSelected = (id: string, checked: boolean) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -133,6 +193,9 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
             <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
               <Icon name="layers" /> Analizar ambos
             </button>
+            <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
+              <Icon name="search" /> Indexar selección
+            </button>
           </>
         )}
         <button
@@ -141,6 +204,24 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
           onClick={reassignThemes}
         >
           <Icon name="wand" /> Reasignar temas
+        </button>
+        <button
+          className="btn btn-ghost border border-cyan-800 text-cyan-300"
+          title="Generar embeddings para todas las ideas sin indexar"
+          onClick={embedAll}
+        >
+          <Icon name="search" /> Indexar todo
+        </button>
+        <button
+          className="btn btn-ghost border border-violet-800 text-violet-300"
+          title="Usar embeddings para descubrir relaciones entre ideas no conectadas"
+          onClick={discoverBridges}
+          disabled={bridgeRunning}
+        >
+          <Icon name="compass" />{' '}
+          {bridgeRunning
+            ? bridgeProgress?.label ?? 'Descubriendo…'
+            : 'Descubrir relaciones'}
         </button>
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
           <Icon name="folder" /> Colecciones
@@ -197,13 +278,14 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
               <th className="p-2 font-medium">Tema(s)</th>
               <th className="p-2 font-medium">Ligero</th>
               <th className="p-2 font-medium">Profundo</th>
+              <th className="p-2 font-medium">Embeddings</th>
               <th className="p-2 font-medium" data-tour="library-actions">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td className="p-4 text-neutral-500" colSpan={8}>
+                <td className="p-4 text-neutral-500" colSpan={9}>
                   Cargando…
                 </td>
               </tr>
@@ -233,6 +315,18 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
                   <td className="p-2">{lightBadge(w.light_status)}</td>
                   <td className="p-2 whitespace-nowrap">
                     {deepBadge(w.deep_status)} {triggerBadge(w)}
+                  </td>
+                  <td className="p-2 whitespace-nowrap">
+                    {embeddingBadge(embeddingStatuses.get(w.nodus_id))}
+                    {needsEmbedding(w) && (
+                      <button
+                        className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-cyan-400 hover:text-cyan-300"
+                        title="Indexar embeddings de esta obra"
+                        onClick={() => embedWork(w.nodus_id)}
+                      >
+                        <Icon name="search" size={11} />
+                      </button>
+                    )}
                   </td>
                   <td className="p-2 whitespace-nowrap">
                     <button

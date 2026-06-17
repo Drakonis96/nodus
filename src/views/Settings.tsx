@@ -118,6 +118,17 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
         <Row label="Modelo de embeddings (similitud semántica multilingüe)">
           <EmbeddingModelControl settings={settings} onPatch={patch} />
         </Row>
+        <Row label="Reindexar embeddings">
+          <button
+            className="btn btn-ghost border border-cyan-800 text-cyan-300"
+            title="Genera embeddings para todas las ideas que aún no los tienen. Útil tras cambiar de modelo de embeddings."
+            onClick={() => {
+              void window.nodus.startEmbedding();
+            }}
+          >
+            <Icon name="search" /> Reindexar todo
+          </button>
+        </Row>
         <Row label="Llamadas simultáneas">
           <input
             type="number"

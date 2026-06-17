@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { NodusApi, QueueProgress, UpdateProgressEvent, ReprocessProgress } from '@shared/types';
+import type { NodusApi, QueueProgress, UpdateProgressEvent, ReprocessProgress, EmbeddingPipelineProgress, SemanticBridgeProgress } from '@shared/types';
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -122,6 +122,26 @@ const api: NodusApi = {
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: () => ipcRenderer.invoke('data:import'),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
+
+  startEmbedding: (nodusIds) => ipcRenderer.invoke('embeddings:start', nodusIds).then(() => undefined),
+  pauseEmbedding: () => ipcRenderer.invoke('embeddings:pause').then(() => undefined),
+  resumeEmbedding: () => ipcRenderer.invoke('embeddings:resume').then(() => undefined),
+  stopEmbedding: () => ipcRenderer.invoke('embeddings:stop').then(() => undefined),
+  getEmbeddingStatus: () => ipcRenderer.invoke('embeddings:status'),
+  getWorkEmbeddingStatuses: (nodusIds) => ipcRenderer.invoke('embeddings:workStatuses', nodusIds),
+  onEmbeddingProgress: (cb) => {
+    const listener = (_e: unknown, p: EmbeddingPipelineProgress) => cb(p);
+    ipcRenderer.on('embeddings:progress', listener);
+    return () => ipcRenderer.removeListener('embeddings:progress', listener);
+  },
+
+  discoverSemanticBridges: (model) => ipcRenderer.invoke('bridges:discover', model),
+  isSemanticBridgeRunning: () => ipcRenderer.invoke('bridges:isRunning'),
+  onSemanticBridgeProgress: (cb) => {
+    const listener = (_e: unknown, p: SemanticBridgeProgress) => cb(p);
+    ipcRenderer.on('bridges:progress', listener);
+    return () => ipcRenderer.removeListener('bridges:progress', listener);
+  },
 
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),

@@ -11,6 +11,7 @@ import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
+import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
 import nodusLogo from './assets/nodus-logo.svg';
@@ -184,6 +185,7 @@ export function App() {
 
       <div data-tour="queue">
         <QueueBar />
+        <EmbeddingProgressBar />
       </div>
 
       {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}

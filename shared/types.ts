@@ -863,6 +863,22 @@ export interface NodusApi {
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
 
+  // embedding pipeline
+  /** Start embedding generation for the given works (or all deep-scanned works if empty). */
+  startEmbedding(nodusIds?: string[]): Promise<void>;
+  pauseEmbedding(): Promise<void>;
+  resumeEmbedding(): Promise<void>;
+  stopEmbedding(): Promise<void>;
+  getEmbeddingStatus(): Promise<EmbeddingPipelineProgress>;
+  /** Per-work embedding counts for the library table. */
+  getWorkEmbeddingStatuses(nodusIds?: string[]): Promise<WorkEmbeddingStatus[]>;
+  onEmbeddingProgress(cb: (p: EmbeddingPipelineProgress) => void): () => void;
+
+  // semantic bridge discovery
+  discoverSemanticBridges(model?: ModelRef | null): Promise<SemanticBridgeResult>;
+  isSemanticBridgeRunning(): Promise<boolean>;
+  onSemanticBridgeProgress(cb: (p: SemanticBridgeProgress) => void): () => void;
+
   // app updates
   checkForUpdates(): Promise<UpdateCheckResponse>;
   installUpdate(): Promise<UpdateCheckResponse>;
@@ -877,4 +893,58 @@ export interface WorkFilter {
   yearMin?: number;
   yearMax?: number;
   includeArchived?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Embedding pipeline
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface EmbeddingPipelineProgress {
+  running: boolean;
+  paused: boolean;
+  /** Index of the work currently being processed (0-based). */
+  currentWorkIndex: number;
+  /** Total works queued for embedding. */
+  totalWorks: number;
+  /** Title of the work currently being processed. */
+  currentWorkTitle: string | null;
+  /** Number of ideas embedded so far across all works. */
+  ideasEmbedded: number;
+  /** Total ideas to embed across all works. */
+  totalIdeas: number;
+  /** Index of the idea being processed within the current work (0-based). */
+  currentIdeaIndex: number;
+  /** Total ideas in the current work. */
+  currentWorkIdeas: number;
+  /** Error message if the pipeline stopped on error. */
+  error: string | null;
+}
+
+/** Per-work embedding status for display in the library table. */
+export interface WorkEmbeddingStatus {
+  nodus_id: string;
+  totalIdeas: number;
+  embeddedIdeas: number;
+  /** true if all ideas have embeddings. */
+  complete: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Semantic bridge discovery
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SemanticBridgeProgress {
+  phase: 'scan' | 'validation' | 'done';
+  label: string;
+  current: number;
+  total: number;
+  candidatesFound: number;
+  bridgesAdded: number;
+}
+
+export interface SemanticBridgeResult {
+  candidatesScanned: number;
+  crossThemeCandidates: number;
+  validated: number;
+  added: number;
 }

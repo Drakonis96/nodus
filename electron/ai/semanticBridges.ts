@@ -1,0 +1,315 @@
+import { v4 as uuid } from 'uuid';
+import crypto from 'node:crypto';
+import type { EdgeType, ModelRef, SemanticBridgeResult, SemanticBridgeProgress } from '@shared/types';
+import { getDb } from '../db/database';
+import { ideasWithEmbeddings, cosineSimilarity, normalizeEdgeType } from '../db/ideasRepo';
+import { completeJson } from './aiClient';
+import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
+
+const SIM_THRESHOLD = 0.70;
+const VALIDATION_BATCH = 15;
+const BRIDGE_EDGE_PREFIX = 'bridge:';
+const CHECKPOINT_KIND = 'semantic_bridge_batch';
+
+const VALID_EDGE_TYPES: EdgeType[] = [
+  'extends', 'contradicts', 'applies_to', 'shares_method', 'precondition_of',
+  'measures_same', 'supports', 'refutes', 'variant_of', 'refines',
+];
+
+type ProgressListener = (p: SemanticBridgeProgress) => void;
+
+interface Candidate {
+  fromId: string;
+  toId: string;
+  fromLabel: string;
+  toLabel: string;
+  fromStatement: string;
+  toStatement: string;
+  fromType: string;
+  toType: string;
+  similarity: number;
+  crossTheme: boolean;
+}
+
+interface ValidationInput {
+  from: { id: string; type: string; label: string; statement: string };
+  to: { id: string; type: string; label: string; statement: string };
+  similarity: number;
+}
+
+interface LlmRelation {
+  from: string;
+  to: string;
+  type: string;
+  confidence?: number;
+}
+
+interface LlmValidationResult {
+  relations: LlmRelation[];
+}
+
+function isLlmValidationResult(v: unknown): v is LlmValidationResult {
+  return typeof v === 'object' && v !== null && Array.isArray((v as LlmValidationResult).relations);
+}
+
+const VALIDATION_SYSTEM = `Eres el motor de descubrimiento semántico de Nodus. Recibes PARES de ideas
+académicas que tienen alta similitud semántica (calculada por embeddings) pero
+que aún no están conectadas en el grafo. Tu tarea es determinar, EXCLUSIVAMENTE
+en JSON válido, si existe una relación válida entre cada par.
+
+TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
+measures_same, supports, refutes, variant_of, refines.
+
+REGLAS:
+- Evalúa CADA par de forma independiente.
+- La similitud semántica alta NO implica automáticamente una relación: dos ideas
+  pueden usar vocabulario similar y no estar relacionadas conceptualmente.
+- Solo propón relaciones que los enunciados sustenten claramente.
+- Confianza: 0.7–1.0 si la relación es directa, 0.4–0.7 si es inferible, < 0.4
+  solo si hay indicios débiles. Si no ves relación, omite el par.
+- No inventes relaciones. Ante la duda, no incluyas el par.
+
+SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0 } ] }
+Si no hay ninguna relación válida: { "relations": [] }`;
+
+const listeners = new Set<ProgressListener>();
+
+let running = false;
+
+function emit(p: SemanticBridgeProgress): void {
+  for (const l of listeners) l(p);
+}
+
+export function onSemanticBridgeProgress(cb: ProgressListener): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
+export function isSemanticBridgeRunning(): boolean {
+  return running;
+}
+
+function clip(text: string, max = 2000): string {
+  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  return clean.length > max ? `${clean.slice(0, max)}…` : clean;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+function loadThemeMap(): Map<string, Set<string>> {
+  const db = getDb();
+  const rows = db
+    .prepare('SELECT global_id, theme_id FROM idea_theme_links')
+    .all() as { global_id: string; theme_id: string }[];
+  const map = new Map<string, Set<string>>();
+  for (const r of rows) {
+    let set = map.get(r.global_id);
+    if (!set) { set = new Set(); map.set(r.global_id, set); }
+    set.add(r.theme_id);
+  }
+  return map;
+}
+
+function loadExistingEdgePairs(): Set<string> {
+  const db = getDb();
+  const rows = db.prepare('SELECT from_id, to_id FROM edges').all() as { from_id: string; to_id: string }[];
+  const set = new Set<string>();
+  for (const r of rows) {
+    set.add(`${r.from_id}|${r.to_id}`);
+    set.add(`${r.to_id}|${r.from_id}`);
+  }
+  return set;
+}
+
+function findCandidates(): Candidate[] {
+  const ideas = ideasWithEmbeddings();
+  if (ideas.length < 2) return [];
+
+  const themeMap = loadThemeMap();
+  const existingPairs = loadExistingEdgePairs();
+  const candidates: Candidate[] = [];
+
+  for (let i = 0; i < ideas.length; i++) {
+    for (let j = i + 1; j < ideas.length; j++) {
+      const a = ideas[i];
+      const b = ideas[j];
+
+      const pairKey = `${a.global_id}|${b.global_id}`;
+      if (existingPairs.has(pairKey)) continue;
+
+      const sim = cosineSimilarity(a.embedding, b.embedding);
+      if (sim < SIM_THRESHOLD) continue;
+
+      const aThemes = themeMap.get(a.global_id);
+      const bThemes = themeMap.get(b.global_id);
+      let crossTheme = true;
+      if (aThemes && bThemes) {
+        for (const t of aThemes) {
+          if (bThemes.has(t)) { crossTheme = false; break; }
+        }
+      }
+
+      candidates.push({
+        fromId: a.global_id,
+        toId: b.global_id,
+        fromLabel: a.label,
+        toLabel: b.label,
+        fromStatement: a.statement,
+        toStatement: b.statement,
+        fromType: a.type,
+        toType: b.type,
+        similarity: sim,
+        crossTheme,
+      });
+    }
+  }
+
+  candidates.sort((a, b) => b.similarity - a.similarity);
+  return candidates;
+}
+
+async function validateCandidates(
+  candidates: Candidate[],
+  model?: ModelRef | null,
+  onProgress?: (p: SemanticBridgeProgress) => void
+): Promise<Map<string, { from: string; to: string; type: EdgeType; confidence: number }>> {
+  const batches = chunk(candidates, VALIDATION_BATCH);
+  const contentHash = crypto
+    .createHash('sha1')
+    .update(candidates.map((c) => `${c.fromId}:${c.toId}`).sort().join(','))
+    .digest('hex');
+
+  const checkpoints = loadCheckpoints('bridges', contentHash, CHECKPOINT_KIND);
+  const validated = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
+
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
+
+    const saved = checkpoints.get(bi) as LlmValidationResult | undefined;
+    if (saved && isLlmValidationResult(saved)) {
+      for (const rel of saved.relations) {
+        const type = normalizeEdgeType(rel.type);
+        if (!type || !VALID_EDGE_TYPES.includes(type)) continue;
+        if (rel.from === rel.to) continue;
+        const confidence = Math.max(0.1, Math.min(1, Number(rel.confidence) || 0.5));
+        const key = [rel.from, rel.to].sort().join('|');
+        const existing = validated.get(key);
+        if (!existing || confidence > existing.confidence) {
+          validated.set(key, { from: rel.from, to: rel.to, type, confidence });
+        }
+      }
+      continue;
+    }
+
+    onProgress?.({
+      phase: 'validation',
+      label: 'Validando candidatos con IA',
+      current: bi + 1,
+      total: batches.length,
+      candidatesFound: candidates.length,
+      bridgesAdded: validated.size,
+    });
+
+    const input = {
+      pairs: batch.map((c): ValidationInput => ({
+        from: { id: c.fromId, type: c.fromType, label: c.fromLabel, statement: clip(c.fromStatement) },
+        to: { id: c.toId, type: c.toType, label: c.toLabel, statement: clip(c.toStatement) },
+        similarity: Number(c.similarity.toFixed(3)),
+      })),
+    };
+
+    let result: LlmValidationResult;
+    try {
+      result = await completeJson<LlmValidationResult>(
+        { system: VALIDATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1 },
+        isLlmValidationResult,
+        model
+      );
+    } catch {
+      continue;
+    }
+
+    saveCheckpoint('bridges', contentHash, CHECKPOINT_KIND, bi, result);
+
+    for (const rel of result.relations) {
+      const type = normalizeEdgeType(rel.type);
+      if (!type || !VALID_EDGE_TYPES.includes(type)) continue;
+      if (rel.from === rel.to) continue;
+      const confidence = Math.max(0.1, Math.min(1, Number(rel.confidence) || 0.5));
+      const key = [rel.from, rel.to].sort().join('|');
+      const existing = validated.get(key);
+      if (!existing || confidence > existing.confidence) {
+        validated.set(key, { from: rel.from, to: rel.to, type, confidence });
+      }
+    }
+  }
+
+  clearCheckpoints('bridges', contentHash, CHECKPOINT_KIND);
+  return validated;
+}
+
+function persistBridges(
+  validated: Map<string, { from: string; to: string; type: EdgeType; confidence: number }>
+): number {
+  const db = getDb();
+  let added = 0;
+  const tx = db.transaction(() => {
+    for (const edge of validated.values()) {
+      const clash = db
+        .prepare('SELECT 1 FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
+        .get(edge.from, edge.to, edge.type);
+      if (clash) continue;
+      db.prepare(
+        'INSERT INTO edges (id, from_id, to_id, type, basis, confidence, source_work) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      ).run(`${BRIDGE_EDGE_PREFIX}${uuid()}`, edge.from, edge.to, edge.type, 'inferred', edge.confidence, null);
+      added++;
+    }
+  });
+  tx();
+  return added;
+}
+
+export async function discoverSemanticBridges(
+  model?: ModelRef | null,
+  onProgress?: ProgressListener
+): Promise<SemanticBridgeResult> {
+  if (running) {
+    return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
+  }
+
+  running = true;
+  const progressListener = onProgress ? (p: SemanticBridgeProgress) => onProgress(p) : undefined;
+  if (progressListener) listeners.add(progressListener);
+
+  try {
+    emit({ phase: 'scan', label: 'Escaneando pares semánticos', current: 0, total: 0, candidatesFound: 0, bridgesAdded: 0 });
+
+    const candidates = findCandidates();
+    const crossTheme = candidates.filter((c) => c.crossTheme).length;
+
+    emit({ phase: 'scan', label: `${candidates.length} candidatos encontrados (${crossTheme} cross-tema)`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: 0 });
+
+    if (candidates.length === 0) {
+      return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
+    }
+
+    const validated = await validateCandidates(candidates, model, emit);
+    const added = persistBridges(validated);
+
+    emit({ phase: 'done', label: `${added} nuevas relaciones`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: added });
+
+    return {
+      candidatesScanned: candidates.length,
+      crossThemeCandidates: crossTheme,
+      validated: validated.size,
+      added,
+    };
+  } finally {
+    if (progressListener) listeners.delete(progressListener);
+    running = false;
+  }
+}
