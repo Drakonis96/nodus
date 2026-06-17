@@ -1448,7 +1448,12 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         if (evt.target === cyRef.current) {
           detailSeqRef.current++;
           hoverActiveRef.current = false;
-          clearFocus();
+          // Use the full clear (resets lastUserFocusRef/focusCenterRef too),
+          // not the local clearFocus() which only strips CSS classes — that left
+          // lastUserFocusRef set, so the background tap didn't drop the focus and
+          // subsequent hovers stayed disabled (their guard is
+          // `if (lastUserFocusRef.current) return;`).
+          clearFocusRef.current();
           setIdeaDetail(null);
           setEdgeDetail(null);
           setDetailLoading(null);
