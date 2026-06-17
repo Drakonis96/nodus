@@ -17,6 +17,7 @@ import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 // cluster centroid). Conservative so unrelated ideas aren't pulled in.
 const THEME_SIM_THRESHOLD = 0.72;
 const MAX_INFERRED_THEMES_PER_IDEA = 1;
+const MAX_SEMANTIC_THEME_EDGE_NODES = 850;
 
 // In-memory cache for the semantic theme edges. These are derived from idea
 // embeddings and don't change between graph renders unless the corpus changes,
@@ -164,13 +165,13 @@ export function buildIdeaGraph(): GraphData {
   const themeWorkRows = themeIds.length
     ? (db
         .prepare(
-          `SELECT wt.theme_id, w.year, w.authors_json, w.deep_status
+          `SELECT wt.theme_id, wt.nodus_id, w.year, w.authors_json, w.deep_status
              FROM work_themes wt
              JOIN works w ON w.nodus_id = wt.nodus_id
             WHERE wt.theme_id IN (${themeIds.map(() => '?').join(',')})
               AND w.archived = 0`
         )
-        .all(...themeIds) as { theme_id: string; year: number | null; authors_json: string; deep_status: string }[])
+        .all(...themeIds) as { theme_id: string; nodus_id: string; year: number | null; authors_json: string; deep_status: string }[])
     : [];
   const themeAggById = new Map<string, { works: Set<string>; read: boolean; years: number[]; authors: Set<string> }>();
   for (const row of themeWorkRows) {
@@ -179,10 +180,7 @@ export function buildIdeaGraph(): GraphData {
       agg = { works: new Set(), read: false, years: [], authors: new Set() };
       themeAggById.set(row.theme_id, agg);
     }
-    // DISTINCT nodus_id semantics: dedupe by work id (not available here, so
-    // dedupe by (year+authors) is unnecessary — work_themes already has one
-    // row per (theme, work), so each row is a distinct work).
-    agg.works.add(`${row.theme_id}|${row.year}|${row.authors_json}`);
+    agg.works.add(row.nodus_id);
     if (row.deep_status === 'done') agg.read = true;
     if (row.year != null) agg.years.push(row.year);
     try {
@@ -305,14 +303,12 @@ function buildThemeMemberships(): ThemeMembership {
          i.label AS idea_label,
          i.statement,
          io.development,
-         COALESCE(GROUP_CONCAT(e.quote, ' '), '') AS evidence_text,
          (SELECT COUNT(*) FROM work_themes wt2 WHERE wt2.nodus_id = wt.nodus_id) AS theme_count
        FROM work_themes wt
        JOIN themes t ON t.theme_id = wt.theme_id
        JOIN works w ON w.nodus_id = wt.nodus_id
        JOIN idea_occurrences io ON io.nodus_id = wt.nodus_id
        JOIN ideas i ON i.global_id = io.global_id
-       LEFT JOIN evidence e ON e.nodus_id = io.nodus_id AND e.global_id = io.global_id
        WHERE w.archived = 0
          AND w.deep_status = 'done'
          AND NOT EXISTS (
@@ -329,12 +325,11 @@ function buildThemeMemberships(): ThemeMembership {
       idea_label: string;
       statement: string;
       development: string;
-      evidence_text: string;
       theme_count: number;
     }[];
 
   for (const row of fallback) {
-    const text = `${row.idea_label}. ${row.statement}. ${row.development}. ${row.evidence_text}`;
+    const text = `${row.idea_label}. ${row.statement}. ${row.development}`;
     const score = row.theme_count <= 1 ? 0.72 : themeRelevance(row.theme_label, text);
     if (score >= 0.62) add(row.theme_id, row.theme_label, row.global_id, Number(score.toFixed(3)), 'inferred', 'theme-edge');
   }
@@ -387,6 +382,24 @@ function centroid(vectors: number[][]): number[] | null {
   return sum;
 }
 
+function compactSignature(values: Iterable<string>): string {
+  let h1 = 2166136261;
+  let h2 = 2166136261;
+  let count = 0;
+  const sorted = Array.from(values).sort();
+  for (const value of sorted) {
+    count++;
+    for (let i = 0; i < value.length; i++) {
+      const code = value.charCodeAt(i);
+      h1 ^= code;
+      h1 = Math.imul(h1, 16777619);
+      h2 ^= code + i + count;
+      h2 = Math.imul(h2, 2246822519);
+    }
+  }
+  return `${count}:${h1 >>> 0}:${h2 >>> 0}`;
+}
+
 /**
  * Derive extra theme→idea "contains" edges by meaning. For each theme we average the
  * embeddings of the ideas it already contains, then link any other embedded idea whose
@@ -398,14 +411,15 @@ function centroid(vectors: number[][]): number[] | null {
  * loading all embeddings into JS memory.
  */
 function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): GraphEdge[] {
+  if (nodeIds.size > MAX_SEMANTIC_THEME_EDGE_NODES) {
+    return [];
+  }
+
   // Cache key: a compact signature of the existing theme→idea memberships plus
   // the set of visible node ids. If neither changed since the last call (within
   // TTL), reuse the previously computed edges.
-  const nodeIdsKey = [...nodeIds].sort().join(',');
-  const membershipKey = themeEdges
-    .map((e) => `${e.source}|${e.target}`)
-    .sort()
-    .join(',');
+  const nodeIdsKey = compactSignature(nodeIds);
+  const membershipKey = compactSignature(themeEdges.map((e) => `${e.source}|${e.target}`));
   const cacheKey = `${membershipKey}::${nodeIdsKey}`;
   const now = Date.now();
   if (semanticThemeEdgesCache && semanticThemeEdgesCache.nodeIdsKey === cacheKey && now - semanticThemeEdgesCache.ts < SEMANTIC_EDGES_TTL_MS) {

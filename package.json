@@ -24,7 +24,6 @@
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.5.0",
     "cytoscape": "^3.30.2",
-    "cytoscape-cose-bilkent": "^4.1.0",
     "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.17",
     "jsonrepair": "^3.14.0",

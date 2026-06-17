@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
-// @ts-ignore – no official types for this extension
-import coseBilkent from 'cytoscape-cose-bilkent';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
 import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT } from '../components/NodeDetailPanel';
@@ -9,76 +7,71 @@ import { useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { TutorPanel } from './TutorPanel';
 
-// Register the cose-bilkent layout extension once.
-try { cytoscape.use(coseBilkent); } catch { /* already registered */ }
-
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
 const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
+const LAYOUT_THEME_LINKS_PER_THEME = 28;
+const LAYOUT_THEME_LINKS_GLOBAL_MAX = 520;
+const DRAG_COLLISION_MAX_ACTIVE = 44;
+const DRAG_COLLISION_CELL_SIZE = 96;
+const DRAG_INFLUENCE_MAX = 140;
 
-// Force-directed layout via cose-bilkent: produces much cleaner clusters than the
-// built-in cose, with automatic edge bundling and better compaction.
-const COSE_BILKENT_LAYOUT = {
-  name: 'cose-bilkent',
-  quality: 'default',
-  animate: false,
-  animationDuration: 400,
-  animationEasing: 'ease-in-out-cubic',
-  fit: false,
-  padding: 60,
-  nodeDimensionsIncludeLabels: false,
-  refresh: 16,
-  randomize: false,
-  nodeRepulsion: 6500,
-  idealEdgeLength: 110,
-  edgeElasticity: 0.45,
-  nestingFactor: 0.1,
-  gravity: 0.30,
-  numIter: 1800,
-  tile: true,
-  tilingPaddingVertical: 20,
-  tilingPaddingHorizontal: 20,
-  gravityRangeCompound: 1.5,
-  gravityCompound: 1.0,
-  gravityRange: 3.8,
-  initialEnergyOnIncremental: 0.6,
-} as any;
+function physicalLayoutElements(cy: Core) {
+  return cy.nodes().filter((node) => !node.isParent()).union(
+    cy.edges().filter((edge) => edge.data('layoutEdge') !== false)
+  );
+}
 
 function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => void, overrides: Record<string, unknown> = {}) {
   const nodeCount = Math.max(1, cy.nodes().filter((node) => !node.isParent()).length);
-  // Keep the graph compact: mild scaling only, so the bounding box stays small
-  // and cy.fit() doesn't have to zoom out to a dot.
-  const spacingScale = Math.min(1.4, 1 + Math.sqrt(nodeCount) / 36);
-  const edgeLengthScale = Math.min(1.3, 1 + Math.sqrt(nodeCount) / 48);
-  const gravityScale = Math.min(1.8, 1 + nodeCount / 200);
+  const layoutEdgeCount = Math.max(1, cy.edges().filter((edge) => edge.data('layoutEdge') !== false).length);
   const padding = Math.round(Math.min(80, 40 + Math.sqrt(nodeCount) * 1.8));
-  const tilingPadding = Math.round(22 + Math.min(24, Math.sqrt(nodeCount) * 1.6));
+  const densityScale = Math.min(1.55, 1 + Math.sqrt(nodeCount + layoutEdgeCount) / 74);
+  const iterationBudget = randomize
+    ? Math.max(260, Math.min(680, 760 - nodeCount * 0.58))
+    : Math.max(110, Math.min(280, 320 - nodeCount * 0.22));
 
   return {
-    ...COSE_BILKENT_LAYOUT,
-    // Always use 'default' quality — 'proof' is ~5× slower and the visual gain
-    // is negligible for an interactive overview.
-    quality: 'default',
-    refresh: randomize ? 10 : 16,
+    name: 'cose',
+    eles: physicalLayoutElements(cy),
+    animate: false,
     fit: randomize,
     padding,
-    nodeDimensionsIncludeLabels: true,
+    nodeDimensionsIncludeLabels: false,
     randomize,
-    nodeRepulsion: Math.round(COSE_BILKENT_LAYOUT.nodeRepulsion * spacingScale),
-    idealEdgeLength: Math.round(COSE_BILKENT_LAYOUT.idealEdgeLength * edgeLengthScale),
-    gravity: Math.max(0.18, COSE_BILKENT_LAYOUT.gravity / gravityScale),
-    gravityCompound: Math.max(0.5, COSE_BILKENT_LAYOUT.gravityCompound / Math.min(2, 1 + nodeCount / 220)),
-    gravityRange: Math.max(2.4, COSE_BILKENT_LAYOUT.gravityRange - Math.min(1.2, nodeCount / 280)),
-    gravityRangeCompound: Math.max(1.1, COSE_BILKENT_LAYOUT.gravityRangeCompound - Math.min(0.3, nodeCount / 700)),
-    tilingPaddingVertical: tilingPadding,
-    tilingPaddingHorizontal: tilingPadding,
-    initialEnergyOnIncremental: randomize ? 0.7 : Math.min(0.5, 0.35 + nodeCount / 1400),
-    // Scale iterations down for large graphs: cose-bilkent's cost grows
-    // super-linearly with node count, and 1800 iters on a 500-node graph
-    // (typical once themes + their "contains" edges are in) froze the UI for
-    // seconds on load. The visual difference is negligible past ~400 nodes.
-    numIter: randomize ? (nodeCount > 400 ? 900 : 1800) : (nodeCount > 400 ? 300 : 600),
+    refresh: randomize ? 18 : 28,
+    componentSpacing: Math.round(95 * densityScale),
+    nodeOverlap: 12,
+    nodeRepulsion: (node: any) => {
+      const type = node.data('type') as GraphNodeType | 'community-guide' | 'community';
+      const degree = Math.max(0, Number(node.data('degree') ?? 0));
+      const size = Math.max(18, Number(node.data('size') ?? 28));
+      if (type === 'theme') return Math.round((9800 + size * 115 + Math.sqrt(degree) * 900) * densityScale);
+      if (type === 'author') return Math.round((6500 + Math.sqrt(degree) * 720) * densityScale);
+      return Math.round((5900 + size * 72 + Math.sqrt(degree) * 650) * densityScale);
+    },
+    idealEdgeLength: (edge: any) => {
+      const confidence = clampUnit(Number(edge.data('confidence') ?? 0.5));
+      const type = edge.data('type') as string;
+      if (type === 'contains') return Math.round(205 + (1 - confidence) * 75 + densityScale * 28);
+      if (type === 'contradicts' || type === 'refutes') return Math.round(172 + (1 - confidence) * 62);
+      if (type === 'shares_method' || type === 'measures_same' || type === 'variant_of') return Math.round(132 + (1 - confidence) * 46);
+      return Math.round(116 + (1 - confidence) * 56);
+    },
+    edgeElasticity: (edge: any) => {
+      const confidence = clampUnit(Number(edge.data('confidence') ?? 0.5));
+      return edge.data('type') === 'contains'
+        ? Math.round(280 + (1 - confidence) * 170)
+        : Math.round(62 + (1 - confidence) * 46);
+    },
+    nestingFactor: 1.2,
+    gravity: randomize ? 0.28 : 0.18,
+    numIter: Math.round(iterationBudget),
+    initialTemp: randomize ? 760 : 170,
+    coolingFactor: randomize ? 0.985 : 0.965,
+    minTemp: 1.4,
+    animationThreshold: 220,
     stop,
     ...overrides,
   } as any;
@@ -99,7 +92,6 @@ const EDGE_TYPE_COLORS: Record<string, string> = {
   contains: '#3f3f46',        // dark gray — structural
 };
 const ZOOM_LABEL_THRESHOLD = 0.3;   // below this, hide all idea labels
-const ZOOM_IDEAS_THRESHOLD = 0.65;  // above this, show all idea labels
 const ZOOM_LABEL_DETAIL_THRESHOLD = 0.98;
 const ZOOM_LABEL_FULL_THRESHOLD = 1.35;
 
@@ -117,6 +109,7 @@ interface DragInfluence {
 interface DragInteractionState {
   nodeId: string;
   influences: DragInfluence[];
+  collisionIds: string[];
   lastPosition: { x: number; y: number };
   pendingDx: number;
   pendingDy: number;
@@ -125,7 +118,7 @@ interface DragInteractionState {
 
 function edgeElasticFactor(edge: any): number {
   const confidence = Math.min(1, Math.max(0.15, Number(edge.data('confidence') ?? 0.5)));
-  const structuralDamping = edge.data('type') === 'contains' ? 0.62 : 1;
+  const structuralDamping = edge.data('type') === 'contains' ? (edge.data('layoutEdge') ? 0.42 : 0.08) : 1;
   return (0.35 + confidence * 0.65) * structuralDamping;
 }
 
@@ -159,7 +152,69 @@ function buildDragInfluences(root: any): DragInfluence[] {
 
   return [...weights.entries()]
     .map(([id, weight]) => ({ id, weight }))
-    .sort((a, b) => b.weight - a.weight);
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, DRAG_INFLUENCE_MAX);
+}
+
+function collisionRadius(node: any): number {
+  const type = node.data('type') as GraphNodeType | 'community' | 'community-guide';
+  const size = Math.max(18, Number(node.data('size') ?? 28));
+  if (type === 'theme') return size / 2 + 28;
+  if (type === 'community' || type === 'community-guide') return size / 2 + 22;
+  return size / 2 + 18;
+}
+
+function applyLocalCollisionRepulsion(cy: Core, activeIds: string[]): void {
+  if (activeIds.length === 0) return;
+
+  const nodes = cy.nodes().filter((node) => !node.isParent()).toArray() as any[];
+  if (nodes.length < 2) return;
+
+  const cells = new Map<string, any[]>();
+  const cellKey = (x: number, y: number) => `${Math.floor(x / DRAG_COLLISION_CELL_SIZE)}:${Math.floor(y / DRAG_COLLISION_CELL_SIZE)}`;
+  for (const node of nodes) {
+    const p = node.position();
+    const key = cellKey(p.x, p.y);
+    const list = cells.get(key) ?? [];
+    list.push(node);
+    cells.set(key, list);
+  }
+
+  const activeSet = new Set(activeIds.slice(0, DRAG_COLLISION_MAX_ACTIVE));
+  for (const id of activeSet) {
+    const active = cy.getElementById(id);
+    if (active.empty() || active.isParent()) continue;
+    const ap = active.position();
+    const ax = Math.floor(ap.x / DRAG_COLLISION_CELL_SIZE);
+    const ay = Math.floor(ap.y / DRAG_COLLISION_CELL_SIZE);
+    const ar = collisionRadius(active);
+
+    for (let gx = ax - 1; gx <= ax + 1; gx++) {
+      for (let gy = ay - 1; gy <= ay + 1; gy++) {
+        const bucket = cells.get(`${gx}:${gy}`);
+        if (!bucket) continue;
+        for (const other of bucket) {
+          if (other.id() === id || other.isParent()) continue;
+          const op = other.position();
+          const dx = op.x - ap.x || stableUnit(`${id}|${other.id()}`) - 0.5;
+          const dy = op.y - ap.y || stableUnit(`${other.id()}|${id}`) - 0.5;
+          const distance = Math.max(0.1, Math.hypot(dx, dy));
+          const minDistance = ar + collisionRadius(other);
+          if (distance >= minDistance) continue;
+
+          const push = Math.min(18, (minDistance - distance) * 0.42);
+          const ux = dx / distance;
+          const uy = dy / distance;
+          if (!other.grabbed() && !other.locked()) {
+            other.position({ x: op.x + ux * push, y: op.y + uy * push });
+          }
+          if (!active.grabbed() && !active.locked()) {
+            active.position({ x: ap.x - ux * push * 0.24, y: ap.y - uy * push * 0.24 });
+          }
+        }
+      }
+    }
+  }
 }
 
 function nodeLabelScore(node: GraphData['nodes'][number], degree: number): number {
@@ -465,7 +520,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
-  nodeTypes: [...IDEA_TYPES],
+  nodeTypes: [...GRAPH_NODE_TYPES],
   edgeTypes: [...EDGE_TYPES],
   theme: '',
   authors: [],
@@ -477,12 +532,18 @@ const DEFAULT_FILTERS: Filters = {
 };
 
 const FILTER_KEY = 'nodus.graph.filters';
+const FILTER_VERSION_KEY = 'nodus.graph.filters.version';
+const FILTER_VERSION = '2';
 const LOCAL_GRAPH_DEPTH_KEY = 'nodus.graph.localDepth.v2';
 
 function loadFilters(): Filters {
   try {
     const parsed = JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>;
     const merged = { ...DEFAULT_FILTERS, ...parsed };
+    const isLegacyFilters = localStorage.getItem(FILTER_VERSION_KEY) !== FILTER_VERSION;
+    const nodeTypes = new Set((merged.nodeTypes ?? []).filter((type) => GRAPH_NODE_TYPES.includes(type as any)));
+    if (isLegacyFilters) nodeTypes.add('theme');
+    merged.nodeTypes = GRAPH_NODE_TYPES.filter((type) => nodeTypes.has(type));
     // Ensure 'contains' edge type is always available (structural edges).
     merged.edgeTypes = Array.from(new Set([...(merged.edgeTypes ?? []), 'contains']));
     return merged;
@@ -634,6 +695,46 @@ function themeEdgeScore(edge: GraphData['edges'][number]): number {
   return (edge.basis === 'explicit' ? 2 : 0) + edge.confidence;
 }
 
+function physicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Set<string> {
+  const physical = new Set<string>();
+  const themeEdgesBySource = new Map<string, GraphData['edges']>();
+
+  for (const edge of edges) {
+    if (edge.type !== 'contains') {
+      physical.add(edge.id);
+      continue;
+    }
+    const list = themeEdgesBySource.get(edge.source) ?? [];
+    list.push(edge);
+    themeEdgesBySource.set(edge.source, list);
+  }
+
+  const candidates: GraphData['edges'] = [];
+  for (const list of themeEdgesBySource.values()) {
+    list.sort((a, b) => {
+      const scoreDiff = themeEdgeScore(b) - themeEdgeScore(a);
+      return scoreDiff || stableUnit(a.id) - stableUnit(b.id);
+    });
+    const localLimit = Math.min(
+      LAYOUT_THEME_LINKS_PER_THEME,
+      Math.max(8, Math.round(8 + Math.sqrt(list.length) * 2.2))
+    );
+    candidates.push(...list.slice(0, localLimit));
+  }
+
+  const globalLimit = Math.min(
+    LAYOUT_THEME_LINKS_GLOBAL_MAX,
+    Math.max(180, Math.round(Math.sqrt(Math.max(1, nodeCount)) * 24))
+  );
+  candidates.sort((a, b) => {
+    const scoreDiff = themeEdgeScore(b) - themeEdgeScore(a);
+    return scoreDiff || stableUnit(a.id) - stableUnit(b.id);
+  });
+  for (const edge of candidates.slice(0, globalLimit)) physical.add(edge.id);
+
+  return physical;
+}
+
 // ── Louvain community detection (simplified) ────────────────────────────────
 // Returns a map of node id → community id. Works on undirected weighted edges.
 function louvain(cy: Core): Map<string, number> {
@@ -656,7 +757,6 @@ function louvain(cy: Core): Map<string, number> {
   });
   if (totalWeight === 0 || nodes.length === 0) return new Map();
 
-  const m2 = 2 * totalWeight;
   // Each node starts in its own community.
   const community = new Map<string, number>();
   const nodeIds: string[] = [];
@@ -741,13 +841,6 @@ function louvain(cy: Core): Map<string, number> {
   return result;
 }
 
-// Community colors (deterministic from community id).
-const COMMUNITY_COLORS = [
-  '#6366f1', '#f97316', '#22c55e', '#eab308', '#ec4899',
-  '#06b6d4', '#a78bfa', '#f472b6', '#14b8a6', '#ef4444',
-  '#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#d946ef',
-];
-
 export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -816,6 +909,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    localStorage.setItem(FILTER_VERSION_KEY, FILTER_VERSION);
   }, [filters]);
 
   useEffect(() => {
@@ -951,6 +1045,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           y: position.y + moveY * influence.weight,
         });
       }
+      applyLocalCollisionRepulsion(cy, state.collisionIds);
     });
   }, []);
 
@@ -967,17 +1062,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     if (!cy || layoutModeRef.current !== 'force') return;
 
     stopActiveLayout();
-    let layout: any;
-    layout = cy.layout({
+    const layout: any = cy.layout({
       ...createForceLayoutOptions(cy, false, () => {
         forceLayoutPrimedRef.current = true;
         if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
       }, {
         fit: false,
-        refresh: 12,
-        initialEnergyOnIncremental: energy,
-        animationDuration: 420,
-        numIter: 500,
+        refresh: 30,
+        initialTemp: Math.round(95 + energy * 130),
+        coolingFactor: 0.96,
+        numIter: Math.round(110 + energy * 145),
       }),
     } as any);
     activeLayoutRef.current = layout;
@@ -1019,6 +1113,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       if (f.basis === 'explicit' && e.basis !== 'explicit') return false;
       return true;
     }));
+    const physicalEdges = physicalEdgeIds(visibleEdges, visibleNodes.length);
 
     const degreeById = new Map<string, number>();
     for (const node of visibleNodes) degreeById.set(node.id, 0);
@@ -1056,7 +1151,15 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         },
       })),
       ...visibleEdges.map((e) => ({
-        data: { id: e.id, source: e.source, target: e.target, type: e.type, basis: e.basis, confidence: e.confidence },
+        data: {
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          type: e.type,
+          basis: e.basis,
+          confidence: e.confidence,
+          layoutEdge: physicalEdges.has(e.id),
+        },
       })),
     ].map((el: any) => {
       // For idea nodes, compute degree from the visible edges and use a softer
@@ -1081,6 +1184,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         minZoom: 0.12,
         maxZoom: 4,
         wheelSensitivity: 0.35,
+        hideEdgesOnViewport: true,
+        textureOnViewport: true,
+        motionBlur: true,
+        motionBlurOpacity: 0.08,
+        pixelRatio: Math.min(1.5, window.devicePixelRatio || 1),
         style: [
           {
             selector: 'node',
@@ -1115,6 +1223,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           {
             selector: 'node[type="theme"]',
             style: { 'border-width': 2.5, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.34 } as any,
+          },
+          {
+            selector: 'node:grabbed',
+            style: {
+              'overlay-color': '#f8fafc',
+              'overlay-opacity': 0.12,
+              'overlay-padding': 8,
+              'z-index': 40,
+              'text-opacity': 1,
+            } as any,
           },
           // Community compound nodes (collapsed clusters).
           {
@@ -1172,7 +1290,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
             style: {
               'line-style': 'solid',
               'line-color': '#3f3f46',
-              width: 0.55,
+              width: (ele: any) => (ele.data('layoutEdge') ? 0.58 : 0.3),
               opacity: 'data(baseOpacity)',
               'target-arrow-shape': 'none',
             } as any,
@@ -1256,7 +1374,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           },
           { selector: 'node.spotlight', style: { opacity: 1, 'text-opacity': 1, 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.12, 'overlay-padding': 9, 'z-index': 32 } as any },
         ],
-        layout: COSE_BILKENT_LAYOUT,
+        layout: { name: 'preset' },
       });
 
       const removeFocusClasses = () => {
@@ -1308,9 +1426,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         if (layoutModeRef.current !== 'force' || node.isParent()) return;
         stopActiveLayout();
         cancelPendingDragFrame();
+        const influences = buildDragInfluences(node);
         dragStateRef.current = {
           nodeId: node.id(),
-          influences: buildDragInfluences(node),
+          influences,
+          collisionIds: [node.id(), ...influences.filter((item) => item.weight >= 0.08).map((item) => item.id)].slice(0, DRAG_COLLISION_MAX_ACTIVE),
           lastPosition: { ...node.position() },
           pendingDx: 0,
           pendingDy: 0,
@@ -1336,7 +1456,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           applyElasticDragStep();
         }
         dragStateRef.current = null;
-        runForceRelaxation(0.85);
+        runForceRelaxation(0.52);
       };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
@@ -1515,8 +1635,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
 
       // ── Semantic zoom: progressively reveal labels ─────────────────────────
       // • zoom < ZOOM_LABEL_THRESHOLD → only theme labels (ideas are just dots)
-      // • zoom < ZOOM_IDEAS_THRESHOLD → themes + high-degree ideas (top 25%)
-      // • zoom ≥ ZOOM_IDEAS_THRESHOLD → everything visible
+      // • mid zoom → themes + high-rank ideas
+      // • close zoom → progressively reveal the rest
       //
       // Performance: we quantise the zoom level into discrete bands and only
       // recompute opacities/label classes when the band changes. This avoids
@@ -1580,7 +1700,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           cy.edges().forEach((edge: any) => {
             const confidence = Math.min(1, Math.max(0, Number(edge.data('confidence') ?? 0.5)));
             const isStructural = edge.data('type') === 'contains';
-            const importance = isStructural ? 0.12 : 0.26 + confidence * 0.44;
+            const isPhysicalStructural = isStructural && edge.data('layoutEdge') !== false;
+            const importance = isStructural ? (isPhysicalStructural ? 0.12 : 0.055) : 0.26 + confidence * 0.44;
             const phase = isStructural ? structurePhase : mix(structurePhase, 1, detailPhase * 0.55);
             const opacity = protectedEdgeIds.has(edge.id())
               ? edge.hasClass('focus-edge')
@@ -1588,7 +1709,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
                 : edge.hasClass('secondary-edge')
                   ? 0.42
                   : 0.18
-              : mix(isStructural ? 0.008 : 0.02, isStructural ? 0.08 : 0.18, clampUnit(importance * phase));
+              : mix(
+                  isStructural ? 0.004 : 0.02,
+                  isStructural ? (isPhysicalStructural ? 0.08 : 0.032) : 0.18,
+                  clampUnit(importance * phase)
+                );
             edge.data('baseOpacity', opacity);
           });
 
@@ -1622,6 +1747,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     dragStateRef.current = null;
     cy.elements().remove();
     cy.add(elements);
+    let seededInitialPositions = false;
     if (previousPositions.size > 0) {
       cy.batch(() => {
         cy.nodes().forEach((node) => {
@@ -1630,9 +1756,20 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           if (position) node.position(position);
         });
       });
+    } else if (layoutMode === 'force' && lens === 'ideas') {
+      const positions = computeRadialPositions(cy);
+      if (positions) {
+        cy.layout({
+          name: 'preset',
+          positions,
+          fit: false,
+          animate: false,
+        } as any).run();
+        seededInitialPositions = true;
+      }
     }
     // NOTE: automatic community guides (invisible compound parents) were removed
-    // — they forced cose-bilkent into its far slower compound layout path on
+    // — they force the layout into a far slower compound-graph path on
     // every rebuild, which was a major cause of the freeze with themes enabled.
     // The explicit "Comunidades" button still groups on demand via toggleCommunities.
     applySemanticZoomRef.current(cy, true);
@@ -1641,12 +1778,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     let layout: any;
     const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || previousPositions.size === 0;
     const shouldFrameGraph = forceLayoutNeedsInitialFrame && !lastTutorFocusRef.current && !lastUserFocusRef.current;
-    const forceLayout = createForceLayoutOptions(cy, forceLayoutNeedsInitialFrame, () => {
+    const forceLayoutRandomize = forceLayoutNeedsInitialFrame && !seededInitialPositions;
+    const forceLayout = createForceLayoutOptions(cy, forceLayoutRandomize, () => {
       forceLayoutPrimedRef.current = true;
       if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
       if (shouldFrameGraph) frameGraph(cy);
     });
-    // Layout selection: force-directed (cose-bilkent) or deterministic radial.
+    // Layout selection: force-directed physics or deterministic radial.
     if (layoutMode === 'radial') {
       const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
       if (positions) {
