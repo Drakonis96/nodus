@@ -775,6 +775,20 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const focusCenterRef = useRef<{ id: string; kind: 'node' | 'edge' } | null>(null);
   // Track whether the current highlight came from a hover (so tap can override it).
   const hoverActiveRef = useRef(false);
+  // Deferred forced semantic-zoom recalc. applyFocus and clearFocus used to call
+  // applySemanticZoom(cy, true) synchronously, which did a full O(N+E) pass over
+  // every node/edge on every tap — the main cause of the multi-second freeze when
+  // tapping nodes in a large graph. Deferring to the next frame coalesces
+  // multiple pending recalcs into one and unblocks the main thread instantly.
+  const pendingZoomRecalcRef = useRef<number | null>(null);
+  const scheduleZoomRecalc = useCallback(() => {
+    if (pendingZoomRecalcRef.current != null) return;
+    pendingZoomRecalcRef.current = window.requestAnimationFrame(() => {
+      pendingZoomRecalcRef.current = null;
+      const cy = cyRef.current;
+      if (cy) applySemanticZoomRef.current(cy, true);
+    });
+  }, []);
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
@@ -1251,7 +1265,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           cy.elements().removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
           cy.nodes().removeClass('spotlight');
         });
-        applySemanticZoomRef.current(cy, true);
+        scheduleZoomRecalc();
       };
       const applyFocus = (focus: { primary: any; secondary?: any; context?: any }, spotlightNodes?: any) => {
         const cy = cyRef.current!;
@@ -1270,8 +1284,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           focus.primary.edges().addClass('focus-edge');
           spotlightNodes?.addClass('spotlight');
         });
-        // Protected node set changed → recompute semantic zoom opacities.
-        applySemanticZoomRef.current(cy, true);
+        scheduleZoomRecalc();
       };
       const focusOnNode = (node: any, depthOverride?: number | null) => {
         const focus = collectLocalGraph(node, depthOverride ?? highlightDepthRef.current);
@@ -1646,7 +1659,17 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       activeLayoutRef.current = layout;
       layout.run();
     }
-  }, [applyCommunityGuides, applyElasticDragStep, cancelPendingDragFrame, elements, lens, layoutMode, runForceRelaxation, scheduleElasticDragStep, stopActiveLayout]);
+  }, [applyCommunityGuides, applyElasticDragStep, cancelPendingDragFrame, elements, lens, layoutMode, runForceRelaxation, scheduleElasticDragStep, scheduleZoomRecalc, stopActiveLayout]);
+
+  // Cancel any pending deferred zoom recalc on unmount.
+  useEffect(() => {
+    return () => {
+      if (pendingZoomRecalcRef.current != null) {
+        window.cancelAnimationFrame(pendingZoomRecalcRef.current);
+        pendingZoomRecalcRef.current = null;
+      }
+    };
+  }, []);
 
   // Keep the graph framed when the window or panels resize.
   useEffect(() => {
