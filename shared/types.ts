@@ -383,6 +383,18 @@ export interface EdgeDetail {
   toLabel: string;
   explanation?: string | null;
   evidence: Evidence[];
+  trace?: EdgeTrace | null;
+}
+
+export interface EdgeTrace {
+  edgeId: string;
+  method: 'deep' | 'fusion' | 'bridge' | 'reprocess' | string;
+  model: ModelRef | null;
+  embeddingProvider: string | null;
+  embeddingModel: string | null;
+  similarity: number | null;
+  rationale: string | null;
+  createdAt: string;
 }
 
 export interface GapAggregate {

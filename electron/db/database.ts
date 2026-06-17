@@ -28,13 +28,18 @@ function vecCosine(a: Buffer | null, b: Buffer | null): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+function openDatabase(file: string): Database.Database {
+  const next = new Database(file);
+  runMigrations(next);
+  next.function('vec_cosine', vecCosine);
+  return next;
+}
+
 export function getDb(): Database.Database {
   if (!db) {
     const dir = app.getPath('userData');
     fs.mkdirSync(dir, { recursive: true });
-    db = new Database(dbPath());
-    runMigrations(db);
-    db.function('vec_cosine', vecCosine);
+    db = openDatabase(dbPath());
   }
   return db;
 }
@@ -51,8 +56,7 @@ export function replaceDbFile(sourceFile: string): void {
   closeDb();
   const target = dbPath();
   fs.copyFileSync(sourceFile, target);
-  db = new Database(target);
-  runMigrations(db); // brings an older import up to the current schema
+  db = openDatabase(target); // brings an older import up to the current schema
 }
 
 export function currentSchemaVersion(): number {

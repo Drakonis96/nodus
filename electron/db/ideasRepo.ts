@@ -1,5 +1,6 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
+import crypto from 'node:crypto';
 import type {
   Idea,
   IdeaType,
@@ -10,8 +11,12 @@ import type {
   EvidenceKind,
   IdeaDetail,
   EdgeDetail,
+  EdgeTrace,
+  ModelRef,
+  EmbeddingProvider,
 } from '@shared/types';
 import { getWorksByIds } from './worksRepo';
+import { getSettings } from './settingsRepo';
 
 const EDGE_TYPES = new Set<EdgeType>([
   'extends',
@@ -27,6 +32,14 @@ const EDGE_TYPES = new Set<EdgeType>([
   'contains',
 ]);
 
+const SYMMETRIC_EDGE_TYPES = new Set<EdgeType>(['contradicts', 'shares_method', 'measures_same', 'variant_of']);
+
+const DEFAULT_EMBED_MODELS: Record<EmbeddingProvider, string> = {
+  openai: 'text-embedding-3-small',
+  openrouter: 'baai/bge-m3',
+  gemini: 'gemini-embedding-001',
+};
+
 export function normalizeEdgeType(type: string | null | undefined): EdgeType | null {
   const raw = (type ?? '').trim().toLowerCase();
   if (EDGE_TYPES.has(raw as EdgeType)) return raw as EdgeType;
@@ -41,6 +54,75 @@ export function normalizeEdgeBasis(basis: string | null | undefined): EdgeBasis 
 function clampConfidence(value: number): number {
   if (!Number.isFinite(value)) return 0.5;
   return Math.max(0, Math.min(1, value));
+}
+
+function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
+  const trimmed = modelId.trim() || DEFAULT_EMBED_MODELS[provider];
+  if (provider === 'openrouter' && !trimmed.includes('/') && trimmed.includes(':')) {
+    const [author, slug] = trimmed.split(':', 2);
+    if (author && slug) return `${author.toLowerCase()}/${slug}`;
+  }
+  return trimmed;
+}
+
+export function currentEmbeddingConfig(): { provider: EmbeddingProvider; model: string } {
+  const settings = getSettings();
+  const provider = settings.embeddingProvider ?? 'openai';
+  return {
+    provider,
+    model: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBED_MODELS[provider]),
+  };
+}
+
+export function embeddingTextForIdea(input: {
+  type?: string | null;
+  label: string;
+  statement: string;
+  themes?: string[] | null;
+}): string {
+  const parts = [
+    input.type ? `tipo: ${input.type}` : '',
+    `etiqueta: ${input.label}`,
+    `enunciado: ${input.statement}`,
+    input.themes?.length ? `temas: ${input.themes.slice(0, 4).join(', ')}` : '',
+  ].filter(Boolean);
+  return parts.join('\n');
+}
+
+export function embeddingTextHash(text: string): string {
+  return crypto.createHash('sha1').update(text.replace(/\s+/g, ' ').trim()).digest('hex');
+}
+
+function embeddingMetaFor(text: string, embedding: number[]): {
+  provider: EmbeddingProvider;
+  model: string;
+  dim: number;
+  textHash: string;
+} {
+  const config = currentEmbeddingConfig();
+  return {
+    ...config,
+    dim: embedding.length,
+    textHash: embeddingTextHash(text),
+  };
+}
+
+export function ideaNeedsEmbedding(row: {
+  embedding: Buffer | null;
+  embedding_provider: string | null;
+  embedding_model: string | null;
+  embedding_dim: number | null;
+  embedding_text_hash: string | null;
+}, text: string): boolean {
+  if (!row.embedding) return true;
+  const config = currentEmbeddingConfig();
+  const dim = row.embedding.byteLength / 4;
+  return (
+    row.embedding_provider !== config.provider ||
+    row.embedding_model !== config.model ||
+    row.embedding_dim !== dim ||
+    row.embedding_text_hash !== embeddingTextHash(text)
+  );
 }
 
 // ── Embedding (de)serialization: store float32 array as BLOB ────────────────
@@ -89,23 +171,49 @@ export interface NewIdeaInput {
   label: string;
   statement: string;
   embedding: number[] | null;
+  embeddingText?: string;
+  themes?: string[];
 }
 
 export function createIdea(input: NewIdeaInput): Idea {
   const db = getDb();
   const global_id = nextGlobalId();
   const created_at = new Date().toISOString();
+  const embeddingText = input.embeddingText ?? embeddingTextForIdea(input);
+  const meta = input.embedding ? embeddingMetaFor(embeddingText, input.embedding) : null;
   db.prepare(
-    'INSERT INTO ideas (global_id, type, label, statement, embedding, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+    `INSERT INTO ideas (
+       global_id, type, label, statement, embedding, created_at,
+       embedding_provider, embedding_model, embedding_dim, embedding_text_hash
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     global_id,
     input.type,
     input.label,
     input.statement,
     input.embedding ? encodeEmbedding(input.embedding) : null,
-    created_at
+    created_at,
+    meta?.provider ?? null,
+    meta?.model ?? null,
+    meta?.dim ?? null,
+    meta?.textHash ?? null
   );
   return { global_id, ...input, created_at };
+}
+
+export function updateIdeaEmbedding(globalId: string, text: string, embedding: number[]): void {
+  const meta = embeddingMetaFor(text, embedding);
+  getDb()
+    .prepare(
+      `UPDATE ideas
+          SET embedding = ?,
+              embedding_provider = ?,
+              embedding_model = ?,
+              embedding_dim = ?,
+              embedding_text_hash = ?
+        WHERE global_id = ?`
+    )
+    .run(encodeEmbedding(embedding), meta.provider, meta.model, meta.dim, meta.textHash, globalId);
 }
 
 export function getIdea(globalId: string): Idea | null {
@@ -132,10 +240,20 @@ export function getIdeaSummary(globalId: string): Idea | null {
   return { ...row, embedding: null };
 }
 
-/** All ideas with an embedding, for in-memory cosine candidate retrieval. */
+/** All ideas with a current-model embedding. Kept for small in-memory consumers. */
 export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; label: string; statement: string; embedding: number[] }[] {
   const db = getDb();
-  const rows = db.prepare('SELECT global_id, type, label, statement, embedding FROM ideas WHERE embedding IS NOT NULL').all() as {
+  const config = currentEmbeddingConfig();
+  const rows = db
+    .prepare(
+      `SELECT global_id, type, label, statement, embedding
+         FROM ideas
+        WHERE embedding IS NOT NULL
+          AND embedding_provider = ?
+          AND embedding_model = ?
+          AND embedding_dim IS NOT NULL`
+    )
+    .all(config.provider, config.model) as {
     global_id: string;
     type: IdeaType;
     label: string;
@@ -162,20 +280,28 @@ export function allIdeaCandidates(): { global_id: string; type: IdeaType; label:
 export function findSimilarIdeas(
   queryEmbedding: number[],
   threshold: number,
-  limit: number
+  limit: number,
+  options: { excludeIds?: string[] } = {}
 ): { global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[] {
   const buf = encodeEmbedding(queryEmbedding);
+  const config = currentEmbeddingConfig();
+  const excluded = options.excludeIds ?? [];
+  const excludeSql = excluded.length ? `AND global_id NOT IN (${excluded.map(() => '?').join(',')})` : '';
   return getDb()
     .prepare(
       `SELECT * FROM (
          SELECT global_id, type, label, statement, vec_cosine(embedding, ?) AS similarity
          FROM ideas
          WHERE embedding IS NOT NULL
+           AND embedding_provider = ?
+           AND embedding_model = ?
+           AND embedding_dim = ?
+           ${excludeSql}
        ) WHERE similarity >= ?
        ORDER BY similarity DESC
        LIMIT ?`
     )
-    .all(buf, threshold, limit) as {
+    .all(buf, config.provider, config.model, queryEmbedding.length, ...excluded, threshold, limit) as {
     global_id: string;
     type: IdeaType;
     label: string;
@@ -215,24 +341,111 @@ export function addEvidence(
 }
 
 export interface NewEdgeInput {
+  id?: string;
   from_id: string;
   to_id: string;
   type: string;
   basis: string;
   confidence: number;
   source_work: string | null;
+  trace?: EdgeTraceInput | null;
 }
 
-/** Insert an edge, de-duplicating on (from, to, type); keeps the higher confidence. */
+export interface EdgeTraceInput {
+  method: EdgeTrace['method'];
+  model?: ModelRef | null;
+  embeddingProvider?: string | null;
+  embeddingModel?: string | null;
+  similarity?: number | null;
+  rationale?: string | null;
+}
+
+function canonicalEdgeEndpoints(fromId: string, toId: string, type: EdgeType): { from_id: string; to_id: string } {
+  if (SYMMETRIC_EDGE_TYPES.has(type) && fromId > toId) {
+    return { from_id: toId, to_id: fromId };
+  }
+  return { from_id: fromId, to_id: toId };
+}
+
+export function canonicalEdgeKey(fromId: string, toId: string, type: EdgeType): string {
+  const endpoints = canonicalEdgeEndpoints(fromId, toId, type);
+  return `${endpoints.from_id}|${endpoints.to_id}|${type}`;
+}
+
+export function upsertEdgeTrace(edgeId: string, trace: EdgeTraceInput): void {
+  getDb()
+    .prepare(
+      `INSERT INTO edge_traces (
+         edge_id, method, model_json, embedding_provider, embedding_model, similarity, rationale, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(edge_id) DO UPDATE SET
+         method = excluded.method,
+         model_json = excluded.model_json,
+         embedding_provider = excluded.embedding_provider,
+         embedding_model = excluded.embedding_model,
+         similarity = excluded.similarity,
+         rationale = excluded.rationale,
+         created_at = excluded.created_at`
+    )
+    .run(
+      edgeId,
+      trace.method,
+      trace.model ? JSON.stringify(trace.model) : null,
+      trace.embeddingProvider ?? null,
+      trace.embeddingModel ?? null,
+      trace.similarity ?? null,
+      trace.rationale ?? null,
+      new Date().toISOString()
+    );
+}
+
+export function getEdgeTrace(edgeId: string): EdgeTrace | null {
+  const row = getDb()
+    .prepare('SELECT * FROM edge_traces WHERE edge_id = ?')
+    .get(edgeId) as
+    | {
+        edge_id: string;
+        method: string;
+        model_json: string | null;
+        embedding_provider: string | null;
+        embedding_model: string | null;
+        similarity: number | null;
+        rationale: string | null;
+        created_at: string;
+      }
+    | undefined;
+  if (!row) return null;
+  let model: ModelRef | null = null;
+  if (row.model_json) {
+    try {
+      model = JSON.parse(row.model_json) as ModelRef;
+    } catch {
+      model = null;
+    }
+  }
+  return {
+    edgeId: row.edge_id,
+    method: row.method,
+    model,
+    embeddingProvider: row.embedding_provider,
+    embeddingModel: row.embedding_model,
+    similarity: row.similarity,
+    rationale: row.rationale,
+    createdAt: row.created_at,
+  };
+}
+
+/** Insert an edge, de-duplicating on canonical (from, to, type); keeps the higher confidence. */
 export function addEdge(input: NewEdgeInput): string | null {
   const type = normalizeEdgeType(input.type);
   if (!type) return null;
   const basis = normalizeEdgeBasis(input.basis);
   const confidence = clampConfidence(input.confidence);
+  const endpoints = canonicalEdgeEndpoints(input.from_id, input.to_id, type);
   const db = getDb();
   const existing = db
     .prepare('SELECT id, confidence FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
-    .get(input.from_id, input.to_id, type) as { id: string; confidence: number } | undefined;
+    .get(endpoints.from_id, endpoints.to_id, type) as { id: string; confidence: number } | undefined;
   if (existing) {
     if (confidence > existing.confidence) {
       db.prepare('UPDATE edges SET confidence = ?, basis = ? WHERE id = ?').run(
@@ -241,12 +454,14 @@ export function addEdge(input: NewEdgeInput): string | null {
         existing.id
       );
     }
+    if (input.trace) upsertEdgeTrace(existing.id, input.trace);
     return existing.id;
   }
-  const id = uuid();
+  const id = input.id ?? uuid();
   db.prepare(
     'INSERT INTO edges (id, from_id, to_id, type, basis, confidence, source_work) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, input.from_id, input.to_id, type, basis, confidence, input.source_work);
+  ).run(id, endpoints.from_id, endpoints.to_id, type, basis, confidence, input.source_work);
+  if (input.trace) upsertEdgeTrace(id, input.trace);
   return id;
 }
 
@@ -262,6 +477,7 @@ export function resetGraphData(): void {
     db.exec(`
       DELETE FROM idea_occurrences;
       DELETE FROM evidence;
+      DELETE FROM edge_traces;
       DELETE FROM edges;
       DELETE FROM ideas;
       DELETE FROM idea_theme_links;
@@ -288,6 +504,7 @@ export function purgeDeepData(nodusId: string): void {
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM idea_occurrences WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM evidence WHERE nodus_id = ?').run(nodusId);
+    db.prepare('DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE source_work = ?)').run(nodusId);
     db.prepare('DELETE FROM edges WHERE source_work = ?').run(nodusId);
     db.prepare('DELETE FROM idea_theme_links WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM gaps WHERE nodus_id = ?').run(nodusId);
@@ -302,6 +519,7 @@ export function purgeDeepData(nodusId: string): void {
        WHERE from_id NOT IN (SELECT global_id FROM ideas)
           OR to_id NOT IN (SELECT global_id FROM ideas)`
     ).run();
+    db.prepare('DELETE FROM edge_traces WHERE edge_id NOT IN (SELECT id FROM edges)').run();
   });
   tx();
 }
@@ -350,6 +568,7 @@ export function getEdgeDetail(edgeId: string): EdgeDetail | null {
     toLabel: to?.label ?? edge.to_id,
     explanation: contradictionExplanation(edge, from, to),
     evidence,
+    trace: getEdgeTrace(edgeId),
   };
 }
 

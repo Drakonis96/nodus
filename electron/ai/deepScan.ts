@@ -7,6 +7,7 @@ import {
   addEvidence,
   addEdge,
   purgeDeepData,
+  embeddingTextForIdea,
 } from '../db/ideasRepo';
 import { addGap, addExternalRef } from '../db/gapsRepo';
 import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
@@ -287,13 +288,26 @@ export async function runDeepScan(
     // Resolve each merged idea against the global graph (Prompt 2 / fusion).
     const labelToGlobal = new Map<string, string>();
     const ideaEntries = Array.from(merged.ideas);
+    const preparedIdeas = ideaEntries.map(([labelKey, idea]) => {
+      const ideaThemeLabels = mergeThemeLabels(idea.theme_labels, [])
+        .map((label) => allowedThemeLabels.get(normalizeThemeLabel(label)))
+        .filter((label): label is string => Boolean(label))
+        .slice(0, 3);
+      const embeddingText = embeddingTextForIdea({
+        type: idea.type,
+        label: idea.label,
+        statement: idea.statement,
+        themes: ideaThemeLabels,
+      });
+      return { labelKey, idea, ideaThemeLabels, embeddingText };
+    });
     const fusionDone = startPerf('embeddings/fusion', perf, { ideas: ideaEntries.length });
     const embeddingDone = startPerf('embedding', perf, { mode: 'batch', ideas: ideaEntries.length });
     try {
-      const embeddings = await embedMany(ideaEntries.map(([, idea]) => `${idea.label}. ${idea.statement}`));
+      const embeddings = await embedMany(preparedIdeas.map((entry) => entry.embeddingText));
       embeddingDone({ available: embeddings.filter(Boolean).length });
-      for (let i = 0; i < ideaEntries.length; i++) {
-        const [labelKey, idea] = ideaEntries[i];
+      for (let i = 0; i < preparedIdeas.length; i++) {
+        const { labelKey, idea, ideaThemeLabels, embeddingText } = preparedIdeas[i];
         onProgress?.({
           detail: `Fusionando idea ${i + 1}/${ideaEntries.length}…`,
           pct: ideaEntries.length ? i / ideaEntries.length : null,
@@ -304,12 +318,14 @@ export async function runDeepScan(
           label: idea.label,
           statement: idea.statement,
         };
-        const globalId = await fuseIdea(ext, work.nodus_id, { model: fusionModel, perf, embedding: embeddings[i] ?? null });
+        const globalId = await fuseIdea(ext, work.nodus_id, {
+          model: fusionModel,
+          perf,
+          embedding: embeddings[i] ?? null,
+          embeddingText,
+          themes: ideaThemeLabels,
+        });
         labelToGlobal.set(labelKey, globalId);
-        const ideaThemeLabels = mergeThemeLabels(idea.theme_labels, [])
-          .map((label) => allowedThemeLabels.get(normalizeThemeLabel(label)))
-          .filter((label): label is string => Boolean(label))
-          .slice(0, 3);
         setIdeaThemeLinks(work.nodus_id, globalId, ideaThemeLabels, idea.confidence, 'explicit');
 
         upsertOccurrence(globalId, work.nodus_id, idea.role, idea.development, idea.confidence);
@@ -329,7 +345,19 @@ export async function runDeepScan(
       const from = labelToGlobal.get(rel.from);
       const to = labelToGlobal.get(rel.to);
       if (!from || !to) continue;
-      addEdge({ from_id: from, to_id: to, type: rel.type, basis: rel.basis, confidence: rel.confidence, source_work: work.nodus_id });
+      addEdge({
+        from_id: from,
+        to_id: to,
+        type: rel.type,
+        basis: rel.basis,
+        confidence: rel.confidence,
+        source_work: work.nodus_id,
+        trace: {
+          method: 'deep',
+          model: extractionModel,
+          rationale: rel.evidence?.quote ? `Relación extraída con evidencia: "${rel.evidence.quote}"` : null,
+        },
+      });
     }
 
     // External references → stored for the gaps/author layers and as cited-work edges.

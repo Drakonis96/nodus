@@ -15,15 +15,23 @@ import {
   replaceIdeaThemeLinks,
   setWorkThemes,
 } from '../db/themesRepo';
-import { normalizeEdgeType } from '../db/ideasRepo';
+import {
+  addEdge,
+  canonicalEdgeKey,
+  currentEmbeddingConfig,
+  findSimilarIdeas,
+  ideasWithEmbeddings,
+  normalizeEdgeType,
+} from '../db/ideasRepo';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { completeJson } from './aiClient';
 
 const THEME_BATCH = 30;
-const RELATION_BATCH_SIZE = 40;
+const RELATION_TOP_K_PER_IDEA = 10;
+const RELATION_MAX_CANDIDATES = 1400;
+const RELATION_VALIDATION_BATCH = 15;
 const STATEMENT_CLIP = 2000;
 const REPROC_EDGE_PREFIX = 'reproc:';
-const RELATION_MAX_TOKENS = 128_000;
 
 const RELATION_TYPES = new Set<EdgeType>([
   'extends',
@@ -50,7 +58,21 @@ interface ThemeAssignmentResult {
 }
 
 interface RelationExtractionResult {
-  relations: { from: string; to: string; type: string; confidence?: number }[];
+  relations: { from: string; to: string; type: string; confidence?: number; rationale?: string }[];
+}
+
+interface RelationCandidate {
+  fromId: string;
+  toId: string;
+  fromType: string;
+  toType: string;
+  fromLabel: string;
+  toLabel: string;
+  fromStatement: string;
+  toStatement: string;
+  fromThemes: string[];
+  toThemes: string[];
+  similarity: number;
 }
 
 export interface ReprocessProgress {
@@ -89,30 +111,28 @@ const THEME_LOCKED_RULE =
 const THEME_OPEN_RULE =
   '\n- Si varias ideas comparten un tema amplio que NO está en la lista, puedes proponer una etiqueta nueva (corta, en minúsculas, reutilizable). Sé MUY conservador: prioriza reutilizar los temas existentes.';
 
-const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes un conjunto amplio de IDEAS ya
-extraídas (afirmaciones, hallazgos, constructos, métodos, marcos) de múltiples
-obras y temas. Cada idea incluye su etiqueta temática. Tu tarea es proponer,
-EXCLUSIVAMENTE en JSON válido, TODAS las relaciones pertinentes entre ellas.
+const RELATION_SYSTEM = `Eres el motor de relaciones de Nodus. Recibes PARES de ideas ya
+extraídas que el sistema propuso por similitud semántica de embeddings. Tu tarea
+es validar, EXCLUSIVAMENTE en JSON válido, si existe una relación conceptual
+real entre cada par.
 
 TIPOS válidos: extends, contradicts, applies_to, shares_method, precondition_of,
 measures_same, supports, refutes, variant_of, refines.
 
 ═══ REGLAS ═══
-- Examina TODA la lista en busca de conexiones. No te limites a ideas vecinas o
-  del mismo tema: las relaciones entre temas distintos son igualmente valiosas.
-- Propón todas las relaciones que identifiques con claridad razonable. No hay
-  límite de relaciones por idea — una idea puede estar conectada con muchas otras
-  si el contenido lo justifica.
+- Evalúa cada par independientemente. La similitud alta NO basta por sí sola.
+- Propón una relación solo si los enunciados la sustentan con claridad razonable.
 - La confianza refleja cuán evidente es la relación a partir de los enunciados:
   0.7–1.0 si la relación es clara y directa, 0.4–0.7 si es plausible pero
   requiere inferencia, < 0.4 solo si hay indicios débiles.
 - No relaciones una idea consigo misma.
 - No inventes relaciones que los enunciados no sustenten.
 - Usa los ids tal cual aparecen en la entrada.
-- Las ideas están ordenadas por tema temático. Pueden pertenecer a distintos
-  temas; no asumas que solo las del mismo tema están relacionadas.
+- Puedes invertir from/to si el tipo de relación es direccional.
+- "rationale": una frase breve en español que explique la validación.
 
-SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0 } ] }`;
+SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0, "rationale": "..." } ] }
+Si ningún par tiene relación válida: { "relations": [] }`;
 
 function clip(text: string): string {
   const clean = (text ?? '').replace(/\s+/g, ' ').trim();
@@ -309,13 +329,10 @@ export async function reprocessConnections(
 }
 
 /**
- * Re-derive idea↔idea relations across ALL active ideas. Ideas are grouped into
- * batches (ordered by theme so the model sees related ideas together) and every
- * idea participates — no theme cap, no per-idea relation limit. The model sees
- * each idea's theme labels so it can draw cross-theme connections. Results are
- * stored as 'inferred' edges with a recognisable id prefix; previous reproc
- * edges are cleared first. Deep-scan edges are never touched, and an inferred
- * edge is skipped if a stronger edge for that pair+type already exists.
+ * Re-derive idea↔idea relations by first retrieving semantic top-k candidate
+ * pairs, then asking the model to validate only those pairs. This avoids the old
+ * batch-bound blind spot where two related ideas in different batches were never
+ * compared, and it keeps model work bounded by candidate count rather than N².
  */
 async function reprocessRelations(
   ideas: IdeaRow[],
@@ -326,66 +343,115 @@ async function reprocessRelations(
 ): Promise<number> {
   const db = getDb();
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
+  const activeIds = new Set(ideas.map((idea) => idea.global_id));
+  const embeddedIdeas = ideasWithEmbeddings().filter((idea) => activeIds.has(idea.global_id));
+  if (embeddedIdeas.length < 2) return 0;
 
-  // Sort ideas by their first theme so the model sees them in thematic groups.
-  // Ideas with no theme go at the end.
-  const themeOrder = new Map<string, number>();
-  const allThemeLabels = [...new Set(ideas.flatMap((i) => themesByIdea.get(i.global_id) ?? []))];
-  allThemeLabels.forEach((label, idx) => themeOrder.set(normalizeThemeLabel(label), idx));
+  const existingPairs = new Set<string>();
+  const existingRows = db
+    .prepare(`SELECT from_id, to_id FROM edges WHERE id NOT LIKE '${REPROC_EDGE_PREFIX}%'`)
+    .all() as { from_id: string; to_id: string }[];
+  for (const row of existingRows) {
+    existingPairs.add([row.from_id, row.to_id].sort().join('|'));
+  }
 
-  const sorted = [...ideas].sort((a, b) => {
-    const aThemes = themesByIdea.get(a.global_id) ?? [];
-    const bThemes = themesByIdea.get(b.global_id) ?? [];
-    const aOrder = aThemes.length ? (themeOrder.get(normalizeThemeLabel(aThemes[0])) ?? 999) : 999;
-    const bOrder = bThemes.length ? (themeOrder.get(normalizeThemeLabel(bThemes[0])) ?? 999) : 999;
-    if (aOrder !== bOrder) return aOrder - bOrder;
-    return a.global_id.localeCompare(b.global_id);
-  });
+  const candidates: RelationCandidate[] = [];
+  const seenPairs = new Set<string>();
+  for (const idea of embeddedIdeas) {
+    const similar = findSimilarIdeas(idea.embedding, 0.68, RELATION_TOP_K_PER_IDEA, { excludeIds: [idea.global_id] });
+    for (const hit of similar) {
+      if (!activeIds.has(hit.global_id)) continue;
+      const other = ideaById.get(hit.global_id);
+      if (!other) continue;
+      const pairKey = [idea.global_id, hit.global_id].sort().join('|');
+      if (seenPairs.has(pairKey) || existingPairs.has(pairKey)) continue;
+      seenPairs.add(pairKey);
+      candidates.push({
+        fromId: idea.global_id,
+        toId: hit.global_id,
+        fromType: idea.type,
+        toType: other.type,
+        fromLabel: idea.label,
+        toLabel: other.label,
+        fromStatement: idea.statement,
+        toStatement: other.statement,
+        fromThemes: themesByIdea.get(idea.global_id) ?? [],
+        toThemes: themesByIdea.get(hit.global_id) ?? [],
+        similarity: hit.similarity,
+      });
+    }
+  }
 
-  const batches = chunk(sorted, RELATION_BATCH_SIZE);
-  if (batches.length === 0) return 0;
+  candidates.sort((a, b) => b.similarity - a.similarity);
+  const cappedCandidates = candidates.slice(0, RELATION_MAX_CANDIDATES);
+  if (cappedCandidates.length === 0) return 0;
 
-  const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
-  const relCheckpoints = contentHash ? loadCheckpoints('reprocess', contentHash, 'reproc_relation_batch') : new Map();
+  const batches = chunk(cappedCandidates, RELATION_VALIDATION_BATCH);
+  const relationHash = crypto
+    .createHash('sha1')
+    .update(`${contentHash ?? ''}:${cappedCandidates.map((c) => `${c.fromId}:${c.toId}`).sort().join(',')}`)
+    .digest('hex');
+  const proposed = new Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>();
+  const candidateByPair = new Map(cappedCandidates.map((c) => [[c.fromId, c.toId].sort().join('|'), c]));
+  const relCheckpoints = loadCheckpoints('reprocess', relationHash, 'reproc_relation_batch');
+
+  const acceptRelation = (relation: RelationExtractionResult['relations'][number]) => {
+    if (!relation || relation.from === relation.to) return;
+    const candidate = candidateByPair.get([relation.from, relation.to].sort().join('|'));
+    if (!candidate) return;
+    const type = normalizeEdgeType(relation.type);
+    if (!type || !RELATION_TYPES.has(type)) return;
+    const confidence = Math.max(0.1, Math.min(1, Number(relation.confidence) || 0.5));
+    const key = canonicalEdgeKey(relation.from, relation.to, type);
+    const existing = proposed.get(key);
+    if (!existing || confidence > existing.confidence) {
+      proposed.set(key, {
+        from: relation.from,
+        to: relation.to,
+        type,
+        confidence,
+        similarity: candidate.similarity,
+        rationale: typeof relation.rationale === 'string' && relation.rationale.trim() ? relation.rationale.trim() : null,
+      });
+    }
+  };
+
   for (let bi = 0; bi < batches.length; bi++) {
     const batch = batches[bi];
-    // Resume from checkpoint if available.
     const saved = relCheckpoints.get(bi) as RelationExtractionResult | undefined;
     if (saved && isRelationExtractionResult(saved)) {
-      const inBatch = new Set(batch.map((i) => i.global_id));
-      for (const relation of saved.relations) {
-        if (!relation || relation.from === relation.to) continue;
-        if (!inBatch.has(relation.from) || !inBatch.has(relation.to)) continue;
-        const type = normalizeEdgeType(relation.type);
-        if (!type || !RELATION_TYPES.has(type)) continue;
-        const confidence = Math.max(0.1, Math.min(1, Number(relation.confidence) || 0.5));
-        const key = `${relation.from}|${relation.to}|${type}`;
-        const existing = proposed.get(key);
-        if (!existing || confidence > existing.confidence) {
-          proposed.set(key, { from: relation.from, to: relation.to, type, confidence });
-        }
-      }
+      for (const relation of saved.relations) acceptRelation(relation);
       continue;
     }
     onProgress?.({
       phase: 'relations',
-      label: 'Trazando relaciones entre ideas',
+      label: 'Validando pares semánticos entre ideas',
       current: bi + 1,
       total: batches.length,
     });
     const input = {
-      ideas: batch.map((idea) => ({
-        id: idea.global_id,
-        type: idea.type,
-        label: idea.label,
-        statement: clip(idea.statement),
-        themes: themesByIdea.get(idea.global_id) ?? [],
+      pairs: batch.map((candidate) => ({
+        from: {
+          id: candidate.fromId,
+          type: candidate.fromType,
+          label: candidate.fromLabel,
+          statement: clip(candidate.fromStatement),
+          themes: candidate.fromThemes,
+        },
+        to: {
+          id: candidate.toId,
+          type: candidate.toType,
+          label: candidate.toLabel,
+          statement: clip(candidate.toStatement),
+          themes: candidate.toThemes,
+        },
+        similarity: Number(candidate.similarity.toFixed(3)),
       })),
     };
     let result: RelationExtractionResult;
     try {
       result = await completeJson<RelationExtractionResult>(
-        { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: RELATION_MAX_TOKENS },
+        { system: RELATION_SYSTEM, user: JSON.stringify(input), temperature: 0.1, maxTokens: 4000 },
         isRelationExtractionResult,
         model
       );
@@ -393,41 +459,39 @@ async function reprocessRelations(
       // If a single batch fails (e.g. output too large), skip it and continue.
       continue;
     }
-    // Checkpoint this batch result.
-    if (contentHash) saveCheckpoint('reprocess', contentHash, 'reproc_relation_batch', bi, result);
-    const inBatch = new Set(batch.map((i) => i.global_id));
-    for (const relation of result.relations) {
-      if (!relation || relation.from === relation.to) continue;
-      if (!inBatch.has(relation.from) || !inBatch.has(relation.to)) continue;
-      const type = normalizeEdgeType(relation.type);
-      if (!type || !RELATION_TYPES.has(type)) continue;
-      const confidence = Math.max(0.1, Math.min(1, Number(relation.confidence) || 0.5));
-      const key = `${relation.from}|${relation.to}|${type}`;
-      const existing = proposed.get(key);
-      if (!existing || confidence > existing.confidence) {
-        proposed.set(key, { from: relation.from, to: relation.to, type, confidence });
-      }
-    }
+    saveCheckpoint('reprocess', relationHash, 'reproc_relation_batch', bi, result);
+    for (const relation of result.relations) acceptRelation(relation);
   }
 
   let added = 0;
+  const config = currentEmbeddingConfig();
   const insert = db.transaction(() => {
     // Clear old reproc edges only now — after all batches completed successfully.
+    db.prepare(`DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%')`).run();
     db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
     for (const edge of proposed.values()) {
-      // Don't duplicate an edge already established for this exact pair+type.
-      const clash = db
-        .prepare('SELECT 1 FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
-        .get(edge.from, edge.to, edge.type);
-      if (clash) continue;
-      db.prepare(
-        'INSERT INTO edges (id, from_id, to_id, type, basis, confidence, source_work) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(`${REPROC_EDGE_PREFIX}${uuid()}`, edge.from, edge.to, edge.type, 'inferred', edge.confidence, null);
-      added++;
+      const id = addEdge({
+        id: `${REPROC_EDGE_PREFIX}${uuid()}`,
+        from_id: edge.from,
+        to_id: edge.to,
+        type: edge.type,
+        basis: 'inferred',
+        confidence: edge.confidence,
+        source_work: null,
+        trace: {
+          method: 'reprocess',
+          model,
+          embeddingProvider: config.provider,
+          embeddingModel: config.model,
+          similarity: edge.similarity,
+          rationale: edge.rationale,
+        },
+      });
+      if (id) added++;
     }
   });
   insert();
   // Relation phase done — clear its checkpoints.
-  if (contentHash) clearCheckpoints('reprocess', contentHash, 'reproc_relation_batch');
+  clearCheckpoints('reprocess', relationHash, 'reproc_relation_batch');
   return added;
 }

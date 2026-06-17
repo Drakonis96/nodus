@@ -1,14 +1,21 @@
-import { v4 as uuid } from 'uuid';
 import crypto from 'node:crypto';
 import type { EdgeType, ModelRef, SemanticBridgeResult, SemanticBridgeProgress } from '@shared/types';
 import { getDb } from '../db/database';
-import { ideasWithEmbeddings, cosineSimilarity, normalizeEdgeType } from '../db/ideasRepo';
+import {
+  addEdge,
+  canonicalEdgeKey,
+  currentEmbeddingConfig,
+  findSimilarIdeas,
+  ideasWithEmbeddings,
+  normalizeEdgeType,
+} from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 
 const SIM_THRESHOLD = 0.70;
+const TOP_K_PER_IDEA = 12;
+const MAX_CANDIDATES = 1200;
 const VALIDATION_BATCH = 15;
-const BRIDGE_EDGE_PREFIX = 'bridge:';
 const CHECKPOINT_KIND = 'semantic_bridge_batch';
 
 const VALID_EDGE_TYPES: EdgeType[] = [
@@ -42,6 +49,7 @@ interface LlmRelation {
   to: string;
   type: string;
   confidence?: number;
+  rationale?: string;
 }
 
 interface LlmValidationResult {
@@ -68,8 +76,9 @@ REGLAS:
 - Confianza: 0.7–1.0 si la relación es directa, 0.4–0.7 si es inferible, < 0.4
   solo si hay indicios débiles. Si no ves relación, omite el par.
 - No inventes relaciones. Ante la duda, no incluyas el par.
+- "rationale": una frase breve en español que explique por qué existe la relación.
 
-SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0 } ] }
+SALIDA: { "relations": [ { "from": "<id>", "to": "<id>", "type": "<tipo>", "confidence": 0.0-1.0, "rationale": "..." } ] }
 Si no hay ninguna relación válida: { "relations": [] }`;
 
 const listeners = new Set<ProgressListener>();
@@ -133,16 +142,18 @@ function findCandidates(): Candidate[] {
   const existingPairs = loadExistingEdgePairs();
   const candidates: Candidate[] = [];
 
-  for (let i = 0; i < ideas.length; i++) {
-    for (let j = i + 1; j < ideas.length; j++) {
-      const a = ideas[i];
-      const b = ideas[j];
+  const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
+  const seenPairs = new Set<string>();
 
-      const pairKey = `${a.global_id}|${b.global_id}`;
-      if (existingPairs.has(pairKey)) continue;
+  for (const a of ideas) {
+    const similar = findSimilarIdeas(a.embedding, SIM_THRESHOLD, TOP_K_PER_IDEA, { excludeIds: [a.global_id] });
+    for (const hit of similar) {
+      const b = ideaById.get(hit.global_id);
+      if (!b) continue;
 
-      const sim = cosineSimilarity(a.embedding, b.embedding);
-      if (sim < SIM_THRESHOLD) continue;
+      const pairKey = [a.global_id, b.global_id].sort().join('|');
+      if (seenPairs.has(pairKey) || existingPairs.has(`${a.global_id}|${b.global_id}`)) continue;
+      seenPairs.add(pairKey);
 
       const aThemes = themeMap.get(a.global_id);
       const bThemes = themeMap.get(b.global_id);
@@ -162,21 +173,21 @@ function findCandidates(): Candidate[] {
         toStatement: b.statement,
         fromType: a.type,
         toType: b.type,
-        similarity: sim,
+        similarity: hit.similarity,
         crossTheme,
       });
     }
   }
 
   candidates.sort((a, b) => b.similarity - a.similarity);
-  return candidates;
+  return candidates.slice(0, MAX_CANDIDATES);
 }
 
 async function validateCandidates(
   candidates: Candidate[],
   model?: ModelRef | null,
   onProgress?: (p: SemanticBridgeProgress) => void
-): Promise<Map<string, { from: string; to: string; type: EdgeType; confidence: number }>> {
+): Promise<Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>> {
   const batches = chunk(candidates, VALIDATION_BATCH);
   const contentHash = crypto
     .createHash('sha1')
@@ -184,24 +195,37 @@ async function validateCandidates(
     .digest('hex');
 
   const checkpoints = loadCheckpoints('bridges', contentHash, CHECKPOINT_KIND);
-  const validated = new Map<string, { from: string; to: string; type: EdgeType; confidence: number }>();
+  const validated = new Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>();
+  const candidateByPair = new Map(candidates.map((c) => [[c.fromId, c.toId].sort().join('|'), c]));
+
+  const acceptRelation = (rel: LlmRelation) => {
+    const type = normalizeEdgeType(rel.type);
+    if (!type || !VALID_EDGE_TYPES.includes(type)) return;
+    if (rel.from === rel.to) return;
+    const pairKey = [rel.from, rel.to].sort().join('|');
+    const candidate = candidateByPair.get(pairKey);
+    if (!candidate) return;
+    const confidence = Math.max(0.1, Math.min(1, Number(rel.confidence) || 0.5));
+    const key = canonicalEdgeKey(rel.from, rel.to, type);
+    const existing = validated.get(key);
+    if (!existing || confidence > existing.confidence) {
+      validated.set(key, {
+        from: rel.from,
+        to: rel.to,
+        type,
+        confidence,
+        similarity: candidate.similarity,
+        rationale: typeof rel.rationale === 'string' && rel.rationale.trim() ? rel.rationale.trim() : null,
+      });
+    }
+  };
 
   for (let bi = 0; bi < batches.length; bi++) {
     const batch = batches[bi];
 
     const saved = checkpoints.get(bi) as LlmValidationResult | undefined;
     if (saved && isLlmValidationResult(saved)) {
-      for (const rel of saved.relations) {
-        const type = normalizeEdgeType(rel.type);
-        if (!type || !VALID_EDGE_TYPES.includes(type)) continue;
-        if (rel.from === rel.to) continue;
-        const confidence = Math.max(0.1, Math.min(1, Number(rel.confidence) || 0.5));
-        const key = [rel.from, rel.to].sort().join('|');
-        const existing = validated.get(key);
-        if (!existing || confidence > existing.confidence) {
-          validated.set(key, { from: rel.from, to: rel.to, type, confidence });
-        }
-      }
+      for (const rel of saved.relations) acceptRelation(rel);
       continue;
     }
 
@@ -235,17 +259,7 @@ async function validateCandidates(
 
     saveCheckpoint('bridges', contentHash, CHECKPOINT_KIND, bi, result);
 
-    for (const rel of result.relations) {
-      const type = normalizeEdgeType(rel.type);
-      if (!type || !VALID_EDGE_TYPES.includes(type)) continue;
-      if (rel.from === rel.to) continue;
-      const confidence = Math.max(0.1, Math.min(1, Number(rel.confidence) || 0.5));
-      const key = [rel.from, rel.to].sort().join('|');
-      const existing = validated.get(key);
-      if (!existing || confidence > existing.confidence) {
-        validated.set(key, { from: rel.from, to: rel.to, type, confidence });
-      }
-    }
+    for (const rel of result.relations) acceptRelation(rel);
   }
 
   clearCheckpoints('bridges', contentHash, CHECKPOINT_KIND);
@@ -253,20 +267,30 @@ async function validateCandidates(
 }
 
 function persistBridges(
-  validated: Map<string, { from: string; to: string; type: EdgeType; confidence: number }>
+  validated: Map<string, { from: string; to: string; type: EdgeType; confidence: number; similarity: number; rationale: string | null }>,
+  model?: ModelRef | null
 ): number {
-  const db = getDb();
   let added = 0;
-  const tx = db.transaction(() => {
+  const config = currentEmbeddingConfig();
+  const tx = getDb().transaction(() => {
     for (const edge of validated.values()) {
-      const clash = db
-        .prepare('SELECT 1 FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
-        .get(edge.from, edge.to, edge.type);
-      if (clash) continue;
-      db.prepare(
-        'INSERT INTO edges (id, from_id, to_id, type, basis, confidence, source_work) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(`${BRIDGE_EDGE_PREFIX}${uuid()}`, edge.from, edge.to, edge.type, 'inferred', edge.confidence, null);
-      added++;
+      const id = addEdge({
+        from_id: edge.from,
+        to_id: edge.to,
+        type: edge.type,
+        basis: 'inferred',
+        confidence: edge.confidence,
+        source_work: null,
+        trace: {
+          method: 'bridge',
+          model,
+          embeddingProvider: config.provider,
+          embeddingModel: config.model,
+          similarity: edge.similarity,
+          rationale: edge.rationale,
+        },
+      });
+      if (id) added++;
     }
   });
   tx();
@@ -298,7 +322,7 @@ export async function discoverSemanticBridges(
     }
 
     const validated = await validateCandidates(candidates, model, emit);
-    const added = persistBridges(validated);
+    const added = persistBridges(validated, model);
 
     emit({ phase: 'done', label: `${added} nuevas relaciones`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: added });
 

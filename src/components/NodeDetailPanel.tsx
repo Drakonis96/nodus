@@ -154,7 +154,20 @@ export function NodeDetailPanel({
           <div className="flex gap-2">
             <Badge color={edgeDetail.edge.basis === 'explicit' ? 'green' : 'amber'}>{edgeDetail.edge.basis}</Badge>
             <Badge>conf {edgeDetail.edge.confidence.toFixed(2)}</Badge>
+            {edgeDetail.trace?.method && <Badge>{edgeDetail.trace.method}</Badge>}
+            {edgeDetail.trace?.similarity != null && <Badge>sim {edgeDetail.trace.similarity.toFixed(2)}</Badge>}
           </div>
+          {edgeDetail.trace && (
+            <div className="rounded-md border border-neutral-800 bg-neutral-950/35 p-3 text-xs text-neutral-300 space-y-1">
+              {edgeDetail.trace.rationale && <p>{edgeDetail.trace.rationale}</p>}
+              {(edgeDetail.trace.model || edgeDetail.trace.embeddingModel) && (
+                <p className="text-neutral-500">
+                  {edgeDetail.trace.model ? `${edgeDetail.trace.model.provider}/${edgeDetail.trace.model.model}` : 'modelo IA no registrado'}
+                  {edgeDetail.trace.embeddingModel ? ` · embeddings ${edgeDetail.trace.embeddingProvider}/${edgeDetail.trace.embeddingModel}` : ''}
+                </p>
+              )}
+            </div>
+          )}
           {edgeDetail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
               “{ev.quote}” <span className="text-neutral-500">{ev.location ?? ''}</span>

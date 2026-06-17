@@ -10,7 +10,7 @@ import type {
   ReadingPathStrategy,
   ReadingPathEntry,
 } from '@shared/types';
-import { getEdgeDetail, findSimilarIdeas } from '../db/ideasRepo';
+import { getEdgeDetail, findSimilarIdeas, currentEmbeddingConfig } from '../db/ideasRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
@@ -446,10 +446,19 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
   const memberEmbeddings = new Map<string, number[]>();
   if (memberIdeaIds.length > 0) {
     const db = getDb();
+    const config = currentEmbeddingConfig();
     const placeholders = memberIdeaIds.map(() => '?').join(',');
     const rows = db
-      .prepare(`SELECT global_id, embedding FROM ideas WHERE global_id IN (${placeholders}) AND embedding IS NOT NULL`)
-      .all(...memberIdeaIds) as { global_id: string; embedding: Buffer }[];
+      .prepare(
+        `SELECT global_id, embedding
+           FROM ideas
+          WHERE global_id IN (${placeholders})
+            AND embedding IS NOT NULL
+            AND embedding_provider = ?
+            AND embedding_model = ?
+            AND embedding_dim IS NOT NULL`
+      )
+      .all(...memberIdeaIds, config.provider, config.model) as { global_id: string; embedding: Buffer }[];
     for (const row of rows) {
       const f32 = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4);
       memberEmbeddings.set(row.global_id, Array.from(f32));

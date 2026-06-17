@@ -1,24 +1,16 @@
 import type { EmbeddingPipelineProgress } from '@shared/types';
 import { getDb } from '../db/database';
-import { getSettings } from '../db/settingsRepo';
-import { encodeEmbedding } from '../db/ideasRepo';
+import { embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
 import { embed } from './aiClient';
-import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
 
-const CHECKPOINT_KIND = 'embedding_batch';
-const EMBED_BATCH_SIZE = 20;
 const PAUSE_POLL_MS = 300;
-
-interface EmbeddingCheckpointData {
-  lastProcessedIndex: number;
-}
 
 interface WorkIdeas {
   nodusId: string;
   title: string;
-  ideas: { globalId: string; label: string; statement: string }[];
+  ideas: { globalId: string; type: string; label: string; statement: string; themes: string[] }[];
 }
 
 const state = {
@@ -81,27 +73,6 @@ export function stopEmbedding(): void {
   state.paused = false;
 }
 
-function contentHash(): string {
-  const s = getSettings();
-  return `embedding:${s.embeddingProvider}:${s.embeddingModel}`;
-}
-
-function loadCheckpoint(nodusId: string): number {
-  const checkpoints = loadCheckpoints(nodusId, contentHash(), CHECKPOINT_KIND);
-  const entry = checkpoints.get(0) as EmbeddingCheckpointData | undefined;
-  return entry?.lastProcessedIndex ?? -1;
-}
-
-function savePipelineCheckpoint(nodusId: string, lastProcessedIndex: number): void {
-  saveCheckpoint(nodusId, contentHash(), CHECKPOINT_KIND, 0, { lastProcessedIndex } as EmbeddingCheckpointData);
-}
-
-function clearPipelineCheckpoints(nodusIds: string[]): void {
-  for (const id of nodusIds) {
-    clearCheckpoints(id, contentHash(), CHECKPOINT_KIND);
-  }
-}
-
 async function waitIfPaused(): Promise<boolean> {
   while (state.paused && !state.stopRequested) {
     await new Promise((r) => setTimeout(r, PAUSE_POLL_MS));
@@ -157,18 +128,64 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
     for (const wi of state.works) {
       const rows = db
         .prepare(
-          `SELECT DISTINCT i.global_id, i.label, i.statement
+          `SELECT DISTINCT
+             i.global_id,
+             i.type,
+             i.label,
+             i.statement,
+             i.embedding,
+             i.embedding_provider,
+             i.embedding_model,
+             i.embedding_dim,
+             i.embedding_text_hash,
+             COALESCE((
+               SELECT GROUP_CONCAT(DISTINCT t.label)
+               FROM idea_theme_links it
+               JOIN themes t ON t.theme_id = it.theme_id
+               WHERE it.global_id = i.global_id
+             ), '') AS theme_labels
            FROM ideas i
            JOIN idea_occurrences io ON io.global_id = i.global_id
-           WHERE io.nodus_id = ? AND i.embedding IS NULL`
+           WHERE io.nodus_id = ?`
         )
-        .all(wi.nodusId) as { global_id: string; label: string; statement: string }[];
+        .all(wi.nodusId) as {
+        global_id: string;
+        type: string;
+        label: string;
+        statement: string;
+        embedding: Buffer | null;
+        embedding_provider: string | null;
+        embedding_model: string | null;
+        embedding_dim: number | null;
+        embedding_text_hash: string | null;
+        theme_labels: string;
+      }[];
 
-      wi.ideas = rows.map((r) => ({
-        globalId: r.global_id,
-        label: r.label,
-        statement: r.statement,
-      }));
+      wi.ideas = rows
+        .map((r) => ({
+          globalId: r.global_id,
+          type: r.type,
+          label: r.label,
+          statement: r.statement,
+          themes: r.theme_labels ? r.theme_labels.split(',').filter(Boolean) : [],
+          embedding: r.embedding,
+          embedding_provider: r.embedding_provider,
+          embedding_model: r.embedding_model,
+          embedding_dim: r.embedding_dim,
+          embedding_text_hash: r.embedding_text_hash,
+        }))
+        .filter((idea) => {
+          const text = embeddingTextForIdea(idea);
+          return ideaNeedsEmbedding(idea, text);
+        })
+        .map(({
+          embedding: _embedding,
+          embedding_provider: _embeddingProvider,
+          embedding_model: _embeddingModel,
+          embedding_dim: _embeddingDim,
+          embedding_text_hash: _embeddingTextHash,
+          ...idea
+        }) => idea);
 
       state.totalIdeas += wi.ideas.length;
     }
@@ -189,16 +206,8 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
 
       state.currentWorkIndex = wi;
       const work = state.works[wi];
-      const checkpointIdx = loadCheckpoint(work.nodusId);
-      const startIdea = checkpointIdx + 1;
 
-      if (startIdea >= work.ideas.length) {
-        state.ideasEmbedded += work.ideas.length;
-        emit();
-        continue;
-      }
-
-      for (let ii = startIdea; ii < work.ideas.length; ii++) {
+      for (let ii = 0; ii < work.ideas.length; ii++) {
         if (await waitIfPaused()) break;
 
         state.currentIdeaIndex = ii;
@@ -206,19 +215,15 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
 
         const idea = work.ideas[ii];
         try {
-          const text = `${idea.label}. ${idea.statement}`;
+          const text = embeddingTextForIdea(idea);
           const embedding = await embed(text);
 
           if (embedding) {
-            const buf = encodeEmbedding(embedding);
-            getDb().prepare('UPDATE ideas SET embedding = ? WHERE global_id = ?').run(buf, idea.globalId);
+            updateIdeaEmbedding(idea.globalId, text, embedding);
           }
 
           state.ideasEmbedded++;
 
-          if ((ii + 1) % EMBED_BATCH_SIZE === 0 || ii === work.ideas.length - 1) {
-            savePipelineCheckpoint(work.nodusId, ii);
-          }
         } catch (e) {
           console.error(
             `[embeddingPipeline] error embedding idea ${idea.globalId}:`,
@@ -229,13 +234,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
 
         emit();
       }
-
-      if (!state.stopRequested) {
-        savePipelineCheckpoint(work.nodusId, work.ideas.length - 1);
-      }
     }
-
-    clearPipelineCheckpoints(state.works.map((w) => w.nodusId));
   } catch (e) {
     state.error = e instanceof Error ? e.message : String(e);
     console.error('[embeddingPipeline] fatal error:', state.error);
@@ -251,37 +250,85 @@ export function getWorkEmbeddingStatuses(
 ): { nodus_id: string; totalIdeas: number; embeddedIdeas: number; complete: boolean }[] {
   const db = getDb();
 
-  let rows: { nodus_id: string; total: number; embedded: number }[];
+  let rows: {
+    nodus_id: string;
+    global_id: string;
+    type: string;
+    label: string;
+    statement: string;
+    embedding: Buffer | null;
+    embedding_provider: string | null;
+    embedding_model: string | null;
+    embedding_dim: number | null;
+    embedding_text_hash: string | null;
+    theme_labels: string;
+  }[];
   if (nodusIds && nodusIds.length > 0) {
     const placeholders = nodusIds.map(() => '?').join(',');
     rows = db
       .prepare(
-        `SELECT io.nodus_id,
-                COUNT(DISTINCT i.global_id) AS total,
-                COUNT(DISTINCT CASE WHEN i.embedding IS NOT NULL THEN i.global_id END) AS embedded
+        `SELECT DISTINCT
+                io.nodus_id,
+                i.global_id,
+                i.type,
+                i.label,
+                i.statement,
+                i.embedding,
+                i.embedding_provider,
+                i.embedding_model,
+                i.embedding_dim,
+                i.embedding_text_hash,
+                COALESCE((
+                  SELECT GROUP_CONCAT(DISTINCT t.label)
+                  FROM idea_theme_links it
+                  JOIN themes t ON t.theme_id = it.theme_id
+                  WHERE it.global_id = i.global_id
+                ), '') AS theme_labels
          FROM idea_occurrences io
          JOIN ideas i ON i.global_id = io.global_id
-         WHERE io.nodus_id IN (${placeholders})
-         GROUP BY io.nodus_id`
+         WHERE io.nodus_id IN (${placeholders})`
       )
-      .all(...nodusIds) as { nodus_id: string; total: number; embedded: number }[];
+      .all(...nodusIds) as typeof rows;
   } else {
     rows = db
       .prepare(
-        `SELECT io.nodus_id,
-                COUNT(DISTINCT i.global_id) AS total,
-                COUNT(DISTINCT CASE WHEN i.embedding IS NOT NULL THEN i.global_id END) AS embedded
+        `SELECT DISTINCT
+                io.nodus_id,
+                i.global_id,
+                i.type,
+                i.label,
+                i.statement,
+                i.embedding,
+                i.embedding_provider,
+                i.embedding_model,
+                i.embedding_dim,
+                i.embedding_text_hash,
+                COALESCE((
+                  SELECT GROUP_CONCAT(DISTINCT t.label)
+                  FROM idea_theme_links it
+                  JOIN themes t ON t.theme_id = it.theme_id
+                  WHERE it.global_id = i.global_id
+                ), '') AS theme_labels
          FROM idea_occurrences io
-         JOIN ideas i ON i.global_id = io.global_id
-         GROUP BY io.nodus_id`
+         JOIN ideas i ON i.global_id = io.global_id`
       )
-      .all() as { nodus_id: string; total: number; embedded: number }[];
+      .all() as typeof rows;
   }
 
-  return rows.map((r) => ({
-    nodus_id: r.nodus_id,
-    totalIdeas: r.total,
-    embeddedIdeas: r.embedded,
-    complete: r.total > 0 && r.embedded === r.total,
+  const byWork = new Map<string, { total: Set<string>; embedded: Set<string> }>();
+  for (const row of rows) {
+    const entry = byWork.get(row.nodus_id) ?? { total: new Set<string>(), embedded: new Set<string>() };
+    byWork.set(row.nodus_id, entry);
+    entry.total.add(row.global_id);
+    const themes = row.theme_labels ? row.theme_labels.split(',').filter(Boolean) : [];
+    const text = embeddingTextForIdea({ type: row.type, label: row.label, statement: row.statement, themes });
+    if (!ideaNeedsEmbedding(row, text)) entry.embedded.add(row.global_id);
+  }
+
+  return [...byWork.entries()].map(([nodus_id, value]) => ({
+    nodus_id,
+    totalIdeas: value.total.size,
+    embeddedIdeas: value.embedded.size,
+    complete: value.total.size > 0 && value.embedded.size === value.total.size,
   }));
 }

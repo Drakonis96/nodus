@@ -6,6 +6,8 @@ import {
   allIdeaCandidates,
   addEdge,
   getIdea,
+  embeddingTextForIdea,
+  currentEmbeddingConfig,
 } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
@@ -31,6 +33,8 @@ export interface FuseIdeaOptions {
   model?: ModelRef | null;
   perf?: PerfContext;
   embedding?: number[] | null;
+  embeddingText?: string;
+  themes?: string[];
 }
 
 function isFusionResult(v: unknown): v is FusionResult {
@@ -108,8 +112,9 @@ export async function fuseIdea(
   const opts: FuseIdeaOptions = optionsOrModel && 'provider' in optionsOrModel ? { model: optionsOrModel } : optionsOrModel ?? {};
   const settings = getSettings();
   const fusionModel = opts.model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
+  const embeddingText = opts.embeddingText ?? embeddingTextForIdea({ ...idea, themes: opts.themes });
   const embeddingDone = opts.embedding === undefined ? startPerf('embedding', opts.perf, { idea: idea.label }) : null;
-  const embedding = opts.embedding === undefined ? await embed(`${idea.label}. ${idea.statement}`) : opts.embedding;
+  const embedding = opts.embedding === undefined ? await embed(embeddingText) : opts.embedding;
   embeddingDone?.({ hit: Boolean(embedding) });
 
   // Retrieve candidates by cosine similarity via SQLite vec_cosine() — no in-memory loading.
@@ -140,7 +145,7 @@ export async function fuseIdea(
   // No candidates → straight to a new idea, no model call needed.
   if (candidates.length === 0) {
     perfLog('LLM fusion', 0, opts.perf, { idea: idea.label, status: 'skipped', candidates: 0 });
-    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding }).global_id;
+    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding, embeddingText, themes: opts.themes }).global_id;
   }
 
   const input = {
@@ -166,7 +171,7 @@ export async function fuseIdea(
   } catch {
     // On fusion failure, be conservative: treat as new (avoid wrong merges).
     fusionDone({ status: 'error' });
-    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding }).global_id;
+    return createIdea({ type: idea.type, label: idea.label, statement: idea.statement, embedding, embeddingText, themes: opts.themes }).global_id;
   }
 
   if (result.resolution === 'same_as' && result.matched_id && getIdea(result.matched_id)) {
@@ -179,9 +184,13 @@ export async function fuseIdea(
     label: result.merged_label || idea.label,
     statement: idea.statement,
     embedding,
+    embeddingText,
+    themes: opts.themes,
   });
 
   if (result.matched_id && result.edge_to_existing && getIdea(result.matched_id)) {
+    const matched = candidates.find((candidate) => candidate.global_id === result.matched_id);
+    const config = embedding ? currentEmbeddingConfig() : { provider: null, model: null };
     addEdge({
       from_id: created.global_id,
       to_id: result.matched_id,
@@ -189,6 +198,14 @@ export async function fuseIdea(
       basis: result.edge_to_existing.basis,
       confidence: result.edge_to_existing.confidence,
       source_work: sourceWork,
+      trace: {
+        method: 'fusion',
+        model: fusionModel,
+        embeddingProvider: config.provider,
+        embeddingModel: config.model,
+        similarity: matched?.similarity ?? null,
+        rationale: result.rationale,
+      },
     });
   }
 

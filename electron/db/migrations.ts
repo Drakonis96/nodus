@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 export const migrations: Migration[] = [
   {
@@ -300,6 +300,54 @@ export const migrations: Migration[] = [
         created_at   TEXT NOT NULL,
         PRIMARY KEY (nodus_id, content_hash, kind, batch_index)
       );
+    `,
+  },
+  {
+    version: 10,
+    up: /* sql */ `
+      ALTER TABLE ideas ADD COLUMN embedding_provider TEXT;
+      ALTER TABLE ideas ADD COLUMN embedding_model TEXT;
+      ALTER TABLE ideas ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE ideas ADD COLUMN embedding_text_hash TEXT;
+
+      CREATE INDEX idx_ideas_embedding_meta
+        ON ideas(embedding_provider, embedding_model, embedding_dim, embedding_text_hash);
+
+      CREATE TABLE edge_traces (
+        edge_id            TEXT PRIMARY KEY,
+        method             TEXT NOT NULL,
+        model_json         TEXT,
+        embedding_provider TEXT,
+        embedding_model    TEXT,
+        similarity         REAL,
+        rationale          TEXT,
+        created_at         TEXT NOT NULL
+      );
+
+      UPDATE edges
+      SET
+        from_id = to_id,
+        to_id = from_id
+      WHERE type IN ('contradicts', 'shares_method', 'measures_same', 'variant_of')
+        AND from_id > to_id;
+
+      DELETE FROM edges
+      WHERE rowid IN (
+        SELECT rowid
+        FROM (
+          SELECT
+            rowid,
+            ROW_NUMBER() OVER (
+              PARTITION BY from_id, to_id, type
+              ORDER BY confidence DESC, CASE basis WHEN 'explicit' THEN 0 ELSE 1 END, rowid ASC
+            ) AS rn
+          FROM edges
+        )
+        WHERE rn > 1
+      );
+
+      CREATE UNIQUE INDEX idx_edges_unique_pair_type
+        ON edges(from_id, to_id, type);
     `,
   },
 ];
