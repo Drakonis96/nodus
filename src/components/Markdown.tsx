@@ -1,5 +1,10 @@
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+const nodusUrlTransform = (value: string) => {
+  if (value.startsWith('nodus://')) return value;
+  return defaultUrlTransform(value);
+};
 
 /**
  * Renders AI-authored Markdown (tutor narration, chat answers). Links never navigate
@@ -26,6 +31,7 @@ export function Markdown({
     <div className={`md ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        urlTransform={nodusUrlTransform}
         components={{
           a: ({ href, children }) => {
             const citation = parseCitation(href);
