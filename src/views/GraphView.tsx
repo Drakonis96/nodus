@@ -21,10 +21,10 @@ const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 const COSE_BILKENT_LAYOUT = {
   name: 'cose-bilkent',
   quality: 'default',
-  animate: 'during',
+  animate: false,
   animationDuration: 600,
   animationEasing: 'ease-in-out-cubic',
-  fit: true,
+  fit: false,
   padding: 60,
   nodeDimensionsIncludeLabels: false,
   refresh: 12,
@@ -895,6 +895,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     layout.run();
   }, [stopActiveLayout]);
 
+  const frameGraph = useCallback((cy: Core, padding = 48) => {
+    const tutorFocus = lastTutorFocusRef.current;
+    if (tutorFocus) {
+      focusByIdRef.current(tutorFocus.nodeIds, tutorFocus.edgeId);
+      return;
+    }
+    if (lastUserFocusRef.current) return;
+    cy.fit(undefined, padding);
+  }, []);
+
   const elements = useMemo<ElementDefinition[]>(() => {
     const f = filters;
     const q = f.search.toLowerCase();
@@ -1427,9 +1437,12 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     // Reset community state when elements are rebuilt.
     setCommunitiesCollapsed(false);
     let layout: any;
-    const forceLayout = createForceLayoutOptions(cy, !forceLayoutPrimedRef.current || previousPositions.size === 0, () => {
+    const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || previousPositions.size === 0;
+    const shouldFrameGraph = forceLayoutNeedsInitialFrame && !lastTutorFocusRef.current && !lastUserFocusRef.current;
+    const forceLayout = createForceLayoutOptions(cy, forceLayoutNeedsInitialFrame, () => {
       forceLayoutPrimedRef.current = true;
       if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+      if (shouldFrameGraph) frameGraph(cy);
     });
     // Layout selection: force-directed (cose-bilkent) or deterministic radial.
     if (layoutMode === 'radial') {
@@ -1438,11 +1451,15 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         cy.layout({
           name: 'preset',
           positions,
-          fit: true,
+          fit: false,
           padding: 60,
           animate: true,
           animationDuration: 600,
           animationEasing: 'ease-in-out-cubic',
+          stop: () => {
+            forceLayoutPrimedRef.current = true;
+            if (shouldFrameGraph) frameGraph(cy);
+          },
         } as any).run();
       } else {
         layout = cy.layout(forceLayout);
@@ -1464,23 +1481,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       const cy = cyRef.current;
       if (!cy || cy.elements().length === 0) return;
       cy.resize();
+      if (activeLayoutRef.current) return;
       const tf = lastTutorFocusRef.current;
-      if (tf) { focusByIdRef.current(tf.nodeIds, tf.edgeId); return; }
-      // When the user has focused a node (click), preserve the current zoom/pan
-      // instead of resetting to fit — the detail panel resize should not steal the view.
-      if (lastUserFocusRef.current) return;
-      cy.fit(undefined, 48);
+      if (tf) {
+        focusByIdRef.current(tf.nodeIds, tf.edgeId);
+        return;
+      }
+      frameGraph(cy);
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [frameGraph]);
 
   const zoomBy = (factor: number) => {
     const cy = cyRef.current;
     if (!cy) return;
     cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
   };
-  const fitGraph = () => cyRef.current?.fit(undefined, 48);
+  const fitGraph = () => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    frameGraph(cy);
+  };
   const changeDetailFont = (delta: number) => {
     setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
   };
