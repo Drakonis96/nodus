@@ -1,6 +1,6 @@
 import { getDb } from './database';
 
-export type CheckpointKind = 'deep_chunk' | 'reproc_theme_batch' | 'reproc_relation_batch';
+export type CheckpointKind = 'deep_chunk' | 'reproc_theme_batch' | 'reproc_relation_batch' | 'embedding_batch' | 'semantic_bridge_batch';
 
 /**
  * Load all saved checkpoints for a given work + content hash + kind.
