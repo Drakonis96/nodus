@@ -73,7 +73,11 @@ function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => voi
     tilingPaddingVertical: tilingPadding,
     tilingPaddingHorizontal: tilingPadding,
     initialEnergyOnIncremental: randomize ? 0.7 : Math.min(0.5, 0.35 + nodeCount / 1400),
-    numIter: randomize ? 1800 : 600,
+    // Scale iterations down for large graphs: cose-bilkent's cost grows
+    // super-linearly with node count, and 1800 iters on a 500-node graph
+    // (typical once themes + their "contains" edges are in) froze the UI for
+    // seconds on load. The visual difference is negligible past ~400 nodes.
+    numIter: randomize ? (nodeCount > 400 ? 900 : 1800) : (nodeCount > 400 ? 300 : 600),
     stop,
     ...overrides,
   } as any;
@@ -774,6 +778,9 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   // When the Tutor is driving the camera, a container resize should re-apply this focus
   // instead of fitting the whole graph (the node detail panel opening would steal it).
   const lastTutorFocusRef = useRef<{ nodeIds: string[]; edgeId?: string | null } | null>(null);
+  // Element to keep centered when the detail panel opens/closes and resizes the
+  // viewport. Without this the tapped node would slide under the panel.
+  const focusCenterRef = useRef<{ id: string; kind: 'node' | 'edge' } | null>(null);
   // Track whether the current highlight came from a hover (so tap can override it).
   const hoverActiveRef = useRef(false);
   const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
@@ -1284,6 +1291,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       clearFocusRef.current = () => {
         lastTutorFocusRef.current = null;
         lastUserFocusRef.current = null;
+        focusCenterRef.current = null;
         clearFocus();
       };
       focusNodeByIdRef.current = (nodeId: string) => {
@@ -1334,6 +1342,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         const cy = cyRef.current;
         if (!cy) return;
         lastTutorFocusRef.current = { nodeIds, edgeId };
+        focusCenterRef.current = null;
         let eles = cy.collection();
         for (const id of nodeIds) {
           const node = cy.getElementById(id);
@@ -1399,6 +1408,11 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
           setDetailLoading(null);
         }
         focusOnNode(node);
+        // Keep the tapped node on screen: the detail panel is about to open on
+        // the right and narrow the viewport, which would otherwise push the
+        // node under the panel. Track it so the resize handler re-centers it.
+        focusCenterRef.current = { id: node.id(), kind: 'node' };
+        cyRef.current?.animate({ center: { eles: node } }, { duration: 280, easing: 'ease-in-out-cubic' });
         if (detailPromise) {
           void detailPromise.then(
             (d) => {
@@ -1424,6 +1438,8 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         setEdgeDetail(null);
         setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
         applyFocus({ primary: edge.connectedNodes().add(edge) }, edge.connectedNodes());
+        focusCenterRef.current = { id: edge.id(), kind: 'edge' };
+        cyRef.current?.animate({ center: { eles: edge.connectedNodes() } }, { duration: 280, easing: 'ease-in-out-cubic' });
         void detailPromise.then(
           (d) => {
             if (seq !== detailSeqRef.current) return;
@@ -1591,7 +1607,10 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         });
       });
     }
-    applyCommunityGuides(cy);
+    // NOTE: automatic community guides (invisible compound parents) were removed
+    // — they forced cose-bilkent into its far slower compound layout path on
+    // every rebuild, which was a major cause of the freeze with themes enabled.
+    // The explicit "Comunidades" button still groups on demand via toggleCommunities.
     applySemanticZoomRef.current(cy, true);
     // Reset community state when elements are rebuilt.
     setCommunitiesCollapsed(false);
@@ -1646,11 +1665,25 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         focusByIdRef.current(tf.nodeIds, tf.edgeId);
         return;
       }
-      frameGraph(cy);
+      // Keep the tapped node/edge centered when the detail panel opens or
+      // closes (which resizes this container). Without this the node would
+      // slide under the panel.
+      const fc = focusCenterRef.current;
+      if (fc) {
+        const el = cy.getElementById(fc.id);
+        if (el.nonempty()) {
+          const eles = fc.kind === 'edge' ? el.connectedNodes() : el;
+          cy.animate({ center: { eles } }, { duration: 180, easing: 'ease-out' });
+        }
+        return;
+      }
+      // No active focus: preserve the current pan/zoom. We deliberately do NOT
+      // call cy.fit() here — auto-fitting on every resize (e.g. when closing
+      // the panel by tapping the background) caused a jarring zoom-out.
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [frameGraph]);
+  }, []);
 
   const zoomBy = (factor: number) => {
     const cy = cyRef.current;
@@ -1693,17 +1726,19 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     ctx.fillStyle = 'rgba(10,10,10,0.85)';
     ctx.fillRect(0, 0, W, H);
 
-    // Draw edges as faint lines.
+    // Draw edges as faint lines — batched into a single path/stroke.
+    // Drawing each edge with its own beginPath()/stroke() was the dominant cost
+    // on large (theme-heavy) graphs and fired on every render frame.
     ctx.strokeStyle = 'rgba(100,100,100,0.25)';
     ctx.lineWidth = 0.5;
+    ctx.beginPath();
     cy.edges().forEach((e) => {
       const sp = toMini(e.sourceEndpoint().x, e.sourceEndpoint().y);
       const tp = toMini(e.targetEndpoint().x, e.targetEndpoint().y);
-      ctx.beginPath();
       ctx.moveTo(sp.x, sp.y);
       ctx.lineTo(tp.x, tp.y);
-      ctx.stroke();
     });
+    ctx.stroke();
 
     // Draw nodes as colored dots.
     cy.nodes().forEach((n) => {
@@ -1727,13 +1762,28 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }, []);
 
-  // Redraw minimap on every Cytoscape render.
+  // Redraw minimap on Cytoscape render, but coalesced through a single
+  // requestAnimationFrame so bursts of render events (pan/zoom/drag/layout)
+  // only produce one redraw per frame instead of tanking the main thread.
+  const minimapRafRef = useRef<number | null>(null);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
-    const handler = () => drawMinimap();
-    cy.on('render', handler);
-    return () => { cy.off('render', handler); };
+    const schedule = () => {
+      if (minimapRafRef.current != null) return;
+      minimapRafRef.current = window.requestAnimationFrame(() => {
+        minimapRafRef.current = null;
+        drawMinimap();
+      });
+    };
+    cy.on('render', schedule);
+    return () => {
+      cy.off('render', schedule);
+      if (minimapRafRef.current != null) {
+        window.cancelAnimationFrame(minimapRafRef.current);
+        minimapRafRef.current = null;
+      }
+    };
   }, [drawMinimap]);
 
   // Minimap click → pan the graph.
@@ -1777,7 +1827,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         });
         parents.remove();
       });
-      applyCommunityGuides(cy);
+      // No automatic guides on expand (see note in the elements effect).
       // Re-layout after expand.
       stopActiveLayout();
       const layout = cy.layout({
