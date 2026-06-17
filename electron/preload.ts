@@ -106,6 +106,8 @@ const api: NodusApi = {
     }
   },
 
+  buildArgumentMap: (request) => ipcRenderer.invoke('argumentMap:build', request),
+
   listConversations: (includeArchived) => ipcRenderer.invoke('chat:list', includeArchived),
   getConversation: (id) => ipcRenderer.invoke('chat:get', id),
   createConversation: (input) => ipcRenderer.invoke('chat:create', input),

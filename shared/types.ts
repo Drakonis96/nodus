@@ -617,6 +617,42 @@ export interface TutorStepStreamHandlers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Argument map (AI-traced hierarchical block outline around a seed idea)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One block in the argument map tree. Synthetic ids are assigned by the backend. */
+export interface ArgumentBlock {
+  id: string;
+  /** global_id of the underlying idea, or null for a synthetic framing block. */
+  ideaId: string | null;
+  label: string;
+  statement: string;
+  type: IdeaType | 'framing';
+  /** One-line gloss from the model explaining this block's role. */
+  summary: string;
+  /** How this block relates to its parent (a real edge type, or 'root'/'framing'). */
+  relation: EdgeType | 'root' | 'framing' | 'related';
+  children: ArgumentBlock[];
+}
+
+export interface ArgumentMap {
+  seedIdeaId: string;
+  seedLabel: string;
+  overview: string;
+  root: ArgumentBlock;
+  generatedAt: string;
+  /** True when the local subgraph sent to the model was capped. */
+  truncated: boolean;
+  ideaCount: number;
+}
+
+export interface ArgumentMapRequest {
+  seedIdeaId: string;
+  model?: ModelRef | null;
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Research chat history (persisted conversations)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -774,6 +810,10 @@ export interface NodusApi {
   /** Narrate one stop of a route, grounded in that node's ideas/evidence. */
   tutorStep(request: TutorStepRequest): Promise<TutorStepResponse>;
   tutorStepStream(request: TutorStepRequest, handlers: TutorStepStreamHandlers): Promise<TutorStepResponse>;
+
+  // argument map (AI-traced hierarchical outline around a seed idea)
+  /** Trace a hierarchical block outline of the ideas connected to a seed idea. */
+  buildArgumentMap(request: ArgumentMapRequest): Promise<ArgumentMap>;
 
   // research chat history
   listConversations(includeArchived?: boolean): Promise<ChatConversationSummary[]>;

@@ -5,6 +5,7 @@ import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
 import { ReadingPathView } from './views/ReadingPathView';
+import { ArgumentMapView } from './views/ArgumentMapView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
@@ -13,10 +14,11 @@ import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
 import nodusLogo from './assets/nodus-logo.svg';
 
-type View = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
+type View = 'library' | 'graph' | 'argument' | 'gaps' | 'reading' | 'settings';
 
 const NAV: { id: View; label: string; icon: string }[] = [
   { id: 'graph', label: 'Grafo', icon: 'layers' },
+  { id: 'argument', label: 'Mapa de argumentos', icon: 'map' },
   { id: 'library', label: 'Biblioteca', icon: 'book' },
   { id: 'gaps', label: 'Huecos', icon: 'gap' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
@@ -170,6 +172,7 @@ export function App() {
         <main className="flex-1 min-w-0 overflow-hidden">
           {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} />}
+          {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'gaps' && <GapsView />}
           {view === 'reading' && <ReadingPathView />}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}

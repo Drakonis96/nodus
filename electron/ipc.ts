@@ -15,6 +15,7 @@ import type {
   ReprocessConnectionsOptions,
   TutorPlanRequest,
   TutorStepRequest,
+  ArgumentMapRequest,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -33,6 +34,7 @@ import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
+import { buildArgumentMap } from './ai/argumentMap';
 import { reprocessConnections } from './ai/reprocessConnections';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
@@ -281,6 +283,11 @@ export function registerIpc(
     streamTutorStep(request, (delta) => {
       e.sender.send('tutor:stepStream:delta', requestId, delta);
     })
+  );
+
+  // argument map (AI-traced hierarchical outline around a seed idea)
+  h('argumentMap:build', async (_e, request: ArgumentMapRequest) =>
+    buildArgumentMap(request, request.model)
   );
 
   // research chat history
