@@ -9,8 +9,9 @@ import type {
   ResearchGraphPartsSelection,
 } from '@shared/types';
 import { Icon, modelLabel } from '../components/ui';
-import { Markdown } from '../components/Markdown';
+import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -60,6 +61,7 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
+  const [citation, setCitation] = useState<CitationTarget>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
@@ -371,7 +373,10 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
                     }`}
                   >
                     {message.role === 'assistant' && !message.error && message.content ? (
-                      <Markdown content={message.content} />
+                      <Markdown
+                        content={message.content}
+                        onCitation={(c: MarkdownCitation) => setCitation({ kind: c.kind, id: c.id })}
+                      />
                     ) : (
                       message.content || (message.role === 'assistant' && sending ? '...' : '')
                     )}
@@ -430,6 +435,8 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
           onCancel={() => setPendingDelete(null)}
         />
       )}
+
+      {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>
   );
 }

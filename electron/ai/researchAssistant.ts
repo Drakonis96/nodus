@@ -145,8 +145,15 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
     'Si el contexto seleccionado no contiene la seccion necesaria, dilo de forma concreta y explica que seccion convendria activar.',
     'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
-    'Cuando uses evidencia, cita titulos, autores, ids de ideas/documentos o ubicaciones disponibles.',
     'No inventes contenido de documentos que no aparezca en el contexto.',
+    '',
+    'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
+    '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
+    '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
+    '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
+    '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
+    '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
+    '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
   ].join('\n');
 
   const user = JSON.stringify(

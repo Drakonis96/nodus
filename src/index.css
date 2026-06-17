@@ -315,3 +315,43 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
   margin: 0.9em 0;
 }
+
+/* NotebookLM-style inline source citation. Rendered as a small pill that opens a
+   source modal instead of navigating. */
+.md .citation-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  font-size: 0.82em;
+  font-weight: 500;
+  line-height: 1;
+  padding: 0.18em 0.42em;
+  margin: 0 0.1em;
+  border-radius: 5px;
+  border: 1px solid rgba(129, 140, 248, 0.45);
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+  text-decoration: none;
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.md .citation-link::before {
+  content: '⎘';
+  font-size: 0.95em;
+  opacity: 0.85;
+}
+.md .citation-link:hover {
+  background: rgba(99, 102, 241, 0.32);
+  color: #e0e7ff;
+  border-color: rgba(165, 180, 252, 0.7);
+}
+.light .md .citation-link {
+  background: rgba(79, 70, 229, 0.1);
+  color: #4338ca;
+  border-color: rgba(79, 70, 229, 0.4);
+}
+.light .md .citation-link:hover {
+  background: rgba(79, 70, 229, 0.2);
+  color: #3730a3;
+}
