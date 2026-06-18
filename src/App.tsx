@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppSettings, SyncLogEntry } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
+import { HomeView } from './views/HomeView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -16,9 +17,10 @@ import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
 import nodusLogo from './assets/nodus-logo.svg';
 
-type View = 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'reading' | 'settings';
+type View = 'home' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'reading' | 'settings';
 
 const NAV: { id: View; label: string; icon: string }[] = [
+  { id: 'home', label: 'Inicio', icon: 'home' },
   { id: 'graph', label: 'Grafo', icon: 'layers' },
   { id: 'argument', label: 'Mapa de argumentos', icon: 'map' },
   { id: 'ideas', label: 'Ideas', icon: 'bulb' },
@@ -30,7 +32,7 @@ const NAV: { id: View; label: string; icon: string }[] = [
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [view, setView] = useState<View>('graph');
+  const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
@@ -92,7 +94,7 @@ export function App() {
   }
 
   if (!settings.onboardingComplete) {
-    return <Onboarding onDone={() => reloadSettings().then(() => setView('graph'))} />;
+    return <Onboarding onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))} />;
   }
 
   return (
@@ -173,6 +175,17 @@ export function App() {
 
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">
+          {view === 'home' && (
+            <HomeView
+              settings={settings}
+              lastSync={lastSync}
+              syncing={syncing}
+              onSync={onSync}
+              onNavigate={setView}
+              onOpenCollections={() => setCollectionsOpen(true)}
+              onOpenAssistant={() => (settings.defaultModel ? setResearchOpen(true) : setView('settings'))}
+            />
+          )}
           {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}

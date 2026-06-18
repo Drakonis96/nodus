@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AiProvider, ZoteroCollection, ModelInfo } from '@shared/types';
-import { AI_PROVIDERS, PROVIDER_LABELS } from '../components/ui';
+import { AI_PROVIDERS, PROVIDER_LABELS, Spinner } from '../components/ui';
 
-export function Onboarding({ onDone }: { onDone: () => void }) {
+type OnboardingExit = 'home' | 'library' | 'settings';
+
+export function Onboarding({ onDone }: { onDone: (view?: OnboardingExit) => void }) {
   const [step, setStep] = useState(0);
   const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
@@ -16,6 +18,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const [modelError, setModelError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [storagePath, setStoragePath] = useState('');
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState<string | null>(null);
+  const [syncSummary, setSyncSummary] = useState<string | null>(null);
+  const [syncedWorks, setSyncedWorks] = useState<number | null>(null);
 
   const checkZotero = async () => {
     const res = await window.nodus.zoteroPing();
@@ -47,22 +53,36 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   };
 
   const finish = async () => {
-    if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
-    const ref = selectedModel ? { provider, model: selectedModel } : null;
-    await window.nodus.updateSettings({
-      monitoredCollections: Array.from(selected),
-      readTag,
-      defaultModel: ref,
-      favorites: ref ? [ref] : [],
-      zoteroStoragePath: storagePath,
-      onboardingComplete: true,
-    });
-    // With automatic analysis disabled by default, the first sync only ingests Zotero metadata.
-    void window.nodus.syncNow();
-    onDone();
+    setFinishing(true);
+    setFinishError(null);
+    setSyncSummary(null);
+    setSyncedWorks(null);
+    try {
+      if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
+      const ref = selectedModel ? { provider, model: selectedModel } : null;
+      await window.nodus.updateSettings({
+        monitoredCollections: Array.from(selected),
+        readTag,
+        defaultModel: ref,
+        favorites: ref ? [ref] : [],
+        zoteroStoragePath: storagePath,
+        onboardingComplete: true,
+      });
+      setStep(4);
+      // With automatic analysis disabled by default, the first sync only ingests Zotero metadata.
+      const sync = await window.nodus.syncNow();
+      const works = await window.nodus.listWorks();
+      setSyncSummary(sync.summary);
+      setSyncedWorks(works.length);
+    } catch (e) {
+      setStep(4);
+      setFinishError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFinishing(false);
+    }
   };
 
-  const steps = ['Conectar Zotero', 'Colecciones', 'Lecturas', 'Proveedor de IA'];
+  const steps = ['Conectar Zotero', 'Colecciones', 'Lecturas', 'Proveedor de IA', 'Primer resultado'];
 
   return (
     <div className="h-full flex items-center justify-center p-8">
@@ -212,21 +232,81 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </div>
         )}
 
+        {step === 4 && (
+          <div className="space-y-4">
+            <div>
+              <div className="text-lg font-semibold">Primer resultado</div>
+              <p className="text-sm text-neutral-400 mt-1">
+                {finishing
+                  ? 'Sincronizando Zotero para preparar el panel inicial...'
+                  : finishError
+                    ? 'No se pudo completar la primera sincronización, pero puedes entrar y corregirlo desde Inicio o Ajustes.'
+                    : 'La biblioteca local ya está preparada. El panel de Inicio te dirá qué conviene hacer después.'}
+              </p>
+            </div>
+            {finishing && <Spinner label="Sincronizando metadatos..." />}
+            {finishError && (
+              <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+                {finishError}
+              </div>
+            )}
+            {!finishing && !finishError && (
+              <div className="grid grid-cols-2 gap-3">
+                <ResultMetric label="Obras locales" value={syncedWorks ?? 0} />
+                <ResultMetric label="Colecciones" value={selected.size} />
+              </div>
+            )}
+            {syncSummary && (
+              <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2 text-sm text-neutral-300">
+                {syncSummary}
+              </div>
+            )}
+            {!selectedModel && (
+              <p className="text-xs text-amber-400">
+                Falta configurar un modelo para analizar temas e ideas. Puedes hacerlo desde Ajustes.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="flex justify-between mt-8">
-          <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>
+          <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || finishing}>
             Atrás
           </button>
           {step < 3 ? (
             <button className="btn btn-primary" onClick={() => setStep((s) => s + 1)}>
               Siguiente
             </button>
-          ) : (
-            <button className="btn btn-primary" onClick={finish}>
-              Empezar
+          ) : step === 3 ? (
+            <button className="btn btn-primary" onClick={finish} disabled={finishing}>
+              {finishing ? 'Preparando...' : 'Empezar'}
             </button>
+          ) : (
+            <div className="flex gap-2">
+              {finishError && (
+                <button className="btn btn-ghost border border-neutral-700" onClick={finish} disabled={finishing}>
+                  Reintentar
+                </button>
+              )}
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(selectedModel ? 'library' : 'settings')} disabled={finishing}>
+                {selectedModel ? 'Ir a Biblioteca' : 'Configurar IA'}
+              </button>
+              <button className="btn btn-primary" onClick={() => onDone('home')} disabled={finishing}>
+                Abrir Inicio
+              </button>
+            </div>
           )}
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+function ResultMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2">
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="text-2xl font-semibold tabular-nums">{value}</div>
     </div>
   );
 }
