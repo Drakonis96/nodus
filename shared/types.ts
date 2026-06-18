@@ -732,6 +732,168 @@ export interface ChatConversation extends ChatConversationSummary {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Writing workshop
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type WritingWorkshopKind =
+  | 'literature_review'
+  | 'theoretical_framework'
+  | 'debate'
+  | 'gap_justification'
+  | 'chapter_section'
+  | 'research_question';
+
+export interface WritingWorkshopBrief {
+  kind: WritingWorkshopKind;
+  objective: string;
+  audience?: string;
+  tone?: 'academic' | 'synthetic' | 'critical' | 'exploratory';
+  language?: 'es' | 'en' | 'fr';
+}
+
+export interface WritingWorkshopSelection {
+  ideaIds: string[];
+  themeIds: string[];
+  gapIds: string[];
+  contradictionIds: string[];
+  workIds: string[];
+  tutorRouteIds: string[];
+}
+
+export interface WritingWorkshopCandidateBase {
+  id: string;
+  label: string;
+  summary: string;
+  score: number;
+  reason: string;
+}
+
+export interface WritingWorkshopIdeaCandidate extends WritingWorkshopCandidateBase {
+  type: IdeaType;
+  statement: string;
+  themes: string[];
+  workCount: number;
+  evidenceCount: number;
+  works: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string }[];
+}
+
+export interface WritingWorkshopThemeCandidate extends WritingWorkshopCandidateBase {
+  workCount: number;
+  ideaCount: number;
+  pinned: boolean;
+}
+
+export interface WritingWorkshopGapCandidate extends WritingWorkshopCandidateBase {
+  kind: GapKind;
+  work: { nodus_id: string; title: string; authors: string[]; year: number | null; zotero_key: string };
+  relatedIdea: string | null;
+  confidence: number;
+}
+
+export interface WritingWorkshopContradictionCandidate extends WritingWorkshopCandidateBase {
+  fromLabel: string;
+  toLabel: string;
+  type: EdgeType | string;
+  basis: EdgeBasis;
+  confidence: number;
+}
+
+export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBase {
+  title: string;
+  authors: string[];
+  year: number | null;
+  zotero_key: string;
+  themes: string[];
+  deepStatus: DeepStatus;
+  ideaCount: number;
+  gapCount: number;
+}
+
+export interface WritingWorkshopRouteCandidate extends WritingWorkshopCandidateBase {
+  routeTitle: string;
+  mode: TutorMode;
+  prompt: string;
+  themes: string[];
+  stops: number;
+  rating: number | null;
+}
+
+export interface WritingWorkshopSnapshot {
+  generatedAt: string;
+  brief: WritingWorkshopBrief;
+  stats: {
+    ideas: number;
+    themes: number;
+    gaps: number;
+    contradictions: number;
+    works: number;
+    tutorRoutes: number;
+  };
+  recommendedSelection: WritingWorkshopSelection;
+  ideas: WritingWorkshopIdeaCandidate[];
+  themes: WritingWorkshopThemeCandidate[];
+  gaps: WritingWorkshopGapCandidate[];
+  contradictions: WritingWorkshopContradictionCandidate[];
+  works: WritingWorkshopWorkCandidate[];
+  tutorRoutes: WritingWorkshopRouteCandidate[];
+}
+
+export interface WritingWorkshopSection {
+  id: string;
+  title: string;
+  purpose: string;
+  keyClaims: string[];
+  sources: string[];
+}
+
+export interface WritingWorkshopMatrixRow {
+  claim: string;
+  role: 'support' | 'contrast' | 'gap' | 'method' | 'definition' | 'context';
+  sourceLabel: string;
+  citation: string;
+  evidence: string;
+  notes: string;
+}
+
+export interface WritingWorkshopDraft {
+  generatedAt: string;
+  brief: WritingWorkshopBrief;
+  selection: WritingWorkshopSelection;
+  title: string;
+  abstract: string;
+  outline: WritingWorkshopSection[];
+  draftMarkdown: string;
+  matrix: WritingWorkshopMatrixRow[];
+  bibliography: string[];
+  nextSteps: string[];
+  limitations: string[];
+  stats: {
+    selectedIdeas: number;
+    selectedThemes: number;
+    selectedGaps: number;
+    selectedContradictions: number;
+    selectedWorks: number;
+    selectedTutorRoutes: number;
+    contextChars: number;
+    truncated: boolean;
+  };
+}
+
+export interface WritingWorkshopDraftRequest {
+  brief: WritingWorkshopBrief;
+  selection: WritingWorkshopSelection;
+  model?: ModelRef | null;
+}
+
+export interface WritingWorkshopExportRequest {
+  draft: WritingWorkshopDraft;
+}
+
+export interface WritingWorkshopStreamHandlers {
+  onDelta(delta: string): void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Updates
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -851,6 +1013,11 @@ export interface NodusApi {
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
+
+  // writing workshop
+  getWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
+  generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft>;
+  exportWritingWorkshopDraft(request: WritingWorkshopExportRequest): Promise<{ path: string } | null>;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

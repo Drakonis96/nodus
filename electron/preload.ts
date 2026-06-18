@@ -90,6 +90,10 @@ const api: NodusApi = {
     }
   },
 
+  getWritingWorkshopSnapshot: (brief) => ipcRenderer.invoke('writing:snapshot', brief),
+  generateWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:draft', request),
+  exportWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:export', request),
+
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
   listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
   rateTutorRoute: (routeId, rating) => ipcRenderer.invoke('tutor:routes:rate', routeId, rating),

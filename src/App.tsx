@@ -6,6 +6,7 @@ import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
 import { ReadingPathView } from './views/ReadingPathView';
+import { WritingWorkshopView } from './views/WritingWorkshopView';
 import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { Settings } from './views/Settings';
@@ -30,6 +31,7 @@ const NAV: { id: View; label: string; icon: string }[] = [
   { id: 'library', label: 'Biblioteca', icon: 'book' },
   { id: 'gaps', label: 'Huecos', icon: 'gap' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
+  { id: 'writing', label: 'Escritura', icon: 'edit' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 
@@ -231,6 +233,7 @@ export function App() {
           {view === 'reading' && (
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
+          {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}
         </main>
       </div>

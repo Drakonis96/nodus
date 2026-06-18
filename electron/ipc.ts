@@ -16,6 +16,9 @@ import type {
   TutorPlanRequest,
   TutorStepRequest,
   ArgumentMapRequest,
+  WritingWorkshopBrief,
+  WritingWorkshopDraftRequest,
+  WritingWorkshopExportRequest,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -35,12 +38,14 @@ import { runDeepScan } from './ai/deepScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
+import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { reprocessConnections } from './ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import { getDb } from './db/database';
+import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
 
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
@@ -276,6 +281,11 @@ export function registerIpc(
       e.sender.send('research:chatStream:delta', requestId, delta);
     })
   );
+
+  // writing workshop
+  h('writing:snapshot', async (_e, brief: WritingWorkshopBrief) => buildWritingWorkshopSnapshot(brief));
+  h('writing:draft', async (_e, request: WritingWorkshopDraftRequest) => generateWritingWorkshopDraft(request));
+  h('writing:export', async (_e, request: WritingWorkshopExportRequest) => exportWritingWorkshopDraft(request));
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

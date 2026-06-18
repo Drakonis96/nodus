@@ -12,7 +12,7 @@ import type {
 import { Badge, Icon, Spinner } from '../components/ui';
 import { useScanComplete } from '../hooks';
 
-type HomeTarget = 'library' | 'graph' | 'ideas' | 'gaps' | 'reading' | 'settings';
+type HomeTarget = 'library' | 'graph' | 'ideas' | 'gaps' | 'reading' | 'writing' | 'settings';
 
 interface HomeViewProps {
   settings: AppSettings;
@@ -252,6 +252,23 @@ export function HomeView({
         </StatusCard>
 
         <StatusCard
+          title="Escritura"
+          icon="edit"
+          tone="indigo"
+          metric={stats.ideaNodes > 0 ? 'lista' : 'pendiente'}
+          metricLabel="taller académico"
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('writing')}>Abrir</button>}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <MiniMetric label="ideas" value={stats.ideaNodes} />
+            <MiniMetric label="huecos" value={stats.gaps} />
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">
+            Convierte ideas, contradicciones, huecos y rutas del Tutor en un borrador con citas verificables.
+          </p>
+        </StatusCard>
+
+        <StatusCard
           title="Configuración IA"
           icon={settings.defaultModel ? 'check' : 'alert'}
           tone={settings.defaultModel ? 'green' : 'red'}
@@ -431,6 +448,14 @@ function getRecommendation(settings: AppSettings, stats: ReturnType<typeof build
       body: 'Hay ideas extraídas sin índice semántico. Indexarlas mejora la fusión, las relaciones y el descubrimiento de puentes.',
       action: { kind: 'embed', label: 'Indexar pendientes' },
       secondary: { target: 'ideas', icon: 'bulb', label: 'Ver ideas' },
+    };
+  }
+  if (stats.ideaNodes >= 12 && stats.deepDone > 0) {
+    return {
+      title: 'Convierte el grafo en escritura',
+      body: 'Ya hay suficientes ideas y fuentes para montar un estado de la cuestión, un marco teórico o una justificación de hueco con citas verificables.',
+      action: { kind: 'view', target: 'writing', icon: 'edit', label: 'Abrir taller' },
+      secondary: { target: stats.gaps > 0 || stats.contradictions > 0 ? 'gaps' : 'ideas', icon: stats.gaps > 0 ? 'gap' : 'bulb', label: stats.gaps > 0 ? 'Ver huecos' : 'Ver ideas' },
     };
   }
   if (stats.gaps > 0 || stats.contradictions > 0) {

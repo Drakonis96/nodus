@@ -1,6 +1,6 @@
 import type { ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'reading' | 'settings';
+export type View = 'home' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'reading' | 'writing' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 

@@ -116,6 +116,27 @@ The plan is one structured JSON call; each stop's explanation is streamed.
 The left navigation collapses by clicking the **Nodus logo**, freeing space for the graph
 and the tutor/detail panels. The research-assistant chat answers also render as Markdown.
 
+### Writing workshop
+The **Taller de escritura** turns the graph into an editable academic artifact rather
+than another exploratory view. You choose the target form (state of the art,
+theoretical framework, debate, gap justification, chapter section or research
+question), describe the objective, and Nodus prepares a workbench of relevant
+materials from the local graph:
+
+- idea nodes with their developing works and anchored evidence,
+- curated themes,
+- mined gaps,
+- contradictions,
+- works from Zotero,
+- saved Tutor routes.
+
+You select what belongs in the draft, then the synthesis model generates a structured
+result: outline, Markdown draft, support matrix, bibliography, next steps and
+limitations. Citations use the same `nodus://idea`, `nodus://work`, `nodus://gap` and
+`nodus://contradiction` links as the research assistant, so every important claim can
+open the real source/evidence in Nodus. The result exports as Markdown for further
+editing in an external writing tool.
+
 ### Sync
 Manual (button) or realtime (polls the Zotero library version every ~25s and diffs
 with `?since=`). Each sync writes a `sync_log` entry.
