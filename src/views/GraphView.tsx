@@ -15,6 +15,8 @@ type GraphLens = 'ideas' | 'authors';
 const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 const LAYOUT_THEME_LINKS_PER_THEME = 28;
 const LAYOUT_THEME_LINKS_GLOBAL_MAX = 520;
+const LAYOUT_AUTHOR_LINKS_PER_AUTHOR = 8;
+const LAYOUT_AUTHOR_LINKS_GLOBAL_MAX = 360;
 const DRAG_COLLISION_MAX_ACTIVE = 44;
 const DRAG_COLLISION_CELL_SIZE = 96;
 const DRAG_INFLUENCE_MAX = 140;
@@ -33,8 +35,10 @@ function physicalLayoutElements(cy: Core) {
 function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => void, overrides: Record<string, unknown> = {}) {
   const nodeCount = Math.max(1, cy.nodes().filter((node) => !node.isParent()).length);
   const layoutEdgeCount = Math.max(1, cy.edges().filter((edge) => edge.data('layoutEdge') !== false).length);
+  const authorNodeCount = cy.nodes().filter((node) => !node.isParent() && node.data('type') === 'author').length;
+  const isAuthorGraph = authorNodeCount > 0 && authorNodeCount >= nodeCount * 0.55;
   const padding = Math.round(Math.min(80, 40 + Math.sqrt(nodeCount) * 1.8));
-  const densityScale = Math.min(1.7, 1 + Math.sqrt(nodeCount + layoutEdgeCount) / 68);
+  const densityScale = Math.min(isAuthorGraph ? 1.35 : 1.7, 1 + Math.sqrt(nodeCount + layoutEdgeCount) / 68);
   const iterationBudget = randomize
     ? Math.max(260, Math.min(680, 760 - nodeCount * 0.58))
     : Math.max(110, Math.min(280, 320 - nodeCount * 0.22));
@@ -48,19 +52,21 @@ function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => voi
     nodeDimensionsIncludeLabels: false,
     randomize,
     refresh: randomize ? 18 : 28,
-    componentSpacing: Math.round(122 * densityScale),
-    nodeOverlap: 24,
+    componentSpacing: Math.round((isAuthorGraph ? 196 : 122) * densityScale),
+    nodeOverlap: isAuthorGraph ? 8 : 24,
     nodeRepulsion: (node: any) => {
       const type = node.data('type') as GraphNodeType | 'community-guide' | 'community';
       const degree = Math.max(0, Number(node.data('degree') ?? 0));
       const size = Math.max(18, Number(node.data('size') ?? 28));
       if (type === 'theme') return Math.round((12200 + size * 150 + Math.sqrt(degree) * 1120) * densityScale);
-      if (type === 'author') return Math.round((8600 + Math.sqrt(degree) * 880) * densityScale);
+      if (type === 'author') return Math.round((22000 + size * 420 + Math.sqrt(degree) * 2100) * densityScale);
       return Math.round((7600 + size * 92 + Math.sqrt(degree) * 820) * densityScale);
     },
     idealEdgeLength: (edge: any) => {
       const confidence = clampUnit(Number(edge.data('confidence') ?? 0.5));
       const type = edge.data('type') as string;
+      const isAuthorEdge = edge.source?.().data('type') === 'author' || edge.target?.().data('type') === 'author';
+      if (isAuthorEdge) return Math.round(250 + (1 - confidence) * 96 + densityScale * 42);
       if (type === 'contains') return Math.round(245 + (1 - confidence) * 86 + densityScale * 34);
       if (type === 'contradicts' || type === 'refutes') return Math.round(205 + (1 - confidence) * 70);
       if (type === 'shares_method' || type === 'measures_same' || type === 'variant_of') return Math.round(168 + (1 - confidence) * 54);
@@ -255,6 +261,16 @@ function ideaNodeSize(degree: number): number {
   return 11 + Math.min(12, Math.sqrt(Math.max(0, degree)) * 2.75);
 }
 
+function authorNodeSize(workCount: number, degree: number): number {
+  return 10 + Math.min(10, Math.sqrt(Math.max(0, workCount)) * 1.35 + Math.sqrt(Math.max(0, degree)) * 0.95);
+}
+
+function graphNodeSize(node: GraphData['nodes'][number], degree: number): number {
+  if (node.type === 'theme') return themeNodeSize(node.workCount);
+  if (node.type === 'author') return authorNodeSize(node.workCount, degree);
+  return ideaNodeSize(degree);
+}
+
 function clampUnit(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -367,6 +383,67 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
 }
 
 /**
+ * Deterministic author layout for dense author graphs. The force layout can use
+ * this as a stable seed, and the explicit radial mode uses it directly.
+ */
+function computeAuthorRadialPositions(cy: Core): Record<string, { x: number; y: number }> | null {
+  const authorNodes = cy.nodes().filter((n) => n.data('type') === 'author');
+  if (authorNodes.empty()) return null;
+
+  const nodes = authorNodes
+    .map((node) => {
+      const degree = Math.max(0, Number(node.data('degree') ?? 0));
+      const workCount = Math.max(0, Number(node.data('_workCount') ?? 0));
+      return {
+        id: node.id(),
+        score: degree * 5 + workCount * 2 + Number(node.data('labelRank') ?? 0),
+      };
+    })
+    .sort((a, b) => b.score - a.score || stableUnit(a.id) - stableUnit(b.id));
+
+  const pos: Record<string, { x: number; y: number }> = {};
+  if (nodes.length === 1) {
+    pos[nodes[0].id] = { x: 0, y: 0 };
+    return pos;
+  }
+
+  let index = 0;
+  if (nodes.length >= 12) {
+    pos[nodes[index].id] = { x: 0, y: 0 };
+    index++;
+  }
+
+  const spacing = nodes.length > 140 ? 132 : nodes.length > 80 ? 150 : 172;
+  const ringGap = nodes.length > 140 ? 176 : nodes.length > 80 ? 198 : 224;
+  let ring = 1;
+
+  while (index < nodes.length) {
+    const radius = 230 + (ring - 1) * ringGap;
+    const capacity = Math.max(8 + ring * 4, Math.floor((2 * Math.PI * radius) / spacing));
+    const take = Math.min(capacity, nodes.length - index);
+    const offset = stableUnit(`author-ring:${ring}:${nodes.length}`) * Math.PI * 2;
+    for (let slot = 0; slot < take; slot++) {
+      const id = nodes[index + slot].id;
+      const angle = offset + (slot / take) * Math.PI * 2;
+      const jitter = (stableUnit(`author-jitter:${id}`) - 0.5) * Math.min(26, spacing * 0.16);
+      pos[id] = {
+        x: (radius + jitter) * Math.cos(angle),
+        y: (radius + jitter) * Math.sin(angle),
+      };
+    }
+    index += take;
+    ring++;
+  }
+
+  separateLabelBoxes(cy, pos);
+  return pos;
+}
+
+function computeSeedPositions(cy: Core, lens: GraphLens): Record<string, { x: number; y: number }> | null {
+  return lens === 'authors' ? computeAuthorRadialPositions(cy) : computeRadialPositions(cy);
+}
+
+/**
  * Keep theme hubs as the visual scaffold, then let idea→idea relations pull their
  * endpoints together. This gives an Obsidian-like local density without turning
  * the whole graph into an unreadable hairball.
@@ -431,8 +508,8 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
       if (!p) return null;
       const type = node.data('type') as GraphNodeType;
       const size = Number(node.data('size') ?? 32);
-      const font = type === 'theme' ? 13 : 10;
-      const maxWidth = type === 'theme' ? 190 : 150;
+      const font = type === 'theme' ? 13 : type === 'author' ? 9.5 : 10;
+      const maxWidth = type === 'theme' ? 190 : type === 'author' ? 118 : 150;
       const label = String(node.data('label') ?? '');
       const charsPerLine = Math.max(8, Math.floor(maxWidth / (font * 0.55)));
       const wrapped = wrapEstimate(label, charsPerLine);
@@ -446,7 +523,7 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
         height: size + labelHeight + 34,
         nodeRadius: size / 2,
         labelHeight,
-        nodeBias: type === 'theme' ? 0.28 : 0.5,
+        nodeBias: type === 'theme' ? 0.28 : type === 'author' ? 0.82 : 0.5,
       };
     })
     .filter((box): box is NonNullable<typeof box> => !!box);
@@ -852,7 +929,9 @@ function themeEdgeScore(edge: GraphData['edges'][number]): number {
   return (edge.basis === 'explicit' ? 2 : 0) + edge.confidence;
 }
 
-function physicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Set<string> {
+function physicalEdgeIds(edges: GraphData['edges'], nodeCount: number, lens: GraphLens): Set<string> {
+  if (lens === 'authors') return authorPhysicalEdgeIds(edges, nodeCount);
+
   const physical = new Set<string>();
   const themeEdgesBySource = new Map<string, GraphData['edges']>();
 
@@ -888,6 +967,50 @@ function physicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Set<stri
     return scoreDiff || stableUnit(a.id) - stableUnit(b.id);
   });
   for (const edge of candidates.slice(0, globalLimit)) physical.add(edge.id);
+
+  return physical;
+}
+
+function authorPhysicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Set<string> {
+  const physical = new Set<string>();
+  const ranked = edges
+    .filter((edge) => edge.type !== 'contains')
+    .sort((a, b) => b.confidence - a.confidence || stableUnit(a.id) - stableUnit(b.id));
+  const localLimit = Math.min(
+    LAYOUT_AUTHOR_LINKS_PER_AUTHOR,
+    Math.max(4, Math.round(3 + Math.sqrt(Math.max(1, nodeCount)) / 2))
+  );
+  const globalLimit = Math.min(
+    LAYOUT_AUTHOR_LINKS_GLOBAL_MAX,
+    Math.max(120, Math.round(Math.max(1, nodeCount) * 3.2))
+  );
+  const countByNode = new Map<string, number>();
+  const strongestByNode = new Map<string, string>();
+
+  for (const edge of ranked) {
+    if (!strongestByNode.has(edge.source)) strongestByNode.set(edge.source, edge.id);
+    if (!strongestByNode.has(edge.target)) strongestByNode.set(edge.target, edge.id);
+  }
+
+  const add = (edge: GraphData['edges'][number]) => {
+    if (physical.size >= globalLimit || physical.has(edge.id)) return;
+    physical.add(edge.id);
+    countByNode.set(edge.source, (countByNode.get(edge.source) ?? 0) + 1);
+    countByNode.set(edge.target, (countByNode.get(edge.target) ?? 0) + 1);
+  };
+
+  const byId = new Map(ranked.map((edge) => [edge.id, edge]));
+  for (const id of strongestByNode.values()) {
+    const edge = byId.get(id);
+    if (edge) add(edge);
+  }
+
+  for (const edge of ranked) {
+    if (physical.size >= globalLimit) break;
+    const sourceCount = countByNode.get(edge.source) ?? 0;
+    const targetCount = countByNode.get(edge.target) ?? 0;
+    if (sourceCount < localLimit || targetCount < localLimit) add(edge);
+  }
 
   return physical;
 }
@@ -1094,6 +1217,7 @@ export function GraphView({
   const communitiesRef = useRef<Map<string, number>>(new Map());
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
   const lensRef = useRef<GraphLens>(lens);
+  const appliedGraphModeRef = useRef<{ lens: GraphLens; layoutMode: 'force' | 'radial' } | null>(null);
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
@@ -1232,6 +1356,7 @@ export function GraphView({
       }
       return true;
     });
+    const visibleNodeById = new Map(visibleNodes.map((node) => [node.id, node]));
     const nodeIds = new Set(visibleNodes.map((n) => n.id));
     const visibleEdges = primaryThemeEdges(data.edges.filter((e) => {
       if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) return false;
@@ -1240,7 +1365,7 @@ export function GraphView({
       if (f.basis === 'explicit' && e.basis !== 'explicit') return false;
       return true;
     }));
-    const physicalEdges = physicalEdgeIds(visibleEdges, visibleNodes.length);
+    const physicalEdges = physicalEdgeIds(visibleEdges, visibleNodes.length, lens);
 
     const degreeById = new Map<string, number>();
     for (const node of visibleNodes) degreeById.set(node.id, 0);
@@ -1273,7 +1398,7 @@ export function GraphView({
           _workCount: n.workCount,
           degree: degreeById.get(n.id) ?? 0,
           labelRank: n.type === 'theme' ? 1.2 : labelRankById.get(n.id) ?? 0,
-          size: n.type === 'theme' ? themeNodeSize(n.workCount) : ideaNodeSize(degreeById.get(n.id) ?? 0),
+          size: graphNodeSize(n, degreeById.get(n.id) ?? 0),
           read: n.read,
         },
       })),
@@ -1289,12 +1414,13 @@ export function GraphView({
         },
       })),
     ].map((el: any) => {
-      // For idea nodes, compute degree from the visible edges and use a softer
-      // square-root scale so important nodes stand out without dominating the graph.
+      // Compute degree from the visible edges and use a soft square-root scale
+      // so important nodes stand out without dominating the graph.
       if (el.data.source) return el; // skip edges
       if (el.data.type === 'theme') return el; // theme size stays workCount-based
       const degree = degreeById.get(el.data.id) ?? 0;
-      el.data.size = ideaNodeSize(degree);
+      const node = visibleNodeById.get(el.data.id);
+      if (node) el.data.size = graphNodeSize(node, degree);
       return el;
     });
   }, [data, filters, lens]);
@@ -1329,7 +1455,7 @@ export function GraphView({
               'text-max-width': (ele: any) => (ele.data('type') === 'theme' ? '128px' : '104px'),
               'text-valign': 'bottom',
               'text-margin-y': 5,
-              'min-zoomed-font-size': 6,
+              'min-zoomed-font-size': (ele: any) => (ele.data('type') === 'author' ? 2.8 : 6),
               // Outline keeps labels legible where they cross edges or other nodes.
               'text-outline-width': 2.1,
               'text-outline-color': lightTheme ? '#ffffff' : '#0a0a0a',
@@ -1397,7 +1523,10 @@ export function GraphView({
           {
             selector: 'edge',
             style: {
-              width: (ele: any) => 0.34 + ele.data('confidence') * 0.62,
+              width: (ele: any) => {
+                const layoutEdge = ele.data('layoutEdge') !== false;
+                return (layoutEdge ? 0.34 : 0.18) + ele.data('confidence') * (layoutEdge ? 0.62 : 0.24);
+              },
               'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
               'line-style': (ele: any) => (ele.data('basis') === 'inferred' ? 'dashed' : 'solid'),
               opacity: 'data(baseOpacity)',
@@ -1981,8 +2110,13 @@ export function GraphView({
           cy.edges().forEach((edge: any) => {
             const confidence = Math.min(1, Math.max(0, Number(edge.data('confidence') ?? 0.5)));
             const isStructural = edge.data('type') === 'contains';
-            const isPhysicalStructural = isStructural && edge.data('layoutEdge') !== false;
-            const importance = isStructural ? (isPhysicalStructural ? 0.2 : 0.12) : 0.34 + confidence * 0.48;
+            const isLayoutEdge = edge.data('layoutEdge') !== false;
+            const isPhysicalStructural = isStructural && isLayoutEdge;
+            const importance = isStructural
+              ? (isPhysicalStructural ? 0.2 : 0.12)
+              : isLayoutEdge
+                ? 0.34 + confidence * 0.48
+                : 0.12 + confidence * 0.18;
             const phase = isStructural ? structurePhase : mix(structurePhase, 1, detailPhase * 0.55);
             const opacity = protectedEdgeIds.has(edge.id())
               ? edge.hasClass('focus-edge')
@@ -1991,8 +2125,8 @@ export function GraphView({
                   ? 0.42
                   : 0.18
               : mix(
-                  isStructural ? 0.018 : 0.04,
-                  isStructural ? (isPhysicalStructural ? 0.14 : 0.075) : 0.26,
+                  isStructural ? 0.018 : isLayoutEdge ? 0.04 : 0.018,
+                  isStructural ? (isPhysicalStructural ? 0.14 : 0.075) : isLayoutEdge ? 0.26 : 0.095,
                   clampUnit(importance * phase)
                 );
             edge.data('baseOpacity', opacity);
@@ -2023,6 +2157,10 @@ export function GraphView({
     }
     const cy = cyRef.current;
     const previousPositions = snapshotNodePositions(cy);
+    const previousGraphMode = appliedGraphModeRef.current;
+    const lensChanged = previousGraphMode?.lens !== lens;
+    const layoutModeChanged = previousGraphMode?.layoutMode !== layoutMode;
+    appliedGraphModeRef.current = { lens, layoutMode };
     cancelPendingInitialLayout();
     cancelPendingFocusFrame();
     focusCacheRef.current.clear();
@@ -2033,33 +2171,47 @@ export function GraphView({
     cy.elements().remove();
     cy.add(elements);
     let seededInitialPositions = false;
-    if (previousPositions.size > 0) {
-      cy.batch(() => {
-        cy.nodes().forEach((node) => {
-          if (node.isParent()) return;
-          const position = previousPositions.get(node.id());
-          if (position) node.position(position);
-        });
+    let restoredPositions = 0;
+    const renderableNodes = cy.nodes().filter((node) => !node.isParent());
+    const renderableNodeCount = renderableNodes.length;
+    const seedPositions = computeSeedPositions(cy, lens);
+    cy.batch(() => {
+      renderableNodes.forEach((node) => {
+        const previousPosition = previousPositions.get(node.id());
+        if (previousPosition) {
+          node.position(previousPosition);
+          restoredPositions++;
+          return;
+        }
+        const seedPosition = seedPositions?.[node.id()];
+        if (seedPosition) {
+          node.position(seedPosition);
+          seededInitialPositions = true;
+        }
       });
-    } else if (layoutMode === 'force') {
-      const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
-      if (positions) {
-        cy.layout({
-          name: 'preset',
-          positions,
-          fit: false,
-          animate: false,
-        } as any).run();
-        seededInitialPositions = true;
-      } else if (cy.nodes().length > 0) {
-        cy.layout({
-          name: 'circle',
-          fit: false,
-          animate: false,
-          padding: 80,
-        } as any).run();
-        seededInitialPositions = true;
-      }
+    });
+    const hasReusablePositions =
+      renderableNodeCount === 0 || restoredPositions >= Math.max(1, Math.ceil(renderableNodeCount * 0.72));
+
+    if (layoutMode === 'force' && !hasReusablePositions && !seededInitialPositions && cy.nodes().length > 0) {
+      cy.layout({
+        name: 'circle',
+        fit: false,
+        animate: false,
+        padding: 120,
+      } as any).run();
+      seededInitialPositions = true;
+    }
+    if (lastUserFocusRef.current && cy.getElementById(lastUserFocusRef.current).empty()) {
+      lastUserFocusRef.current = null;
+      focusCenterRef.current = null;
+      setIdeaDetail(null);
+      setEdgeDetail(null);
+      setDetailLoading(null);
+    }
+    const tutorFocus = lastTutorFocusRef.current;
+    if (tutorFocus && !tutorFocus.nodeIds.some((id) => cy.getElementById(id).nonempty())) {
+      lastTutorFocusRef.current = null;
     }
     // NOTE: automatic community guides (invisible compound parents) were removed
     // — they force the layout into a far slower compound-graph path on
@@ -2069,9 +2221,11 @@ export function GraphView({
     // Reset community state when elements are rebuilt.
     setCommunitiesCollapsed(false);
     let layout: any;
-    const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || previousPositions.size === 0;
-    const shouldFrameGraph = forceLayoutNeedsInitialFrame && !lastTutorFocusRef.current && !lastUserFocusRef.current;
-    const forceLayoutRandomize = forceLayoutNeedsInitialFrame && !seededInitialPositions;
+    if (lensChanged || layoutModeChanged || !hasReusablePositions) forceLayoutPrimedRef.current = false;
+    const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || !hasReusablePositions;
+    const shouldFrameGraph =
+      (forceLayoutNeedsInitialFrame || lensChanged || layoutModeChanged) && !lastTutorFocusRef.current && !lastUserFocusRef.current;
+    const forceLayoutRandomize = forceLayoutNeedsInitialFrame && !seededInitialPositions && restoredPositions === 0;
     const startForceLayout = (
       randomize: boolean,
       overrides: Record<string, unknown> = {},
@@ -2088,15 +2242,15 @@ export function GraphView({
     };
     // Layout selection: force-directed physics or deterministic radial.
     if (layoutMode === 'radial') {
-      const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
+      const positions = computeSeedPositions(cy, lens);
       if (positions) {
         cy.layout({
           name: 'preset',
           positions,
           fit: false,
           padding: 60,
-          animate: true,
-          animationDuration: 600,
+          animate: hasReusablePositions && !lensChanged,
+          animationDuration: layoutModeChanged ? 420 : 600,
           animationEasing: 'ease-in-out-cubic',
           stop: () => {
             forceLayoutPrimedRef.current = true;
@@ -2247,10 +2401,12 @@ export function GraphView({
       const p = toMini(n.position().x, n.position().y);
       const color = n.data('type') === 'theme'
         ? '#f97316'
+        : n.data('type') === 'author'
+          ? '#a3a3a3'
         : (NODE_COLORS[n.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888');
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, n.data('type') === 'theme' ? 3 : 1.8, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, n.data('type') === 'theme' ? 3 : n.data('type') === 'author' ? 2.2 : 1.8, 0, Math.PI * 2);
       ctx.fill();
     });
 
