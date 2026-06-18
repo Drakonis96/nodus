@@ -216,6 +216,20 @@ export function updateIdeaEmbedding(globalId: string, text: string, embedding: n
     .run(encodeEmbedding(embedding), meta.provider, meta.model, meta.dim, meta.textHash, globalId);
 }
 
+export function clearAllEmbeddings(): void {
+  getDb()
+    .prepare(
+      `UPDATE ideas
+          SET embedding = NULL,
+              embedding_provider = NULL,
+              embedding_model = NULL,
+              embedding_dim = NULL,
+              embedding_text_hash = NULL
+        WHERE embedding IS NOT NULL`
+    )
+    .run();
+}
+
 export function getIdea(globalId: string): Idea | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM ideas WHERE global_id = ?').get(globalId) as

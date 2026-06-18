@@ -523,7 +523,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
-  nodeTypes: [...GRAPH_NODE_TYPES],
+  nodeTypes: GRAPH_NODE_TYPES.filter((t) => t !== 'theme'),
   edgeTypes: [...EDGE_TYPES],
   theme: '',
   workIds: [],
@@ -2506,8 +2506,8 @@ export function GraphView({
                     onClick={() => toggleIn('nodeTypes', t)}
                     className="px-2 py-0.5 rounded flex items-center gap-1"
                     style={{
-                      backgroundColor: filters.nodeTypes.includes(t) ? NODE_COLORS[t] : '#262626',
-                      color: filters.nodeTypes.includes(t) ? 'white' : '#a3a3a3',
+                      backgroundColor: filters.nodeTypes.includes(t) ? NODE_COLORS[t] : (settings.theme === 'light' ? '#e5e7eb' : '#262626'),
+                      color: filters.nodeTypes.includes(t) ? 'white' : (settings.theme === 'light' ? '#525252' : '#a3a3a3'),
                     }}
                   >
                     {NODE_LABELS[t]}

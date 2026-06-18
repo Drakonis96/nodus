@@ -43,6 +43,7 @@ const api: NodusApi = {
   clearQueue: () => ipcRenderer.invoke('queue:clear'),
   stopQueue: () => ipcRenderer.invoke('queue:stopAll'),
   retryFailed: () => ipcRenderer.invoke('queue:retryFailed'),
+  enqueueBridgeDiscovery: (model) => ipcRenderer.invoke('queue:enqueueBridge', model).then(() => undefined),
   onQueueProgress: (cb) => {
     const listener = (_e: unknown, p: QueueProgress) => cb(p);
     ipcRenderer.on('queue:progress', listener);
@@ -124,6 +125,7 @@ const api: NodusApi = {
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   startEmbedding: (nodusIds) => ipcRenderer.invoke('embeddings:start', nodusIds).then(() => undefined),
+  reindexAll: () => ipcRenderer.invoke('embeddings:reindexAll').then(() => undefined),
   pauseEmbedding: () => ipcRenderer.invoke('embeddings:pause').then(() => undefined),
   resumeEmbedding: () => ipcRenderer.invoke('embeddings:resume').then(() => undefined),
   stopEmbedding: () => ipcRenderer.invoke('embeddings:stop').then(() => undefined),

@@ -11,6 +11,8 @@ import { getItem } from '../zotero/zoteroClient';
 import { setDeepResult } from '../db/worksRepo';
 import { purgeDeepData } from '../db/ideasRepo';
 import { AiError } from '../ai/aiClient';
+import { discoverSemanticBridges } from '../ai/semanticBridges';
+import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { startPerf } from '../perf';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -67,6 +69,24 @@ class ScanQueue {
       nodus_id: nodusId,
       title,
       kind,
+      state: 'queued',
+      error: null,
+      enqueued_at: new Date().toISOString(),
+      model: model ?? null,
+    });
+    this.emit();
+    void this.run();
+  }
+
+  enqueueBridge(model?: ModelRef | null): void {
+    if (this.items.some((i) => i.kind === 'bridge' && (i.state === 'queued' || i.state === 'running'))) {
+      return;
+    }
+    this.items.push({
+      id: uuid(),
+      nodus_id: '',
+      title: 'Descubrir relaciones semánticas',
+      kind: 'bridge',
       state: 'queued',
       error: null,
       enqueued_at: new Date().toISOString(),
@@ -148,6 +168,7 @@ class ScanQueue {
   }
 
   private resetPendingStatus(item: QueueItem): void {
+    if (item.kind === 'bridge') return;
     const column = item.kind === 'deep' ? 'deep_status' : 'light_status';
     getDb().prepare(`UPDATE works SET ${column} = 'none' WHERE nodus_id = ? AND ${column} = 'pending'`).run(item.nodus_id);
   }
@@ -192,7 +213,7 @@ class ScanQueue {
     } else if (!this.paused && this.deepSinceReprocess && !this.reprocessing) {
       // Queue drained after deep scans → re-trace inter-work idea relations and
       // theme memberships automatically so the global graph stays connected.
-      void this.autoReprocessConnections();
+      void this.autoReprocessConnections().then(() => this.autoEmbed());
     }
   }
 
@@ -216,9 +237,37 @@ class ScanQueue {
     }
   }
 
+  /**
+   * Trigger embedding for pending ideas after deep scans complete, if an
+   * embedding model is configured and the pipeline is not already running.
+   */
+  private autoEmbed(): void {
+    try {
+      const settings = getSettings();
+      if (!settings.embeddingProvider && !settings.embeddingModel) return;
+      const snapshot = getEmbeddingSnapshot();
+      if (snapshot.running) return;
+      void startEmbedding();
+    } catch (e) {
+      console.error('[scanQueue] auto-indexación de embeddings falló:', e instanceof Error ? e.message : String(e));
+    }
+  }
+
   private async process(item: QueueItem): Promise<void> {
     item.state = 'running';
     this.emit();
+    if (item.kind === 'bridge') {
+      try {
+        await this.doBridge(item);
+        item.state = 'done';
+        item.error = null;
+      } catch (e) {
+        item.state = 'failed';
+        item.error = (e as Error).message;
+      }
+      this.emit();
+      return;
+    }
     const work = getWorkById(item.nodus_id);
     if (!work) {
       item.state = 'failed';
@@ -319,6 +368,28 @@ class ScanQueue {
       queueItem.subPct = p.pct;
       this.emit();
     });
+  }
+
+  private async doBridge(item: QueueItem): Promise<void> {
+    item.detail = 'Escaneando pares semánticos…';
+    item.subPct = null;
+    this.emit();
+    const result = await discoverSemanticBridges(item.model ?? null, (p) => {
+      if (p.phase === 'validation') {
+        item.detail = `${p.label} (${p.current}/${p.total})`;
+        item.subPct = p.total > 0 ? p.current / p.total : null;
+      } else if (p.phase === 'scan') {
+        item.detail = p.label;
+        item.subPct = null;
+      } else if (p.phase === 'done') {
+        item.detail = p.label;
+        item.subPct = 1;
+      }
+      this.emit();
+    });
+    item.detail = `${result.added} nuevas · ${result.validated} validados · ${result.candidatesScanned} escaneados`;
+    item.subPct = 1;
+    this.emit();
   }
 
   /**

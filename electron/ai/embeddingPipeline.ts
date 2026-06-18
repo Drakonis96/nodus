@@ -1,6 +1,6 @@
 import type { EmbeddingPipelineProgress } from '@shared/types';
 import { getDb } from '../db/database';
-import { embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
+import { clearAllEmbeddings, embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
 import { embed } from './aiClient';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
@@ -242,6 +242,15 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
     state.running = false;
     emit();
   }
+}
+
+/**
+ * Clear all existing embeddings and re-embed every idea from scratch.
+ * Useful after changing the embedding model.
+ */
+export async function reindexAll(): Promise<void> {
+  clearAllEmbeddings();
+  await startEmbedding();
 }
 
 /** Get per-work embedding status for the library table. */

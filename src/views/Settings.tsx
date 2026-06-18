@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AppSettings, EmbeddingProvider, ModelInfo, UpdateProgressEvent } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 
@@ -23,6 +24,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgressEvent | null>(null);
+  const [confirmReindex, setConfirmReindex] = useState(false);
 
   useEffect(() => {
     return window.nodus.onUpdateProgress((event) => {
@@ -254,16 +256,25 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             <Row label="Modelo de embeddings (similitud semántica multilingüe)">
               <EmbeddingModelControl settings={settings} onPatch={patch} />
             </Row>
-            <Row label="Reindexar embeddings">
-              <button
-                className="btn btn-ghost border border-cyan-800 text-cyan-300"
-                title="Genera embeddings para todas las ideas que aún no los tienen. Útil tras cambiar de modelo de embeddings."
-                onClick={() => {
-                  void window.nodus.startEmbedding();
-                }}
-              >
-                <Icon name="search" /> Reindexar todo
-              </button>
+            <Row label="Indexación de embeddings">
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-ghost border border-cyan-800 text-cyan-300"
+                  title="Genera embeddings solo para ideas que aún no los tienen."
+                  onClick={() => {
+                    void window.nodus.startEmbedding();
+                  }}
+                >
+                  <Icon name="search" /> Indexar pendientes
+                </button>
+                <button
+                  className="btn btn-ghost border border-cyan-800 text-cyan-300"
+                  title="Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo."
+                  onClick={() => setConfirmReindex(true)}
+                >
+                  <Icon name="search" /> Reindexar todo
+                </button>
+              </div>
             </Row>
             <Row label="Llamadas simultáneas">
               <input
@@ -392,6 +403,19 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       )}
 
       {saved && <div className="fixed bottom-20 right-6 card px-4 py-2 text-sm text-emerald-400">{saved}</div>}
+      {confirmReindex && (
+        <ConfirmModal
+          title="Reindexar todos los embeddings"
+          message="Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?"
+          confirmLabel="Reindexar todo"
+          danger
+          onConfirm={() => {
+            setConfirmReindex(false);
+            void window.nodus.reindexAll();
+          }}
+          onCancel={() => setConfirmReindex(false)}
+        />
+      )}
     </div>
   );
 }

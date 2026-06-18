@@ -36,7 +36,7 @@ import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { reprocessConnections } from './ai/reprocessConnections';
-import { startEmbedding, pauseEmbedding, resumeEmbedding, stopEmbedding, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
+import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
@@ -227,6 +227,7 @@ export function registerIpc(
   h('queue:clear', async () => scanQueue.clear());
   h('queue:stopAll', async () => scanQueue.stopAll());
   h('queue:retryFailed', async () => scanQueue.retryFailed());
+  h('queue:enqueueBridge', async (_e, model?: ModelRef | null) => scanQueue.enqueueBridge(model));
 
   // graph
   h('graph:get', async (_e, lens: 'ideas' | 'authors') =>
@@ -321,6 +322,7 @@ export function registerIpc(
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));
+  h('embeddings:reindexAll', async () => reindexAll());
   h('embeddings:pause', async () => pauseEmbedding());
   h('embeddings:resume', async () => resumeEmbedding());
   h('embeddings:stop', async () => stopEmbedding());

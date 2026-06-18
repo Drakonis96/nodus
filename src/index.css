@@ -45,6 +45,9 @@ body {
 .light .text-indigo-400 {
   color: #4f46e5;
 }
+.light .text-indigo-300\/80 {
+  color: rgba(79, 70, 229, 0.8);
+}
 .light .text-emerald-300,
 .light .text-emerald-400 {
   color: #047857;
@@ -118,12 +121,33 @@ body {
 .light .bg-cyan-900\/50 {
   background-color: #cffafe;
 }
+.light .bg-indigo-600\/15 {
+  background-color: rgba(129, 140, 248, 0.12);
+}
+.light .bg-indigo-950\/35,
+.light .bg-indigo-950\/25,
+.light .bg-indigo-950\/20 {
+  background-color: #e0e7ff;
+}
+.light .bg-neutral-700 {
+  background-color: #d4d4d4;
+}
+.light .border-indigo-900\/70 {
+  border-color: rgba(129, 140, 248, 0.45);
+}
+.light .border-indigo-700 {
+  border-color: #a5b4fc;
+}
+.light .text-indigo-200 {
+  color: #4338ca;
+}
 .light .hover\:bg-neutral-900:hover,
 .light .hover\:bg-neutral-900\/50:hover,
 .light .hover\:bg-neutral-900\/60:hover {
   background-color: #f5f5f5;
 }
-.light .hover\:bg-neutral-800:hover {
+.light .hover\:bg-neutral-800:hover,
+.light .hover\:bg-neutral-800\/80:hover {
   background-color: #e5e7eb;
 }
 .light .hover\:bg-red-950\/50:hover {

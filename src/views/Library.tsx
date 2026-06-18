@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus, SemanticBridgeProgress } from '@shared/types';
+import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import {
@@ -73,9 +74,8 @@ export function Library({
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
-  const [bridgeProgress, setBridgeProgress] = useState<SemanticBridgeProgress | null>(null);
-  const [bridgeRunning, setBridgeRunning] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [confirmReindex, setConfirmReindex] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,12 +148,13 @@ export function Library({
     setSelected(new Set());
   };
 
-  const embedAll = async () => {
-    const ok = window.confirm(
-      'Se generarán embeddings para todas las ideas de las obras con análisis profundo. Esto consume tokens del proveedor de embeddings configurado. ¿Continuar?'
-    );
-    if (!ok) return;
+  const embedPending = async () => {
     await window.nodus.startEmbedding();
+  };
+
+  const doReindexAll = async () => {
+    setConfirmReindex(false);
+    await window.nodus.reindexAll();
   };
 
   const needsEmbedding = (w: WorkView) => {
@@ -162,26 +163,8 @@ export function Library({
   };
 
   const discoverBridges = async () => {
-    setBridgeRunning(true);
-    setBridgeProgress(null);
-    try {
-      const result = await window.nodus.discoverSemanticBridges(scanModel);
-      window.alert(
-        `${result.candidatesScanned} candidatos escaneados (${result.crossThemeCandidates} cross-tema)\n` +
-        `${result.validated} validados por IA → ${result.added} nuevas relaciones`
-      );
-    } catch (e) {
-      window.alert(`Error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBridgeRunning(false);
-      setBridgeProgress(null);
-      await load();
-    }
+    await window.nodus.enqueueBridgeDiscovery(scanModel);
   };
-
-  useEffect(() => {
-    return window.nodus.onSemanticBridgeProgress(setBridgeProgress);
-  }, []);
 
   const toggleSelected = (id: string, checked: boolean) => {
     setSelected((prev) => {
@@ -293,7 +276,7 @@ export function Library({
       )}
 
       {advancedOpen && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
           <OperationCard
             icon="wand"
             title="Reasignar temas"
@@ -303,19 +286,26 @@ export function Library({
           />
           <OperationCard
             icon="search"
-            title="Indexar embeddings"
-            description="Genera embeddings para las ideas ya extraídas. Mejora similitud, fusión y búsqueda de relaciones."
-            buttonLabel="Indexar todo"
+            title="Indexar pendientes"
+            description="Genera embeddings para las ideas que aún no los tienen. No regenera los existentes."
+            buttonLabel="Indexar pendientes"
             tone="cyan"
-            onClick={embedAll}
+            onClick={embedPending}
+          />
+          <OperationCard
+            icon="search"
+            title="Reindexar todo"
+            description="Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo de embeddings."
+            buttonLabel="Reindexar todo"
+            tone="cyan"
+            onClick={() => setConfirmReindex(true)}
           />
           <OperationCard
             icon="compass"
             title="Descubrir relaciones"
-            description="Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas."
-            buttonLabel={bridgeRunning ? bridgeProgress?.label ?? 'Descubriendo…' : 'Descubrir'}
+            description="Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola."
+            buttonLabel="Descubrir"
             tone="violet"
-            disabled={bridgeRunning}
             onClick={discoverBridges}
           />
         </div>
@@ -435,6 +425,16 @@ export function Library({
           />
         )}
       </div>
+      {confirmReindex && (
+        <ConfirmModal
+          title="Reindexar todos los embeddings"
+          message="Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?"
+          confirmLabel="Reindexar todo"
+          danger
+          onConfirm={() => void doReindexAll()}
+          onCancel={() => setConfirmReindex(false)}
+        />
+      )}
     </div>
   );
 }

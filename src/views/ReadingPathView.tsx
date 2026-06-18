@@ -26,7 +26,7 @@ const STRATEGY_HELP: Record<ReadingPathStrategy, string> = {
   connected_authors: 'Da peso a autores relacionados por el grafo de ideas.',
   bridges: 'Busca textos que conectan varias líneas temáticas o zonas del grafo.',
 };
-const READING_ENTRY_ROW_HEIGHT = 184;
+const READING_ENTRY_ROW_HEIGHT = 220;
 
 export function ReadingPathView({
   onOpenGraph,
@@ -196,7 +196,7 @@ function ReadingEntryCard({
   };
 
   return (
-    <div className={`card h-[172px] p-3 mr-2 flex gap-3 items-start overflow-hidden ${entry.read ? 'opacity-75' : ''}`}>
+    <div className={`card h-[208px] p-3 mr-2 flex gap-3 items-start overflow-hidden ${entry.read ? 'opacity-75' : ''}`}>
       <div className="text-lg font-mono text-neutral-600 w-8 text-right">{index}</div>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">

@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { QueueProgress } from '@shared/types';
+import type { QueueProgress, QueueKind } from '@shared/types';
 import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
+
+const KIND_LABELS: Record<QueueKind, string> = {
+  light: 'LIGERO',
+  deep: 'PROFUNDO',
+  bridge: 'PUENTES',
+};
 
 export function QueueBar() {
   const [progress, setProgress] = useState<QueueProgress | null>(null);
@@ -40,7 +46,7 @@ export function QueueBar() {
               {current ? (
                 <>
                   {done + failed} / {total} — Procesando: <span className="text-neutral-200">{current.title}</span>{' '}
-                  <span className="uppercase text-[10px] tracking-wide">({current.kind})</span>
+                  <span className="uppercase text-[10px] tracking-wide">({KIND_LABELS[current.kind] ?? current.kind})</span>
                   {running?.detail && (
                     <span className="text-indigo-300 ml-1">
                       · {running.detail}
@@ -128,7 +134,7 @@ export function QueueBar() {
               {items.map((it) => (
                 <div key={it.id} className="flex items-center justify-between py-1 text-xs">
                   <span className="truncate flex-1">{it.title}</span>
-                  <span className="uppercase text-[10px] text-neutral-500 mx-2">{it.kind}</span>
+                  <span className="uppercase text-[10px] text-neutral-500 mx-2">{KIND_LABELS[it.kind] ?? it.kind}</span>
                   <span
                     className={
                       it.state === 'done'

@@ -303,7 +303,7 @@ export interface ZoteroItem {
 // Queue / pipeline
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type QueueKind = 'light' | 'deep';
+export type QueueKind = 'light' | 'deep' | 'bridge';
 export type QueueState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'paused';
 
 export interface QueueItem {
@@ -802,6 +802,8 @@ export interface NodusApi {
   clearQueue(): Promise<void>;
   stopQueue(): Promise<void>;
   retryFailed(): Promise<void>;
+  /** Enqueue a semantic bridge discovery job into the scan queue. */
+  enqueueBridgeDiscovery(model?: ModelRef | null): Promise<void>;
   onQueueProgress(cb: (p: QueueProgress) => void): () => void;
 
   // graph
@@ -879,6 +881,8 @@ export interface NodusApi {
   // embedding pipeline
   /** Start embedding generation for the given works (or all deep-scanned works if empty). */
   startEmbedding(nodusIds?: string[]): Promise<void>;
+  /** Clear all existing embeddings and regenerate from scratch. */
+  reindexAll(): Promise<void>;
   pauseEmbedding(): Promise<void>;
   resumeEmbedding(): Promise<void>;
   stopEmbedding(): Promise<void>;
