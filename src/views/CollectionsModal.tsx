@@ -1,10 +1,12 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings, ModelRef } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { VirtualList } from '../components/VirtualList';
 
 const ITEM_TYPES = ['journalArticle', 'book', 'bookSection', 'conferencePaper', 'thesis', 'preprint', 'report'];
+const ZOTERO_ITEM_ROW_HEIGHT = 58;
 
 // Session-level cache of collection items so re-selecting doesn't re-hit the API.
 const itemCache = new Map<string, ZoteroItem[]>();
@@ -108,31 +110,36 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
     if (selected) void loadItems(selected, true);
   }, [recursive, selected, loadItems]);
 
-  const statusOf = (key: string): 'unscanned' | 'light' | 'deep' => {
+  const statusOf = useCallback((key: string): 'unscanned' | 'light' | 'deep' => {
     const w = worksByKey.get(key);
     if (!w) return 'unscanned';
     if (w.deep_status === 'done') return 'deep';
     if (w.light_status === 'done') return 'light';
     return 'unscanned';
-  };
+  }, [worksByKey]);
 
-  const filtered = items.filter((it) => {
-    if (search) {
-      const q = search.toLowerCase();
-      const hit =
-        it.title.toLowerCase().includes(q) ||
-        it.creators.some((c) => (c.lastName ?? c.name ?? '').toLowerCase().includes(q)) ||
-        String(it.year ?? '').includes(q) ||
-        (it.abstract ?? '').toLowerCase().includes(q);
-      if (!hit) return false;
-    }
-    if (types.size && !types.has(it.itemType)) return false;
-    if (yearMin && (it.year ?? 0) < parseInt(yearMin)) return false;
-    if (yearMax && (it.year ?? 9999) > parseInt(yearMax)) return false;
-    if (onlyTag && !it.tags.some((t) => t.toLowerCase() === readTag.toLowerCase())) return false;
-    if (statusFilter !== 'all' && statusOf(it.key) !== statusFilter) return false;
-    return true;
-  });
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    const min = yearMin ? parseInt(yearMin) : null;
+    const max = yearMax ? parseInt(yearMax) : null;
+    const readTagLower = readTag.toLowerCase();
+    return items.filter((it) => {
+      if (q) {
+        const hit =
+          it.title.toLowerCase().includes(q) ||
+          it.creators.some((c) => (c.lastName ?? c.name ?? '').toLowerCase().includes(q)) ||
+          String(it.year ?? '').includes(q) ||
+          (it.abstract ?? '').toLowerCase().includes(q);
+        if (!hit) return false;
+      }
+      if (types.size && !types.has(it.itemType)) return false;
+      if (min != null && (it.year ?? 0) < min) return false;
+      if (max != null && (it.year ?? 9999) > max) return false;
+      if (onlyTag && !it.tags.some((t) => t.toLowerCase() === readTagLower)) return false;
+      if (statusFilter !== 'all' && statusOf(it.key) !== statusFilter) return false;
+      return true;
+    });
+  }, [items, onlyTag, readTag, search, statusFilter, statusOf, types, yearMax, yearMin]);
 
   const refreshWorks = async () => {
     const ws = await window.nodus.listWorks({ includeArchived: true });
@@ -264,21 +271,27 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
             </div>
 
             {/* List */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0">
               {loadingItems && <div className="p-4 text-neutral-500 text-sm">Cargando ítems…</div>}
               {!loadingItems && !selected && (
                 <div className="p-4 text-neutral-500 text-sm">Selecciona una colección.</div>
               )}
-              {!loadingItems &&
-                filtered.map((it) => {
+              {!loadingItems && selected && (
+                <VirtualList
+                  items={filtered}
+                  itemHeight={ZOTERO_ITEM_ROW_HEIGHT}
+                  getKey={(it) => it.key}
+                  className="h-full"
+                  empty={<div className="p-4 text-neutral-500 text-sm">No hay ítems con los filtros actuales.</div>}
+                  renderItem={(it) => {
                   const w = worksByKey.get(it.key);
                   const st = statusOf(it.key);
                   return (
-                    <div key={it.key} className="flex items-center gap-3 px-4 py-2 border-b border-neutral-800/60">
+                    <div className="flex h-full items-center gap-3 border-b border-neutral-800/60 px-4">
                       <input
                         type="checkbox"
                         checked={!!w?.manual_deep}
-                        onChange={() => toggleItem(it)}
+                        onChange={() => void toggleItem(it)}
                         title={w ? 'Analizar ideas de esta obra' : 'Incorporar a Nodus y analizar ideas'}
                       />
                       <div className="flex-1 min-w-0">
@@ -294,7 +307,9 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
                       {w?.deep_trigger === 'both' && <span title="ambos">🏷✦</span>}
                     </div>
                   );
-                })}
+                  }}
+                />
+              )}
             </div>
             <div className="px-4 py-1.5 border-t border-neutral-800 text-xs text-neutral-500">
               {filtered.length} de {items.length} ítems

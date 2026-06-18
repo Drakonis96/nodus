@@ -2,11 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus, SemanticBridgeProgress } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { VirtualList } from '../components/VirtualList';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
+
+const LIBRARY_ROW_HEIGHT = 64;
+const LIBRARY_GRID_TEMPLATE =
+  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 12rem';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">ligero ✓</Badge>;
@@ -316,116 +321,119 @@ export function Library({
         </div>
       )}
 
-      <div className="card flex-1 overflow-auto min-h-0">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-neutral-900 text-neutral-400 text-left">
-            <tr>
-              <th className="p-2 font-medium w-8">
-                <input
-                  type="checkbox"
-                  checked={allVisibleSelected}
-                  onChange={(e) => {
-                    if (e.target.checked) setSelected(new Set(works.map((w) => w.nodus_id)));
-                    else setSelected(new Set());
-                  }}
-                />
-              </th>
-              <th className="p-2 font-medium">Título</th>
-              <th className="p-2 font-medium">Autores</th>
-              <th className="p-2 font-medium">Año</th>
-              <th className="p-2 font-medium">Tema(s)</th>
-              <th className="p-2 font-medium">Ligero</th>
-              <th className="p-2 font-medium">Profundo</th>
-              <th className="p-2 font-medium">Embeddings</th>
-              <th className="p-2 font-medium" data-tour="library-actions">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td className="p-4 text-neutral-500" colSpan={9}>
-                  Cargando…
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              works.map((w) => (
-                <tr key={w.nodus_id} className="border-t border-neutral-800 hover:bg-neutral-900/50">
-                  <td className="p-2">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(w.nodus_id)}
-                      onChange={(e) => toggleSelected(w.nodus_id, e.target.checked)}
+      <div className="card flex-1 flex flex-col min-h-0 overflow-hidden text-sm">
+        <div
+          className="grid items-center bg-neutral-900 text-neutral-400 border-b border-neutral-800 px-2 py-2 text-left text-xs"
+          style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
+        >
+          <div className="font-medium">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              onChange={(e) => {
+                if (e.target.checked) setSelected(new Set(works.map((w) => w.nodus_id)));
+                else setSelected(new Set());
+              }}
+            />
+          </div>
+          <div className="font-medium">Título</div>
+          <div className="font-medium">Autores</div>
+          <div className="font-medium">Año</div>
+          <div className="font-medium">Tema(s)</div>
+          <div className="font-medium">Ligero</div>
+          <div className="font-medium">Profundo</div>
+          <div className="font-medium">Embeddings</div>
+          <div className="font-medium" data-tour="library-actions">Acciones</div>
+        </div>
+        {loading ? (
+          <div className="p-4 text-neutral-500">Cargando...</div>
+        ) : (
+          <VirtualList
+            items={works}
+            itemHeight={LIBRARY_ROW_HEIGHT}
+            getKey={(w) => w.nodus_id}
+            className="flex-1 min-h-0"
+            empty={<div className="p-4 text-neutral-500">No hay obras con los filtros actuales.</div>}
+            renderItem={(w) => (
+              <div
+                className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
+                style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
+              >
+                <div className="p-1">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(w.nodus_id)}
+                    onChange={(e) => toggleSelected(w.nodus_id, e.target.checked)}
+                  />
+                </div>
+                <div className="min-w-0 p-1">
+                  <div className="truncate" title={w.title}>
+                    {w.title}
+                  </div>
+                  <div className="text-[10px] text-neutral-600 font-mono">{w.nodus_id.slice(0, 8)}</div>
+                </div>
+                <div className="p-1 min-w-0 truncate text-neutral-400">
+                  {w.authors[0] ?? '—'}
+                  {w.authors.length > 1 ? ' et al.' : ''}
+                </div>
+                <div className="p-1 text-neutral-400">{w.year ?? '—'}</div>
+                <div className="p-1 text-neutral-400 truncate">{w.themes.join(', ')}</div>
+                <div className="p-1">{lightBadge(w.light_status)}</div>
+                <div className="p-1 whitespace-nowrap">
+                  {deepBadge(w.deep_status)} {triggerBadge(w)}
+                </div>
+                <div className="p-1 whitespace-nowrap">
+                  {embeddingBadge(embeddingStatuses.get(w.nodus_id))}
+                  {needsEmbedding(w) && (
+                    <button
+                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-cyan-400 hover:text-cyan-300"
+                      title="Indexar embeddings de esta obra"
+                      onClick={() => embedWork(w.nodus_id)}
+                    >
+                      <Icon name="search" size={11} />
+                    </button>
+                  )}
+                </div>
+                <div className="p-1 whitespace-nowrap">
+                  <div className="flex items-center gap-1">
+                    <RowIconButton title="Analizar temas" icon="tag" onClick={() => analyzeThemes(w)} />
+                    <RowIconButton title={w.deep_status === 'done' ? 'Reanalizar ideas' : 'Analizar ideas'} icon="bulb" onClick={() => analyzeIdeas(w)} />
+                    <RowIconButton title="Analizar temas e ideas" icon="layers" onClick={() => analyzeBoth(w)} />
+                    <RowIconButton
+                      title="Ver esta obra en el grafo"
+                      icon="map"
+                      tone="cyan"
+                      onClick={() =>
+                        onOpenGraph({
+                          preset: 'reading',
+                          workId: w.nodus_id,
+                          workTitle: w.title,
+                          zoteroKey: w.zotero_key,
+                          label: `Lectura: ${w.title}`,
+                        })
+                      }
                     />
-                  </td>
-                  <td className="p-2 max-w-md">
-                    <div className="truncate" title={w.title}>
-                      {w.title}
-                    </div>
-                    <div className="text-[10px] text-neutral-600 font-mono">{w.nodus_id.slice(0, 8)}</div>
-                  </td>
-                  <td className="p-2 text-neutral-400">
-                    {w.authors[0] ?? '—'}
-                    {w.authors.length > 1 ? ' et al.' : ''}
-                  </td>
-                  <td className="p-2 text-neutral-400">{w.year ?? '—'}</td>
-                  <td className="p-2 text-neutral-400 max-w-[140px] truncate">{w.themes.join(', ')}</td>
-                  <td className="p-2">{lightBadge(w.light_status)}</td>
-                  <td className="p-2 whitespace-nowrap">
-                    {deepBadge(w.deep_status)} {triggerBadge(w)}
-                  </td>
-                  <td className="p-2 whitespace-nowrap">
-                    {embeddingBadge(embeddingStatuses.get(w.nodus_id))}
-                    {needsEmbedding(w) && (
-                      <button
-                        className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-cyan-400 hover:text-cyan-300"
-                        title="Indexar embeddings de esta obra"
-                        onClick={() => embedWork(w.nodus_id)}
-                      >
-                        <Icon name="search" size={11} />
-                      </button>
-                    )}
-                  </td>
-                  <td className="p-2 whitespace-nowrap">
-                    <div className="flex items-center gap-1">
-                      <RowIconButton title="Analizar temas" icon="tag" onClick={() => analyzeThemes(w)} />
-                      <RowIconButton title={w.deep_status === 'done' ? 'Reanalizar ideas' : 'Analizar ideas'} icon="bulb" onClick={() => analyzeIdeas(w)} />
-                      <RowIconButton title="Analizar temas e ideas" icon="layers" onClick={() => analyzeBoth(w)} />
-                      <RowIconButton
-                        title="Ver esta obra en el grafo"
-                        icon="map"
-                        tone="cyan"
-                        onClick={() =>
-                          onOpenGraph({
-                            preset: 'reading',
-                            workId: w.nodus_id,
-                            workTitle: w.title,
-                            zoteroKey: w.zotero_key,
-                            label: `Lectura: ${w.title}`,
-                          })
-                        }
-                      />
-                      <RowIconButton
-                        title="Preguntar al asistente sobre esta obra"
-                        icon="wand"
-                        tone="violet"
-                        onClick={() =>
-                          onOpenAssistant({
-                            title: `Lectura: ${w.title}`,
-                            selection: ASSISTANT_CONTEXTS.reading,
-                            prompt:
-                              `Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.\n\n` +
-                              `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
-                          })
-                        }
-                      />
-                      <RowIconButton title="Abrir en Zotero" icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
+                    <RowIconButton
+                      title="Preguntar al asistente sobre esta obra"
+                      icon="wand"
+                      tone="violet"
+                      onClick={() =>
+                        onOpenAssistant({
+                          title: `Lectura: ${w.title}`,
+                          selection: ASSISTANT_CONTEXTS.reading,
+                          prompt:
+                            `Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.\n\n` +
+                            `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
+                        })
+                      }
+                    />
+                    <RowIconButton title="Abrir en Zotero" icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
+                  </div>
+                </div>
+              </div>
+            )}
+          />
+        )}
       </div>
     </div>
   );

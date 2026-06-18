@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon } from '../components/ui';
+import { VirtualList } from '../components/VirtualList';
 import { useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -21,6 +22,9 @@ const KIND_COLOR: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
   open_question: 'indigo',
   unresolved_contradiction: 'red',
 };
+
+const GAP_ROW_HEIGHT = 172;
+const CONTRADICTION_ROW_HEIGHT = 218;
 
 export function GapsView({
   onOpenGraph,
@@ -49,37 +53,43 @@ export function GapsView({
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <Icon name="gap" size={22} className="text-indigo-300" />
-        <h1 className="text-xl font-semibold">Huecos de investigación</h1>
-      </div>
-      <p className="text-sm text-neutral-400 mb-4">
-        Agregados del corpus: trabajo futuro y limitaciones minados de las obras, y contradicciones sin reconciliar.
-      </p>
+    <div className="h-full flex flex-col min-h-0 p-6">
+      <div className="shrink-0">
+        <div className="flex items-center gap-3 mb-4">
+          <Icon name="gap" size={22} className="text-indigo-300" />
+          <h1 className="text-xl font-semibold">Huecos de investigación</h1>
+        </div>
+        <p className="text-sm text-neutral-400 mb-4">
+          Agregados del corpus: trabajo futuro y limitaciones minados de las obras, y contradicciones sin reconciliar.
+        </p>
 
-      <div className="flex gap-2 mb-4">
-        <button
-          className={`btn ${tab === 'mined' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('mined')}
-        >
-          Minados ({gaps.length})
-        </button>
-        <button
-          className={`btn ${tab === 'contradictions' ? 'btn-primary' : 'btn-ghost'}`}
-          onClick={() => setTab('contradictions')}
-        >
-          Contradicciones ({contradictions.length})
-        </button>
+        <div className="flex gap-2 mb-4">
+          <button
+            className={`btn ${tab === 'mined' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setTab('mined')}
+          >
+            Minados ({gaps.length})
+          </button>
+          <button
+            className={`btn ${tab === 'contradictions' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setTab('contradictions')}
+          >
+            Contradicciones ({contradictions.length})
+          </button>
+        </div>
       </div>
 
       {tab === 'mined' && (
-        <div className="space-y-2">
-          {gaps.length === 0 && <div className="text-neutral-500 text-sm">Aún no hay huecos. Ejecuta escaneos profundos.</div>}
-          {gaps.map((g, i) => (
-            <div key={i} className="card p-3">
+        <VirtualList
+          items={gaps}
+          itemHeight={GAP_ROW_HEIGHT}
+          getKey={(g, i) => `${g.kind}:${g.statement}:${i}`}
+          className="flex-1 min-h-0"
+          empty={<div className="text-neutral-500 text-sm">Aún no hay huecos. Ejecuta escaneos profundos.</div>}
+          renderItem={(g) => (
+            <div className="card h-[160px] p-3 mr-2">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm flex-1">{g.statement}</p>
+                <p className="text-sm flex-1 line-clamp-2">{g.statement}</p>
                 <Badge color={KIND_COLOR[g.kind]}>{KIND_LABELS[g.kind]}</Badge>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
@@ -106,7 +116,7 @@ export function GapsView({
               </div>
               <div className="text-xs text-neutral-500 mt-2">
                 Mencionado en {g.count} obra(s):{' '}
-                {g.works.map((w) => (
+                {g.works.slice(0, 6).map((w) => (
                   <button
                     key={w.nodus_id}
                     className="text-indigo-400 hover:underline mr-2"
@@ -115,25 +125,28 @@ export function GapsView({
                     {w.title.slice(0, 40)}
                   </button>
                 ))}
+                {g.works.length > 6 && <span>+{g.works.length - 6} más</span>}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       {tab === 'contradictions' && (
-        <div className="space-y-2">
-          {contradictions.length === 0 && (
-            <div className="text-neutral-500 text-sm">No se detectaron contradicciones sin resolver.</div>
-          )}
-          {contradictions.map((c) => (
-            <div key={c.edge.id} className="card p-3">
+        <VirtualList
+          items={contradictions}
+          itemHeight={CONTRADICTION_ROW_HEIGHT}
+          getKey={(c) => c.edge.id}
+          className="flex-1 min-h-0"
+          empty={<div className="text-neutral-500 text-sm">No se detectaron contradicciones sin resolver.</div>}
+          renderItem={(c) => (
+            <div className="card h-[206px] p-3 mr-2">
               <div className="flex items-center gap-2 mb-1">
                 <Badge color="red">{EDGE_LABELS[c.edge.type as keyof typeof EDGE_LABELS] ?? c.edge.type}</Badge>
                 <Badge color={c.edge.basis === 'explicit' ? 'green' : 'amber'}>{c.edge.basis}</Badge>
                 <Badge>conf {c.edge.confidence.toFixed(2)}</Badge>
               </div>
-              {c.explanation && <p className="text-sm text-neutral-300 mb-2">{c.explanation}</p>}
+              {c.explanation && <p className="text-sm text-neutral-300 mb-2 line-clamp-2">{c.explanation}</p>}
               <div className="text-sm">
                 <span className="text-neutral-200">{c.fromLabel}</span> ✕{' '}
                 <span className="text-neutral-200">{c.toLabel}</span>
@@ -160,9 +173,9 @@ export function GapsView({
                   <Icon name="wand" size={13} /> Asistente
                 </button>
               </div>
-              {c.evidence.map((ev) => (
+              {c.evidence.slice(0, 2).map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-red-700 pl-2 mt-2 text-xs italic text-neutral-400">
-                  “{ev.quote}” {ev.location ?? ''}
+                  <span className="block line-clamp-1">“{ev.quote}” {ev.location ?? ''}</span>
                   <button
                     className="ml-2 inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 not-italic"
                     onClick={() => void openEvidenceInZotero(ev.nodus_id)}
@@ -171,9 +184,10 @@ export function GapsView({
                   </button>
                 </blockquote>
               ))}
+              {c.evidence.length > 2 && <div className="mt-1 text-[11px] text-neutral-500">+{c.evidence.length - 2} evidencias más</div>}
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
     </div>
   );

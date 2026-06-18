@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ReadingPathEntry, ReadingPathPlan, ReadingPathStrategy } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
+import { VirtualList } from '../components/VirtualList';
 import { useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -25,6 +26,7 @@ const STRATEGY_HELP: Record<ReadingPathStrategy, string> = {
   connected_authors: 'Da peso a autores relacionados por el grafo de ideas.',
   bridges: 'Busca textos que conectan varias líneas temáticas o zonas del grafo.',
 };
+const READING_ENTRY_ROW_HEIGHT = 184;
 
 export function ReadingPathView({
   onOpenGraph,
@@ -143,17 +145,21 @@ export function ReadingPathView({
               <Badge>{phase.entries.length}/{phase.totalCandidates}</Badge>
               {phase.omitted > 0 && <Badge color="amber">{phase.omitted} fuera del bloque</Badge>}
             </div>
-            <ol className="space-y-2">
-              {phase.entries.map((entry, i) => (
+            <VirtualList
+              items={phase.entries}
+              itemHeight={READING_ENTRY_ROW_HEIGHT}
+              getKey={(entry) => entry.nodus_id}
+              className="min-h-0 rounded-lg"
+              style={{ height: Math.min(phase.entries.length * READING_ENTRY_ROW_HEIGHT, 640) }}
+              renderItem={(entry, i) => (
                 <ReadingEntryCard
-                  key={entry.nodus_id}
                   entry={entry}
                   index={i + 1}
                   onOpenGraph={onOpenGraph}
                   onOpenAssistant={onOpenAssistant}
                 />
-              ))}
-            </ol>
+              )}
+            />
           </section>
         ))}
       </div>
@@ -190,7 +196,7 @@ function ReadingEntryCard({
   };
 
   return (
-    <li className={`card p-3 flex gap-3 items-start ${entry.read ? 'opacity-75' : ''}`}>
+    <div className={`card h-[172px] p-3 mr-2 flex gap-3 items-start overflow-hidden ${entry.read ? 'opacity-75' : ''}`}>
       <div className="text-lg font-mono text-neutral-600 w-8 text-right">{index}</div>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -212,9 +218,9 @@ function ReadingEntryCard({
           {entry.analysis.gapCount > 0 && <Badge color="amber">{entry.analysis.gapCount} huecos</Badge>}
           {entry.bridgeScore >= 0.45 && <Badge color="indigo">puente</Badge>}
         </div>
-        <p className="text-xs text-neutral-400 mt-2">{entry.reason}</p>
+        <p className="text-xs text-neutral-400 mt-2 line-clamp-2">{entry.reason}</p>
         {entry.relatedGaps.length > 0 && (
-          <div className="mt-2 text-xs text-neutral-500">
+          <div className="mt-2 text-xs text-neutral-500 line-clamp-1">
             Huecos relacionados: {entry.relatedGaps.map((g) => g.slice(0, 120)).join(' · ')}
           </div>
         )}
@@ -244,7 +250,7 @@ function ReadingEntryCard({
           </button>
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 

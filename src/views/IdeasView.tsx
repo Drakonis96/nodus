@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
+import { VirtualList } from '../components/VirtualList';
 import { useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -10,6 +11,7 @@ import {
 } from '../navigation';
 
 type SortKey = 'label' | 'type' | 'works' | 'confidence';
+const IDEA_ROW_HEIGHT = 116;
 
 export function IdeasView({
   onOpenGraph,
@@ -124,59 +126,65 @@ export function IdeasView({
   return (
     <div className="h-full flex min-h-0">
       {/* List */}
-      <div className="flex-1 min-w-0 overflow-y-auto p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Icon name="bulb" size={22} className="text-indigo-300" />
-          <h1 className="text-xl font-semibold">Ideas</h1>
-          <span className="text-sm text-neutral-500">{ideaNodes.length} ideas extraídas</span>
-        </div>
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        <div className="p-6 pb-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Icon name="bulb" size={22} className="text-indigo-300" />
+            <h1 className="text-xl font-semibold">Ideas</h1>
+            <span className="text-sm text-neutral-500">{ideaNodes.length} ideas extraídas</span>
+          </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
-          <input
-            className="input text-sm w-60"
-            placeholder="Buscar ideas…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <select
-            className="input text-sm"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as IdeaType | '')}
-          >
-            <option value="">Todos los tipos</option>
-            {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((t) => (
-              <option key={t} value={t}>{NODE_LABELS[t]}</option>
-            ))}
-          </select>
-          <select
-            className="input text-sm"
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-          >
-            <option value="label">Ordenar: nombre</option>
-            <option value="type">Ordenar: tipo</option>
-            <option value="works">Ordenar: obras</option>
-            <option value="confidence">Ordenar: confianza</option>
-          </select>
+          {/* Filters */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              className="input text-sm w-60"
+              placeholder="Buscar ideas…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <select
+              className="input text-sm"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as IdeaType | '')}
+            >
+              <option value="">Todos los tipos</option>
+              {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((t) => (
+                <option key={t} value={t}>{NODE_LABELS[t]}</option>
+              ))}
+            </select>
+            <select
+              className="input text-sm"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <option value="label">Ordenar: nombre</option>
+              <option value="type">Ordenar: tipo</option>
+              <option value="works">Ordenar: obras</option>
+              <option value="confidence">Ordenar: confianza</option>
+            </select>
+          </div>
         </div>
 
         {/* Idea cards */}
-        <div className="space-y-2">
-          {filtered.length === 0 && (
+        <VirtualList
+          items={filtered}
+          itemHeight={IDEA_ROW_HEIGHT}
+          getKey={(node) => node.id}
+          className="flex-1 min-h-0 px-6 pb-6"
+          empty={
             <div className="text-neutral-500 text-sm">
               {ideaNodes.length === 0
                 ? 'Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.'
                 : 'Sin resultados para los filtros actuales.'}
             </div>
-          )}
-          {filtered.map((node) => {
+          }
+          renderItem={(node) => {
             const degree = (edgesByNode.get(node.id) ?? []).length;
             const isSelected = node.id === selectedId;
             return (
               <button
                 key={node.id}
-                className={`card p-3 w-full text-left transition-colors ${
+                className={`card p-3 w-full h-[104px] text-left transition-colors ${
                   isSelected ? 'ring-1 ring-indigo-500 bg-neutral-800/80' : 'hover:bg-neutral-800/50'
                 }`}
                 onClick={() => setSelectedId(node.id)}
@@ -196,15 +204,15 @@ export function IdeasView({
                       <span>{degree} conexión(es)</span>
                       <span>conf {node.maxConfidence.toFixed(2)}</span>
                       {node.themes.length > 0 && (
-                        <span className="text-neutral-600">{node.themes.join(', ')}</span>
+                        <span className="min-w-0 truncate text-neutral-600">{node.themes.join(', ')}</span>
                       )}
                     </div>
                   </div>
                 </div>
               </button>
             );
-          })}
-        </div>
+          }}
+        />
       </div>
 
       {/* Detail panel */}

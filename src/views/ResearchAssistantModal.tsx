@@ -12,7 +12,8 @@ import { Icon, modelLabel } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
-import type { AssistantNavigationTarget } from '../navigation';
+import { VirtualList } from '../components/VirtualList';
+import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -48,6 +49,118 @@ const ALL_SELECTION: ResearchContextSelection = {
   },
 };
 
+type AssistantModeId = 'synthesis' | 'gaps' | 'contradictions' | 'reading' | 'authors' | 'documents';
+type ActiveAssistantModeId = AssistantModeId | 'custom';
+
+const AUTHOR_SELECTION: ResearchContextSelection = {
+  ideas: false,
+  themes: true,
+  contradictions: false,
+  gaps: false,
+  readingPath: false,
+  authors: true,
+  documents: true,
+  graph: true,
+  graphParts: {
+    ideaNodes: false,
+    themeNodes: false,
+    ideaEdges: false,
+    authorGraph: true,
+  },
+};
+
+const DOCUMENT_SELECTION: ResearchContextSelection = {
+  ideas: true,
+  themes: true,
+  contradictions: false,
+  gaps: false,
+  readingPath: false,
+  authors: false,
+  documents: true,
+  graph: false,
+  graphParts: {
+    ideaNodes: false,
+    themeNodes: false,
+    ideaEdges: false,
+    authorGraph: false,
+  },
+};
+
+const SYNTHESIS_SELECTION: ResearchContextSelection = {
+  ideas: true,
+  themes: true,
+  contradictions: true,
+  gaps: true,
+  readingPath: false,
+  authors: false,
+  documents: false,
+  graph: true,
+  graphParts: {
+    ideaNodes: true,
+    themeNodes: true,
+    ideaEdges: true,
+    authorGraph: false,
+  },
+};
+
+const ASSISTANT_MODES: {
+  id: AssistantModeId;
+  label: string;
+  icon: string;
+  description: string;
+  selection: ResearchContextSelection;
+  starter: string;
+}[] = [
+  {
+    id: 'synthesis',
+    label: 'Síntesis',
+    icon: 'layers',
+    description: 'Ideas, temas, tensiones y estructura del grafo.',
+    selection: SYNTHESIS_SELECTION,
+    starter: 'Dame una síntesis crítica del corpus: líneas principales, tensiones, huecos y próximos pasos.',
+  },
+  {
+    id: 'gaps',
+    label: 'Huecos',
+    icon: 'gap',
+    description: 'Preguntas abiertas, limitaciones y trabajo futuro.',
+    selection: ASSISTANT_CONTEXTS.gap,
+    starter: 'Prioriza los huecos de investigación del corpus y propón cómo atacarlos con lecturas o análisis.',
+  },
+  {
+    id: 'contradictions',
+    label: 'Contradicciones',
+    icon: 'alert',
+    description: 'Refutaciones, tensiones y evidencia asociada.',
+    selection: ASSISTANT_CONTEXTS.contradiction,
+    starter: 'Resume las contradicciones más relevantes y distingue tensiones reales de diferencias de marco o método.',
+  },
+  {
+    id: 'reading',
+    label: 'Lecturas',
+    icon: 'route',
+    description: 'Ruta de lectura, documentos, autores y grafo completo.',
+    selection: ASSISTANT_CONTEXTS.reading,
+    starter: 'Construye una ruta de lectura razonada para avanzar en la investigación y explica la prioridad de cada bloque.',
+  },
+  {
+    id: 'authors',
+    label: 'Autores',
+    icon: 'graduation',
+    description: 'Autores, documentos y red autoral.',
+    selection: AUTHOR_SELECTION,
+    starter: 'Analiza los autores centrales, sus relaciones y qué zonas del corpus dependen de cada grupo autoral.',
+  },
+  {
+    id: 'documents',
+    label: 'Documentos',
+    icon: 'book',
+    description: 'Obras relacionadas, ideas y temas sin grafo completo.',
+    selection: DOCUMENT_SELECTION,
+    starter: 'Compara los documentos más relevantes y señala qué aporta cada uno al argumento general.',
+  },
+];
+
 interface UiMessage extends ChatMessageRecord {
   id: string;
 }
@@ -61,10 +174,11 @@ export function ResearchAssistantModal({
   initialTarget?: AssistantNavigationTarget | null;
   onClose: () => void;
 }) {
-  const [selection, setSelection] = useState<ResearchContextSelection>(DEFAULT_SELECTION);
+  const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [contextTitle, setContextTitle] = useState<string | null>(null);
+  const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
   const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [sending, setSending] = useState(false);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
@@ -123,11 +237,18 @@ export function ResearchAssistantModal({
     setSelection((current) => ({ ...current, graphParts: { ...current.graphParts, [key]: value } }));
   };
 
+  const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
+    setActiveModeId(mode.id);
+    setSelection(cloneSelection(mode.selection));
+    setContextTitle(mode.label);
+    if (!input.trim()) setInput(mode.starter);
+  };
+
   const startNewConversation = () => {
     setActiveId(null);
     setMessages([]);
     setInput('');
-    setContextTitle(null);
+    setContextTitle(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? null);
   };
 
   useEffect(() => {
@@ -136,7 +257,8 @@ export function ResearchAssistantModal({
     setActiveId(null);
     setMessages([]);
     setContextTitle(initialTarget.title ?? null);
-    if (initialTarget.selection) setSelection(initialTarget.selection);
+    setActiveModeId('custom');
+    if (initialTarget.selection) setSelection(cloneSelection(initialTarget.selection));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
   }, [initialTarget]);
 
@@ -149,8 +271,9 @@ export function ResearchAssistantModal({
     }
     setActiveId(conversation.id);
     setMessages(conversation.messages.map((m) => ({ ...m, id: m.id || crypto.randomUUID() })));
-    if (conversation.selection) setSelection(conversation.selection);
+    if (conversation.selection) setSelection(cloneSelection(conversation.selection));
     if (conversation.model) setSelectedModel(conversation.model);
+    setContextTitle(null);
     setInput('');
     window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 0);
   };
@@ -254,6 +377,7 @@ export function ResearchAssistantModal({
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
+  const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
@@ -300,23 +424,28 @@ export function ResearchAssistantModal({
                 <Icon name="plus" /> Nueva conversación
               </button>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
-              {visibleConversations.length === 0 && (
+            <VirtualList
+              items={visibleConversations}
+              itemHeight={58}
+              getKey={(conversation) => conversation.id}
+              className="flex-1 min-h-0 p-2"
+              empty={
                 <div className="text-xs text-neutral-600 text-center py-6 px-2">
                   Aún no hay conversaciones. Escribe abajo para empezar.
                 </div>
+              }
+              renderItem={(conversation) => (
+                <div className="h-[52px]">
+                  <ConversationRow
+                    conversation={conversation}
+                    active={conversation.id === activeId}
+                    onOpen={() => void loadConversation(conversation.id)}
+                    onArchive={() => void archiveConversation(conversation)}
+                    onDelete={() => setPendingDelete(conversation)}
+                  />
+                </div>
               )}
-              {visibleConversations.map((conversation) => (
-                <ConversationRow
-                  key={conversation.id}
-                  conversation={conversation}
-                  active={conversation.id === activeId}
-                  onOpen={() => void loadConversation(conversation.id)}
-                  onArchive={() => void archiveConversation(conversation)}
-                  onDelete={() => setPendingDelete(conversation)}
-                />
-              ))}
-            </div>
+            />
             {archivedCount > 0 && (
               <button
                 className="text-xs text-neutral-500 hover:text-neutral-300 px-3 py-2 border-t border-neutral-800 text-left flex items-center gap-1.5"
@@ -334,11 +463,48 @@ export function ResearchAssistantModal({
               <h2 className="text-sm font-semibold">Contexto</h2>
               <span className="text-xs text-neutral-500">{selectedCount}</span>
             </div>
+            <div className="mb-4">
+              <div className="text-[11px] uppercase text-neutral-500 mb-2">Modo</div>
+              <div className="grid grid-cols-1 gap-1.5">
+                {ASSISTANT_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
+                      activeModeId === mode.id
+                        ? 'border-indigo-700 bg-indigo-950/35'
+                        : 'border-neutral-800 hover:bg-neutral-900'
+                    }`}
+                    title={mode.description}
+                    onClick={() => applyMode(mode)}
+                  >
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <Icon name={mode.icon} size={13} className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'} />
+                      <span>{mode.label}</span>
+                    </div>
+                    <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{mode.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="mb-3 flex gap-2">
-              <button className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1" onClick={() => setSelection(ALL_SELECTION)}>
+              <button
+                className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
+                onClick={() => {
+                  setActiveModeId('custom');
+                  setContextTitle('Todo');
+                  setSelection(cloneSelection(ALL_SELECTION));
+                }}
+              >
                 Todo
               </button>
-              <button className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1" onClick={() => setSelection(DEFAULT_SELECTION)}>
+              <button
+                className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
+                onClick={() => {
+                  setActiveModeId('custom');
+                  setContextTitle('Manual');
+                  setSelection(cloneSelection(DEFAULT_SELECTION));
+                }}
+              >
                 Nada
               </button>
             </div>
@@ -425,7 +591,7 @@ export function ResearchAssistantModal({
                 <textarea
                   className="input flex-1 min-h-[44px] max-h-32 resize-none"
                   value={input}
-                  placeholder="Pregunta al asistente..."
+                  placeholder={activeMode?.starter ?? 'Pregunta al asistente...'}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -560,6 +726,13 @@ function parseModel(value: string): ModelRef {
 
 function sameModelRef(a: ModelRef, b: ModelRef): boolean {
   return a.provider === b.provider && a.model === b.model;
+}
+
+function cloneSelection(selection: ResearchContextSelection): ResearchContextSelection {
+  return {
+    ...selection,
+    graphParts: { ...selection.graphParts },
+  };
 }
 
 function formatChars(chars: number): string {
