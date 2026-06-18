@@ -47,6 +47,15 @@ const EMPTY_SELECTION: WritingWorkshopSelection = {
 
 type MaterialTab = 'ideas' | 'themes' | 'gaps' | 'contradictions' | 'works' | 'routes';
 
+const TAB_SELECTION_KEYS: Record<MaterialTab, keyof WritingWorkshopSelection> = {
+  ideas: 'ideaIds',
+  themes: 'themeIds',
+  gaps: 'gapIds',
+  contradictions: 'contradictionIds',
+  works: 'workIds',
+  routes: 'tutorRouteIds',
+};
+
 export function WritingWorkshopView({
   settings,
   onOpenGraph,
@@ -66,6 +75,7 @@ export function WritingWorkshopView({
   const [activeTab, setActiveTab] = useState<MaterialTab>('ideas');
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [showTutorial, setShowTutorial] = useState(true);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -73,6 +83,9 @@ export function WritingWorkshopView({
   const [error, setError] = useState<string | null>(null);
 
   const selectedCount = useMemo(() => countSelection(selection), [selection]);
+  const tableCount = useMemo(() => (snapshot ? countSnapshot(snapshot) : 0), [snapshot]);
+  const activeTabTotal = snapshot ? candidateIdsForTab(snapshot, activeTab).length : 0;
+  const activeTabSelected = selection[TAB_SELECTION_KEYS[activeTab]].length;
   const hasModel = !!selectedModel;
 
   const prepare = async () => {
@@ -146,6 +159,31 @@ export function WritingWorkshopView({
     setSelection(snapshot.recommendedSelection);
   };
 
+  const selectAllMaterials = () => {
+    if (!snapshot) return;
+    setSelection(selectionFromSnapshot(snapshot));
+  };
+
+  const selectAllIdeas = () => {
+    if (!snapshot) return;
+    setSelection((current) => ({ ...current, ideaIds: snapshot.ideas.map((item) => item.id) }));
+  };
+
+  const clearIdeas = () => {
+    setSelection((current) => ({ ...current, ideaIds: [] }));
+  };
+
+  const selectActiveTab = () => {
+    if (!snapshot) return;
+    const key = TAB_SELECTION_KEYS[activeTab];
+    setSelection((current) => ({ ...current, [key]: candidateIdsForTab(snapshot, activeTab) }));
+  };
+
+  const clearActiveTab = () => {
+    const key = TAB_SELECTION_KEYS[activeTab];
+    setSelection((current) => ({ ...current, [key]: [] }));
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0">
       <header className="border-b border-neutral-800 p-4 flex flex-wrap items-end gap-3">
@@ -188,6 +226,10 @@ export function WritingWorkshopView({
         </select>
         <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact />
         <div className="flex-1" />
+        <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setShowTutorial((value) => !value)}>
+          <Icon name="help" />
+          {showTutorial ? 'Ocultar tutorial' : 'Tutorial'}
+        </button>
         <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={prepare} disabled={loadingMaterials}>
           <Icon name={loadingMaterials ? 'sync' : 'search'} className={loadingMaterials ? 'animate-spin' : ''} />
           Preparar mesa
@@ -213,12 +255,26 @@ export function WritingWorkshopView({
         <div className="flex flex-wrap gap-2 mt-2 text-xs text-neutral-500">
           {snapshot && (
             <>
-              <Badge>{selectedCount} materiales seleccionados</Badge>
-              <Badge>{snapshot.stats.ideas} ideas</Badge>
+              <Badge>
+                {selection.ideaIds.length}/{snapshot.ideas.length} ideas en mesa
+              </Badge>
+              <Badge>{snapshot.stats.ideas} ideas en el grafo</Badge>
+              <Badge>
+                {selectedCount}/{tableCount} materiales seleccionados
+              </Badge>
               <Badge>{snapshot.stats.gaps} huecos</Badge>
               <Badge>{snapshot.stats.contradictions} contradicciones</Badge>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={applyRecommended}>
                 Recomendados
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={selectAllMaterials}>
+                Toda la mesa
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={selectAllIdeas}>
+                Todas las ideas
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={clearIdeas}>
+                Vaciar ideas
               </button>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={() => setSelection(EMPTY_SELECTION)}>
                 Vaciar
@@ -229,6 +285,8 @@ export function WritingWorkshopView({
         </div>
       </div>
 
+      {showTutorial && <WritingWorkshopTutorial />}
+
       {(message || error) && (
         <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-900 bg-red-950/30 text-red-200' : 'border-neutral-800 text-neutral-400'}`}>
           {error ?? message}
@@ -238,13 +296,41 @@ export function WritingWorkshopView({
       <div className="flex-1 min-h-0 grid grid-cols-[22rem_minmax(0,1fr)_24rem] max-xl:grid-cols-1">
         <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
           <div className="p-3 border-b border-neutral-800 grid grid-cols-3 gap-1 text-xs">
-            <TabButton id="ideas" active={activeTab} setActive={setActiveTab} label={`Ideas ${selection.ideaIds.length}`} />
-            <TabButton id="themes" active={activeTab} setActive={setActiveTab} label={`Temas ${selection.themeIds.length}`} />
-            <TabButton id="gaps" active={activeTab} setActive={setActiveTab} label={`Huecos ${selection.gapIds.length}`} />
-            <TabButton id="contradictions" active={activeTab} setActive={setActiveTab} label={`Contrad. ${selection.contradictionIds.length}`} />
-            <TabButton id="works" active={activeTab} setActive={setActiveTab} label={`Obras ${selection.workIds.length}`} />
-            <TabButton id="routes" active={activeTab} setActive={setActiveTab} label={`Rutas ${selection.tutorRouteIds.length}`} />
+            <TabButton id="ideas" active={activeTab} setActive={setActiveTab} label={tabLabel('Ideas', selection.ideaIds.length, snapshot?.ideas.length)} />
+            <TabButton id="themes" active={activeTab} setActive={setActiveTab} label={tabLabel('Temas', selection.themeIds.length, snapshot?.themes.length)} />
+            <TabButton id="gaps" active={activeTab} setActive={setActiveTab} label={tabLabel('Huecos', selection.gapIds.length, snapshot?.gaps.length)} />
+            <TabButton
+              id="contradictions"
+              active={activeTab}
+              setActive={setActiveTab}
+              label={tabLabel('Contrad.', selection.contradictionIds.length, snapshot?.contradictions.length)}
+            />
+            <TabButton id="works" active={activeTab} setActive={setActiveTab} label={tabLabel('Obras', selection.workIds.length, snapshot?.works.length)} />
+            <TabButton
+              id="routes"
+              active={activeTab}
+              setActive={setActiveTab}
+              label={tabLabel('Rutas', selection.tutorRouteIds.length, snapshot?.tutorRoutes.length)}
+            />
           </div>
+          {snapshot && (
+            <div className="px-3 py-2 border-b border-neutral-800 text-xs text-neutral-500 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <span>
+                  {activeTabSelected}/{activeTabTotal} en esta pestaña
+                </span>
+                <span>{selection.ideaIds.length} ideas seleccionadas</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button className="btn btn-ghost border border-neutral-700 py-1 text-xs gap-1" onClick={selectActiveTab}>
+                  <Icon name="check" size={13} /> Seleccionar
+                </button>
+                <button className="btn btn-ghost border border-neutral-700 py-1 text-xs gap-1" onClick={clearActiveTab}>
+                  <Icon name="minus" size={13} /> Vaciar
+                </button>
+              </div>
+            </div>
+          )}
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
             {!snapshot && (
               <div className="text-sm text-neutral-500 p-3">
@@ -376,6 +462,47 @@ export function WritingWorkshopView({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function WritingWorkshopTutorial() {
+  return (
+    <section className="border-b border-neutral-800 bg-neutral-950/80 px-4 py-3">
+      <div className="grid grid-cols-4 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
+        <TutorialStep
+          icon="search"
+          title="1. Delimita"
+          body="Escribe el apartado que quieres construir: pregunta, capítulo, debate, hueco o marco teórico. Cuanto más concreto sea el objetivo, mejor se ordena la mesa."
+        />
+        <TutorialStep
+          icon="layers"
+          title="2. Monta la mesa"
+          body="Pulsa Preparar mesa y revisa ideas, temas, huecos, contradicciones, obras y rutas. Usa Todas las ideas cuando quieras una revisión amplia del corpus encontrado."
+        />
+        <TutorialStep
+          icon="check"
+          title="3. Decide el foco"
+          body="Selecciona todo para explorar, vacía para empezar de cero o ajusta cada pestaña. La matriz final te dirá qué papel cumple cada material en el argumento."
+        />
+        <TutorialStep
+          icon="edit"
+          title="4. Convierte en texto"
+          body="Genera el borrador, abre las citas para verificar fuentes y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito."
+        />
+      </div>
+    </section>
+  );
+}
+
+function TutorialStep({ icon, title, body }: { icon: string; title: string; body: string }) {
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-900/60 p-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-neutral-200">
+        <Icon name={icon} size={14} className="text-indigo-300" />
+        {title}
+      </div>
+      <p className="mt-1 text-xs leading-5 text-neutral-500">{body}</p>
     </div>
   );
 }
@@ -550,6 +677,49 @@ function countSelection(selection: WritingWorkshopSelection): number {
     selection.workIds.length +
     selection.tutorRouteIds.length
   );
+}
+
+function countSnapshot(snapshot: WritingWorkshopSnapshot): number {
+  return (
+    snapshot.ideas.length +
+    snapshot.themes.length +
+    snapshot.gaps.length +
+    snapshot.contradictions.length +
+    snapshot.works.length +
+    snapshot.tutorRoutes.length
+  );
+}
+
+function selectionFromSnapshot(snapshot: WritingWorkshopSnapshot): WritingWorkshopSelection {
+  return {
+    ideaIds: snapshot.ideas.map((item) => item.id),
+    themeIds: snapshot.themes.map((item) => item.id),
+    gapIds: snapshot.gaps.map((item) => item.id),
+    contradictionIds: snapshot.contradictions.map((item) => item.id),
+    workIds: snapshot.works.map((item) => item.id),
+    tutorRouteIds: snapshot.tutorRoutes.map((item) => item.id),
+  };
+}
+
+function candidateIdsForTab(snapshot: WritingWorkshopSnapshot, tab: MaterialTab): string[] {
+  switch (tab) {
+    case 'ideas':
+      return snapshot.ideas.map((item) => item.id);
+    case 'themes':
+      return snapshot.themes.map((item) => item.id);
+    case 'gaps':
+      return snapshot.gaps.map((item) => item.id);
+    case 'contradictions':
+      return snapshot.contradictions.map((item) => item.id);
+    case 'works':
+      return snapshot.works.map((item) => item.id);
+    case 'routes':
+      return snapshot.tutorRoutes.map((item) => item.id);
+  }
+}
+
+function tabLabel(label: string, selected: number, total?: number): string {
+  return total === undefined ? `${label} ${selected}` : `${label} ${selected}/${total}`;
 }
 
 function matrixColor(role: WritingWorkshopDraft['matrix'][number]['role']): 'neutral' | 'indigo' | 'green' | 'amber' | 'red' | 'cyan' {

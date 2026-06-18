@@ -21,13 +21,13 @@ import { getContradictions } from '../graph/graphService';
 import { listTutorRoutes } from '../db/tutorRepo';
 import { completeJson } from './aiClient';
 
-const MAX_IDEAS = 36;
-const MAX_THEMES = 18;
-const MAX_GAPS = 24;
-const MAX_CONTRADICTIONS = 18;
-const MAX_WORKS = 36;
+const MAX_IDEAS = 120;
+const MAX_THEMES = 30;
+const MAX_GAPS = 36;
+const MAX_CONTRADICTIONS = 30;
+const MAX_WORKS = 80;
 const MAX_ROUTES = 12;
-const MAX_CONTEXT_CHARS = 260_000;
+const MAX_CONTEXT_CHARS = 420_000;
 
 interface Scored<T> {
   item: T;
@@ -158,6 +158,13 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     'Debes escribir en espanol salvo que el campo language pida otra lengua.',
     'Usa SOLO los materiales recibidos. No inventes obras, autores, citas, paginas ni relaciones.',
     'Cada afirmacion sustantiva del borrador debe ir ligada a una fuente mediante enlaces Markdown nodus://.',
+    'El objetivo NO es una respuesta breve: entrega un borrador desarrollado, pegable en un capitulo o articulo.',
+    'Integra de forma explicita todas las ideas seleccionadas que puedas sostener con el contexto. Si hay muchas, agrupalas en lineas argumentales, pero no las reduzcas a una lista.',
+    'Relaciona las ideas entre si: muestra continuidad, diferencias, niveles de abstraccion, consecuencias metodologicas, contradicciones y huecos.',
+    'Escribe en Markdown real: usa ## para secciones, ### para subsecciones, parrafos completos y listas solo para sintesis, pasos o matriz.',
+    'Cada seccion sustantiva debe tener 2-4 parrafos desarrollados. Evita parrafos de una sola frase.',
+    'Longitud orientativa del draftMarkdown: 700-1000 palabras si hay pocas ideas, 1200-1800 si hay 8-20 ideas, y 1800-3000 si hay mas de 20 ideas y el contexto lo permite.',
+    'La matriz debe cubrir las ideas y tensiones principales; si una idea seleccionada no entra en el borrador, incluyela en matrix o limitations explicando por que.',
     'Formatos de cita permitidos:',
     '- Ideas: [Autor, año](nodus://idea/<global_id>)',
     '- Obras: [Autor, año](nodus://work/<nodus_id>)',
@@ -189,7 +196,7 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
         system,
         user,
         temperature: 0.18,
-        maxTokens: 10000,
+        maxTokens: 16000,
       },
       isAiWorkshopResult,
       request.model
@@ -198,7 +205,7 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     return structuralFallback(request.brief, selection, context);
   }
 
-  return sanitizeDraft(ai, request.brief, selection, context.stats);
+  return sanitizeDraft(ai, request.brief, selection, context);
 }
 
 function countTable(table: string): number {
@@ -775,12 +782,14 @@ function selectedRoutes(ids: string[]) {
 function trimContext<T extends Record<string, any>>(context: T): T {
   return {
     ...context,
-    ideas: context.ideas.slice(0, 24).map((idea: any) => ({ ...idea, evidencia: idea.evidencia?.slice(0, 3) ?? [] })),
-    temas: context.temas.slice(0, 10),
-    huecos: context.huecos.slice(0, 14),
-    contradicciones: context.contradicciones.slice(0, 10),
-    obras: context.obras.slice(0, 24),
-    rutas_tutor: context.rutas_tutor.slice(0, 3).map((route: any) => ({ ...route, paradas: route.paradas.slice(0, 18) })),
+    ideas: context.ideas
+      .slice(0, 96)
+      .map((idea: any) => ({ ...idea, obras: idea.obras?.slice(0, 3) ?? [], evidencia: idea.evidencia?.slice(0, 2) ?? [] })),
+    temas: context.temas.slice(0, 18).map((theme: any) => ({ ...theme, ideas_muestra: theme.ideas_muestra?.slice(0, 8) ?? [] })),
+    huecos: context.huecos.slice(0, 20),
+    contradicciones: context.contradicciones.slice(0, 16),
+    obras: context.obras.slice(0, 42),
+    rutas_tutor: context.rutas_tutor.slice(0, 4).map((route: any) => ({ ...route, paradas: route.paradas.slice(0, 22) })),
   };
 }
 
@@ -788,8 +797,9 @@ function sanitizeDraft(
   ai: AiWorkshopResult,
   brief: WritingWorkshopBrief,
   selection: WritingWorkshopSelection,
-  stats: WritingWorkshopDraft['stats']
+  context: ReturnType<typeof buildSelectedContext>
 ): WritingWorkshopDraft {
+  const draftMarkdown = ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context);
   return {
     generatedAt: new Date().toISOString(),
     brief,
@@ -797,12 +807,12 @@ function sanitizeDraft(
     title: cleanString(ai.title, 'Borrador de escritura'),
     abstract: cleanString(ai.abstract, ''),
     outline: sanitizeOutline(ai.outline),
-    draftMarkdown: cleanString(ai.draftMarkdown, ''),
+    draftMarkdown,
     matrix: sanitizeMatrix(ai.matrix),
     bibliography: stringList(ai.bibliography),
     nextSteps: stringList(ai.nextSteps),
     limitations: stringList(ai.limitations),
-    stats,
+    stats: context.stats,
   };
 }
 
@@ -859,26 +869,32 @@ function structuralFallback(
     })),
   ];
   const draftMarkdown = [
-    `# ${title}`,
+    `## ${title}`,
     '',
     '## Planteamiento',
-    ideas.length
-      ? ideas
-          .slice(0, 4)
-          .map((idea) => `- ${idea.enunciado} ${citationMarkdown(idea.obras?.[0], idea.cita)}`)
-          .join('\n')
-      : 'No hay ideas seleccionadas suficientes para desarrollar este apartado.',
+    ideas.length ? narrativeParagraph(ideas.slice(0, 5), 'El punto de partida del corpus es que') : 'No hay ideas seleccionadas suficientes para desarrollar este apartado.',
     '',
-    '## Debate y matices',
+    '## Lineas de desarrollo',
+    ...ideaDevelopmentSections(ideas.slice(5)),
+    '',
+    '## Debate, matices y tensiones',
     contradictions.length
       ? contradictions
           .slice(0, 4)
-          .map((c) => `- ${c.explicacion ?? `${c.desde} / ${c.hacia}`} [contradicción](${c.cita})`)
-          .join('\n')
+          .map(
+            (c) =>
+              `La relacion entre ${c.desde} y ${c.hacia} introduce un matiz critico: ${c.explicacion ?? `${c.desde} / ${c.hacia}`} [contradiccion](${c.cita}).`
+          )
+          .join('\n\n')
       : 'No hay contradicciones seleccionadas.',
     '',
     '## Hueco y contribución',
-    gaps.length ? gaps.slice(0, 4).map((g) => `- ${g.enunciado} [hueco](${g.cita})`).join('\n') : 'No hay huecos seleccionados.',
+    gaps.length
+      ? gaps
+          .slice(0, 5)
+          .map((g) => `Este recorrido deja visible un hueco de investigacion: ${g.enunciado} [hueco](${g.cita}).`)
+          .join('\n\n')
+      : 'No hay huecos seleccionados.',
   ].join('\n');
 
   return {
@@ -903,7 +919,7 @@ function sanitizeOutline(items: AiWorkshopResult['outline']): WritingWorkshopSec
     id: cleanString(item.id, `s${index + 1}`),
     title: cleanString(item.title, `Sección ${index + 1}`),
     purpose: cleanString(item.purpose, ''),
-    keyClaims: stringList(item.keyClaims).slice(0, 8),
+    keyClaims: stringList(item.keyClaims).slice(0, 12),
     sources: stringList(item.sources).slice(0, 12),
   }));
 }
@@ -911,7 +927,7 @@ function sanitizeOutline(items: AiWorkshopResult['outline']): WritingWorkshopSec
 function sanitizeMatrix(items: AiWorkshopResult['matrix']): WritingWorkshopMatrixRow[] {
   if (!Array.isArray(items)) return [];
   const roles = new Set<WritingWorkshopMatrixRow['role']>(['support', 'contrast', 'gap', 'method', 'definition', 'context']);
-  return items.slice(0, 60).map((item) => {
+  return items.slice(0, 90).map((item) => {
     const role = roles.has(item.role as WritingWorkshopMatrixRow['role'])
       ? (item.role as WritingWorkshopMatrixRow['role'])
       : 'support';
@@ -924,6 +940,75 @@ function sanitizeMatrix(items: AiWorkshopResult['matrix']): WritingWorkshopMatri
       notes: cleanString(item.notes, ''),
     };
   });
+}
+
+function ensureSubstantialMarkdown(
+  draftMarkdown: string,
+  brief: WritingWorkshopBrief,
+  context: ReturnType<typeof buildSelectedContext>
+): string {
+  const clean = draftMarkdown.trim();
+  const payload = context.payload as any;
+  const ideas = ((payload.ideas ?? []) as any[]).filter((idea) => idea?.enunciado);
+  const gaps = ((payload.huecos ?? []) as any[]).filter((gap) => gap?.enunciado);
+  const contradictions = ((payload.contradicciones ?? []) as any[]).filter((item) => item?.desde || item?.hacia || item?.explicacion);
+  const minimumChars = ideas.length >= 20 ? 9000 : ideas.length >= 8 ? 5500 : 2600;
+  if (clean.length >= minimumChars || ideas.length === 0) return clean;
+
+  const supplement = [
+    '',
+    '## Desarrollo ampliado de las ideas seleccionadas',
+    `El objetivo de este ${kindLabel(brief.kind)} exige que las ideas no queden como notas sueltas, sino como una secuencia argumental. ${narrativeParagraph(
+      ideas.slice(0, 5),
+      'En primer lugar, el corpus permite sostener que'
+    )}`,
+    '',
+    ...ideaDevelopmentSections(ideas.slice(5)),
+    gaps.length ? '## Huecos que orientan la contribución' : '',
+    gaps.length
+      ? gaps
+          .slice(0, 6)
+          .map((gap) => `Este desarrollo abre una pregunta especifica: ${gap.enunciado} [hueco](${gap.cita}).`)
+          .join('\n\n')
+      : '',
+    contradictions.length ? '## Tensiones interpretativas' : '',
+    contradictions.length
+      ? contradictions
+          .slice(0, 5)
+          .map(
+            (item) =>
+              `La relacion entre ${item.desde ?? 'una idea'} y ${item.hacia ?? 'otra idea'} obliga a matizar el argumento: ${item.explicacion ?? 'hay una tension registrada en el grafo'} [contradiccion](${item.cita}).`
+          )
+          .join('\n\n')
+      : '',
+  ].filter(Boolean);
+
+  return [clean, ...supplement].join('\n');
+}
+
+function ideaDevelopmentSections(ideas: any[]): string[] {
+  const sections: string[] = [];
+  let sectionNumber = 1;
+  for (let i = 0; i < ideas.length; i += 5) {
+    const chunk = ideas.slice(i, i + 5);
+    if (chunk.length === 0) continue;
+    const isFirst = sectionNumber === 1;
+    sections.push(`### Linea ${sectionNumber}`);
+    sections.push(narrativeParagraph(chunk, isFirst ? 'A partir de esa base, otra linea del corpus muestra que' : 'La linea se completa cuando'));
+    sections.push('');
+    sectionNumber += 1;
+  }
+  return sections;
+}
+
+function narrativeParagraph(ideas: any[], opener: string): string {
+  const clauses = ideas
+    .filter((idea) => idea?.enunciado)
+    .map((idea) => `${idea.enunciado} ${citationMarkdown(idea.obras?.[0], idea.cita)}`);
+  if (clauses.length === 0) return 'No hay ideas suficientes para desarrollar esta linea.';
+  if (clauses.length === 1) return `${opener} ${clauses[0]}.`;
+  const [first, ...rest] = clauses;
+  return `${opener} ${first}. Esto se conecta con ${rest.join('; y, a la vez, con ')}. En conjunto, estas ideas no deben leerse como evidencias aisladas, sino como piezas de una misma arquitectura argumental que permite pasar de la revision del corpus a una posicion propia.`;
 }
 
 function placeholders(values: string[]): string {
