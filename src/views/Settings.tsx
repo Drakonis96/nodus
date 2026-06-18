@@ -14,6 +14,7 @@ const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
 
 export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [saved, setSaved] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<'basic' | 'advanced'>('basic');
   // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
   // freshly generated 4-digit code so it can't be triggered by accident.
   const [resetCode, setResetCode] = useState<string | null>(null);
@@ -101,234 +102,256 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <h1 className="text-xl font-semibold mb-6">Ajustes</h1>
-
-      <ProvidersSettings settings={settings} onChange={onChange} />
-
-      <Section title="IA (avanzado)">
-        <Row label="Modelo de extracción (extrae temas, ideas, evidencias y huecos)">
-          <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
-        </Row>
-        <Row label="Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)">
-          <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
-        </Row>
-        <Row label="Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)">
-          <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
-        </Row>
-        <Row label="Modelo de embeddings (similitud semántica multilingüe)">
-          <EmbeddingModelControl settings={settings} onPatch={patch} />
-        </Row>
-        <Row label="Reindexar embeddings">
-          <button
-            className="btn btn-ghost border border-cyan-800 text-cyan-300"
-            title="Genera embeddings para todas las ideas que aún no los tienen. Útil tras cambiar de modelo de embeddings."
-            onClick={() => {
-              void window.nodus.startEmbedding();
-            }}
-          >
-            <Icon name="search" /> Reindexar todo
-          </button>
-        </Row>
-        <Row label="Llamadas simultáneas">
-          <input
-            type="number"
-            min={1}
-            max={5}
-            className="input w-20"
-            value={settings.concurrency}
-            onChange={(e) => patch({ concurrency: parseInt(e.target.value) || 1 })}
-          />
-        </Row>
-        <Row label="Email Unpaywall (fallback de texto)">
-          <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
-        </Row>
-        <Row label="Modo de contexto deep scan">
-          <select
-            className="input"
-            value={settings.deepContextMode}
-            onChange={(e) => patch({ deepContextMode: e.target.value as AppSettings['deepContextMode'] })}
-          >
-            <option value="standard">Estándar</option>
-            <option value="long">Contexto largo</option>
-          </select>
-        </Row>
-        <Row label="Palabras por fragmento">
-          <input
-            type="number"
-            min={settings.deepContextMode === 'long' ? 5000 : 500}
-            max={settings.deepContextMode === 'long' ? 50000 : 5000}
-            step={settings.deepContextMode === 'long' ? 1000 : 100}
-            className="input w-28"
-            value={activeChunkWords}
-            onChange={(e) => patchActiveChunkWords(e.target.value)}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Zotero y sincronización">
-        <Row label="Modo de sincronización">
-          <select className="input" value={settings.syncMode} onChange={(e) => patch({ syncMode: e.target.value as any })}>
-            <option value="manual">Manual</option>
-            <option value="realtime">Tiempo real</option>
-          </select>
-        </Row>
-        <Row label="Tag de lectura">
-          <input className="input" value={settings.readTag} onChange={(e) => patch({ readTag: e.target.value })} />
-        </Row>
-        <Row label="Ruta de storage de Zotero">
-          <input
-            className="input w-full"
-            value={settings.zoteroStoragePath}
-            onChange={(e) => patch({ zoteroStoragePath: e.target.value })}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Automatización de análisis">
-        <Row label="Analizar temas al sincronizar">
-          <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />
-        </Row>
-        <Row label="Analizar a fondo obras con tag">
-          <input
-            type="checkbox"
-            checked={settings.autoDeepScanOnReadTag}
-            onChange={(e) => patch({ autoDeepScanOnReadTag: e.target.checked })}
-          />
-        </Row>
-        <Row label="Reanudar cola al abrir">
-          <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
-        </Row>
-        <p className="text-xs text-neutral-500">
-          Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.
-        </p>
-      </Section>
-
-      <Section title="Extracción de texto (PDFs grandes)">
-        <Row label="Reusar texto indexado por Zotero">
-          <input
-            type="checkbox"
-            checked={settings.preferZoteroFulltext}
-            onChange={(e) => patch({ preferZoteroFulltext: e.target.checked })}
-          />
-        </Row>
-        <Row label="OCR para PDFs escaneados">
-          <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => patch({ ocrEnabled: e.target.checked })} />
-        </Row>
-        <Row label="Idiomas de OCR (Tesseract)">
-          <input
-            className="input"
-            value={settings.ocrLanguages}
-            onChange={(e) => patch({ ocrLanguages: e.target.value })}
-            placeholder="spa+eng"
-          />
-        </Row>
-        <Row label="Máx. páginas a OCR por obra">
-          <input
-            type="number"
-            min={1}
-            max={2000}
-            className="input w-24"
-            value={settings.ocrMaxPages}
-            onChange={(e) => patch({ ocrMaxPages: parseInt(e.target.value) || 1 })}
-          />
-        </Row>
-        <p className="text-xs text-neutral-500">
-          El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.
-        </p>
-      </Section>
-
-      <Section title="Apariencia">
-        <Row label="Tema">
-          <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
-            <option value="dark">Oscuro</option>
-            <option value="light">Claro</option>
-          </select>
-        </Row>
-        <Row label="Velocidad de animaciones">
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={settings.animationSpeed}
-            onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
-          />
-        </Row>
-      </Section>
-
-      <Section title="Ayuda">
-        <div className="flex items-center justify-between gap-4">
-          <label className="text-sm text-neutral-300">Tutorial de uso</label>
-          <button
-            className="btn btn-ghost border border-neutral-700"
-            onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
-          >
-            <Icon name="help" /> Ver de nuevo
-          </button>
+      <div className="flex flex-wrap items-start gap-4 mb-5">
+        <div>
+          <h1 className="text-xl font-semibold">Ajustes</h1>
+          <p className="text-sm text-neutral-500 mt-1">
+            Lo básico queda separado de los parámetros técnicos de análisis y extracción.
+          </p>
         </div>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <label className="text-sm text-neutral-300">Actualizaciones</label>
-            {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
-            {(updatePct != null || updateBusy) && (
-              <div className="mt-2 w-72 max-w-full">
-                <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
-                  <div
-                    className="h-full bg-indigo-500 transition-all duration-300"
-                    style={{ width: `${updatePct ?? 100}%` }}
-                  />
-                </div>
-                {updateProgress?.bytesPerSecond != null && updateProgress.status === 'downloading' && (
-                  <p className="mt-1 text-[11px] text-neutral-500">
-                    {Math.round(updateProgress.bytesPerSecond / 1024)} KiB/s
-                  </p>
+        <div className="flex-1" />
+        <div className="inline-grid grid-cols-2 rounded-lg border border-neutral-800 bg-neutral-900/50 p-1">
+          <SettingsTabButton active={settingsTab === 'basic'} onClick={() => setSettingsTab('basic')}>
+            Básico
+          </SettingsTabButton>
+          <SettingsTabButton active={settingsTab === 'advanced'} onClick={() => setSettingsTab('advanced')}>
+            Avanzado
+          </SettingsTabButton>
+        </div>
+      </div>
+
+      {settingsTab === 'basic' ? (
+        <>
+          <ProvidersSettings settings={settings} onChange={onChange} />
+
+          <Section title="Zotero y sincronización">
+            <Row label="Modo de sincronización">
+              <select className="input" value={settings.syncMode} onChange={(e) => patch({ syncMode: e.target.value as any })}>
+                <option value="manual">Manual</option>
+                <option value="realtime">Tiempo real</option>
+              </select>
+            </Row>
+            <Row label="Tag de lectura">
+              <input className="input" value={settings.readTag} onChange={(e) => patch({ readTag: e.target.value })} />
+            </Row>
+            <Row label="Ruta de storage de Zotero">
+              <input
+                className="input w-full"
+                value={settings.zoteroStoragePath}
+                onChange={(e) => patch({ zoteroStoragePath: e.target.value })}
+              />
+            </Row>
+          </Section>
+
+          <Section title="Automatización de análisis">
+            <Row label="Analizar temas al sincronizar">
+              <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />
+            </Row>
+            <Row label="Analizar a fondo obras con tag">
+              <input
+                type="checkbox"
+                checked={settings.autoDeepScanOnReadTag}
+                onChange={(e) => patch({ autoDeepScanOnReadTag: e.target.checked })}
+              />
+            </Row>
+            <Row label="Reanudar cola al abrir">
+              <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
+            </Row>
+            <p className="text-xs text-neutral-500">
+              Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.
+            </p>
+          </Section>
+
+          <Section title="Apariencia">
+            <Row label="Tema">
+              <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
+                <option value="dark">Oscuro</option>
+                <option value="light">Claro</option>
+              </select>
+            </Row>
+            <Row label="Velocidad de animaciones">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.1}
+                value={settings.animationSpeed}
+                onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
+              />
+            </Row>
+          </Section>
+
+          <Section title="Ayuda">
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-300">Tutorial de uso</label>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
+              >
+                <Icon name="help" /> Ver de nuevo
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="text-sm text-neutral-300">Actualizaciones</label>
+                {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
+                {(updatePct != null || updateBusy) && (
+                  <div className="mt-2 w-72 max-w-full">
+                    <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 transition-all duration-300"
+                        style={{ width: `${updatePct ?? 100}%` }}
+                      />
+                    </div>
+                    {updateProgress?.bytesPerSecond != null && updateProgress.status === 'downloading' && (
+                      <p className="mt-1 text-[11px] text-neutral-500">
+                        {Math.round(updateProgress.bytesPerSecond / 1024)} KiB/s
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {updateDownloaded && (
-              <button className="btn btn-primary" onClick={installUpdate}>
-                <Icon name="refresh" /> Reiniciar
+              <div className="flex gap-2">
+                {updateDownloaded && (
+                  <button className="btn btn-primary" onClick={installUpdate}>
+                    <Icon name="refresh" /> Reiniciar
+                  </button>
+                )}
+                <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
+                  <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
+                  {checkingUpdate ? 'Buscando…' : updateBusy ? 'Actualizando…' : 'Buscar actualización'}
+                </button>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Datos">
+            <div className="flex gap-2">
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => window.nodus.exportData().then((r) => r && flash(`Exportado: ${r.path}`))}>
+                <Icon name="download" /> Exportar (.nodus)
               </button>
-            )}
-            <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
-              <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
-              {checkingUpdate ? 'Buscando…' : updateBusy ? 'Actualizando…' : 'Buscar actualización'}
-            </button>
-          </div>
-        </div>
-      </Section>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={() => window.nodus.importData().then((r) => flash(r.message))}
+              >
+                <Icon name="upload" /> Importar (.nodus)
+              </button>
+            </div>
+          </Section>
+        </>
+      ) : (
+        <>
+          <Section title="IA avanzada">
+            <Row label="Modelo de extracción (extrae temas, ideas, evidencias y huecos)">
+              <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
+            </Row>
+            <Row label="Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)">
+              <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
+            </Row>
+            <Row label="Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)">
+              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
+            </Row>
+            <Row label="Modelo de embeddings (similitud semántica multilingüe)">
+              <EmbeddingModelControl settings={settings} onPatch={patch} />
+            </Row>
+            <Row label="Reindexar embeddings">
+              <button
+                className="btn btn-ghost border border-cyan-800 text-cyan-300"
+                title="Genera embeddings para todas las ideas que aún no los tienen. Útil tras cambiar de modelo de embeddings."
+                onClick={() => {
+                  void window.nodus.startEmbedding();
+                }}
+              >
+                <Icon name="search" /> Reindexar todo
+              </button>
+            </Row>
+            <Row label="Llamadas simultáneas">
+              <input
+                type="number"
+                min={1}
+                max={5}
+                className="input w-20"
+                value={settings.concurrency}
+                onChange={(e) => patch({ concurrency: parseInt(e.target.value) || 1 })}
+              />
+            </Row>
+            <Row label="Email Unpaywall (fallback de texto)">
+              <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
+            </Row>
+            <Row label="Modo de contexto deep scan">
+              <select
+                className="input"
+                value={settings.deepContextMode}
+                onChange={(e) => patch({ deepContextMode: e.target.value as AppSettings['deepContextMode'] })}
+              >
+                <option value="standard">Estándar</option>
+                <option value="long">Contexto largo</option>
+              </select>
+            </Row>
+            <Row label="Palabras por fragmento">
+              <input
+                type="number"
+                min={settings.deepContextMode === 'long' ? 5000 : 500}
+                max={settings.deepContextMode === 'long' ? 50000 : 5000}
+                step={settings.deepContextMode === 'long' ? 1000 : 100}
+                className="input w-28"
+                value={activeChunkWords}
+                onChange={(e) => patchActiveChunkWords(e.target.value)}
+              />
+            </Row>
+          </Section>
 
-      <Section title="Datos">
-        <div className="flex gap-2">
-          <button className="btn btn-ghost border border-neutral-700" onClick={() => window.nodus.exportData().then((r) => r && flash(`Exportado: ${r.path}`))}>
-            <Icon name="download" /> Exportar (.nodus)
-          </button>
-          <button
-            className="btn btn-ghost border border-neutral-700"
-            onClick={() => window.nodus.importData().then((r) => flash(r.message))}
-          >
-            <Icon name="upload" /> Importar (.nodus)
-          </button>
-        </div>
-      </Section>
-
-      <section className="card p-4 mb-4 border border-red-900/60">
-        <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">Zona de peligro</h2>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <label className="text-sm text-neutral-300">Reinicializar grafo</label>
-            <p className="text-xs text-neutral-500 mt-0.5">
-              Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La
-              biblioteca y los ajustes se conservan.
+          <Section title="Extracción de texto (PDFs grandes)">
+            <Row label="Reusar texto indexado por Zotero">
+              <input
+                type="checkbox"
+                checked={settings.preferZoteroFulltext}
+                onChange={(e) => patch({ preferZoteroFulltext: e.target.checked })}
+              />
+            </Row>
+            <Row label="OCR para PDFs escaneados">
+              <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => patch({ ocrEnabled: e.target.checked })} />
+            </Row>
+            <Row label="Idiomas de OCR (Tesseract)">
+              <input
+                className="input"
+                value={settings.ocrLanguages}
+                onChange={(e) => patch({ ocrLanguages: e.target.value })}
+                placeholder="spa+eng"
+              />
+            </Row>
+            <Row label="Máx. páginas a OCR por obra">
+              <input
+                type="number"
+                min={1}
+                max={2000}
+                className="input w-24"
+                value={settings.ocrMaxPages}
+                onChange={(e) => patch({ ocrMaxPages: parseInt(e.target.value) || 1 })}
+              />
+            </Row>
+            <p className="text-xs text-neutral-500">
+              El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.
             </p>
-          </div>
-          <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
-            <Icon name="trash" /> Reinicializar…
-          </button>
-        </div>
-      </section>
+          </Section>
+
+          <section className="card p-4 mb-4 border border-red-900/60">
+            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">Zona de peligro</h2>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="text-sm text-neutral-300">Reinicializar grafo</label>
+                <p className="text-xs text-neutral-500 mt-0.5">
+                  Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La
+                  biblioteca y los ajustes se conservan.
+                </p>
+              </div>
+              <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
+                <Icon name="trash" /> Reinicializar…
+              </button>
+            </div>
+          </section>
+        </>
+      )}
 
       {resetCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => !resetting && setResetCode(null)}>
@@ -388,6 +411,27 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
       <label className="text-sm text-neutral-300">{label}</label>
       <div>{children}</div>
     </div>
+  );
+}
+
+function SettingsTabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+        active ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
+      }`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 

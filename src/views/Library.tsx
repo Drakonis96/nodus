@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus, SemanticBridgeProgress } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -55,6 +55,7 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [bridgeProgress, setBridgeProgress] = useState<SemanticBridgeProgress | null>(null);
   const [bridgeRunning, setBridgeRunning] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -172,91 +173,133 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
   };
 
   const allVisibleSelected = works.length > 0 && works.every((w) => selected.has(w.nodus_id));
+  const summary = useMemo(() => {
+    const pendingEmbeddings = works.filter((w) => {
+      const s = embeddingStatuses.get(w.nodus_id);
+      return w.deep_status === 'done' && s && !s.complete && s.totalIdeas > 0;
+    }).length;
+    return {
+      withoutThemes: works.filter((w) => w.light_status === 'none').length,
+      themesDone: works.filter((w) => w.light_status === 'done').length,
+      ideasDone: works.filter((w) => w.deep_status === 'done').length,
+      failed: works.filter((w) => w.light_status === 'failed' || w.deep_status === 'failed').length,
+      pendingEmbeddings,
+    };
+  }, [embeddingStatuses, works]);
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
-      <div className="flex items-center gap-3 mb-4">
-        <h1 className="text-xl font-semibold">Biblioteca</h1>
-        <span className="text-sm text-neutral-500">{works.length} obras</span>
+      <div className="flex flex-wrap items-start gap-3 mb-4">
+        <div>
+          <h1 className="text-xl font-semibold">Biblioteca</h1>
+          <p className="text-sm text-neutral-500 mt-1">{works.length} obras visibles</p>
+        </div>
         <div className="flex-1" />
-        <span className="text-xs text-neutral-500">Escanear con:</span>
-        <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
-        {selected.size > 0 && (
-          <>
-            <span className="text-xs text-neutral-500">{selected.size} seleccionadas</span>
-            <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
-              <Icon name="tag" /> Analizar temas
-            </button>
-            <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
-              <Icon name="bulb" /> Analizar ideas
-            </button>
-            <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
-              <Icon name="layers" /> Analizar ambos
-            </button>
-            <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
-              <Icon name="search" /> Indexar selección
-            </button>
-          </>
-        )}
         <button
-          className="btn btn-ghost border border-neutral-700"
-          title="Re-ejecuta el análisis ligero en toda la biblioteca para reconstruir los temas padre"
-          onClick={reassignThemes}
+          className={`btn border border-neutral-700 gap-1.5 ${advancedOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
+          onClick={() => setAdvancedOpen((v) => !v)}
+          aria-expanded={advancedOpen}
         >
-          <Icon name="wand" /> Reasignar temas
-        </button>
-        <button
-          className="btn btn-ghost border border-cyan-800 text-cyan-300"
-          title="Generar embeddings para todas las ideas sin indexar"
-          onClick={embedAll}
-        >
-          <Icon name="search" /> Indexar todo
-        </button>
-        <button
-          className="btn btn-ghost border border-violet-800 text-violet-300"
-          title="Usar embeddings para descubrir relaciones entre ideas no conectadas"
-          onClick={discoverBridges}
-          disabled={bridgeRunning}
-        >
-          <Icon name="compass" />{' '}
-          {bridgeRunning
-            ? bridgeProgress?.label ?? 'Descubriendo…'
-            : 'Descubrir relaciones'}
+          <Icon name="wand" /> Operaciones
         </button>
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
           <Icon name="folder" /> Colecciones
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input
-          className="input"
-          placeholder="Buscar título o autor…"
-          onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
-        />
-        <select
-          className="input"
-          value={filter.lightStatus}
-          onChange={(e) => setFilter((f) => ({ ...f, lightStatus: e.target.value as any }))}
-        >
-          <option value="all">Ligero: todos</option>
-          <option value="none">Ligero: ninguno</option>
-          <option value="done">Ligero: hecho</option>
-          <option value="pending">Ligero: pendiente</option>
-          <option value="failed">Ligero: fallido</option>
-        </select>
-        <select
-          className="input"
-          value={filter.deepStatus}
-          onChange={(e) => setFilter((f) => ({ ...f, deepStatus: e.target.value as any }))}
-        >
-          <option value="all">Profundo: todos</option>
-          <option value="done">Profundo: hecho</option>
-          <option value="pending">Profundo: pendiente</option>
-          <option value="none">Profundo: ninguno</option>
-          <option value="skipped_no_text">Profundo: sin texto</option>
-        </select>
+      <div className="card p-3 mb-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            className="input"
+            placeholder="Buscar título o autor…"
+            onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
+          />
+          <select
+            className="input"
+            value={filter.lightStatus}
+            onChange={(e) => setFilter((f) => ({ ...f, lightStatus: e.target.value as any }))}
+          >
+            <option value="all">Ligero: todos</option>
+            <option value="none">Ligero: ninguno</option>
+            <option value="done">Ligero: hecho</option>
+            <option value="pending">Ligero: pendiente</option>
+            <option value="failed">Ligero: fallido</option>
+          </select>
+          <select
+            className="input"
+            value={filter.deepStatus}
+            onChange={(e) => setFilter((f) => ({ ...f, deepStatus: e.target.value as any }))}
+          >
+            <option value="all">Profundo: todos</option>
+            <option value="done">Profundo: hecho</option>
+            <option value="pending">Profundo: pendiente</option>
+            <option value="none">Profundo: ninguno</option>
+            <option value="skipped_no_text">Profundo: sin texto</option>
+          </select>
+          <div className="flex-1" />
+          <span className="text-xs text-neutral-500">Modelo para análisis</span>
+          <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
+        </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <SummaryPill label="temas hechos" value={summary.themesDone} />
+          <SummaryPill label="sin temas" value={summary.withoutThemes} />
+          <SummaryPill label="ideas hechas" value={summary.ideasDone} />
+          <SummaryPill label="embeddings pendientes" value={summary.pendingEmbeddings} tone="cyan" />
+          {summary.failed > 0 && <SummaryPill label="fallos" value={summary.failed} tone="red" />}
+        </div>
       </div>
+
+      {selected.size > 0 && (
+        <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-indigo-200">{selected.size} seleccionadas</span>
+          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
+            <Icon name="tag" /> Temas
+          </button>
+          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
+            <Icon name="bulb" /> Ideas
+          </button>
+          <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
+            <Icon name="layers" /> Temas + ideas
+          </button>
+          <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
+            <Icon name="search" /> Indexar
+          </button>
+          <div className="flex-1" />
+          <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
+            Limpiar selección
+          </button>
+        </div>
+      )}
+
+      {advancedOpen && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 mb-4">
+          <OperationCard
+            icon="wand"
+            title="Reasignar temas"
+            description="Reconstruye los temas padre de toda la biblioteca con análisis ligero. Útil tras cambiar criterios temáticos."
+            buttonLabel="Reasignar"
+            onClick={reassignThemes}
+          />
+          <OperationCard
+            icon="search"
+            title="Indexar embeddings"
+            description="Genera embeddings para las ideas ya extraídas. Mejora similitud, fusión y búsqueda de relaciones."
+            buttonLabel="Indexar todo"
+            tone="cyan"
+            onClick={embedAll}
+          />
+          <OperationCard
+            icon="compass"
+            title="Descubrir relaciones"
+            description="Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas."
+            buttonLabel={bridgeRunning ? bridgeProgress?.label ?? 'Descubriendo…' : 'Descubrir'}
+            tone="violet"
+            disabled={bridgeRunning}
+            onClick={discoverBridges}
+          />
+        </div>
+      )}
 
       <div className="card flex-1 overflow-auto min-h-0">
         <table className="w-full text-sm">
@@ -329,33 +372,12 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
                     )}
                   </td>
                   <td className="p-2 whitespace-nowrap">
-                    <button
-                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
-                      title="Analizar temas (ligero)"
-                      onClick={() => analyzeThemes(w)}
-                    >
-                      <Icon name="tag" size={13} /> temas
-                    </button>
-                    <button
-                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
-                      title="Analizar ideas (profundo)"
-                      onClick={() => analyzeIdeas(w)}
-                    >
-                      <Icon name="bulb" size={13} /> {w.deep_status === 'done' ? 'reanalizar' : 'ideas'}
-                    </button>
-                    <button
-                      className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-white mr-2"
-                      title="Analizar temas y luego ideas"
-                      onClick={() => analyzeBoth(w)}
-                    >
-                      <Icon name="layers" size={13} /> ambos
-                    </button>
-                    <button
-                      className="inline-flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300"
-                      onClick={() => window.nodus.openInZotero(w.zotero_key)}
-                    >
-                      <Icon name="external" size={13} /> Zotero
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <RowIconButton title="Analizar temas" icon="tag" onClick={() => analyzeThemes(w)} />
+                      <RowIconButton title={w.deep_status === 'done' ? 'Reanalizar ideas' : 'Analizar ideas'} icon="bulb" onClick={() => analyzeIdeas(w)} />
+                      <RowIconButton title="Analizar temas e ideas" icon="layers" onClick={() => analyzeBoth(w)} />
+                      <RowIconButton title="Abrir en Zotero" icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -363,5 +385,94 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
         </table>
       </div>
     </div>
+  );
+}
+
+function SummaryPill({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: number;
+  tone?: 'neutral' | 'cyan' | 'red';
+}) {
+  const toneClass =
+    tone === 'cyan'
+      ? 'border-cyan-900/70 text-cyan-300'
+      : tone === 'red'
+        ? 'border-red-900/70 text-red-300'
+        : 'border-neutral-800 text-neutral-400';
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${toneClass}`}>
+      <span className="font-semibold tabular-nums text-neutral-100">{value}</span>
+      {label}
+    </span>
+  );
+}
+
+function OperationCard({
+  icon,
+  title,
+  description,
+  buttonLabel,
+  tone = 'neutral',
+  disabled,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  tone?: 'neutral' | 'cyan' | 'violet';
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  const toneClass =
+    tone === 'cyan'
+      ? 'border-cyan-900/70 text-cyan-300'
+      : tone === 'violet'
+        ? 'border-violet-900/70 text-violet-300'
+        : 'border-neutral-800 text-neutral-300';
+  return (
+    <section className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3 flex flex-col gap-3">
+      <div className="flex items-start gap-2">
+        <span className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md border ${toneClass}`}>
+          <Icon name={icon} />
+        </span>
+        <div>
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <p className="text-xs text-neutral-500 mt-1 leading-relaxed">{description}</p>
+        </div>
+      </div>
+      <button className="btn btn-ghost border border-neutral-700 mt-auto" disabled={disabled} onClick={onClick}>
+        {buttonLabel}
+      </button>
+    </section>
+  );
+}
+
+function RowIconButton({
+  title,
+  icon,
+  tone = 'neutral',
+  onClick,
+}: {
+  title: string;
+  icon: string;
+  tone?: 'neutral' | 'indigo';
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 ${
+        tone === 'indigo' ? 'text-indigo-400 hover:text-indigo-300' : 'text-neutral-400 hover:text-neutral-100'
+      }`}
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+    >
+      <Icon name={icon} size={13} />
+    </button>
   );
 }
