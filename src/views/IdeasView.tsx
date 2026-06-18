@@ -10,7 +10,7 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 
-type SortKey = 'label' | 'type' | 'works' | 'confidence';
+type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 const IDEA_ROW_HEIGHT = 116;
 
 export function IdeasView({
@@ -69,12 +69,14 @@ export function IdeasView({
           return a.type.localeCompare(b.type) || a.label.localeCompare(b.label, 'es');
         case 'works':
           return b.workCount - a.workCount || a.label.localeCompare(b.label, 'es');
+        case 'connections':
+          return (edgesByNode.get(b.id) ?? []).length - (edgesByNode.get(a.id) ?? []).length || a.label.localeCompare(b.label, 'es');
         case 'confidence':
           return b.maxConfidence - a.maxConfidence || a.label.localeCompare(b.label, 'es');
       }
     });
     return list;
-  }, [ideaNodes, search, typeFilter, sortKey]);
+  }, [ideaNodes, search, typeFilter, sortKey, edgesByNode]);
 
   const connectedIdeas = useMemo(() => {
     if (!selectedId) return [];
@@ -160,6 +162,7 @@ export function IdeasView({
               <option value="label">Ordenar: nombre</option>
               <option value="type">Ordenar: tipo</option>
               <option value="works">Ordenar: obras</option>
+              <option value="connections">Ordenar: conexiones</option>
               <option value="confidence">Ordenar: confianza</option>
             </select>
           </div>

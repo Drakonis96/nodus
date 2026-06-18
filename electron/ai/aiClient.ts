@@ -93,6 +93,14 @@ function wrapProviderError(e: any): AiError {
   if (status === 429 || status === 529) return new AiError('Límite de tasa del proveedor de IA', true);
   if (status >= 500) return new AiError(`Error del proveedor (${status})`, true);
   if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+  if (status === 400) {
+    const detail = e?.error?.message ?? e?.message;
+    const suffix = detail && !/no body/i.test(detail) ? ` Detalle: ${detail}` : '';
+    return new AiError(
+      `El proveedor rechazó la solicitud (400). Si ocurre al abrir el asistente con mucho contexto, la petición supera el límite del modelo.${suffix}`,
+      false
+    );
+  }
   return new AiError(e?.message ?? 'Error de IA', false);
 }
 

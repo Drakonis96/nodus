@@ -341,7 +341,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
             <div className="relative flex-1 min-w-[180px] max-w-xs">
               <Icon name="search" size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
               <input
-                className="input w-full pl-7 py-1"
+                className="input input-with-leading-icon w-full py-1"
                 placeholder="Buscar recorrido…"
                 value={suggestionSearch}
                 onChange={(e) => setSuggestionSearch(e.target.value)}

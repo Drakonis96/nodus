@@ -52,7 +52,7 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     gaps: true,
     readingPath: true,
     authors: false,
-    documents: true,
+    documents: false,
     graph: true,
     graphParts: {
       ideaNodes: true,

@@ -25,6 +25,7 @@ const KIND_COLOR: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
 
 const GAP_ROW_HEIGHT = 172;
 const CONTRADICTION_ROW_HEIGHT = 218;
+const GAP_PROMPT_WORK_LIMIT = 8;
 
 export function GapsView({
   onOpenGraph,
@@ -105,9 +106,7 @@ export function GapsView({
                     onOpenAssistant({
                       title: `Hueco: ${KIND_LABELS[g.kind]}`,
                       selection: ASSISTANT_CONTEXTS.gap,
-                      prompt:
-                        `Trabaja este hueco de investigación: identifica obras relevantes, ideas conectadas y próximos pasos.\n\n` +
-                        `${g.statement}`,
+                      prompt: buildGapAssistantPrompt(g),
                     })
                   }
                 >
@@ -190,5 +189,18 @@ export function GapsView({
         />
       )}
     </div>
+  );
+}
+
+function buildGapAssistantPrompt(gap: GapAggregate): string {
+  const works = gap.works.slice(0, GAP_PROMPT_WORK_LIMIT).map((work) => `- ${work.title}`);
+  const omitted = gap.works.length - works.length;
+  const worksBlock =
+    works.length > 0
+      ? `\n\nObras donde aparece:\n${works.join('\n')}${omitted > 0 ? `\n- +${omitted} obras más` : ''}`
+      : '';
+  return (
+    `Trabaja este hueco de investigación: identifica obras relevantes, ideas conectadas y próximos pasos.\n\n` +
+    `${gap.statement}${worksBlock}`
   );
 }

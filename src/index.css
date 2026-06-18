@@ -147,6 +147,7 @@ body {
   background-color: #f5f5f5;
 }
 .light .hover\:bg-neutral-800:hover,
+.light .hover\:bg-neutral-800\/50:hover,
 .light .hover\:bg-neutral-800\/80:hover {
   background-color: #e5e7eb;
 }
@@ -201,6 +202,9 @@ body {
 }
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
+}
+.input.input-with-leading-icon {
+  padding-left: 2rem;
 }
 
 .graph-detail-panel {
