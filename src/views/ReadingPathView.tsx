@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReadingPathEntry, ReadingPathPlan, ReadingPathStrategy } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
 import { useScanComplete } from '../hooks';
+import {
+  ASSISTANT_CONTEXTS,
+  type PendingAssistantNavigationTarget,
+  type PendingGraphNavigationTarget,
+} from '../navigation';
 
 const STRATEGY_LABELS: Record<ReadingPathStrategy, string> = {
   research_relevance: 'Más relevante',
@@ -21,7 +26,13 @@ const STRATEGY_HELP: Record<ReadingPathStrategy, string> = {
   bridges: 'Busca textos que conectan varias líneas temáticas o zonas del grafo.',
 };
 
-export function ReadingPathView() {
+export function ReadingPathView({
+  onOpenGraph,
+  onOpenAssistant,
+}: {
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
   const [plan, setPlan] = useState<ReadingPathPlan | null>(null);
   const [strategy, setStrategy] = useState<ReadingPathStrategy>('research_relevance');
   const [researchBrief, setResearchBrief] = useState('');
@@ -134,7 +145,13 @@ export function ReadingPathView() {
             </div>
             <ol className="space-y-2">
               {phase.entries.map((entry, i) => (
-                <ReadingEntryCard key={entry.nodus_id} entry={entry} index={i + 1} />
+                <ReadingEntryCard
+                  key={entry.nodus_id}
+                  entry={entry}
+                  index={i + 1}
+                  onOpenGraph={onOpenGraph}
+                  onOpenAssistant={onOpenAssistant}
+                />
               ))}
             </ol>
           </section>
@@ -146,7 +163,32 @@ export function ReadingPathView() {
   );
 }
 
-function ReadingEntryCard({ entry, index }: { entry: ReadingPathEntry; index: number }) {
+function ReadingEntryCard({
+  entry,
+  index,
+  onOpenGraph,
+  onOpenAssistant,
+}: {
+  entry: ReadingPathEntry;
+  index: number;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
+  const openInZotero = async () => {
+    const work = await window.nodus.getWork(entry.nodus_id);
+    if (work) await window.nodus.openInZotero(work.zotero_key);
+  };
+  const openInGraph = async () => {
+    const work = await window.nodus.getWork(entry.nodus_id);
+    onOpenGraph({
+      preset: 'reading',
+      workId: entry.nodus_id,
+      workTitle: entry.title,
+      zoteroKey: work?.zotero_key,
+      label: `Lectura: ${entry.title}`,
+    });
+  };
+
   return (
     <li className={`card p-3 flex gap-3 items-start ${entry.read ? 'opacity-75' : ''}`}>
       <div className="text-lg font-mono text-neutral-600 w-8 text-right">{index}</div>
@@ -176,6 +218,31 @@ function ReadingEntryCard({ entry, index }: { entry: ReadingPathEntry; index: nu
             Huecos relacionados: {entry.relatedGaps.map((g) => g.slice(0, 120)).join(' · ')}
           </div>
         )}
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button
+            className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+            onClick={() => void openInGraph()}
+          >
+            <Icon name="layers" size={13} /> Grafo
+          </button>
+          <button
+            className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+            onClick={() =>
+              onOpenAssistant({
+                title: `Lectura: ${entry.title}`,
+                selection: ASSISTANT_CONTEXTS.reading,
+                prompt:
+                  `Usa esta lectura de la ruta como punto de partida. Explica por qué es prioritaria, qué ideas/huecos conecta y qué debería leer después.\n\n` +
+                  `${entry.title}\n${entry.reason}`,
+              })
+            }
+          >
+            <Icon name="wand" size={13} /> Asistente
+          </button>
+          <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={() => void openInZotero()}>
+            <Icon name="external" size={13} /> Zotero
+          </button>
+        </div>
       </div>
     </li>
   );

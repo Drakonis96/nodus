@@ -15,9 +15,12 @@ import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
+import type {
+  PendingAssistantNavigationTarget,
+  PendingGraphNavigationTarget,
+  View,
+} from './navigation';
 import nodusLogo from './assets/nodus-logo.svg';
-
-type View = 'home' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'reading' | 'settings';
 
 const NAV: { id: View; label: string; icon: string }[] = [
   { id: 'home', label: 'Inicio', icon: 'home' },
@@ -36,6 +39,8 @@ export function App() {
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,6 +81,23 @@ export function App() {
       setSyncing(false);
     }
   };
+
+  const navigate = useCallback((nextView: View, graph?: PendingGraphNavigationTarget) => {
+    if (graph) setGraphTarget({ ...graph, nonce: Date.now() });
+    setView(nextView);
+  }, []);
+
+  const openAssistant = useCallback(
+    (target?: PendingAssistantNavigationTarget) => {
+      if (!settings?.defaultModel) {
+        setView('settings');
+        return;
+      }
+      if (target) setAssistantTarget({ ...target, nonce: Date.now() });
+      setResearchOpen(true);
+    },
+    [settings?.defaultModel]
+  );
 
   if (loadError) {
     return (
@@ -141,7 +163,7 @@ export function App() {
         <button
           className="btn btn-ghost gap-1.5"
           title={settings.defaultModel ? 'Abrir asistente de investigación' : 'Configura un modelo de IA'}
-          onClick={() => (settings.defaultModel ? setResearchOpen(true) : setView('settings'))}
+          onClick={() => openAssistant()}
         >
           <Icon name="wand" /> Asistente
         </button>
@@ -156,21 +178,21 @@ export function App() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo) */}
         {!navCollapsed && (
-        <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              data-tour={`nav-${n.id}`}
-              onClick={() => setView(n.id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
-              }`}
-            >
-              <Icon name={n.icon} className="opacity-70" />
-              {n.label}
-            </button>
-          ))}
-        </nav>
+          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
+            {NAV.map((n) => (
+              <button
+                key={n.id}
+                data-tour={`nav-${n.id}`}
+                onClick={() => setView(n.id)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                  view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                }`}
+              >
+                <Icon name={n.icon} className="opacity-70" />
+                {n.label}
+              </button>
+            ))}
+          </nav>
         )}
 
         {/* Main view */}
@@ -181,17 +203,26 @@ export function App() {
               lastSync={lastSync}
               syncing={syncing}
               onSync={onSync}
-              onNavigate={setView}
+              onNavigate={(target) => navigate(target)}
               onOpenCollections={() => setCollectionsOpen(true)}
-              onOpenAssistant={() => (settings.defaultModel ? setResearchOpen(true) : setView('settings'))}
+              onOpenAssistant={() => openAssistant()}
             />
           )}
-          {view === 'library' && <Library settings={settings} onOpenCollections={() => setCollectionsOpen(true)} />}
-          {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} />}
+          {view === 'library' && (
+            <Library
+              settings={settings}
+              onOpenCollections={() => setCollectionsOpen(true)}
+              onOpenGraph={(target) => navigate('graph', target)}
+              onOpenAssistant={openAssistant}
+            />
+          )}
+          {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}
-          {view === 'ideas' && <IdeasView />}
-          {view === 'gaps' && <GapsView />}
-          {view === 'reading' && <ReadingPathView />}
+          {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'gaps' && <GapsView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'reading' && (
+            <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
+          )}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}
         </main>
       </div>
@@ -202,7 +233,7 @@ export function App() {
       </div>
 
       {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
-      {researchOpen && <ResearchAssistantModal settings={settings} onClose={() => setResearchOpen(false)} />}
+      {researchOpen && <ResearchAssistantModal settings={settings} initialTarget={assistantTarget} onClose={() => setResearchOpen(false)} />}
 
       {settings.onboardingComplete && !settings.tourComplete && (
         <Tour

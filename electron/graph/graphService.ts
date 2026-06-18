@@ -103,16 +103,16 @@ export function buildIdeaGraph(): GraphData {
   const ideaWorkRows = ideaIds.length
     ? (db
         .prepare(
-          `SELECT io.global_id, w.year, w.authors_json, w.deep_status
+          `SELECT io.global_id, w.nodus_id, w.year, w.authors_json, w.deep_status
              FROM idea_occurrences io
              JOIN works w ON w.nodus_id = io.nodus_id
             WHERE io.global_id IN (${ideaIds.map(() => '?').join(',')})
               AND w.archived = 0
               AND w.deep_status = 'done'`
         )
-        .all(...ideaIds) as { global_id: string; year: number | null; authors_json: string; deep_status: string }[])
+        .all(...ideaIds) as { global_id: string; nodus_id: string; year: number | null; authors_json: string; deep_status: string }[])
     : [];
-  const ideaAggById = new Map<string, { works: number; maxConf: number; read: boolean; years: number[]; authors: Set<string> }>();
+  const ideaAggById = new Map<string, { works: Set<string>; maxConf: number; read: boolean; years: number[]; authors: Set<string> }>();
   // maxConfidence comes from idea_occurrences.confidence; fetch in a second tiny query.
   const ideaConfRows = ideaIds.length
     ? (db
@@ -131,10 +131,10 @@ export function buildIdeaGraph(): GraphData {
   for (const row of ideaWorkRows) {
     let agg = ideaAggById.get(row.global_id);
     if (!agg) {
-      agg = { works: 0, maxConf: 0, read: false, years: [], authors: new Set() };
+      agg = { works: new Set(), maxConf: 0, read: false, years: [], authors: new Set() };
       ideaAggById.set(row.global_id, agg);
     }
-    agg.works += 1;
+    agg.works.add(row.nodus_id);
     if (row.deep_status === 'done') agg.read = true;
     if (row.year != null) agg.years.push(row.year);
     try {
@@ -151,7 +151,8 @@ export function buildIdeaGraph(): GraphData {
       label: idea.label,
       type: idea.type,
       statement: idea.statement,
-      workCount: agg?.works ?? 0,
+      workCount: agg?.works.size ?? 0,
+      workIds: agg ? Array.from(agg.works) : [],
       read: agg?.read ?? false,
       themes: Array.from(memberships.labelsByIdea.get(idea.global_id) ?? []).sort(),
       years: agg?.years ?? [],
@@ -198,6 +199,7 @@ export function buildIdeaGraph(): GraphData {
       type: 'theme',
       statement: `Familia temática: ${theme.label}`,
       workCount: agg?.works.size ?? theme.work_count,
+      workIds: agg ? Array.from(agg.works) : [],
       read: agg?.read ?? false,
       themes: [theme.label],
       years: agg?.years ?? [],
@@ -513,9 +515,9 @@ export function buildAuthorGraph(): GraphData {
 
   // Batch-load all author→work mappings in one query instead of N+1.
   const waRows = db
-    .prepare(`SELECT wa.author_id, w.year, w.deep_status FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id`)
-    .all() as { author_id: string; year: number | null; deep_status: string }[];
-  const worksByAuthor = new Map<string, { year: number | null; deep_status: string }[]>();
+    .prepare(`SELECT wa.author_id, w.nodus_id, w.year, w.deep_status FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id`)
+    .all() as { author_id: string; nodus_id: string; year: number | null; deep_status: string }[];
+  const worksByAuthor = new Map<string, { nodus_id: string; year: number | null; deep_status: string }[]>();
   for (const row of waRows) {
     const list = worksByAuthor.get(row.author_id) ?? [];
     list.push(row);
@@ -531,6 +533,7 @@ export function buildAuthorGraph(): GraphData {
       label: a.name,
       type: 'author',
       workCount: works.length,
+      workIds: works.map((w) => w.nodus_id),
       read,
       themes: [],
       years,

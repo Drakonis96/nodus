@@ -2,6 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { useScanComplete } from '../hooks';
+import {
+  ASSISTANT_CONTEXTS,
+  type PendingAssistantNavigationTarget,
+  type PendingGraphNavigationTarget,
+} from '../navigation';
 
 const KIND_LABELS: Record<GapKind, string> = {
   future_work: 'trabajo futuro',
@@ -17,7 +22,13 @@ const KIND_COLOR: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
   unresolved_contradiction: 'red',
 };
 
-export function GapsView() {
+export function GapsView({
+  onOpenGraph,
+  onOpenAssistant,
+}: {
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
   const [gaps, setGaps] = useState<GapAggregate[]>([]);
   const [contradictions, setContradictions] = useState<EdgeDetail[]>([]);
   const [tab, setTab] = useState<'mined' | 'contradictions'>('mined');
@@ -31,6 +42,11 @@ export function GapsView() {
     reload();
   }, [reload]);
   useScanComplete(reload);
+
+  const openEvidenceInZotero = async (nodusId: string) => {
+    const work = await window.nodus.getWork(nodusId);
+    if (work) await window.nodus.openInZotero(work.zotero_key);
+  };
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -66,6 +82,28 @@ export function GapsView() {
                 <p className="text-sm flex-1">{g.statement}</p>
                 <Badge color={KIND_COLOR[g.kind]}>{KIND_LABELS[g.kind]}</Badge>
               </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                  onClick={() => onOpenGraph({ preset: 'gaps', label: `Hueco: ${KIND_LABELS[g.kind]}` })}
+                >
+                  <Icon name="layers" size={13} /> Grafo
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                  onClick={() =>
+                    onOpenAssistant({
+                      title: `Hueco: ${KIND_LABELS[g.kind]}`,
+                      selection: ASSISTANT_CONTEXTS.gap,
+                      prompt:
+                        `Trabaja este hueco de investigación: identifica obras relevantes, ideas conectadas y próximos pasos.\n\n` +
+                        `${g.statement}`,
+                    })
+                  }
+                >
+                  <Icon name="wand" size={13} /> Asistente
+                </button>
+              </div>
               <div className="text-xs text-neutral-500 mt-2">
                 Mencionado en {g.count} obra(s):{' '}
                 {g.works.map((w) => (
@@ -100,9 +138,37 @@ export function GapsView() {
                 <span className="text-neutral-200">{c.fromLabel}</span> ✕{' '}
                 <span className="text-neutral-200">{c.toLabel}</span>
               </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <button
+                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                  onClick={() => onOpenGraph({ preset: 'contradictions', edgeId: c.edge.id, label: 'Contradicción seleccionada' })}
+                >
+                  <Icon name="layers" size={13} /> Grafo
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                  onClick={() =>
+                    onOpenAssistant({
+                      title: 'Contradicción',
+                      selection: ASSISTANT_CONTEXTS.contradiction,
+                      prompt:
+                        `Analiza esta contradicción del corpus. Resume las posiciones, evidencia y lecturas necesarias para decidir si es tensión real o diferencia de marco.\n\n` +
+                        `${c.fromLabel} vs. ${c.toLabel}\n${c.explanation ?? ''}`,
+                    })
+                  }
+                >
+                  <Icon name="wand" size={13} /> Asistente
+                </button>
+              </div>
               {c.evidence.map((ev) => (
-                <blockquote key={ev.id} className="border-l-2 border-red-700 pl-2 mt-1 text-xs italic text-neutral-400">
+                <blockquote key={ev.id} className="border-l-2 border-red-700 pl-2 mt-2 text-xs italic text-neutral-400">
                   “{ev.quote}” {ev.location ?? ''}
+                  <button
+                    className="ml-2 inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 not-italic"
+                    onClick={() => void openEvidenceInZotero(ev.nodus_id)}
+                  >
+                    <Icon name="external" size={12} /> Zotero
+                  </button>
                 </blockquote>
               ))}
             </div>

@@ -6,10 +6,12 @@ import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_
 import { useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { TutorPanel } from './TutorPanel';
+import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
+type GraphLens = 'ideas' | 'authors';
 const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 const LAYOUT_THEME_LINKS_PER_THEME = 28;
 const LAYOUT_THEME_LINKS_GLOBAL_MAX = 520;
@@ -510,6 +512,7 @@ interface Filters {
   nodeTypes: string[];
   edgeTypes: string[];
   theme: string;
+  workIds: string[];
   authors: string[];
   yearMin: number | null;
   yearMax: number | null;
@@ -523,6 +526,7 @@ const DEFAULT_FILTERS: Filters = {
   nodeTypes: [...GRAPH_NODE_TYPES],
   edgeTypes: [...EDGE_TYPES],
   theme: '',
+  workIds: [],
   authors: [],
   yearMin: null,
   yearMax: null,
@@ -531,24 +535,148 @@ const DEFAULT_FILTERS: Filters = {
   basis: 'all',
 };
 
+const GRAPH_PRESETS: {
+  id: GraphPresetId;
+  label: string;
+  icon: string;
+  description: string;
+}[] = [
+  {
+    id: 'overview',
+    label: 'Panorama',
+    icon: 'layers',
+    description: 'Toda la red de ideas y temas.',
+  },
+  {
+    id: 'contradictions',
+    label: 'Contradicciones',
+    icon: 'gap',
+    description: 'Refutaciones y tensiones explícitas o inferidas.',
+  },
+  {
+    id: 'gaps',
+    label: 'Huecos',
+    icon: 'search',
+    description: 'Ideas abiertas, limitaciones y zonas por conectar.',
+  },
+  {
+    id: 'reading',
+    label: 'Lectura',
+    icon: 'book',
+    description: 'Contexto de una obra o ruta de lectura.',
+  },
+  {
+    id: 'unread',
+    label: 'Por leer',
+    icon: 'route',
+    description: 'Nodos vinculados a obras sin tag de lectura.',
+  },
+  {
+    id: 'authors',
+    label: 'Autores',
+    icon: 'graduation',
+    description: 'Relaciones entre autores del corpus.',
+  },
+];
+
 const FILTER_KEY = 'nodus.graph.filters';
 const FILTER_VERSION_KEY = 'nodus.graph.filters.version';
-const FILTER_VERSION = '2';
+const FILTER_VERSION = '3';
 const LOCAL_GRAPH_DEPTH_KEY = 'nodus.graph.localDepth.v2';
+
+function cloneFilters(filters: Filters): Filters {
+  return {
+    ...filters,
+    nodeTypes: [...filters.nodeTypes],
+    edgeTypes: [...filters.edgeTypes],
+    workIds: [...filters.workIds],
+    authors: [...filters.authors],
+  };
+}
+
+function defaultFilters(): Filters {
+  return cloneFilters(DEFAULT_FILTERS);
+}
+
+function graphPreset(id: GraphPresetId, target?: GraphNavigationTarget): { lens: GraphLens; filters: Filters; depth: number | null; layoutMode: 'force' | 'radial' } {
+  const base = defaultFilters();
+  const withTarget = {
+    ...base,
+    search: target?.search ?? '',
+    theme: target?.theme ?? '',
+    workIds: target?.workId ? [target.workId] : [],
+  };
+  switch (id) {
+    case 'contradictions':
+      return {
+        lens: 'ideas',
+        filters: {
+          ...withTarget,
+          edgeTypes: ['contradicts', 'refutes', 'contains'],
+          minConfidence: 0.1,
+        },
+        depth: 2,
+        layoutMode: 'force',
+      };
+    case 'gaps':
+      return {
+        lens: 'ideas',
+        filters: {
+          ...withTarget,
+          nodeTypes: ['theme', 'finding', 'claim', 'construct', 'framework'],
+          edgeTypes: ['extends', 'refines', 'applies_to', 'shares_method', 'measures_same', 'variant_of', 'contains'],
+          minConfidence: 0,
+        },
+        depth: 2,
+        layoutMode: 'force',
+      };
+    case 'reading':
+      return {
+        lens: 'ideas',
+        filters: withTarget,
+        depth: 1,
+        layoutMode: 'radial',
+      };
+    case 'unread':
+      return {
+        lens: 'ideas',
+        filters: { ...withTarget, readState: 'unread' },
+        depth: 1,
+        layoutMode: 'force',
+      };
+    case 'authors':
+      return {
+        lens: 'authors',
+        filters: withTarget,
+        depth: 1,
+        layoutMode: 'force',
+      };
+    case 'overview':
+    default:
+      return {
+        lens: 'ideas',
+        filters: withTarget,
+        depth: 1,
+        layoutMode: 'force',
+      };
+  }
+}
 
 function loadFilters(): Filters {
   try {
     const parsed = JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>;
-    const merged = { ...DEFAULT_FILTERS, ...parsed };
+    const merged = { ...defaultFilters(), ...parsed };
     const isLegacyFilters = localStorage.getItem(FILTER_VERSION_KEY) !== FILTER_VERSION;
     const nodeTypes = new Set((merged.nodeTypes ?? []).filter((type) => GRAPH_NODE_TYPES.includes(type as any)));
     if (isLegacyFilters) nodeTypes.add('theme');
     merged.nodeTypes = GRAPH_NODE_TYPES.filter((type) => nodeTypes.has(type));
     // Ensure 'contains' edge type is always available (structural edges).
     merged.edgeTypes = Array.from(new Set([...(merged.edgeTypes ?? []), 'contains']));
+    merged.workIds = Array.isArray(merged.workIds) ? merged.workIds : [];
+    merged.authors = Array.isArray(merged.authors) ? merged.authors : [];
     return merged;
   } catch {
-    return DEFAULT_FILTERS;
+    return defaultFilters();
   }
 }
 
@@ -559,6 +687,15 @@ function loadHighlightDepth(): number | null {
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) return DEFAULT_LOCAL_GRAPH_DEPTH;
   return Math.min(8, Math.max(1, Math.round(parsed)));
+}
+
+function navigationNotice(target: GraphNavigationTarget, preset: GraphPresetId): string {
+  if (target.label) return target.label;
+  if (target.workTitle) return `Lectura: ${target.workTitle}`;
+  if (target.edgeId) return 'Relación enfocada desde otra pantalla';
+  if (target.nodeId) return 'Idea enfocada desde otra pantalla';
+  if (target.theme) return `Tema: ${target.theme}`;
+  return GRAPH_PRESETS.find((p) => p.id === preset)?.description ?? 'Contexto aplicado';
 }
 
 function collectLocalGraph(startNode: any, maxDepth: number | null): { center: any; primary: any; secondary: any; context: any } {
@@ -841,7 +978,15 @@ function louvain(cy: Core): Map<string, number> {
   return result;
 }
 
-export function GraphView({ settings, onSettingsChange }: { settings: AppSettings; onSettingsChange: () => void }) {
+export function GraphView({
+  settings,
+  onSettingsChange,
+  target,
+}: {
+  settings: AppSettings;
+  onSettingsChange: () => void;
+  target?: GraphNavigationTarget | null;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const activeLayoutRef = useRef<any | null>(null);
@@ -850,9 +995,13 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const forceLayoutPrimedRef = useRef(false);
   const clearFocusRef = useRef<() => void>(() => {});
   const focusNodeByIdRef = useRef<(nodeId: string) => void>(() => {});
+  const openNodeByIdRef = useRef<(nodeId: string) => boolean>(() => false);
+  const openEdgeByIdRef = useRef<(edgeId: string) => boolean>(() => false);
   const highlightDepthRef = useRef<number | null>(null);
   const lastUserFocusRef = useRef<string | null>(null);
   const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
+  const pendingNavigationRef = useRef<GraphNavigationTarget | null>(null);
+  const lastNavigationNonceRef = useRef<number | null>(null);
   // Track the last semantic-zoom "band" so we only recompute opacities/labels
   // when the zoom level actually crosses a meaningful threshold, not on every
   // wheel tick. This is the single biggest perf win for fluidity.
@@ -882,13 +1031,17 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
       if (cy) applySemanticZoomRef.current(cy, true);
     });
   }, []);
-  const [lens, setLens] = useState<'ideas' | 'authors'>('ideas');
+  const [lens, setLens] = useState<GraphLens>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
+  const [activePreset, setActivePreset] = useState<GraphPresetId>('overview');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [contextNotice, setContextNotice] = useState<string | null>(null);
+  const [contextZoteroKey, setContextZoteroKey] = useState<string | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
   const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
   // Optimistic detail placeholder: shown instantly on tap so the sidebar opens
@@ -906,11 +1059,16 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const communitiesRef = useRef<Map<string, number>>(new Map());
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
+  const lensRef = useRef<GraphLens>(lens);
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
     localStorage.setItem(FILTER_VERSION_KEY, FILTER_VERSION);
   }, [filters]);
+
+  useEffect(() => {
+    lensRef.current = lens;
+  }, [lens]);
 
   useEffect(() => {
     layoutModeRef.current = layoutMode;
@@ -1094,6 +1252,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     const visibleNodes = data.nodes.filter((n) => {
       if (lens === 'ideas' && !f.nodeTypes.includes(n.type)) return false;
       if (f.theme && !n.themes.includes(f.theme)) return false;
+      if (f.workIds.length > 0 && !(n.workIds ?? []).some((id) => f.workIds.includes(id))) return false;
       if (f.readState === 'read' && !n.read) return false;
       if (f.readState === 'unread' && n.read) return false;
       if (f.minConfidence > 0 && n.maxConfidence < f.minConfidence) return false;
@@ -1421,6 +1580,88 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         const node = cyRef.current?.getElementById(nodeId);
         if (node?.nonempty()) focusOnNode(node);
       };
+      openNodeByIdRef.current = (nodeId: string) => {
+        const cy = cyRef.current;
+        const node = cy?.getElementById(nodeId);
+        if (!cy || !node || node.empty()) return false;
+        lastTutorFocusRef.current = null;
+        hoverActiveRef.current = false;
+        lastUserFocusRef.current = node.id();
+        const isIdea = lensRef.current === 'ideas' && !node.id().startsWith('theme:');
+        const seq = ++detailSeqRef.current;
+        let detailPromise: Promise<IdeaDetail | null> | null = null;
+        if (isIdea) {
+          detailPromise = window.nodus.getIdeaDetail(node.id());
+          setIdeaDetail(null);
+          setEdgeDetail(null);
+          setDetailLoading({ kind: 'idea', id: node.id(), label: String(node.data('label') ?? ''), type: String(node.data('type') ?? '') });
+        } else {
+          setIdeaDetail(null);
+          setEdgeDetail(null);
+          setDetailLoading(null);
+        }
+        const focus = collectLocalGraph(node, highlightDepthRef.current ?? 1);
+        applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
+        const neighbourhood = focus.primary.union(focus.secondary).union(focus.context).union(focus.center);
+        focusCenterRef.current = { id: node.id(), kind: 'node' };
+        cy.animate({ center: { eles: neighbourhood } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        if (detailPromise) {
+          void detailPromise.then(
+            (d) => {
+              if (seq !== detailSeqRef.current) return;
+              setIdeaDetail(d);
+              setDetailLoading(null);
+            },
+            () => {
+              if (seq !== detailSeqRef.current) return;
+              setDetailLoading(null);
+            }
+          );
+        }
+        return true;
+      };
+      openEdgeByIdRef.current = (edgeId: string) => {
+        const cy = cyRef.current;
+        const edge = cy?.getElementById(edgeId);
+        if (!cy || !edge || edge.empty()) return false;
+        lastTutorFocusRef.current = null;
+        hoverActiveRef.current = false;
+        lastUserFocusRef.current = edge.id();
+        const seq = ++detailSeqRef.current;
+        const detailPromise = window.nodus.getEdgeDetail(edge.id());
+        setIdeaDetail(null);
+        setEdgeDetail(null);
+        setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
+        const endpoints = edge.connectedNodes();
+        const depth = highlightDepthRef.current ?? 1;
+        let mergedPrimary = cy.collection();
+        let mergedSecondary = cy.collection();
+        let mergedContext = cy.collection();
+        endpoints.forEach((ep: any) => {
+          const fg = collectLocalGraph(ep, depth);
+          mergedPrimary = mergedPrimary.union(fg.primary);
+          mergedSecondary = mergedSecondary.union(fg.secondary);
+          mergedContext = mergedContext.union(fg.context);
+        });
+        mergedPrimary = mergedPrimary.union(edge);
+        mergedSecondary = mergedSecondary.difference(mergedPrimary);
+        mergedContext = mergedContext.difference(mergedPrimary).difference(mergedSecondary);
+        applyFocus({ primary: mergedPrimary, secondary: mergedSecondary, context: mergedContext }, endpoints.add(edge));
+        focusCenterRef.current = { id: edge.id(), kind: 'edge' };
+        cy.animate({ center: { eles: endpoints } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        void detailPromise.then(
+          (d) => {
+            if (seq !== detailSeqRef.current) return;
+            setEdgeDetail(d);
+            setDetailLoading(null);
+          },
+          () => {
+            if (seq !== detailSeqRef.current) return;
+            setDetailLoading(null);
+          }
+        );
+        return true;
+      };
 
       const beginElasticDrag = (node: any) => {
         if (layoutModeRef.current !== 'force' || node.isParent()) return;
@@ -1516,7 +1757,7 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
-        const isIdea = lens === 'ideas' && !node.id().startsWith('theme:');
+        const isIdea = lensRef.current === 'ideas' && !node.id().startsWith('theme:');
         const seq = ++detailSeqRef.current;
         let detailPromise: Promise<IdeaDetail | null> | null = null;
         if (isIdea) {
@@ -2108,6 +2349,49 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
     const parsed = Number(value);
     setHighlightDepth(Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.round(parsed))) : DEFAULT_LOCAL_GRAPH_DEPTH);
   };
+  const applyPreset = useCallback((id: GraphPresetId, navigationTarget?: GraphNavigationTarget) => {
+    const next = graphPreset(id, navigationTarget);
+    setActivePreset(id);
+    setLens(next.lens);
+    setFilters(next.filters);
+    setLayoutMode(next.layoutMode);
+    setHighlightDepth(next.depth);
+    setFiltersOpen(false);
+    if (id !== 'reading' || !navigationTarget?.workId) {
+      setContextNotice(null);
+      setContextZoteroKey(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!target || target.nonce === lastNavigationNonceRef.current) return;
+    lastNavigationNonceRef.current = target.nonce;
+    const preset = target.preset ?? (target.edgeId ? 'contradictions' : target.workId ? 'reading' : 'overview');
+    applyPreset(preset, target);
+    if (target.openTutor) setTutorOpen(true);
+    setContextNotice(navigationNotice(target, preset));
+    setContextZoteroKey(target.zoteroKey ?? null);
+    pendingNavigationRef.current = target;
+  }, [applyPreset, target]);
+
+  useEffect(() => {
+    const pending = pendingNavigationRef.current;
+    const cy = cyRef.current;
+    if (!pending || !cy) return;
+    const timer = window.setTimeout(() => {
+      const current = pendingNavigationRef.current;
+      if (!current) return;
+      let handled = false;
+      if (current.edgeId) handled = openEdgeByIdRef.current(current.edgeId);
+      else if (current.nodeId) handled = openNodeByIdRef.current(current.nodeId);
+      else if (current.workId || current.theme || current.search) {
+        fitGraph();
+        handled = true;
+      }
+      if (handled) pendingNavigationRef.current = null;
+    }, 140);
+    return () => window.clearTimeout(timer);
+  }, [elements, filters, lens, layoutMode, target]);
 
   useEffect(() => {
     if (!themesLoaded) return;
@@ -2117,125 +2401,178 @@ export function GraphView({ settings, onSettingsChange }: { settings: AppSetting
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Filter bar */}
-      <div className="border-b border-neutral-800 p-2 flex flex-wrap gap-2 items-center text-xs">
-        <div className="flex rounded-lg overflow-hidden border border-neutral-700">
-          <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('ideas')}>
-            Ideas
-          </button>
-          <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('authors')}>
-            Autores
-          </button>
-        </div>
-        <div className="flex rounded-lg overflow-hidden border border-neutral-700">
-          <button
-            className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
-            title="Layout dirigido por fuerzas: agrupa ideas conectadas"
-            onClick={() => setLayoutMode('force')}
-          >
-            Grafo
-          </button>
-          <button
-            className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
-            title="Layout radial: temas en polígono, ideas alrededor"
-            onClick={() => setLayoutMode('radial')}
-          >
-            Radial
-          </button>
-        </div>
-        <input className="input" placeholder="Buscar…" value={filters.search} onChange={(e) => setF({ search: e.target.value })} />
-        {lens === 'ideas' && (
-          <div className="flex gap-1">
-            {GRAPH_NODE_TYPES.map((t) => (
+      <div className="border-b border-neutral-800 p-2 text-xs">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-wrap gap-1">
+            {GRAPH_PRESETS.map((preset) => (
               <button
-                key={t}
-                onClick={() => toggleIn('nodeTypes', t)}
-                className="px-2 py-0.5 rounded flex items-center gap-1"
-                style={{
-                  backgroundColor: filters.nodeTypes.includes(t) ? NODE_COLORS[t] : '#262626',
-                  color: filters.nodeTypes.includes(t) ? 'white' : '#a3a3a3',
-                }}
+                key={preset.id}
+                className={`btn gap-1.5 py-1 ${activePreset === preset.id ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+                title={preset.description}
+                onClick={() => applyPreset(preset.id)}
               >
-                {NODE_LABELS[t]}
+                <Icon name={preset.icon} size={13} /> {preset.label}
               </button>
             ))}
           </div>
-        )}
-        <select className="input" value={filters.theme} onChange={(e) => setF({ theme: e.target.value })}>
-          <option value="">Todos los temas</option>
-          {themes.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
-          <option value="all">Leído + no leído</option>
-          <option value="read">Solo leído (profundo)</option>
-          <option value="unread">Solo no leído</option>
-        </select>
-        <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
-          <option value="all">Explícito + inferido</option>
-          <option value="explicit">Solo explícito</option>
-        </select>
-        <label className="flex items-center gap-1 text-neutral-400">
-          conf ≥ {filters.minConfidence.toFixed(1)}
           <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.1}
-            value={filters.minConfidence}
-            onChange={(e) => setF({ minConfidence: parseFloat(e.target.value) })}
+            className="input min-w-44"
+            placeholder="Buscar en el grafo..."
+            value={filters.search}
+            onChange={(e) => setF({ search: e.target.value })}
           />
-        </label>
-        <label className="flex items-center gap-1 text-neutral-400" title="Profundidad de la ruta local al clicar un nodo">
-          Ruta
-          <select
-            className="input w-24"
-            value={highlightDepth == null ? 'unlimited' : String(highlightDepth)}
-            onChange={(e) => setLocalGraphDepth(e.target.value)}
-          >
-            <option value="1">1 salto</option>
-            <option value="2">2 saltos</option>
-            <option value="3">3 saltos</option>
-            <option value="4">4 saltos</option>
-            <option value="unlimited">Sin límite</option>
-          </select>
-        </label>
-        <input className="input w-16" placeholder="año≥" onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })} />
-        <input className="input w-16" placeholder="año≤" onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })} />
-        <button className="btn btn-ghost" onClick={() => setFilters(DEFAULT_FILTERS)}>
-          Limpiar filtros
-        </button>
-        {lens === 'ideas' && (
           <button
-            className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
-            title={communitiesCollapsed ? 'Expandir comunidades' : 'Colapsar en comunidades (Louvain)'}
-            onClick={toggleCommunities}
+            className={`btn border border-neutral-700 gap-1.5 ${filtersOpen ? 'bg-neutral-800 text-neutral-100' : 'btn-ghost'}`}
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
           >
-            <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
+            <Icon name="search" /> Filtros
           </button>
+          {contextNotice && (
+            <div className="inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/20 px-2 py-1 text-indigo-200">
+              <Icon name="fit" size={12} />
+              <span className="max-w-60 truncate">{contextNotice}</span>
+              <button
+                className="text-indigo-300 hover:text-white"
+                title="Quitar contexto"
+                onClick={() => applyPreset('overview')}
+              >
+                <Icon name="x" size={12} />
+              </button>
+              {contextZoteroKey && (
+                <button
+                  className="text-indigo-300 hover:text-white"
+                  title="Abrir lectura en Zotero"
+                  onClick={() => void window.nodus.openInZotero(contextZoteroKey)}
+                >
+                  <Icon name="external" size={12} />
+                </button>
+              )}
+            </div>
+          )}
+          {lens === 'ideas' && (
+            <button
+              className={`btn border border-neutral-700 gap-1.5 ${tutorOpen ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
+              title="Recorrido guiado por la IA a través de tus ideas y conexiones"
+              onClick={() => setTutorOpen((v) => !v)}
+            >
+              <Icon name="compass" /> Modo Tutor
+            </button>
+          )}
+          {lens === 'ideas' && (
+            <button
+              className="btn btn-ghost border border-neutral-700 gap-1.5"
+              title="Gestionar los temas principales y reprocesar las conexiones de los nodos"
+              onClick={() => setThemesModalOpen(true)}
+            >
+              <Icon name="tag" /> Temas
+            </button>
+          )}
+          <div className="flex-1" />
+          <span className="text-neutral-500">{elements.filter((e) => !(e.data as any).source).length} nodos</span>
+        </div>
+
+        {filtersOpen && (
+          <div className="mt-2 rounded-lg border border-neutral-800 bg-neutral-900/55 p-2 flex flex-wrap gap-2 items-center">
+            <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+              <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('ideas')}>
+                Ideas
+              </button>
+              <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('authors')}>
+                Autores
+              </button>
+            </div>
+            <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+              <button
+                className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
+                title="Layout dirigido por fuerzas: agrupa ideas conectadas"
+                onClick={() => setLayoutMode('force')}
+              >
+                Grafo
+              </button>
+              <button
+                className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
+                title="Layout radial: temas en polígono, ideas alrededor"
+                onClick={() => setLayoutMode('radial')}
+              >
+                Radial
+              </button>
+            </div>
+            {lens === 'ideas' && (
+              <div className="flex flex-wrap gap-1">
+                {GRAPH_NODE_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => toggleIn('nodeTypes', t)}
+                    className="px-2 py-0.5 rounded flex items-center gap-1"
+                    style={{
+                      backgroundColor: filters.nodeTypes.includes(t) ? NODE_COLORS[t] : '#262626',
+                      color: filters.nodeTypes.includes(t) ? 'white' : '#a3a3a3',
+                    }}
+                  >
+                    {NODE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            )}
+            <select className="input" value={filters.theme} onChange={(e) => setF({ theme: e.target.value })}>
+              <option value="">Todos los temas</option>
+              {themes.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
+              <option value="all">Leído + no leído</option>
+              <option value="read">Solo leído</option>
+              <option value="unread">Solo no leído</option>
+            </select>
+            <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
+              <option value="all">Explícito + inferido</option>
+              <option value="explicit">Solo explícito</option>
+            </select>
+            <label className="flex items-center gap-1 text-neutral-400">
+              conf ≥ {filters.minConfidence.toFixed(1)}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.1}
+                value={filters.minConfidence}
+                onChange={(e) => setF({ minConfidence: parseFloat(e.target.value) })}
+              />
+            </label>
+            <label className="flex items-center gap-1 text-neutral-400" title="Profundidad de la ruta local al clicar un nodo">
+              Ruta
+              <select
+                className="input w-24"
+                value={highlightDepth == null ? 'unlimited' : String(highlightDepth)}
+                onChange={(e) => setLocalGraphDepth(e.target.value)}
+              >
+                <option value="1">1 salto</option>
+                <option value="2">2 saltos</option>
+                <option value="3">3 saltos</option>
+                <option value="4">4 saltos</option>
+                <option value="unlimited">Sin límite</option>
+              </select>
+            </label>
+            <input className="input w-16" placeholder="año≥" onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })} />
+            <input className="input w-16" placeholder="año≤" onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })} />
+            {lens === 'ideas' && (
+              <button
+                className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
+                title={communitiesCollapsed ? 'Expandir comunidades' : 'Colapsar en comunidades (Louvain)'}
+                onClick={toggleCommunities}
+              >
+                <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
+              </button>
+            )}
+            <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset('overview')}>
+              Limpiar
+            </button>
+          </div>
         )}
-        {lens === 'ideas' && (
-          <button
-            className="btn btn-ghost border border-neutral-700 gap-1.5"
-            title="Gestionar los temas principales y reprocesar las conexiones de los nodos"
-            onClick={() => setThemesModalOpen(true)}
-          >
-            <Icon name="tag" /> Temas principales
-          </button>
-        )}
-        {lens === 'ideas' && (
-          <button
-            className={`btn border border-neutral-700 gap-1.5 ${tutorOpen ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
-            title="Recorrido guiado por la IA a través de tus ideas y conexiones"
-            onClick={() => setTutorOpen((v) => !v)}
-          >
-            <Icon name="compass" /> Modo Tutor
-          </button>
-        )}
-        <div className="flex-1" />
-        <span className="text-neutral-500">{elements.filter((e) => !(e.data as any).source).length} nodos</span>
       </div>
 
       <div className="flex-1 flex min-h-0 relative">

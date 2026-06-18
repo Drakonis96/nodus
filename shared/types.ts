@@ -350,6 +350,7 @@ export interface GraphNode {
   type: GraphNodeType;
   statement?: string;
   workCount: number;
+  workIds?: string[];
   read: boolean; // true if any developing work is deep-scanned
   themes: string[];
   years: number[];

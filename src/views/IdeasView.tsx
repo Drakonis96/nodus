@@ -3,10 +3,21 @@ import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@sh
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
 import { useScanComplete } from '../hooks';
+import {
+  ASSISTANT_CONTEXTS,
+  type PendingAssistantNavigationTarget,
+  type PendingGraphNavigationTarget,
+} from '../navigation';
 
 type SortKey = 'label' | 'type' | 'works' | 'confidence';
 
-export function IdeasView() {
+export function IdeasView({
+  onOpenGraph,
+  onOpenAssistant,
+}: {
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<IdeaType | ''>('');
@@ -228,6 +239,28 @@ export function IdeasView() {
                     ))}
                   </div>
                 )}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <button
+                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                    onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `Idea: ${detail.idea.label}` })}
+                  >
+                    <Icon name="layers" size={13} /> Grafo
+                  </button>
+                  <button
+                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                    onClick={() =>
+                      onOpenAssistant({
+                        title: `Idea: ${detail.idea.label}`,
+                        selection: ASSISTANT_CONTEXTS.idea,
+                        prompt:
+                          `Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.\n\n` +
+                          `Idea: ${detail.idea.label}\n${detail.idea.statement}`,
+                      })
+                    }
+                  >
+                    <Icon name="wand" size={13} /> Asistente
+                  </button>
+                </div>
               </div>
 
               {/* Occurrences */}
@@ -341,6 +374,12 @@ export function IdeasView() {
                 onClick={() => setSelectedId(connectedDetail.idea.global_id)}
               >
                 <Icon name="bulb" size={12} /> Ver detalle completo
+              </button>
+              <button
+                className="btn btn-ghost text-xs mt-3 ml-2 gap-1"
+                onClick={() => onOpenGraph({ preset: 'overview', nodeId: connectedDetail.idea.global_id, label: `Idea: ${connectedDetail.idea.label}` })}
+              >
+                <Icon name="layers" size={12} /> Ver en grafo
               </button>
             </div>
           )}

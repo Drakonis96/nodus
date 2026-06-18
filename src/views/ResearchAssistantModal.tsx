@@ -12,6 +12,7 @@ import { Icon, modelLabel } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import type { AssistantNavigationTarget } from '../navigation';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -51,10 +52,19 @@ interface UiMessage extends ChatMessageRecord {
   id: string;
 }
 
-export function ResearchAssistantModal({ settings, onClose }: { settings: AppSettings; onClose: () => void }) {
+export function ResearchAssistantModal({
+  settings,
+  initialTarget,
+  onClose,
+}: {
+  settings: AppSettings;
+  initialTarget?: AssistantNavigationTarget | null;
+  onClose: () => void;
+}) {
   const [selection, setSelection] = useState<ResearchContextSelection>(DEFAULT_SELECTION);
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
+  const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [sending, setSending] = useState(false);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
@@ -63,6 +73,7 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastInitialTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
   const messagesRef = useRef<UiMessage[]>([]);
@@ -116,7 +127,18 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
     setActiveId(null);
     setMessages([]);
     setInput('');
+    setContextTitle(null);
   };
+
+  useEffect(() => {
+    if (!initialTarget || initialTarget.nonce === lastInitialTargetRef.current) return;
+    lastInitialTargetRef.current = initialTarget.nonce;
+    setActiveId(null);
+    setMessages([]);
+    setContextTitle(initialTarget.title ?? null);
+    if (initialTarget.selection) setSelection(initialTarget.selection);
+    if (initialTarget.prompt) setInput(initialTarget.prompt);
+  }, [initialTarget]);
 
   const loadConversation = async (id: string) => {
     if (sending) return;
@@ -258,6 +280,12 @@ export function ResearchAssistantModal({ settings, onClose }: { settings: AppSet
               </option>
             ))}
           </select>
+          {contextTitle && (
+            <span className="hidden md:inline-flex max-w-xs items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200">
+              <Icon name="fit" size={12} />
+              <span className="truncate">{contextTitle}</span>
+            </span>
+          )}
           <div className="flex-1" />
           <button className="btn btn-ghost" onClick={onClose} title="Cerrar">
             <Icon name="x" />

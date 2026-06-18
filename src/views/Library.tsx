@@ -2,6 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus, SemanticBridgeProgress } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import {
+  ASSISTANT_CONTEXTS,
+  type PendingAssistantNavigationTarget,
+  type PendingGraphNavigationTarget,
+} from '../navigation';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">ligero ✓</Badge>;
@@ -46,7 +51,17 @@ function embeddingBadge(status: WorkEmbeddingStatus | undefined) {
   );
 }
 
-export function Library({ settings, onOpenCollections }: { settings: AppSettings; onOpenCollections: () => void }) {
+export function Library({
+  settings,
+  onOpenCollections,
+  onOpenGraph,
+  onOpenAssistant,
+}: {
+  settings: AppSettings;
+  onOpenCollections: () => void;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+}) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
   const [loading, setLoading] = useState(true);
@@ -376,6 +391,34 @@ export function Library({ settings, onOpenCollections }: { settings: AppSettings
                       <RowIconButton title="Analizar temas" icon="tag" onClick={() => analyzeThemes(w)} />
                       <RowIconButton title={w.deep_status === 'done' ? 'Reanalizar ideas' : 'Analizar ideas'} icon="bulb" onClick={() => analyzeIdeas(w)} />
                       <RowIconButton title="Analizar temas e ideas" icon="layers" onClick={() => analyzeBoth(w)} />
+                      <RowIconButton
+                        title="Ver esta obra en el grafo"
+                        icon="map"
+                        tone="cyan"
+                        onClick={() =>
+                          onOpenGraph({
+                            preset: 'reading',
+                            workId: w.nodus_id,
+                            workTitle: w.title,
+                            zoteroKey: w.zotero_key,
+                            label: `Lectura: ${w.title}`,
+                          })
+                        }
+                      />
+                      <RowIconButton
+                        title="Preguntar al asistente sobre esta obra"
+                        icon="wand"
+                        tone="violet"
+                        onClick={() =>
+                          onOpenAssistant({
+                            title: `Lectura: ${w.title}`,
+                            selection: ASSISTANT_CONTEXTS.reading,
+                            prompt:
+                              `Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.\n\n` +
+                              `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
+                          })
+                        }
+                      />
                       <RowIconButton title="Abrir en Zotero" icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
                     </div>
                   </td>
@@ -460,14 +503,20 @@ function RowIconButton({
 }: {
   title: string;
   icon: string;
-  tone?: 'neutral' | 'indigo';
+  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet';
   onClick: () => void;
 }) {
+  const toneClass =
+    tone === 'indigo'
+      ? 'text-indigo-400 hover:text-indigo-300'
+      : tone === 'cyan'
+        ? 'text-cyan-400 hover:text-cyan-300'
+        : tone === 'violet'
+          ? 'text-violet-400 hover:text-violet-300'
+          : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 ${
-        tone === 'indigo' ? 'text-indigo-400 hover:text-indigo-300' : 'text-neutral-400 hover:text-neutral-100'
-      }`}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 ${toneClass}`}
       title={title}
       aria-label={title}
       onClick={onClick}
