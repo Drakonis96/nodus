@@ -1,12 +1,29 @@
 import { useEffect, useState } from 'react';
-import type { IdeaDetail, WorkMeta, WorkView } from '@shared/types';
-import { Badge, Icon } from './ui';
+import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, WorkMeta, WorkView } from '@shared/types';
+import type { PendingGraphNavigationTarget } from '../navigation';
+import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { OccurrenceCard } from './NodeDetailPanel';
 
 export type CitationTarget =
   | { kind: 'idea'; id: string }
   | { kind: 'work'; id: string }
+  | { kind: 'gap'; id: string }
+  | { kind: 'contradiction'; id: string }
   | null;
+
+const GAP_LABELS: Record<GapKind, string> = {
+  future_work: 'trabajo futuro',
+  limitation: 'limitación',
+  open_question: 'pregunta abierta',
+  unresolved_contradiction: 'contradicción sin resolver',
+};
+
+const GAP_COLORS: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
+  future_work: 'cyan',
+  limitation: 'amber',
+  open_question: 'indigo',
+  unresolved_contradiction: 'red',
+};
 
 /**
  * NotebookLM-style source modal opened from inline citations in the research
@@ -14,7 +31,15 @@ export type CitationTarget =
  * developing works with their Zotero link, anchored evidence); for documents it
  * shows the bibliographic metadata and a Zotero open action.
  */
-export function SourceCitationModal({ target, onClose }: { target: CitationTarget; onClose: () => void }) {
+export function SourceCitationModal({
+  target,
+  onClose,
+  onOpenGraph,
+}: {
+  target: CitationTarget;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
   return (
     <div className="fixed inset-0 z-[60] bg-black/70 p-4 flex items-center justify-center" onClick={onClose}>
       <div
@@ -32,15 +57,27 @@ export function SourceCitationModal({ target, onClose }: { target: CitationTarge
           </button>
         </header>
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
-          {target?.kind === 'idea' && <IdeaBody globalId={target.id} />}
+          {target?.kind === 'idea' && <IdeaBody globalId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
           {target?.kind === 'work' && <WorkBody nodusId={target.id} />}
+          {target?.kind === 'gap' && <GapBody gapId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
+          {target?.kind === 'contradiction' && (
+            <ContradictionBody edgeId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function IdeaBody({ globalId }: { globalId: string }) {
+function IdeaBody({
+  globalId,
+  onClose,
+  onOpenGraph,
+}: {
+  globalId: string;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -78,9 +115,20 @@ function IdeaBody({ globalId }: { globalId: string }) {
   return (
     <div className="space-y-3">
       <div>
-        <Badge color="indigo">{detail.idea.type}</Badge>
+        <Badge color="indigo">{NODE_LABELS[detail.idea.type as IdeaType] ?? detail.idea.type}</Badge>
         <h3 className="font-semibold mt-2">{detail.idea.label}</h3>
         <p className="text-neutral-400 mt-1">{detail.idea.statement}</p>
+        {onOpenGraph && (
+          <button
+            className="btn btn-primary gap-1.5 mt-3"
+            onClick={() => {
+              onClose();
+              onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `Idea: ${detail.idea.label}` });
+            }}
+          >
+            <Icon name="layers" size={14} /> Ver conexiones en grafo
+          </button>
+        )}
       </div>
       <div>
         <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
@@ -97,6 +145,203 @@ function IdeaBody({ globalId }: { globalId: string }) {
               key={ev.id}
               className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md"
             >
+              “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
+            </blockquote>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GapBody({
+  gapId,
+  onClose,
+  onOpenGraph,
+}: {
+  gapId: string;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
+  const [detail, setDetail] = useState<GapDetail | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    setDetail(null);
+    setMissing(false);
+    void window.nodus.getGapDetail(gapId).then((d) => {
+      if (!on) return;
+      if (d) setDetail(d);
+      else setMissing(true);
+    });
+    return () => {
+      on = false;
+    };
+  }, [gapId]);
+
+  if (missing) return <p className="text-sm text-neutral-400">No se encontró el hueco citado.</p>;
+  if (!detail) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-4 bg-neutral-800 rounded w-1/3" />
+        <div className="h-3 bg-neutral-800 rounded w-full" />
+        <div className="h-3 bg-neutral-800 rounded w-2/3" />
+      </div>
+    );
+  }
+
+  const authors = detail.work.authors.length ? detail.work.authors.join('; ') : 'Autoría no disponible';
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge color={GAP_COLORS[detail.gap.kind]}>{GAP_LABELS[detail.gap.kind]}</Badge>
+          <Badge>conf {detail.gap.confidence.toFixed(2)}</Badge>
+        </div>
+        <h3 className="font-semibold mt-2">Hueco de investigación</h3>
+        <p className="text-neutral-300 mt-1">{detail.gap.statement}</p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {onOpenGraph && (
+            <button
+              className="btn btn-primary gap-1.5"
+              onClick={() => {
+                onClose();
+                onOpenGraph({ preset: 'gaps', label: `Hueco: ${GAP_LABELS[detail.gap.kind]}` });
+              }}
+            >
+              <Icon name="layers" size={14} /> Ver en grafo
+            </button>
+          )}
+          <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5"
+            onClick={() => void window.nodus.openInZotero(detail.work.zotero_key)}
+          >
+            <Icon name="external" size={14} /> Abrir obra
+          </button>
+        </div>
+      </div>
+
+      <div className="card p-3">
+        <div className="text-xs uppercase text-neutral-500 mb-1">Obra</div>
+        <div className="text-sm font-medium">{detail.work.title}</div>
+        <div className="text-xs text-neutral-400 mt-1">
+          {authors}
+          {detail.work.year ? ` · ${detail.work.year}` : ''}
+        </div>
+      </div>
+
+      {detail.relatedIdea && (
+        <div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">Idea relacionada</div>
+          <div className="card p-3">
+            <Badge color="indigo">{NODE_LABELS[detail.relatedIdea.type as IdeaType] ?? detail.relatedIdea.type}</Badge>
+            <div className="font-medium mt-2">{detail.relatedIdea.label}</div>
+            <p className="text-sm text-neutral-400 mt-1">{detail.relatedIdea.statement}</p>
+            {onOpenGraph && (
+              <button
+                className="btn btn-ghost border border-neutral-700 text-xs gap-1.5 mt-3"
+                onClick={() => {
+                  onClose();
+                  onOpenGraph({
+                    preset: 'overview',
+                    nodeId: detail.relatedIdea?.global_id,
+                    label: `Idea: ${detail.relatedIdea?.label ?? 'relacionada'}`,
+                  });
+                }}
+              >
+                <Icon name="layers" size={13} /> Conexiones de la idea
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {detail.evidence && (
+        <div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
+          <blockquote className="border-l-2 border-amber-700 pl-3 py-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
+            “{detail.evidence.quote}”{' '}
+            <span className="text-neutral-500 not-italic">
+              {detail.evidence.location ?? ''} · {detail.evidence.kind}
+            </span>
+          </blockquote>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContradictionBody({
+  edgeId,
+  onClose,
+  onOpenGraph,
+}: {
+  edgeId: string;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
+  const [detail, setDetail] = useState<EdgeDetail | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    setDetail(null);
+    setMissing(false);
+    void window.nodus.getEdgeDetail(edgeId).then((d) => {
+      if (!on) return;
+      if (d) setDetail(d);
+      else setMissing(true);
+    });
+    return () => {
+      on = false;
+    };
+  }, [edgeId]);
+
+  if (missing) return <p className="text-sm text-neutral-400">No se encontró la contradicción citada.</p>;
+  if (!detail) {
+    return (
+      <div className="space-y-3 animate-pulse">
+        <div className="h-4 bg-neutral-800 rounded w-1/3" />
+        <div className="h-3 bg-neutral-800 rounded w-full" />
+        <div className="h-3 bg-neutral-800 rounded w-2/3" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge color="red">{EDGE_LABELS[detail.edge.type as keyof typeof EDGE_LABELS] ?? detail.edge.type}</Badge>
+          <Badge color={detail.edge.basis === 'explicit' ? 'green' : 'amber'}>{detail.edge.basis}</Badge>
+          <Badge>conf {detail.edge.confidence.toFixed(2)}</Badge>
+        </div>
+        <h3 className="font-semibold mt-2">Contradicción citada</h3>
+        {detail.explanation && <p className="text-neutral-400 mt-1">{detail.explanation}</p>}
+        <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950/45 p-3 text-sm">
+          <span className="text-neutral-200">{detail.fromLabel}</span>
+          <span className="px-2 text-red-300">×</span>
+          <span className="text-neutral-200">{detail.toLabel}</span>
+        </div>
+        {onOpenGraph && (
+          <button
+            className="btn btn-primary gap-1.5 mt-3"
+            onClick={() => {
+              onClose();
+              onOpenGraph({ preset: 'contradictions', edgeId: detail.edge.id, label: 'Contradicción citada' });
+            }}
+          >
+            <Icon name="layers" size={14} /> Ver en grafo
+          </button>
+        )}
+      </div>
+
+      {detail.evidence.length > 0 && (
+        <div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia</div>
+          {detail.evidence.map((ev) => (
+            <blockquote key={ev.id} className="border-l-2 border-red-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
               “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
             </blockquote>
           ))}

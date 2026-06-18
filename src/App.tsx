@@ -99,6 +99,14 @@ export function App() {
     [settings?.defaultModel]
   );
 
+  const openGraphFromAssistant = useCallback(
+    (target: PendingGraphNavigationTarget) => {
+      setResearchOpen(false);
+      navigate('graph', target);
+    },
+    [navigate]
+  );
+
   if (loadError) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
@@ -233,7 +241,14 @@ export function App() {
       </div>
 
       {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
-      {researchOpen && <ResearchAssistantModal settings={settings} initialTarget={assistantTarget} onClose={() => setResearchOpen(false)} />}
+      {researchOpen && (
+        <ResearchAssistantModal
+          settings={settings}
+          initialTarget={assistantTarget}
+          onClose={() => setResearchOpen(false)}
+          onOpenGraph={openGraphFromAssistant}
+        />
+      )}
 
       {settings.onboardingComplete && !settings.tourComplete && (
         <Tour

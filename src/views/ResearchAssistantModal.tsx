@@ -13,7 +13,7 @@ import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
-import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
+import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget, type PendingGraphNavigationTarget } from '../navigation';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -168,10 +168,12 @@ interface UiMessage extends ChatMessageRecord {
 export function ResearchAssistantModal({
   settings,
   initialTarget,
+  onOpenGraph,
   onClose,
 }: {
   settings: AppSettings;
   initialTarget?: AssistantNavigationTarget | null;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
   onClose: () => void;
 }) {
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
@@ -378,13 +380,30 @@ export function ResearchAssistantModal({
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
+  const handleCitation = useCallback(
+    (c: MarkdownCitation) => {
+      if (c.kind === 'idea' && onOpenGraph) {
+        onOpenGraph({ preset: 'overview', nodeId: c.id, label: 'Idea citada por el asistente' });
+        return;
+      }
+      setCitation({ kind: c.kind, id: c.id });
+    },
+    [onOpenGraph]
+  );
+  const openGraphFromCitation = useCallback(
+    (target: PendingGraphNavigationTarget) => {
+      setCitation(null);
+      onOpenGraph?.(target);
+    },
+    [onOpenGraph]
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 p-4 flex items-center justify-center">
       <div
         role="dialog"
         aria-modal="true"
-        className="w-full max-w-6xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        className="w-full max-w-7xl h-[86vh] bg-neutral-950 border border-neutral-800 rounded-lg shadow-2xl flex flex-col overflow-hidden"
       >
         <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
           <div className="flex items-center gap-2 font-semibold">
@@ -569,7 +588,7 @@ export function ResearchAssistantModal({
                     {message.role === 'assistant' && !message.error && message.content ? (
                       <Markdown
                         content={message.content}
-                        onCitation={(c: MarkdownCitation) => setCitation({ kind: c.kind, id: c.id })}
+                        onCitation={handleCitation}
                       />
                     ) : (
                       message.content || (message.role === 'assistant' && sending ? '...' : '')
@@ -589,7 +608,8 @@ export function ResearchAssistantModal({
             <footer className="border-t border-neutral-800 p-3">
               <div className="flex gap-2">
                 <textarea
-                  className="input flex-1 min-h-[44px] max-h-32 resize-none"
+                  className="input flex-1 min-h-[112px] max-h-56 resize-y"
+                  rows={5}
                   value={input}
                   placeholder={activeMode?.starter ?? 'Pregunta al asistente...'}
                   onChange={(e) => setInput(e.target.value)}
@@ -630,7 +650,13 @@ export function ResearchAssistantModal({
         />
       )}
 
-      {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
+      {citation && (
+        <SourceCitationModal
+          target={citation}
+          onClose={() => setCitation(null)}
+          onOpenGraph={onOpenGraph ? openGraphFromCitation : undefined}
+        />
+      )}
     </div>
   );
 }

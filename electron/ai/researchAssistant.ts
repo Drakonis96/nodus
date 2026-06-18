@@ -152,6 +152,9 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
     '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
     '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
+    '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
+    '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
+    '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
     '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
     '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
   ].join('\n');

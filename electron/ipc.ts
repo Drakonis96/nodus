@@ -24,7 +24,7 @@ import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import * as ideas from './db/ideasRepo';
 import * as themes from './db/themesRepo';
-import { aggregateGaps } from './db/gapsRepo';
+import { aggregateGaps, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { scanQueue } from './pipeline/scanQueue';
@@ -265,6 +265,7 @@ export function registerIpc(
 
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());
+  h('gaps:detail', async (_e, gapId: string) => getGapDetail(gapId));
   h('gaps:contradictions', async () => getContradictions());
   h('reading:path', async (_e, request?: ReadingPathRequest) => buildReadingPath(request));
 

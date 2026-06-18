@@ -71,6 +71,7 @@ const api: NodusApi = {
   },
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
+  getGapDetail: (gapId) => ipcRenderer.invoke('gaps:detail', gapId),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
   getReadingPath: (request) => ipcRenderer.invoke('reading:path', request),
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),

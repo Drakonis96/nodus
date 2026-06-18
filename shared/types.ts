@@ -405,6 +405,20 @@ export interface GapAggregate {
   works: { nodus_id: string; title: string; zotero_key: string }[];
 }
 
+export interface GapDetail {
+  gap: Gap;
+  work: {
+    nodus_id: string;
+    title: string;
+    zotero_key: string;
+    authors: string[];
+    year: number | null;
+    item_type: string;
+  };
+  relatedIdea: Pick<Idea, 'global_id' | 'type' | 'label' | 'statement'> | null;
+  evidence: Evidence | null;
+}
+
 export type ReadingPathStrategy =
   | 'research_relevance'
   | 'gaps'
@@ -830,6 +844,7 @@ export interface NodusApi {
 
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
+  getGapDetail(gapId: string): Promise<GapDetail | null>;
   getContradictions(): Promise<EdgeDetail[]>;
   getReadingPath(request?: ReadingPathRequest): Promise<ReadingPathPlan>;
 

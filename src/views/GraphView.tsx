@@ -18,6 +18,11 @@ const LAYOUT_THEME_LINKS_GLOBAL_MAX = 520;
 const DRAG_COLLISION_MAX_ACTIVE = 44;
 const DRAG_COLLISION_CELL_SIZE = 96;
 const DRAG_INFLUENCE_MAX = 140;
+const FOCUS_CACHE_LIMIT = 260;
+const INITIAL_FORCE_LAYOUT_DELAY_MS = 90;
+const INITIAL_FORCE_LAYOUT_MAX_ITER = 96;
+const DRAG_TAP_SUPPRESSION_MS = 260;
+const DRAG_MOVEMENT_THRESHOLD = 3;
 
 function physicalLayoutElements(cy: Core) {
   return cy.nodes().filter((node) => !node.isParent()).union(
@@ -29,7 +34,7 @@ function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => voi
   const nodeCount = Math.max(1, cy.nodes().filter((node) => !node.isParent()).length);
   const layoutEdgeCount = Math.max(1, cy.edges().filter((edge) => edge.data('layoutEdge') !== false).length);
   const padding = Math.round(Math.min(80, 40 + Math.sqrt(nodeCount) * 1.8));
-  const densityScale = Math.min(1.55, 1 + Math.sqrt(nodeCount + layoutEdgeCount) / 74);
+  const densityScale = Math.min(1.7, 1 + Math.sqrt(nodeCount + layoutEdgeCount) / 68);
   const iterationBudget = randomize
     ? Math.max(260, Math.min(680, 760 - nodeCount * 0.58))
     : Math.max(110, Math.min(280, 320 - nodeCount * 0.22));
@@ -43,32 +48,32 @@ function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => voi
     nodeDimensionsIncludeLabels: false,
     randomize,
     refresh: randomize ? 18 : 28,
-    componentSpacing: Math.round(95 * densityScale),
-    nodeOverlap: 12,
+    componentSpacing: Math.round(122 * densityScale),
+    nodeOverlap: 24,
     nodeRepulsion: (node: any) => {
       const type = node.data('type') as GraphNodeType | 'community-guide' | 'community';
       const degree = Math.max(0, Number(node.data('degree') ?? 0));
       const size = Math.max(18, Number(node.data('size') ?? 28));
-      if (type === 'theme') return Math.round((9800 + size * 115 + Math.sqrt(degree) * 900) * densityScale);
-      if (type === 'author') return Math.round((6500 + Math.sqrt(degree) * 720) * densityScale);
-      return Math.round((5900 + size * 72 + Math.sqrt(degree) * 650) * densityScale);
+      if (type === 'theme') return Math.round((12200 + size * 150 + Math.sqrt(degree) * 1120) * densityScale);
+      if (type === 'author') return Math.round((8600 + Math.sqrt(degree) * 880) * densityScale);
+      return Math.round((7600 + size * 92 + Math.sqrt(degree) * 820) * densityScale);
     },
     idealEdgeLength: (edge: any) => {
       const confidence = clampUnit(Number(edge.data('confidence') ?? 0.5));
       const type = edge.data('type') as string;
-      if (type === 'contains') return Math.round(205 + (1 - confidence) * 75 + densityScale * 28);
-      if (type === 'contradicts' || type === 'refutes') return Math.round(172 + (1 - confidence) * 62);
-      if (type === 'shares_method' || type === 'measures_same' || type === 'variant_of') return Math.round(132 + (1 - confidence) * 46);
-      return Math.round(116 + (1 - confidence) * 56);
+      if (type === 'contains') return Math.round(245 + (1 - confidence) * 86 + densityScale * 34);
+      if (type === 'contradicts' || type === 'refutes') return Math.round(205 + (1 - confidence) * 70);
+      if (type === 'shares_method' || type === 'measures_same' || type === 'variant_of') return Math.round(168 + (1 - confidence) * 54);
+      return Math.round(154 + (1 - confidence) * 62);
     },
     edgeElasticity: (edge: any) => {
       const confidence = clampUnit(Number(edge.data('confidence') ?? 0.5));
       return edge.data('type') === 'contains'
-        ? Math.round(280 + (1 - confidence) * 170)
-        : Math.round(62 + (1 - confidence) * 46);
+        ? Math.round(220 + (1 - confidence) * 130)
+        : Math.round(52 + (1 - confidence) * 38);
     },
     nestingFactor: 1.2,
-    gravity: randomize ? 0.28 : 0.18,
+    gravity: randomize ? 0.2 : 0.11,
     numIter: Math.round(iterationBudget),
     initialTemp: randomize ? 760 : 170,
     coolingFactor: randomize ? 0.985 : 0.965,
@@ -93,13 +98,11 @@ const EDGE_TYPE_COLORS: Record<string, string> = {
   variant_of: '#a78bfa',      // light purple — variant
   contains: '#3f3f46',        // dark gray — structural
 };
-const ZOOM_LABEL_THRESHOLD = 0.3;   // below this, hide all idea labels
-const ZOOM_LABEL_DETAIL_THRESHOLD = 0.98;
-const ZOOM_LABEL_FULL_THRESHOLD = 1.35;
+const ZOOM_LABEL_THRESHOLD = 0.52;   // below this, hide all idea labels
+const ZOOM_LABEL_DETAIL_THRESHOLD = 1.18;
+const ZOOM_LABEL_FULL_THRESHOLD = 1.72;
 
 const LAYOUT_KEY = 'nodus.graph.layout';
-const COMMUNITY_GUIDE_PREFIX = 'guide:comm:';
-const COMMUNITY_GUIDE_MIN_SIZE = 3;
 const DRAG_ELASTIC_DEPTH_PULL = [0.62, 0.30, 0.14];
 const DRAG_ELASTIC_MAX_STEP = 32;
 
@@ -115,7 +118,24 @@ interface DragInteractionState {
   lastPosition: { x: number; y: number };
   pendingDx: number;
   pendingDy: number;
+  totalDx: number;
+  totalDy: number;
+  moved: boolean;
   frameId: number | null;
+}
+
+interface FocusCollections {
+  center: any;
+  primary: any;
+  secondary: any;
+  context: any;
+}
+
+interface FocusClassState {
+  primary: any;
+  secondary: any;
+  context: any;
+  spotlight: any;
 }
 
 function edgeElasticFactor(edge: any): number {
@@ -228,11 +248,11 @@ function nodeLabelScore(node: GraphData['nodes'][number], degree: number): numbe
 }
 
 function themeNodeSize(workCount: number): number {
-  return 30 + Math.min(14, Math.sqrt(Math.max(0, workCount)) * 3.1);
+  return 22 + Math.min(12, Math.sqrt(Math.max(0, workCount)) * 2.55);
 }
 
 function ideaNodeSize(degree: number): number {
-  return 17 + Math.min(15, Math.sqrt(Math.max(0, degree)) * 3.4);
+  return 11 + Math.min(12, Math.sqrt(Math.max(0, degree)) * 2.75);
 }
 
 function clampUnit(value: number): number {
@@ -1002,6 +1022,12 @@ export function GraphView({
   const focusByIdRef = useRef<(nodeIds: string[], edgeId?: string | null) => void>(() => {});
   const pendingNavigationRef = useRef<GraphNavigationTarget | null>(null);
   const lastNavigationNonceRef = useRef<number | null>(null);
+  const focusCacheRef = useRef<Map<string, FocusCollections>>(new Map());
+  const focusClassStateRef = useRef<FocusClassState | null>(null);
+  const hoverAugmentRef = useRef<any | null>(null);
+  const lastDragReleaseRef = useRef<{ id: string; at: number } | null>(null);
+  const pendingFocusFrameRef = useRef<number | null>(null);
+  const pendingInitialLayoutTimerRef = useRef<number | null>(null);
   // Track the last semantic-zoom "band" so we only recompute opacities/labels
   // when the zoom level actually crosses a meaningful threshold, not on every
   // wheel tick. This is the single biggest perf win for fluidity.
@@ -1017,11 +1043,9 @@ export function GraphView({
   const focusCenterRef = useRef<{ id: string; kind: 'node' | 'edge' } | null>(null);
   // Track whether the current highlight came from a hover (so tap can override it).
   const hoverActiveRef = useRef(false);
-  // Deferred forced semantic-zoom recalc. applyFocus and clearFocus used to call
-  // applySemanticZoom(cy, true) synchronously, which did a full O(N+E) pass over
-  // every node/edge on every tap — the main cause of the multi-second freeze when
-  // tapping nodes in a large graph. Deferring to the next frame coalesces
-  // multiple pending recalcs into one and unblocks the main thread instantly.
+  // Deferred forced semantic-zoom recalc. Clearing focus still needs a full label
+  // pass to restore the non-focused view; deferring it coalesces pending recalcs
+  // and keeps taps from doing O(N+E) work synchronously.
   const pendingZoomRecalcRef = useRef<number | null>(null);
   const scheduleZoomRecalc = useCallback(() => {
     if (pendingZoomRecalcRef.current != null) return;
@@ -1030,6 +1054,16 @@ export function GraphView({
       const cy = cyRef.current;
       if (cy) applySemanticZoomRef.current(cy, true);
     });
+  }, []);
+  const cancelPendingFocusFrame = useCallback(() => {
+    if (pendingFocusFrameRef.current == null) return;
+    window.cancelAnimationFrame(pendingFocusFrameRef.current);
+    pendingFocusFrameRef.current = null;
+  }, []);
+  const cancelPendingInitialLayout = useCallback(() => {
+    if (pendingInitialLayoutTimerRef.current == null) return;
+    window.clearTimeout(pendingInitialLayoutTimerRef.current);
+    pendingInitialLayoutTimerRef.current = null;
   }, []);
   const [lens, setLens] = useState<GraphLens>('ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
@@ -1130,51 +1164,6 @@ export function GraphView({
     });
   }, []);
 
-  const applyCommunityGuides = useCallback((cy: Core) => {
-    removeCommunityGuides(cy);
-    if (layoutModeRef.current !== 'force' || lens !== 'ideas') return;
-
-    const commMap = louvain(cy);
-    communitiesRef.current = commMap;
-    const groups = new Map<number, string[]>();
-    for (const [nodeId, commId] of commMap) {
-      const node = cy.getElementById(nodeId);
-      if (node.empty() || node.isParent()) continue;
-      if (!groups.has(commId)) groups.set(commId, []);
-      groups.get(commId)!.push(nodeId);
-    }
-
-    const validGroups = [...groups.entries()].filter(([, nodeIds]) => nodeIds.length >= COMMUNITY_GUIDE_MIN_SIZE);
-    if (validGroups.length < 2) return;
-
-    cy.batch(() => {
-      for (const [commId, nodeIds] of validGroups) {
-        const parentId = `${COMMUNITY_GUIDE_PREFIX}${commId}`;
-        cy.add({
-          group: 'nodes',
-          data: {
-            id: parentId,
-            type: 'community-guide',
-            guidePadding: Math.round(40 + Math.min(56, Math.sqrt(nodeIds.length) * 8)),
-          },
-        });
-      }
-
-      for (const [commId, nodeIds] of validGroups) {
-        const parentId = `${COMMUNITY_GUIDE_PREFIX}${commId}`;
-        for (const nodeId of nodeIds) {
-          const node = cy.getElementById(nodeId);
-          if (node.nonempty() && !node.isParent()) node.move({ parent: parentId });
-        }
-      }
-    });
-
-    cy.nodes('[type="community-guide"]').forEach((guide) => {
-      guide.ungrabify();
-      guide.unselectify();
-    });
-  }, [lens, removeCommunityGuides]);
-
   const applyElasticDragStep = useCallback(() => {
     const cy = cyRef.current;
     const state = dragStateRef.current;
@@ -1214,27 +1203,6 @@ export function GraphView({
       applyElasticDragStep();
     });
   }, [applyElasticDragStep]);
-
-  const runForceRelaxation = useCallback((energy = 0.85) => {
-    const cy = cyRef.current;
-    if (!cy || layoutModeRef.current !== 'force') return;
-
-    stopActiveLayout();
-    const layout: any = cy.layout({
-      ...createForceLayoutOptions(cy, false, () => {
-        forceLayoutPrimedRef.current = true;
-        if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
-      }, {
-        fit: false,
-        refresh: 30,
-        initialTemp: Math.round(95 + energy * 130),
-        coolingFactor: 0.96,
-        numIter: Math.round(110 + energy * 145),
-      }),
-    } as any);
-    activeLayoutRef.current = layout;
-    layout.run();
-  }, [stopActiveLayout]);
 
   const frameGraph = useCallback((cy: Core, padding = 80) => {
     const tutorFocus = lastTutorFocusRef.current;
@@ -1343,11 +1311,10 @@ export function GraphView({
         minZoom: 0.12,
         maxZoom: 4,
         wheelSensitivity: 0.35,
-        hideEdgesOnViewport: true,
-        textureOnViewport: true,
-        motionBlur: true,
-        motionBlurOpacity: 0.08,
-        pixelRatio: Math.min(1.5, window.devicePixelRatio || 1),
+        hideEdgesOnViewport: false,
+        textureOnViewport: false,
+        motionBlur: false,
+        pixelRatio: Math.min(1.35, window.devicePixelRatio || 1),
         style: [
           {
             selector: 'node',
@@ -1356,15 +1323,15 @@ export function GraphView({
                 ele.data('type') === 'author' ? '#a3a3a3' : NODE_COLORS[ele.data('type') as Exclude<GraphNodeType, 'author'>] ?? '#888',
               label: 'data(label)',
               color: lightTheme ? '#171717' : '#ededed',
-              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 13 : 10),
-              'font-weight': (ele: any) => (ele.data('type') === 'theme' ? 700 : 400),
+              'font-size': (ele: any) => (ele.data('type') === 'theme' ? 11 : ele.data('type') === 'author' ? 9.5 : 8.5),
+              'font-weight': (ele: any) => (ele.data('type') === 'theme' ? 650 : 450),
               'text-wrap': 'wrap',
-              'text-max-width': '150px',
+              'text-max-width': (ele: any) => (ele.data('type') === 'theme' ? '128px' : '104px'),
               'text-valign': 'bottom',
-              'text-margin-y': 6,
-              'min-zoomed-font-size': 5,
+              'text-margin-y': 5,
+              'min-zoomed-font-size': 6,
               // Outline keeps labels legible where they cross edges or other nodes.
-              'text-outline-width': 2.5,
+              'text-outline-width': 2.1,
               'text-outline-color': lightTheme ? '#ffffff' : '#0a0a0a',
               'text-outline-opacity': lightTheme ? 0.8 : 0.72,
               width: 'data(size)',
@@ -1373,22 +1340,22 @@ export function GraphView({
               'border-width': (ele: any) => (ele.data('read') ? 0 : 2),
               'border-color': '#737373',
               'border-style': 'dashed',
-              'transition-property': 'opacity, text-opacity, text-outline-opacity, border-width, border-color, overlay-opacity',
-              'transition-duration': '0.28s',
+              'transition-property': 'opacity, text-opacity, text-outline-opacity, border-width, border-color, overlay-opacity, background-opacity',
+              'transition-duration': '0.18s',
               'transition-timing-function': 'ease-in-out',
             } as any,
           },
           // Theme hubs get a soft solid halo so the centre reads as the backbone.
           {
             selector: 'node[type="theme"]',
-            style: { 'border-width': 2.5, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.34 } as any,
+            style: { 'border-width': 1.8, 'border-color': '#f9b069', 'border-style': 'solid', 'border-opacity': 0.32 } as any,
           },
           {
             selector: 'node:grabbed',
             style: {
               'overlay-color': '#f8fafc',
-              'overlay-opacity': 0.12,
-              'overlay-padding': 8,
+              'overlay-opacity': 0.08,
+              'overlay-padding': 5,
               'z-index': 40,
               'text-opacity': 1,
             } as any,
@@ -1430,16 +1397,16 @@ export function GraphView({
           {
             selector: 'edge',
             style: {
-              width: (ele: any) => 0.45 + ele.data('confidence') * 0.95,
+              width: (ele: any) => 0.34 + ele.data('confidence') * 0.62,
               'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
               'line-style': (ele: any) => (ele.data('basis') === 'inferred' ? 'dashed' : 'solid'),
               opacity: 'data(baseOpacity)',
               'target-arrow-shape': 'triangle',
               'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#525252',
-              'arrow-scale': 0.7,
+              'arrow-scale': 0.52,
               'curve-style': 'bezier',
               'transition-property': 'opacity, line-color, width, target-arrow-color, source-arrow-color',
-              'transition-duration': '0.28s',
+              'transition-duration': '0.18s',
               'transition-timing-function': 'ease-in-out',
             } as any,
           },
@@ -1449,7 +1416,7 @@ export function GraphView({
             style: {
               'line-style': 'solid',
               'line-color': '#3f3f46',
-              width: (ele: any) => (ele.data('layoutEdge') ? 0.58 : 0.3),
+              width: (ele: any) => (ele.data('layoutEdge') ? 0.44 : 0.24),
               opacity: 'data(baseOpacity)',
               'target-arrow-shape': 'none',
             } as any,
@@ -1458,33 +1425,33 @@ export function GraphView({
           // Semantic zoom: hide labels at low zoom for clarity. These come before
           // focus styles so that focus-node/context-node override them.
           { selector: 'node.zoom-label-hidden', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
-          { selector: 'node.zoom-label-muted', style: { 'text-opacity': 0.08, 'text-outline-opacity': 0.12 } as any },
-          { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0.24, 'text-outline-opacity': 0.28 } as any },
+          { selector: 'node.zoom-label-muted', style: { 'text-opacity': 0.035, 'text-outline-opacity': 0.06 } as any },
+          { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0.16, 'text-outline-opacity': 0.2 } as any },
           // Focus mode: everything not in the tapped traversal fades back.
-          { selector: 'node.faded', style: { opacity: 0.3, 'text-opacity': 0.12, 'text-outline-opacity': 0.12 } as any },
-          { selector: 'edge.faded', style: { opacity: 0.07 } as any },
+          { selector: 'node.faded', style: { opacity: 0.36, 'text-opacity': 0.08, 'text-outline-opacity': 0.08 } as any },
+          { selector: 'edge.faded', style: { opacity: 0.105 } as any },
           {
             selector: 'node.focus-node',
             style: {
-              opacity: 0.96,
+              opacity: 0.98,
               'text-opacity': 0.94,
-              'border-width': 2.5,
+              'border-width': 2,
               'border-color': '#c7d2fe',
               'border-style': 'solid',
               'border-opacity': 0.72,
               'overlay-color': '#818cf8',
-              'overlay-opacity': 0.05,
-              'overlay-padding': 5,
+              'overlay-opacity': 0.035,
+              'overlay-padding': 3,
               'z-index': 18,
             } as any,
           },
           {
             selector: 'edge.focus-edge',
             style: {
-              width: (ele: any) => 1.9 + ele.data('confidence') * 2.2,
+              width: (ele: any) => 1.25 + ele.data('confidence') * 1.35,
               'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
               'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#a5b4fc',
-              'arrow-scale': 0.92,
+              'arrow-scale': 0.72,
               opacity: 0.96,
               'z-index': 26,
             } as any,
@@ -1492,9 +1459,9 @@ export function GraphView({
           {
             selector: 'node.secondary-node',
             style: {
-              opacity: 0.78,
-              'text-opacity': 0.76,
-              'border-width': 2,
+              opacity: 0.82,
+              'text-opacity': 0.72,
+              'border-width': 1.4,
               'border-color': '#93c5fd',
               'border-style': 'solid',
               'border-opacity': 0.42,
@@ -1504,8 +1471,8 @@ export function GraphView({
           {
             selector: 'edge.secondary-edge',
             style: {
-              width: (ele: any) => 1.0 + ele.data('confidence') * 0.95,
-              opacity: 0.38,
+              width: (ele: any) => 0.78 + ele.data('confidence') * 0.78,
+              opacity: 0.44,
               'z-index': 16,
             } as any,
           },
@@ -1524,53 +1491,140 @@ export function GraphView({
           {
             selector: 'edge.context-edge',
             style: {
-              width: 0.72,
+              width: 0.58,
               'line-color': '#f59e0b',
-              opacity: 0.16,
+              opacity: 0.2,
               'target-arrow-shape': 'none',
               'z-index': 9,
             } as any,
           },
-          { selector: 'node.spotlight', style: { opacity: 1, 'text-opacity': 1, 'border-width': 5, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 1, 'overlay-opacity': 0.12, 'overlay-padding': 9, 'z-index': 32 } as any },
+          { selector: 'node.spotlight', style: { opacity: 1, 'text-opacity': 1, 'border-width': 3, 'border-color': '#f8fafc', 'border-style': 'solid', 'border-opacity': 0.95, 'overlay-opacity': 0.08, 'overlay-padding': 5, 'z-index': 32 } as any },
+          {
+            selector: 'node.hover-augment-node',
+            style: {
+              opacity: 1,
+              'text-opacity': 1,
+              'text-outline-opacity': 0.85,
+              'border-width': 2.4,
+              'border-color': '#facc15',
+              'border-style': 'solid',
+              'border-opacity': 0.9,
+              'overlay-color': '#facc15',
+              'overlay-opacity': 0.08,
+              'overlay-padding': 5,
+              'z-index': 36,
+            } as any,
+          },
+          {
+            selector: 'edge.hover-augment-edge',
+            style: {
+              width: (ele: any) => 1.15 + ele.data('confidence') * 1.15,
+              opacity: 0.86,
+              'line-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#facc15',
+              'target-arrow-color': (ele: any) => EDGE_TYPE_COLORS[ele.data('type')] ?? '#facc15',
+              'arrow-scale': 0.7,
+              'z-index': 34,
+            } as any,
+          },
         ],
         layout: { name: 'preset' },
       });
 
+      const getCachedFocus = (node: any, depth: number | null): FocusCollections => {
+        const key = `${node.id()}::${depth == null ? 'all' : depth}`;
+        const cache = focusCacheRef.current;
+        const cached = cache.get(key);
+        if (cached && cached.center?.nonempty?.()) return cached;
+
+        const focus = collectLocalGraph(node, depth);
+        cache.set(key, focus);
+        if (cache.size > FOCUS_CACHE_LIMIT) {
+          const oldest = cache.keys().next().value;
+          if (oldest) cache.delete(oldest);
+        }
+        return focus;
+      };
+
       const removeFocusClasses = () => {
         const cy = cyRef.current!;
+        const previous = focusClassStateRef.current;
         cy.batch(() => {
-          cy.elements().removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
-          cy.nodes().removeClass('spotlight');
+          previous?.primary.removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
+          previous?.secondary.removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
+          previous?.context.removeClass('faded focus-node focus-edge secondary-node secondary-edge context-node context-edge');
+          previous?.spotlight.removeClass('spotlight');
+          cy.elements('.faded').removeClass('faded');
+          cy.nodes('.spotlight').removeClass('spotlight');
         });
+        focusClassStateRef.current = null;
         scheduleZoomRecalc();
+      };
+      const clearHoverAugment = () => {
+        const hover = hoverAugmentRef.current;
+        if (!hover) return;
+        hover.removeClass('hover-augment-node hover-augment-edge');
+        hoverAugmentRef.current = null;
+      };
+      const applyHoverAugment = (node: any) => {
+        const cy = cyRef.current;
+        if (!cy || node.empty()) return;
+        const neighbourhood = node.closedNeighborhood().filter((ele: any) => {
+          if (ele.isNode?.()) return true;
+          return ele.data('type') !== 'contains' || ele.data('layoutEdge') !== false;
+        });
+        clearHoverAugment();
+        cy.batch(() => {
+          neighbourhood.nodes().addClass('hover-augment-node');
+          neighbourhood.edges().addClass('hover-augment-edge');
+        });
+        hoverAugmentRef.current = neighbourhood;
       };
       const applyFocus = (focus: { primary: any; secondary?: any; context?: any }, spotlightNodes?: any) => {
         const cy = cyRef.current!;
+        clearHoverAugment();
+        const previous = focusClassStateRef.current;
+        const primary = focus.primary;
+        const secondary = focus.secondary ?? cy.collection();
+        const context = focus.context ?? cy.collection();
+        const spotlight = spotlightNodes ?? cy.collection();
         cy.batch(() => {
-          cy.elements().removeClass('focus-node focus-edge secondary-node secondary-edge context-node context-edge');
-          cy.nodes().removeClass('spotlight');
-          cy.elements().addClass('faded');
-          focus.context?.removeClass('faded');
-          focus.context?.nodes().addClass('context-node');
-          focus.context?.edges().addClass('context-edge');
-          focus.secondary?.removeClass('faded');
-          focus.secondary?.nodes().addClass('secondary-node');
-          focus.secondary?.edges().addClass('secondary-edge');
-          focus.primary.removeClass('faded');
-          focus.primary.nodes().addClass('focus-node');
-          focus.primary.edges().addClass('focus-edge');
-          spotlightNodes?.addClass('spotlight');
+          if (previous) {
+            previous.primary.addClass('faded').removeClass('focus-node focus-edge');
+            previous.secondary.addClass('faded').removeClass('secondary-node secondary-edge');
+            previous.context.addClass('faded').removeClass('context-node context-edge');
+            previous.spotlight.removeClass('spotlight');
+          } else {
+            cy.elements().addClass('faded');
+          }
+
+          context
+            .removeClass('faded focus-node focus-edge secondary-node secondary-edge')
+            .nodes()
+            .addClass('context-node');
+          context.edges().addClass('context-edge');
+          secondary
+            .removeClass('faded focus-node focus-edge context-node context-edge')
+            .nodes()
+            .addClass('secondary-node');
+          secondary.edges().addClass('secondary-edge');
+          primary
+            .removeClass('faded secondary-node secondary-edge context-node context-edge')
+            .nodes()
+            .addClass('focus-node');
+          primary.edges().addClass('focus-edge');
+          spotlight.removeClass('faded').addClass('spotlight');
         });
-        scheduleZoomRecalc();
+        focusClassStateRef.current = { primary, secondary, context, spotlight };
       };
       const focusOnNode = (node: any, depthOverride?: number | null) => {
-        const focus = collectLocalGraph(node, depthOverride ?? highlightDepthRef.current);
+        const focus = getCachedFocus(node, depthOverride ?? highlightDepthRef.current);
         applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
       };
       const clearFocus = () => {
         removeFocusClasses();
       };
       clearFocusRef.current = () => {
+        clearHoverAugment();
         lastTutorFocusRef.current = null;
         lastUserFocusRef.current = null;
         focusCenterRef.current = null;
@@ -1580,10 +1634,52 @@ export function GraphView({
         const node = cyRef.current?.getElementById(nodeId);
         if (node?.nonempty()) focusOnNode(node);
       };
+      const scheduleNodeFocus = (nodeId: string, seq: number) => {
+        cancelPendingFocusFrame();
+        pendingFocusFrameRef.current = window.requestAnimationFrame(() => {
+          pendingFocusFrameRef.current = null;
+          if (seq !== detailSeqRef.current || lastUserFocusRef.current !== nodeId) return;
+          const cy = cyRef.current;
+          const node = cy?.getElementById(nodeId);
+          if (!cy || !node || node.empty()) return;
+          const focus = getCachedFocus(node, highlightDepthRef.current ?? 1);
+          applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
+          const neighbourhood = focus.primary.union(focus.secondary).union(focus.context).union(focus.center);
+          cy.animate({ center: { eles: neighbourhood } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        });
+      };
+      const scheduleEdgeFocus = (edgeId: string, seq: number) => {
+        cancelPendingFocusFrame();
+        pendingFocusFrameRef.current = window.requestAnimationFrame(() => {
+          pendingFocusFrameRef.current = null;
+          if (seq !== detailSeqRef.current || lastUserFocusRef.current !== edgeId) return;
+          const cy = cyRef.current;
+          const edge = cy?.getElementById(edgeId);
+          if (!cy || !edge || edge.empty()) return;
+          const endpoints = edge.connectedNodes();
+          const depth = highlightDepthRef.current ?? 1;
+          let mergedPrimary = cy.collection();
+          let mergedSecondary = cy.collection();
+          let mergedContext = cy.collection();
+          endpoints.forEach((ep: any) => {
+            const fg = getCachedFocus(ep, depth);
+            mergedPrimary = mergedPrimary.union(fg.primary);
+            mergedSecondary = mergedSecondary.union(fg.secondary);
+            mergedContext = mergedContext.union(fg.context);
+          });
+          mergedPrimary = mergedPrimary.union(edge);
+          mergedSecondary = mergedSecondary.difference(mergedPrimary);
+          mergedContext = mergedContext.difference(mergedPrimary).difference(mergedSecondary);
+          applyFocus({ primary: mergedPrimary, secondary: mergedSecondary, context: mergedContext }, endpoints.add(edge));
+          cy.animate({ center: { eles: endpoints } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        });
+      };
       openNodeByIdRef.current = (nodeId: string) => {
         const cy = cyRef.current;
         const node = cy?.getElementById(nodeId);
         if (!cy || !node || node.empty()) return false;
+        cancelPendingInitialLayout();
+        stopActiveLayout();
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = node.id();
@@ -1600,11 +1696,8 @@ export function GraphView({
           setEdgeDetail(null);
           setDetailLoading(null);
         }
-        const focus = collectLocalGraph(node, highlightDepthRef.current ?? 1);
-        applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
-        const neighbourhood = focus.primary.union(focus.secondary).union(focus.context).union(focus.center);
         focusCenterRef.current = { id: node.id(), kind: 'node' };
-        cy.animate({ center: { eles: neighbourhood } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        scheduleNodeFocus(node.id(), seq);
         if (detailPromise) {
           void detailPromise.then(
             (d) => {
@@ -1624,6 +1717,8 @@ export function GraphView({
         const cy = cyRef.current;
         const edge = cy?.getElementById(edgeId);
         if (!cy || !edge || edge.empty()) return false;
+        cancelPendingInitialLayout();
+        stopActiveLayout();
         lastTutorFocusRef.current = null;
         hoverActiveRef.current = false;
         lastUserFocusRef.current = edge.id();
@@ -1632,23 +1727,8 @@ export function GraphView({
         setIdeaDetail(null);
         setEdgeDetail(null);
         setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
-        const endpoints = edge.connectedNodes();
-        const depth = highlightDepthRef.current ?? 1;
-        let mergedPrimary = cy.collection();
-        let mergedSecondary = cy.collection();
-        let mergedContext = cy.collection();
-        endpoints.forEach((ep: any) => {
-          const fg = collectLocalGraph(ep, depth);
-          mergedPrimary = mergedPrimary.union(fg.primary);
-          mergedSecondary = mergedSecondary.union(fg.secondary);
-          mergedContext = mergedContext.union(fg.context);
-        });
-        mergedPrimary = mergedPrimary.union(edge);
-        mergedSecondary = mergedSecondary.difference(mergedPrimary);
-        mergedContext = mergedContext.difference(mergedPrimary).difference(mergedSecondary);
-        applyFocus({ primary: mergedPrimary, secondary: mergedSecondary, context: mergedContext }, endpoints.add(edge));
         focusCenterRef.current = { id: edge.id(), kind: 'edge' };
-        cy.animate({ center: { eles: endpoints } }, { duration: 280, easing: 'ease-in-out-cubic' });
+        scheduleEdgeFocus(edge.id(), seq);
         void detailPromise.then(
           (d) => {
             if (seq !== detailSeqRef.current) return;
@@ -1664,17 +1744,25 @@ export function GraphView({
       };
 
       const beginElasticDrag = (node: any) => {
-        if (layoutModeRef.current !== 'force' || node.isParent()) return;
+        if (node.isParent()) return;
+        cancelPendingInitialLayout();
+        clearHoverAugment();
         stopActiveLayout();
         cancelPendingDragFrame();
-        const influences = buildDragInfluences(node);
+        const isForceLayout = layoutModeRef.current === 'force';
+        const influences = isForceLayout ? buildDragInfluences(node) : [];
         dragStateRef.current = {
           nodeId: node.id(),
           influences,
-          collisionIds: [node.id(), ...influences.filter((item) => item.weight >= 0.08).map((item) => item.id)].slice(0, DRAG_COLLISION_MAX_ACTIVE),
+          collisionIds: isForceLayout
+            ? [node.id(), ...influences.filter((item) => item.weight >= 0.08).map((item) => item.id)].slice(0, DRAG_COLLISION_MAX_ACTIVE)
+            : [node.id()],
           lastPosition: { ...node.position() },
           pendingDx: 0,
           pendingDy: 0,
+          totalDx: 0,
+          totalDy: 0,
+          moved: false,
           frameId: null,
         };
       };
@@ -1683,8 +1771,15 @@ export function GraphView({
         const state = dragStateRef.current;
         if (!state || state.nodeId !== node.id()) return;
         const position = node.position();
-        state.pendingDx += position.x - state.lastPosition.x;
-        state.pendingDy += position.y - state.lastPosition.y;
+        const dx = position.x - state.lastPosition.x;
+        const dy = position.y - state.lastPosition.y;
+        state.pendingDx += dx;
+        state.pendingDy += dy;
+        state.totalDx += dx;
+        state.totalDy += dy;
+        if (Math.hypot(state.totalDx, state.totalDy) >= DRAG_MOVEMENT_THRESHOLD) {
+          state.moved = true;
+        }
         state.lastPosition = { ...position };
         scheduleElasticDragStep();
       };
@@ -1696,8 +1791,10 @@ export function GraphView({
         if (Math.abs(state.pendingDx) > 0.01 || Math.abs(state.pendingDy) > 0.01) {
           applyElasticDragStep();
         }
+        if (state.moved) {
+          lastDragReleaseRef.current = { id: node.id(), at: Date.now() };
+        }
         dragStateRef.current = null;
-        runForceRelaxation(0.52);
       };
 
       // Drive the graph from the Tutor: spotlight the stop's node(s) (and edge when a
@@ -1754,40 +1851,12 @@ export function GraphView({
           window.clearTimeout(hoverFocusTimerRef.current);
           hoverFocusTimerRef.current = null;
         }
-        lastTutorFocusRef.current = null;
-        hoverActiveRef.current = false;
-        lastUserFocusRef.current = node.id();
-        const isIdea = lensRef.current === 'ideas' && !node.id().startsWith('theme:');
-        const seq = ++detailSeqRef.current;
-        let detailPromise: Promise<IdeaDetail | null> | null = null;
-        if (isIdea) {
-          detailPromise = window.nodus.getIdeaDetail(node.id());
-          setIdeaDetail(null);
-          setEdgeDetail(null);
-          setDetailLoading({ kind: 'idea', id: node.id(), label: String(node.data('label') ?? ''), type: String(node.data('type') ?? '') });
-        } else {
-          setIdeaDetail(null);
-          setEdgeDetail(null);
-          setDetailLoading(null);
+        const lastDrag = lastDragReleaseRef.current;
+        if (lastDrag && lastDrag.id === node.id() && Date.now() - lastDrag.at < DRAG_TAP_SUPPRESSION_MS) {
+          lastDragReleaseRef.current = null;
+          return;
         }
-        const focus = collectLocalGraph(node, highlightDepthRef.current ?? 1);
-        applyFocus({ primary: focus.primary, secondary: focus.secondary, context: focus.context }, focus.center);
-        const neighbourhood = focus.primary.union(focus.secondary).union(focus.context).union(focus.center);
-        focusCenterRef.current = { id: node.id(), kind: 'node' };
-        cyRef.current?.animate({ center: { eles: neighbourhood } }, { duration: 280, easing: 'ease-in-out-cubic' });
-        if (detailPromise) {
-          void detailPromise.then(
-            (d) => {
-              if (seq !== detailSeqRef.current) return;
-              setIdeaDetail(d);
-              setDetailLoading(null);
-            },
-            () => {
-              if (seq !== detailSeqRef.current) return;
-              setDetailLoading(null);
-            }
-          );
-        }
+        void openNodeByIdRef.current(node.id());
       });
       cyRef.current.on('tap', 'edge', (evt) => {
         const edge = evt.target;
@@ -1795,46 +1864,12 @@ export function GraphView({
           window.clearTimeout(hoverFocusTimerRef.current);
           hoverFocusTimerRef.current = null;
         }
-        lastTutorFocusRef.current = null;
-        hoverActiveRef.current = false;
-        lastUserFocusRef.current = edge.id();
-        const seq = ++detailSeqRef.current;
-        const detailPromise = window.nodus.getEdgeDetail(edge.id());
-        setIdeaDetail(null);
-        setEdgeDetail(null);
-        setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
-        const endpoints = edge.connectedNodes();
-        const depth = highlightDepthRef.current ?? 1;
-        let mergedPrimary = cyRef.current!.collection();
-        let mergedSecondary = cyRef.current!.collection();
-        let mergedContext = cyRef.current!.collection();
-        endpoints.forEach((ep: any) => {
-          const fg = collectLocalGraph(ep, depth);
-          mergedPrimary = mergedPrimary.union(fg.primary);
-          mergedSecondary = mergedSecondary.union(fg.secondary);
-          mergedContext = mergedContext.union(fg.context);
-        });
-        mergedPrimary = mergedPrimary.union(edge);
-        mergedSecondary = mergedSecondary.difference(mergedPrimary);
-        mergedContext = mergedContext.difference(mergedPrimary).difference(mergedSecondary);
-        applyFocus({ primary: mergedPrimary, secondary: mergedSecondary, context: mergedContext }, endpoints.add(edge));
-        focusCenterRef.current = { id: edge.id(), kind: 'edge' };
-        cyRef.current?.animate({ center: { eles: endpoints } }, { duration: 280, easing: 'ease-in-out-cubic' });
-        void detailPromise.then(
-          (d) => {
-            if (seq !== detailSeqRef.current) return;
-            setEdgeDetail(d);
-            setDetailLoading(null);
-          },
-          () => {
-            if (seq !== detailSeqRef.current) return;
-            setDetailLoading(null);
-          }
-        );
+        void openEdgeByIdRef.current(edge.id());
       });
       cyRef.current.on('tap', (evt) => {
         if (evt.target === cyRef.current) {
           detailSeqRef.current++;
+          cancelPendingFocusFrame();
           hoverActiveRef.current = false;
           // Use the full clear (resets lastUserFocusRef/focusCenterRef too),
           // not the local clearFocus() which only strips CSS classes — that left
@@ -1847,21 +1882,25 @@ export function GraphView({
           setDetailLoading(null);
         }
       });
-      // Hover highlight: show the node's neighbourhood while hovering, unless the
-      // user has already clicked a node (tap-focus takes priority). Debounced so
+      // Hover highlight: show the node's neighbourhood while hovering. When a tap
+      // focus exists, this augments it instead of replacing the selected route. Debounced so
       // sweeping the cursor across many nodes doesn't trigger a traversal + style
       // recalc per element — only the node the cursor actually rests on.
       cyRef.current.on('mouseover', 'node', (evt) => {
-        if (lastUserFocusRef.current) return; // tap-focus active → skip hover
+        if (dragStateRef.current) return;
         if (hoverFocusTimerRef.current != null) {
           window.clearTimeout(hoverFocusTimerRef.current);
         }
         const target = evt.target;
         hoverFocusTimerRef.current = window.setTimeout(() => {
           hoverFocusTimerRef.current = null;
-          if (lastUserFocusRef.current) return;
+          if (dragStateRef.current) return;
           hoverActiveRef.current = true;
-          focusOnNode(target, 1);
+          if (lastUserFocusRef.current) {
+            applyHoverAugment(target);
+          } else {
+            focusOnNode(target, 1);
+          }
         }, 60);
       });
       cyRef.current.on('mouseout', 'node', () => {
@@ -1871,7 +1910,8 @@ export function GraphView({
         }
         if (!hoverActiveRef.current) return;
         hoverActiveRef.current = false;
-        if (!lastUserFocusRef.current) clearFocus();
+        if (lastUserFocusRef.current) clearHoverAugment();
+        else clearFocus();
       });
 
       // ── Semantic zoom: progressively reveal labels ─────────────────────────
@@ -1884,7 +1924,7 @@ export function GraphView({
       // the O(N+E) style recalc that fired on every single wheel tick, which
       // was the main reason the graph felt sluggish compared to Obsidian's
       // WebGL renderer.
-      const ZOOM_BAND_EDGES = [0.18, 0.3, 0.58, 0.65, 0.98, 1.0, 1.35, 1.42];
+      const ZOOM_BAND_EDGES = [0.24, 0.42, 0.52, 0.76, 1.02, 1.18, 1.42, 1.72, 2.05];
       const zoomBand = (z: number) => {
         let band = 0;
         for (const edge of ZOOM_BAND_EDGES) {
@@ -1898,9 +1938,9 @@ export function GraphView({
         const band = zoomBand(z);
         if (!force && band === lastZoomBandRef.current) return;
         lastZoomBandRef.current = band;
-        const structurePhase = smoothstep(0.18, 0.58, z);
-        const detailPhase = smoothstep(0.6, 1.02, z);
-        const fineDetailPhase = smoothstep(1.0, 1.42, z);
+        const structurePhase = smoothstep(0.2, 0.64, z);
+        const detailPhase = smoothstep(0.82, 1.28, z);
+        const fineDetailPhase = smoothstep(1.28, 1.82, z);
         cy.batch(() => {
           // Never hide labels on focused / spotlighted / context nodes.
           const protectedNodes = cy.nodes('.focus-node, .secondary-node, .spotlight, .context-node, :selected');
@@ -1942,7 +1982,7 @@ export function GraphView({
             const confidence = Math.min(1, Math.max(0, Number(edge.data('confidence') ?? 0.5)));
             const isStructural = edge.data('type') === 'contains';
             const isPhysicalStructural = isStructural && edge.data('layoutEdge') !== false;
-            const importance = isStructural ? (isPhysicalStructural ? 0.12 : 0.055) : 0.26 + confidence * 0.44;
+            const importance = isStructural ? (isPhysicalStructural ? 0.2 : 0.12) : 0.34 + confidence * 0.48;
             const phase = isStructural ? structurePhase : mix(structurePhase, 1, detailPhase * 0.55);
             const opacity = protectedEdgeIds.has(edge.id())
               ? edge.hasClass('focus-edge')
@@ -1951,8 +1991,8 @@ export function GraphView({
                   ? 0.42
                   : 0.18
               : mix(
-                  isStructural ? 0.004 : 0.02,
-                  isStructural ? (isPhysicalStructural ? 0.08 : 0.032) : 0.18,
+                  isStructural ? 0.018 : 0.04,
+                  isStructural ? (isPhysicalStructural ? 0.14 : 0.075) : 0.26,
                   clampUnit(importance * phase)
                 );
             edge.data('baseOpacity', opacity);
@@ -1983,6 +2023,10 @@ export function GraphView({
     }
     const cy = cyRef.current;
     const previousPositions = snapshotNodePositions(cy);
+    cancelPendingInitialLayout();
+    cancelPendingFocusFrame();
+    focusCacheRef.current.clear();
+    focusClassStateRef.current = null;
     stopActiveLayout();
     cancelPendingDragFrame();
     dragStateRef.current = null;
@@ -1997,14 +2041,22 @@ export function GraphView({
           if (position) node.position(position);
         });
       });
-    } else if (layoutMode === 'force' && lens === 'ideas') {
-      const positions = computeRadialPositions(cy);
+    } else if (layoutMode === 'force') {
+      const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
       if (positions) {
         cy.layout({
           name: 'preset',
           positions,
           fit: false,
           animate: false,
+        } as any).run();
+        seededInitialPositions = true;
+      } else if (cy.nodes().length > 0) {
+        cy.layout({
+          name: 'circle',
+          fit: false,
+          animate: false,
+          padding: 80,
         } as any).run();
         seededInitialPositions = true;
       }
@@ -2020,11 +2072,20 @@ export function GraphView({
     const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || previousPositions.size === 0;
     const shouldFrameGraph = forceLayoutNeedsInitialFrame && !lastTutorFocusRef.current && !lastUserFocusRef.current;
     const forceLayoutRandomize = forceLayoutNeedsInitialFrame && !seededInitialPositions;
-    const forceLayout = createForceLayoutOptions(cy, forceLayoutRandomize, () => {
-      forceLayoutPrimedRef.current = true;
-      if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
-      if (shouldFrameGraph) frameGraph(cy);
-    });
+    const startForceLayout = (
+      randomize: boolean,
+      overrides: Record<string, unknown> = {},
+      frameOnStop = shouldFrameGraph
+    ) => {
+      const forceLayout = createForceLayoutOptions(cy, randomize, () => {
+        forceLayoutPrimedRef.current = true;
+        if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+        if (frameOnStop) frameGraph(cy);
+      }, overrides);
+      layout = cy.layout(forceLayout);
+      activeLayoutRef.current = layout;
+      layout.run();
+    };
     // Layout selection: force-directed physics or deterministic radial.
     if (layoutMode === 'radial') {
       const positions = lens === 'ideas' ? computeRadialPositions(cy) : null;
@@ -2043,26 +2104,52 @@ export function GraphView({
           },
         } as any).run();
       } else {
-        layout = cy.layout(forceLayout);
-        activeLayoutRef.current = layout;
-        layout.run();
+        startForceLayout(forceLayoutRandomize);
       }
     } else {
-      layout = cy.layout(forceLayout);
-      activeLayoutRef.current = layout;
-      layout.run();
+      if (forceLayoutNeedsInitialFrame && seededInitialPositions) {
+        forceLayoutPrimedRef.current = true;
+        if (shouldFrameGraph) frameGraph(cy);
+        pendingInitialLayoutTimerRef.current = window.setTimeout(() => {
+          pendingInitialLayoutTimerRef.current = null;
+          if (cyRef.current !== cy || layoutModeRef.current !== 'force') return;
+          startForceLayout(false, {
+            fit: false,
+            refresh: 36,
+            initialTemp: 120,
+            coolingFactor: 0.955,
+            numIter: Math.max(48, Math.min(INITIAL_FORCE_LAYOUT_MAX_ITER, Math.round(42 + cy.nodes().length * 0.08 + cy.edges().length * 0.025))),
+          }, false);
+        }, INITIAL_FORCE_LAYOUT_DELAY_MS);
+      } else {
+        startForceLayout(forceLayoutRandomize);
+      }
     }
-  }, [applyCommunityGuides, applyElasticDragStep, cancelPendingDragFrame, elements, lens, layoutMode, runForceRelaxation, scheduleElasticDragStep, scheduleZoomRecalc, stopActiveLayout]);
+  }, [applyElasticDragStep, cancelPendingDragFrame, cancelPendingFocusFrame, cancelPendingInitialLayout, elements, lens, layoutMode, scheduleElasticDragStep, scheduleZoomRecalc, stopActiveLayout]);
 
-  // Cancel any pending deferred zoom recalc on unmount.
+  // Tear down Cytoscape work on unmount so render/layout loops from the graph
+  // cannot keep competing with other sections after navigation.
   useEffect(() => {
     return () => {
+      cancelPendingInitialLayout();
+      cancelPendingFocusFrame();
+      stopActiveLayout();
+      cancelPendingDragFrame();
       if (pendingZoomRecalcRef.current != null) {
         window.cancelAnimationFrame(pendingZoomRecalcRef.current);
         pendingZoomRecalcRef.current = null;
       }
+      if (hoverFocusTimerRef.current != null) {
+        window.clearTimeout(hoverFocusTimerRef.current);
+        hoverFocusTimerRef.current = null;
+      }
+      dragStateRef.current = null;
+      focusCacheRef.current.clear();
+      focusClassStateRef.current = null;
+      cyRef.current?.destroy();
+      cyRef.current = null;
     };
-  }, []);
+  }, [cancelPendingDragFrame, cancelPendingFocusFrame, cancelPendingInitialLayout, stopActiveLayout]);
 
   // Keep the graph framed when the window or panels resize.
   useEffect(() => {
@@ -2119,6 +2206,7 @@ export function GraphView({
     if (!cy || !canvas || cy.elements().length === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const lightTheme = document.documentElement.classList.contains('light');
 
     const W = canvas.width;
     const H = canvas.height;
@@ -2136,13 +2224,13 @@ export function GraphView({
     });
 
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = 'rgba(10,10,10,0.85)';
+    ctx.fillStyle = lightTheme ? 'rgba(255,255,255,0.78)' : 'rgba(10,10,10,0.78)';
     ctx.fillRect(0, 0, W, H);
 
     // Draw edges as faint lines — batched into a single path/stroke.
     // Drawing each edge with its own beginPath()/stroke() was the dominant cost
     // on large (theme-heavy) graphs and fired on every render frame.
-    ctx.strokeStyle = 'rgba(100,100,100,0.25)';
+    ctx.strokeStyle = lightTheme ? 'rgba(82,82,82,0.22)' : 'rgba(160,160,160,0.25)';
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     cy.edges().forEach((e) => {
@@ -2170,7 +2258,7 @@ export function GraphView({
     const ext = cy.extent();
     const tl = toMini(ext.x1, ext.y1);
     const br = toMini(ext.x2, ext.y2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.strokeStyle = lightTheme ? 'rgba(23,23,23,0.58)' : 'rgba(255,255,255,0.6)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }, []);
@@ -2304,7 +2392,7 @@ export function GraphView({
       layout.run();
       setCommunitiesCollapsed(true);
     }
-  }, [applyCommunityGuides, communitiesCollapsed, removeCommunityGuides, stopActiveLayout]);
+  }, [communitiesCollapsed, removeCommunityGuides, stopActiveLayout]);
 
   // Tutor stop → frame the node on the graph and open its info in the right sidebar so
   // it can be read alongside the narration. A sequence token avoids a stale async detail
@@ -2607,9 +2695,9 @@ export function GraphView({
           {/* Minimap */}
           <canvas
             ref={minimapRef}
-            width={180}
-            height={120}
-            className="absolute bottom-3 right-3 rounded-lg border border-neutral-700 cursor-pointer opacity-80 hover:opacity-100"
+            width={156}
+            height={104}
+            className="absolute bottom-3 right-3 rounded-lg border border-neutral-300/70 dark:border-neutral-700 cursor-pointer opacity-70 hover:opacity-95"
             title="Mini-mapa · click para navegar"
             onClick={handleMinimapClick}
           />

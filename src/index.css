@@ -352,30 +352,121 @@ body {
   padding: 0.18em 0.42em;
   margin: 0 0.1em;
   border-radius: 5px;
-  border: 1px solid rgba(129, 140, 248, 0.45);
-  background: rgba(99, 102, 241, 0.16);
-  color: #c7d2fe;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(148, 163, 184, 0.14);
+  color: #cbd5e1;
   text-decoration: none;
   cursor: pointer;
   vertical-align: baseline;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .md .citation-link::before {
-  content: '⎘';
-  font-size: 0.95em;
+  content: 'src';
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0;
   opacity: 0.85;
+  text-transform: uppercase;
 }
 .md .citation-link:hover {
-  background: rgba(99, 102, 241, 0.32);
-  color: #e0e7ff;
-  border-color: rgba(165, 180, 252, 0.7);
+  background: rgba(148, 163, 184, 0.24);
+  color: #f8fafc;
+  border-color: rgba(203, 213, 225, 0.6);
 }
 .light .md .citation-link {
+  background: rgba(100, 116, 139, 0.1);
+  color: #334155;
+  border-color: rgba(100, 116, 139, 0.35);
+}
+.light .md .citation-link:hover {
+  background: rgba(100, 116, 139, 0.18);
+  color: #0f172a;
+}
+.md .citation-link[data-citation-kind='idea'] {
+  border-color: rgba(129, 140, 248, 0.5);
+  background: rgba(99, 102, 241, 0.16);
+  color: #c7d2fe;
+}
+.md .citation-link[data-citation-kind='idea']::before {
+  content: 'id';
+}
+.md .citation-link[data-citation-kind='idea']:hover {
+  background: rgba(99, 102, 241, 0.32);
+  color: #e0e7ff;
+  border-color: rgba(165, 180, 252, 0.75);
+}
+.md .citation-link[data-citation-kind='work'] {
+  border-color: rgba(56, 189, 248, 0.45);
+  background: rgba(14, 165, 233, 0.14);
+  color: #bae6fd;
+}
+.md .citation-link[data-citation-kind='work']::before {
+  content: 'doc';
+}
+.md .citation-link[data-citation-kind='work']:hover {
+  background: rgba(14, 165, 233, 0.26);
+  color: #e0f2fe;
+  border-color: rgba(125, 211, 252, 0.72);
+}
+.md .citation-link[data-citation-kind='contradiction'] {
+  border-color: rgba(248, 113, 113, 0.48);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+.md .citation-link[data-citation-kind='contradiction']::before {
+  content: '!';
+}
+.md .citation-link[data-citation-kind='contradiction']:hover {
+  background: rgba(239, 68, 68, 0.27);
+  color: #fee2e2;
+  border-color: rgba(252, 165, 165, 0.72);
+}
+.md .citation-link[data-citation-kind='gap'] {
+  border-color: rgba(251, 191, 36, 0.52);
+  background: rgba(245, 158, 11, 0.15);
+  color: #fde68a;
+}
+.md .citation-link[data-citation-kind='gap']::before {
+  content: 'gap';
+}
+.md .citation-link[data-citation-kind='gap']:hover {
+  background: rgba(245, 158, 11, 0.28);
+  color: #fef3c7;
+  border-color: rgba(252, 211, 77, 0.75);
+}
+.light .md .citation-link[data-citation-kind='idea'] {
   background: rgba(79, 70, 229, 0.1);
   color: #4338ca;
   border-color: rgba(79, 70, 229, 0.4);
 }
-.light .md .citation-link:hover {
+.light .md .citation-link[data-citation-kind='idea']:hover {
   background: rgba(79, 70, 229, 0.2);
   color: #3730a3;
+}
+.light .md .citation-link[data-citation-kind='work'] {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0369a1;
+  border-color: rgba(2, 132, 199, 0.35);
+}
+.light .md .citation-link[data-citation-kind='work']:hover {
+  background: rgba(2, 132, 199, 0.18);
+  color: #075985;
+}
+.light .md .citation-link[data-citation-kind='contradiction'] {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.light .md .citation-link[data-citation-kind='contradiction']:hover {
+  background: rgba(220, 38, 38, 0.18);
+  color: #991b1b;
+}
+.light .md .citation-link[data-citation-kind='gap'] {
+  background: rgba(217, 119, 6, 0.12);
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.38);
+}
+.light .md .citation-link[data-citation-kind='gap']:hover {
+  background: rgba(217, 119, 6, 0.2);
+  color: #78350f;
 }
