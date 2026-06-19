@@ -46,6 +46,13 @@ jobs:
       - name: Build and publish installer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # No signing certificates in CI — produce unsigned artifacts.
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Configure these repository secrets to publish a notarized macOS
+          # build. Without them electron-builder produces the explicit local
+          # ad-hoc fallback, which macOS does not support for auto-update.
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: true
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npx electron-builder ${{ matrix.platform }} --publish always

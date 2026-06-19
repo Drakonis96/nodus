@@ -26,6 +26,7 @@ let updateCheckTimer: NodeJS.Timeout | null = null;
 let installingUpdate = false;
 let downloadedUpdateVersion: string | null = null;
 let lastUpdateEvent: UpdateProgressEvent | null = null;
+let installUpdateTimer: NodeJS.Timeout | null = null;
 
 const UPDATE_CHECK_DELAY_MS = 10_000;
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
@@ -155,7 +156,8 @@ async function installDownloadedUpdate(): Promise<UpdateCheckResponse> {
     version: downloadedUpdateVersion,
     progress: 100,
   });
-  setTimeout(() => {
+  installUpdateTimer = setTimeout(() => {
+    installUpdateTimer = null;
     try {
       autoUpdater.quitAndInstall(false, true);
     } catch (e) {
@@ -167,7 +169,7 @@ async function installDownloadedUpdate(): Promise<UpdateCheckResponse> {
         progress: null,
       });
     }
-  }, 800);
+  }, 650);
   return response;
 }
 
@@ -178,7 +180,11 @@ function setupAutoUpdates(): void {
   }
 
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = false;
+  // On macOS this starts Squirrel's native hand-off while the downloaded ZIP
+  // is still available. With this disabled, electron-updater only had a cached
+  // file and the subsequent restart path could wait forever for Squirrel.
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoRunAppAfterInstall = true;
   autoUpdater.allowPrerelease = false;
 
   autoUpdater.on('checking-for-update', () => console.log('[updates] checking for update'));
@@ -226,6 +232,11 @@ function setupAutoUpdates(): void {
     setTimeout(() => void installDownloadedUpdate(), 1200);
   });
   autoUpdater.on('error', (e) => {
+    if (installUpdateTimer) {
+      clearTimeout(installUpdateTimer);
+      installUpdateTimer = null;
+    }
+    installingUpdate = false;
     console.error(`[updates] error: ${e instanceof Error ? e.message : String(e)}`);
     emitUpdate({
       status: 'error',
@@ -266,6 +277,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
+  if (installUpdateTimer) clearTimeout(installUpdateTimer);
   stopRealtimeSync();
   closeDb();
 });

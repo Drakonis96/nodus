@@ -26,7 +26,8 @@ const INITIAL_FORCE_LAYOUT_MAX_ITER = 96;
 const DRAG_TAP_SUPPRESSION_MS = 260;
 const DRAG_MOVEMENT_THRESHOLD = 3;
 const LEGEND_COLLAPSED_KEY = 'nodus.graph.legendCollapsed';
-const GRAPH_LOADING_DELAY_MS = 380;
+const LABEL_MIN_GAP = 18;
+const LABEL_COLLISION_CELL_SIZE = 224;
 
 function physicalLayoutElements(cy: Core) {
   return cy.nodes().filter((node) => !node.isParent()).union(
@@ -51,11 +52,13 @@ function createForceLayoutOptions(cy: Core, randomize: boolean, stop?: () => voi
     animate: false,
     fit: randomize,
     padding,
-    nodeDimensionsIncludeLabels: false,
+    // Labels are part of the visual footprint. Let the force solver account for
+    // them first, then the post-layout label pass below guarantees clearance.
+    nodeDimensionsIncludeLabels: true,
     randomize,
     refresh: randomize ? 18 : 28,
     componentSpacing: Math.round((isAuthorGraph ? 196 : 122) * densityScale),
-    nodeOverlap: isAuthorGraph ? 8 : 24,
+    nodeOverlap: isAuthorGraph ? 4 : 8,
     nodeRepulsion: (node: any) => {
       const type = node.data('type') as GraphNodeType | 'community-guide' | 'community';
       const degree = Math.max(0, Number(node.data('degree') ?? 0));
@@ -501,78 +504,114 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
 }
 
 function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number }>): void {
-  const nodes = cy.nodes().toArray();
-  if (nodes.length < 2 || nodes.length > 900) return;
+  const nodes = cy.nodes().filter((node) => !node.isParent()).toArray();
+  if (nodes.length < 2 || nodes.length > 1200) return;
 
   const boxes = nodes
-    .map((node) => {
-      const p = pos[node.id()];
-      if (!p) return null;
+    .map((node, index) => {
+      if (!pos[node.id()]) return null;
       const type = node.data('type') as GraphNodeType;
       const size = Number(node.data('size') ?? 32);
-      const font = type === 'theme' ? 13 : type === 'author' ? 9.5 : 10;
-      const maxWidth = type === 'theme' ? 190 : type === 'author' ? 118 : 150;
+      // These measurements mirror the Cytoscape label styles below, but include
+      // a small halo so a readable gap remains even when outlines are visible.
+      const font = type === 'theme' ? 11 : type === 'author' ? 9.5 : 8.5;
+      const maxWidth = type === 'theme' ? 128 : 104;
       const label = String(node.data('label') ?? '');
       const charsPerLine = Math.max(8, Math.floor(maxWidth / (font * 0.55)));
       const wrapped = wrapEstimate(label, charsPerLine);
-      const lines = Math.max(1, wrapped.lines);
-      const labelWidth = Math.min(maxWidth, Math.max(44, wrapped.maxLineLength * font * 0.58));
-      const labelHeight = lines * (font + 4);
+      const labelWidth = Math.min(maxWidth, Math.max(42, wrapped.maxLineLength * font * 0.58));
+      const labelHeight = Math.max(1, wrapped.lines) * (font + 3);
       return {
         id: node.id(),
-        type,
-        width: Math.max(size + 34, labelWidth + 42),
-        height: size + labelHeight + 34,
+        index,
+        width: Math.max(size + 30, labelWidth + 34),
         nodeRadius: size / 2,
         labelHeight,
-        nodeBias: type === 'theme' ? 0.28 : type === 'author' ? 0.82 : 0.5,
+        // Theme hubs hold the structure in place; authors are allowed to move
+        // further so dense author labels do not pile up around a hub.
+        mobility: type === 'theme' ? 0.28 : type === 'author' ? 0.78 : 0.56,
       };
     })
     .filter((box): box is NonNullable<typeof box> => !!box);
 
-  const boxFor = (box: (typeof boxes)[number]) => {
+  const boundsFor = (box: (typeof boxes)[number]) => {
     const p = pos[box.id];
     return {
       left: p.x - box.width / 2,
       right: p.x + box.width / 2,
       top: p.y - box.nodeRadius - 10,
-      bottom: p.y + box.nodeRadius + box.labelHeight + 24,
+      bottom: p.y + box.nodeRadius + box.labelHeight + 20,
     };
   };
 
-  const iterations = nodes.length > 450 ? 80 : 150;
+  // A uniform spatial grid keeps the label physics bounded for large libraries.
+  // The old all-pairs pass grew quadratically and was itself a source of freezes.
+  const iterations = boxes.length > 480 ? 30 : boxes.length > 220 ? 42 : 64;
   for (let iter = 0; iter < iterations; iter++) {
-    let moved = false;
-    for (let i = 0; i < boxes.length; i++) {
-      const a = boxes[i];
-      const pa = pos[a.id];
-      for (let j = i + 1; j < boxes.length; j++) {
-        const b = boxes[j];
-        const pb = pos[b.id];
-        const ba = boxFor(a);
-        const bb = boxFor(b);
-        const overlapX = Math.min(ba.right, bb.right) - Math.max(ba.left, bb.left);
-        const overlapY = Math.min(ba.bottom, bb.bottom) - Math.max(ba.top, bb.top);
-        if (overlapX <= 0 || overlapY <= 0) continue;
+    const cells = new Map<string, (typeof boxes)[number][]>();
+    for (const box of boxes) {
+      const p = pos[box.id];
+      const cell = `${Math.floor(p.x / LABEL_COLLISION_CELL_SIZE)}:${Math.floor(p.y / LABEL_COLLISION_CELL_SIZE)}`;
+      const bucket = cells.get(cell);
+      if (bucket) bucket.push(box);
+      else cells.set(cell, [box]);
+    }
 
-        const dx = pb.x - pa.x || stableUnit(`${a.id}|${b.id}`) - 0.5;
-        const dy = pb.y - pa.y || stableUnit(`${b.id}|${a.id}`) - 0.5;
-        if (overlapX < overlapY) {
-          const dir = dx >= 0 ? 1 : -1;
-          const push = Math.min(72, overlapX / 2 + 12);
-          pa.x -= dir * push * a.nodeBias;
-          pb.x += dir * push * b.nodeBias;
-        } else {
-          const dir = dy >= 0 ? 1 : -1;
-          const push = Math.min(72, overlapY / 2 + 12);
-          pa.y -= dir * push * a.nodeBias;
-          pb.y += dir * push * b.nodeBias;
+    let moved = false;
+    for (const a of boxes) {
+      const pa = pos[a.id];
+      const ba = boundsFor(a);
+      const minX = Math.floor((ba.left - LABEL_MIN_GAP) / LABEL_COLLISION_CELL_SIZE);
+      const maxX = Math.floor((ba.right + LABEL_MIN_GAP) / LABEL_COLLISION_CELL_SIZE);
+      const minY = Math.floor((ba.top - LABEL_MIN_GAP) / LABEL_COLLISION_CELL_SIZE);
+      const maxY = Math.floor((ba.bottom + LABEL_MIN_GAP) / LABEL_COLLISION_CELL_SIZE);
+
+      for (let gx = minX; gx <= maxX; gx++) {
+        for (let gy = minY; gy <= maxY; gy++) {
+          for (const b of cells.get(`${gx}:${gy}`) ?? []) {
+            if (b.index <= a.index) continue;
+            const pb = pos[b.id];
+            const currentA = boundsFor(a);
+            const bb = boundsFor(b);
+            const overlapX = Math.min(currentA.right + LABEL_MIN_GAP, bb.right) - Math.max(currentA.left - LABEL_MIN_GAP, bb.left);
+            const overlapY = Math.min(currentA.bottom + LABEL_MIN_GAP, bb.bottom) - Math.max(currentA.top - LABEL_MIN_GAP, bb.top);
+            if (overlapX <= 0 || overlapY <= 0) continue;
+
+            const dx = pb.x - pa.x || stableUnit(`${a.id}|${b.id}`) - 0.5;
+            const dy = pb.y - pa.y || stableUnit(`${b.id}|${a.id}`) - 0.5;
+            const totalMobility = a.mobility + b.mobility;
+            const aShare = a.mobility / totalMobility;
+            const bShare = b.mobility / totalMobility;
+            const push = Math.min(42, (Math.min(overlapX, overlapY) + 1) * 0.48);
+
+            if (overlapX < overlapY) {
+              const direction = dx >= 0 ? 1 : -1;
+              pa.x -= direction * push * aShare;
+              pb.x += direction * push * bShare;
+            } else {
+              const direction = dy >= 0 ? 1 : -1;
+              pa.y -= direction * push * aShare;
+              pb.y += direction * push * bShare;
+            }
+            moved = true;
+          }
         }
-        moved = true;
       }
     }
     if (!moved) return;
   }
+}
+
+function applyLabelBoxRepulsion(cy: Core): void {
+  const positions = Object.fromEntries(snapshotNodePositions(cy)) as Record<string, { x: number; y: number }>;
+  separateLabelBoxes(cy, positions);
+  cy.batch(() => {
+    cy.nodes().forEach((node) => {
+      if (node.isParent()) return;
+      const position = positions[node.id()];
+      if (position) node.position(position);
+    });
+  });
 }
 
 function wrapEstimate(label: string, charsPerLine: number): { lines: number; maxLineLength: number } {
@@ -1202,7 +1241,6 @@ export function GraphView({
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [graphLoading, setGraphLoading] = useState(false);
-  const [showGraphLoading, setShowGraphLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -1229,6 +1267,9 @@ export function GraphView({
   const lensRef = useRef<GraphLens>(lens);
   const appliedGraphModeRef = useRef<{ lens: GraphLens; layoutMode: 'force' | 'radial' } | null>(null);
   const graphLoadSeqRef = useRef(0);
+  const graphRenderSeqRef = useRef(0);
+  const graphRequestPendingRef = useRef(false);
+  const pendingGraphTransitionRef = useRef<{ first: number | null; second: number | null }>({ first: null, second: null });
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
@@ -1249,14 +1290,29 @@ export function GraphView({
     localStorage.setItem(LEGEND_COLLAPSED_KEY, legendCollapsed ? '1' : '0');
   }, [legendCollapsed]);
 
-  useEffect(() => {
-    if (!graphLoading) {
-      setShowGraphLoading(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setShowGraphLoading(true), GRAPH_LOADING_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [graphLoading]);
+  const cancelPendingGraphTransition = useCallback(() => {
+    const pending = pendingGraphTransitionRef.current;
+    if (pending.first != null) window.cancelAnimationFrame(pending.first);
+    if (pending.second != null) window.cancelAnimationFrame(pending.second);
+    pending.first = null;
+    pending.second = null;
+  }, []);
+
+  // Show the spinner for one painted frame before a Cytoscape rebuild. Layout
+  // calculation is synchronous, so simply setting state in the same click event
+  // never let the browser draw the indicator before the main thread was busy.
+  const transitionGraph = useCallback((apply: () => void) => {
+    cancelPendingGraphTransition();
+    setGraphLoading(true);
+    const pending = pendingGraphTransitionRef.current;
+    pending.first = window.requestAnimationFrame(() => {
+      pending.first = null;
+      pending.second = window.requestAnimationFrame(() => {
+        pending.second = null;
+        apply();
+      });
+    });
+  }, [cancelPendingGraphTransition]);
 
   useEffect(() => {
     localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
@@ -1274,6 +1330,7 @@ export function GraphView({
 
   const reload = useCallback(() => {
     const seq = ++graphLoadSeqRef.current;
+    graphRequestPendingRef.current = true;
     setGraphLoading(true);
     void Promise.all([
       window.nodus.getGraph(lens),
@@ -1281,12 +1338,15 @@ export function GraphView({
     ])
       .then(([nextData, nextThemes]) => {
         if (seq !== graphLoadSeqRef.current) return;
+        graphRequestPendingRef.current = false;
         setData(nextData);
         setThemes(nextThemes.map((x) => x.label));
         setThemesLoaded(true);
-      })
-      .finally(() => {
-        if (seq === graphLoadSeqRef.current) setGraphLoading(false);
+      }, (error) => {
+        if (seq !== graphLoadSeqRef.current) return;
+        graphRequestPendingRef.current = false;
+        console.error('[graph] load failed', error);
+        setGraphLoading(false);
       });
   }, [lens]);
 
@@ -1483,6 +1543,14 @@ export function GraphView({
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const renderSeq = ++graphRenderSeqRef.current;
+    const finishGraphRender = () => {
+      if (graphRequestPendingRef.current) return;
+      window.requestAnimationFrame(() => {
+        if (renderSeq !== graphRenderSeqRef.current || graphRequestPendingRef.current) return;
+        setGraphLoading(false);
+      });
+    };
     if (!cyRef.current) {
       const lightTheme = document.documentElement.classList.contains('light');
       cyRef.current = cytoscape({
@@ -2230,6 +2298,11 @@ export function GraphView({
     let restoredPositions = 0;
     const renderableNodes = cy.nodes().filter((node) => !node.isParent());
     const renderableNodeCount = renderableNodes.length;
+    if (renderableNodeCount === 0) {
+      setCommunitiesCollapsed(false);
+      finishGraphRender();
+      return;
+    }
     const seedPositions = computeSeedPositions(cy, lens);
     cy.batch(() => {
       renderableNodes.forEach((node) => {
@@ -2290,7 +2363,9 @@ export function GraphView({
       const forceLayout = createForceLayoutOptions(cy, randomize, () => {
         forceLayoutPrimedRef.current = true;
         if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+        applyLabelBoxRepulsion(cy);
         if (frameOnStop) frameGraph(cy);
+        finishGraphRender();
       }, overrides);
       layout = cy.layout(forceLayout);
       activeLayoutRef.current = layout;
@@ -2310,7 +2385,9 @@ export function GraphView({
           animationEasing: 'ease-in-out-cubic',
           stop: () => {
             forceLayoutPrimedRef.current = true;
+            applyLabelBoxRepulsion(cy);
             if (shouldFrameGraph) frameGraph(cy);
+            finishGraphRender();
           },
         } as any).run();
       } else {
@@ -2341,6 +2418,8 @@ export function GraphView({
   // cannot keep competing with other sections after navigation.
   useEffect(() => {
     return () => {
+      graphRenderSeqRef.current++;
+      cancelPendingGraphTransition();
       cancelPendingInitialLayout();
       cancelPendingFocusFrame();
       stopActiveLayout();
@@ -2359,7 +2438,7 @@ export function GraphView({
       cyRef.current?.destroy();
       cyRef.current = null;
     };
-  }, [cancelPendingDragFrame, cancelPendingFocusFrame, cancelPendingInitialLayout, stopActiveLayout]);
+  }, [cancelPendingDragFrame, cancelPendingFocusFrame, cancelPendingGraphTransition, cancelPendingInitialLayout, stopActiveLayout]);
 
   // Keep the graph framed when the window or panels resize.
   useEffect(() => {
@@ -2546,6 +2625,7 @@ export function GraphView({
       const layout = cy.layout({
         ...createForceLayoutOptions(cy, false, () => {
           if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+          applyLabelBoxRepulsion(cy);
         }),
         fit: false,
         animationDuration: 400,
@@ -2596,6 +2676,7 @@ export function GraphView({
       const layout = cy.layout({
         ...createForceLayoutOptions(cy, false, () => {
           if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
+          applyLabelBoxRepulsion(cy);
         }),
         fit: false,
         animationDuration: 400,
@@ -2650,22 +2731,31 @@ export function GraphView({
     setHighlightDepth(Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.round(parsed))) : DEFAULT_LOCAL_GRAPH_DEPTH);
   };
   const selectLens = (nextLens: GraphLens) => {
-    setLens(nextLens);
-    setActivePreset(nextLens === 'authors' ? 'authors' : 'overview');
+    if (nextLens === lens) return;
+    transitionGraph(() => {
+      setLens(nextLens);
+      setActivePreset(nextLens === 'authors' ? 'authors' : 'overview');
+    });
+  };
+  const selectLayoutMode = (nextLayoutMode: 'force' | 'radial') => {
+    if (nextLayoutMode === layoutMode) return;
+    transitionGraph(() => setLayoutMode(nextLayoutMode));
   };
   const applyPreset = useCallback((id: GraphPresetId, navigationTarget?: GraphNavigationTarget) => {
     const next = graphPreset(id, navigationTarget);
-    setActivePreset(id);
-    setLens(next.lens);
-    setFilters(next.filters);
-    setLayoutMode(next.layoutMode);
-    setHighlightDepth(next.depth);
-    setFiltersOpen(false);
-    if (id !== 'reading' || !navigationTarget?.workId) {
-      setContextNotice(null);
-      setContextZoteroKey(null);
-    }
-  }, []);
+    transitionGraph(() => {
+      setActivePreset(id);
+      setLens(next.lens);
+      setFilters(next.filters);
+      setLayoutMode(next.layoutMode);
+      setHighlightDepth(next.depth);
+      setFiltersOpen(false);
+      if (id !== 'reading' || !navigationTarget?.workId) {
+        setContextNotice(null);
+        setContextZoteroKey(null);
+      }
+    });
+  }, [transitionGraph]);
 
   useEffect(() => {
     if (!target || target.nonce === lastNavigationNonceRef.current) return;
@@ -2790,14 +2880,14 @@ export function GraphView({
               <button
                 className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
                 title="Layout dirigido por fuerzas: agrupa ideas conectadas"
-                onClick={() => setLayoutMode('force')}
+                onClick={() => selectLayoutMode('force')}
               >
                 Grafo
               </button>
               <button
                 className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
                 title="Layout radial: temas en polígono, ideas alrededor"
-                onClick={() => setLayoutMode('radial')}
+                onClick={() => selectLayoutMode('radial')}
               >
                 Radial
               </button>
@@ -2909,11 +2999,11 @@ export function GraphView({
         <div className="flex-1 min-w-0 relative">
           <div ref={containerRef} className="absolute inset-0" />
 
-          {showGraphLoading && (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          {graphLoading && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-neutral-950/10">
               <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-sm text-neutral-300 shadow-lg">
                 <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
-                Cargando grafo
+                Reorganizando grafo…
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.5.12",
+  "version": "0.5.13",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -96,8 +96,7 @@
         }
       ],
       "category": "public.app-category.education",
-      "icon": "build/icon.icns",
-      "identity": null
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": "nsis",
