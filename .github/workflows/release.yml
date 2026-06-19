@@ -15,6 +15,8 @@ permissions:
 
 jobs:
   release:
+    env:
+      HAS_MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
     strategy:
       fail-fast: false
       # electron-builder creates the GitHub Release as part of publishing. Running
@@ -43,16 +45,32 @@ jobs:
       - name: Build renderer + main
         run: npm run build
 
-      - name: Build and publish installer
+      - name: Build and publish Windows installer
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder ${{ matrix.platform }} --publish always
+
+      - name: Build and publish signed macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Configure these repository secrets to publish a notarized macOS
-          # build. Without them electron-builder produces the explicit local
-          # ad-hoc fallback, which macOS does not support for auto-update.
+          # build. This path is selected only when the certificate exists.
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: true
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx electron-builder ${{ matrix.platform }} --publish always
+
+      - name: Build and publish ad-hoc macOS installer
+        if: matrix.os == 'macos-latest' && env.HAS_MACOS_SIGNING != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The fallback keeps release production available while signing
+          # credentials are being configured. It deliberately avoids passing an
+          # empty CSC_LINK, which electron-builder treats as an invalid path.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
         run: npx electron-builder ${{ matrix.platform }} --publish always
