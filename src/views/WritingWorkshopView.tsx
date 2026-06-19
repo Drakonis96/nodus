@@ -75,7 +75,7 @@ export function WritingWorkshopView({
   const [activeTab, setActiveTab] = useState<MaterialTab>('ideas');
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
-  const [showTutorial, setShowTutorial] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -468,7 +468,7 @@ export function WritingWorkshopView({
 
 function WritingWorkshopTutorial() {
   return (
-    <section className="border-b border-neutral-800 bg-neutral-950/80 px-4 py-3">
+    <section className="border-b border-neutral-800 bg-white/95 px-4 py-3 dark:bg-neutral-950/80">
       <div className="grid grid-cols-4 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
         <TutorialStep
           icon="search"
@@ -497,7 +497,7 @@ function WritingWorkshopTutorial() {
 
 function TutorialStep({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
-    <div className="rounded-md border border-neutral-800 bg-neutral-900/60 p-3">
+    <div className="rounded-md border border-neutral-800 bg-white p-3 shadow-sm dark:bg-neutral-900/60 dark:shadow-none">
       <div className="flex items-center gap-2 text-sm font-medium text-neutral-200">
         <Icon name={icon} size={14} className="text-indigo-300" />
         {title}

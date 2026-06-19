@@ -15,21 +15,31 @@ function CollectionNode({
   col,
   depth,
   selectedKey,
+  monitoredKeys,
+  onMonitorToggle,
+  registerCollections,
   onSelect,
 }: {
   col: ZoteroCollection;
   depth: number;
   selectedKey: string | null;
+  monitoredKeys: Set<string>;
+  onMonitorToggle: (key: string) => void;
+  registerCollections: (collections: ZoteroCollection[]) => void;
   onSelect: (c: ZoteroCollection) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [children, setChildren] = useState<ZoteroCollection[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const isSelected = selectedKey === col.key;
+  const isMonitored = monitoredKeys.has(col.key);
 
   const expand = async () => {
     if (!open && children === null) {
       setLoading(true);
-      setChildren(await window.nodus.zoteroChildCollections(col.key).catch(() => []));
+      const loaded = await window.nodus.zoteroChildCollections(col.key).catch(() => []);
+      registerCollections(loaded);
+      setChildren(loaded);
       setLoading(false);
     }
     setOpen((o) => !o);
@@ -38,8 +48,12 @@ function CollectionNode({
   return (
     <div>
       <div
-        className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer text-sm hover:bg-neutral-800 ${
-          selectedKey === col.key ? 'bg-neutral-800 text-white' : 'text-neutral-300'
+        className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-sm transition-colors ${
+          isSelected
+            ? 'border-indigo-600 bg-indigo-600/15 text-neutral-100'
+            : isMonitored
+              ? 'border-emerald-600/70 bg-emerald-900/50 text-emerald-300'
+              : 'border-transparent text-neutral-300 hover:bg-neutral-800'
         }`}
         style={{ paddingLeft: depth * 14 + 6 }}
       >
@@ -49,6 +63,25 @@ function CollectionNode({
         <span className="flex-1 truncate" onClick={() => onSelect(col)}>
           {col.name}
         </span>
+        {isMonitored && (
+          <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+            Monitorizada
+          </span>
+        )}
+        <button
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
+            isMonitored
+              ? 'bg-red-950/40 text-red-300 hover:bg-red-900/50'
+              : 'bg-indigo-600/15 text-indigo-300 hover:bg-indigo-600 hover:text-white'
+          }`}
+          title={isMonitored ? 'Quitar esta colección del monitoreo' : 'Monitorizar esta colección'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMonitorToggle(col.key);
+          }}
+        >
+          {isMonitored ? 'Quitar' : 'Monitorizar'}
+        </button>
         <span className="text-[10px] text-neutral-600" title="ítems directos · subcolecciones">
           {col.itemCount}
           {col.subCount ? ` · ${col.subCount}▸` : ''}
@@ -56,13 +89,30 @@ function CollectionNode({
       </div>
       {open &&
         children?.map((c) => (
-          <CollectionNode key={c.key} col={c} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} />
+          <CollectionNode
+            key={c.key}
+            col={c}
+            depth={depth + 1}
+            selectedKey={selectedKey}
+            monitoredKeys={monitoredKeys}
+            onMonitorToggle={onMonitorToggle}
+            registerCollections={registerCollections}
+            onSelect={onSelect}
+          />
         ))}
     </div>
   );
 }
 
-export function CollectionsModal({ settings, onClose }: { settings: AppSettings; onClose: () => void }) {
+export function CollectionsModal({
+  settings,
+  onSettingsChange,
+  onClose,
+}: {
+  settings: AppSettings;
+  onSettingsChange?: () => Promise<unknown> | unknown;
+  onClose: () => void;
+}) {
   const readTag = settings.readTag;
   const [roots, setRoots] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<ZoteroCollection | null>(null);
@@ -71,6 +121,9 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
   const [worksByKey, setWorksByKey] = useState<Map<string, WorkView>>(new Map());
   const [recursive, setRecursive] = useState(true);
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
+  const [monitoringKeys, setMonitoringKeys] = useState<string[]>(settings.monitoredCollections ?? []);
+  const [knownCollections, setKnownCollections] = useState<Map<string, string>>(new Map());
+  const monitoredKeys = useMemo(() => new Set(monitoringKeys), [monitoringKeys]);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -86,6 +139,41 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
       setWorksByKey(new Map(ws.map((w) => [w.zotero_key, w])));
     });
   }, []);
+
+  useEffect(() => {
+    setMonitoringKeys(settings.monitoredCollections ?? []);
+  }, [settings.monitoredCollections]);
+
+  const registerCollections = useCallback((collections: ZoteroCollection[]) => {
+    setKnownCollections((current) => {
+      const next = new Map(current);
+      for (const collection of collections) next.set(collection.key, collection.name);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    registerCollections(roots);
+  }, [registerCollections, roots]);
+
+  const updateMonitoredCollections = useCallback(
+    async (nextKeys: string[]) => {
+      setMonitoringKeys(nextKeys);
+      await window.nodus.updateSettings({ monitoredCollections: nextKeys });
+      await onSettingsChange?.();
+    },
+    [onSettingsChange]
+  );
+
+  const toggleMonitoredCollection = useCallback(
+    (key: string) => {
+      const nextKeys = monitoredKeys.has(key)
+        ? monitoringKeys.filter((current) => current !== key)
+        : [...monitoringKeys, key];
+      void updateMonitoredCollections(nextKeys);
+    },
+    [monitoredKeys, monitoringKeys, updateMonitoredCollections]
+  );
 
   const loadItems = useCallback(
     async (col: ZoteroCollection, force = false) => {
@@ -140,6 +228,9 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
       return true;
     });
   }, [items, onlyTag, readTag, search, statusFilter, statusOf, types, yearMax, yearMin]);
+
+  const selectedIsMonitored = selected ? monitoredKeys.has(selected.key) : false;
+  const monitoredEntries = monitoringKeys.map((key) => ({ key, name: knownCollections.get(key) ?? key }));
 
   const refreshWorks = async () => {
     const ws = await window.nodus.listWorks({ includeArchived: true });
@@ -198,11 +289,60 @@ export function CollectionsModal({ settings, onClose }: { settings: AppSettings;
           </button>
         </div>
 
+        <div className="border-b border-neutral-800 bg-neutral-950/35 px-4 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-neutral-300">Monitorizando:</span>
+            {monitoringKeys.length === 0 ? (
+              <Badge color="amber">Ninguna colección</Badge>
+            ) : (
+              monitoredEntries.map((entry) => (
+                <button
+                  key={entry.key}
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-900/50 px-2 py-0.5 text-xs text-emerald-300 hover:bg-red-950/50 hover:text-red-300"
+                  title="Quitar del monitoreo"
+                  onClick={() => toggleMonitoredCollection(entry.key)}
+                >
+                  {entry.name}
+                  <Icon name="x" size={10} />
+                </button>
+              ))
+            )}
+            {selected && (
+              <>
+                <span className="text-neutral-600">|</span>
+                <span className="text-neutral-500">Vista actual:</span>
+                <Badge color={selectedIsMonitored ? 'green' : 'neutral'}>
+                  {selected.name} · {selectedIsMonitored ? 'monitorizada' : 'solo exploración'}
+                </Badge>
+                <button
+                  className={`rounded-md border px-2 py-0.5 ${
+                    selectedIsMonitored
+                      ? 'border-red-900/60 text-red-300 hover:bg-red-950/50'
+                      : 'border-indigo-800 text-indigo-300 hover:bg-indigo-600 hover:text-white'
+                  }`}
+                  onClick={() => toggleMonitoredCollection(selected.key)}
+                >
+                  {selectedIsMonitored ? 'Quitar del monitoreo' : 'Monitorizar esta colección'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
         <div className="flex-1 flex min-h-0">
           {/* Tree */}
           <div className="w-72 border-r border-neutral-800 overflow-y-auto p-2">
             {roots.map((c) => (
-              <CollectionNode key={c.key} col={c} depth={0} selectedKey={selected?.key ?? null} onSelect={loadItems} />
+              <CollectionNode
+                key={c.key}
+                col={c}
+                depth={0}
+                selectedKey={selected?.key ?? null}
+                monitoredKeys={monitoredKeys}
+                onMonitorToggle={toggleMonitoredCollection}
+                registerCollections={registerCollections}
+                onSelect={loadItems}
+              />
             ))}
             {roots.length === 0 && <div className="text-neutral-500 text-sm p-2">Sin colecciones.</div>}
           </div>

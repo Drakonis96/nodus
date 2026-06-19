@@ -346,7 +346,7 @@ export function registerIpc(
 
   // export / import
   h('data:export', async () => exportData());
-  h('data:import', async () => importData());
+  h('data:import', async (_e, password: string) => importData(password));
   h('data:resetGraph', async () => {
     // Stop any pending scans first so a finishing job can't repopulate after the wipe.
     scanQueue.clear();

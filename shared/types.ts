@@ -351,7 +351,7 @@ export interface GraphNode {
   statement?: string;
   workCount: number;
   workIds?: string[];
-  read: boolean; // true if any developing work is deep-scanned
+  read: boolean; // true when every linked work has the user's read tag
   themes: string[];
   years: number[];
   authors: string[];
@@ -1054,8 +1054,8 @@ export interface NodusApi {
   deleteConversation(id: string): Promise<void>;
 
   // export / import
-  exportData(): Promise<{ path: string } | null>;
-  importData(): Promise<{ ok: boolean; message: string }>;
+  exportData(): Promise<{ path: string; password: string } | null>;
+  importData(password: string): Promise<{ ok: boolean; message: string }>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;

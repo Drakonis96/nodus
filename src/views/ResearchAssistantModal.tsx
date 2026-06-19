@@ -188,6 +188,8 @@ export function ResearchAssistantModal({
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
@@ -215,6 +217,53 @@ export function ResearchAssistantModal({
   useEffect(() => {
     void refreshConversations();
   }, [refreshConversations]);
+
+  const isNearBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }, []);
+
+  const updateJumpIndicator = useCallback(() => {
+    const el = scrollRef.current;
+    setShowJumpToBottom(!!el && el.scrollHeight > el.clientHeight + 16 && !isNearBottom());
+  }, [isNearBottom]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => updateJumpIndicator();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    updateJumpIndicator();
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [updateJumpIndicator]);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    setShowJumpToBottom(false);
+  }, []);
+
+  const scrollToMessageStart = useCallback((messageId: string) => {
+    window.setTimeout(() => {
+      const el = scrollRef.current;
+      const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+      if (!el || !target) return;
+      el.scrollTo({ top: Math.max(0, target.offsetTop - el.offsetTop), behavior: 'smooth' });
+      setShowJumpToBottom(el.scrollHeight > el.clientHeight + 16);
+    }, 0);
+  }, []);
+
+  const copyMessageMarkdown = useCallback(async (message: UiMessage) => {
+    const text = message.content.trim();
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopiedMessageId(message.id);
+    window.setTimeout(() => {
+      setCopiedMessageId((current) => (current === message.id ? null : current));
+    }, 1400);
+  }, []);
 
   const selectedCount = useMemo(
     () =>
@@ -251,6 +300,8 @@ export function ResearchAssistantModal({
     setMessages([]);
     setInput('');
     setContextTitle(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? null);
+    setShowJumpToBottom(false);
+    setCopiedMessageId(null);
   };
 
   useEffect(() => {
@@ -262,6 +313,8 @@ export function ResearchAssistantModal({
     setActiveModeId('custom');
     if (initialTarget.selection) setSelection(cloneSelection(initialTarget.selection));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
+    setShowJumpToBottom(false);
+    setCopiedMessageId(null);
   }, [initialTarget]);
 
   const loadConversation = async (id: string) => {
@@ -277,7 +330,7 @@ export function ResearchAssistantModal({
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(null);
     setInput('');
-    window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 0);
+    window.setTimeout(() => scrollToBottom('auto'), 0);
   };
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
@@ -337,6 +390,7 @@ export function ResearchAssistantModal({
     setMessages((current) => [...current, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setInput('');
     setSending(true);
+    scrollToMessageStart(assistantId);
 
     try {
       const response = await window.nodus.researchChatStream(
@@ -348,7 +402,7 @@ export function ResearchAssistantModal({
                 message.id === assistantId ? { ...message, content: message.content + delta } : message
               )
             );
-            window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }), 0);
+            window.setTimeout(updateJumpIndicator, 0);
           },
         }
       );
@@ -358,7 +412,7 @@ export function ResearchAssistantModal({
         { id: assistantId, role: 'assistant', content: response.answer, selectionKey, stats: response.stats },
       ];
       setMessages(finalMessages);
-      window.setTimeout(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }), 0);
+      window.setTimeout(updateJumpIndicator, 0);
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
       const errorMessage: UiMessage = {
@@ -370,6 +424,7 @@ export function ResearchAssistantModal({
       };
       const finalMessages = [...priorMessages, userMessage, errorMessage];
       setMessages(finalMessages);
+      window.setTimeout(updateJumpIndicator, 0);
       await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);
@@ -568,41 +623,68 @@ export function ResearchAssistantModal({
           </aside>
 
           <section className="flex-1 min-w-0 flex flex-col">
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-              {messages.length === 0 && (
-                <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
-                  Pregunta sobre ideas, autores, temas, contradicciones o documentos.
-                </div>
-              )}
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[78%] rounded-lg border px-3 py-2 text-sm ${
-                      message.role === 'user'
-                        ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
-                        : message.error
-                          ? 'bg-red-950/40 border-red-800 text-red-200 whitespace-pre-wrap'
-                          : 'bg-neutral-900 border-neutral-800 text-neutral-200'
-                    }`}
-                  >
-                    {message.role === 'assistant' && !message.error && message.content ? (
-                      <Markdown
-                        content={message.content}
-                        onCitation={handleCitation}
-                      />
-                    ) : (
-                      message.content || (message.role === 'assistant' && sending ? '...' : '')
-                    )}
-                    {message.stats && (
-                      <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
-                        {message.stats.sections.join(', ') || 'Sin secciones'} · {message.stats.works} obras ·{' '}
-                        {message.stats.documents} docs · {formatChars(message.stats.contextChars)}
-                        {message.stats.truncated ? ' · recortado' : ''}
-                      </div>
-                    )}
+            <div className="relative flex-1 min-h-0">
+              <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
+                {messages.length === 0 && (
+                  <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
+                    Pregunta sobre ideas, autores, temas, contradicciones o documentos.
                   </div>
-                </div>
-              ))}
+                )}
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    data-message-id={message.id}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-9 text-sm ${
+                        message.role === 'user'
+                          ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
+                          : message.error
+                            ? 'bg-red-950/40 border-red-800 text-red-200 whitespace-pre-wrap'
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-200'
+                      }`}
+                    >
+                      <button
+                        className={`absolute right-2 top-2 rounded p-1 opacity-70 transition hover:opacity-100 ${
+                          message.role === 'user'
+                            ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
+                            : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+                        }`}
+                        title={copiedMessageId === message.id ? 'Copiado' : 'Copiar en Markdown'}
+                        onClick={() => void copyMessageMarkdown(message)}
+                        disabled={!message.content.trim()}
+                      >
+                        <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
+                      </button>
+                      {message.role === 'assistant' && !message.error && message.content ? (
+                        <Markdown
+                          content={message.content}
+                          onCitation={handleCitation}
+                        />
+                      ) : (
+                        message.content || (message.role === 'assistant' && sending ? '...' : '')
+                      )}
+                      {message.stats && (
+                        <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
+                          {message.stats.sections.join(', ') || 'Sin secciones'} · {message.stats.works} obras ·{' '}
+                          {message.stats.documents} docs · {formatChars(message.stats.contextChars)}
+                          {message.stats.truncated ? ' · recortado' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {showJumpToBottom && (
+                <button
+                  className="absolute bottom-4 right-4 h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800"
+                  title="Bajar al final"
+                  onClick={() => scrollToBottom()}
+                >
+                  <Icon name="arrowDown" />
+                </button>
+              )}
             </div>
 
             <footer className="border-t border-neutral-800 p-3">

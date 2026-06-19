@@ -25,6 +25,11 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgressEvent | null>(null);
   const [confirmReindex, setConfirmReindex] = useState(false);
+  const [backupResult, setBackupResult] = useState<{ path: string; password: string } | null>(null);
+  const [backupCopied, setBackupCopied] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importPassword, setImportPassword] = useState('');
+  const [importingBackup, setImportingBackup] = useState(false);
 
   useEffect(() => {
     return window.nodus.onUpdateProgress((event) => {
@@ -95,6 +100,39 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     const result = await window.nodus.installUpdate();
     setUpdateProgress({ ...result, at: new Date().toISOString() });
     setUpdateMessage(result.message);
+  };
+
+  const exportBackup = async () => {
+    const result = await window.nodus.exportData();
+    if (!result) return;
+    setBackupCopied(false);
+    setBackupResult(result);
+    flash(`Exportado: ${result.path}`);
+  };
+
+  const copyBackupPassword = async () => {
+    if (!backupResult) return;
+    await navigator.clipboard.writeText(backupResult.password);
+    setBackupCopied(true);
+  };
+
+  const importBackup = async () => {
+    if (!importPassword.trim()) {
+      flash('Introduce la contraseña de la copia.');
+      return;
+    }
+    setImportingBackup(true);
+    try {
+      const result = await window.nodus.importData(importPassword);
+      flash(result.message);
+      if (result.ok) {
+        setImportOpen(false);
+        setImportPassword('');
+        await onChange();
+      }
+    } finally {
+      setImportingBackup(false);
+    }
   };
 
   const updatePct =
@@ -228,17 +266,23 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           </Section>
 
           <Section title="Datos">
-            <div className="flex gap-2">
-              <button className="btn btn-ghost border border-neutral-700" onClick={() => window.nodus.exportData().then((r) => r && flash(`Exportado: ${r.path}`))}>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn btn-ghost border border-neutral-700" onClick={exportBackup}>
                 <Icon name="download" /> Exportar (.nodus)
               </button>
               <button
                 className="btn btn-ghost border border-neutral-700"
-                onClick={() => window.nodus.importData().then((r) => flash(r.message))}
+                onClick={() => {
+                  setImportPassword('');
+                  setImportOpen(true);
+                }}
               >
                 <Icon name="upload" /> Importar (.nodus)
               </button>
             </div>
+            <p className="text-xs text-neutral-500">
+              La copia incluye base de datos, ajustes, modelos, grafo y claves API dentro de un archivo cifrado con contraseña generada.
+            </p>
           </Section>
         </>
       ) : (
@@ -403,6 +447,57 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       )}
 
       {saved && <div className="fixed bottom-20 right-6 card px-4 py-2 text-sm text-emerald-400">{saved}</div>}
+      {backupResult && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
+          <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-semibold mb-2">Contraseña de la copia</h2>
+            <p className="text-sm text-neutral-400 mb-4">
+              Guarda esta contraseña. Nodus no puede recuperarla y será necesaria para importar la copia en otro ordenador.
+            </p>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3 font-mono text-sm break-all">
+              {backupResult.password}
+            </div>
+            <div className="mt-2 text-xs text-neutral-500 truncate">{backupResult.path}</div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setBackupResult(null)}>
+                Cerrar
+              </button>
+              <button className="btn btn-primary" onClick={() => void copyBackupPassword()}>
+                <Icon name={backupCopied ? 'check' : 'copy'} /> {backupCopied ? 'Copiada' : 'Copiar contraseña'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {importOpen && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setImportOpen(false)}>
+          <div className="card w-full max-w-md p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-semibold mb-2">Importar copia cifrada</h2>
+            <p className="text-sm text-neutral-400 mb-4">
+              Introduce la contraseña generada al exportar. Después selecciona el archivo .nodus.
+            </p>
+            <input
+              className="input w-full"
+              type="password"
+              value={importPassword}
+              onChange={(e) => setImportPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void importBackup();
+              }}
+              autoFocus
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setImportOpen(false)} disabled={importingBackup}>
+                Cancelar
+              </button>
+              <button className="btn btn-primary" onClick={() => void importBackup()} disabled={importingBackup}>
+                <Icon name={importingBackup ? 'sync' : 'upload'} className={importingBackup ? 'animate-spin' : ''} />
+                {importingBackup ? 'Importando…' : 'Seleccionar archivo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmReindex && (
         <ConfirmModal
           title="Reindexar todos los embeddings"

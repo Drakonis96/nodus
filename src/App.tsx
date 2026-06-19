@@ -243,7 +243,13 @@ export function App() {
         <EmbeddingProgressBar />
       </div>
 
-      {collectionsOpen && <CollectionsModal settings={settings} onClose={() => setCollectionsOpen(false)} />}
+      {collectionsOpen && (
+        <CollectionsModal
+          settings={settings}
+          onSettingsChange={reloadSettings}
+          onClose={() => setCollectionsOpen(false)}
+        />
+      )}
       {researchOpen && (
         <ResearchAssistantModal
           settings={settings}

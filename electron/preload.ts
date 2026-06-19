@@ -126,7 +126,7 @@ const api: NodusApi = {
   deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
 
   exportData: () => ipcRenderer.invoke('data:export'),
-  importData: () => ipcRenderer.invoke('data:import'),
+  importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   startEmbedding: (nodusIds) => ipcRenderer.invoke('embeddings:start', nodusIds).then(() => undefined),

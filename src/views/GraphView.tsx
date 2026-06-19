@@ -25,6 +25,8 @@ const INITIAL_FORCE_LAYOUT_DELAY_MS = 90;
 const INITIAL_FORCE_LAYOUT_MAX_ITER = 96;
 const DRAG_TAP_SUPPRESSION_MS = 260;
 const DRAG_MOVEMENT_THRESHOLD = 3;
+const LEGEND_COLLAPSED_KEY = 'nodus.graph.legendCollapsed';
+const GRAPH_LOADING_DELAY_MS = 380;
 
 function physicalLayoutElements(cy: Core) {
   return cy.nodes().filter((node) => !node.isParent()).union(
@@ -620,7 +622,7 @@ interface Filters {
 
 const DEFAULT_FILTERS: Filters = {
   search: '',
-  nodeTypes: GRAPH_NODE_TYPES.filter((t) => t !== 'theme'),
+  nodeTypes: [...GRAPH_NODE_TYPES],
   edgeTypes: [...EDGE_TYPES],
   theme: '',
   workIds: [],
@@ -678,7 +680,8 @@ const GRAPH_PRESETS: {
 
 const FILTER_KEY = 'nodus.graph.filters';
 const FILTER_VERSION_KEY = 'nodus.graph.filters.version';
-const FILTER_VERSION = '3';
+const FILTER_VERSION = '4';
+const LENS_KEY = 'nodus.graph.lens';
 const LOCAL_GRAPH_DEPTH_KEY = 'nodus.graph.localDepth.v2';
 
 function cloneFilters(filters: Filters): Filters {
@@ -775,6 +778,10 @@ function loadFilters(): Filters {
   } catch {
     return defaultFilters();
   }
+}
+
+function loadLens(): GraphLens {
+  return localStorage.getItem(LENS_KEY) === 'authors' ? 'authors' : 'ideas';
 }
 
 function loadHighlightDepth(): number | null {
@@ -1188,15 +1195,18 @@ export function GraphView({
     window.clearTimeout(pendingInitialLayoutTimerRef.current);
     pendingInitialLayoutTimerRef.current = null;
   }, []);
-  const [lens, setLens] = useState<GraphLens>('ideas');
+  const [lens, setLens] = useState<GraphLens>(loadLens);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
+  const [graphLoading, setGraphLoading] = useState(false);
+  const [showGraphLoading, setShowGraphLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
-  const [activePreset, setActivePreset] = useState<GraphPresetId>('overview');
+  const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1');
   const [contextNotice, setContextNotice] = useState<string | null>(null);
   const [contextZoteroKey, setContextZoteroKey] = useState<string | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
@@ -1218,6 +1228,7 @@ export function GraphView({
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
   const lensRef = useRef<GraphLens>(lens);
   const appliedGraphModeRef = useRef<{ lens: GraphLens; layoutMode: 'force' | 'radial' } | null>(null);
+  const graphLoadSeqRef = useRef(0);
 
   useEffect(() => {
     localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
@@ -1226,12 +1237,26 @@ export function GraphView({
 
   useEffect(() => {
     lensRef.current = lens;
+    localStorage.setItem(LENS_KEY, lens);
   }, [lens]);
 
   useEffect(() => {
     layoutModeRef.current = layoutMode;
     localStorage.setItem(LAYOUT_KEY, layoutMode);
   }, [layoutMode]);
+
+  useEffect(() => {
+    localStorage.setItem(LEGEND_COLLAPSED_KEY, legendCollapsed ? '1' : '0');
+  }, [legendCollapsed]);
+
+  useEffect(() => {
+    if (!graphLoading) {
+      setShowGraphLoading(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowGraphLoading(true), GRAPH_LOADING_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [graphLoading]);
 
   useEffect(() => {
     localStorage.setItem(DETAIL_WIDTH_KEY, String(detailWidth));
@@ -1248,11 +1273,21 @@ export function GraphView({
   }, [highlightDepth]);
 
   const reload = useCallback(() => {
-    void window.nodus.getGraph(lens).then(setData);
-    void window.nodus.getThemes().then((t) => {
-      setThemes(t.map((x) => x.label));
-      setThemesLoaded(true);
-    });
+    const seq = ++graphLoadSeqRef.current;
+    setGraphLoading(true);
+    void Promise.all([
+      window.nodus.getGraph(lens),
+      window.nodus.getThemes(),
+    ])
+      .then(([nextData, nextThemes]) => {
+        if (seq !== graphLoadSeqRef.current) return;
+        setData(nextData);
+        setThemes(nextThemes.map((x) => x.label));
+        setThemesLoaded(true);
+      })
+      .finally(() => {
+        if (seq === graphLoadSeqRef.current) setGraphLoading(false);
+      });
   }, [lens]);
 
   useEffect(() => {
@@ -1341,9 +1376,9 @@ export function GraphView({
   const elements = useMemo<ElementDefinition[]>(() => {
     const f = filters;
     const q = f.search.toLowerCase();
-    const visibleNodes = data.nodes.filter((n) => {
+    let visibleNodes = data.nodes.filter((n) => {
       if (lens === 'ideas' && !f.nodeTypes.includes(n.type)) return false;
-      if (f.theme && !n.themes.includes(f.theme)) return false;
+      if (lens === 'ideas' && f.theme && !n.themes.includes(f.theme)) return false;
       if (f.workIds.length > 0 && !(n.workIds ?? []).some((id) => f.workIds.includes(id))) return false;
       if (f.readState === 'read' && !n.read) return false;
       if (f.readState === 'unread' && n.read) return false;
@@ -1356,15 +1391,36 @@ export function GraphView({
       }
       return true;
     });
-    const visibleNodeById = new Map(visibleNodes.map((node) => [node.id, node]));
-    const nodeIds = new Set(visibleNodes.map((n) => n.id));
-    const visibleEdges = primaryThemeEdges(data.edges.filter((e) => {
+    let nodeIds = new Set(visibleNodes.map((n) => n.id));
+    let visibleEdges = primaryThemeEdges(data.edges.filter((e) => {
       if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) return false;
       if (lens === 'ideas' && !f.edgeTypes.includes(e.type)) return false;
       if (f.minConfidence > 0 && e.confidence < f.minConfidence) return false;
-      if (f.basis === 'explicit' && e.basis !== 'explicit') return false;
+      if (lens === 'ideas' && f.basis === 'explicit' && e.basis !== 'explicit') return false;
       return true;
     }));
+
+    if (lens === 'ideas' && activePreset === 'contradictions') {
+      const contradictionNodeIds = new Set<string>();
+      for (const edge of visibleEdges) {
+        if (edge.type !== 'contradicts' && edge.type !== 'refutes') continue;
+        contradictionNodeIds.add(edge.source);
+        contradictionNodeIds.add(edge.target);
+      }
+      const contextualNodeIds = new Set(contradictionNodeIds);
+      for (const edge of visibleEdges) {
+        if (edge.type !== 'contains') continue;
+        if (contradictionNodeIds.has(edge.source) || contradictionNodeIds.has(edge.target)) {
+          contextualNodeIds.add(edge.source);
+          contextualNodeIds.add(edge.target);
+        }
+      }
+      visibleNodes = visibleNodes.filter((node) => contextualNodeIds.has(node.id));
+      nodeIds = new Set(visibleNodes.map((n) => n.id));
+      visibleEdges = primaryThemeEdges(visibleEdges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target)));
+    }
+
+    const visibleNodeById = new Map(visibleNodes.map((node) => [node.id, node]));
     const physicalEdges = physicalEdgeIds(visibleEdges, visibleNodes.length, lens);
 
     const degreeById = new Map<string, number>();
@@ -1423,7 +1479,7 @@ export function GraphView({
       if (node) el.data.size = graphNodeSize(node, degree);
       return el;
     });
-  }, [data, filters, lens]);
+  }, [activePreset, data, filters, lens]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -2273,7 +2329,7 @@ export function GraphView({
             initialTemp: 120,
             coolingFactor: 0.955,
             numIter: Math.max(48, Math.min(INITIAL_FORCE_LAYOUT_MAX_ITER, Math.round(42 + cy.nodes().length * 0.08 + cy.edges().length * 0.025))),
-          }, false);
+          }, shouldFrameGraph);
         }, INITIAL_FORCE_LAYOUT_DELAY_MS);
       } else {
         startForceLayout(forceLayoutRandomize);
@@ -2593,6 +2649,10 @@ export function GraphView({
     const parsed = Number(value);
     setHighlightDepth(Number.isFinite(parsed) ? Math.min(8, Math.max(1, Math.round(parsed))) : DEFAULT_LOCAL_GRAPH_DEPTH);
   };
+  const selectLens = (nextLens: GraphLens) => {
+    setLens(nextLens);
+    setActivePreset(nextLens === 'authors' ? 'authors' : 'overview');
+  };
   const applyPreset = useCallback((id: GraphPresetId, navigationTarget?: GraphNavigationTarget) => {
     const next = graphPreset(id, navigationTarget);
     setActivePreset(id);
@@ -2719,10 +2779,10 @@ export function GraphView({
         {filtersOpen && (
           <div className="mt-2 rounded-lg border border-neutral-800 bg-neutral-900/55 p-2 flex flex-wrap gap-2 items-center">
             <div className="flex rounded-lg overflow-hidden border border-neutral-700">
-              <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('ideas')}>
+              <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('ideas')}>
                 Ideas
               </button>
-              <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => setLens('authors')}>
+              <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('authors')}>
                 Autores
               </button>
             </div>
@@ -2759,23 +2819,27 @@ export function GraphView({
                 ))}
               </div>
             )}
-            <select className="input" value={filters.theme} onChange={(e) => setF({ theme: e.target.value })}>
-              <option value="">Todos los temas</option>
-              {themes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            {lens === 'ideas' && (
+              <select className="input" value={filters.theme} onChange={(e) => setF({ theme: e.target.value })}>
+                <option value="">Todos los temas</option>
+                {themes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            )}
             <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
               <option value="all">Leído + no leído</option>
               <option value="read">Solo leído</option>
               <option value="unread">Solo no leído</option>
             </select>
-            <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
-              <option value="all">Explícito + inferido</option>
-              <option value="explicit">Solo explícito</option>
-            </select>
+            {lens === 'ideas' && (
+              <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
+                <option value="all">Explícito + inferido</option>
+                <option value="explicit">Solo explícito</option>
+              </select>
+            )}
             <label className="flex items-center gap-1 text-neutral-400">
               conf ≥ {filters.minConfidence.toFixed(1)}
               <input
@@ -2801,8 +2865,18 @@ export function GraphView({
                 <option value="unlimited">Sin límite</option>
               </select>
             </label>
-            <input className="input w-16" placeholder="año≥" onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })} />
-            <input className="input w-16" placeholder="año≤" onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })} />
+            <input
+              className="input w-16"
+              placeholder="año≥"
+              value={filters.yearMin ?? ''}
+              onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })}
+            />
+            <input
+              className="input w-16"
+              placeholder="año≤"
+              value={filters.yearMax ?? ''}
+              onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })}
+            />
             {lens === 'ideas' && (
               <button
                 className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
@@ -2812,7 +2886,7 @@ export function GraphView({
                 <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
               </button>
             )}
-            <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset('overview')}>
+            <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset(lens === 'authors' ? 'authors' : 'overview')}>
               Limpiar
             </button>
           </div>
@@ -2834,6 +2908,15 @@ export function GraphView({
         )}
         <div className="flex-1 min-w-0 relative">
           <div ref={containerRef} className="absolute inset-0" />
+
+          {showGraphLoading && (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+              <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-sm text-neutral-300 shadow-lg">
+                <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
+                Cargando grafo
+              </div>
+            </div>
+          )}
 
           {/* Zoom / fit controls */}
           <div className="absolute top-3 right-3 flex flex-col gap-1">
@@ -2859,23 +2942,37 @@ export function GraphView({
           />
 
           {/* Legend */}
-          <div className="absolute bottom-3 left-3 card p-2 text-[10px] space-y-1 bg-neutral-900/90 max-w-[220px]">
-            {GRAPH_NODE_TYPES.map((t) => (
-              <div key={t} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
-                {NODE_LABELS[t]}
-              </div>
-            ))}
-            <div className="pt-1 border-t border-neutral-800 text-neutral-500">○ borde punteado: no leída</div>
-            <div className="pt-1 border-t border-neutral-800 space-y-0.5">
-              {Object.entries(EDGE_TYPE_COLORS).filter(([t]) => t !== 'contains').map(([type, color]) => (
-                <div key={type} className="flex items-center gap-1.5 text-neutral-400">
-                  <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
-                  {EDGE_LABELS[type as keyof typeof EDGE_LABELS] ?? type}
-                </div>
-              ))}
+          <div className="absolute bottom-3 left-3 card p-2 text-[10px] bg-neutral-900/90 max-w-[220px]">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-neutral-300">Leyenda</span>
+              <button
+                className="ml-auto rounded p-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
+                title={legendCollapsed ? 'Mostrar leyenda' : 'Minimizar leyenda'}
+                onClick={() => setLegendCollapsed((v) => !v)}
+              >
+                <Icon name={legendCollapsed ? 'chevronRight' : 'chevronLeft'} size={12} />
+              </button>
             </div>
-            <div className="text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
+            {!legendCollapsed && (
+              <div className="mt-1 space-y-1">
+                {GRAPH_NODE_TYPES.map((t) => (
+                  <div key={t} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
+                    {NODE_LABELS[t]}
+                  </div>
+                ))}
+                <div className="pt-1 border-t border-neutral-800 text-neutral-500">○ borde punteado: no leída</div>
+                <div className="pt-1 border-t border-neutral-800 space-y-0.5">
+                  {Object.entries(EDGE_TYPE_COLORS).filter(([t]) => t !== 'contains').map(([type, color]) => (
+                    <div key={type} className="flex items-center gap-1.5 text-neutral-400">
+                      <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
+                      {EDGE_LABELS[type as keyof typeof EDGE_LABELS] ?? type}
+                    </div>
+                  ))}
+                </div>
+                <div className="text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
+              </div>
+            )}
           </div>
         </div>
 
