@@ -1,6 +1,7 @@
 import type { EmbeddingPipelineProgress } from '@shared/types';
 import { getDb } from '../db/database';
 import { clearAllEmbeddings, embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
+import { allWorkSummaryRows, clearAllWorkSummaryEmbeddings, summaryNeedsEmbedding, updateWorkSummaryEmbedding } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
@@ -267,7 +268,25 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
  */
 export async function reindexAll(): Promise<void> {
   clearAllEmbeddings();
+  clearAllWorkSummaryEmbeddings();
   await startEmbedding();
+  await reembedAllSummaries();
+}
+
+/** Rebuild orientation-summary vectors without coupling them to the idea-progress UI. */
+async function reembedAllSummaries(): Promise<void> {
+  for (const row of allWorkSummaryRows()) {
+    if (!summaryNeedsEmbedding(row, row.summary)) continue;
+    try {
+      const embedding = await embed(row.summary);
+      if (embedding) updateWorkSummaryEmbedding(row.nodus_id, row.summary, embedding);
+    } catch (error) {
+      console.error(
+        `[embeddingPipeline] error embedding work summary ${row.nodus_id}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+  }
 }
 
 /** Get per-work embedding status for the library table. */

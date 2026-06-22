@@ -4,11 +4,13 @@ import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
 import { runDeepScan } from '../ai/deepScan';
+import { runSummaryScan } from '../ai/summaryScan';
 import { reprocessConnections } from '../ai/reprocessConnections';
 import { listThemeLabels } from '../db/themesRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { getItem } from '../zotero/zoteroClient';
-import { setDeepResult } from '../db/worksRepo';
+import { setDeepResult, setSummaryPending } from '../db/worksRepo';
+import { failedSummaryWorks, pendingSummaryWorks } from '../db/workSummariesRepo';
 import { purgeDeepData } from '../db/ideasRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
@@ -27,8 +29,8 @@ class ScanQueue {
   private running = false;
   private listeners = new Set<ProgressListener>();
   private retries = new Map<string, number>();
-  /** Last kind dequeued, used to interleave light/deep so neither starves. */
-  private lastKind: QueueKind | null = null;
+  /** Last scan kind dequeued, used to interleave deep/light/summary fairly. */
+  private lastKind: 'light' | 'deep' | 'summary' | null = null;
   /** True if at least one deep scan completed since the last reprocess run. */
   private deepSinceReprocess = false;
   /** Guards against concurrent reprocess runs. */
@@ -148,7 +150,10 @@ class ScanQueue {
     const firstQueued = this.items.findIndex((i) => i.state === 'queued');
     const insertAt = firstQueued >= 0 ? firstQueued : this.items.length;
     this.items.splice(insertAt, 0, item);
-    this.lastKind = item.kind === 'deep' ? 'light' : 'deep';
+    if (item.kind !== 'bridge') {
+      const order: Array<'deep' | 'light' | 'summary'> = ['deep', 'light', 'summary'];
+      this.lastKind = order[(order.indexOf(item.kind) + order.length - 1) % order.length];
+    }
     this.emit();
   }
 
@@ -193,21 +198,21 @@ class ScanQueue {
 
   private resetPendingStatus(item: QueueItem): void {
     if (item.kind === 'bridge') return;
-    const column = item.kind === 'deep' ? 'deep_status' : 'light_status';
+    const column = item.kind === 'deep' ? 'deep_status' : item.kind === 'summary' ? 'summary_status' : 'light_status';
     getDb().prepare(`UPDATE works SET ${column} = 'none' WHERE nodus_id = ? AND ${column} = 'pending'`).run(item.nodus_id);
   }
 
   /**
-   * Pick the next job, alternating light/deep so neither layer starves the other.
-   * Deep jobs build the idea graph (nodes); light jobs populate themes. Interleaving
-   * means the user sees both appear early instead of waiting for one whole layer.
+   * Pick the next job by rotating deep/light/summary so no independent scan kind
+   * starves the others. Bridge jobs remain a valid fallback without entering rotation.
    */
   private nextQueued(): QueueItem | undefined {
     const queued = this.items.filter((i) => i.state === 'queued');
     if (queued.length === 0) return undefined;
-    const want: QueueKind = this.lastKind === 'deep' ? 'light' : 'deep';
-    const pick = queued.find((i) => i.kind === want) ?? queued[0];
-    this.lastKind = pick.kind;
+    const order: Array<'deep' | 'light' | 'summary'> = ['deep', 'light', 'summary'];
+    const nextIndex = this.lastKind === null ? 0 : (order.indexOf(this.lastKind) + 1) % order.length;
+    const pick = queued.find((item) => item.kind === order[nextIndex]) ?? queued[0];
+    if (pick.kind !== 'bridge') this.lastKind = pick.kind;
     return pick;
   }
 
@@ -305,9 +310,11 @@ class ScanQueue {
     try {
       if (item.kind === 'light') {
         await this.doLight(work, item.model ?? null);
-      } else {
+      } else if (item.kind === 'deep') {
         await this.doDeep(work, item);
         this.deepSinceReprocess = true;
+      } else {
+        await this.doSummary(work, item);
       }
       item.state = 'done';
       item.error = null;
@@ -398,6 +405,13 @@ class ScanQueue {
     });
   }
 
+  private async doSummary(work: Work, item: QueueItem): Promise<void> {
+    item.detail = 'Resumiendo…';
+    item.subPct = null;
+    this.emit();
+    await runSummaryScan(work, item.model ?? null);
+  }
+
   private async doBridge(item: QueueItem): Promise<void> {
     item.detail = 'Escaneando pares semánticos…';
     item.subPct = null;
@@ -434,15 +448,18 @@ class ScanQueue {
         "SELECT nodus_id, title FROM works WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
       )
       .all() as { nodus_id: string; title: string }[];
+    const failedSummary = failedSummaryWorks();
     db.prepare("UPDATE works SET light_status = 'pending' WHERE light_status = 'failed' AND archived = 0").run();
     db.prepare(
       "UPDATE works SET deep_status = 'pending' WHERE deep_status = 'failed' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
     ).run();
+    for (const w of failedSummary) setSummaryPending(w.nodus_id);
     for (const w of failedDeep) {
       purgeDeepData(w.nodus_id);
       this.enqueue(w.nodus_id, w.title, 'deep');
     }
     for (const w of failedLight) this.enqueue(w.nodus_id, w.title, 'light');
+    for (const w of failedSummary) this.enqueue(w.nodus_id, w.title, 'summary');
     this.resume();
   }
 
@@ -457,11 +474,13 @@ class ScanQueue {
         "SELECT nodus_id, title FROM works WHERE deep_status = 'pending' AND archived = 0 AND (read_tag = 1 OR manual_deep = 1)"
       )
       .all() as { nodus_id: string; title: string }[];
+    const pendingSummary = pendingSummaryWorks();
     for (const w of pendingDeep) {
       purgeDeepData(w.nodus_id);
       this.enqueue(w.nodus_id, w.title, 'deep');
     }
     for (const w of pendingLight) this.enqueue(w.nodus_id, w.title, 'light');
+    for (const w of pendingSummary) this.enqueue(w.nodus_id, w.title, 'summary');
   }
 }
 

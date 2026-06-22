@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const migrations: Migration[] = [
   {
@@ -368,6 +368,33 @@ export const migrations: Migration[] = [
       );
 
       CREATE INDEX idx_work_zotero_tags_tag ON work_zotero_tags(tag_id, nodus_id);
+    `,
+  },
+  {
+    version: 12,
+    up: /* sql */ `
+      ALTER TABLE works ADD COLUMN summary_status TEXT DEFAULT 'none';
+      ALTER TABLE works ADD COLUMN summary_at     TEXT;
+      ALTER TABLE works ADD COLUMN summary_hash   TEXT;
+
+      CREATE TABLE work_summaries (
+        nodus_id            TEXT PRIMARY KEY,
+        summary             TEXT NOT NULL,
+        source_level        TEXT NOT NULL,
+        model_json          TEXT,
+        content_hash        TEXT NOT NULL,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL,
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_work_summaries_embedding_meta
+        ON work_summaries(embedding_provider, embedding_model, embedding_dim, embedding_text_hash);
     `,
   },
 ];

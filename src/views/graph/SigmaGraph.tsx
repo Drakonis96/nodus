@@ -17,7 +17,7 @@ import type { GraphData, GraphNodeType } from '@shared/types';
 import { NODE_COLORS } from '../../components/ui';
 import type { GraphPresetId } from '../../navigation';
 import { t } from '../../i18n';
-import { buildGraphModel, EDGE_TYPE_COLORS, clampUnit, type GraphFilters, type GraphLens, type GraphModel } from './model';
+import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens, type GraphModel } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
 import { WorkerLayout, seedMissingPositions, scatterPositions } from './layout';
 import { computeClusters, type AggregatedGraph } from './lod';

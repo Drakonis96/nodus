@@ -27,7 +27,7 @@ const STRATEGY_HELP: Record<ReadingPathStrategy, string> = {
   connected_authors: 'Da peso a autores relacionados por el grafo de ideas.',
   bridges: 'Busca textos que conectan varias líneas temáticas o zonas del grafo.',
 };
-const READING_ENTRY_ROW_HEIGHT = 220;
+const READING_ENTRY_ROW_HEIGHT = 246;
 
 export function ReadingPathView({
   onOpenGraph,
@@ -198,7 +198,7 @@ function ReadingEntryCard({
   };
 
   return (
-    <div className={`card h-[208px] p-3 mr-2 flex gap-3 items-start overflow-hidden ${entry.read ? 'opacity-75' : ''}`}>
+    <div className={`card h-[246px] p-3 mr-2 flex gap-3 items-start overflow-hidden ${entry.read ? 'opacity-75' : ''}`}>
       <div className="text-lg font-mono text-neutral-600 w-8 text-right">{index}</div>
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -206,6 +206,7 @@ function ReadingEntryCard({
           {entry.read ? <Badge color="indigo">{t('leída')}</Badge> : <Badge color="amber">{t('por leer')}</Badge>}
           <Badge color={entry.analysis.deepStatus === 'done' ? 'green' : 'neutral'}>{entry.analysis.deepStatus === 'done' ? t('ideas analizadas') : t('ideas pendientes')}</Badge>
           <Badge color={entry.analysis.lightStatus === 'done' ? 'cyan' : 'neutral'}>{entry.analysis.lightStatus === 'done' ? t('temas analizados') : t('temas pendientes')}</Badge>
+          {entry.analysis.summaryStatus === 'done' && <Badge color="indigo">{t('resumen')}</Badge>}
           <Badge>{tx('prioridad {n}', { n: entry.priority })}</Badge>
         </div>
         <div className="text-xs text-neutral-500 mt-1">
@@ -221,6 +222,11 @@ function ReadingEntryCard({
           {entry.bridgeScore >= 0.45 && <Badge color="indigo">{t('puente')}</Badge>}
         </div>
         <p className="text-xs text-neutral-400 mt-2 line-clamp-2">{entry.reason}</p>
+        {entry.orientationSummary && (
+          <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2">
+            <span className="text-neutral-400">{t('Resumen (orientación):')} </span>{entry.orientationSummary}
+          </p>
+        )}
         {entry.relatedGaps.length > 0 && (
           <div className="mt-2 text-xs text-neutral-500 line-clamp-1">
             {t('Huecos relacionados:')} {entry.relatedGaps.map((g) => g.slice(0, 120)).join(' · ')}

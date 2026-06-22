@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, WorkMeta, WorkView } from '@shared/types';
+import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView } from '@shared/types';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { OccurrenceCard } from './NodeDetailPanel';
@@ -379,12 +379,14 @@ function WorkBody({
 }) {
   const [work, setWork] = useState<WorkView | null>(null);
   const [meta, setMeta] = useState<WorkMeta | null>(null);
+  const [summary, setSummary] = useState<WorkSummary | null>(null);
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     let on = true;
     setWork(null);
     setMeta(null);
+    setSummary(null);
     setMissing(false);
     void window.nodus.getWork(nodusId).then((w) => {
       if (!on) return;
@@ -392,6 +394,9 @@ function WorkBody({
         setWork(w);
         void window.nodus.getWorkMeta(nodusId).then((m) => {
           if (on) setMeta(m);
+        });
+        void window.nodus.getWorkSummary(nodusId).then((value) => {
+          if (on) setSummary(value);
         });
       } else {
         setMissing(true);
@@ -447,6 +452,13 @@ function WorkBody({
           </div>
         )}
       </div>
+      {summary && (
+        <section className="rounded-md border border-violet-900/60 bg-violet-950/15 p-3">
+          <div className="text-xs font-medium text-violet-200">{t('Resumen (orientación)')}</div>
+          <p className="mt-1 text-sm leading-relaxed text-neutral-300">{summary.summary}</p>
+          <p className="mt-2 text-[11px] text-neutral-500">{t('No es evidencia citable; sirve para situar la obra en el corpus.')}</p>
+        </section>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           className="btn btn-primary gap-1.5"

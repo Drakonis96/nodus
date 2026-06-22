@@ -336,6 +336,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             <Row label={t('Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
             </Row>
+            <Row label={t('Modelo de resúmenes (orientación por obra; no genera evidencia citable)')}>
+              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} />
+            </Row>
             <Row label={t('Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)')}>
               <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
             </Row>

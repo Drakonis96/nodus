@@ -8,6 +8,7 @@ import { t, tx } from '../i18n';
 const KIND_LABELS: Record<QueueKind, string> = {
   light: 'LIGERO',
   deep: 'PROFUNDO',
+  summary: 'RESUMEN',
   bridge: 'PUENTES',
 };
 

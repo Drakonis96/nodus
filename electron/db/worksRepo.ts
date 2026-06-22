@@ -1,5 +1,5 @@
 import { getDb } from './database';
-import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag } from '@shared/types';
+import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus } from '@shared/types';
 
 function normalizeZoteroTag(tag: string): string {
   return tag.trim().normalize('NFC').toLowerCase();
@@ -129,6 +129,10 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
   if (filter.deepStatus && filter.deepStatus !== 'all') {
     clauses.push('deep_status = @deepStatus');
     params.deepStatus = filter.deepStatus;
+  }
+  if (filter.summaryStatus && filter.summaryStatus !== 'all') {
+    clauses.push('summary_status = @summaryStatus');
+    params.summaryStatus = filter.summaryStatus;
   }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');
@@ -312,8 +316,15 @@ export function setDeepPending(nodusId: string): void {
   getDb().prepare("UPDATE works SET deep_status = 'pending' WHERE nodus_id = ?").run(nodusId);
 }
 
+export function setSummaryPending(nodusId: string): void {
+  getDb().prepare("UPDATE works SET summary_status = 'pending' WHERE nodus_id = ?").run(nodusId);
+}
+
 export function setLightResult(nodusId: string, status: string, hash: string | null, notes?: string | null): void {
-  getDb()
+  const db = getDb();
+  const previous = db.prepare('SELECT light_hash FROM works WHERE nodus_id = ?').get(nodusId) as { light_hash: string | null } | undefined;
+  if (status === 'done' && previous?.light_hash !== hash) invalidateSummary(nodusId);
+  db
     .prepare('UPDATE works SET light_status=?, light_at=?, light_hash=?, notes=COALESCE(?, notes) WHERE nodus_id=?')
     .run(status, new Date().toISOString(), hash, notes ?? null, nodusId);
 }
@@ -325,11 +336,27 @@ export function setDeepResult(
   sourceType: string | null,
   notes?: string | null
 ): void {
-  getDb()
+  const db = getDb();
+  const previous = db.prepare('SELECT deep_hash FROM works WHERE nodus_id = ?').get(nodusId) as { deep_hash: string | null } | undefined;
+  if ((status === 'done' || status === 'skipped_no_text') && previous?.deep_hash !== hash) invalidateSummary(nodusId);
+  db
     .prepare(
       'UPDATE works SET deep_status=?, deep_at=?, deep_hash=?, source_type=COALESCE(?, source_type), notes=COALESCE(?, notes) WHERE nodus_id=?'
     )
     .run(status, new Date().toISOString(), hash, sourceType ?? null, notes ?? null, nodusId);
+}
+
+export function setSummaryResult(nodusId: string, status: SummaryStatus, hash: string | null): void {
+  getDb()
+    .prepare('UPDATE works SET summary_status = ?, summary_at = ?, summary_hash = ? WHERE nodus_id = ?')
+    .run(status, new Date().toISOString(), hash, nodusId);
+}
+
+/** Underlying light/deep material changed, so its orientation summary is no longer current. */
+export function invalidateSummary(nodusId: string): void {
+  getDb()
+    .prepare("UPDATE works SET summary_status = 'none', summary_at = NULL, summary_hash = NULL WHERE nodus_id = ?")
+    .run(nodusId);
 }
 
 export function setArchived(nodusId: string, value: boolean): void {

@@ -9,6 +9,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   defaultModel: null,
   extractionModel: null,
   synthesisModel: null,
+  summaryModel: null,
   fusionModel: null,
   syncMode: 'manual',
   readTag: 'leído',

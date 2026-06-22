@@ -503,9 +503,11 @@ export function resetGraphData(): void {
       DELETE FROM authors;
       DELETE FROM work_themes;
       DELETE FROM themes;
+      DELETE FROM work_summaries;
       UPDATE works SET
         light_status = 'none', light_at = NULL, light_hash = NULL,
         deep_status = 'none', deep_at = NULL, deep_hash = NULL,
+        summary_status = 'none', summary_at = NULL, summary_hash = NULL,
         source_type = NULL, notes = NULL;
     `);
   });

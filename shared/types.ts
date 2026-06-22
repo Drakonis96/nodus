@@ -22,6 +22,7 @@ export type EvidenceKind = 'explicit' | 'paraphrased';
 
 export type LightStatus = 'none' | 'pending' | 'done' | 'failed';
 export type DeepStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
+export type SummaryStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
 export type DeepTrigger = 'tag' | 'manual' | 'both' | null;
 export type SourceType = 'pdf' | 'markdown' | 'upload' | 'abstract_only' | 'none';
 
@@ -50,6 +51,9 @@ export interface Work {
   deep_status: DeepStatus;
   deep_at: string | null;
   deep_hash: string | null;
+  summary_status: SummaryStatus;
+  summary_at: string | null;
+  summary_hash: string | null;
   archived: number; // 0|1
   notes: string | null;
 }
@@ -59,6 +63,15 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   authors: string[];
   themes: string[];
   zoteroTags: string[];
+}
+
+/** A non-citable orientation summary derived from already extracted material. */
+export interface WorkSummary {
+  nodus_id: string;
+  summary: string;
+  source_level: 'deep' | 'light';
+  created_at: string;
+  updated_at: string;
 }
 
 /** A Zotero tag available in the local library, with its current work count. */
@@ -222,6 +235,8 @@ export interface AppSettings {
   extractionModel: ModelRef | null;
   // Synthesis/tutor: long-form answers (research assistant, tutor narrative).
   synthesisModel: ModelRef | null;
+  // Short orientation summaries of individual works. Falls back to synthesisModel.
+  summaryModel: ModelRef | null;
   // Fusion: the many small dedup/relate calls during deep scan. Kept separate from
   // synthesisModel so a fast model can be used here without slowing long-form output.
   // Falls back to synthesisModel when unset.
@@ -321,7 +336,7 @@ export interface ZoteroItem {
 // Queue / pipeline
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type QueueKind = 'light' | 'deep' | 'bridge';
+export type QueueKind = 'light' | 'deep' | 'summary' | 'bridge';
 export type QueueState = 'queued' | 'running' | 'done' | 'failed' | 'cancelled' | 'paused';
 
 export interface QueueItem {
@@ -455,6 +470,7 @@ export interface ReadingPathRequest {
 export interface ReadingAnalysisStatus {
   lightStatus: LightStatus;
   deepStatus: DeepStatus;
+  summaryStatus: SummaryStatus;
   hasThemes: boolean;
   hasIdeas: boolean;
   hasContradictions: boolean;
@@ -474,6 +490,8 @@ export interface ReadingPathEntry {
   authors: string[];
   year: number | null;
   themes: string[];
+  /** Orientation only; it must not be treated as evidence or a citation. */
+  orientationSummary: string | null;
   readTag: boolean;
   read: boolean;
   analysis: ReadingAnalysisStatus;
@@ -555,6 +573,7 @@ export interface ResearchContextStats {
   sections: string[];
   works: number;
   documents: number;
+  summaries: number;
   contextChars: number;
   truncated: boolean;
 }
@@ -823,6 +842,8 @@ export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBa
   zotero_key: string;
   themes: string[];
   deepStatus: DeepStatus;
+  /** Orientation only; never evidence or a citation target. */
+  orientationSummary?: string | null;
   ideaCount: number;
   gapCount: number;
 }
@@ -976,6 +997,10 @@ export interface NodusApi {
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
+  summarizeWork(nodusId: string, model?: ModelRef | null): Promise<void>;
+  summarizeBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
+  summarizeAll(model?: ModelRef | null): Promise<void>;
+  getWorkSummary(nodusId: string): Promise<WorkSummary | null>;
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
@@ -1112,6 +1137,7 @@ export interface WorkFilter {
   search?: string;
   lightStatus?: LightStatus | 'all';
   deepStatus?: DeepStatus | 'all';
+  summaryStatus?: SummaryStatus | 'all';
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

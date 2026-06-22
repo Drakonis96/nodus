@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkView } from '@shared/types';
+import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView } from '@shared/types';
 import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
 import { t } from '../i18n';
 
@@ -202,9 +202,21 @@ function itemTypeLabel(type?: string | null): string | null {
 
 export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurrences'][number] }) {
   const [open, setOpen] = useState(false);
+  const [summary, setSummary] = useState<WorkSummary | null>(null);
   const work = occurrence.work;
   const author = work.authors[0] ?? t('Autor desconocido');
   const year = work.year ?? t('s.f.');
+
+  useEffect(() => {
+    let active = true;
+    if (work.summary_status !== 'done') return;
+    void window.nodus.getWorkSummary(work.nodus_id).then((value) => {
+      if (active) setSummary(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [work.nodus_id, work.summary_status]);
 
   return (
     <div className="card p-3 mb-2">
@@ -238,6 +250,13 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
         {occurrence.role} · conf {occurrence.confidence.toFixed(2)}
       </div>
       <p className="text-xs text-neutral-400 mt-1 leading-relaxed">{occurrence.development}</p>
+      {summary && (
+        <div className="mt-2 rounded border border-violet-900/60 bg-violet-950/15 p-2 text-xs leading-relaxed text-neutral-300">
+          <div className="mb-1 text-[10px] font-medium uppercase text-violet-200">{t('Resumen (orientación)')}</div>
+          {summary.summary}
+          <div className="mt-1 text-[10px] text-neutral-500">{t('No es evidencia citable.')}</div>
+        </div>
+      )}
     </div>
   );
 }

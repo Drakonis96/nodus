@@ -586,6 +586,8 @@ interface ReadingWorkRow {
   read_tag: number;
   light_status: string;
   deep_status: string;
+  summary_status: string;
+  orientation_summary: string | null;
   theme_count: number;
   theme_labels: string | null;
   idea_count: number;
@@ -730,7 +732,8 @@ function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
       )
       SELECT
         w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi,
-        w.read_tag, w.light_status, w.deep_status,
+        w.read_tag, w.light_status, w.deep_status, w.summary_status,
+        CASE WHEN w.summary_status = 'done' THEN ws.summary ELSE NULL END AS orientation_summary,
         COALESCE(ts.theme_count, 0) AS theme_count,
         ts.theme_labels,
         COALESCE(ist.idea_count, 0) AS idea_count,
@@ -745,6 +748,7 @@ function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
         COALESCE(ast.author_weight, 0) AS author_weight,
         COALESCE(ds.dependency_count, 0) AS dependency_count
       FROM works w
+      LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
       LEFT JOIN theme_stats ts ON ts.nodus_id = w.nodus_id
       LEFT JOIN idea_stats ist ON ist.nodus_id = w.nodus_id
       LEFT JOIN edge_stats es ON es.nodus_id = w.nodus_id
@@ -781,6 +785,7 @@ function toReadingEntry(
   const analysis = {
     lightStatus: row.light_status as any,
     deepStatus: row.deep_status as any,
+    summaryStatus: row.summary_status as any,
     hasThemes: row.theme_count > 0,
     hasIdeas: row.idea_count > 0,
     hasContradictions: row.contradiction_count > 0,
@@ -826,7 +831,7 @@ function toReadingEntry(
       Math.min(0.16, row.external_ref_count * 0.04)
   );
   const interestScore = opts.researchBrief
-    ? textRelevance(opts.researchBrief, [row.title, authors.join(' '), themes.join(' '), ideaLabels.join(' '), gapStatements.join(' ')].join(' '))
+    ? textRelevance(opts.researchBrief, [row.title, authors.join(' '), themes.join(' '), ideaLabels.join(' '), gapStatements.join(' '), row.orientation_summary ?? ''].join(' '))
     : coreThemeScore;
   const unreadBoost = read ? 0 : 0.08;
   const pendingAnalysisBoost = isPendingAnalysis(analysis) ? 0.08 : 0;
@@ -849,6 +854,7 @@ function toReadingEntry(
     authors,
     year: row.year,
     themes,
+    orientationSummary: row.orientation_summary,
     readTag: read,
     read,
     analysis,

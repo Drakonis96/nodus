@@ -4,6 +4,7 @@ import type {
   WorkFilter,
   DeepStatus,
   LightStatus,
+  SummaryStatus,
   AppSettings,
   ModelRef,
   WorkEmbeddingStatus,
@@ -23,7 +24,7 @@ import { t, tx } from '../i18n';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 12rem';
+  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 14.5rem';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">{t('ligero')} ✓</Badge>;
@@ -40,6 +41,21 @@ function deepBadge(s: DeepStatus) {
       return <Badge color="amber">{t('profundo')}…</Badge>;
     case 'failed':
       return <Badge color="red">{t('profundo')} ✕</Badge>;
+    case 'skipped_no_text':
+      return <Badge color="amber" title={t('Sin texto disponible')}>{t('sin texto')}</Badge>;
+    default:
+      return <Badge color="neutral">—</Badge>;
+  }
+}
+
+function summaryBadge(s: SummaryStatus) {
+  switch (s) {
+    case 'done':
+      return <Badge color="indigo">{t('resumen')} ✓</Badge>;
+    case 'pending':
+      return <Badge color="amber">{t('resumen')}…</Badge>;
+    case 'failed':
+      return <Badge color="red">{t('resumen')} ✕</Badge>;
     case 'skipped_no_text':
       return <Badge color="amber" title={t('Sin texto disponible')}>{t('sin texto')}</Badge>;
     default:
@@ -80,7 +96,7 @@ export function Library({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
-  const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
+  const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all', summaryStatus: 'all' });
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -143,6 +159,11 @@ export function Library({
     await load();
   };
 
+  const summarizeWork = async (w: WorkView) => {
+    await window.nodus.summarizeWork(w.nodus_id, scanModel);
+    await load();
+  };
+
   const analyzeSelectedThemes = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
@@ -166,6 +187,19 @@ export function Library({
     if (ids.length === 0) return;
     await window.nodus.analyzeBothBulk(ids, scanModel);
     setSelected(new Set());
+    await load();
+  };
+
+  const summarizeSelected = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    await window.nodus.summarizeBulk(ids, scanModel);
+    setSelected(new Set());
+    await load();
+  };
+
+  const summarizeMissing = async () => {
+    await window.nodus.summarizeAll(scanModel);
     await load();
   };
 
@@ -274,7 +308,8 @@ export function Library({
       withoutThemes: works.filter((w) => w.light_status === 'none').length,
       themesDone: works.filter((w) => w.light_status === 'done').length,
       ideasDone: works.filter((w) => w.deep_status === 'done').length,
-      failed: works.filter((w) => w.light_status === 'failed' || w.deep_status === 'failed').length,
+      summariesDone: works.filter((w) => w.summary_status === 'done').length,
+      failed: works.filter((w) => w.light_status === 'failed' || w.deep_status === 'failed' || w.summary_status === 'failed').length,
       pendingEmbeddings,
     };
   }, [embeddingStatuses, works]);
@@ -328,6 +363,18 @@ export function Library({
             <option value="none">{t('Profundo: ninguno')}</option>
             <option value="failed">{t('Profundo: fallido')}</option>
             <option value="skipped_no_text">{t('Profundo: sin texto')}</option>
+          </select>
+          <select
+            className="input"
+            value={filter.summaryStatus}
+            onChange={(e) => setFilter((f) => ({ ...f, summaryStatus: e.target.value as any }))}
+          >
+            <option value="all">{t('Resumen: todos')}</option>
+            <option value="done">{t('Resumen: hecho')}</option>
+            <option value="pending">{t('Resumen: pendiente')}</option>
+            <option value="none">{t('Resumen: ninguno')}</option>
+            <option value="failed">{t('Resumen: fallido')}</option>
+            <option value="skipped_no_text">{t('Resumen: sin texto')}</option>
           </select>
           <div className="relative">
             <button
@@ -424,6 +471,7 @@ export function Library({
           <SummaryPill label={t('temas hechos')} value={summary.themesDone} />
           <SummaryPill label={t('sin temas')} value={summary.withoutThemes} />
           <SummaryPill label={t('ideas hechas')} value={summary.ideasDone} />
+          <SummaryPill label={t('resúmenes hechos')} value={summary.summariesDone} tone="violet" />
           <SummaryPill label={t('embeddings pendientes')} value={summary.pendingEmbeddings} tone="cyan" />
           {summary.failed > 0 && <SummaryPill label={t('fallos')} value={summary.failed} tone="red" />}
         </div>
@@ -477,6 +525,9 @@ export function Library({
           <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
             <Icon name="layers" /> {t('Temas + ideas')}
           </button>
+          <button className="btn btn-ghost border border-violet-800 text-violet-300" onClick={summarizeSelected}>
+            <Icon name="wand" /> {t('Generar resumen')}
+          </button>
           <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
             <Icon name="search" /> {t('Indexar')}
           </button>
@@ -489,6 +540,14 @@ export function Library({
 
       {advancedOpen && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
+          <OperationCard
+            icon="wand"
+            title={t('Generar resúmenes faltantes')}
+            description={t('Crea resúmenes de orientación independientes a partir de ideas, evidencia, temas y abstract. No son evidencia citable.')}
+            buttonLabel={t('Generar resúmenes faltantes')}
+            tone="violet"
+            onClick={summarizeMissing}
+          />
           <OperationCard
             icon="wand"
             title={t('Reasignar temas')}
@@ -546,6 +605,7 @@ export function Library({
           <div className="font-medium">{t('Tema(s)')}</div>
           <div className="font-medium">{t('Ligero')}</div>
           <div className="font-medium">{t('Profundo')}</div>
+          <div className="font-medium">{t('Resumen')}</div>
           <div className="font-medium">{t('Embeddings')}</div>
           <div className="font-medium" data-tour="library-actions">{t('Acciones')}</div>
         </div>
@@ -586,6 +646,7 @@ export function Library({
                 <div className="p-1 whitespace-nowrap">
                   {deepBadge(w.deep_status)} {triggerBadge(w)}
                 </div>
+                <div className="p-1 whitespace-nowrap">{summaryBadge(w.summary_status)}</div>
                 <div className="p-1 whitespace-nowrap">
                   {embeddingBadge(embeddingStatuses.get(w.nodus_id))}
                   {needsEmbedding(w) && (
@@ -603,6 +664,12 @@ export function Library({
                     <RowIconButton title={t('Analizar temas')} icon="tag" onClick={() => analyzeThemes(w)} />
                     <RowIconButton title={w.deep_status === 'done' ? t('Reanalizar ideas') : t('Analizar ideas')} icon="bulb" onClick={() => analyzeIdeas(w)} />
                     <RowIconButton title={t('Analizar temas e ideas')} icon="layers" onClick={() => analyzeBoth(w)} />
+                    <RowIconButton
+                      title={w.summary_status === 'done' ? t('Regenerar resumen') : t('Generar resumen')}
+                      icon="wand"
+                      tone="violet"
+                      onClick={() => summarizeWork(w)}
+                    />
                     <RowIconButton
                       title={t('Ver esta obra en el grafo')}
                       icon="map"
@@ -660,13 +727,15 @@ function SummaryPill({
 }: {
   label: string;
   value: number;
-  tone?: 'neutral' | 'cyan' | 'red';
+  tone?: 'neutral' | 'cyan' | 'red' | 'violet';
 }) {
   const toneClass =
     tone === 'cyan'
       ? 'border-cyan-900/70 text-cyan-300'
       : tone === 'red'
         ? 'border-red-900/70 text-red-300'
+        : tone === 'violet'
+          ? 'border-violet-900/70 text-violet-300'
         : 'border-neutral-800 text-neutral-400';
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${toneClass}`}>

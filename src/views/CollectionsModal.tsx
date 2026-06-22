@@ -132,7 +132,7 @@ export function CollectionsModal({
   const [yearMin, setYearMin] = useState('');
   const [yearMax, setYearMax] = useState('');
   const [onlyTag, setOnlyTag] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'unscanned' | 'light' | 'deep'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unscanned' | 'light' | 'deep' | 'summary'>('all');
 
   useEffect(() => {
     void window.nodus.zoteroCollections().then(setRoots);
@@ -225,7 +225,8 @@ export function CollectionsModal({
       if (min != null && (it.year ?? 0) < min) return false;
       if (max != null && (it.year ?? 9999) > max) return false;
       if (onlyTag && !it.tags.some((t) => t.toLowerCase() === readTagLower)) return false;
-      if (statusFilter !== 'all' && statusOf(it.key) !== statusFilter) return false;
+      if (statusFilter === 'summary' && worksByKey.get(it.key)?.summary_status !== 'done') return false;
+      if (statusFilter !== 'all' && statusFilter !== 'summary' && statusOf(it.key) !== statusFilter) return false;
       return true;
     });
   }, [items, onlyTag, readTag, search, statusFilter, statusOf, types, yearMax, yearMin]);
@@ -261,6 +262,13 @@ export function CollectionsModal({
     await refreshWorks();
   };
 
+  const summarizeFiltered = async () => {
+    const nextWorks = await ensureWorks(filtered);
+    const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
+    if (ids.length) await window.nodus.summarizeBulk(ids, scanModel);
+    await refreshWorks();
+  };
+
   const deselectAllFiltered = async () => {
     const ids = filtered.map((it) => worksByKey.get(it.key)?.nodus_id).filter((x): x is string => !!x);
     if (ids.length) await window.nodus.setManualDeepBulk(ids, false);
@@ -272,6 +280,14 @@ export function CollectionsModal({
     const w = nextWorks.get(it.key);
     if (!w) return;
     await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
+    await refreshWorks();
+  };
+
+  const summarizeItem = async (it: ZoteroItem) => {
+    const nextWorks = worksByKey.has(it.key) ? worksByKey : await ensureWorks([it]);
+    const work = nextWorks.get(it.key);
+    if (!work) return;
+    await window.nodus.summarizeWork(work.nodus_id, scanModel);
     await refreshWorks();
   };
 
@@ -366,6 +382,7 @@ export function CollectionsModal({
                   <option value="unscanned">{t('Sin escanear')}</option>
                   <option value="light">{t('Ligero')}</option>
                   <option value="deep">{t('Profundo')}</option>
+                  <option value="summary">{t('Resumen')}</option>
                 </select>
                 <label className="text-xs flex items-center gap-1 text-neutral-400">
                   <input type="checkbox" checked={onlyTag} onChange={(e) => setOnlyTag(e.target.checked)} /> {t('solo tag')}
@@ -399,6 +416,9 @@ export function CollectionsModal({
                 </button>
                 <button className="btn btn-primary text-xs" title={t('Analizar temas y luego ideas de los ítems filtrados')} onClick={analyzeFilteredBoth}>
                   <Icon name="layers" size={14} /> {t('Ambos')}
+                </button>
+                <button className="btn btn-ghost text-xs border border-violet-800 text-violet-300" title={t('Generar resúmenes de los ítems filtrados')} onClick={summarizeFiltered}>
+                  <Icon name="wand" size={14} /> {t('Resumen')}
                 </button>
                 <button className="btn btn-ghost text-xs" onClick={deselectAllFiltered}>
                   <Icon name="x" size={14} /> {t('Deseleccionar')}
@@ -443,6 +463,14 @@ export function CollectionsModal({
                         </div>
                       </div>
                       <Badge color={st === 'deep' ? 'indigo' : st === 'light' ? 'green' : 'neutral'}>{st}</Badge>
+                      {w && <Badge color={w.summary_status === 'done' ? 'indigo' : w.summary_status === 'failed' ? 'red' : 'neutral'}>{w.summary_status === 'done' ? t('resumen ✓') : t('resumen —')}</Badge>}
+                      <button
+                        className="btn btn-ghost text-xs border border-violet-800/70 text-violet-300"
+                        title={w?.summary_status === 'done' ? t('Regenerar resumen') : t('Generar resumen')}
+                        onClick={() => void summarizeItem(it)}
+                      >
+                        <Icon name="wand" size={13} />
+                      </button>
                       {w?.deep_trigger === 'tag' && <span title={t('tag')}>🏷</span>}
                       {w?.deep_trigger === 'manual' && <span title={t('manual')}>✦</span>}
                       {w?.deep_trigger === 'both' && <span title={t('ambos')}>🏷✦</span>}

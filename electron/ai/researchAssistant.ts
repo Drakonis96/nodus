@@ -17,11 +17,16 @@ import { buildAuthorGraph, buildIdeaGraph, buildReadingPath, getContradictions }
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
 import { completeText, completeTextStream } from './aiClient';
+import { embed } from './aiClient';
+import { findSimilarWorks } from '../db/workSummariesRepo';
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
 const MAX_DOCUMENT_CHARS = 45_000;
 const MAX_DOCUMENT_TOTAL_CHARS = 800_000;
+const MAX_SUMMARIES = 180;
+const MAX_SUMMARY_CHARS = 5_000;
+const MAX_SUMMARY_TOTAL_CHARS = 180_000;
 
 type SectionPayload = Record<string, unknown>;
 
@@ -139,7 +144,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     throw new Error('El chat necesita una pregunta del usuario.');
   }
 
-  const { context, stats } = await buildResearchContext(request.selection);
+  const question = messages[messages.length - 1].content;
+  const { context, stats } = await buildResearchContext(request.selection, question);
   const system = [
     'Eres el asistente de investigacion avanzado de Nodus.',
     'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
@@ -157,6 +163,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
     '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
     '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
+    '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
   ].join('\n');
 
   const user = JSON.stringify(
@@ -171,7 +178,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   return { system, user, stats };
 }
 
-async function buildResearchContext(selection: ResearchContextSelection): Promise<BuildResult> {
+async function buildResearchContext(selection: ResearchContextSelection, question = ''): Promise<BuildResult> {
   const context: SectionPayload = {
     generated_at: new Date().toISOString(),
     note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario en el modal.',
@@ -220,8 +227,9 @@ async function buildResearchContext(selection: ResearchContextSelection): Promis
   }
 
   if (selection.documents) {
-    const documentContext = await listDocuments(linkedWorkIds);
+    const documentContext = await listDocuments(linkedWorkIds, question);
     context.documentos_relacionados = documentContext.documents;
+    context.documentos_resumidos = documentContext.summaries;
     if (documentContext.omitted > 0) {
       context.documentos_relacionados_omitidos = documentContext.omitted;
     }
@@ -237,6 +245,9 @@ async function buildResearchContext(selection: ResearchContextSelection): Promis
       works: linkedWorkIds.size,
       documents: selection.documents && Array.isArray(context.documentos_relacionados)
         ? context.documentos_relacionados.length
+        : 0,
+      summaries: selection.documents && Array.isArray(context.documentos_resumidos)
+        ? context.documentos_resumidos.length
         : 0,
       contextChars,
       truncated,
@@ -519,8 +530,11 @@ function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<strin
   return out;
 }
 
-async function listDocuments(linkedWorkIds: Set<string>): Promise<{ documents: unknown[]; omitted: number; truncated: boolean }> {
-  const candidateWorks = selectDocumentWorks(linkedWorkIds);
+async function listDocuments(
+  linkedWorkIds: Set<string>,
+  question: string
+): Promise<{ documents: unknown[]; summaries: unknown[]; omitted: number; truncated: boolean }> {
+  const candidateWorks = await selectDocumentWorks(linkedWorkIds, question);
   const works = candidateWorks.slice(0, MAX_DOCUMENTS);
   const omitted = Math.max(0, candidateWorks.length - works.length);
   const settings = getSettings();
@@ -528,6 +542,7 @@ async function listDocuments(linkedWorkIds: Set<string>): Promise<{ documents: u
   const documents: unknown[] = [];
   let totalChars = 0;
   let truncated = omitted > 0;
+  const summaries = listDocumentSummaries(candidateWorks);
 
   for (const work of works) {
     linkedWorkIds.add(work.nodus_id);
@@ -563,20 +578,71 @@ async function listDocuments(linkedWorkIds: Set<string>): Promise<{ documents: u
     }
   }
 
-  return { documents, omitted, truncated };
+  return { documents, summaries, omitted, truncated };
 }
 
-function selectDocumentWorks(linkedWorkIds: Set<string>): WorkRow[] {
+async function selectDocumentWorks(linkedWorkIds: Set<string>, question: string): Promise<WorkRow[]> {
   const db = getDb();
+  let works: WorkRow[];
   if (linkedWorkIds.size > 0) {
     const all = Array.from(linkedWorkIds)
       .map((id) => db.prepare('SELECT * FROM works WHERE nodus_id = ? AND archived = 0').get(id) as WorkRow | undefined)
       .filter((work): work is WorkRow => Boolean(work));
-    return all.sort((a, b) => Number(b.deep_status === 'done') - Number(a.deep_status === 'done') || (b.year ?? 0) - (a.year ?? 0));
+    works = all;
+  } else {
+    works = db
+      .prepare("SELECT * FROM works WHERE archived = 0 ORDER BY deep_status = 'done' DESC, year DESC, title ASC")
+      .all() as WorkRow[];
   }
-  return db
-    .prepare("SELECT * FROM works WHERE archived = 0 ORDER BY deep_status = 'done' DESC, year DESC, title ASC")
-    .all() as WorkRow[];
+  const fallback = (a: WorkRow, b: WorkRow) =>
+    Number(b.deep_status === 'done') - Number(a.deep_status === 'done') ||
+    (b.year ?? 0) - (a.year ?? 0) ||
+    a.title.localeCompare(b.title);
+  if (!question.trim()) return works.sort(fallback);
+
+  const queryEmbedding = await embed(question.trim());
+  if (!queryEmbedding) return works.sort(fallback);
+  const similarities = new Map(findSimilarWorks(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES)).map((row) => [row.nodus_id, row.similarity]));
+  return works.sort((a, b) => {
+    const aSimilarity = similarities.get(a.nodus_id);
+    const bSimilarity = similarities.get(b.nodus_id);
+    if (aSimilarity != null || bSimilarity != null) return (bSimilarity ?? -Infinity) - (aSimilarity ?? -Infinity) || fallback(a, b);
+    return fallback(a, b);
+  });
+}
+
+function listDocumentSummaries(candidateWorks: WorkRow[]): unknown[] {
+  const ids = candidateWorks.map((work) => work.nodus_id);
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = getDb()
+    .prepare(
+      `SELECT ws.nodus_id, ws.summary, ws.source_level
+         FROM work_summaries ws
+         JOIN works w ON w.nodus_id = ws.nodus_id
+        WHERE ws.nodus_id IN (${placeholders})
+          AND w.summary_status = 'done'`
+    )
+    .all(...ids) as { nodus_id: string; summary: string; source_level: 'deep' | 'light' }[];
+  const byWork = new Map(rows.map((row) => [row.nodus_id, row]));
+  const summaries: unknown[] = [];
+  let chars = 0;
+  for (const work of candidateWorks) {
+    const row = byWork.get(work.nodus_id);
+    if (!row || summaries.length >= MAX_SUMMARIES) continue;
+    const remaining = Math.max(0, MAX_SUMMARY_TOTAL_CHARS - chars);
+    if (remaining === 0) break;
+    const clipped = clipText(row.summary, Math.min(MAX_SUMMARY_CHARS, remaining));
+    chars += clipped.text.length;
+    summaries.push({
+      work: workSummary(work),
+      summary: clipped.text,
+      source_level: row.source_level,
+      orientation_only: true,
+      truncated: clipped.truncated,
+    });
+  }
+  return summaries;
 }
 
 function getWorkSummary(nodusId: string): WorkSummary | null {

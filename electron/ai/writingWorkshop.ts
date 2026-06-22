@@ -82,6 +82,7 @@ interface WorkRow {
   authors_json: string;
   year: number | null;
   deep_status: WritingWorkshopWorkCandidate['deepStatus'];
+  orientation_summary: string | null;
   themes: string | null;
   idea_count: number;
   gap_count: number;
@@ -158,6 +159,7 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     'Eres el Taller de escritura de Nodus. Ayudas a convertir un grafo academico local en un borrador verificable.',
     'Debes escribir en espanol salvo que el campo language pida otra lengua.',
     'Usa SOLO los materiales recibidos. No inventes obras, autores, citas, paginas ni relaciones.',
+    'Los campos resumen_orientacion son solo para ubicar una obra: NUNCA son evidencia ni una fuente citable. Para afirmaciones sustantivas usa ideas, evidencias, huecos o contradicciones anclados.',
     'Cada afirmacion sustantiva del borrador debe ir ligada a una fuente mediante enlaces Markdown nodus://.',
     'El objetivo NO es una respuesta breve: entrega un borrador desarrollado, pegable en un capitulo o articulo.',
     'Integra de forma explicita todas las ideas seleccionadas que puedas sostener con el contexto. Si hay muchas, agrupalas en lineas argumentales, pero no las reduzcas a una lista.',
@@ -398,10 +400,12 @@ function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status,
+              CASE WHEN w.summary_status = 'done' THEN ws.summary ELSE NULL END AS orientation_summary,
               COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
               COUNT(DISTINCT io.global_id) AS idea_count,
               COUNT(DISTINCT g.id) AS gap_count
          FROM works w
+         LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
          LEFT JOIN work_themes wt ON wt.nodus_id = w.nodus_id
          LEFT JOIN themes t ON t.theme_id = wt.theme_id
          LEFT JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
@@ -415,7 +419,7 @@ function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
   return rows
     .map((row): Scored<WritingWorkshopWorkCandidate> => {
       const themes = splitList(row.themes);
-      const semantic = relevance(tokens, [row.title, themes.join(' ')].join(' '));
+      const semantic = relevance(tokens, [row.title, themes.join(' '), row.orientation_summary ?? ''].join(' '));
       const support = Math.min(0.18, row.idea_count * 0.03) + Math.min(0.14, row.gap_count * 0.035) + (row.deep_status === 'done' ? 0.08 : 0);
       const score = semantic + support;
       return {
@@ -424,7 +428,7 @@ function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
         item: {
           id: row.nodus_id,
           label: row.title,
-          summary: `${parseAuthors(row.authors_json)[0] ?? 'Autoría no disponible'}${row.year ? `, ${row.year}` : ''}`,
+          summary: row.orientation_summary ?? `${parseAuthors(row.authors_json)[0] ?? 'Autoría no disponible'}${row.year ? `, ${row.year}` : ''}`,
           score,
           reason: '',
           title: row.title,
@@ -433,6 +437,7 @@ function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
           zotero_key: row.zotero_key,
           themes,
           deepStatus: row.deep_status,
+          orientationSummary: row.orientation_summary,
           ideaCount: row.idea_count,
           gapCount: row.gap_count,
         },
@@ -733,10 +738,12 @@ function selectedWorks(ids: string[]) {
   const rows = getDb()
     .prepare(
       `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status,
+              CASE WHEN w.summary_status = 'done' THEN ws.summary ELSE NULL END AS orientation_summary,
               COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
               COUNT(DISTINCT io.global_id) AS idea_count,
               COUNT(DISTINCT g.id) AS gap_count
          FROM works w
+         LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
          LEFT JOIN work_themes wt ON wt.nodus_id = w.nodus_id
          LEFT JOIN themes t ON t.theme_id = wt.theme_id
          LEFT JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
@@ -754,6 +761,8 @@ function selectedWorks(ids: string[]) {
     estado_profundo: row.deep_status,
     ideas: row.idea_count,
     huecos: row.gap_count,
+    resumen_orientacion: row.orientation_summary,
+    resumen_no_citable: row.orientation_summary ? true : undefined,
     cita: `nodus://work/${row.nodus_id}`,
   }));
 }

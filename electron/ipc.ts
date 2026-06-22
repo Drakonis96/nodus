@@ -37,6 +37,7 @@ import { buildIdeaGraph, buildAuthorGraph, getContradictions, buildReadingPath }
 import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
+import { summaryContentHash } from './ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
@@ -46,6 +47,7 @@ import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedd
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
+import * as workSummaries from './db/workSummariesRepo';
 import { getDb } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
 
@@ -193,11 +195,43 @@ export function registerIpc(
     if (kind === 'deep') {
       ideas.purgeDeepData(nodusId);
       works.setDeepPending(nodusId);
+    } else if (kind === 'summary') {
+      works.setSummaryPending(nodusId);
     } else {
       works.setLightPending(nodusId);
     }
     scanQueue.enqueue(nodusId, w.title, kind, model);
   });
+  h('works:summarize', async (_e, nodusId: string, model?: ModelRef | null) => {
+    const work = works.getWork(nodusId);
+    if (!work) return;
+    works.setSummaryPending(nodusId);
+    scanQueue.enqueue(nodusId, work.title, 'summary', model);
+  });
+  h('works:summarizeBulk', async (_e, nodusIds: string[], model?: ModelRef | null) => {
+    for (const nodusId of nodusIds) {
+      const work = works.getWork(nodusId);
+      if (!work) continue;
+      works.setSummaryPending(nodusId);
+      scanQueue.enqueue(nodusId, work.title, 'summary', model);
+    }
+  });
+  h('works:summarizeAll', async (_e, model?: ModelRef | null) => {
+    const all = works.listWorks();
+    let enqueued = 0;
+    for (const work of all) {
+      if (
+        work.summary_status === 'done' &&
+        work.summary_hash === summaryContentHash(work, model) &&
+        workSummaries.getWorkSummary(work.nodus_id)
+      ) continue;
+      works.setSummaryPending(work.nodus_id);
+      scanQueue.enqueue(work.nodus_id, work.title, 'summary', model);
+      enqueued++;
+    }
+    return enqueued;
+  });
+  h('works:getSummary', async (_e, nodusId: string) => workSummaries.getWorkSummary(nodusId));
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();
     await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);
