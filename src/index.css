@@ -70,6 +70,9 @@ body {
 .light .hover\:text-indigo-300:hover {
   color: #4338ca;
 }
+.light .hover\:text-neutral-100:hover {
+  color: #111827;
+}
 .light .hover\:text-red-400:hover {
   color: #b91c1c;
 }
@@ -178,6 +181,16 @@ body {
 }
 .light .zotero-tag-chip:hover {
   background-color: #e0e7ff;
+}
+
+/* The per-work analysis actions use neutral icons in dark mode.  Give their
+   hover, active and keyboard-focus states an explicit light palette so the
+   icons never turn white on a pale background. */
+.light .library-row-action-neutral:hover,
+.light .library-row-action-neutral:active,
+.light .library-row-action-neutral:focus-visible {
+  background-color: #e0e7ff;
+  color: #312e81;
 }
 
 /* Subtle, minimalist scrollbars. */

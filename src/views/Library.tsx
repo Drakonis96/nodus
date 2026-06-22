@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   WorkView,
   WorkFilter,
@@ -13,7 +13,7 @@ import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
-import { useDataRefresh } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -89,24 +89,39 @@ export function Library({
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
+  const initialLoadRef = useRef(true);
+  const loadRequestRef = useRef(0);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    const [w, tags, statuses] = await Promise.all([
-      window.nodus.listWorks(filter),
-      window.nodus.listZoteroTags(),
-      window.nodus.getWorkEmbeddingStatuses(),
-    ]);
-    setWorks(w);
-    setAvailableZoteroTags(tags);
-    setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
-    setLoading(false);
+    const requestId = ++loadRequestRef.current;
+    if (initialLoadRef.current) setLoading(true);
+    try {
+      const [w, tags, statuses] = await Promise.all([
+        window.nodus.listWorks(filter),
+        window.nodus.listZoteroTags(),
+        window.nodus.getWorkEmbeddingStatuses(),
+      ]);
+      // A newer filter or refresh may have completed while this request was in
+      // flight.  Never replace its results with stale rows.
+      if (requestId !== loadRequestRef.current) return;
+      setWorks(w);
+      setAvailableZoteroTags(tags);
+      setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
+    } finally {
+      if (requestId === loadRequestRef.current) {
+        initialLoadRef.current = false;
+        setLoading(false);
+      }
+    }
   }, [filter]);
 
   useEffect(() => {
     void load();
   }, [load]);
   useDataRefresh(load);
+  // Once a queued analysis finishes, reapply the active tag/status predicate
+  // without remounting the virtual list or losing the reader's scroll position.
+  useScanComplete(() => void load());
 
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light', scanModel);
@@ -128,7 +143,9 @@ export function Library({
   };
 
   const analyzeSelectedThemes = async () => {
-    for (const id of selected) {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    for (const id of ids) {
       await window.nodus.rescan(id, 'light', scanModel);
     }
     setSelected(new Set());
@@ -136,13 +153,17 @@ export function Library({
   };
 
   const analyzeSelectedIdeas = async () => {
-    await window.nodus.setManualDeepBulk(Array.from(selected), true, scanModel);
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    await window.nodus.setManualDeepBulk(ids, true, scanModel);
     setSelected(new Set());
     await load();
   };
 
   const analyzeSelectedBoth = async () => {
-    await window.nodus.analyzeBothBulk(Array.from(selected), scanModel);
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    await window.nodus.analyzeBothBulk(ids, scanModel);
     setSelected(new Set());
     await load();
   };
@@ -162,7 +183,9 @@ export function Library({
   };
 
   const embedSelected = async () => {
-    await window.nodus.startEmbedding(Array.from(selected));
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    await window.nodus.startEmbedding(ids);
     setSelected(new Set());
   };
 
@@ -216,7 +239,31 @@ export function Library({
     setTagSearch('');
   };
 
-  const allVisibleSelected = works.length > 0 && works.every((w) => selected.has(w.nodus_id));
+  // A batch action must only operate on the current result set.  Otherwise a
+  // selection made before changing a tag/status filter can silently enqueue
+  // works that are no longer visible.
+  const selectedVisibleIds = useMemo(
+    () => works.filter((work) => selected.has(work.nodus_id)).map((work) => work.nodus_id),
+    [selected, works]
+  );
+  useEffect(() => {
+    const visibleIds = new Set(works.map((work) => work.nodus_id));
+    setSelected((current) => {
+      let changed = current.size !== selectedVisibleIds.length;
+      if (!changed) {
+        for (const id of current) {
+          if (!visibleIds.has(id)) {
+            changed = true;
+            break;
+          }
+        }
+      }
+      return changed ? new Set(selectedVisibleIds) : current;
+    });
+  }, [selectedVisibleIds, works]);
+
+  const allVisibleSelected = works.length > 0 && selectedVisibleIds.length === works.length;
+  const selectAllVisible = () => setSelected(new Set(works.map((work) => work.nodus_id)));
   const summary = useMemo(() => {
     const pendingEmbeddings = works.filter((w) => {
       const s = embeddingStatuses.get(w.nodus_id);
@@ -278,6 +325,7 @@ export function Library({
             <option value="done">Profundo: hecho</option>
             <option value="pending">Profundo: pendiente</option>
             <option value="none">Profundo: ninguno</option>
+            <option value="failed">Profundo: fallido</option>
             <option value="skipped_no_text">Profundo: sin texto</option>
           </select>
           <div className="relative">
@@ -401,9 +449,23 @@ export function Library({
         )}
       </div>
 
-      {selected.size > 0 && (
+      {!loading && works.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+          <span>{works.length} resultados con los filtros actuales</span>
+          <button
+            className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+            onClick={() => (allVisibleSelected ? setSelected(new Set()) : selectAllVisible())}
+          >
+            <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
+            {allVisibleSelected ? 'Quitar selección' : `Seleccionar los ${works.length} filtrados`}
+          </button>
+          <span className="text-neutral-600">Después elige Temas, Ideas o Ambos.</span>
+        </div>
+      )}
+
+      {selectedVisibleIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-200">{selected.size} seleccionadas</span>
+          <span className="text-sm font-medium text-indigo-200">{selectedVisibleIds.length} seleccionadas</span>
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
             <Icon name="tag" /> Temas
@@ -466,14 +528,16 @@ export function Library({
           style={{ gridTemplateColumns: LIBRARY_GRID_TEMPLATE }}
         >
           <div className="font-medium">
-            <input
-              type="checkbox"
-              checked={allVisibleSelected}
-              onChange={(e) => {
-                if (e.target.checked) setSelected(new Set(works.map((w) => w.nodus_id)));
-                else setSelected(new Set());
-              }}
-            />
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                title={`Seleccionar los ${works.length} resultados filtrados`}
+                aria-label={`Seleccionar los ${works.length} resultados filtrados`}
+                onChange={(e) => {
+                  if (e.target.checked) selectAllVisible();
+                  else setSelected(new Set());
+                }}
+              />
           </div>
           <div className="font-medium">Título</div>
           <div className="font-medium">Autores</div>
@@ -673,7 +737,7 @@ function RowIconButton({
           : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
-      className={`inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 ${toneClass}`}
+      className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 ${toneClass}`}
       title={title}
       aria-label={title}
       onClick={onClick}
