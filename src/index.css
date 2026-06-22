@@ -1,5 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
+/* Inter is loaded from the system font stack (Tailwind `sans` falls back to
+   system-ui). A runtime Google Fonts @import is blocked by the app CSP and
+   breaks offline use, so it is intentionally not used. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

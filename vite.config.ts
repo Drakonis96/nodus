@@ -3,6 +3,14 @@ import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron/simple';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+// graphology and sigma ship CJS builds that `require('events')` (a Node
+// builtin). Vite's dev optimizer externalizes builtins for the browser, which
+// surfaces as a runtime "Dynamic require of 'events' is not supported" crash.
+// Resolve `events` to the installed browser polyfill so it gets bundled instead.
+const require = createRequire(import.meta.url);
+const eventsPolyfill = require.resolve('events/');
 
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
@@ -22,7 +30,20 @@ export default defineConfig({
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),
+      events: eventsPolyfill,
     },
+  },
+  optimizeDeps: {
+    // Pre-bundle the WebGL graph stack (incl. the FA2 worker subpath, which the
+    // dep scanner misses) so CJS→ESM interop is handled at optimize time.
+    include: [
+      'sigma',
+      'graphology',
+      'graphology-layout-forceatlas2',
+      'graphology-layout-forceatlas2/worker',
+      'graphology-communities-louvain',
+      'events',
+    ],
   },
   plugins: [
     react(),

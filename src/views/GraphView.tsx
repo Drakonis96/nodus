@@ -6,7 +6,20 @@ import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { TutorPanel } from './TutorPanel';
+import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
+import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
+
+// Opt-in flag for the new Sigma (WebGL) + worker-layout + LOD renderer. The
+// Cytoscape path stays the default until the migration is verified end-to-end.
+// Precedence: an explicit localStorage choice wins (so you can A/B compare in a
+// running app), otherwise fall back to the VITE_GRAPH_ENGINE build/dev env var.
+//   • localStorage.setItem('nodus.graph.engine', 'sigma' | 'cytoscape')
+//   • VITE_GRAPH_ENGINE=sigma npm run dev
+const enginePref = typeof localStorage !== 'undefined' ? localStorage.getItem('nodus.graph.engine') : null;
+const USE_SIGMA = enginePref
+  ? enginePref === 'sigma'
+  : (import.meta as any).env?.VITE_GRAPH_ENGINE === 'sigma';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
@@ -1537,6 +1550,7 @@ export function GraphView({
   const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(LAYOUT_KEY) as 'force' | 'radial') || 'force');
   const [communitiesCollapsed, setCommunitiesCollapsed] = useState(false);
   const minimapRef = useRef<HTMLCanvasElement>(null);
+  const sigmaApiRef = useRef<SigmaGraphApi | null>(null);
   const communitiesRef = useRef<Map<string, number>>(new Map());
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
   const lensRef = useRef<GraphLens>(lens);
@@ -2774,11 +2788,19 @@ export function GraphView({
   }, []);
 
   const zoomBy = (factor: number) => {
+    if (USE_SIGMA) {
+      sigmaApiRef.current?.zoomBy(factor);
+      return;
+    }
     const cy = cyRef.current;
     if (!cy) return;
     cy.zoom({ level: cy.zoom() * factor, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
   };
   const fitGraph = () => {
+    if (USE_SIGMA) {
+      sigmaApiRef.current?.fit();
+      return;
+    }
     const cy = cyRef.current;
     if (!cy) return;
     frameGraph(cy);
@@ -2786,6 +2808,56 @@ export function GraphView({
   const changeDetailFont = (delta: number) => {
     setDetailFontSize((value) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, value + delta)));
   };
+
+  // ── Sigma renderer bridge ───────────────────────────────────────────────────
+  // The Sigma engine renders the graph; these handlers reuse the existing detail
+  // sidebar logic so taps open the same panels as the Cytoscape path.
+  const onSigmaOpenNode = useCallback((id: string, label: string, type: string) => {
+    const seq = ++detailSeqRef.current;
+    setEdgeDetail(null);
+    const isIdea = lensRef.current === 'ideas' && !id.startsWith('theme:');
+    if (!isIdea) {
+      setIdeaDetail(null);
+      setDetailLoading(null);
+      return;
+    }
+    setIdeaDetail(null);
+    setDetailLoading({ kind: 'idea', id, label, type });
+    void window.nodus.getIdeaDetail(id).then(
+      (d) => {
+        if (seq === detailSeqRef.current) {
+          setIdeaDetail(d);
+          setDetailLoading(null);
+        }
+      },
+      () => {
+        if (seq === detailSeqRef.current) setDetailLoading(null);
+      }
+    );
+  }, []);
+  const onSigmaOpenEdge = useCallback((id: string, type: string) => {
+    const seq = ++detailSeqRef.current;
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading({ kind: 'edge', id, label: type });
+    void window.nodus.getEdgeDetail(id).then(
+      (d) => {
+        if (seq === detailSeqRef.current) {
+          setEdgeDetail(d);
+          setDetailLoading(null);
+        }
+      },
+      () => {
+        if (seq === detailSeqRef.current) setDetailLoading(null);
+      }
+    );
+  }, []);
+  const onSigmaClear = useCallback(() => {
+    detailSeqRef.current++;
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading(null);
+  }, []);
 
   // ── Minimap ────────────────────────────────────────────────────────────────
   const drawMinimap = useCallback(() => {
@@ -3058,6 +3130,18 @@ export function GraphView({
     });
   }, [transitionGraph]);
 
+  // Reset the graph to its original state: default preset/filters, fresh layout
+  // and framed camera. Works for whichever renderer is active.
+  const resetGraph = useCallback(() => {
+    applyPreset(lensRef.current === 'authors' ? 'authors' : 'overview');
+    if (USE_SIGMA) {
+      sigmaApiRef.current?.reset();
+      onSigmaClear();
+    } else if (cyRef.current) {
+      frameGraph(cyRef.current);
+    }
+  }, [applyPreset, frameGraph, onSigmaClear]);
+
   useEffect(() => {
     if (!target || target.nonce === lastNavigationNonceRef.current) return;
     lastNavigationNonceRef.current = target.nonce;
@@ -3298,9 +3382,28 @@ export function GraphView({
           />
         )}
         <div className="flex-1 min-w-0 relative">
-          <div ref={containerRef} className="absolute inset-0" />
+          {USE_SIGMA ? (
+            <GraphErrorBoundary>
+              <SigmaGraph
+                data={data}
+                filters={filters}
+                lens={lens}
+                preset={activePreset}
+                highlightDepth={highlightDepth}
+                lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')}
+                onOpenNode={onSigmaOpenNode}
+                onOpenEdge={onSigmaOpenEdge}
+                onClearFocus={onSigmaClear}
+                onApiReady={(api) => {
+                  sigmaApiRef.current = api;
+                }}
+              />
+            </GraphErrorBoundary>
+          ) : (
+            <div ref={containerRef} className="absolute inset-0" />
+          )}
 
-          {graphLoading && (
+          {!USE_SIGMA && graphLoading && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-neutral-950/10">
               <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-sm text-neutral-300 shadow-lg">
                 <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
@@ -3320,17 +3423,26 @@ export function GraphView({
             <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Ajustar a la pantalla" onClick={fitGraph}>
               <Icon name="fit" size={16} />
             </button>
+            <button
+              className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
+              title="Reiniciar grafo (vista y disposición originales)"
+              onClick={resetGraph}
+            >
+              <Icon name="refresh" size={16} />
+            </button>
           </div>
 
-          {/* Minimap */}
-          <canvas
-            ref={minimapRef}
-            width={156}
-            height={104}
-            className="absolute bottom-3 right-3 rounded-lg border border-neutral-300/70 dark:border-neutral-700 cursor-pointer opacity-70 hover:opacity-95"
-            title="Mini-mapa · click para navegar"
-            onClick={handleMinimapClick}
-          />
+          {/* Minimap (Cytoscape engine only for now) */}
+          {!USE_SIGMA && (
+            <canvas
+              ref={minimapRef}
+              width={156}
+              height={104}
+              className="absolute bottom-3 right-3 rounded-lg border border-neutral-300/70 dark:border-neutral-700 cursor-pointer opacity-70 hover:opacity-95"
+              title="Mini-mapa · click para navegar"
+              onClick={handleMinimapClick}
+            />
+          )}
 
           {/* Legend */}
           <div className="absolute bottom-3 left-3 card p-2 text-[10px] bg-neutral-900/90 max-w-[220px]">
