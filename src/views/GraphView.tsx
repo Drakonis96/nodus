@@ -28,6 +28,12 @@ const DRAG_MOVEMENT_THRESHOLD = 3;
 const LEGEND_COLLAPSED_KEY = 'nodus.graph.legendCollapsed';
 const LABEL_MIN_GAP = 18;
 const LABEL_COLLISION_CELL_SIZE = 224;
+// The post-layout pass moves labels apart in graph coordinates.  A dense graph
+// can still produce collisions at a particular zoom level (or after a manual
+// drag), so use a small viewport-space pass as the final safety net.
+const RENDERED_LABEL_COLLISION_CELL_SIZE = 240;
+const RENDERED_LABEL_COLLISION_GAP = 7;
+const RENDERED_LABEL_COLLISION_MAX_CANDIDATES = 3200;
 
 function physicalLayoutElements(cy: Core) {
   return cy.nodes().filter((node) => !node.isParent()).union(
@@ -612,6 +618,117 @@ function applyLabelBoxRepulsion(cy: Core): void {
       if (position) node.position(position);
     });
   });
+}
+
+type RenderedLabelCandidate = {
+  node: any;
+  priority: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+function renderedLabelPriority(node: any): number {
+  const type = node.data('type') as string;
+  const rank = Math.max(0, Number(node.data('labelRank') ?? 0));
+  const degree = Math.max(0, Number(node.data('degree') ?? 0));
+  const isActive =
+    node.selected() ||
+    node.hasClass('focus-node') ||
+    node.hasClass('secondary-node') ||
+    node.hasClass('context-node') ||
+    node.hasClass('spotlight') ||
+    node.hasClass('hover-augment-node');
+
+  if (isActive) return 100_000;
+  const typeWeight = type === 'theme' || type === 'community' ? 72 : type === 'author' ? 16 : 0;
+  return typeWeight + rank * 28 + Math.log2(degree + 1);
+}
+
+function applyRenderedLabelDeclutter(cy: Core): void {
+  const allNodes = cy.nodes().filter((node) => !node.isParent() && (node.data('type') as string) !== 'community-guide');
+  if (allNodes.length === 0) return;
+
+  // Start from the semantic-zoom result.  This makes the operation idempotent
+  // and lets a selected or focused node immediately recover its label.
+  cy.batch(() => allNodes.removeClass('label-collision-hidden'));
+
+  const candidates: RenderedLabelCandidate[] = [];
+  allNodes.forEach((node: any) => {
+    if (node.hasClass('zoom-label-hidden')) return;
+    const box = node.renderedBoundingBox({
+      includeNodes: false,
+      includeEdges: false,
+      includeLabels: true,
+      includeOverlays: false,
+      includeUnderlays: false,
+    });
+    if (!Number.isFinite(box.x1) || !Number.isFinite(box.x2) || !Number.isFinite(box.y1) || !Number.isFinite(box.y2)) return;
+    if (box.w < 2 || box.h < 2) return;
+    candidates.push({
+      node,
+      priority: renderedLabelPriority(node),
+      left: box.x1,
+      right: box.x2,
+      top: box.y1,
+      bottom: box.y2,
+    });
+  });
+
+  if (candidates.length < 2) return;
+  candidates.sort((a, b) => b.priority - a.priority || a.node.id().localeCompare(b.node.id()));
+
+  // Keep the pass bounded for very large libraries.  Less relevant labels are
+  // intentionally hidden rather than making the viewport unresponsive.
+  const visibleCandidates = candidates.slice(0, RENDERED_LABEL_COLLISION_MAX_CANDIDATES);
+  const hiddenNodes = candidates.slice(RENDERED_LABEL_COLLISION_MAX_CANDIDATES).map((candidate) => candidate.node);
+
+  const cells = new Map<string, RenderedLabelCandidate[]>();
+  const overlaps = (a: RenderedLabelCandidate, b: RenderedLabelCandidate) =>
+    a.left - RENDERED_LABEL_COLLISION_GAP < b.right &&
+    a.right + RENDERED_LABEL_COLLISION_GAP > b.left &&
+    a.top - RENDERED_LABEL_COLLISION_GAP < b.bottom &&
+    a.bottom + RENDERED_LABEL_COLLISION_GAP > b.top;
+
+  for (const candidate of visibleCandidates) {
+    const minX = Math.floor((candidate.left - RENDERED_LABEL_COLLISION_GAP) / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const maxX = Math.floor((candidate.right + RENDERED_LABEL_COLLISION_GAP) / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const minY = Math.floor((candidate.top - RENDERED_LABEL_COLLISION_GAP) / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const maxY = Math.floor((candidate.bottom + RENDERED_LABEL_COLLISION_GAP) / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    let collision = false;
+
+    for (let x = minX; x <= maxX && !collision; x++) {
+      for (let y = minY; y <= maxY && !collision; y++) {
+        for (const other of cells.get(`${x}:${y}`) ?? []) {
+          if (overlaps(candidate, other)) {
+            collision = true;
+            break;
+          }
+        }
+      }
+    }
+
+    if (collision) {
+      hiddenNodes.push(candidate.node);
+      continue;
+    }
+
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const key = `${x}:${y}`;
+        const bucket = cells.get(key);
+        if (bucket) bucket.push(candidate);
+        else cells.set(key, [candidate]);
+      }
+    }
+  }
+
+  if (hiddenNodes.length > 0) {
+    cy.batch(() => {
+      for (const node of hiddenNodes) node.addClass('label-collision-hidden');
+    });
+  }
 }
 
 function wrapEstimate(label: string, charsPerLine: number): { lines: number; maxLineLength: number } {
@@ -1681,6 +1798,10 @@ export function GraphView({
           { selector: 'node.zoom-label-hidden', style: { 'text-opacity': 0, 'min-zoomed-font-size': 0 } as any },
           { selector: 'node.zoom-label-muted', style: { 'text-opacity': 0.035, 'text-outline-opacity': 0.06 } as any },
           { selector: 'node.zoom-label-mid', style: { 'text-opacity': 0.16, 'text-outline-opacity': 0.2 } as any },
+          // A final viewport-space pass removes the remaining collisions after
+          // layout and semantic zoom.  Focus styles below deliberately override it.
+          { selector: 'node.label-collision-hidden', style: { 'text-opacity': 0, 'text-outline-opacity': 0, 'min-zoomed-font-size': 0 } as any },
+          { selector: 'node.label-collision-hidden:selected', style: { 'text-opacity': 1, 'text-outline-opacity': lightTheme ? 0.8 : 0.72 } as any },
           // Focus mode: everything not in the tapped traversal fades back.
           { selector: 'node.faded', style: { opacity: 0.36, 'text-opacity': 0.08, 'text-outline-opacity': 0.08 } as any },
           { selector: 'edge.faded', style: { opacity: 0.105 } as any },
@@ -2276,6 +2397,7 @@ export function GraphView({
             if (mode === 'mid') node.addClass('zoom-label-mid');
           });
         });
+        applyRenderedLabelDeclutter(cy);
       };
       applySemanticZoomRef.current = applySemanticZoom;
       cyRef.current.on('zoom', () => applySemanticZoomRef.current(cyRef.current!));
@@ -2365,6 +2487,7 @@ export function GraphView({
         forceLayoutPrimedRef.current = true;
         if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
         applyLabelBoxRepulsion(cy);
+        applySemanticZoomRef.current(cy, true);
         if (frameOnStop) frameGraph(cy);
         finishGraphRender();
       }, overrides);
@@ -2387,6 +2510,7 @@ export function GraphView({
           stop: () => {
             forceLayoutPrimedRef.current = true;
             applyLabelBoxRepulsion(cy);
+            applySemanticZoomRef.current(cy, true);
             if (shouldFrameGraph) frameGraph(cy);
             finishGraphRender();
           },
@@ -2627,6 +2751,7 @@ export function GraphView({
         ...createForceLayoutOptions(cy, false, () => {
           if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
           applyLabelBoxRepulsion(cy);
+          applySemanticZoomRef.current(cy, true);
         }),
         fit: false,
         animationDuration: 400,
@@ -2678,6 +2803,7 @@ export function GraphView({
         ...createForceLayoutOptions(cy, false, () => {
           if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
           applyLabelBoxRepulsion(cy);
+          applySemanticZoomRef.current(cy, true);
         }),
         fit: false,
         animationDuration: 400,
