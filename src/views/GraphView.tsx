@@ -28,12 +28,15 @@ const DRAG_MOVEMENT_THRESHOLD = 3;
 const LEGEND_COLLAPSED_KEY = 'nodus.graph.legendCollapsed';
 const LABEL_MIN_GAP = 18;
 const LABEL_COLLISION_CELL_SIZE = 224;
+const NODE_COLLISION_CELL_SIZE = 176;
+const NODE_MIN_GAP = 14;
 // The post-layout pass moves labels apart in graph coordinates.  A dense graph
 // can still produce collisions at a particular zoom level (or after a manual
 // drag), so use a small viewport-space pass as the final safety net.
 const RENDERED_LABEL_COLLISION_CELL_SIZE = 240;
 const RENDERED_LABEL_COLLISION_GAP = 7;
-const RENDERED_LABEL_COLLISION_MAX_CANDIDATES = 3200;
+const RENDERED_LABEL_VIEWPORT_PADDING = 80;
+const RENDERED_LABEL_MAX_CANDIDATES = 180;
 
 function physicalLayoutElements(cy: Core) {
   return cy.nodes().filter((node) => !node.isParent()).union(
@@ -389,7 +392,9 @@ function computeRadialPositions(cy: Core): Record<string, { x: number; y: number
   }
 
   relaxRelatedIdeaEdges(cy, pos);
+  separateNodeBoxes(cy, pos);
   separateLabelBoxes(cy, pos);
+  separateNodeBoxes(cy, pos);
   return pos;
 }
 
@@ -446,7 +451,9 @@ function computeAuthorRadialPositions(cy: Core): Record<string, { x: number; y: 
     ring++;
   }
 
+  separateNodeBoxes(cy, pos);
   separateLabelBoxes(cy, pos);
+  separateNodeBoxes(cy, pos);
   return pos;
 }
 
@@ -506,6 +513,87 @@ function relaxRelatedIdeaEdges(cy: Core, pos: Record<string, { x: number; y: num
       b.x -= moveX;
       b.y -= moveY;
     }
+  }
+}
+
+function nodeCollisionMobility(type: string): number {
+  if (type === 'theme') return 0.3;
+  if (type === 'author') return 0.78;
+  return 0.58;
+}
+
+/**
+ * CoSE normally prevents node overlap, but a reused or radial layout can leave
+ * a few nodes stacked after relation relaxation.  This bounded spatial pass is
+ * deliberately independent from text geometry: it guarantees circle-to-circle
+ * clearance before the label pass starts moving nodes for their captions.
+ */
+function separateNodeBoxes(cy: Core, pos: Record<string, { x: number; y: number }>): void {
+  const nodes = cy
+    .nodes()
+    .filter((node) => !node.isParent() && (node.data('type') as string) !== 'community-guide')
+    .toArray();
+  if (nodes.length < 2) return;
+
+  const boxes = nodes
+    .map((node, index) => {
+      if (!pos[node.id()]) return null;
+      return {
+        id: node.id(),
+        index,
+        radius: Math.max(9, Number(node.data('size') ?? 28) / 2),
+        mobility: nodeCollisionMobility(String(node.data('type') ?? '')),
+      };
+    })
+    .filter((box): box is NonNullable<typeof box> => !!box);
+  const iterations = boxes.length > 900 ? 18 : boxes.length > 480 ? 26 : 38;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const cells = new Map<string, (typeof boxes)[number][]>();
+    for (const box of boxes) {
+      const p = pos[box.id];
+      const key = `${Math.floor(p.x / NODE_COLLISION_CELL_SIZE)}:${Math.floor(p.y / NODE_COLLISION_CELL_SIZE)}`;
+      const bucket = cells.get(key);
+      if (bucket) bucket.push(box);
+      else cells.set(key, [box]);
+    }
+
+    let moved = false;
+    for (const a of boxes) {
+      const pa = pos[a.id];
+      const centerX = Math.floor(pa.x / NODE_COLLISION_CELL_SIZE);
+      const centerY = Math.floor(pa.y / NODE_COLLISION_CELL_SIZE);
+      for (let gx = centerX - 1; gx <= centerX + 1; gx++) {
+        for (let gy = centerY - 1; gy <= centerY + 1; gy++) {
+          for (const b of cells.get(`${gx}:${gy}`) ?? []) {
+            if (b.index <= a.index) continue;
+            const pb = pos[b.id];
+            let dx = pb.x - pa.x;
+            let dy = pb.y - pa.y;
+            let distance = Math.hypot(dx, dy);
+            const minimum = a.radius + b.radius + NODE_MIN_GAP;
+            if (distance >= minimum) continue;
+            if (distance < 0.001) {
+              dx = stableUnit(`${a.id}|${b.id}`) - 0.5;
+              dy = stableUnit(`${b.id}|${a.id}`) - 0.5;
+              distance = Math.max(0.001, Math.hypot(dx, dy));
+            }
+            const push = Math.min(56, (minimum - distance + 1) * 0.58);
+            const totalMobility = a.mobility + b.mobility;
+            const aShare = a.mobility / totalMobility;
+            const bShare = b.mobility / totalMobility;
+            const ux = dx / distance;
+            const uy = dy / distance;
+            pa.x -= ux * push * aShare;
+            pa.y -= uy * push * aShare;
+            pb.x += ux * push * bShare;
+            pb.y += uy * push * bShare;
+            moved = true;
+          }
+        }
+      }
+    }
+    if (!moved) return;
   }
 }
 
@@ -610,7 +698,11 @@ function separateLabelBoxes(cy: Core, pos: Record<string, { x: number; y: number
 
 function applyLabelBoxRepulsion(cy: Core): void {
   const positions = Object.fromEntries(snapshotNodePositions(cy)) as Record<string, { x: number; y: number }>;
+  separateNodeBoxes(cy, positions);
   separateLabelBoxes(cy, positions);
+  // The label pass can make a small final move, so finish by restoring the
+  // guaranteed node-to-node gap as well.
+  separateNodeBoxes(cy, positions);
   cy.batch(() => {
     cy.nodes().forEach((node) => {
       if (node.isParent()) return;
@@ -623,6 +715,14 @@ function applyLabelBoxRepulsion(cy: Core): void {
 type RenderedLabelCandidate = {
   node: any;
   priority: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+type RenderedNodeBox = {
+  id: string;
   left: number;
   right: number;
   top: number;
@@ -654,8 +754,35 @@ function applyRenderedLabelDeclutter(cy: Core): void {
   // and lets a selected or focused node immediately recover its label.
   cy.batch(() => allNodes.removeClass('label-collision-hidden'));
 
+  const viewport = {
+    left: -RENDERED_LABEL_VIEWPORT_PADDING,
+    right: cy.width() + RENDERED_LABEL_VIEWPORT_PADDING,
+    top: -RENDERED_LABEL_VIEWPORT_PADDING,
+    bottom: cy.height() + RENDERED_LABEL_VIEWPORT_PADDING,
+  };
+  const intersectsViewport = (box: { left: number; right: number; top: number; bottom: number }) =>
+    box.left < viewport.right && box.right > viewport.left && box.top < viewport.bottom && box.bottom > viewport.top;
+  const nodeBoxes: RenderedNodeBox[] = [];
   const candidates: RenderedLabelCandidate[] = [];
   allNodes.forEach((node: any) => {
+    const nodeBox = node.renderedBoundingBox({
+      includeNodes: true,
+      includeEdges: false,
+      includeLabels: false,
+      includeOverlays: false,
+      includeUnderlays: false,
+    });
+    if (
+      Number.isFinite(nodeBox.x1) &&
+      Number.isFinite(nodeBox.x2) &&
+      Number.isFinite(nodeBox.y1) &&
+      Number.isFinite(nodeBox.y2) &&
+      nodeBox.w > 1 &&
+      nodeBox.h > 1
+    ) {
+      const box = { id: node.id(), left: nodeBox.x1, right: nodeBox.x2, top: nodeBox.y1, bottom: nodeBox.y2 };
+      if (intersectsViewport(box)) nodeBoxes.push(box);
+    }
     if (node.hasClass('zoom-label-hidden')) return;
     const box = node.renderedBoundingBox({
       includeNodes: false,
@@ -666,30 +793,53 @@ function applyRenderedLabelDeclutter(cy: Core): void {
     });
     if (!Number.isFinite(box.x1) || !Number.isFinite(box.x2) || !Number.isFinite(box.y1) || !Number.isFinite(box.y2)) return;
     if (box.w < 2 || box.h < 2) return;
-    candidates.push({
+    const candidate = {
       node,
       priority: renderedLabelPriority(node),
       left: box.x1,
       right: box.x2,
       top: box.y1,
       bottom: box.y2,
-    });
+    };
+    if (intersectsViewport(candidate)) candidates.push(candidate);
   });
 
   if (candidates.length < 2) return;
   candidates.sort((a, b) => b.priority - a.priority || a.node.id().localeCompare(b.node.id()));
 
-  // Keep the pass bounded for very large libraries.  Less relevant labels are
-  // intentionally hidden rather than making the viewport unresponsive.
-  const visibleCandidates = candidates.slice(0, RENDERED_LABEL_COLLISION_MAX_CANDIDATES);
-  const hiddenNodes = candidates.slice(RENDERED_LABEL_COLLISION_MAX_CANDIDATES).map((candidate) => candidate.node);
+  // A dense overview cannot be made legible by rendering every caption.  The
+  // budget scales with the available pixels, while the active/selected node is
+  // ranked first so it always remains readable.
+  const viewportBudget = Math.round((cy.width() * cy.height()) / 16_000);
+  const candidateBudget = Math.max(36, Math.min(RENDERED_LABEL_MAX_CANDIDATES, viewportBudget));
+  const visibleCandidates = candidates.slice(0, candidateBudget);
+  const hiddenNodes = candidates.slice(candidateBudget).map((candidate) => candidate.node);
 
-  const cells = new Map<string, RenderedLabelCandidate[]>();
-  const overlaps = (a: RenderedLabelCandidate, b: RenderedLabelCandidate) =>
+  const labelCells = new Map<string, RenderedLabelCandidate[]>();
+  const nodeCells = new Map<string, RenderedNodeBox[]>();
+  const overlaps = (
+    a: Pick<RenderedLabelCandidate, 'left' | 'right' | 'top' | 'bottom'>,
+    b: Pick<RenderedLabelCandidate, 'left' | 'right' | 'top' | 'bottom'>
+  ) =>
     a.left - RENDERED_LABEL_COLLISION_GAP < b.right &&
     a.right + RENDERED_LABEL_COLLISION_GAP > b.left &&
     a.top - RENDERED_LABEL_COLLISION_GAP < b.bottom &&
     a.bottom + RENDERED_LABEL_COLLISION_GAP > b.top;
+
+  for (const node of nodeBoxes) {
+    const minX = Math.floor(node.left / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const maxX = Math.floor(node.right / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const minY = Math.floor(node.top / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    const maxY = Math.floor(node.bottom / RENDERED_LABEL_COLLISION_CELL_SIZE);
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        const key = `${x}:${y}`;
+        const bucket = nodeCells.get(key);
+        if (bucket) bucket.push(node);
+        else nodeCells.set(key, [node]);
+      }
+    }
+  }
 
   for (const candidate of visibleCandidates) {
     const minX = Math.floor((candidate.left - RENDERED_LABEL_COLLISION_GAP) / RENDERED_LABEL_COLLISION_CELL_SIZE);
@@ -700,8 +850,16 @@ function applyRenderedLabelDeclutter(cy: Core): void {
 
     for (let x = minX; x <= maxX && !collision; x++) {
       for (let y = minY; y <= maxY && !collision; y++) {
-        for (const other of cells.get(`${x}:${y}`) ?? []) {
+        for (const other of labelCells.get(`${x}:${y}`) ?? []) {
           if (overlaps(candidate, other)) {
+            collision = true;
+            break;
+          }
+        }
+        if (collision) break;
+        for (const node of nodeCells.get(`${x}:${y}`) ?? []) {
+          if (node.id === candidate.node.id()) continue;
+          if (overlaps(candidate, node)) {
             collision = true;
             break;
           }
@@ -717,9 +875,9 @@ function applyRenderedLabelDeclutter(cy: Core): void {
     for (let x = minX; x <= maxX; x++) {
       for (let y = minY; y <= maxY; y++) {
         const key = `${x}:${y}`;
-        const bucket = cells.get(key);
+        const bucket = labelCells.get(key);
         if (bucket) bucket.push(candidate);
-        else cells.set(key, [candidate]);
+        else labelCells.set(key, [candidate]);
       }
     }
   }
@@ -2299,6 +2457,15 @@ export function GraphView({
       // the O(N+E) style recalc that fired on every single wheel tick, which
       // was the main reason the graph felt sluggish compared to Obsidian's
       // WebGL renderer.
+      const graph = cyRef.current!;
+      let renderedDeclutterTimer: number | null = null;
+      const scheduleRenderedLabelDeclutter = (delay = 80) => {
+        if (renderedDeclutterTimer != null) window.clearTimeout(renderedDeclutterTimer);
+        renderedDeclutterTimer = window.setTimeout(() => {
+          renderedDeclutterTimer = null;
+          if (cyRef.current === graph) applyRenderedLabelDeclutter(graph);
+        }, delay);
+      };
       const ZOOM_BAND_EDGES = [0.24, 0.42, 0.52, 0.76, 1.02, 1.18, 1.42, 1.72, 2.05];
       const zoomBand = (z: number) => {
         let band = 0;
@@ -2311,7 +2478,10 @@ export function GraphView({
       const applySemanticZoom = (cy: Core, force = false) => {
         const z = cy.zoom();
         const band = zoomBand(z);
-        if (!force && band === lastZoomBandRef.current) return;
+        if (!force && band === lastZoomBandRef.current) {
+          scheduleRenderedLabelDeclutter();
+          return;
+        }
         lastZoomBandRef.current = band;
         const structurePhase = smoothstep(0.2, 0.64, z);
         const detailPhase = smoothstep(0.82, 1.28, z);
@@ -2397,10 +2567,14 @@ export function GraphView({
             if (mode === 'mid') node.addClass('zoom-label-mid');
           });
         });
-        applyRenderedLabelDeclutter(cy);
+        scheduleRenderedLabelDeclutter(0);
       };
       applySemanticZoomRef.current = applySemanticZoom;
-      cyRef.current.on('zoom', () => applySemanticZoomRef.current(cyRef.current!));
+      graph.on('zoom', () => applySemanticZoomRef.current(graph));
+      graph.on('pan resize', () => scheduleRenderedLabelDeclutter());
+      graph.on('destroy', () => {
+        if (renderedDeclutterTimer != null) window.clearTimeout(renderedDeclutterTimer);
+      });
     }
     const cy = cyRef.current;
     const previousPositions = snapshotNodePositions(cy);

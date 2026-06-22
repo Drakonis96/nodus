@@ -1,6 +1,9 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { constants as fsConstants, promises as fs } from 'node:fs';
+import os from 'node:os';
+import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
@@ -25,11 +28,82 @@ let mainWindow: BrowserWindow | null = null;
 let updateCheckTimer: NodeJS.Timeout | null = null;
 let installingUpdate = false;
 let downloadedUpdateVersion: string | null = null;
+let downloadedUpdateFile: string | null = null;
 let lastUpdateEvent: UpdateProgressEvent | null = null;
 let installUpdateTimer: NodeJS.Timeout | null = null;
+let useUnsignedMacUpdaterFallback = false;
 
 const UPDATE_CHECK_DELAY_MS = 10_000;
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+
+function macAppBundlePath(): string | null {
+  if (process.platform !== 'darwin') return null;
+  const marker = '.app/Contents/MacOS/';
+  const markerIndex = process.execPath.indexOf(marker);
+  if (markerIndex < 0) return null;
+  return process.execPath.slice(0, markerIndex + '.app'.length);
+}
+
+function macAppHasDeveloperIdSignature(): boolean {
+  const appPath = macAppBundlePath();
+  if (!appPath) return false;
+  const result = spawnSync('/usr/bin/codesign', ['-dv', '--verbose=4', appPath], { encoding: 'utf8' });
+  const signature = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  return result.status === 0 && /Authority=Developer ID Application:/.test(signature);
+}
+
+function unsignedMacUpdateHelperScript(): string {
+  // The helper is outside the bundle, so it can replace the .app after this
+  // process exits. electron-updater has already verified the ZIP checksum.
+  return [
+    '#!/bin/sh',
+    'set -eu',
+    'PID="$1"',
+    'ZIP="$2"',
+    'TARGET="$3"',
+    'STATE="$4"',
+    'STAGING="$(/usr/bin/mktemp -d /private/tmp/nodus-update.XXXXXX)"',
+    'BACKUP="${TARGET}.previous"',
+    'finish() { /bin/rm -rf "$STAGING"; /bin/rm -f "$0"; }',
+    "fail() { /usr/bin/printf '%s\\n' '{\"status\":\"failed\"}' > \"$STATE\"; finish; exit 1; }",
+    'trap finish EXIT',
+    'while /bin/kill -0 "$PID" 2>/dev/null; do /bin/sleep 0.1; done',
+    '/usr/bin/ditto -x -k "$ZIP" "$STAGING" || fail',
+    'NEW_APP="$(/usr/bin/find "$STAGING" -type d -name Nodus.app -print -quit)"',
+    '[ -n "$NEW_APP" ] && [ -d "$NEW_APP/Contents" ] || fail',
+    '/bin/rm -rf "$BACKUP"',
+    '/bin/mv "$TARGET" "$BACKUP" || fail',
+    'if ! /bin/mv "$NEW_APP" "$TARGET"; then /bin/mv "$BACKUP" "$TARGET" || true; fail; fi',
+    '/usr/bin/xattr -dr com.apple.quarantine "$TARGET" 2>/dev/null || true',
+    " /usr/bin/printf '%s\\n' '{\"status\":\"installed\"}' > \"$STATE\"",
+    '/usr/bin/open -n "$TARGET" || true',
+  ].join('\n');
+}
+
+async function installUnsignedMacUpdate(downloadedFile: string): Promise<void> {
+  const appPath = macAppBundlePath();
+  if (!appPath) throw new Error('No se pudo localizar la aplicación de macOS para actualizarla.');
+  if (path.extname(downloadedFile).toLowerCase() !== '.zip') {
+    throw new Error('El paquete descargado no es un ZIP de macOS válido.');
+  }
+  await Promise.all([
+    fs.access(downloadedFile, fsConstants.R_OK),
+    fs.access(appPath, fsConstants.R_OK),
+    fs.access(path.dirname(appPath), fsConstants.W_OK),
+  ]);
+
+  const statePath = path.join(app.getPath('userData'), 'update-install-state.json');
+  const helperPath = path.join(os.tmpdir(), `nodus-update-${process.pid}-${Date.now()}.sh`);
+  await fs.writeFile(helperPath, unsignedMacUpdateHelperScript(), { encoding: 'utf8', mode: 0o700 });
+  await fs.writeFile(statePath, JSON.stringify({ status: 'starting', version: downloadedUpdateVersion }), 'utf8');
+
+  const helper = spawn('/bin/sh', [helperPath, String(process.pid), downloadedFile, appPath, statePath], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  helper.unref();
+  app.quit();
+}
 
 function emitUpdate(event: UpdateCheckResponse): UpdateCheckResponse {
   lastUpdateEvent = { ...event, at: new Date().toISOString() };
@@ -158,17 +232,24 @@ async function installDownloadedUpdate(): Promise<UpdateCheckResponse> {
   });
   installUpdateTimer = setTimeout(() => {
     installUpdateTimer = null;
-    try {
-      autoUpdater.quitAndInstall(false, true);
-    } catch (e) {
-      installingUpdate = false;
-      emitUpdate({
-        status: 'error',
-        message: e instanceof Error ? e.message : String(e),
-        version: downloadedUpdateVersion ?? app.getVersion(),
-        progress: null,
-      });
-    }
+    void (async () => {
+      try {
+        if (useUnsignedMacUpdaterFallback) {
+          if (!downloadedUpdateFile) throw new Error('No se encontró el paquete descargado para instalar la actualización.');
+          await installUnsignedMacUpdate(downloadedUpdateFile);
+        } else {
+          autoUpdater.quitAndInstall(false, true);
+        }
+      } catch (e) {
+        installingUpdate = false;
+        emitUpdate({
+          status: 'error',
+          message: e instanceof Error ? e.message : String(e),
+          version: downloadedUpdateVersion ?? app.getVersion(),
+          progress: null,
+        });
+      }
+    })();
   }, 650);
   return response;
 }
@@ -179,13 +260,20 @@ function setupAutoUpdates(): void {
     return;
   }
 
+  useUnsignedMacUpdaterFallback = process.platform === 'darwin' && !macAppHasDeveloperIdSignature();
   autoUpdater.autoDownload = true;
-  // On macOS this starts Squirrel's native hand-off while the downloaded ZIP
-  // is still available. With this disabled, electron-updater only had a cached
-  // file and the subsequent restart path could wait forever for Squirrel.
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Squirrel.Mac only reliably hands off to a Developer ID-signed app. For the
+  // current ad-hoc fallback, keep electron-updater's verified ZIP and replace
+  // the writable .app with our external helper instead of waiting forever for
+  // a native event that macOS never delivers.
+  autoUpdater.autoInstallOnAppQuit = !useUnsignedMacUpdaterFallback;
   autoUpdater.autoRunAppAfterInstall = true;
   autoUpdater.allowPrerelease = false;
+  console.log(
+    useUnsignedMacUpdaterFallback
+      ? '[updates] using unsigned macOS fallback installer'
+      : '[updates] using native updater hand-off'
+  );
 
   autoUpdater.on('checking-for-update', () => console.log('[updates] checking for update'));
   autoUpdater.on('update-available', (info) => {
@@ -222,6 +310,7 @@ function setupAutoUpdates(): void {
   autoUpdater.on('update-downloaded', (info) => {
     if (installingUpdate) return;
     downloadedUpdateVersion = info.version;
+    downloadedUpdateFile = info.downloadedFile;
     console.log(`[updates] downloaded ${info.version}; installing and restarting`);
     emitUpdate({
       status: 'downloaded',
