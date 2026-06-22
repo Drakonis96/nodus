@@ -98,6 +98,7 @@ export function registerIpc(
 
   // works / library
   h('works:list', async (_e, filter?: WorkFilter) => works.listWorks(filter));
+  h('works:listZoteroTags', async () => works.listZoteroTags());
   h('works:get', async (_e, nodusId: string) => works.getWork(nodusId));
   h('works:ingestZoteroItems', async (_e, items: ZoteroItem[]) => {
     const { readTag } = getSettings();

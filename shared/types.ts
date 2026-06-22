@@ -58,6 +58,13 @@ export interface Work {
 export interface WorkView extends Omit<Work, 'authors_json'> {
   authors: string[];
   themes: string[];
+  zoteroTags: string[];
+}
+
+/** A Zotero tag available in the local library, with its current work count. */
+export interface ZoteroTag {
+  label: string;
+  workCount: number;
 }
 
 export interface Theme {
@@ -947,6 +954,7 @@ export interface NodusApi {
 
   // works / library
   listWorks(filter?: WorkFilter): Promise<WorkView[]>;
+  listZoteroTags(): Promise<ZoteroTag[]>;
   getWork(nodusId: string): Promise<WorkView | null>;
   ingestZoteroItems(items: ZoteroItem[]): Promise<WorkView[]>;
   setManualDeep(nodusId: string, value: boolean, model?: ModelRef | null): Promise<void>;
@@ -1089,6 +1097,9 @@ export interface WorkFilter {
   lightStatus?: LightStatus | 'all';
   deepStatus?: DeepStatus | 'all';
   theme?: string;
+  /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
+  zoteroTags?: string[];
+  zoteroTagMode?: 'any' | 'all';
   yearMin?: number;
   yearMax?: number;
   includeArchived?: boolean;

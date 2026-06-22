@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 export const migrations: Migration[] = [
   {
@@ -348,6 +348,26 @@ export const migrations: Migration[] = [
 
       CREATE UNIQUE INDEX idx_edges_unique_pair_type
         ON edges(from_id, to_id, type);
+    `,
+  },
+  {
+    version: 11,
+    up: /* sql */ `
+      CREATE TABLE zotero_tags (
+        tag_id           INTEGER PRIMARY KEY,
+        label            TEXT NOT NULL,
+        normalized_label TEXT NOT NULL UNIQUE
+      );
+
+      CREATE TABLE work_zotero_tags (
+        nodus_id TEXT NOT NULL,
+        tag_id   INTEGER NOT NULL,
+        PRIMARY KEY (nodus_id, tag_id),
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE,
+        FOREIGN KEY (tag_id) REFERENCES zotero_tags(tag_id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_work_zotero_tags_tag ON work_zotero_tags(tag_id, nodus_id);
     `,
   },
 ];

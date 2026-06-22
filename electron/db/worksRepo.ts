@@ -1,7 +1,11 @@
 import { getDb } from './database';
-import type { Work, WorkView, WorkFilter, DeepTrigger } from '@shared/types';
+import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag } from '@shared/types';
 
-function toView(row: Work, themes: string[]): WorkView {
+function normalizeZoteroTag(tag: string): string {
+  return tag.trim().normalize('NFC').toLowerCase();
+}
+
+function toView(row: Work, themes: string[], zoteroTags: string[]): WorkView {
   const { authors_json, ...rest } = row;
   let authors: string[] = [];
   try {
@@ -9,14 +13,14 @@ function toView(row: Work, themes: string[]): WorkView {
   } catch {
     authors = [];
   }
-  return { ...rest, authors, themes };
+  return { ...rest, authors, themes, zoteroTags };
 }
 
 export function getWork(nodusId: string): WorkView | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as Work | undefined;
   if (!row) return null;
-  return toView(row, themesFor(nodusId));
+  return toView(row, themesFor(nodusId), zoteroTagsFor(nodusId));
 }
 
 /**
@@ -39,14 +43,10 @@ export function getWorksByIds(nodusIds: string[]): Map<string, WorkView> {
         ORDER BY wt.nodus_id, t.label`
     )
     .all(...nodusIds) as { nodus_id: string; label: string }[];
-  const themesByWork = new Map<string, string[]>();
-  for (const r of themeRows) {
-    const list = themesByWork.get(r.nodus_id) ?? [];
-    list.push(r.label);
-    themesByWork.set(r.nodus_id, list);
-  }
+  const themesByWork = groupLabels(themeRows);
+  const zoteroTagsByWork = zoteroTagsForWorks(nodusIds);
   for (const row of rows) {
-    result.set(row.nodus_id, toView(row, themesByWork.get(row.nodus_id) ?? []));
+    result.set(row.nodus_id, toView(row, themesByWork.get(row.nodus_id) ?? [], zoteroTagsByWork.get(row.nodus_id) ?? []));
   }
   return result;
 }
@@ -70,6 +70,50 @@ function themesFor(nodusId: string): string[] {
     )
     .all(nodusId) as { label: string }[];
   return rows.map((r) => r.label);
+}
+
+function zoteroTagsFor(nodusId: string): string[] {
+  return zoteroTagsForWorks([nodusId]).get(nodusId) ?? [];
+}
+
+function zoteroTagsForWorks(nodusIds: string[]): Map<string, string[]> {
+  const tagsByWork = new Map<string, string[]>();
+  if (nodusIds.length === 0) return tagsByWork;
+  const placeholders = nodusIds.map(() => '?').join(',');
+  const rows = getDb()
+    .prepare(
+      `SELECT wzt.nodus_id, zt.label
+         FROM work_zotero_tags wzt JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
+        WHERE wzt.nodus_id IN (${placeholders})
+        ORDER BY wzt.nodus_id, zt.label COLLATE NOCASE`
+    )
+    .all(...nodusIds) as { nodus_id: string; label: string }[];
+  return groupLabels(rows);
+}
+
+function groupLabels(rows: { nodus_id: string; label: string }[]): Map<string, string[]> {
+  const labelsByWork = new Map<string, string[]>();
+  for (const row of rows) {
+    const labels = labelsByWork.get(row.nodus_id) ?? [];
+    labels.push(row.label);
+    labelsByWork.set(row.nodus_id, labels);
+  }
+  return labelsByWork;
+}
+
+export function listZoteroTags(): ZoteroTag[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT zt.label, COUNT(*) AS work_count
+         FROM zotero_tags zt
+         JOIN work_zotero_tags wzt ON wzt.tag_id = zt.tag_id
+         JOIN works w ON w.nodus_id = wzt.nodus_id
+        WHERE w.archived = 0
+        GROUP BY zt.tag_id, zt.label
+        ORDER BY work_count DESC, zt.label COLLATE NOCASE`
+    )
+    .all() as { label: string; work_count: number }[];
+  return rows.map((row) => ({ label: row.label, workCount: row.work_count }));
 }
 
 export function listWorks(filter: WorkFilter = {}): WorkView[] {
@@ -104,6 +148,36 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
     );
     params.theme = filter.theme;
   }
+  const zoteroTags = Array.from(
+    new Set((filter.zoteroTags ?? []).map(normalizeZoteroTag).filter(Boolean))
+  );
+  if (zoteroTags.length > 0) {
+    const tagParams = zoteroTags.map((tag, index) => {
+      const name = `zoteroTag${index}`;
+      params[name] = tag;
+      return `@${name}`;
+    });
+    const tagWhere = `zt.normalized_label IN (${tagParams.join(', ')})`;
+    if (filter.zoteroTagMode === 'all') {
+      clauses.push(
+        `nodus_id IN (
+          SELECT wzt.nodus_id
+            FROM work_zotero_tags wzt JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
+           WHERE ${tagWhere}
+           GROUP BY wzt.nodus_id
+          HAVING COUNT(DISTINCT zt.normalized_label) = ${zoteroTags.length}
+        )`
+      );
+    } else {
+      clauses.push(
+        `nodus_id IN (
+          SELECT wzt.nodus_id
+            FROM work_zotero_tags wzt JOIN zotero_tags zt ON zt.tag_id = wzt.tag_id
+           WHERE ${tagWhere}
+        )`
+      );
+    }
+  }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
   const rows = db.prepare(`SELECT * FROM works ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
@@ -120,14 +194,10 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
         ORDER BY wt.nodus_id, t.label`
     )
     .all(...ids) as { nodus_id: string; label: string }[];
-  const themesByWork = new Map<string, string[]>();
-  for (const r of themeRows) {
-    const list = themesByWork.get(r.nodus_id) ?? [];
-    list.push(r.label);
-    themesByWork.set(r.nodus_id, list);
-  }
+  const themesByWork = groupLabels(themeRows);
+  const zoteroTagsByWork = zoteroTagsForWorks(ids);
 
-  return rows.map((r) => toView(r, themesByWork.get(r.nodus_id) ?? []));
+  return rows.map((r) => toView(r, themesByWork.get(r.nodus_id) ?? [], zoteroTagsByWork.get(r.nodus_id) ?? []));
 }
 
 export interface UpsertWorkInput {
@@ -140,6 +210,7 @@ export interface UpsertWorkInput {
   item_type: string;
   doi: string | null;
   read_tag: boolean;
+  zoteroTags: string[];
 }
 
 /** Insert a new work or update mutable Zotero-sourced fields of an existing one. */
@@ -170,7 +241,38 @@ export function upsertWork(input: UpsertWorkInput): void {
       read_tag: input.read_tag ? 1 : 0,
     });
   }
-  recomputeDeepTrigger(getWorkByZoteroKey(input.zotero_key)!.nodus_id);
+  const nodusId = getWorkByZoteroKey(input.zotero_key)!.nodus_id;
+  replaceZoteroTags(nodusId, input.zoteroTags);
+  recomputeDeepTrigger(nodusId);
+}
+
+/** Replace one work's Zotero-sourced tags without affecting user-managed themes. */
+function replaceZoteroTags(nodusId: string, tags: string[]): void {
+  const labels = Array.from(
+    new Map(
+      tags
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+        .map((tag) => [normalizeZoteroTag(tag), tag])
+    ).values()
+  );
+  const db = getDb();
+  const replace = db.transaction(() => {
+    db.prepare('DELETE FROM work_zotero_tags WHERE nodus_id = ?').run(nodusId);
+    const insertTag = db.prepare(
+      'INSERT INTO zotero_tags (label, normalized_label) VALUES (?, ?) ON CONFLICT(normalized_label) DO NOTHING'
+    );
+    const findTag = db.prepare('SELECT tag_id FROM zotero_tags WHERE normalized_label = ?');
+    const linkTag = db.prepare('INSERT INTO work_zotero_tags (nodus_id, tag_id) VALUES (?, ?)');
+    for (const label of labels) {
+      const normalizedLabel = normalizeZoteroTag(label);
+      insertTag.run(label, normalizedLabel);
+      const tag = findTag.get(normalizedLabel) as { tag_id: number };
+      linkTag.run(nodusId, tag.tag_id);
+    }
+  });
+  replace();
 }
 
 export function addAlias(nodusId: string, zoteroKey: string): void {

@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { WorkView, WorkFilter, DeepStatus, LightStatus, AppSettings, ModelRef, WorkEmbeddingStatus } from '@shared/types';
+import type {
+  WorkView,
+  WorkFilter,
+  DeepStatus,
+  LightStatus,
+  AppSettings,
+  ModelRef,
+  WorkEmbeddingStatus,
+  ZoteroTag,
+} from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ModelPicker } from '../components/ModelPicker';
@@ -70,6 +79,9 @@ export function Library({
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all' });
+  const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
+  const [tagFilterOpen, setTagFilterOpen] = useState(false);
+  const [tagSearch, setTagSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -79,9 +91,13 @@ export function Library({
 
   const load = useCallback(async () => {
     setLoading(true);
-    const w = await window.nodus.listWorks(filter);
+    const [w, tags, statuses] = await Promise.all([
+      window.nodus.listWorks(filter),
+      window.nodus.listZoteroTags(),
+      window.nodus.getWorkEmbeddingStatuses(),
+    ]);
     setWorks(w);
-    const statuses = await window.nodus.getWorkEmbeddingStatuses();
+    setAvailableZoteroTags(tags);
     setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
     setLoading(false);
   }, [filter]);
@@ -175,6 +191,29 @@ export function Library({
     });
   };
 
+  const selectedZoteroTags = filter.zoteroTags ?? [];
+  const visibleZoteroTags = useMemo(() => {
+    const query = tagSearch.trim().toLocaleLowerCase();
+    return query ? availableZoteroTags.filter((tag) => tag.label.toLocaleLowerCase().includes(query)) : availableZoteroTags;
+  }, [availableZoteroTags, tagSearch]);
+
+  const toggleZoteroTag = (label: string) => {
+    setFilter((current) => {
+      const selected = current.zoteroTags ?? [];
+      const normalized = label.toLocaleLowerCase();
+      const exists = selected.some((tag) => tag.toLocaleLowerCase() === normalized);
+      return {
+        ...current,
+        zoteroTags: exists ? selected.filter((tag) => tag.toLocaleLowerCase() !== normalized) : [...selected, label],
+      };
+    });
+  };
+
+  const clearZoteroTags = () => {
+    setFilter((current) => ({ ...current, zoteroTags: [], zoteroTagMode: 'any' }));
+    setTagSearch('');
+  };
+
   const allVisibleSelected = works.length > 0 && works.every((w) => selected.has(w.nodus_id));
   const summary = useMemo(() => {
     const pendingEmbeddings = works.filter((w) => {
@@ -239,6 +278,93 @@ export function Library({
             <option value="none">Profundo: ninguno</option>
             <option value="skipped_no_text">Profundo: sin texto</option>
           </select>
+          <div className="relative">
+            <button
+              type="button"
+              className={`btn border gap-1.5 ${selectedZoteroTags.length ? 'border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+              onClick={() => setTagFilterOpen((open) => !open)}
+              aria-expanded={tagFilterOpen}
+              aria-haspopup="dialog"
+            >
+              <Icon name="tag" /> Etiquetas Zotero
+              {selectedZoteroTags.length > 0 && (
+                <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                  {selectedZoteroTags.length}
+                </span>
+              )}
+            </button>
+            {tagFilterOpen && (
+              <div
+                role="dialog"
+                aria-label="Filtrar por etiquetas de Zotero"
+                className="absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    className="input min-w-0 flex-1"
+                    value={tagSearch}
+                    onChange={(e) => setTagSearch(e.target.value)}
+                    placeholder="Buscar etiqueta…"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost text-xs"
+                    disabled={selectedZoteroTags.length === 0}
+                    onClick={clearZoteroTags}
+                  >
+                    Limpiar
+                  </button>
+                </div>
+                {selectedZoteroTags.length > 1 && (
+                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                    Combinar etiquetas
+                    <select
+                      className="input py-1 text-xs"
+                      value={filter.zoteroTagMode ?? 'any'}
+                      onChange={(e) => setFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
+                    >
+                      <option value="any">Cualquiera</option>
+                      <option value="all">Todas</option>
+                    </select>
+                  </label>
+                )}
+                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                  {visibleZoteroTags.map((tag) => {
+                    const checked = selectedZoteroTags.some((selected) => selected.toLocaleLowerCase() === tag.label.toLocaleLowerCase());
+                    return (
+                      <button
+                        key={tag.label}
+                        type="button"
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                          checked ? 'bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
+                        }`}
+                        onClick={() => toggleZoteroTag(tag.label)}
+                      >
+                        <span
+                          className={`flex h-4 w-4 items-center justify-center rounded border ${
+                            checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
+                          }`}
+                        >
+                          {checked && <Icon name="check" size={12} />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{tag.label}</span>
+                        <span className="text-xs tabular-nums text-neutral-500">{tag.workCount}</span>
+                      </button>
+                    );
+                  })}
+                  {availableZoteroTags.length === 0 && (
+                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                      Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.
+                    </p>
+                  )}
+                  {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
+                    <p className="px-2 py-3 text-xs text-neutral-500">No hay etiquetas que coincidan.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex-1" />
           <span className="text-xs text-neutral-500">Modelo para análisis</span>
           <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
@@ -250,6 +376,27 @@ export function Library({
           <SummaryPill label="embeddings pendientes" value={summary.pendingEmbeddings} tone="cyan" />
           {summary.failed > 0 && <SummaryPill label="fallos" value={summary.failed} tone="red" />}
         </div>
+        {selectedZoteroTags.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+            <span>Etiquetas:</span>
+            {selectedZoteroTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
+                onClick={() => toggleZoteroTag(tag)}
+                title={`Quitar ${tag}`}
+              >
+                {tag} <Icon name="x" size={12} />
+              </button>
+            ))}
+            {selectedZoteroTags.length > 1 && (
+              <span className="ml-1">
+                {filter.zoteroTagMode === 'all' ? 'deben estar todas' : 'basta cualquiera'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {selected.size > 0 && (

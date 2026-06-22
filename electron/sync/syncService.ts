@@ -49,6 +49,7 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
     item_type: item.itemType,
     doi: item.doi,
     read_tag: hasTag,
+    zoteroTags: item.tags,
   });
 
   const trigger = recomputeDeepTrigger(nodusId);

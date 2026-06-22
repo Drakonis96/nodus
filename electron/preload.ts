@@ -18,6 +18,7 @@ const api: NodusApi = {
     ipcRenderer.invoke('zotero:collectionItems', collectionKey, opts),
 
   listWorks: (filter) => ipcRenderer.invoke('works:list', filter),
+  listZoteroTags: () => ipcRenderer.invoke('works:listZoteroTags'),
   getWork: (nodusId) => ipcRenderer.invoke('works:get', nodusId),
   ingestZoteroItems: (items) => ipcRenderer.invoke('works:ingestZoteroItems', items),
   setManualDeep: (nodusId, value, model) => ipcRenderer.invoke('works:setManualDeep', nodusId, value, model),
