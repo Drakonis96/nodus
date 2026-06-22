@@ -9,6 +9,7 @@ import {
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
+import { t, tx } from '../i18n';
 
 type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 const IDEA_ROW_HEIGHT = 116;
@@ -133,15 +134,15 @@ export function IdeasView({
         <div className="p-6 pb-4">
           <div className="flex items-center gap-3 mb-4">
             <Icon name="bulb" size={22} className="text-indigo-300" />
-            <h1 className="text-xl font-semibold">Ideas</h1>
-            <span className="text-sm text-neutral-500">{ideaNodes.length} ideas extraídas</span>
+            <h1 className="text-xl font-semibold">{t('Ideas')}</h1>
+            <span className="text-sm text-neutral-500">{tx('{n} ideas extraídas', { n: ideaNodes.length })}</span>
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
             <input
               className="input text-sm w-60"
-              placeholder="Buscar ideas…"
+              placeholder={t('Buscar ideas…')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -150,9 +151,9 @@ export function IdeasView({
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value as IdeaType | '')}
             >
-              <option value="">Todos los tipos</option>
-              {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((t) => (
-                <option key={t} value={t}>{NODE_LABELS[t]}</option>
+              <option value="">{t('Todos los tipos')}</option>
+              {(['claim', 'finding', 'construct', 'method', 'framework'] as IdeaType[]).map((tp) => (
+                <option key={tp} value={tp}>{t(NODE_LABELS[tp])}</option>
               ))}
             </select>
             <select
@@ -160,11 +161,11 @@ export function IdeasView({
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
             >
-              <option value="label">Ordenar: nombre</option>
-              <option value="type">Ordenar: tipo</option>
-              <option value="works">Ordenar: obras</option>
-              <option value="connections">Ordenar: conexiones</option>
-              <option value="confidence">Ordenar: confianza</option>
+              <option value="label">{t('Ordenar: nombre')}</option>
+              <option value="type">{t('Ordenar: tipo')}</option>
+              <option value="works">{t('Ordenar: obras')}</option>
+              <option value="connections">{t('Ordenar: conexiones')}</option>
+              <option value="confidence">{t('Ordenar: confianza')}</option>
             </select>
           </div>
         </div>
@@ -178,8 +179,8 @@ export function IdeasView({
           empty={
             <div className="text-neutral-500 text-sm">
               {ideaNodes.length === 0
-                ? 'Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.'
-                : 'Sin resultados para los filtros actuales.'}
+                ? t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.')
+                : t('Sin resultados para los filtros actuales.')}
             </div>
           }
           renderItem={(node) => {
@@ -198,15 +199,15 @@ export function IdeasView({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-sm">{node.label}</span>
-                      <Badge color="indigo">{NODE_LABELS[node.type as IdeaType] ?? node.type}</Badge>
+                      <Badge color="indigo">{t(NODE_LABELS[node.type as IdeaType]) ?? node.type}</Badge>
                     </div>
                     {node.statement && (
                       <p className="text-xs text-neutral-400 mt-1 line-clamp-2">{node.statement}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1.5 text-[11px] text-neutral-500">
-                      <span>{node.workCount} obra(s)</span>
-                      <span>{degree} conexión(es)</span>
-                      <span>conf {node.maxConfidence.toFixed(2)}</span>
+                      <span>{tx('{n} obra(s)', { n: node.workCount })}</span>
+                      <span>{tx('{n} conexión(es)', { n: degree })}</span>
+                      <span>{t('conf')} {node.maxConfidence.toFixed(2)}</span>
                       {node.themes.length > 0 && (
                         <span className="min-w-0 truncate text-neutral-600">{node.themes.join(', ')}</span>
                       )}
@@ -223,7 +224,7 @@ export function IdeasView({
       {selectedId && (
         <div className="w-[420px] shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-sm text-neutral-300">Detalle</h2>
+            <h2 className="font-semibold text-sm text-neutral-300">{t('Detalle')}</h2>
             <button className="text-neutral-500 hover:text-white text-sm" onClick={() => setSelectedId(null)}>
               ✕
             </button>
@@ -241,36 +242,36 @@ export function IdeasView({
             <div className="space-y-4">
               {/* Idea info */}
               <div>
-                <Badge color="indigo">{NODE_LABELS[detail.idea.type as IdeaType] ?? detail.idea.type}</Badge>
+                <Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge>
                 <h3 className="font-semibold mt-2">{detail.idea.label}</h3>
                 <p className="text-neutral-400 text-sm mt-1">{detail.idea.statement}</p>
                 {selectedNode && selectedNode.themes.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
-                    {selectedNode.themes.map((t) => (
-                      <Badge key={t} color="amber">{t}</Badge>
+                    {selectedNode.themes.map((theme) => (
+                      <Badge key={theme} color="amber">{theme}</Badge>
                     ))}
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button
                     className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                    onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `Idea: ${detail.idea.label}` })}
+                    onClick={() => onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` })}
                   >
-                    <Icon name="layers" size={13} /> Grafo
+                    <Icon name="layers" size={13} /> {t('Grafo')}
                   </button>
                   <button
                     className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
                     onClick={() =>
                       onOpenAssistant({
-                        title: `Idea: ${detail.idea.label}`,
+                        title: `${t('Idea:')} ${detail.idea.label}`,
                         selection: ASSISTANT_CONTEXTS.idea,
                         prompt:
-                          `Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.\n\n` +
-                          `Idea: ${detail.idea.label}\n${detail.idea.statement}`,
+                          `${t('Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.')}\n\n` +
+                          `${t('Idea:')} ${detail.idea.label}\n${detail.idea.statement}`,
                       })
                     }
                   >
-                    <Icon name="wand" size={13} /> Asistente
+                    <Icon name="wand" size={13} /> {t('Asistente')}
                   </button>
                 </div>
               </div>
@@ -278,7 +279,7 @@ export function IdeasView({
               {/* Occurrences */}
               {detail.occurrences.length > 0 && (
                 <div>
-                  <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
+                  <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
                   {detail.occurrences.map((o) => (
                     <OccurrenceCard key={o.nodus_id} occurrence={o} />
                   ))}
@@ -288,7 +289,7 @@ export function IdeasView({
               {/* Evidence */}
               {detail.evidence.length > 0 && (
                 <div>
-                  <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
+                  <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
                   {detail.evidence.map((ev) => (
                     <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
                       "{ev.quote}" <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
@@ -301,12 +302,12 @@ export function IdeasView({
               {connectedIdeas.length > 0 && (
                 <div>
                   <div className="text-xs uppercase text-neutral-500 mb-1">
-                    Ideas conectadas ({connectedIdeas.length})
+                    {tx('Ideas conectadas ({n})', { n: connectedIdeas.length })}
                   </div>
                   <div className="space-y-1.5">
                     {connectedIdeas.map(({ edge, node }) => {
                       if (!node) return null;
-                      const edgeLabel = EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS] ?? edge.type;
+                      const edgeLabel = t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type;
                       return (
                         <button
                           key={edge.id}
@@ -319,7 +320,7 @@ export function IdeasView({
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge color={edge.basis === 'explicit' ? 'green' : 'amber'}>{edgeLabel}</Badge>
-                            <span className="text-[11px] text-neutral-500">conf {edge.confidence.toFixed(2)}</span>
+                            <span className="text-[11px] text-neutral-500">{t('conf')} {edge.confidence.toFixed(2)}</span>
                           </div>
                         </button>
                       );
@@ -339,17 +340,17 @@ export function IdeasView({
           )}
           {connectedDetail && (
             <div className="mt-4 pt-4 border-t border-neutral-800">
-              <div className="text-xs uppercase text-neutral-500 mb-2">Idea conectada</div>
+              <div className="text-xs uppercase text-neutral-500 mb-2">{t('Idea conectada')}</div>
               {connectedEdge && (
                 <div className="mb-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge color="indigo">
-                      {EDGE_LABELS[connectedEdge.edge.type as keyof typeof EDGE_LABELS] ?? connectedEdge.edge.type}
+                      {t(EDGE_LABELS[connectedEdge.edge.type as keyof typeof EDGE_LABELS]) ?? connectedEdge.edge.type}
                     </Badge>
                     <Badge color={connectedEdge.edge.basis === 'explicit' ? 'green' : 'amber'}>
                       {connectedEdge.edge.basis}
                     </Badge>
-                    <Badge>conf {connectedEdge.edge.confidence.toFixed(2)}</Badge>
+                    <Badge>{t('conf')} {connectedEdge.edge.confidence.toFixed(2)}</Badge>
                   </div>
                   {connectedEdge.explanation && (
                     <p className="text-xs text-neutral-400 mb-2">{connectedEdge.explanation}</p>
@@ -365,18 +366,18 @@ export function IdeasView({
                   ))}
                 </div>
               )}
-              <Badge color="indigo">{NODE_LABELS[connectedDetail.idea.type as IdeaType] ?? connectedDetail.idea.type}</Badge>
+              <Badge color="indigo">{t(NODE_LABELS[connectedDetail.idea.type as IdeaType]) ?? connectedDetail.idea.type}</Badge>
               <h4 className="font-semibold mt-1">{connectedDetail.idea.label}</h4>
               <p className="text-neutral-400 text-xs mt-1">{connectedDetail.idea.statement}</p>
               {connectedDetail.occurrences.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-[11px] uppercase text-neutral-500 mb-1">Obras</div>
+                  <div className="text-[11px] uppercase text-neutral-500 mb-1">{t('Obras')}</div>
                   {connectedDetail.occurrences.slice(0, 3).map((o) => (
                     <OccurrenceCard key={o.nodus_id} occurrence={o} />
                   ))}
                   {connectedDetail.occurrences.length > 3 && (
                     <div className="text-[11px] text-neutral-500 mt-1">
-                      +{connectedDetail.occurrences.length - 3} más
+                      +{connectedDetail.occurrences.length - 3} {t('más')}
                     </div>
                   )}
                 </div>
@@ -385,13 +386,13 @@ export function IdeasView({
                 className="btn btn-ghost text-xs mt-3 gap-1"
                 onClick={() => setSelectedId(connectedDetail.idea.global_id)}
               >
-                <Icon name="bulb" size={12} /> Ver detalle completo
+                <Icon name="bulb" size={12} /> {t('Ver detalle completo')}
               </button>
               <button
                 className="btn btn-ghost text-xs mt-3 ml-2 gap-1"
-                onClick={() => onOpenGraph({ preset: 'overview', nodeId: connectedDetail.idea.global_id, label: `Idea: ${connectedDetail.idea.label}` })}
+                onClick={() => onOpenGraph({ preset: 'overview', nodeId: connectedDetail.idea.global_id, label: `${t('Idea:')} ${connectedDetail.idea.label}` })}
               >
-                <Icon name="layers" size={12} /> Ver en grafo
+                <Icon name="layers" size={12} /> {t('Ver en grafo')}
               </button>
             </div>
           )}

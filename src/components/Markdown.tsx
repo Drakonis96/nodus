@@ -1,5 +1,6 @@
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { t } from '../i18n';
 
 const nodusUrlTransform = (value: string) => {
   if (value.startsWith('nodus://')) return value;
@@ -87,12 +88,12 @@ function parseCitation(href: string | undefined): MarkdownCitation | null {
 function citationLabel(kind: MarkdownCitation['kind']): string {
   switch (kind) {
     case 'idea':
-      return 'idea';
+      return t('idea');
     case 'work':
-      return 'documento';
+      return t('documento');
     case 'gap':
-      return 'hueco de investigación';
+      return t('hueco de investigación');
     case 'contradiction':
-      return 'contradicción';
+      return t('contradicción');
   }
 }

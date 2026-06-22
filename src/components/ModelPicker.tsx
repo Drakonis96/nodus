@@ -1,5 +1,6 @@
 import type { AppSettings, ModelRef } from '@shared/types';
 import { modelLabel, sameModel } from './ui';
+import { t, tx } from '../i18n';
 
 /**
  * Lets the user pick which model a scan should use: the default, or any favorite.
@@ -28,10 +29,10 @@ export function ModelPicker({
         const [provider, model] = e.target.value.split('::');
         onChange({ provider: provider as ModelRef['provider'], model });
       }}
-      title="Modelo para el escaneo"
+      title={t('Modelo para el escaneo')}
     >
       <option value="">
-        {settings.defaultModel ? `Predeterminado (${modelLabel(settings.defaultModel)})` : 'Predeterminado (sin configurar)'}
+        {settings.defaultModel ? tx('Predeterminado ({model})', { model: modelLabel(settings.defaultModel) }) : t('Predeterminado (sin configurar)')}
       </option>
       {favorites.map((m) => (
         <option key={serialize(m)} value={serialize(m)} disabled={sameModel(m, settings.defaultModel)}>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { QueueProgress, QueueKind } from '@shared/types';
 import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
+import { t, tx } from '../i18n';
 
 const KIND_LABELS: Record<QueueKind, string> = {
   light: 'LIGERO',
@@ -32,21 +33,21 @@ export function QueueBar() {
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-950/60 border border-amber-800/60 px-3 py-1.5 text-amber-300 text-xs">
           <span>⚠</span>
           <span className="flex-1">
-            Escaneo en pausa: {pausedReason} Corrígelo en Ajustes y pulsa <b>Reanudar</b>.
+            {t('Escaneo en pausa:')} {pausedReason} {t('Corrígelo en Ajustes y pulsa')} <b>{t('Reanudar')}</b>.
           </span>
         </div>
       )}
       <div className="flex items-center gap-3">
         <button className="btn-ghost btn" onClick={() => setExpanded((e) => !e)}>
-          {expanded ? '▾' : '▸'} Cola
+          {expanded ? '▾' : '▸'} {t('Cola')}
         </button>
         <div className="flex-1">
           <div className="flex justify-between text-xs text-neutral-400 mb-1">
             <span>
               {current ? (
                 <>
-                  {done + failed} / {total} — Procesando: <span className="text-neutral-200">{current.title}</span>{' '}
-                  <span className="uppercase text-[10px] tracking-wide">({KIND_LABELS[current.kind] ?? current.kind})</span>
+                  {done + failed} / {total} — {t('Procesando:')} <span className="text-neutral-200">{current.title}</span>{' '}
+                  <span className="uppercase text-[10px] tracking-wide">({t(KIND_LABELS[current.kind]) ?? current.kind})</span>
                   {running?.detail && (
                     <span className="text-indigo-300 ml-1">
                       · {running.detail}
@@ -55,11 +56,11 @@ export function QueueBar() {
                   )}
                 </>
               ) : paused ? (
-                'Cola en pausa'
+                t('Cola en pausa')
               ) : active ? (
-                'En cola…'
+                t('En cola…')
               ) : (
-                `${done} completados${failed ? `, ${failed} fallidos` : ''}`
+                `${done} ${t('completados')}${failed ? `, ${failed} ${t('fallidos')}` : ''}`
               )}
             </span>
             <span>{pct}%</span>
@@ -76,8 +77,8 @@ export function QueueBar() {
           (paused ? (
             <button
               className="btn btn-ghost"
-              title="Reanudar la cola"
-              aria-label="Reanudar la cola"
+              title={t('Reanudar la cola')}
+              aria-label={t('Reanudar la cola')}
               onClick={() => window.nodus.resumeQueue()}
             >
               <Icon name="play" size={16} />
@@ -85,8 +86,8 @@ export function QueueBar() {
           ) : (
             <button
               className="btn btn-ghost"
-              title="Pausar la cola"
-              aria-label="Pausar la cola"
+              title={t('Pausar la cola')}
+              aria-label={t('Pausar la cola')}
               onClick={() => window.nodus.pauseQueue()}
             >
               <Icon name="pause" size={16} />
@@ -95,8 +96,8 @@ export function QueueBar() {
         {failed > 0 && (
           <button
             className="btn btn-ghost text-amber-300"
-            title={`Reencolar ${failed} obra(s) cuyo escaneo falló`}
-            aria-label={`Reintentar ${failed} fallidos`}
+            title={tx('Reencolar {n} obra(s) cuyo escaneo falló', { n: failed })}
+            aria-label={tx('Reintentar {n} fallidos', { n: failed })}
             onClick={() => window.nodus.retryFailed()}
           >
             <Icon name="refresh" size={15} /> {failed}
@@ -104,8 +105,8 @@ export function QueueBar() {
         )}
         <button
           className="btn btn-ghost"
-          title="Limpiar la cola (quita los elementos pendientes y terminados)"
-          aria-label="Limpiar la cola"
+          title={t('Limpiar la cola (quita los elementos pendientes y terminados)')}
+          aria-label={t('Limpiar la cola')}
           onClick={() => setConfirm('clear')}
         >
           <Icon name="trash" size={16} />
@@ -113,8 +114,8 @@ export function QueueBar() {
         {active && (
           <button
             className="btn btn-ghost text-red-400 hover:text-red-300"
-            title="Detener y eliminar todos los elementos de la cola"
-            aria-label="Detener y vaciar la cola"
+            title={t('Detener y eliminar todos los elementos de la cola')}
+            aria-label={t('Detener y vaciar la cola')}
             onClick={() => setConfirm('stop')}
           >
             <Icon name="stop" size={16} />
@@ -134,7 +135,7 @@ export function QueueBar() {
               {items.map((it) => (
                 <div key={it.id} className="flex items-center justify-between py-1 text-xs">
                   <span className="truncate flex-1">{it.title}</span>
-                  <span className="uppercase text-[10px] text-neutral-500 mx-2">{KIND_LABELS[it.kind] ?? it.kind}</span>
+                  <span className="uppercase text-[10px] text-neutral-500 mx-2">{t(KIND_LABELS[it.kind]) ?? it.kind}</span>
                   <span
                     className={
                       it.state === 'done'
@@ -151,8 +152,8 @@ export function QueueBar() {
                   {it.state === 'queued' && (
                     <button
                       className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-indigo-300"
-                      title="Mover al principio de la cola"
-                      aria-label={`Mover al principio de la cola: ${it.title}`}
+                      title={t('Mover al principio de la cola')}
+                      aria-label={`${t('Mover al principio de la cola')}: ${it.title}`}
                       onClick={() => window.nodus.moveQueueItemToTop(it.id)}
                     >
                       <Icon name="arrowUp" size={13} />
@@ -161,8 +162,8 @@ export function QueueBar() {
                   {(it.state === 'queued' || it.state === 'paused' || it.state === 'running') && (
                     <button
                       className="ml-1 inline-flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-800 hover:text-red-400"
-                      title={it.state === 'running' ? 'Detener y eliminar de la cola' : 'Eliminar de la cola'}
-                      aria-label={`${it.state === 'running' ? 'Detener y eliminar' : 'Eliminar'} de la cola: ${it.title}`}
+                      title={it.state === 'running' ? t('Detener y eliminar de la cola') : t('Eliminar de la cola')}
+                      aria-label={`${it.state === 'running' ? t('Detener y eliminar de la cola') : t('Eliminar de la cola')}: ${it.title}`}
                       onClick={() => window.nodus.removeQueueItem(it.id)}
                     >
                       <Icon name={it.state === 'running' ? 'stop' : 'x'} size={13} />
@@ -177,9 +178,9 @@ export function QueueBar() {
 
       {confirm === 'clear' && (
         <ConfirmModal
-          title="Limpiar la cola"
-          message="Se quitarán de la cola los elementos pendientes y los ya terminados. El elemento en curso seguirá procesándose."
-          confirmLabel="Limpiar"
+          title={t('Limpiar la cola')}
+          message={t('Se quitarán de la cola los elementos pendientes y los ya terminados. El elemento en curso seguirá procesándose.')}
+          confirmLabel={t('Limpiar')}
           onConfirm={() => {
             void window.nodus.clearQueue();
             setConfirm(null);
@@ -190,9 +191,9 @@ export function QueueBar() {
 
       {confirm === 'stop' && (
         <ConfirmModal
-          title="Detener y vaciar la cola"
-          message="Se detendrá el escaneo en curso y se eliminarán todos los elementos de la cola. Esta acción no se puede deshacer."
-          confirmLabel="Detener y vaciar"
+          title={t('Detener y vaciar la cola')}
+          message={t('Se detendrá el escaneo en curso y se eliminarán todos los elementos de la cola. Esta acción no se puede deshacer.')}
+          confirmLabel={t('Detener y vaciar')}
           danger
           onConfirm={() => {
             void window.nodus.stopQueue();

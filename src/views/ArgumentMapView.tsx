@@ -16,6 +16,7 @@ import {
   DETAIL_DEFAULT_FONT,
   type DetailLoading,
 } from '../components/NodeDetailPanel';
+import { t, tx } from '../i18n';
 
 const RELATION_LABELS: Record<string, string> = {
   ...EDGE_LABELS,
@@ -251,7 +252,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
         <button
           className="btn btn-ghost text-neutral-400 hover:text-neutral-100 mr-2"
-          title="Volver al grafo"
+          title={t('Volver al grafo')}
           onClick={onBack}
         >
           <Icon name="chevronLeft" size={16} />
@@ -259,28 +260,28 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
         <div className="flex rounded-lg overflow-hidden border border-neutral-700">
           <button
             className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-            title="Detecta los recorridos por conectividad (sin IA)"
+            title={t('Detecta los recorridos por conectividad (sin IA)')}
             onClick={() => switchMode('auto')}
           >
-            Automático
+            {t('Automático')}
           </button>
           <button
             className={`px-3 py-1.5 ${!isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-            title="La IA traza el esquema de argumentos desde una idea"
+            title={t('La IA traza el esquema de argumentos desde una idea')}
             onClick={() => switchMode('ai')}
           >
-            IA
+            {t('IA')}
           </button>
         </div>
 
         {!isAuto && (
           <>
             <div className="flex flex-col gap-1 min-w-[260px] flex-1">
-              <label className="text-neutral-500 uppercase tracking-wide">Idea a investigar</label>
+              <label className="text-neutral-500 uppercase tracking-wide">{t('Idea a investigar')}</label>
               <div className="relative">
                 <input
                   className="input w-full"
-                  placeholder={graphLoaded ? 'Busca una idea…' : 'Cargando ideas…'}
+                  placeholder={graphLoaded ? t('Busca una idea…') : t('Cargando ideas…')}
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -291,7 +292,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                 {search && (
                   <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto card bg-neutral-900 border border-neutral-700 shadow-xl">
                     {filteredIdeas.length === 0 && (
-                      <div className="px-3 py-2 text-neutral-500">Sin coincidencias</div>
+                      <div className="px-3 py-2 text-neutral-500">{t('Sin coincidencias')}</div>
                     )}
                     {filteredIdeas.map((n) => (
                       <button
@@ -314,21 +315,21 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
               </div>
               {seedId && (
                 <div className="text-[11px] text-indigo-400 flex items-center gap-1">
-                  <Icon name="check" size={12} /> Idea seleccionada
+                  <Icon name="check" size={12} /> {t('Idea seleccionada')}
                 </div>
               )}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-neutral-500 uppercase tracking-wide">Modelo</label>
+              <label className="text-neutral-500 uppercase tracking-wide">{t('Modelo')}</label>
               <ModelPicker settings={settings} value={model} onChange={setModel} compact />
             </div>
             <button
               className="btn btn-primary gap-1.5"
               onClick={() => build()}
               disabled={!seedId || building || !hasModel}
-              title={!hasModel ? 'Configura un modelo de IA en Ajustes' : 'Trazar el mapa de argumentos'}
+              title={!hasModel ? t('Configura un modelo de IA en Ajustes') : t('Trazar el mapa de argumentos')}
             >
-              <Icon name="map" /> {building ? 'Trazando…' : 'Trazar mapa'}
+              <Icon name="map" /> {building ? t('Trazando…') : t('Trazar mapa')}
             </button>
           </>
         )}
@@ -336,19 +337,19 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
         {isAuto && (
           <div className="flex-1 flex items-end gap-2 flex-wrap">
             <span className="text-neutral-500">
-              {suggestions.length > 0 ? `${filteredSuggestions.length} de ${suggestions.length} recorridos` : 'Detectando recorridos…'}
+              {suggestions.length > 0 ? tx('{a} de {b} recorridos', { a: filteredSuggestions.length, b: suggestions.length }) : t('Detectando recorridos…')}
             </span>
             <div className="relative flex-1 min-w-[180px] max-w-xs">
               <Icon name="search" size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" />
               <input
                 className="input input-with-leading-icon w-full py-1"
-                placeholder="Buscar recorrido…"
+                placeholder={t('Buscar recorrido…')}
                 value={suggestionSearch}
                 onChange={(e) => setSuggestionSearch(e.target.value)}
               />
             </div>
             <label className="flex items-center gap-1.5 text-neutral-400">
-              Mín. conexiones
+              {t('Mín. conexiones')}
               <input
                 type="number"
                 className="input w-16 py-1 text-center"
@@ -358,7 +359,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
               />
             </label>
             <button className="btn btn-ghost gap-1.5" onClick={() => discoverRoutes()} disabled={suggestionsLoading}>
-              <Icon name="sync" className={suggestionsLoading ? 'animate-spin' : ''} /> Actualizar
+              <Icon name="sync" className={suggestionsLoading ? 'animate-spin' : ''} /> {t('Actualizar')}
             </button>
           </div>
         )}
@@ -369,7 +370,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
         <div className="flex-1 min-w-0 overflow-y-auto p-4">
           {!isAuto && !hasModel && (
             <div className="card p-4 text-amber-400 text-sm flex items-center gap-2">
-              <Icon name="alert" /> Configura un modelo de IA en Ajustes para trazar mapas en modo IA, o usa el modo Automático.
+              <Icon name="alert" /> {t('Configura un modelo de IA en Ajustes para trazar mapas en modo IA, o usa el modo Automático.')}
             </div>
           )}
           {error && (
@@ -379,7 +380,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
           )}
           {building && !map && (
             <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3">
-              <Spinner label={isAuto ? 'Construyendo el esquema…' : 'El modelo está trazando el esquema de argumentos…'} />
+              <Spinner label={isAuto ? t('Construyendo el esquema…') : t('El modelo está trazando el esquema de argumentos…')} />
             </div>
           )}
 
@@ -390,19 +391,19 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                 <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3 text-center max-w-md mx-auto py-10">
                   <Icon name="map" size={40} className="text-neutral-700" />
                   <div className="text-neutral-400">
-                    No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.
+                    {t('No hay ideas conectadas todavía. Analiza tus obras (escaneo profundo) para que el grafo genere conexiones entre ideas.')}
                   </div>
                 </div>
               )}
               {suggestionsLoading && (
                 <div className="flex items-center justify-center h-full text-neutral-500 gap-2">
-                  <Icon name="sync" className="animate-spin" /> Detectando recorridos…
+                  <Icon name="sync" className="animate-spin" /> {t('Detectando recorridos…')}
                 </div>
               )}
               <div className="space-y-2">
                 {filteredSuggestions.length === 0 && !suggestionsLoading && suggestions.length > 0 && (
                   <div className="text-center text-neutral-500 text-sm py-8">
-                    Ningún recorrido coincide con los filtros actuales.
+                    {t('Ningún recorrido coincide con los filtros actuales.')}
                   </div>
                 )}
                 {filteredSuggestions.map((s, i) => (
@@ -410,7 +411,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                     key={s.ideaId}
                     className="w-full text-left card p-3 hover:bg-neutral-800/80 transition-colors group"
                     onClick={() => build(s.ideaId)}
-                    title="Trazar el esquema desde esta idea"
+                    title={t('Trazar el esquema desde esta idea')}
                   >
                     <div className="flex items-start gap-3">
                       <div className="shrink-0 w-7 h-7 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-semibold text-neutral-400">
@@ -421,15 +422,15 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NODE_COLORS[s.type as IdeaType] ?? '#888' }} />
                           <span className="font-medium text-sm text-neutral-100 truncate">{s.label}</span>
                           {s.debateCount > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">{s.debateCount} debate(s)</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">{tx('{n} debate(s)', { n: s.debateCount })}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500 flex-wrap">
-                          <span>{s.degree} conexiones</span>
-                          <span>conf media {s.avgConfidence.toFixed(2)}</span>
+                          <span>{tx('{n} conexiones', { n: s.degree })}</span>
+                          <span>{t('conf media')} {s.avgConfidence.toFixed(2)}</span>
                           {s.topRelations.slice(0, 3).map((r) => (
                             <span key={r.type} className="text-neutral-400">
-                              {EDGE_LABELS[r.type as EdgeType] ?? r.type} ×{r.count}
+                              {t(EDGE_LABELS[r.type as EdgeType]) ?? r.type} ×{r.count}
                             </span>
                           ))}
                         </div>
@@ -451,8 +452,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
             <div className="flex flex-col items-center justify-center h-full text-neutral-500 gap-3 text-center max-w-md mx-auto">
               <Icon name="map" size={40} className="text-neutral-700" />
               <div className="text-neutral-400">
-                Selecciona una idea y traza su <span className="text-neutral-200">mapa de argumentos</span>: un esquema jerárquico de bloques
-                que despliega progresivamente cómo se ramifica la argumentación desde esa idea, siguiendo las conexiones reales del grafo.
+                {t('Selecciona una idea y traza su')} <span className="text-neutral-200">{t('mapa de argumentos')}</span>{t(': un esquema jerárquico de bloques que despliega progresivamente cómo se ramifica la argumentación desde esa idea, siguiendo las conexiones reales del grafo.')}
               </div>
             </div>
           )}
@@ -460,16 +460,16 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
             <div className="max-w-4xl mx-auto">
               <div className="card p-4 mb-4 bg-neutral-900/60">
                 <div className="flex items-center gap-2 text-xs text-neutral-500 mb-1 flex-wrap">
-                  <Icon name="map" size={14} /> Mapa desde <span className="text-neutral-300">{map.seedLabel}</span>
-                  <span>· {map.ideaCount} ideas</span>
-                  {map.truncated && <span className="text-amber-500">· subgrafo recortado</span>}
-                  <span className="text-neutral-600">· {isAuto ? 'modo automático' : 'modo IA'}</span>
+                  <Icon name="map" size={14} /> {t('Mapa desde')} <span className="text-neutral-300">{map.seedLabel}</span>
+                  <span>· {tx('{n} ideas', { n: map.ideaCount })}</span>
+                  {map.truncated && <span className="text-amber-500">· {t('subgrafo recortado')}</span>}
+                  <span className="text-neutral-600">· {isAuto ? t('modo automático') : t('modo IA')}</span>
                   <button
                     className="ml-auto btn btn-ghost text-xs gap-1 py-0.5 px-2"
-                    title="Volver al selector"
+                    title={t('Volver al selector')}
                     onClick={() => setMap(null)}
                   >
-                    <Icon name="chevronLeft" size={12} /> {isAuto ? 'Recorridos' : 'Empezar de nuevo'}
+                    <Icon name="chevronLeft" size={12} /> {isAuto ? t('Recorridos') : t('Empezar de nuevo')}
                   </button>
                 </div>
                 {map.overview && <p className="text-sm text-neutral-300 leading-relaxed">{map.overview}</p>}
@@ -547,12 +547,12 @@ function BlockTree({
                       className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded"
                       style={{ backgroundColor: `${typeColor(block.type)}22`, color: typeColor(block.type) }}
                     >
-                      {typeLabel(block.type)}
+                      {t(typeLabel(block.type))}
                     </span>
                     {block.relation !== 'root' && (
                       <span className="text-[10px] text-neutral-500 flex items-center gap-1">
                         <span style={{ color: accent }}><Icon name="arrowUp" size={10} className="rotate-90" /></span>
-                        {RELATION_LABELS[block.relation as EdgeType] ?? block.relation}
+                        {t(RELATION_LABELS[block.relation as EdgeType]) ?? block.relation}
                       </span>
                     )}
                   </div>
@@ -565,7 +565,7 @@ function BlockTree({
                 {hasChildren && (
                   <button
                     className="shrink-0 p-1 rounded hover:bg-neutral-700 text-neutral-400"
-                    title={isExpanded ? 'Contraer rama' : 'Desplegar rama'}
+                    title={isExpanded ? t('Contraer rama') : t('Desplegar rama')}
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggle(block.id);

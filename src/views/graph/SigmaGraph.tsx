@@ -16,6 +16,7 @@ import Sigma from 'sigma';
 import type { GraphData, GraphNodeType } from '@shared/types';
 import { NODE_COLORS } from '../../components/ui';
 import type { GraphPresetId } from '../../navigation';
+import { t } from '../../i18n';
 import { buildGraphModel, EDGE_TYPE_COLORS, clampUnit, type GraphFilters, type GraphLens, type GraphModel } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
 import { WorkerLayout, seedMissingPositions, scatterPositions } from './layout';
@@ -1317,7 +1318,7 @@ export function SigmaGraph({
         width={156}
         height={104}
         className="absolute bottom-3 right-3 z-10 cursor-pointer rounded-lg border border-neutral-300/70 opacity-70 hover:opacity-95 dark:border-neutral-700"
-        title="Mini-mapa · click para navegar"
+        title={t('Mini-mapa · click para navegar')}
         onClick={onMinimapClick}
       />
     </>

@@ -9,6 +9,7 @@ import { TutorPanel } from './TutorPanel';
 import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
+import { t, tx } from '../i18n';
 
 // The Sigma (WebGL) + worker-layout + LOD renderer is the default engine.
 // Fall back to the legacy Cytoscape canvas renderer by setting:
@@ -1117,11 +1118,11 @@ function loadHighlightDepth(): number | null {
 
 function navigationNotice(target: GraphNavigationTarget, preset: GraphPresetId): string {
   if (target.label) return target.label;
-  if (target.workTitle) return `Lectura: ${target.workTitle}`;
-  if (target.edgeId) return 'Relación enfocada desde otra pantalla';
-  if (target.nodeId) return 'Idea enfocada desde otra pantalla';
-  if (target.theme) return `Tema: ${target.theme}`;
-  return GRAPH_PRESETS.find((p) => p.id === preset)?.description ?? 'Contexto aplicado';
+  if (target.workTitle) return `${t('Lectura:')} ${target.workTitle}`;
+  if (target.edgeId) return t('Relación enfocada desde otra pantalla');
+  if (target.nodeId) return t('Idea enfocada desde otra pantalla');
+  if (target.theme) return `${t('Tema:')} ${target.theme}`;
+  return t(GRAPH_PRESETS.find((p) => p.id === preset)?.description ?? '') || t('Contexto aplicado');
 }
 
 function collectLocalGraph(startNode: any, maxDepth: number | null): { center: any; primary: any; secondary: any; context: any } {
@@ -3023,7 +3024,7 @@ export function GraphView({
             group: 'nodes',
             data: {
               id: parentId,
-              label: `Comunidad ${commId + 1}`,
+              label: tx('Comunidad {n}', { n: commId + 1 }),
               type: 'community',
               size: 60,
             },
@@ -3191,16 +3192,16 @@ export function GraphView({
               <button
                 key={preset.id}
                 className={`btn gap-1.5 py-1 ${activePreset === preset.id ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
-                title={preset.description}
+                title={t(preset.description)}
                 onClick={() => applyPreset(preset.id)}
               >
-                <Icon name={preset.icon} size={13} /> {preset.label}
+                <Icon name={preset.icon} size={13} /> {t(preset.label)}
               </button>
             ))}
           </div>
           <input
             className="input min-w-44"
-            placeholder="Buscar en el grafo..."
+            placeholder={t('Buscar en el grafo...')}
             value={filters.search}
             onChange={(e) => setF({ search: e.target.value })}
           />
@@ -3209,7 +3210,7 @@ export function GraphView({
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
           >
-            <Icon name="search" /> Filtros
+            <Icon name="search" /> {t('Filtros')}
           </button>
           {contextNotice && (
             <div className="inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/20 px-2 py-1 text-indigo-200">
@@ -3217,7 +3218,7 @@ export function GraphView({
               <span className="max-w-60 truncate">{contextNotice}</span>
               <button
                 className="text-indigo-300 hover:text-white"
-                title="Quitar contexto"
+                title={t('Quitar contexto')}
                 onClick={() => applyPreset('overview')}
               >
                 <Icon name="x" size={12} />
@@ -3225,7 +3226,7 @@ export function GraphView({
               {contextZoteroKey && (
                 <button
                   className="text-indigo-300 hover:text-white"
-                  title="Abrir lectura en Zotero"
+                  title={t('Abrir lectura en Zotero')}
                   onClick={() => void window.nodus.openInZotero(contextZoteroKey)}
                 >
                   <Icon name="external" size={12} />
@@ -3236,91 +3237,91 @@ export function GraphView({
           {lens === 'ideas' && (
             <button
               className={`btn border border-neutral-700 gap-1.5 ${tutorOpen ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
-              title="Recorrido guiado por la IA a través de tus ideas y conexiones"
+              title={t('Recorrido guiado por la IA a través de tus ideas y conexiones')}
               onClick={() => setTutorOpen((v) => !v)}
             >
-              <Icon name="compass" /> Modo Tutor
+              <Icon name="compass" /> {t('Modo Tutor')}
             </button>
           )}
           {lens === 'ideas' && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
-              title="Gestionar los temas principales y reprocesar las conexiones de los nodos"
+              title={t('Gestionar los temas principales y reprocesar las conexiones de los nodos')}
               onClick={() => setThemesModalOpen(true)}
             >
-              <Icon name="tag" /> Temas
+              <Icon name="tag" /> {t('Temas')}
             </button>
           )}
           <div className="flex-1" />
-          <span className="text-neutral-500">{elements.filter((e) => !(e.data as any).source).length} nodos</span>
+          <span className="text-neutral-500">{tx('{n} nodos', { n: elements.filter((e) => !(e.data as any).source).length })}</span>
         </div>
 
         {filtersOpen && (
           <div className="mt-2 rounded-lg border border-neutral-800 bg-neutral-900/55 p-2 flex flex-wrap gap-2 items-center">
             <div className="flex rounded-lg overflow-hidden border border-neutral-700">
               <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('ideas')}>
-                Ideas
+                {t('Ideas')}
               </button>
               <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('authors')}>
-                Autores
+                {t('Autores')}
               </button>
             </div>
             <div className="flex rounded-lg overflow-hidden border border-neutral-700">
               <button
                 className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
-                title="Layout dirigido por fuerzas: agrupa ideas conectadas"
+                title={t('Layout dirigido por fuerzas: agrupa ideas conectadas')}
                 onClick={() => selectLayoutMode('force')}
               >
-                Grafo
+                {t('Grafo')}
               </button>
               <button
                 className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
-                title="Layout radial: temas en polígono, ideas alrededor"
+                title={t('Layout radial: temas en polígono, ideas alrededor')}
                 onClick={() => selectLayoutMode('radial')}
               >
-                Radial
+                {t('Radial')}
               </button>
             </div>
             {lens === 'ideas' && (
               <div className="flex flex-wrap gap-1">
-                {GRAPH_NODE_TYPES.map((t) => (
+                {GRAPH_NODE_TYPES.map((nt) => (
                   <button
-                    key={t}
-                    onClick={() => toggleIn('nodeTypes', t)}
+                    key={nt}
+                    onClick={() => toggleIn('nodeTypes', nt)}
                     className="px-2 py-0.5 rounded flex items-center gap-1"
                     style={{
-                      backgroundColor: filters.nodeTypes.includes(t) ? NODE_COLORS[t] : (settings.theme === 'light' ? '#e5e7eb' : '#262626'),
-                      color: filters.nodeTypes.includes(t) ? 'white' : (settings.theme === 'light' ? '#525252' : '#a3a3a3'),
+                      backgroundColor: filters.nodeTypes.includes(nt) ? NODE_COLORS[nt] : (settings.theme === 'light' ? '#e5e7eb' : '#262626'),
+                      color: filters.nodeTypes.includes(nt) ? 'white' : (settings.theme === 'light' ? '#525252' : '#a3a3a3'),
                     }}
                   >
-                    {NODE_LABELS[t]}
+                    {t(NODE_LABELS[nt])}
                   </button>
                 ))}
               </div>
             )}
             {lens === 'ideas' && (
               <select className="input" value={filters.theme} onChange={(e) => setF({ theme: e.target.value })}>
-                <option value="">Todos los temas</option>
-                {themes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                <option value="">{t('Todos los temas')}</option>
+                {themes.map((themeName) => (
+                  <option key={themeName} value={themeName}>
+                    {themeName}
                   </option>
                 ))}
               </select>
             )}
             <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
-              <option value="all">Leído + no leído</option>
-              <option value="read">Solo leído</option>
-              <option value="unread">Solo no leído</option>
+              <option value="all">{t('Leído + no leído')}</option>
+              <option value="read">{t('Solo leído')}</option>
+              <option value="unread">{t('Solo no leído')}</option>
             </select>
             {lens === 'ideas' && (
               <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
-                <option value="all">Explícito + inferido</option>
-                <option value="explicit">Solo explícito</option>
+                <option value="all">{t('Explícito + inferido')}</option>
+                <option value="explicit">{t('Solo explícito')}</option>
               </select>
             )}
             <label className="flex items-center gap-1 text-neutral-400">
-              conf ≥ {filters.minConfidence.toFixed(1)}
+              {t('conf')} ≥ {filters.minConfidence.toFixed(1)}
               <input
                 type="range"
                 min={0}
@@ -3330,43 +3331,43 @@ export function GraphView({
                 onChange={(e) => setF({ minConfidence: parseFloat(e.target.value) })}
               />
             </label>
-            <label className="flex items-center gap-1 text-neutral-400" title="Profundidad de la ruta local al clicar un nodo">
-              Ruta
+            <label className="flex items-center gap-1 text-neutral-400" title={t('Profundidad de la ruta local al clicar un nodo')}>
+              {t('Ruta')}
               <select
                 className="input w-24"
                 value={highlightDepth == null ? 'unlimited' : String(highlightDepth)}
                 onChange={(e) => setLocalGraphDepth(e.target.value)}
               >
-                <option value="1">1 salto</option>
-                <option value="2">2 saltos</option>
-                <option value="3">3 saltos</option>
-                <option value="4">4 saltos</option>
-                <option value="unlimited">Sin límite</option>
+                <option value="1">{tx('{n} salto', { n: 1 })}</option>
+                <option value="2">{tx('{n} saltos', { n: 2 })}</option>
+                <option value="3">{tx('{n} saltos', { n: 3 })}</option>
+                <option value="4">{tx('{n} saltos', { n: 4 })}</option>
+                <option value="unlimited">{t('Sin límite')}</option>
               </select>
             </label>
             <input
               className="input w-16"
-              placeholder="año≥"
+              placeholder={t('año≥')}
               value={filters.yearMin ?? ''}
               onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })}
             />
             <input
               className="input w-16"
-              placeholder="año≤"
+              placeholder={t('año≤')}
               value={filters.yearMax ?? ''}
               onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })}
             />
             {lens === 'ideas' && (
               <button
                 className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
-                title={communitiesCollapsed ? 'Expandir comunidades' : 'Colapsar en comunidades (Louvain)'}
+                title={communitiesCollapsed ? t('Expandir comunidades') : t('Colapsar en comunidades (Louvain)')}
                 onClick={handleCommunitiesToggle}
               >
-                <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
+                <Icon name="layers" /> {communitiesCollapsed ? t('Expandir') : t('Comunidades')}
               </button>
             )}
             <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset(lens === 'authors' ? 'authors' : 'overview')}>
-              Limpiar
+              {t('Limpiar')}
             </button>
           </div>
         )}
@@ -3418,25 +3419,25 @@ export function GraphView({
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-neutral-950/10">
               <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-sm text-neutral-300 shadow-lg">
                 <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
-                Reorganizando grafo…
+                {t('Reorganizando grafo…')}
               </div>
             </div>
           )}
 
           {/* Zoom / fit controls */}
           <div className="absolute top-3 right-3 flex flex-col gap-1">
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Acercar" onClick={() => zoomBy(1.25)}>
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Acercar')} onClick={() => zoomBy(1.25)}>
               <Icon name="plus" size={16} />
             </button>
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Alejar" onClick={() => zoomBy(0.8)}>
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Alejar')} onClick={() => zoomBy(0.8)}>
               <Icon name="minus" size={16} />
             </button>
-            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title="Ajustar a la pantalla" onClick={fitGraph}>
+            <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Ajustar a la pantalla')} onClick={fitGraph}>
               <Icon name="fit" size={16} />
             </button>
             <button
               className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
-              title="Reiniciar grafo (vista y disposición originales)"
+              title={t('Reiniciar grafo (vista y disposición originales)')}
               onClick={resetGraph}
             >
               <Icon name="refresh" size={16} />
@@ -3450,7 +3451,7 @@ export function GraphView({
               width={156}
               height={104}
               className="absolute bottom-3 right-3 rounded-lg border border-neutral-300/70 dark:border-neutral-700 cursor-pointer opacity-70 hover:opacity-95"
-              title="Mini-mapa · click para navegar"
+              title={t('Mini-mapa · click para navegar')}
               onClick={handleMinimapClick}
             />
           )}
@@ -3458,10 +3459,10 @@ export function GraphView({
           {/* Legend */}
           <div className="absolute bottom-3 left-3 card p-2 text-[10px] bg-neutral-900/90 max-w-[220px]">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-neutral-300">Leyenda</span>
+              <span className="font-medium text-neutral-300">{t('Leyenda')}</span>
               <button
                 className="ml-auto rounded p-0.5 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
-                title={legendCollapsed ? 'Mostrar leyenda' : 'Minimizar leyenda'}
+                title={legendCollapsed ? t('Mostrar leyenda') : t('Minimizar leyenda')}
                 onClick={() => setLegendCollapsed((v) => !v)}
               >
                 <Icon name={legendCollapsed ? 'chevronRight' : 'chevronLeft'} size={12} />
@@ -3469,22 +3470,22 @@ export function GraphView({
             </div>
             {!legendCollapsed && (
               <div className="mt-1 space-y-1">
-                {GRAPH_NODE_TYPES.map((t) => (
-                  <div key={t} className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[t] }} />
-                    {NODE_LABELS[t]}
+                {GRAPH_NODE_TYPES.map((nt) => (
+                  <div key={nt} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: NODE_COLORS[nt] }} />
+                    {t(NODE_LABELS[nt])}
                   </div>
                 ))}
-                <div className="pt-1 border-t border-neutral-800 text-neutral-500">○ borde punteado: no leída</div>
+                <div className="pt-1 border-t border-neutral-800 text-neutral-500">{t('○ borde punteado: no leída')}</div>
                 <div className="pt-1 border-t border-neutral-800 space-y-0.5">
-                  {Object.entries(EDGE_TYPE_COLORS).filter(([t]) => t !== 'contains').map(([type, color]) => (
+                  {Object.entries(EDGE_TYPE_COLORS).filter(([et]) => et !== 'contains').map(([type, color]) => (
                     <div key={type} className="flex items-center gap-1.5 text-neutral-400">
                       <span className="w-3 h-0.5 rounded" style={{ backgroundColor: color }} />
-                      {EDGE_LABELS[type as keyof typeof EDGE_LABELS] ?? type}
+                      {t(EDGE_LABELS[type as keyof typeof EDGE_LABELS]) ?? type}
                     </div>
                   ))}
                 </div>
-                <div className="text-neutral-500">— sólida: explícita · ·· punteada: inferida</div>
+                <div className="text-neutral-500">{t('— sólida: explícita · ·· punteada: inferida')}</div>
               </div>
             )}
           </div>

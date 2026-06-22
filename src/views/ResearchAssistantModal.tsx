@@ -14,6 +14,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget, type PendingGraphNavigationTarget } from '../navigation';
+import { t, tx } from '../i18n';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -291,15 +292,15 @@ export function ResearchAssistantModal({
   const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
     setActiveModeId(mode.id);
     setSelection(cloneSelection(mode.selection));
-    setContextTitle(mode.label);
-    if (!input.trim()) setInput(mode.starter);
+    setContextTitle(t(mode.label));
+    if (!input.trim()) setInput(t(mode.starter));
   };
 
   const startNewConversation = () => {
     setActiveId(null);
     setMessages([]);
     setInput('');
-    setContextTitle(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? null);
+    setContextTitle(t(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? '') || null);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
   };
@@ -458,15 +459,15 @@ export function ResearchAssistantModal({
         <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
           <div className="flex items-center gap-2 font-semibold">
             <Icon name="wand" className="text-indigo-300" />
-            Asistente de investigación
+            {t('Asistente de investigación')}
           </div>
           <select
             className="input text-xs py-1 max-w-xs"
-            title="Modelo del chat"
+            title={t('Modelo del chat')}
             value={serializedModel}
             onChange={(e) => setSelectedModel(e.target.value ? parseModel(e.target.value) : null)}
           >
-            {!selectedModel && <option value="">Sin modelo seleccionado</option>}
+            {!selectedModel && <option value="">{t('Sin modelo seleccionado')}</option>}
             {availableModels.map((model) => (
               <option key={serializeModel(model)} value={serializeModel(model)}>
                 {modelLabel(model)}
@@ -480,7 +481,7 @@ export function ResearchAssistantModal({
             </span>
           )}
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={onClose} title="Cerrar">
+          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
           </button>
         </header>
@@ -490,7 +491,7 @@ export function ResearchAssistantModal({
           <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
             <div className="p-3 border-b border-neutral-800">
               <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
-                <Icon name="plus" /> Nueva conversación
+                <Icon name="plus" /> {t('Nueva conversación')}
               </button>
             </div>
             <VirtualList
@@ -500,7 +501,7 @@ export function ResearchAssistantModal({
               className="flex-1 min-h-0 p-2"
               empty={
                 <div className="text-xs text-neutral-600 text-center py-6 px-2">
-                  Aún no hay conversaciones. Escribe abajo para empezar.
+                  {t('Aún no hay conversaciones. Escribe abajo para empezar.')}
                 </div>
               }
               renderItem={(conversation) => (
@@ -521,7 +522,7 @@ export function ResearchAssistantModal({
                 onClick={() => setShowArchived((v) => !v)}
               >
                 <Icon name="archive" size={13} />
-                {showArchived ? 'Ocultar archivadas' : `Ver archivadas (${archivedCount})`}
+                {showArchived ? t('Ocultar archivadas') : tx('Ver archivadas ({n})', { n: archivedCount })}
               </button>
             )}
           </aside>
@@ -529,11 +530,11 @@ export function ResearchAssistantModal({
           {/* Context selection */}
           <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 p-4 overflow-y-auto max-h-56 md:max-h-none">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Contexto</h2>
+              <h2 className="text-sm font-semibold">{t('Contexto')}</h2>
               <span className="text-xs text-neutral-500">{selectedCount}</span>
             </div>
             <div className="mb-4">
-              <div className="text-[11px] uppercase text-neutral-500 mb-2">Modo</div>
+              <div className="text-[11px] uppercase text-neutral-500 mb-2">{t('Modo')}</div>
               <div className="grid grid-cols-1 gap-1.5">
                 {ASSISTANT_MODES.map((mode) => (
                   <button
@@ -543,14 +544,14 @@ export function ResearchAssistantModal({
                         ? 'border-indigo-700 bg-indigo-950/35'
                         : 'border-neutral-800 hover:bg-neutral-900'
                     }`}
-                    title={mode.description}
+                    title={t(mode.description)}
                     onClick={() => applyMode(mode)}
                   >
                     <div className="flex items-center gap-1.5 text-sm">
                       <Icon name={mode.icon} size={13} className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'} />
-                      <span>{mode.label}</span>
+                      <span>{t(mode.label)}</span>
                     </div>
-                    <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{mode.description}</div>
+                    <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{t(mode.description)}</div>
                   </button>
                 ))}
               </div>
@@ -560,56 +561,56 @@ export function ResearchAssistantModal({
                 className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
                 onClick={() => {
                   setActiveModeId('custom');
-                  setContextTitle('Todo');
+                  setContextTitle(t('Todo'));
                   setSelection(cloneSelection(ALL_SELECTION));
                 }}
               >
-                Todo
+                {t('Todo')}
               </button>
               <button
                 className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
                 onClick={() => {
                   setActiveModeId('custom');
-                  setContextTitle('Manual');
+                  setContextTitle(t('Manual'));
                   setSelection(cloneSelection(DEFAULT_SELECTION));
                 }}
               >
-                Nada
+                {t('Nada')}
               </button>
             </div>
 
             <div className="space-y-2">
-              <ContextCheckbox label="Ideas generadas" checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
-              <ContextCheckbox label="Temas principales" checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
-              <ContextCheckbox label="Contradicciones" checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
-              <ContextCheckbox label="Huecos de investigación" checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
-              <ContextCheckbox label="Rutas de lectura" checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
-              <ContextCheckbox label="Autores" checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
-              <ContextCheckbox label="Documentos relacionados" checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
-              <ContextCheckbox label="Grafo" checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
+              <ContextCheckbox label={t('Ideas generadas')} checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
+              <ContextCheckbox label={t('Temas principales')} checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
+              <ContextCheckbox label={t('Contradicciones')} checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
+              <ContextCheckbox label={t('Huecos de investigación')} checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
+              <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
+              <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
+              <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
+              <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
             </div>
 
             <div className={`mt-3 pl-3 border-l border-neutral-800 space-y-2 ${selection.graph ? '' : 'opacity-45'}`}>
               <ContextCheckbox
-                label="Nodos de ideas"
+                label={t('Nodos de ideas')}
                 checked={selection.graphParts.ideaNodes}
                 disabled={!selection.graph}
                 onChange={(v) => updateGraphPart('ideaNodes', v)}
               />
               <ContextCheckbox
-                label="Nodos de temas"
+                label={t('Nodos de temas')}
                 checked={selection.graphParts.themeNodes}
                 disabled={!selection.graph}
                 onChange={(v) => updateGraphPart('themeNodes', v)}
               />
               <ContextCheckbox
-                label="Relaciones de ideas"
+                label={t('Relaciones de ideas')}
                 checked={selection.graphParts.ideaEdges}
                 disabled={!selection.graph}
                 onChange={(v) => updateGraphPart('ideaEdges', v)}
               />
               <ContextCheckbox
-                label="Grafo de autores"
+                label={t('Grafo de autores')}
                 checked={selection.graphParts.authorGraph}
                 disabled={!selection.graph}
                 onChange={(v) => updateGraphPart('authorGraph', v)}
@@ -622,7 +623,7 @@ export function ResearchAssistantModal({
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {messages.length === 0 && (
                   <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
-                    Pregunta sobre ideas, autores, temas, contradicciones o documentos.
+                    {t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
                   </div>
                 )}
                 {messages.map((message) => (
@@ -646,7 +647,7 @@ export function ResearchAssistantModal({
                             ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
                             : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
                         }`}
-                        title={copiedMessageId === message.id ? 'Copiado' : 'Copiar en Markdown'}
+                        title={copiedMessageId === message.id ? t('Copiado') : t('Copiar en Markdown')}
                         onClick={() => void copyMessageMarkdown(message)}
                         disabled={!message.content.trim()}
                       >
@@ -662,9 +663,9 @@ export function ResearchAssistantModal({
                       )}
                       {message.stats && (
                         <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
-                          {message.stats.sections.join(', ') || 'Sin secciones'} · {message.stats.works} obras ·{' '}
-                          {message.stats.documents} docs · {formatChars(message.stats.contextChars)}
-                          {message.stats.truncated ? ' · recortado' : ''}
+                          {message.stats.sections.join(', ') || t('Sin secciones')} · {tx('{n} obras', { n: message.stats.works })} ·{' '}
+                          {tx('{n} docs', { n: message.stats.documents })} · {formatChars(message.stats.contextChars)}
+                          {message.stats.truncated ? ` · ${t('recortado')}` : ''}
                         </div>
                       )}
                     </div>
@@ -674,7 +675,7 @@ export function ResearchAssistantModal({
               {showJumpToBottom && (
                 <button
                   className="absolute bottom-4 right-4 h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800"
-                  title="Bajar al final"
+                  title={t('Bajar al final')}
                   onClick={() => scrollToBottom()}
                 >
                   <Icon name="arrowDown" />
@@ -688,7 +689,7 @@ export function ResearchAssistantModal({
                   className="input flex-1 min-h-[112px] max-h-56 resize-y"
                   rows={5}
                   value={input}
-                  placeholder={activeMode?.starter ?? 'Pregunta al asistente...'}
+                  placeholder={activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -699,7 +700,7 @@ export function ResearchAssistantModal({
                 />
                 <button
                   className="btn btn-primary self-end h-11 w-11 px-0"
-                  title="Enviar"
+                  title={t('Enviar')}
                   onClick={() => void send()}
                   disabled={sending || !input.trim() || !selectedModel}
                 >
@@ -713,14 +714,13 @@ export function ResearchAssistantModal({
 
       {pendingDelete && (
         <ConfirmModal
-          title="Eliminar conversación"
+          title={t('Eliminar conversación')}
           message={
             <>
-              Se eliminará <span className="text-neutral-200">«{pendingDelete.title}»</span> y todo su historial de mensajes.
-              Esta acción no se puede deshacer.
+              {t('Se eliminará')} <span className="text-neutral-200">«{pendingDelete.title}»</span> {t('y todo su historial de mensajes. Esta acción no se puede deshacer.')}
             </>
           }
-          confirmLabel="Eliminar"
+          confirmLabel={t('Eliminar')}
           danger
           onConfirm={() => void confirmDelete()}
           onCancel={() => setPendingDelete(null)}
@@ -766,7 +766,7 @@ function ConversationRow({
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
-            title={conversation.archived ? 'Desarchivar' : 'Archivar'}
+            title={conversation.archived ? t('Desarchivar') : t('Archivar')}
             onClick={(e) => {
               e.stopPropagation();
               onArchive();
@@ -776,7 +776,7 @@ function ConversationRow({
           </button>
           <button
             className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
-            title="Eliminar"
+            title={t('Eliminar')}
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
@@ -787,7 +787,7 @@ function ConversationRow({
         </div>
       </div>
       <div className="text-[10px] text-neutral-600 mt-0.5 pl-5">
-        {formatRelative(conversation.updated_at)} · {conversation.messageCount} mensaje(s)
+        {formatRelative(conversation.updated_at)} · {tx('{n} mensaje(s)', { n: conversation.messageCount })}
       </div>
     </div>
   );
@@ -849,12 +849,12 @@ function formatRelative(iso: string): string {
   if (!Number.isFinite(then)) return '';
   const diff = Date.now() - then;
   const minutes = Math.round(diff / 60000);
-  if (minutes < 1) return 'ahora';
-  if (minutes < 60) return `hace ${minutes} min`;
+  if (minutes < 1) return t('ahora');
+  if (minutes < 60) return tx('hace {n} min', { n: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `hace ${hours} h`;
+  if (hours < 24) return tx('hace {n} h', { n: hours });
   const days = Math.round(hours / 24);
-  if (days < 7) return `hace ${days} d`;
+  if (days < 7) return tx('hace {n} d', { n: days });
   return new Date(iso).toLocaleDateString();
 }
 

@@ -3,6 +3,7 @@ import type { AppSettings, ManagedTheme, ModelRef, ReprocessProgress } from '@sh
 import { Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { t, tx } from '../i18n';
 
 /**
  * "Temas principales" manager. Lets the user curate the main theme hubs of the graph:
@@ -136,17 +137,17 @@ export function ThemesModal({
         (p) => setProgress(p)
       );
       if (result.ideas === 0) {
-        setNotice('No hay ideas extraídas que reprocesar. Analiza primero algunas obras (escaneo profundo).');
+        setNotice(t('No hay ideas extraídas que reprocesar. Analiza primero algunas obras (escaneo profundo).'));
       } else {
-        const parts = [`${result.themedIdeas}/${result.ideas} ideas agrupadas en temas`];
-        if (result.newThemes > 0) parts.push(`${result.newThemes} tema(s) nuevo(s)`);
-        if (includeRelations) parts.push(`${result.relationsAdded} relación(es) idea↔idea inferida(s)`);
-        setNotice(`Listo: ${parts.join(' · ')}.`);
+        const parts = [tx('{a}/{b} ideas agrupadas en temas', { a: result.themedIdeas, b: result.ideas })];
+        if (result.newThemes > 0) parts.push(tx('{n} tema(s) nuevo(s)', { n: result.newThemes }));
+        if (includeRelations) parts.push(tx('{n} relación(es) idea↔idea inferida(s)', { n: result.relationsAdded }));
+        setNotice(`${t('Listo:')} ${parts.join(' · ')}.`);
       }
       setThemes(await window.nodus.listManagedThemes());
       onReprocessed?.();
     } catch (e) {
-      setNotice(`Error al reprocesar: ${e instanceof Error ? e.message : String(e)}`);
+      setNotice(`${t('Error al reprocesar:')} ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(false);
       setReprocessing(false);
@@ -164,28 +165,26 @@ export function ThemesModal({
         <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
           <div className="flex items-center gap-2 font-semibold">
             <Icon name="tag" className="text-orange-300" />
-            Temas principales
+            {t('Temas principales')}
           </div>
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={onClose} title="Cerrar">
+          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
           </button>
         </header>
 
         <div className="p-4 overflow-y-auto space-y-4">
           <p className="text-xs text-neutral-400 leading-relaxed">
-            Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para
-            controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros
-            nuevos. <span className="text-neutral-300">Reprocesar</span> coge las ideas ya extraídas (afirmaciones, hallazgos…)
-            y las vuelve a agrupar bajo estos temas con el modelo seleccionado, sin volver a leer los documentos ni
-            re-extraer ideas.
+            {t('Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros nuevos.')}{' '}
+            <span className="text-neutral-300">{t('Reprocesar')}</span>{' '}
+            {t('coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con el modelo seleccionado, sin volver a leer los documentos ni re-extraer ideas.')}
           </p>
 
           {/* Add a manual theme */}
           <div className="flex gap-2">
             <input
               className="input flex-1"
-              placeholder="Añadir tema principal…"
+              placeholder={t('Añadir tema principal…')}
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
               onKeyDown={(e) => {
@@ -196,7 +195,7 @@ export function ThemesModal({
               }}
             />
             <button className="btn btn-primary gap-1.5" onClick={() => void addTheme()} disabled={busy || !newLabel.trim()}>
-              <Icon name="plus" /> Añadir
+              <Icon name="plus" /> {t('Añadir')}
             </button>
           </div>
 
@@ -206,11 +205,10 @@ export function ThemesModal({
             <span className="text-sm">
               <span className="flex items-center gap-1.5 font-medium">
                 <Icon name={locked ? 'lock' : 'unlock'} size={14} className={locked ? 'text-emerald-300' : 'text-neutral-400'} />
-                Bloquear generación automática de temas
+                {t('Bloquear generación automática de temas')}
               </span>
               <span className="block text-xs text-neutral-500 mt-1">
-                Con esto activado, los análisis ligeros y profundos solo asignan las obras a los temas de esta lista. Desactívalo
-                para volver a permitir que la IA proponga temas nuevos.
+                {t('Con esto activado, los análisis ligeros y profundos solo asignan las obras a los temas de esta lista. Desactívalo para volver a permitir que la IA proponga temas nuevos.')}
               </span>
             </span>
           </label>
@@ -218,19 +216,19 @@ export function ThemesModal({
           {/* Theme list */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs uppercase text-neutral-500 px-1">
-              <span>{themes.length} tema(s)</span>
-              <span>obras · ideas</span>
+              <span>{tx('{n} tema(s)', { n: themes.length })}</span>
+              <span>{t('obras · ideas')}</span>
             </div>
             {loading ? (
-              <div className="text-sm text-neutral-500 py-6 text-center">Cargando temas…</div>
+              <div className="text-sm text-neutral-500 py-6 text-center">{t('Cargando temas…')}</div>
             ) : themes.length === 0 ? (
-              <div className="text-sm text-neutral-500 py-6 text-center">Todavía no hay temas. Añade el primero arriba.</div>
+              <div className="text-sm text-neutral-500 py-6 text-center">{t('Todavía no hay temas. Añade el primero arriba.')}</div>
             ) : (
               themes.map((theme) => (
                 <div key={theme.theme_id} className="card p-2.5 flex items-center gap-2">
                   <button
                     className={`p-1 rounded hover:bg-neutral-800 ${theme.pinned ? 'text-amber-400' : 'text-neutral-600'}`}
-                    title={theme.pinned ? 'Tema fijado (protegido). Clic para soltar.' : 'Fijar como tema principal (protegido)'}
+                    title={theme.pinned ? t('Tema fijado (protegido). Clic para soltar.') : t('Fijar como tema principal (protegido)')}
                     onClick={() => void togglePinned(theme)}
                     disabled={busy}
                   >
@@ -255,7 +253,7 @@ export function ThemesModal({
                   ) : (
                     <button
                       className="flex-1 min-w-0 text-left text-sm truncate hover:text-indigo-300"
-                      title="Renombrar tema"
+                      title={t('Renombrar tema')}
                       onClick={() => startEdit(theme)}
                     >
                       {theme.label}
@@ -266,7 +264,7 @@ export function ThemesModal({
                   </span>
                   <button
                     className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
-                    title="Renombrar"
+                    title={t('Renombrar')}
                     onClick={() => startEdit(theme)}
                     disabled={busy}
                   >
@@ -274,7 +272,7 @@ export function ThemesModal({
                   </button>
                   <button
                     className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
-                    title="Eliminar tema y sus conexiones"
+                    title={t('Eliminar tema y sus conexiones')}
                     onClick={() => setPendingDelete(theme)}
                     disabled={busy}
                   >
@@ -290,7 +288,7 @@ export function ThemesModal({
 
         <footer className="border-t border-neutral-800 p-3 space-y-3">
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs uppercase text-neutral-500">Qué reprocesar</span>
+            <span className="text-xs uppercase text-neutral-500">{t('Qué reprocesar')}</span>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input
                 type="radio"
@@ -300,8 +298,8 @@ export function ThemesModal({
                 disabled={busy}
               />
               <span>
-                Solo temas <span className="text-emerald-400 text-xs">(recomendado)</span>
-                <span className="block text-xs text-neutral-500">Reasigna las ideas a los temas principales. No toca las relaciones idea↔idea.</span>
+                {t('Solo temas')} <span className="text-emerald-400 text-xs">{t('(recomendado)')}</span>
+                <span className="block text-xs text-neutral-500">{t('Reasigna las ideas a los temas principales. No toca las relaciones idea↔idea.')}</span>
               </span>
             </label>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
@@ -313,9 +311,9 @@ export function ThemesModal({
                 disabled={busy}
               />
               <span>
-                Temas + relaciones entre ideas
+                {t('Temas + relaciones entre ideas')}
                 <span className="block text-xs text-neutral-500">
-                  Además vuelve a trazar relaciones idea↔idea. Al no haber cita textual, se marcan como inferidas.
+                  {t('Además vuelve a trazar relaciones idea↔idea. Al no haber cita textual, se marcan como inferidas.')}
                 </span>
               </span>
             </label>
@@ -327,7 +325,7 @@ export function ThemesModal({
               <div className="flex items-center justify-between text-xs text-neutral-400">
                 <span className="flex items-center gap-1.5">
                   <Icon name="sync" size={12} className="animate-spin text-indigo-400" />
-                  {progress.label}…
+                  {t(progress.label)}…
                 </span>
                 <span className="tabular-nums text-neutral-500">
                   {progress.current}/{progress.total}
@@ -344,19 +342,19 @@ export function ThemesModal({
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-500 shrink-0">Modelo:</span>
+              <span className="text-xs text-neutral-500 shrink-0">{t('Modelo:')}</span>
               <div className="min-w-0 flex-1">
                 <ModelPicker settings={settings} value={model} onChange={setModel} compact />
               </div>
             </div>
             <button
               className="btn btn-primary w-full gap-1.5"
-              title="Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)"
+              title={t('Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)')}
               onClick={() => void reprocess()}
               disabled={busy}
             >
               <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} />
-              {reprocessing ? 'Reprocesando…' : 'Reprocesar conexiones'}
+              {reprocessing ? t('Reprocesando…') : t('Reprocesar conexiones')}
             </button>
           </div>
         </footer>
@@ -364,14 +362,13 @@ export function ThemesModal({
 
       {pendingDelete && (
         <ConfirmModal
-          title="Eliminar tema"
+          title={t('Eliminar tema')}
           message={
             <>
-              Se eliminará el tema <span className="text-neutral-200">«{pendingDelete.label}»</span> y todas sus conexiones con
-              obras e ideas. Las ideas en sí no se borran. ¿Continuar?
+              {t('Se eliminará el tema')} <span className="text-neutral-200">«{pendingDelete.label}»</span> {t('y todas sus conexiones con obras e ideas. Las ideas en sí no se borran. ¿Continuar?')}
             </>
           }
-          confirmLabel="Eliminar"
+          confirmLabel={t('Eliminar')}
           danger
           onConfirm={() => void confirmDelete()}
           onCancel={() => setPendingDelete(null)}

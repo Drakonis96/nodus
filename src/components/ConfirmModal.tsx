@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
+import { t } from '../i18n';
 
 /**
  * Small centred confirmation dialog. Closes on Escape or backdrop click; the
@@ -11,8 +12,8 @@ import type { ReactNode } from 'react';
 export function ConfirmModal({
   title,
   message,
-  confirmLabel = 'Confirmar',
-  cancelLabel = 'Cancelar',
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onCancel,
@@ -47,14 +48,14 @@ export function ConfirmModal({
         <div className="text-sm text-neutral-400 mb-5">{message}</div>
         <div className="flex justify-end gap-2">
           <button className="btn btn-ghost" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t('Cancelar')}
           </button>
           <button
             className={`btn ${danger ? 'bg-red-600 hover:bg-red-500 text-white' : 'btn-primary'}`}
             onClick={onConfirm}
             autoFocus
           >
-            {confirmLabel}
+            {confirmLabel ?? t('Confirmar')}
           </button>
         </div>
       </motion.div>

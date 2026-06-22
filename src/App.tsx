@@ -17,6 +17,7 @@ import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
+import { t, tx, setActiveLang } from './i18n';
 import { notifyDataChanged } from './hooks';
 import type {
   PendingAssistantNavigationTarget,
@@ -51,17 +52,19 @@ export function App() {
 
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
-      setLoadError('El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.');
+      setLoadError(t('El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.'));
       return undefined;
     }
     try {
       const s = await window.nodus.getSettings();
       setSettings(s);
+      setActiveLang(s.uiLanguage);
+      document.documentElement.lang = s.uiLanguage;
       document.documentElement.classList.toggle('light', s.theme === 'light');
       document.documentElement.classList.toggle('dark', s.theme === 'dark');
       return s;
     } catch (e) {
-      setLoadError(`No se pudieron cargar los ajustes: ${(e as Error).message}`);
+      setLoadError(tx('No se pudieron cargar los ajustes: {msg}', { msg: (e as Error).message }));
       return undefined;
     }
   }, []);
@@ -116,18 +119,22 @@ export function App() {
   if (loadError) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
-        <div className="text-red-400 font-semibold">No se pudo iniciar Nodus</div>
+        <div className="text-red-400 font-semibold">{t('No se pudo iniciar Nodus')}</div>
         <div className="text-neutral-400 text-sm max-w-md">{loadError}</div>
         <button className="btn btn-primary" onClick={() => { setLoadError(null); void reloadSettings(); }}>
-          Reintentar
+          {t('Reintentar')}
         </button>
       </div>
     );
   }
 
   if (!settings) {
-    return <div className="h-full flex items-center justify-center text-neutral-500">Cargando Nodus…</div>;
+    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Cargando Nodus…')}</div>;
   }
+
+  // Authoritative per-render language: set before any child renders so every t() call
+  // (including in plain helper functions) reads the current language.
+  setActiveLang(settings.uiLanguage);
 
   if (!settings.onboardingComplete) {
     return <Onboarding onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))} />;
@@ -161,7 +168,7 @@ export function App() {
               void reloadSettings();
             }}
           >
-            {!settings.defaultModel && <option value="">Modelo: sin configurar</option>}
+            {!settings.defaultModel && <option value="">{t('Modelo: sin configurar')}</option>}
             {settings.favorites.map((m) => (
               <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>
                 {m.provider} · {m.model}
@@ -171,21 +178,21 @@ export function App() {
         )}
         {!settings.defaultModel && (
           <button data-tour="model" className="btn btn-ghost text-amber-400 gap-1.5" onClick={() => setView('settings')}>
-            <Icon name="alert" /> Configura un modelo de IA
+            <Icon name="alert" /> {t('Configura un modelo de IA')}
           </button>
         )}
         <button
           className="btn btn-ghost gap-1.5"
-          title={settings.defaultModel ? 'Abrir asistente de investigación' : 'Configura un modelo de IA'}
+          title={settings.defaultModel ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
           onClick={() => openAssistant()}
         >
-          <Icon name="wand" /> Asistente
+          <Icon name="wand" /> {t('Asistente')}
         </button>
         <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
-          <Icon name="folder" /> Colecciones
+          <Icon name="folder" /> {t('Colecciones')}
         </button>
         <button data-tour="sync" className="btn btn-primary gap-1.5" onClick={onSync} disabled={syncing}>
-          <Icon name="sync" className={syncing ? 'animate-spin' : ''} /> {syncing ? 'Actualizando…' : 'Actualizar'}
+          <Icon name="sync" className={syncing ? 'animate-spin' : ''} /> {syncing ? t('Actualizando…') : t('Actualizar')}
         </button>
       </header>
 
@@ -203,7 +210,7 @@ export function App() {
                 }`}
               >
                 <Icon name={n.icon} className="opacity-70" />
-                {n.label}
+                {t(n.label)}
               </button>
             ))}
           </nav>

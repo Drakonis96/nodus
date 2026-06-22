@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { View } from '../navigation';
+import { t } from '../i18n';
 
 export interface AdvancedTourStep {
   /** A `data-tour="…"` value to spotlight. Omit for a centered, target-less step. */
@@ -192,15 +193,15 @@ export function AdvancedTour({ onClose, onNavigate }: { onClose: () => void; onN
       >
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] uppercase tracking-wide text-emerald-400">
-            Tutorial avanzado · {i + 1}/{STEPS.length}
+            {t('Tutorial avanzado')} · {i + 1}/{STEPS.length}
           </div>
           <button className="text-neutral-500 hover:text-white text-xs" onClick={onClose}>
-            Salir ✕
+            {t('Salir')} ✕
           </button>
         </div>
-        <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-0.5">{step.stage}</div>
-        <h3 className="font-semibold text-base mb-1">{step.title}</h3>
-        <p className="text-neutral-300 leading-relaxed">{step.body}</p>
+        <div className="text-[11px] uppercase tracking-wide text-neutral-500 mb-0.5">{t(step.stage)}</div>
+        <h3 className="font-semibold text-base mb-1">{t(step.title)}</h3>
+        <p className="text-neutral-300 leading-relaxed">{t(step.body)}</p>
 
         <div className="flex items-center justify-between mt-4">
           <div className="flex gap-1">
@@ -214,25 +215,25 @@ export function AdvancedTour({ onClose, onNavigate }: { onClose: () => void; onN
           <div className="flex gap-2">
             {!isFirst && (
               <button className="btn btn-ghost" onClick={() => setI((n) => Math.max(0, n - 1))}>
-                Atrás
+                {t('Atrás')}
               </button>
             )}
             {isFirst ? (
               <>
                 <button className="btn btn-ghost" onClick={onClose}>
-                  Ahora no
+                  {t('Ahora no')}
                 </button>
                 <button className="btn btn-primary" onClick={() => setI(1)}>
-                  Empezar el recorrido
+                  {t('Empezar el recorrido')}
                 </button>
               </>
             ) : isLast ? (
               <button className="btn btn-primary" onClick={onClose}>
-                Terminar
+                {t('Terminar')}
               </button>
             ) : (
               <button className="btn btn-primary" onClick={() => setI((n) => n + 1)}>
-                Siguiente
+                {t('Siguiente')}
               </button>
             )}
           </div>

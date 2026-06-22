@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkView } from '@shared/types';
 import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
+import { t } from '../i18n';
 
 // Persisted detail-panel sizing, shared by the graph view and the argument map.
 export const DETAIL_WIDTH_KEY = 'nodus.graph.detailWidth';
@@ -71,17 +72,17 @@ export function NodeDetailPanel({
         className="absolute left-0 top-0 h-full w-2 -translate-x-1/2 cursor-col-resize hover:bg-indigo-500/25"
         role="separator"
         aria-orientation="vertical"
-        title="Ajustar ancho"
+        title={t('Ajustar ancho')}
         onPointerDown={startResize}
       />
       <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-end gap-1 border-b border-neutral-800 bg-neutral-900/95 px-4 py-2">
-        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-xs" title="Disminuir texto" onClick={() => onFontChange(-1)}>
+        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-xs" title={t('Disminuir texto')} onClick={() => onFontChange(-1)}>
           a
         </button>
-        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-sm font-semibold" title="Aumentar texto" onClick={() => onFontChange(1)}>
+        <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-sm font-semibold" title={t('Aumentar texto')} onClick={() => onFontChange(1)}>
           A
         </button>
-        <button className="ml-2 text-neutral-500 hover:text-white" title="Cerrar" onClick={onClose}>
+        <button className="ml-2 text-neutral-500 hover:text-white" title={t('Cerrar')} onClick={onClose}>
           ✕
         </button>
       </div>
@@ -90,14 +91,14 @@ export function NodeDetailPanel({
           {loading.kind === 'idea' ? (
             <>
               <div>
-                <Badge color="indigo">{NODE_LABELS[loading.type as IdeaType] ?? loading.type ?? ''}</Badge>
+                <Badge color="indigo">{t(NODE_LABELS[loading.type as IdeaType]) ?? loading.type ?? ''}</Badge>
                 <h3 className="font-semibold mt-2">{loading.label}</h3>
                 <div className="h-3 bg-neutral-800 rounded mt-2 w-3/4" />
                 <div className="h-3 bg-neutral-800 rounded mt-1.5 w-full" />
                 <div className="h-3 bg-neutral-800 rounded mt-1.5 w-5/6" />
               </div>
               <div>
-                <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
+                <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
                 <div className="card p-3 mb-2">
                   <div className="h-3 bg-neutral-800 rounded w-2/3" />
                   <div className="h-2.5 bg-neutral-800 rounded mt-2 w-1/2" />
@@ -110,7 +111,7 @@ export function NodeDetailPanel({
             </>
           ) : (
             <>
-              <h3 className="font-semibold">{EDGE_LABELS[loading.label as keyof typeof EDGE_LABELS] ?? loading.label}</h3>
+              <h3 className="font-semibold">{t(EDGE_LABELS[loading.label as keyof typeof EDGE_LABELS]) ?? loading.label}</h3>
               <div className="h-3 bg-neutral-800 rounded w-1/2" />
               <div className="h-3 bg-neutral-800 rounded mt-2 w-3/4" />
             </>
@@ -120,19 +121,19 @@ export function NodeDetailPanel({
       {ideaDetail && (
         <div className="space-y-3">
           <div>
-            <Badge color="indigo">{NODE_LABELS[ideaDetail.idea.type as IdeaType] ?? ideaDetail.idea.type}</Badge>
+            <Badge color="indigo">{t(NODE_LABELS[ideaDetail.idea.type as IdeaType]) ?? ideaDetail.idea.type}</Badge>
             <h3 className="font-semibold mt-2">{ideaDetail.idea.label}</h3>
             <p className="text-neutral-400 mt-1">{ideaDetail.idea.statement}</p>
           </div>
           <div>
-            <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
+            <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
             {ideaDetail.occurrences.map((o) => (
               <OccurrenceCard key={o.nodus_id} occurrence={o} />
             ))}
           </div>
           {ideaDetail.evidence.length > 0 && (
             <div>
-              <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
+              <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
               {ideaDetail.evidence.map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
                   “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
@@ -145,7 +146,7 @@ export function NodeDetailPanel({
       {edgeDetail && (
         <div className="space-y-3">
           <h3 className="font-semibold">
-            {EDGE_LABELS[edgeDetail.edge.type as keyof typeof EDGE_LABELS] ?? edgeDetail.edge.type}
+            {t(EDGE_LABELS[edgeDetail.edge.type as keyof typeof EDGE_LABELS]) ?? edgeDetail.edge.type}
           </h3>
           {edgeDetail.explanation && <p className="text-neutral-300">{edgeDetail.explanation}</p>}
           <div className="text-neutral-400">
@@ -162,8 +163,8 @@ export function NodeDetailPanel({
               {edgeDetail.trace.rationale && <p>{edgeDetail.trace.rationale}</p>}
               {(edgeDetail.trace.model || edgeDetail.trace.embeddingModel) && (
                 <p className="text-neutral-500">
-                  {edgeDetail.trace.model ? `${edgeDetail.trace.model.provider}/${edgeDetail.trace.model.model}` : 'modelo IA no registrado'}
-                  {edgeDetail.trace.embeddingModel ? ` · embeddings ${edgeDetail.trace.embeddingProvider}/${edgeDetail.trace.embeddingModel}` : ''}
+                  {edgeDetail.trace.model ? `${edgeDetail.trace.model.provider}/${edgeDetail.trace.model.model}` : t('modelo IA no registrado')}
+                  {edgeDetail.trace.embeddingModel ? ` · ${t('embeddings')} ${edgeDetail.trace.embeddingProvider}/${edgeDetail.trace.embeddingModel}` : ''}
                 </p>
               )}
             </div>
@@ -195,15 +196,15 @@ const ITEM_TYPE_ES: Record<string, string> = {
   encyclopediaArticle: 'entrada de enciclopedia',
 };
 
-function itemTypeEs(t?: string | null): string | null {
-  return t ? ITEM_TYPE_ES[t] ?? t : null;
+function itemTypeLabel(type?: string | null): string | null {
+  return type ? t(ITEM_TYPE_ES[type] ?? type) : null;
 }
 
 export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurrences'][number] }) {
   const [open, setOpen] = useState(false);
   const work = occurrence.work;
-  const author = work.authors[0] ?? 'Autor desconocido';
-  const year = work.year ?? 's.f.';
+  const author = work.authors[0] ?? t('Autor desconocido');
+  const year = work.year ?? t('s.f.');
 
   return (
     <div className="card p-3 mb-2">
@@ -218,14 +219,14 @@ export function OccurrenceCard({ occurrence }: { occurrence: IdeaDetail['occurre
         <div className="flex items-center gap-1 shrink-0">
           <button
             className="inline-flex items-center justify-center text-neutral-500 hover:text-neutral-200 p-1"
-            title={open ? 'Ocultar metadatos' : 'Mostrar metadatos'}
+            title={open ? t('Ocultar metadatos') : t('Mostrar metadatos')}
             onClick={() => setOpen((v) => !v)}
           >
             <Icon name="info" size={14} />
           </button>
           <button
             className="inline-flex items-center gap-1 text-indigo-400 text-xs p-1 hover:text-indigo-300"
-            title="Abrir en Zotero"
+            title={t('Abrir en Zotero')}
             onClick={() => window.nodus.openInZotero(work.zotero_key)}
           >
             <Icon name="external" size={13} /> Zotero
@@ -255,13 +256,13 @@ function OccurrenceMeta({ work }: { work: WorkView }) {
   }, [work.nodus_id]);
 
   const authors = meta?.authors?.length ? meta.authors : work.authors;
-  const type = itemTypeEs(meta?.itemType ?? work.item_type);
+  const type = itemTypeLabel(meta?.itemType ?? work.item_type);
   const year = work.year ?? meta?.year ?? null;
   const venue: string[] = [];
   if (meta?.container) venue.push(meta.container);
   if (meta?.publisher) venue.push(meta.publisher);
-  if (meta?.volume) venue.push(`vol. ${meta.volume}${meta.issue ? `(${meta.issue})` : ''}`);
-  else if (meta?.issue) venue.push(`n.º ${meta.issue}`);
+  if (meta?.volume) venue.push(`${t('vol.')} ${meta.volume}${meta.issue ? `(${meta.issue})` : ''}`);
+  else if (meta?.issue) venue.push(`${t('n.º')} ${meta.issue}`);
   if (meta?.pages) venue.push(`pp. ${meta.pages}`);
   else if (meta?.numPages) venue.push(`${meta.numPages} pp.`);
   if (meta?.place) venue.push(meta.place);

@@ -4,6 +4,7 @@ import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { t } from '../i18n';
 
 const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
 
@@ -64,7 +65,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
 
   const startReset = () => {
     const ok = window.confirm(
-      'Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?'
+      t('Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?')
     );
     if (!ok) return;
     setResetInput('');
@@ -78,7 +79,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       await window.nodus.resetGraph();
       setResetCode(null);
       setResetInput('');
-      flash('Grafo reinicializado. Vuelve a analizar tus obras para reconstruirlo.');
+      flash(t('Grafo reinicializado. Vuelve a analizar tus obras para reconstruirlo.'));
     } finally {
       setResetting(false);
     }
@@ -107,7 +108,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     if (!result) return;
     setBackupCopied(false);
     setBackupResult(result);
-    flash(`Exportado: ${result.path}`);
+    flash(`${t('Exportado')}: ${result.path}`);
   };
 
   const copyBackupPassword = async () => {
@@ -118,7 +119,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
 
   const importBackup = async () => {
     if (!importPassword.trim()) {
-      flash('Introduce la contraseña de la copia.');
+      flash(t('Introduce la contraseña de la copia.'));
       return;
     }
     setImportingBackup(true);
@@ -144,18 +145,18 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     <div className="h-full overflow-y-auto p-6">
       <div className="flex flex-wrap items-start gap-4 mb-5">
         <div>
-          <h1 className="text-xl font-semibold">Ajustes</h1>
+          <h1 className="text-xl font-semibold">{t('Ajustes')}</h1>
           <p className="text-sm text-neutral-500 mt-1">
-            Lo básico queda separado de los parámetros técnicos de análisis y extracción.
+            {t('Lo básico queda separado de los parámetros técnicos de análisis y extracción.')}
           </p>
         </div>
         <div className="flex-1" />
         <div className="inline-grid grid-cols-2 rounded-lg border border-neutral-800 bg-neutral-900/50 p-1">
           <SettingsTabButton active={settingsTab === 'basic'} onClick={() => setSettingsTab('basic')}>
-            Básico
+            {t('Básico')}
           </SettingsTabButton>
           <SettingsTabButton active={settingsTab === 'advanced'} onClick={() => setSettingsTab('advanced')}>
-            Avanzado
+            {t('Avanzado')}
           </SettingsTabButton>
         </div>
       </div>
@@ -164,17 +165,17 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
         <>
           <ProvidersSettings settings={settings} onChange={onChange} />
 
-          <Section title="Zotero y sincronización">
-            <Row label="Modo de sincronización">
+          <Section title={t('Zotero y sincronización')}>
+            <Row label={t('Modo de sincronización')}>
               <select className="input" value={settings.syncMode} onChange={(e) => patch({ syncMode: e.target.value as any })}>
-                <option value="manual">Manual</option>
-                <option value="realtime">Tiempo real</option>
+                <option value="manual">{t('Manual')}</option>
+                <option value="realtime">{t('Tiempo real')}</option>
               </select>
             </Row>
-            <Row label="Tag de lectura">
+            <Row label={t('Tag de lectura')}>
               <input className="input" value={settings.readTag} onChange={(e) => patch({ readTag: e.target.value })} />
             </Row>
-            <Row label="Ruta de storage de Zotero">
+            <Row label={t('Ruta de storage de Zotero')}>
               <input
                 className="input w-full"
                 value={settings.zoteroStoragePath}
@@ -183,33 +184,59 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </Row>
           </Section>
 
-          <Section title="Automatización de análisis">
-            <Row label="Analizar temas al sincronizar">
+          <Section title={t('Automatización de análisis')}>
+            <Row label={t('Analizar temas al sincronizar')}>
               <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />
             </Row>
-            <Row label="Analizar a fondo obras con tag">
+            <Row label={t('Analizar a fondo obras con tag')}>
               <input
                 type="checkbox"
                 checked={settings.autoDeepScanOnReadTag}
                 onChange={(e) => patch({ autoDeepScanOnReadTag: e.target.checked })}
               />
             </Row>
-            <Row label="Reanudar cola al abrir">
+            <Row label={t('Reanudar cola al abrir')}>
               <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
             </Row>
             <p className="text-xs text-neutral-500">
-              Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.
+              {t('Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.')}
             </p>
           </Section>
 
-          <Section title="Apariencia">
-            <Row label="Tema">
-              <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
-                <option value="dark">Oscuro</option>
-                <option value="light">Claro</option>
+          <Section title={t('Idioma')}>
+            <Row label={t('Idioma de la interfaz')}>
+              <select
+                className="input"
+                value={settings.uiLanguage}
+                onChange={(e) => patch({ uiLanguage: e.target.value as AppSettings['uiLanguage'] })}
+              >
+                <option value="es">Español</option>
+                <option value="en">English</option>
               </select>
             </Row>
-            <Row label="Velocidad de animaciones">
+            <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
+              <select
+                className="input"
+                value={settings.promptLanguage}
+                onChange={(e) => patch({ promptLanguage: e.target.value as AppSettings['promptLanguage'] })}
+              >
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
+            </Row>
+            <p className="text-xs text-neutral-500">
+              {t('El idioma de los prompts determina en qué idioma la IA genera ideas, temas, narrativa del tutor y borradores. Las citas textuales siempre conservan el idioma original de la fuente.')}
+            </p>
+          </Section>
+
+          <Section title={t('Apariencia')}>
+            <Row label={t('Tema')}>
+              <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
+                <option value="dark">{t('Oscuro')}</option>
+                <option value="light">{t('Claro')}</option>
+              </select>
+            </Row>
+            <Row label={t('Velocidad de animaciones')}>
               <input
                 type="range"
                 min={0}
@@ -221,34 +248,34 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </Row>
           </Section>
 
-          <Section title="Ayuda">
+          <Section title={t('Ayuda')}>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">Tutorial de uso</label>
-                <p className="text-xs text-neutral-500 mt-0.5">Lo básico: sincronizar, escanear y moverte por el grafo.</p>
+                <label className="text-sm text-neutral-300">{t('Tutorial de uso')}</label>
+                <p className="text-xs text-neutral-500 mt-0.5">{t('Lo básico: sincronizar, escanear y moverte por el grafo.')}</p>
               </div>
               <button
                 className="btn btn-ghost border border-neutral-700"
-                onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
+                onClick={() => patch({ tourComplete: false }).then(() => flash(t('Se mostrará el tutorial.')))}
               >
-                <Icon name="help" /> Ver de nuevo
+                <Icon name="help" /> {t('Ver de nuevo')}
               </button>
             </div>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">Tutorial avanzado de investigación</label>
-                <p className="text-xs text-neutral-500 mt-0.5">El flujo completo: leer con criterio, comprender el corpus, encontrar tu aportación y escribir.</p>
+                <label className="text-sm text-neutral-300">{t('Tutorial avanzado de investigación')}</label>
+                <p className="text-xs text-neutral-500 mt-0.5">{t('El flujo completo: leer con criterio, comprender el corpus, encontrar tu aportación y escribir.')}</p>
               </div>
               <button
                 className="btn btn-ghost border border-neutral-700"
-                onClick={() => patch({ advancedTourComplete: false }).then(() => flash('Se mostrará el tutorial avanzado.'))}
+                onClick={() => patch({ advancedTourComplete: false }).then(() => flash(t('Se mostrará el tutorial avanzado.')))}
               >
-                <Icon name="route" /> Empezar
+                <Icon name="route" /> {t('Empezar')}
               </button>
             </div>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">Actualizaciones</label>
+                <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>
                 {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
                 {(updatePct != null || updateBusy) && (
                   <div className="mt-2 w-72 max-w-full">
@@ -269,21 +296,21 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               <div className="flex gap-2">
                 {updateDownloaded && (
                   <button className="btn btn-primary" onClick={installUpdate}>
-                    <Icon name="refresh" /> Reiniciar
+                    <Icon name="refresh" /> {t('Reiniciar')}
                   </button>
                 )}
                 <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
                   <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
-                  {checkingUpdate ? 'Buscando…' : updateBusy ? 'Actualizando…' : 'Buscar actualización'}
+                  {checkingUpdate ? t('Buscando…') : updateBusy ? t('Actualizando…') : t('Buscar actualización')}
                 </button>
               </div>
             </div>
           </Section>
 
-          <Section title="Datos">
+          <Section title={t('Datos')}>
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-ghost border border-neutral-700" onClick={exportBackup}>
-                <Icon name="download" /> Exportar (.nodus)
+                <Icon name="download" /> {t('Exportar (.nodus)')}
               </button>
               <button
                 className="btn btn-ghost border border-neutral-700"
@@ -292,50 +319,50 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                   setImportOpen(true);
                 }}
               >
-                <Icon name="upload" /> Importar (.nodus)
+                <Icon name="upload" /> {t('Importar (.nodus)')}
               </button>
             </div>
             <p className="text-xs text-neutral-500">
-              La copia incluye base de datos, ajustes, modelos, grafo y claves API dentro de un archivo cifrado con contraseña generada.
+              {t('La copia incluye base de datos, ajustes, modelos, grafo y claves API dentro de un archivo cifrado con contraseña generada.')}
             </p>
           </Section>
         </>
       ) : (
         <>
-          <Section title="IA avanzada">
-            <Row label="Modelo de extracción (extrae temas, ideas, evidencias y huecos)">
+          <Section title={t('IA avanzada')}>
+            <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
             </Row>
-            <Row label="Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)">
+            <Row label={t('Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
             </Row>
-            <Row label="Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)">
+            <Row label={t('Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)')}>
               <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
             </Row>
-            <Row label="Modelo de embeddings (similitud semántica multilingüe)">
+            <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
               <EmbeddingModelControl settings={settings} onPatch={patch} />
             </Row>
-            <Row label="Indexación de embeddings">
+            <Row label={t('Indexación de embeddings')}>
               <div className="flex gap-2">
                 <button
                   className="btn btn-ghost border border-cyan-800 text-cyan-300"
-                  title="Genera embeddings solo para ideas que aún no los tienen."
+                  title={t('Genera embeddings solo para ideas que aún no los tienen.')}
                   onClick={() => {
                     void window.nodus.startEmbedding();
                   }}
                 >
-                  <Icon name="search" /> Indexar pendientes
+                  <Icon name="search" /> {t('Indexar pendientes')}
                 </button>
                 <button
                   className="btn btn-ghost border border-cyan-800 text-cyan-300"
-                  title="Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo."
+                  title={t('Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo.')}
                   onClick={() => setConfirmReindex(true)}
                 >
-                  <Icon name="search" /> Reindexar todo
+                  <Icon name="search" /> {t('Reindexar todo')}
                 </button>
               </div>
             </Row>
-            <Row label="Llamadas simultáneas">
+            <Row label={t('Llamadas simultáneas')}>
               <input
                 type="number"
                 min={1}
@@ -345,20 +372,20 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                 onChange={(e) => patch({ concurrency: parseInt(e.target.value) || 1 })}
               />
             </Row>
-            <Row label="Email Unpaywall (fallback de texto)">
+            <Row label={t('Email Unpaywall (fallback de texto)')}>
               <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
             </Row>
-            <Row label="Modo de contexto deep scan">
+            <Row label={t('Modo de contexto deep scan')}>
               <select
                 className="input"
                 value={settings.deepContextMode}
                 onChange={(e) => patch({ deepContextMode: e.target.value as AppSettings['deepContextMode'] })}
               >
-                <option value="standard">Estándar</option>
-                <option value="long">Contexto largo</option>
+                <option value="standard">{t('Estándar')}</option>
+                <option value="long">{t('Contexto largo')}</option>
               </select>
             </Row>
-            <Row label="Palabras por fragmento">
+            <Row label={t('Palabras por fragmento')}>
               <input
                 type="number"
                 min={settings.deepContextMode === 'long' ? 5000 : 500}
@@ -371,18 +398,18 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </Row>
           </Section>
 
-          <Section title="Extracción de texto (PDFs grandes)">
-            <Row label="Reusar texto indexado por Zotero">
+          <Section title={t('Extracción de texto (PDFs grandes)')}>
+            <Row label={t('Reusar texto indexado por Zotero')}>
               <input
                 type="checkbox"
                 checked={settings.preferZoteroFulltext}
                 onChange={(e) => patch({ preferZoteroFulltext: e.target.checked })}
               />
             </Row>
-            <Row label="OCR para PDFs escaneados">
+            <Row label={t('OCR para PDFs escaneados')}>
               <input type="checkbox" checked={settings.ocrEnabled} onChange={(e) => patch({ ocrEnabled: e.target.checked })} />
             </Row>
-            <Row label="Idiomas de OCR (Tesseract)">
+            <Row label={t('Idiomas de OCR (Tesseract)')}>
               <input
                 className="input"
                 value={settings.ocrLanguages}
@@ -390,7 +417,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                 placeholder="spa+eng"
               />
             </Row>
-            <Row label="Máx. páginas a OCR por obra">
+            <Row label={t('Máx. páginas a OCR por obra')}>
               <input
                 type="number"
                 min={1}
@@ -401,22 +428,21 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               />
             </Row>
             <p className="text-xs text-neutral-500">
-              El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.
+              {t('El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.')}
             </p>
           </Section>
 
           <section className="card p-4 mb-4 border border-red-900/60">
-            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">Zona de peligro</h2>
+            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">{t('Zona de peligro')}</h2>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">Reinicializar grafo</label>
+                <label className="text-sm text-neutral-300">{t('Reinicializar grafo')}</label>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La
-                  biblioteca y los ajustes se conservan.
+                  {t('Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La biblioteca y los ajustes se conservan.')}
                 </p>
               </div>
               <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
-                <Icon name="trash" /> Reinicializar…
+                <Icon name="trash" /> {t('Reinicializar…')}
               </button>
             </div>
           </section>
@@ -426,9 +452,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       {resetCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => !resetting && setResetCode(null)}>
           <div className="card p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-red-400">Confirmación final</h3>
+            <h3 className="font-semibold text-red-400">{t('Confirmación final')}</h3>
             <p className="text-sm text-neutral-300">
-              Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:
+              {t('Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:')}
             </p>
             <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-100 bg-neutral-950 rounded-lg py-3 select-none">
               {resetCode}
@@ -447,14 +473,14 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             />
             <div className="flex justify-end gap-2">
               <button className="btn btn-ghost" disabled={resetting} onClick={() => setResetCode(null)}>
-                Cancelar
+                {t('Cancelar')}
               </button>
               <button
                 className="btn border border-red-800 text-red-300 hover:bg-red-950/50 disabled:opacity-40"
                 disabled={resetInput !== resetCode || resetting}
                 onClick={() => void confirmReset()}
               >
-                {resetting ? 'Borrando…' : 'Borrar grafo'}
+                {resetting ? t('Borrando…') : t('Borrar grafo')}
               </button>
             </div>
           </div>
@@ -465,9 +491,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       {backupResult && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
           <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-semibold mb-2">Contraseña de la copia</h2>
+            <h2 className="font-semibold mb-2">{t('Contraseña de la copia')}</h2>
             <p className="text-sm text-neutral-400 mb-4">
-              Guarda esta contraseña. Nodus no puede recuperarla y será necesaria para importar la copia en otro ordenador.
+              {t('Guarda esta contraseña. Nodus no puede recuperarla y será necesaria para importar la copia en otro ordenador.')}
             </p>
             <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3 font-mono text-sm break-all">
               {backupResult.password}
@@ -475,10 +501,10 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             <div className="mt-2 text-xs text-neutral-500 truncate">{backupResult.path}</div>
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setBackupResult(null)}>
-                Cerrar
+                {t('Cerrar')}
               </button>
               <button className="btn btn-primary" onClick={() => void copyBackupPassword()}>
-                <Icon name={backupCopied ? 'check' : 'copy'} /> {backupCopied ? 'Copiada' : 'Copiar contraseña'}
+                <Icon name={backupCopied ? 'check' : 'copy'} /> {backupCopied ? t('Copiada') : t('Copiar contraseña')}
               </button>
             </div>
           </div>
@@ -487,9 +513,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       {importOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setImportOpen(false)}>
           <div className="card w-full max-w-md p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-semibold mb-2">Importar copia cifrada</h2>
+            <h2 className="font-semibold mb-2">{t('Importar copia cifrada')}</h2>
             <p className="text-sm text-neutral-400 mb-4">
-              Introduce la contraseña generada al exportar. Después selecciona el archivo .nodus.
+              {t('Introduce la contraseña generada al exportar. Después selecciona el archivo .nodus.')}
             </p>
             <input
               className="input w-full"
@@ -503,11 +529,11 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             />
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setImportOpen(false)} disabled={importingBackup}>
-                Cancelar
+                {t('Cancelar')}
               </button>
               <button className="btn btn-primary" onClick={() => void importBackup()} disabled={importingBackup}>
                 <Icon name={importingBackup ? 'sync' : 'upload'} className={importingBackup ? 'animate-spin' : ''} />
-                {importingBackup ? 'Importando…' : 'Seleccionar archivo'}
+                {importingBackup ? t('Importando…') : t('Seleccionar archivo')}
               </button>
             </div>
           </div>
@@ -515,9 +541,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       )}
       {confirmReindex && (
         <ConfirmModal
-          title="Reindexar todos los embeddings"
-          message="Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?"
-          confirmLabel="Reindexar todo"
+          title={t('Reindexar todos los embeddings')}
+          message={t('Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?')}
+          confirmLabel={t('Reindexar todo')}
           danger
           onConfirm={() => {
             setConfirmReindex(false);
@@ -618,7 +644,7 @@ function EmbeddingModelControl({
           placeholder={DEFAULT_EMBEDDING_MODEL[provider]}
         />
         <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
-          {loading ? 'Cargando…' : 'Cargar modelos'}
+          {loading ? t('Cargando…') : t('Cargar modelos')}
         </button>
       </div>
       {models && (
@@ -639,7 +665,7 @@ function EmbeddingModelControl({
       )}
       {error && <div className="text-xs text-red-400 max-w-md text-right">{error}</div>}
       <p className="text-xs text-neutral-500 max-w-md text-right">
-        OpenRouter acepta IDs como baai/bge-m3; si escribes BAAI:bge-m3 se normaliza automáticamente.
+        {t('OpenRouter acepta IDs como baai/bge-m3; si escribes BAAI:bge-m3 se normaliza automáticamente.')}
       </p>
     </div>
   );

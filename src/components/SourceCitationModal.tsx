@@ -3,6 +3,7 @@ import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, WorkMeta, Wo
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { OccurrenceCard } from './NodeDetailPanel';
+import { t } from '../i18n';
 
 export type CitationTarget =
   | { kind: 'idea'; id: string }
@@ -50,9 +51,9 @@ export function SourceCitationModal({
       >
         <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-2">
           <Icon name="book" className="text-indigo-300" />
-          <span className="font-semibold text-sm">Fuente citada</span>
+          <span className="font-semibold text-sm">{t('Fuente citada')}</span>
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={onClose} title="Cerrar">
+          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
             <Icon name="x" />
           </button>
         </header>
@@ -96,7 +97,7 @@ function IdeaBody({
   }, [globalId]);
 
   if (missing) {
-    return <p className="text-sm text-neutral-400">No se encontró la idea citada en el grafo actual.</p>;
+    return <p className="text-sm text-neutral-400">{t('No se encontró la idea citada en el grafo actual.')}</p>;
   }
   if (!detail) {
     return (
@@ -115,7 +116,7 @@ function IdeaBody({
   return (
     <div className="space-y-3">
       <div>
-        <Badge color="indigo">{NODE_LABELS[detail.idea.type as IdeaType] ?? detail.idea.type}</Badge>
+        <Badge color="indigo">{t(NODE_LABELS[detail.idea.type as IdeaType]) ?? detail.idea.type}</Badge>
         <h3 className="font-semibold mt-2">{detail.idea.label}</h3>
         <p className="text-neutral-400 mt-1">{detail.idea.statement}</p>
         {onOpenGraph && (
@@ -123,23 +124,23 @@ function IdeaBody({
             className="btn btn-primary gap-1.5 mt-3"
             onClick={() => {
               onClose();
-              onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `Idea: ${detail.idea.label}` });
+              onOpenGraph({ preset: 'overview', nodeId: detail.idea.global_id, label: `${t('Idea:')} ${detail.idea.label}` });
             }}
           >
-            <Icon name="layers" size={14} /> Ver conexiones en grafo
+            <Icon name="layers" size={14} /> {t('Ver conexiones en grafo')}
           </button>
         )}
       </div>
       <div>
-        <div className="text-xs uppercase text-neutral-500 mb-1">Obras que la desarrollan</div>
-        {detail.occurrences.length === 0 && <p className="text-xs text-neutral-500">Sin obras vinculadas.</p>}
+        <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
+        {detail.occurrences.length === 0 && <p className="text-xs text-neutral-500">{t('Sin obras vinculadas.')}</p>}
         {detail.occurrences.map((o) => (
           <OccurrenceCard key={o.nodus_id} occurrence={o} />
         ))}
       </div>
       {detail.evidence.length > 0 && (
         <div>
-          <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
           {detail.evidence.map((ev) => (
             <blockquote
               key={ev.id}
@@ -180,7 +181,7 @@ function GapBody({
     };
   }, [gapId]);
 
-  if (missing) return <p className="text-sm text-neutral-400">No se encontró el hueco citado.</p>;
+  if (missing) return <p className="text-sm text-neutral-400">{t('No se encontró el hueco citado.')}</p>;
   if (!detail) {
     return (
       <div className="space-y-3 animate-pulse">
@@ -191,15 +192,15 @@ function GapBody({
     );
   }
 
-  const authors = detail.work.authors.length ? detail.work.authors.join('; ') : 'Autoría no disponible';
+  const authors = detail.work.authors.length ? detail.work.authors.join('; ') : t('Autoría no disponible');
   return (
     <div className="space-y-4">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge color={GAP_COLORS[detail.gap.kind]}>{GAP_LABELS[detail.gap.kind]}</Badge>
-          <Badge>conf {detail.gap.confidence.toFixed(2)}</Badge>
+          <Badge color={GAP_COLORS[detail.gap.kind]}>{t(GAP_LABELS[detail.gap.kind])}</Badge>
+          <Badge>{t('conf')} {detail.gap.confidence.toFixed(2)}</Badge>
         </div>
-        <h3 className="font-semibold mt-2">Hueco de investigación</h3>
+        <h3 className="font-semibold mt-2">{t('Hueco de investigación')}</h3>
         <p className="text-neutral-300 mt-1">{detail.gap.statement}</p>
         <div className="flex flex-wrap gap-2 mt-3">
           {onOpenGraph && (
@@ -207,23 +208,23 @@ function GapBody({
               className="btn btn-primary gap-1.5"
               onClick={() => {
                 onClose();
-                onOpenGraph({ preset: 'gaps', label: `Hueco: ${GAP_LABELS[detail.gap.kind]}` });
+                onOpenGraph({ preset: 'gaps', label: `${t('Hueco:')} ${t(GAP_LABELS[detail.gap.kind])}` });
               }}
             >
-              <Icon name="layers" size={14} /> Ver en grafo
+              <Icon name="layers" size={14} /> {t('Ver en grafo')}
             </button>
           )}
           <button
             className="btn btn-ghost border border-neutral-700 gap-1.5"
             onClick={() => void window.nodus.openInZotero(detail.work.zotero_key)}
           >
-            <Icon name="external" size={14} /> Abrir obra
+            <Icon name="external" size={14} /> {t('Abrir obra')}
           </button>
         </div>
       </div>
 
       <div className="card p-3">
-        <div className="text-xs uppercase text-neutral-500 mb-1">Obra</div>
+        <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obra')}</div>
         <div className="text-sm font-medium">{detail.work.title}</div>
         <div className="text-xs text-neutral-400 mt-1">
           {authors}
@@ -233,9 +234,9 @@ function GapBody({
 
       {detail.relatedIdea && (
         <div>
-          <div className="text-xs uppercase text-neutral-500 mb-1">Idea relacionada</div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">{t('Idea relacionada')}</div>
           <div className="card p-3">
-            <Badge color="indigo">{NODE_LABELS[detail.relatedIdea.type as IdeaType] ?? detail.relatedIdea.type}</Badge>
+            <Badge color="indigo">{t(NODE_LABELS[detail.relatedIdea.type as IdeaType]) ?? detail.relatedIdea.type}</Badge>
             <div className="font-medium mt-2">{detail.relatedIdea.label}</div>
             <p className="text-sm text-neutral-400 mt-1">{detail.relatedIdea.statement}</p>
             {onOpenGraph && (
@@ -246,11 +247,11 @@ function GapBody({
                   onOpenGraph({
                     preset: 'overview',
                     nodeId: detail.relatedIdea?.global_id,
-                    label: `Idea: ${detail.relatedIdea?.label ?? 'relacionada'}`,
+                    label: `${t('Idea:')} ${detail.relatedIdea?.label ?? t('relacionada')}`,
                   });
                 }}
               >
-                <Icon name="layers" size={13} /> Conexiones de la idea
+                <Icon name="layers" size={13} /> {t('Conexiones de la idea')}
               </button>
             )}
           </div>
@@ -259,7 +260,7 @@ function GapBody({
 
       {detail.evidence && (
         <div>
-          <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia anclada</div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
           <blockquote className="border-l-2 border-amber-700 pl-3 py-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
             “{detail.evidence.quote}”{' '}
             <span className="text-neutral-500 not-italic">
@@ -298,7 +299,7 @@ function ContradictionBody({
     };
   }, [edgeId]);
 
-  if (missing) return <p className="text-sm text-neutral-400">No se encontró la contradicción citada.</p>;
+  if (missing) return <p className="text-sm text-neutral-400">{t('No se encontró la contradicción citada.')}</p>;
   if (!detail) {
     return (
       <div className="space-y-3 animate-pulse">
@@ -313,11 +314,11 @@ function ContradictionBody({
     <div className="space-y-4">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge color="red">{EDGE_LABELS[detail.edge.type as keyof typeof EDGE_LABELS] ?? detail.edge.type}</Badge>
+          <Badge color="red">{t(EDGE_LABELS[detail.edge.type as keyof typeof EDGE_LABELS]) ?? detail.edge.type}</Badge>
           <Badge color={detail.edge.basis === 'explicit' ? 'green' : 'amber'}>{detail.edge.basis}</Badge>
-          <Badge>conf {detail.edge.confidence.toFixed(2)}</Badge>
+          <Badge>{t('conf')} {detail.edge.confidence.toFixed(2)}</Badge>
         </div>
-        <h3 className="font-semibold mt-2">Contradicción citada</h3>
+        <h3 className="font-semibold mt-2">{t('Contradicción citada')}</h3>
         {detail.explanation && <p className="text-neutral-400 mt-1">{detail.explanation}</p>}
         <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950/45 p-3 text-sm">
           <span className="text-neutral-200">{detail.fromLabel}</span>
@@ -329,17 +330,17 @@ function ContradictionBody({
             className="btn btn-primary gap-1.5 mt-3"
             onClick={() => {
               onClose();
-              onOpenGraph({ preset: 'contradictions', edgeId: detail.edge.id, label: 'Contradicción citada' });
+              onOpenGraph({ preset: 'contradictions', edgeId: detail.edge.id, label: t('Contradicción citada') });
             }}
           >
-            <Icon name="layers" size={14} /> Ver en grafo
+            <Icon name="layers" size={14} /> {t('Ver en grafo')}
           </button>
         )}
       </div>
 
       {detail.evidence.length > 0 && (
         <div>
-          <div className="text-xs uppercase text-neutral-500 mb-1">Evidencia</div>
+          <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia')}</div>
           {detail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-red-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
               “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
@@ -401,7 +402,7 @@ function WorkBody({
     };
   }, [nodusId]);
 
-  if (missing) return <p className="text-sm text-neutral-400">No se encontró el documento citado.</p>;
+  if (missing) return <p className="text-sm text-neutral-400">{t('No se encontró el documento citado.')}</p>;
   if (!work) {
     return (
       <div className="space-y-3 animate-pulse">
@@ -412,13 +413,14 @@ function WorkBody({
   }
 
   const authors = meta?.authors?.length ? meta.authors : work.authors;
-  const type = ITEM_TYPE_ES[meta?.itemType ?? work.item_type] ?? meta?.itemType ?? work.item_type;
+  const rawType = ITEM_TYPE_ES[meta?.itemType ?? work.item_type] ?? meta?.itemType ?? work.item_type;
+  const type = t(rawType);
   const year = work.year ?? meta?.year ?? null;
   const venue: string[] = [];
   if (meta?.container) venue.push(meta.container);
   if (meta?.publisher) venue.push(meta.publisher);
-  if (meta?.volume) venue.push(`vol. ${meta.volume}${meta.issue ? `(${meta.issue})` : ''}`);
-  else if (meta?.issue) venue.push(`n.º ${meta.issue}`);
+  if (meta?.volume) venue.push(`${t('vol.')} ${meta.volume}${meta.issue ? `(${meta.issue})` : ''}`);
+  else if (meta?.issue) venue.push(`${t('n.º')} ${meta.issue}`);
   if (meta?.pages) venue.push(`pp. ${meta.pages}`);
   else if (meta?.numPages) venue.push(`${meta.numPages} pp.`);
   if (meta?.place) venue.push(meta.place);
@@ -450,7 +452,7 @@ function WorkBody({
           className="btn btn-primary gap-1.5"
           onClick={() => void window.nodus.openInZotero(work.zotero_key)}
         >
-          <Icon name="external" size={14} /> Abrir en Zotero
+          <Icon name="external" size={14} /> {t('Abrir en Zotero')}
         </button>
         {onOpenGraph && (
           <button
@@ -462,11 +464,11 @@ function WorkBody({
                 workId: work.nodus_id,
                 workTitle: work.title,
                 zoteroKey: work.zotero_key,
-                label: `Ideas y conexiones: ${work.title}`,
+                label: `${t('Ideas y conexiones:')} ${work.title}`,
               });
             }}
           >
-            <Icon name="layers" size={14} /> Ver ideas y conexiones
+            <Icon name="layers" size={14} /> {t('Ver ideas y conexiones')}
           </button>
         )}
       </div>

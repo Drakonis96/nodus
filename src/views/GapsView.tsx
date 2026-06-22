@@ -8,6 +8,7 @@ import {
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
+import { t, tx } from '../i18n';
 
 const KIND_LABELS: Record<GapKind, string> = {
   future_work: 'trabajo futuro',
@@ -59,10 +60,10 @@ export function GapsView({
       <div className="shrink-0">
         <div className="flex items-center gap-3 mb-4">
           <Icon name="gap" size={22} className="text-indigo-300" />
-          <h1 className="text-xl font-semibold">Huecos de investigación</h1>
+          <h1 className="text-xl font-semibold">{t('Huecos de investigación')}</h1>
         </div>
         <p className="text-sm text-neutral-400 mb-4">
-          Agregados del corpus: trabajo futuro y limitaciones minados de las obras, y contradicciones sin reconciliar.
+          {t('Agregados del corpus: trabajo futuro y limitaciones minados de las obras, y contradicciones sin reconciliar.')}
         </p>
 
         <div className="flex gap-2 mb-4">
@@ -70,13 +71,13 @@ export function GapsView({
             className={`btn ${tab === 'mined' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setTab('mined')}
           >
-            Minados ({gaps.length})
+            {tx('Minados ({n})', { n: gaps.length })}
           </button>
           <button
             className={`btn ${tab === 'contradictions' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setTab('contradictions')}
           >
-            Contradicciones ({contradictions.length})
+            {tx('Contradicciones ({n})', { n: contradictions.length })}
           </button>
         </div>
       </div>
@@ -87,35 +88,35 @@ export function GapsView({
           itemHeight={GAP_ROW_HEIGHT}
           getKey={(g, i) => `${g.kind}:${g.statement}:${i}`}
           className="flex-1 min-h-0"
-          empty={<div className="text-neutral-500 text-sm">Aún no hay huecos. Ejecuta escaneos profundos.</div>}
+          empty={<div className="text-neutral-500 text-sm">{t('Aún no hay huecos. Ejecuta escaneos profundos.')}</div>}
           renderItem={(g) => (
             <div className="card h-[160px] p-3 mr-2">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm flex-1 line-clamp-2">{g.statement}</p>
-                <Badge color={KIND_COLOR[g.kind]}>{KIND_LABELS[g.kind]}</Badge>
+                <Badge color={KIND_COLOR[g.kind]}>{t(KIND_LABELS[g.kind])}</Badge>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 <button
                   className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                  onClick={() => onOpenGraph({ preset: 'gaps', label: `Hueco: ${KIND_LABELS[g.kind]}` })}
+                  onClick={() => onOpenGraph({ preset: 'gaps', label: `${t('Hueco:')} ${t(KIND_LABELS[g.kind])}` })}
                 >
-                  <Icon name="layers" size={13} /> Grafo
+                  <Icon name="layers" size={13} /> {t('Grafo')}
                 </button>
                 <button
                   className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
                   onClick={() =>
                     onOpenAssistant({
-                      title: `Hueco: ${KIND_LABELS[g.kind]}`,
+                      title: `${t('Hueco:')} ${t(KIND_LABELS[g.kind])}`,
                       selection: ASSISTANT_CONTEXTS.gap,
                       prompt: buildGapAssistantPrompt(g),
                     })
                   }
                 >
-                  <Icon name="wand" size={13} /> Asistente
+                  <Icon name="wand" size={13} /> {t('Asistente')}
                 </button>
               </div>
               <div className="text-xs text-neutral-500 mt-2">
-                Mencionado en {g.count} obra(s):{' '}
+                {tx('Mencionado en {n} obra(s):', { n: g.count })}{' '}
                 {g.works.slice(0, 6).map((w) => (
                   <button
                     key={w.nodus_id}
@@ -125,7 +126,7 @@ export function GapsView({
                     {w.title.slice(0, 40)}
                   </button>
                 ))}
-                {g.works.length > 6 && <span>+{g.works.length - 6} más</span>}
+                {g.works.length > 6 && <span>+{g.works.length - 6} {t('más')}</span>}
               </div>
             </div>
           )}
@@ -138,13 +139,13 @@ export function GapsView({
           itemHeight={CONTRADICTION_ROW_HEIGHT}
           getKey={(c) => c.edge.id}
           className="flex-1 min-h-0"
-          empty={<div className="text-neutral-500 text-sm">No se detectaron contradicciones sin resolver.</div>}
+          empty={<div className="text-neutral-500 text-sm">{t('No se detectaron contradicciones sin resolver.')}</div>}
           renderItem={(c) => (
             <div className="card h-[206px] p-3 mr-2">
               <div className="flex items-center gap-2 mb-1">
-                <Badge color="red">{EDGE_LABELS[c.edge.type as keyof typeof EDGE_LABELS] ?? c.edge.type}</Badge>
+                <Badge color="red">{t(EDGE_LABELS[c.edge.type as keyof typeof EDGE_LABELS]) ?? c.edge.type}</Badge>
                 <Badge color={c.edge.basis === 'explicit' ? 'green' : 'amber'}>{c.edge.basis}</Badge>
-                <Badge>conf {c.edge.confidence.toFixed(2)}</Badge>
+                <Badge>{t('conf')} {c.edge.confidence.toFixed(2)}</Badge>
               </div>
               {c.explanation && <p className="text-sm text-neutral-300 mb-2 line-clamp-2">{c.explanation}</p>}
               <div className="text-sm">
@@ -154,23 +155,23 @@ export function GapsView({
               <div className="flex flex-wrap gap-2 mt-3">
                 <button
                   className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                  onClick={() => onOpenGraph({ preset: 'contradictions', edgeId: c.edge.id, label: 'Contradicción seleccionada' })}
+                  onClick={() => onOpenGraph({ preset: 'contradictions', edgeId: c.edge.id, label: t('Contradicción seleccionada') })}
                 >
-                  <Icon name="layers" size={13} /> Grafo
+                  <Icon name="layers" size={13} /> {t('Grafo')}
                 </button>
                 <button
                   className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
                   onClick={() =>
                     onOpenAssistant({
-                      title: 'Contradicción',
+                      title: t('Contradicción'),
                       selection: ASSISTANT_CONTEXTS.contradiction,
                       prompt:
-                        `Analiza esta contradicción del corpus. Resume las posiciones, evidencia y lecturas necesarias para decidir si es tensión real o diferencia de marco.\n\n` +
+                        `${t('Analiza esta contradicción del corpus. Resume las posiciones, evidencia y lecturas necesarias para decidir si es tensión real o diferencia de marco.')}\n\n` +
                         `${c.fromLabel} vs. ${c.toLabel}\n${c.explanation ?? ''}`,
                     })
                   }
                 >
-                  <Icon name="wand" size={13} /> Asistente
+                  <Icon name="wand" size={13} /> {t('Asistente')}
                 </button>
               </div>
               {c.evidence.slice(0, 2).map((ev) => (
@@ -184,7 +185,7 @@ export function GapsView({
                   </button>
                 </blockquote>
               ))}
-              {c.evidence.length > 2 && <div className="mt-1 text-[11px] text-neutral-500">+{c.evidence.length - 2} evidencias más</div>}
+              {c.evidence.length > 2 && <div className="mt-1 text-[11px] text-neutral-500">+{c.evidence.length - 2} {t('evidencias más')}</div>}
             </div>
           )}
         />
@@ -198,10 +199,10 @@ function buildGapAssistantPrompt(gap: GapAggregate): string {
   const omitted = gap.works.length - works.length;
   const worksBlock =
     works.length > 0
-      ? `\n\nObras donde aparece:\n${works.join('\n')}${omitted > 0 ? `\n- +${omitted} obras más` : ''}`
+      ? `\n\n${t('Obras donde aparece:')}\n${works.join('\n')}${omitted > 0 ? `\n- +${tx('{n} obras más', { n: omitted })}` : ''}`
       : '';
   return (
-    `Trabaja este hueco de investigación: identifica obras relevantes, ideas conectadas y próximos pasos.\n\n` +
+    `${t('Trabaja este hueco de investigación: identifica obras relevantes, ideas conectadas y próximos pasos.')}\n\n` +
     `${gap.statement}${worksBlock}`
   );
 }

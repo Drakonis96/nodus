@@ -4,6 +4,7 @@ import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings, ModelRef } fr
 import { Badge, Icon } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
+import { t, tx } from '../i18n';
 
 const ITEM_TYPES = ['journalArticle', 'book', 'bookSection', 'conferencePaper', 'thesis', 'preprint', 'report'];
 const ZOTERO_ITEM_ROW_HEIGHT = 58;
@@ -65,7 +66,7 @@ function CollectionNode({
         </span>
         {isMonitored && (
           <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
-            Monitorizada
+            {t('Monitorizada')}
           </span>
         )}
         <button
@@ -74,15 +75,15 @@ function CollectionNode({
               ? 'bg-red-950/40 text-red-300 hover:bg-red-900/50'
               : 'bg-indigo-600/15 text-indigo-300 hover:bg-indigo-600 hover:text-white'
           }`}
-          title={isMonitored ? 'Quitar esta colección del monitoreo' : 'Monitorizar esta colección'}
+          title={isMonitored ? t('Quitar esta colección del monitoreo') : t('Monitorizar esta colección')}
           onClick={(e) => {
             e.stopPropagation();
             onMonitorToggle(col.key);
           }}
         >
-          {isMonitored ? 'Quitar' : 'Monitorizar'}
+          {isMonitored ? t('Quitar') : t('Monitorizar')}
         </button>
-        <span className="text-[10px] text-neutral-600" title="ítems directos · subcolecciones">
+        <span className="text-[10px] text-neutral-600" title={t('ítems directos · subcolecciones')}>
           {col.itemCount}
           {col.subCount ? ` · ${col.subCount}▸` : ''}
         </span>
@@ -283,7 +284,7 @@ export function CollectionsModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-neutral-800">
-          <h2 className="font-semibold">Colecciones de Zotero</h2>
+          <h2 className="font-semibold">{t('Colecciones de Zotero')}</h2>
           <button className="btn btn-ghost" onClick={onClose}>
             ✕
           </button>
@@ -291,15 +292,15 @@ export function CollectionsModal({
 
         <div className="border-b border-neutral-800 bg-neutral-950/35 px-4 py-2 text-xs">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-neutral-300">Monitorizando:</span>
+            <span className="font-medium text-neutral-300">{t('Monitorizando:')}</span>
             {monitoringKeys.length === 0 ? (
-              <Badge color="amber">Ninguna colección</Badge>
+              <Badge color="amber">{t('Ninguna colección')}</Badge>
             ) : (
               monitoredEntries.map((entry) => (
                 <button
                   key={entry.key}
                   className="inline-flex items-center gap-1 rounded-md bg-emerald-900/50 px-2 py-0.5 text-xs text-emerald-300 hover:bg-red-950/50 hover:text-red-300"
-                  title="Quitar del monitoreo"
+                  title={t('Quitar del monitoreo')}
                   onClick={() => toggleMonitoredCollection(entry.key)}
                 >
                   {entry.name}
@@ -310,9 +311,9 @@ export function CollectionsModal({
             {selected && (
               <>
                 <span className="text-neutral-600">|</span>
-                <span className="text-neutral-500">Vista actual:</span>
+                <span className="text-neutral-500">{t('Vista actual:')}</span>
                 <Badge color={selectedIsMonitored ? 'green' : 'neutral'}>
-                  {selected.name} · {selectedIsMonitored ? 'monitorizada' : 'solo exploración'}
+                  {selected.name} · {selectedIsMonitored ? t('monitorizada') : t('solo exploración')}
                 </Badge>
                 <button
                   className={`rounded-md border px-2 py-0.5 ${
@@ -322,7 +323,7 @@ export function CollectionsModal({
                   }`}
                   onClick={() => toggleMonitoredCollection(selected.key)}
                 >
-                  {selectedIsMonitored ? 'Quitar del monitoreo' : 'Monitorizar esta colección'}
+                  {selectedIsMonitored ? t('Quitar del monitoreo') : t('Monitorizar esta colección')}
                 </button>
               </>
             )}
@@ -344,7 +345,7 @@ export function CollectionsModal({
                 onSelect={loadItems}
               />
             ))}
-            {roots.length === 0 && <div className="text-neutral-500 text-sm p-2">Sin colecciones.</div>}
+            {roots.length === 0 && <div className="text-neutral-500 text-sm p-2">{t('Sin colecciones.')}</div>}
           </div>
 
           {/* Items */}
@@ -354,25 +355,25 @@ export function CollectionsModal({
               <div className="flex gap-2 flex-wrap items-center">
                 <input
                   className="input flex-1 min-w-[160px]"
-                  placeholder="Buscar título, autor, año, abstract…"
+                  placeholder={t('Buscar título, autor, año, abstract…')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <input className="input w-20" placeholder="Año min" value={yearMin} onChange={(e) => setYearMin(e.target.value)} />
-                <input className="input w-20" placeholder="Año max" value={yearMax} onChange={(e) => setYearMax(e.target.value)} />
+                <input className="input w-20" placeholder={t('Año min')} value={yearMin} onChange={(e) => setYearMin(e.target.value)} />
+                <input className="input w-20" placeholder={t('Año max')} value={yearMax} onChange={(e) => setYearMax(e.target.value)} />
                 <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
-                  <option value="all">Todos</option>
-                  <option value="unscanned">Sin escanear</option>
-                  <option value="light">Ligero</option>
-                  <option value="deep">Profundo</option>
+                  <option value="all">{t('Todos')}</option>
+                  <option value="unscanned">{t('Sin escanear')}</option>
+                  <option value="light">{t('Ligero')}</option>
+                  <option value="deep">{t('Profundo')}</option>
                 </select>
                 <label className="text-xs flex items-center gap-1 text-neutral-400">
-                  <input type="checkbox" checked={onlyTag} onChange={(e) => setOnlyTag(e.target.checked)} /> solo tag
+                  <input type="checkbox" checked={onlyTag} onChange={(e) => setOnlyTag(e.target.checked)} /> {t('solo tag')}
                 </label>
-                <label className="text-xs flex items-center gap-1 text-neutral-400" title="Incluir ítems de subcolecciones">
-                  <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} /> subcolecciones
+                <label className="text-xs flex items-center gap-1 text-neutral-400" title={t('Incluir ítems de subcolecciones')}>
+                  <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} /> {t('subcolecciones')}
                 </label>
-                <span className="text-xs text-neutral-500">Escanear con:</span>
+                <span className="text-xs text-neutral-500">{t('Escanear con:')}</span>
                 <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
               </div>
               <div className="flex gap-1 flex-wrap">
@@ -393,17 +394,17 @@ export function CollectionsModal({
                   </button>
                 ))}
                 <div className="flex-1" />
-                <button className="btn btn-ghost text-xs" title="Analizar ideas de los ítems filtrados" onClick={analyzeFiltered}>
-                  <Icon name="bulb" size={14} /> Ideas
+                <button className="btn btn-ghost text-xs" title={t('Analizar ideas de los ítems filtrados')} onClick={analyzeFiltered}>
+                  <Icon name="bulb" size={14} /> {t('Ideas')}
                 </button>
-                <button className="btn btn-primary text-xs" title="Analizar temas y luego ideas de los ítems filtrados" onClick={analyzeFilteredBoth}>
-                  <Icon name="layers" size={14} /> Ambos
+                <button className="btn btn-primary text-xs" title={t('Analizar temas y luego ideas de los ítems filtrados')} onClick={analyzeFilteredBoth}>
+                  <Icon name="layers" size={14} /> {t('Ambos')}
                 </button>
                 <button className="btn btn-ghost text-xs" onClick={deselectAllFiltered}>
-                  <Icon name="x" size={14} /> Deseleccionar
+                  <Icon name="x" size={14} /> {t('Deseleccionar')}
                 </button>
                 {selected && (
-                  <button className="btn btn-ghost text-xs" title="Recargar ítems" onClick={() => loadItems(selected, true)}>
+                  <button className="btn btn-ghost text-xs" title={t('Recargar ítems')} onClick={() => loadItems(selected, true)}>
                     <Icon name="refresh" size={14} />
                   </button>
                 )}
@@ -412,9 +413,9 @@ export function CollectionsModal({
 
             {/* List */}
             <div className="flex-1 min-h-0">
-              {loadingItems && <div className="p-4 text-neutral-500 text-sm">Cargando ítems…</div>}
+              {loadingItems && <div className="p-4 text-neutral-500 text-sm">{t('Cargando ítems…')}</div>}
               {!loadingItems && !selected && (
-                <div className="p-4 text-neutral-500 text-sm">Selecciona una colección.</div>
+                <div className="p-4 text-neutral-500 text-sm">{t('Selecciona una colección.')}</div>
               )}
               {!loadingItems && selected && (
                 <VirtualList
@@ -422,7 +423,7 @@ export function CollectionsModal({
                   itemHeight={ZOTERO_ITEM_ROW_HEIGHT}
                   getKey={(it) => it.key}
                   className="h-full"
-                  empty={<div className="p-4 text-neutral-500 text-sm">No hay ítems con los filtros actuales.</div>}
+                  empty={<div className="p-4 text-neutral-500 text-sm">{t('No hay ítems con los filtros actuales.')}</div>}
                   renderItem={(it) => {
                   const w = worksByKey.get(it.key);
                   const st = statusOf(it.key);
@@ -432,19 +433,19 @@ export function CollectionsModal({
                         type="checkbox"
                         checked={!!w?.manual_deep}
                         onChange={() => void toggleItem(it)}
-                        title={w ? 'Analizar ideas de esta obra' : 'Incorporar a Nodus y analizar ideas'}
+                        title={w ? t('Analizar ideas de esta obra') : t('Incorporar a Nodus y analizar ideas')}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="truncate text-sm">{it.title}</div>
                         <div className="text-xs text-neutral-500">
                           {(it.creators[0]?.lastName ?? it.creators[0]?.name ?? '—')}
-                          {it.creators.length > 1 ? ' et al.' : ''} · {it.year ?? 's.f.'} · {it.itemType}
+                          {it.creators.length > 1 ? ' et al.' : ''} · {it.year ?? t('s.f.')} · {it.itemType}
                         </div>
                       </div>
                       <Badge color={st === 'deep' ? 'indigo' : st === 'light' ? 'green' : 'neutral'}>{st}</Badge>
-                      {w?.deep_trigger === 'tag' && <span title="tag">🏷</span>}
-                      {w?.deep_trigger === 'manual' && <span title="manual">✦</span>}
-                      {w?.deep_trigger === 'both' && <span title="ambos">🏷✦</span>}
+                      {w?.deep_trigger === 'tag' && <span title={t('tag')}>🏷</span>}
+                      {w?.deep_trigger === 'manual' && <span title={t('manual')}>✦</span>}
+                      {w?.deep_trigger === 'both' && <span title={t('ambos')}>🏷✦</span>}
                     </div>
                   );
                   }}
@@ -452,7 +453,7 @@ export function CollectionsModal({
               )}
             </div>
             <div className="px-4 py-1.5 border-t border-neutral-800 text-xs text-neutral-500">
-              {filtered.length} de {items.length} ítems
+              {tx('{a} de {b} ítems', { a: filtered.length, b: items.length })}
             </div>
           </div>
         </div>

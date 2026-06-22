@@ -3,6 +3,7 @@ import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorSave
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { t, tx, getActiveLang } from '../i18n';
 
 type Phase = 'setup' | 'routes' | 'touring';
 type SetupTab = 'generate' | 'saved';
@@ -261,11 +262,11 @@ export function TutorPanel({
     <aside className="w-[26rem] max-w-full shrink-0 border-r border-neutral-800 bg-neutral-950/95 flex flex-col min-h-0">
       <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-2">
         <Icon name="compass" className="text-indigo-300" />
-        <span className="font-semibold">Modo Tutor</span>
+        <span className="font-semibold">{t('Modo Tutor')}</span>
         <div className="flex-1" />
         {phase === 'touring' && (
-          <button className="btn btn-ghost text-xs px-2 py-1 gap-1" onClick={backToRoutes} title="Volver a las rutas">
-            <Icon name="stop" size={14} /> Parar
+          <button className="btn btn-ghost text-xs px-2 py-1 gap-1" onClick={backToRoutes} title={t('Volver a las rutas')}>
+            <Icon name="stop" size={14} /> {t('Parar')}
           </button>
         )}
         {phase === 'routes' && (
@@ -275,12 +276,12 @@ export function TutorPanel({
               setPhase('setup');
               onClearFocus();
             }}
-            title="Generar otro recorrido"
+            title={t('Generar otro recorrido')}
           >
-            <Icon name="refresh" size={14} /> Nuevo
+            <Icon name="refresh" size={14} /> {t('Nuevo')}
           </button>
         )}
-        <button className="btn btn-ghost px-2 py-1" onClick={close} title="Cerrar modo Tutor">
+        <button className="btn btn-ghost px-2 py-1" onClick={close} title={t('Cerrar modo Tutor')}>
           <Icon name="x" />
         </button>
       </header>
@@ -348,7 +349,7 @@ export function TutorPanel({
             onClick={() => setStopIndex((i) => Math.max(0, i - 1))}
             disabled={stopIndex === 0}
           >
-            <Icon name="chevronLeft" /> Anterior
+            <Icon name="chevronLeft" /> {t('Anterior')}
           </button>
           <span className="text-xs text-neutral-500 tabular-nums px-1">
             {stopIndex + 1}/{route.stops.length}
@@ -358,15 +359,15 @@ export function TutorPanel({
             onClick={() => setStopIndex((i) => Math.min(route.stops.length - 1, i + 1))}
             disabled={stopIndex >= route.stops.length - 1}
           >
-            Siguiente <Icon name="chevronRight" />
+            {t('Siguiente')} <Icon name="chevronRight" />
           </button>
         </footer>
       )}
       {pendingRouteDelete && (
         <ConfirmModal
-          title="Eliminar recorrido guardado"
-          message={<>Se eliminará «{pendingRouteDelete.route.title}». Esta acción no se puede deshacer.</>}
-          confirmLabel="Eliminar"
+          title={t('Eliminar recorrido guardado')}
+          message={<>{t('Se eliminará «')}{pendingRouteDelete.route.title}{t('». Esta acción no se puede deshacer.')}</>}
+          confirmLabel={t('Eliminar')}
           danger
           onConfirm={() => void deleteSavedRoute()}
           onCancel={() => setPendingRouteDelete(null)}
@@ -392,13 +393,13 @@ function TutorTabs({
           className={`rounded-md px-3 py-1.5 text-sm transition-colors ${value === 'generate' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
           onClick={() => onChange('generate')}
         >
-          Generar
+          {t('Generar')}
         </button>
         <button
           className={`rounded-md px-3 py-1.5 text-sm transition-colors ${value === 'saved' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
           onClick={() => onChange('saved')}
         >
-          Guardados{savedCount > 0 ? ` (${savedCount})` : ''}
+          {t('Guardados')}{savedCount > 0 ? ` (${savedCount})` : ''}
         </button>
       </div>
     </div>
@@ -433,23 +434,22 @@ function SetupPanel({
   return (
     <div className="p-4 space-y-4">
       <p className="text-sm text-neutral-400">
-        Una IA de contexto largo analiza todas tus ideas, temas y conexiones y traza un recorrido guiado. Avanza con las
-        flechas y el Tutor te lo explica paso a paso sobre el propio grafo.
+        {t('Una IA de contexto largo analiza todas tus ideas, temas y conexiones y traza un recorrido guiado. Avanza con las flechas y el Tutor te lo explica paso a paso sobre el propio grafo.')}
       </p>
 
       <div>
-        <div className="text-xs uppercase text-neutral-500 mb-1.5">Tipo de recorrido</div>
+        <div className="text-xs uppercase text-neutral-500 mb-1.5">{t('Tipo de recorrido')}</div>
         <div className="space-y-2">
           <ModeCard
             active={mode === 'overview'}
-            title="Recorrido completo"
-            description="El Tutor propone varias rutas que cubren todo el grafo, ordenadas por peso, y menciona todo lo importante."
+            title={t('Recorrido completo')}
+            description={t('El Tutor propone varias rutas que cubren todo el grafo, ordenadas por peso, y menciona todo lo importante.')}
             onClick={() => setMode('overview')}
           />
           <ModeCard
             active={mode === 'prompt'}
-            title="Desde un objetivo"
-            description="Describe qué quieres repasar y el Tutor traza un recorrido a medida con las ideas y conexiones pertinentes."
+            title={t('Desde un objetivo')}
+            description={t('Describe qué quieres repasar y el Tutor traza un recorrido a medida con las ideas y conexiones pertinentes.')}
             onClick={() => setMode('prompt')}
           />
         </div>
@@ -460,14 +460,14 @@ function SetupPanel({
           className="input w-full min-h-24 resize-y"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ej.: Quiero repasar cómo se relaciona el concepto de identidad nacional con la literatura de viajes y dónde hay contradicciones."
+          placeholder={t('Ej.: Quiero repasar cómo se relaciona el concepto de identidad nacional con la literatura de viajes y dónde hay contradicciones.')}
         />
       )}
 
       <div>
-        <div className="text-xs uppercase text-neutral-500 mb-1.5">Modelo (recomendado: contexto largo)</div>
+        <div className="text-xs uppercase text-neutral-500 mb-1.5">{t('Modelo (recomendado: contexto largo)')}</div>
         <select className="input w-full text-sm" value={serializedModel} onChange={(e) => onModelChange(e.target.value)}>
-          {!hasModel && <option value="">Sin modelo seleccionado</option>}
+          {!hasModel && <option value="">{t('Sin modelo seleccionado')}</option>}
           {availableModels.map((m) => (
             <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>
               {modelLabel(m)}
@@ -483,7 +483,7 @@ function SetupPanel({
         onClick={onGenerate}
         disabled={generating || !hasModel || (mode === 'prompt' && !prompt.trim())}
       >
-        {generating ? <Spinner label="Analizando el grafo…" /> : <><Icon name="wand" /> Generar recorrido</>}
+        {generating ? <Spinner label={t('Analizando el grafo…')} /> : <><Icon name="wand" /> {t('Generar recorrido')}</>}
       </button>
     </div>
   );
@@ -526,19 +526,19 @@ function RoutesPanel({
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
-        <div className="text-xs uppercase text-neutral-500">Panorama</div>
+        <div className="text-xs uppercase text-neutral-500">{t('Panorama')}</div>
         <Markdown content={plan.overview} className="text-sm text-neutral-300" />
         <div className="flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
-          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.totalThemes} temas</span>
-          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.totalIdeas} ideas</span>
-          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.totalConnections} conexiones</span>
-          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{plan.coveredIdeas} ideas en rutas</span>
-          {plan.truncated && <span className="rounded-md border border-amber-800/60 text-amber-300/80 px-1.5 py-0.5">grafo recortado</span>}
+          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} temas', { n: plan.totalThemes })}</span>
+          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} ideas', { n: plan.totalIdeas })}</span>
+          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} conexiones', { n: plan.totalConnections })}</span>
+          <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} ideas en rutas', { n: plan.coveredIdeas })}</span>
+          {plan.truncated && <span className="rounded-md border border-amber-800/60 text-amber-300/80 px-1.5 py-0.5">{t('grafo recortado')}</span>}
         </div>
       </div>
 
       <div className="space-y-2">
-        <div className="text-xs uppercase text-neutral-500">Rutas propuestas</div>
+        <div className="text-xs uppercase text-neutral-500">{t('Rutas propuestas')}</div>
         {plan.routes.map((route) => (
           <div
             key={route.id}
@@ -552,7 +552,7 @@ function RoutesPanel({
               </div>
               <div className="text-[11px] text-neutral-500 mt-1 flex flex-wrap gap-1.5">
                 <span className="text-indigo-300/80">{route.weightLabel}</span>
-                <span>· {route.stops.length} paradas</span>
+                <span>· {tx('{n} paradas', { n: route.stops.length })}</span>
                 {route.themes.length > 0 && <span>· {route.themes.slice(0, 3).join(', ')}</span>}
               </div>
               {route.description && <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{route.description}</p>}
@@ -582,17 +582,17 @@ function SavedRoutesPanel({
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-xs uppercase text-neutral-500">Recorridos guardados</div>
+        <div className="text-xs uppercase text-neutral-500">{t('Recorridos guardados')}</div>
         <button className="btn btn-ghost text-xs px-2 py-1 gap-1" onClick={onRefresh} disabled={loading}>
-          <Icon name="refresh" size={13} className={loading ? 'animate-spin' : ''} /> Actualizar
+          <Icon name="refresh" size={13} className={loading ? 'animate-spin' : ''} /> {t('Actualizar')}
         </button>
       </div>
 
       {loading ? (
-        <Spinner label="Cargando recorridos…" />
+        <Spinner label={t('Cargando recorridos…')} />
       ) : routes.length === 0 ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-500">
-          Todavía no hay recorridos guardados. Completa una ruta, puntúala y elige guardarla para repetirla sin volver a llamar al modelo.
+          {t('Todavía no hay recorridos guardados. Completa una ruta, puntúala y elige guardarla para repetirla sin volver a llamar al modelo.')}
         </div>
       ) : (
         <div className="space-y-2">
@@ -602,29 +602,29 @@ function SavedRoutesPanel({
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{saved.route.title}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
-                    <span>{saved.mode === 'overview' ? 'Completo' : 'Objetivo'}</span>
-                    <span>· {saved.route.stops.length} paradas</span>
+                    <span>{saved.mode === 'overview' ? t('Completo') : t('Objetivo')}</span>
+                    <span>· {tx('{n} paradas', { n: saved.route.stops.length })}</span>
                     <span>· {formatDate(saved.generatedAt)}</span>
-                    {saved.lastPlayedAt && <span>· visto {formatDate(saved.lastPlayedAt)}</span>}
+                    {saved.lastPlayedAt && <span>· {t('visto')} {formatDate(saved.lastPlayedAt)}</span>}
                   </div>
                   {saved.prompt && <p className="mt-1 text-xs text-neutral-500 line-clamp-2">{saved.prompt}</p>}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button className="btn btn-primary px-2 py-1 gap-1" onClick={() => onStart(saved)} title="Iniciar recorrido">
-                    <Icon name="play" size={14} /> Play
+                  <button className="btn btn-primary px-2 py-1 gap-1" onClick={() => onStart(saved)} title={t('Iniciar recorrido')}>
+                    <Icon name="play" size={14} /> {t('Play')}
                   </button>
                   <button
                     className="btn btn-ghost px-2 py-1 text-red-400 hover:text-red-300"
                     onClick={() => onDelete(saved)}
-                    title="Eliminar recorrido guardado"
-                    aria-label={`Eliminar recorrido guardado: ${saved.route.title}`}
+                    title={t('Eliminar recorrido guardado')}
+                    aria-label={`${t('Eliminar recorrido guardado')}: ${saved.route.title}`}
                   >
                     <Icon name="trash" size={14} />
                   </button>
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-800/70 pt-2">
-                <span className="text-[11px] text-neutral-500">Valoración</span>
+                <span className="text-[11px] text-neutral-500">{t('Valoración')}</span>
                 <RatingStars rating={saved.rating} onChange={(rating) => onRate(saved.id, rating)} allowClear={false} />
               </div>
             </div>
@@ -665,7 +665,7 @@ function RatingStars({
 
 function formatDate(value: string): string {
   try {
-    return new Intl.DateTimeFormat('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+    return new Intl.DateTimeFormat(getActiveLang(), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
   } catch {
     return value.slice(0, 10);
   }
@@ -724,7 +724,7 @@ function TourPanel({
       <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2.5">
         <div className="flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wide text-indigo-300/80 rounded bg-indigo-600/15 px-1.5 py-0.5">
-            {STOP_KIND_LABEL[stop.kind]}
+            {t(STOP_KIND_LABEL[stop.kind])}
           </span>
           <span className="text-sm font-semibold">{stop.title}</span>
         </div>
@@ -736,31 +736,31 @@ function TourPanel({
           <div className="text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-sm">
             <div>{step.text}</div>
             <button className="btn btn-ghost border border-red-800/60 text-xs mt-2 gap-1" onClick={onRetry}>
-              <Icon name="refresh" size={13} /> Reintentar
+              <Icon name="refresh" size={13} /> {t('Reintentar')}
             </button>
           </div>
         ) : step?.text ? (
           <Markdown content={step.text} />
         ) : (
-          <Spinner label="El Tutor está preparando la explicación…" />
+          <Spinner label={t('El Tutor está preparando la explicación…')} />
         )}
       </div>
 
       {finished && showSavePrompt && (
         <div className="rounded-lg border border-indigo-700/70 bg-indigo-950/20 p-3">
-          <div className="text-sm font-medium">¿Quieres guardar este recorrido?</div>
-          <p className="mt-1 text-xs text-neutral-400">Puntúalo para guardarlo y poder repetirlo después.</p>
+          <div className="text-sm font-medium">{t('¿Quieres guardar este recorrido?')}</div>
+          <p className="mt-1 text-xs text-neutral-400">{t('Puntúalo para guardarlo y poder repetirlo después.')}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
             <RatingStars rating={completionRating} onChange={onCompletionRating} />
             <button className="btn btn-primary text-xs gap-1.5" disabled={!completionRating || savingRoute || step?.loading} onClick={onSave}>
-              <Icon name="star" size={14} /> {savingRoute ? 'Guardando…' : 'Guardar ruta'}
+              <Icon name="star" size={14} /> {savingRoute ? t('Guardando…') : t('Guardar ruta')}
             </button>
           </div>
         </div>
       )}
       {finished && isSaved && (
         <div className="rounded-lg border border-emerald-800/60 bg-emerald-900/20 px-3 py-2 text-xs text-emerald-300">
-          <Icon name="check" size={13} className="mr-1 inline-block" /> Recorrido guardado en tu colección.
+          <Icon name="check" size={13} className="mr-1 inline-block" /> {t('Recorrido guardado en tu colección.')}
         </div>
       )}
     </div>
@@ -769,7 +769,7 @@ function TourPanel({
 
 function WeightDots({ weight }: { weight: number }) {
   return (
-    <span className="inline-flex gap-0.5 shrink-0" title={`Peso ${weight}/5`}>
+    <span className="inline-flex gap-0.5 shrink-0" title={`${t('Peso')} ${weight}/5`}>
       {[1, 2, 3, 4, 5].map((n) => (
         <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= weight ? 'bg-indigo-400' : 'bg-neutral-700'}`} />
       ))}

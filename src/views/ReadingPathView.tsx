@@ -8,6 +8,7 @@ import {
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
+import { t, tx } from '../i18n';
 
 const STRATEGY_LABELS: Record<ReadingPathStrategy, string> = {
   research_relevance: 'Más relevante',
@@ -63,14 +64,14 @@ export function ReadingPathView({
     <div className="h-full overflow-y-auto p-6">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div>
-          <h1 className="text-xl font-semibold mb-1">Ruta de lectura</h1>
+          <h1 className="text-xl font-semibold mb-1">{t('Ruta de lectura')}</h1>
           <p className="text-sm text-neutral-400">
-            Plan por fases según estado de lectura, análisis, huecos, temas, autores e ideas conectadas.
+            {t('Plan por fases según estado de lectura, análisis, huecos, temas, autores e ideas conectadas.')}
           </p>
         </div>
         <div className="flex-1" />
         <button className="btn btn-primary gap-1.5" onClick={() => void reload()} disabled={loading}>
-          <Icon name="wand" /> Analizar ruta
+          <Icon name="wand" /> {t('Analizar ruta')}
         </button>
       </div>
 
@@ -80,14 +81,14 @@ export function ReadingPathView({
             <select className="input" value={strategy} onChange={(e) => setStrategy(e.target.value as ReadingPathStrategy)}>
               {Object.entries(STRATEGY_LABELS).map(([id, label]) => (
                 <option key={id} value={id}>
-                  {label}
+                  {t(label)}
                 </option>
               ))}
             </select>
             <select className="input" value={limit} onChange={(e) => setLimit(Number(e.target.value))}>
               {[36, 72, 108, 144].map((n) => (
                 <option key={n} value={n}>
-                  {n} lecturas
+                  {tx('{n} lecturas', { n })}
                 </option>
               ))}
             </select>
@@ -98,37 +99,37 @@ export function ReadingPathView({
                 checked={includeRead}
                 onChange={(e) => setIncludeRead(e.target.checked)}
               />
-              Incluir leídas
+              {t('Incluir leídas')}
             </label>
           </div>
           <textarea
             className="input w-full min-h-24 resize-y"
             value={researchBrief}
             onChange={(e) => setResearchBrief(e.target.value)}
-            placeholder="Describe tu investigación, preguntas principales, objetivos o prioridades actuales..."
+            placeholder={t('Describe tu investigación, preguntas principales, objetivos o prioridades actuales...')}
           />
-          <div className="text-xs text-neutral-500">{STRATEGY_HELP[strategy]}</div>
+          <div className="text-xs text-neutral-500">{t(STRATEGY_HELP[strategy])}</div>
         </div>
 
         <div className="border border-neutral-800 rounded-lg p-3 bg-neutral-900/40">
           {plan ? (
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <Metric label="Corpus" value={plan.totalWorks} />
-              <Metric label="Mostradas" value={plan.shownWorks} />
-              <Metric label="Leídas" value={plan.readCount} />
-              <Metric label="Por leer" value={plan.unreadCount} />
-              <Metric label="Analizadas" value={plan.analyzedCount} />
-              <Metric label="Pendientes" value={plan.pendingAnalysisCount} />
+              <Metric label={t('Corpus')} value={plan.totalWorks} />
+              <Metric label={t('Mostradas')} value={plan.shownWorks} />
+              <Metric label={t('Leídas')} value={plan.readCount} />
+              <Metric label={t('Por leer')} value={plan.unreadCount} />
+              <Metric label={t('Analizadas')} value={plan.analyzedCount} />
+              <Metric label={t('Pendientes')} value={plan.pendingAnalysisCount} />
             </div>
           ) : (
-            <div className="text-sm text-neutral-500">Sin plan calculado.</div>
+            <div className="text-sm text-neutral-500">{t('Sin plan calculado.')}</div>
           )}
         </div>
       </div>
 
       {loading && (
         <div className="mb-4">
-          <Spinner label="Recalculando ruta..." />
+          <Spinner label={t('Recalculando ruta...')} />
         </div>
       )}
 
@@ -144,7 +145,7 @@ export function ReadingPathView({
               </div>
               <div className="flex-1" />
               <Badge>{phase.entries.length}/{phase.totalCandidates}</Badge>
-              {phase.omitted > 0 && <Badge color="amber">{phase.omitted} fuera del bloque</Badge>}
+              {phase.omitted > 0 && <Badge color="amber">{tx('{n} fuera del bloque', { n: phase.omitted })}</Badge>}
             </div>
             <VirtualList
               items={phase.entries}
@@ -165,7 +166,7 @@ export function ReadingPathView({
         ))}
       </div>
 
-      {plan && phases.length === 0 && <div className="text-neutral-500 text-sm">No hay obras que cumplan los filtros actuales.</div>}
+      {plan && phases.length === 0 && <div className="text-neutral-500 text-sm">{t('No hay obras que cumplan los filtros actuales.')}</div>}
     </div>
   );
 }
@@ -192,7 +193,7 @@ function ReadingEntryCard({
       workId: entry.nodus_id,
       workTitle: entry.title,
       zoteroKey: work?.zotero_key,
-      label: `Lectura: ${entry.title}`,
+      label: `${t('Lectura:')} ${entry.title}`,
     });
   };
 
@@ -202,27 +203,27 @@ function ReadingEntryCard({
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-sm">{entry.title}</span>
-          {entry.read ? <Badge color="indigo">leída</Badge> : <Badge color="amber">por leer</Badge>}
-          <Badge color={entry.analysis.deepStatus === 'done' ? 'green' : 'neutral'}>{entry.analysis.deepStatus === 'done' ? 'ideas analizadas' : 'ideas pendientes'}</Badge>
-          <Badge color={entry.analysis.lightStatus === 'done' ? 'cyan' : 'neutral'}>{entry.analysis.lightStatus === 'done' ? 'temas analizados' : 'temas pendientes'}</Badge>
-          <Badge>prioridad {entry.priority}</Badge>
+          {entry.read ? <Badge color="indigo">{t('leída')}</Badge> : <Badge color="amber">{t('por leer')}</Badge>}
+          <Badge color={entry.analysis.deepStatus === 'done' ? 'green' : 'neutral'}>{entry.analysis.deepStatus === 'done' ? t('ideas analizadas') : t('ideas pendientes')}</Badge>
+          <Badge color={entry.analysis.lightStatus === 'done' ? 'cyan' : 'neutral'}>{entry.analysis.lightStatus === 'done' ? t('temas analizados') : t('temas pendientes')}</Badge>
+          <Badge>{tx('prioridad {n}', { n: entry.priority })}</Badge>
         </div>
         <div className="text-xs text-neutral-500 mt-1">
           {entry.authors[0] ?? '—'}
-          {entry.authors.length > 1 ? ' et al.' : ''} · {entry.year ?? 's.f.'}
+          {entry.authors.length > 1 ? ' et al.' : ''} · {entry.year ?? t('s.f.')}
           {entry.themes.length > 0 ? ` · ${entry.themes.slice(0, 4).join(', ')}` : ''}
         </div>
         <div className="flex flex-wrap gap-1 mt-2">
-          {entry.analysis.ideaCount > 0 && <Badge color="green">{entry.analysis.ideaCount} ideas</Badge>}
-          {entry.analysis.themeCount > 0 && <Badge color="cyan">{entry.analysis.themeCount} temas</Badge>}
-          {entry.analysis.contradictionCount > 0 && <Badge color="red">{entry.analysis.contradictionCount} contrad.</Badge>}
-          {entry.analysis.gapCount > 0 && <Badge color="amber">{entry.analysis.gapCount} huecos</Badge>}
-          {entry.bridgeScore >= 0.45 && <Badge color="indigo">puente</Badge>}
+          {entry.analysis.ideaCount > 0 && <Badge color="green">{tx('{n} ideas', { n: entry.analysis.ideaCount })}</Badge>}
+          {entry.analysis.themeCount > 0 && <Badge color="cyan">{tx('{n} temas', { n: entry.analysis.themeCount })}</Badge>}
+          {entry.analysis.contradictionCount > 0 && <Badge color="red">{tx('{n} contrad.', { n: entry.analysis.contradictionCount })}</Badge>}
+          {entry.analysis.gapCount > 0 && <Badge color="amber">{tx('{n} huecos', { n: entry.analysis.gapCount })}</Badge>}
+          {entry.bridgeScore >= 0.45 && <Badge color="indigo">{t('puente')}</Badge>}
         </div>
         <p className="text-xs text-neutral-400 mt-2 line-clamp-2">{entry.reason}</p>
         {entry.relatedGaps.length > 0 && (
           <div className="mt-2 text-xs text-neutral-500 line-clamp-1">
-            Huecos relacionados: {entry.relatedGaps.map((g) => g.slice(0, 120)).join(' · ')}
+            {t('Huecos relacionados:')} {entry.relatedGaps.map((g) => g.slice(0, 120)).join(' · ')}
           </div>
         )}
         <div className="flex flex-wrap gap-2 mt-3">
@@ -230,21 +231,21 @@ function ReadingEntryCard({
             className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
             onClick={() => void openInGraph()}
           >
-            <Icon name="layers" size={13} /> Grafo
+            <Icon name="layers" size={13} /> {t('Grafo')}
           </button>
           <button
             className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
             onClick={() =>
               onOpenAssistant({
-                title: `Lectura: ${entry.title}`,
+                title: `${t('Lectura:')} ${entry.title}`,
                 selection: ASSISTANT_CONTEXTS.reading,
                 prompt:
-                  `Usa esta lectura de la ruta como punto de partida. Explica por qué es prioritaria, qué ideas/huecos conecta y qué debería leer después.\n\n` +
+                  `${t('Usa esta lectura de la ruta como punto de partida. Explica por qué es prioritaria, qué ideas/huecos conecta y qué debería leer después.')}\n\n` +
                   `${entry.title}\n${entry.reason}`,
               })
             }
           >
-            <Icon name="wand" size={13} /> Asistente
+            <Icon name="wand" size={13} /> {t('Asistente')}
           </button>
           <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={() => void openInZotero()}>
             <Icon name="external" size={13} /> Zotero

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { EmbeddingPipelineProgress } from '@shared/types';
 import { Icon } from './ui';
+import { t, tx } from '../i18n';
 
 export function EmbeddingProgressBar() {
   const [progress, setProgress] = useState<EmbeddingPipelineProgress | null>(null);
@@ -21,7 +22,7 @@ export function EmbeddingProgressBar() {
     <div className="border-t border-neutral-800 bg-neutral-900/80 backdrop-blur px-4 py-2 text-sm">
       {error && (
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-950/60 border border-red-800/60 px-3 py-1.5 text-red-300 text-xs">
-          <span>Error: {error}</span>
+          <span>{t('Error')}: {error}</span>
         </div>
       )}
       <div className="flex items-center gap-3">
@@ -33,20 +34,20 @@ export function EmbeddingProgressBar() {
                 <>
                   {currentWorkTitle ? (
                     <>
-                      Obra {currentWorkIndex + 1}/{totalWorks}:{' '}
+                      {t('Obra')} {currentWorkIndex + 1}/{totalWorks}:{' '}
                       <span className="text-neutral-200">{currentWorkTitle}</span>
                       <span className="text-cyan-300 ml-1">
-                        · idea {currentIdeaIndex + 1}/{currentWorkIdeas}
+                        · {t('idea')} {currentIdeaIndex + 1}/{currentWorkIdeas}
                       </span>
                     </>
                   ) : (
-                    'Preparando…'
+                    t('Preparando…')
                   )}
                 </>
               ) : error ? (
-                'Indexación detenida por error'
+                t('Indexación detenida por error')
               ) : (
-                `${ideasEmbedded} ideas indexadas`
+                tx('{n} ideas indexadas', { n: ideasEmbedded })
               )}
             </span>
             <span>{pct}%</span>
@@ -63,8 +64,8 @@ export function EmbeddingProgressBar() {
           (paused ? (
             <button
               className="btn btn-ghost"
-              title="Reanudar indexación"
-              aria-label="Reanudar indexación"
+              title={t('Reanudar indexación')}
+              aria-label={t('Reanudar indexación')}
               onClick={() => window.nodus.resumeEmbedding()}
             >
               <Icon name="play" size={16} />
@@ -72,8 +73,8 @@ export function EmbeddingProgressBar() {
           ) : (
             <button
               className="btn btn-ghost"
-              title="Pausar indexación"
-              aria-label="Pausar indexación"
+              title={t('Pausar indexación')}
+              aria-label={t('Pausar indexación')}
               onClick={() => window.nodus.pauseEmbedding()}
             >
               <Icon name="pause" size={16} />
@@ -82,8 +83,8 @@ export function EmbeddingProgressBar() {
         {active && (
           <button
             className="btn btn-ghost text-red-400 hover:text-red-300"
-            title="Detener indexación"
-            aria-label="Detener indexación"
+            title={t('Detener indexación')}
+            aria-label={t('Detener indexación')}
             onClick={() => window.nodus.stopEmbedding()}
           >
             <Icon name="stop" size={16} />
@@ -92,8 +93,8 @@ export function EmbeddingProgressBar() {
         {!active && (
           <button
             className="btn btn-ghost"
-            title="Ocultar cola de embeddings terminada"
-            aria-label="Ocultar cola de embeddings terminada"
+            title={t('Ocultar cola de embeddings terminada')}
+            aria-label={t('Ocultar cola de embeddings terminada')}
             onClick={() => void window.nodus.clearEmbeddingProgress()}
           >
             <Icon name="trash" size={16} />

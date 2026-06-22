@@ -19,28 +19,29 @@ import {
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
+import { t, tx } from '../i18n';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 12rem';
 
 function lightBadge(s: LightStatus) {
-  if (s === 'done') return <Badge color="green">ligero ✓</Badge>;
+  if (s === 'done') return <Badge color="green">{t('ligero')} ✓</Badge>;
   if (s === 'none') return <Badge color="neutral">—</Badge>;
-  if (s === 'failed') return <Badge color="red">ligero ✕</Badge>;
-  return <Badge color="neutral">ligero…</Badge>;
+  if (s === 'failed') return <Badge color="red">{t('ligero')} ✕</Badge>;
+  return <Badge color="neutral">{t('ligero')}…</Badge>;
 }
 
 function deepBadge(s: DeepStatus) {
   switch (s) {
     case 'done':
-      return <Badge color="indigo">profundo ✓</Badge>;
+      return <Badge color="indigo">{t('profundo')} ✓</Badge>;
     case 'pending':
-      return <Badge color="amber">profundo…</Badge>;
+      return <Badge color="amber">{t('profundo')}…</Badge>;
     case 'failed':
-      return <Badge color="red">profundo ✕</Badge>;
+      return <Badge color="red">{t('profundo')} ✕</Badge>;
     case 'skipped_no_text':
-      return <Badge color="amber" title="Sin texto disponible">sin texto</Badge>;
+      return <Badge color="amber" title={t('Sin texto disponible')}>{t('sin texto')}</Badge>;
     default:
       return <Badge color="neutral">—</Badge>;
   }
@@ -48,10 +49,10 @@ function deepBadge(s: DeepStatus) {
 
 function triggerBadge(w: WorkView) {
   if (!w.deep_trigger) return null;
-  if (w.deep_trigger === 'tag') return <span title="Por tag">🏷</span>;
-  if (w.deep_trigger === 'manual') return <span title="Manual">✦</span>;
+  if (w.deep_trigger === 'tag') return <span title={t('Por tag')}>🏷</span>;
+  if (w.deep_trigger === 'manual') return <span title={t('Manual')}>✦</span>;
   return (
-    <span title="Tag + manual">
+    <span title={t('Tag + manual')}>
       🏷✦
     </span>
   );
@@ -61,7 +62,7 @@ function embeddingBadge(status: WorkEmbeddingStatus | undefined) {
   if (!status || status.totalIdeas === 0) return <Badge color="neutral">—</Badge>;
   if (status.complete) return <Badge color="cyan">✓ {status.embeddedIdeas}</Badge>;
   return (
-    <Badge color="amber" title={`${status.embeddedIdeas}/${status.totalIdeas} ideas indexadas`}>
+    <Badge color="amber" title={tx('{a}/{b} ideas indexadas', { a: status.embeddedIdeas, b: status.totalIdeas })}>
       {status.embeddedIdeas}/{status.totalIdeas}
     </Badge>
   );
@@ -170,12 +171,12 @@ export function Library({
 
   const reassignThemes = async () => {
     const ok = window.confirm(
-      'Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?'
+      t('Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?')
     );
     if (!ok) return;
     const n = await window.nodus.reassignThemes(scanModel);
     await load();
-    window.alert(`Reasignación de temas en cola para ${n} obra(s). Verás el progreso en la cola.`);
+    window.alert(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
   };
 
   const embedWork = async (nodusId: string) => {
@@ -282,8 +283,8 @@ export function Library({
     <div className="h-full flex flex-col p-6 min-h-0">
       <div className="flex flex-wrap items-start gap-3 mb-4">
         <div>
-          <h1 className="text-xl font-semibold">Biblioteca</h1>
-          <p className="text-sm text-neutral-500 mt-1">{works.length} obras visibles</p>
+          <h1 className="text-xl font-semibold">{t('Biblioteca')}</h1>
+          <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: works.length })}</p>
         </div>
         <div className="flex-1" />
         <button
@@ -291,10 +292,10 @@ export function Library({
           onClick={() => setAdvancedOpen((v) => !v)}
           aria-expanded={advancedOpen}
         >
-          <Icon name="wand" /> Operaciones
+          <Icon name="wand" /> {t('Operaciones')}
         </button>
         <button className="btn btn-ghost border border-neutral-700" onClick={onOpenCollections}>
-          <Icon name="folder" /> Colecciones
+          <Icon name="folder" /> {t('Colecciones')}
         </button>
       </div>
 
@@ -302,7 +303,7 @@ export function Library({
         <div className="flex flex-wrap gap-2 items-center">
           <input
             className="input"
-            placeholder="Buscar título o autor…"
+            placeholder={t('Buscar título o autor…')}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
           />
           <select
@@ -310,23 +311,23 @@ export function Library({
             value={filter.lightStatus}
             onChange={(e) => setFilter((f) => ({ ...f, lightStatus: e.target.value as any }))}
           >
-            <option value="all">Ligero: todos</option>
-            <option value="none">Ligero: ninguno</option>
-            <option value="done">Ligero: hecho</option>
-            <option value="pending">Ligero: pendiente</option>
-            <option value="failed">Ligero: fallido</option>
+            <option value="all">{t('Ligero: todos')}</option>
+            <option value="none">{t('Ligero: ninguno')}</option>
+            <option value="done">{t('Ligero: hecho')}</option>
+            <option value="pending">{t('Ligero: pendiente')}</option>
+            <option value="failed">{t('Ligero: fallido')}</option>
           </select>
           <select
             className="input"
             value={filter.deepStatus}
             onChange={(e) => setFilter((f) => ({ ...f, deepStatus: e.target.value as any }))}
           >
-            <option value="all">Profundo: todos</option>
-            <option value="done">Profundo: hecho</option>
-            <option value="pending">Profundo: pendiente</option>
-            <option value="none">Profundo: ninguno</option>
-            <option value="failed">Profundo: fallido</option>
-            <option value="skipped_no_text">Profundo: sin texto</option>
+            <option value="all">{t('Profundo: todos')}</option>
+            <option value="done">{t('Profundo: hecho')}</option>
+            <option value="pending">{t('Profundo: pendiente')}</option>
+            <option value="none">{t('Profundo: ninguno')}</option>
+            <option value="failed">{t('Profundo: fallido')}</option>
+            <option value="skipped_no_text">{t('Profundo: sin texto')}</option>
           </select>
           <div className="relative">
             <button
@@ -336,7 +337,7 @@ export function Library({
               aria-expanded={tagFilterOpen}
               aria-haspopup="dialog"
             >
-              <Icon name="tag" /> Etiquetas Zotero
+              <Icon name="tag" /> {t('Etiquetas Zotero')}
               {selectedZoteroTags.length > 0 && (
                 <span className="zotero-tag-filter-count rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
                   {selectedZoteroTags.length}
@@ -346,7 +347,7 @@ export function Library({
             {tagFilterOpen && (
               <div
                 role="dialog"
-                aria-label="Filtrar por etiquetas de Zotero"
+                aria-label={t('Filtrar por etiquetas de Zotero')}
                 className="absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
               >
                 <div className="flex items-center gap-2">
@@ -355,7 +356,7 @@ export function Library({
                     className="input min-w-0 flex-1"
                     value={tagSearch}
                     onChange={(e) => setTagSearch(e.target.value)}
-                    placeholder="Buscar etiqueta…"
+                    placeholder={t('Buscar etiqueta…')}
                   />
                   <button
                     type="button"
@@ -363,19 +364,19 @@ export function Library({
                     disabled={selectedZoteroTags.length === 0}
                     onClick={clearZoteroTags}
                   >
-                    Limpiar
+                    {t('Limpiar')}
                   </button>
                 </div>
                 {selectedZoteroTags.length > 1 && (
                   <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    Combinar etiquetas
+                    {t('Combinar etiquetas')}
                     <select
                       className="input py-1 text-xs"
                       value={filter.zoteroTagMode ?? 'any'}
                       onChange={(e) => setFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
                     >
-                      <option value="any">Cualquiera</option>
-                      <option value="all">Todas</option>
+                      <option value="any">{t('Cualquiera')}</option>
+                      <option value="all">{t('Todas')}</option>
                     </select>
                   </label>
                 )}
@@ -405,44 +406,44 @@ export function Library({
                   })}
                   {availableZoteroTags.length === 0 && (
                     <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
-                      Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.
+                      {t('Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.')}
                     </p>
                   )}
                   {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
-                    <p className="px-2 py-3 text-xs text-neutral-500">No hay etiquetas que coincidan.</p>
+                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay etiquetas que coincidan.')}</p>
                   )}
                 </div>
               </div>
             )}
           </div>
           <div className="flex-1" />
-          <span className="text-xs text-neutral-500">Modelo para análisis</span>
+          <span className="text-xs text-neutral-500">{t('Modelo para análisis')}</span>
           <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
-          <SummaryPill label="temas hechos" value={summary.themesDone} />
-          <SummaryPill label="sin temas" value={summary.withoutThemes} />
-          <SummaryPill label="ideas hechas" value={summary.ideasDone} />
-          <SummaryPill label="embeddings pendientes" value={summary.pendingEmbeddings} tone="cyan" />
-          {summary.failed > 0 && <SummaryPill label="fallos" value={summary.failed} tone="red" />}
+          <SummaryPill label={t('temas hechos')} value={summary.themesDone} />
+          <SummaryPill label={t('sin temas')} value={summary.withoutThemes} />
+          <SummaryPill label={t('ideas hechas')} value={summary.ideasDone} />
+          <SummaryPill label={t('embeddings pendientes')} value={summary.pendingEmbeddings} tone="cyan" />
+          {summary.failed > 0 && <SummaryPill label={t('fallos')} value={summary.failed} tone="red" />}
         </div>
         {selectedZoteroTags.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
-            <span>Etiquetas:</span>
+            <span>{t('Etiquetas:')}</span>
             {selectedZoteroTags.map((tag) => (
               <button
                 key={tag}
                 type="button"
                 className="zotero-tag-chip inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
                 onClick={() => toggleZoteroTag(tag)}
-                title={`Quitar ${tag}`}
+                title={`${t('Quitar')} ${tag}`}
               >
                 {tag} <Icon name="x" size={12} />
               </button>
             ))}
             {selectedZoteroTags.length > 1 && (
               <span className="ml-1">
-                {filter.zoteroTagMode === 'all' ? 'deben estar todas' : 'basta cualquiera'}
+                {filter.zoteroTagMode === 'all' ? t('deben estar todas') : t('basta cualquiera')}
               </span>
             )}
           </div>
@@ -451,37 +452,37 @@ export function Library({
 
       {!loading && works.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-          <span>{works.length} resultados con los filtros actuales</span>
+          <span>{tx('{n} resultados con los filtros actuales', { n: works.length })}</span>
           <button
             className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
             onClick={() => (allVisibleSelected ? setSelected(new Set()) : selectAllVisible())}
           >
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
-            {allVisibleSelected ? 'Quitar selección' : `Seleccionar los ${works.length} filtrados`}
+            {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} filtrados', { n: works.length })}
           </button>
-          <span className="text-neutral-600">Después elige Temas, Ideas o Ambos.</span>
+          <span className="text-neutral-600">{t('Después elige Temas, Ideas o Ambos.')}</span>
         </div>
       )}
 
       {selectedVisibleIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-200">{selectedVisibleIds.length} seleccionadas</span>
+          <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
-            <Icon name="tag" /> Temas
+            <Icon name="tag" /> {t('Temas')}
           </button>
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
-            <Icon name="bulb" /> Ideas
+            <Icon name="bulb" /> {t('Ideas')}
           </button>
           <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
-            <Icon name="layers" /> Temas + ideas
+            <Icon name="layers" /> {t('Temas + ideas')}
           </button>
           <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
-            <Icon name="search" /> Indexar
+            <Icon name="search" /> {t('Indexar')}
           </button>
           <div className="flex-1" />
           <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
-            Limpiar selección
+            {t('Limpiar selección')}
           </button>
         </div>
       )}
@@ -490,32 +491,32 @@ export function Library({
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 mb-4">
           <OperationCard
             icon="wand"
-            title="Reasignar temas"
-            description="Reconstruye los temas padre de toda la biblioteca con análisis ligero. Útil tras cambiar criterios temáticos."
-            buttonLabel="Reasignar"
+            title={t('Reasignar temas')}
+            description={t('Reconstruye los temas padre de toda la biblioteca con análisis ligero. Útil tras cambiar criterios temáticos.')}
+            buttonLabel={t('Reasignar')}
             onClick={reassignThemes}
           />
           <OperationCard
             icon="search"
-            title="Indexar pendientes"
-            description="Genera embeddings para las ideas que aún no los tienen. No regenera los existentes."
-            buttonLabel="Indexar pendientes"
+            title={t('Indexar pendientes')}
+            description={t('Genera embeddings para las ideas que aún no los tienen. No regenera los existentes.')}
+            buttonLabel={t('Indexar pendientes')}
             tone="cyan"
             onClick={embedPending}
           />
           <OperationCard
             icon="search"
-            title="Reindexar todo"
-            description="Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo de embeddings."
-            buttonLabel="Reindexar todo"
+            title={t('Reindexar todo')}
+            description={t('Borra todos los embeddings y los regenera desde cero. Útil tras cambiar de modelo de embeddings.')}
+            buttonLabel={t('Reindexar todo')}
             tone="cyan"
             onClick={() => setConfirmReindex(true)}
           />
           <OperationCard
             icon="compass"
-            title="Descubrir relaciones"
-            description="Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola."
-            buttonLabel="Descubrir"
+            title={t('Descubrir relaciones')}
+            description={t('Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola.')}
+            buttonLabel={t('Descubrir')}
             tone="violet"
             onClick={discoverBridges}
           />
@@ -531,32 +532,32 @@ export function Library({
               <input
                 type="checkbox"
                 checked={allVisibleSelected}
-                title={`Seleccionar los ${works.length} resultados filtrados`}
-                aria-label={`Seleccionar los ${works.length} resultados filtrados`}
+                title={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
+                aria-label={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 onChange={(e) => {
                   if (e.target.checked) selectAllVisible();
                   else setSelected(new Set());
                 }}
               />
           </div>
-          <div className="font-medium">Título</div>
-          <div className="font-medium">Autores</div>
-          <div className="font-medium">Año</div>
-          <div className="font-medium">Tema(s)</div>
-          <div className="font-medium">Ligero</div>
-          <div className="font-medium">Profundo</div>
-          <div className="font-medium">Embeddings</div>
-          <div className="font-medium" data-tour="library-actions">Acciones</div>
+          <div className="font-medium">{t('Título')}</div>
+          <div className="font-medium">{t('Autores')}</div>
+          <div className="font-medium">{t('Año')}</div>
+          <div className="font-medium">{t('Tema(s)')}</div>
+          <div className="font-medium">{t('Ligero')}</div>
+          <div className="font-medium">{t('Profundo')}</div>
+          <div className="font-medium">{t('Embeddings')}</div>
+          <div className="font-medium" data-tour="library-actions">{t('Acciones')}</div>
         </div>
         {loading ? (
-          <div className="p-4 text-neutral-500">Cargando...</div>
+          <div className="p-4 text-neutral-500">{t('Cargando...')}</div>
         ) : (
           <VirtualList
             items={works}
             itemHeight={LIBRARY_ROW_HEIGHT}
             getKey={(w) => w.nodus_id}
             className="flex-1 min-h-0"
-            empty={<div className="p-4 text-neutral-500">No hay obras con los filtros actuales.</div>}
+            empty={<div className="p-4 text-neutral-500">{t('No hay obras con los filtros actuales.')}</div>}
             renderItem={(w) => (
               <div
                 className="grid h-full items-center border-b border-neutral-800/70 px-2 hover:bg-neutral-900/50"
@@ -590,7 +591,7 @@ export function Library({
                   {needsEmbedding(w) && (
                     <button
                       className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-cyan-400 hover:text-cyan-300"
-                      title="Indexar embeddings de esta obra"
+                      title={t('Indexar embeddings de esta obra')}
                       onClick={() => embedWork(w.nodus_id)}
                     >
                       <Icon name="search" size={11} />
@@ -599,11 +600,11 @@ export function Library({
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
-                    <RowIconButton title="Analizar temas" icon="tag" onClick={() => analyzeThemes(w)} />
-                    <RowIconButton title={w.deep_status === 'done' ? 'Reanalizar ideas' : 'Analizar ideas'} icon="bulb" onClick={() => analyzeIdeas(w)} />
-                    <RowIconButton title="Analizar temas e ideas" icon="layers" onClick={() => analyzeBoth(w)} />
+                    <RowIconButton title={t('Analizar temas')} icon="tag" onClick={() => analyzeThemes(w)} />
+                    <RowIconButton title={w.deep_status === 'done' ? t('Reanalizar ideas') : t('Analizar ideas')} icon="bulb" onClick={() => analyzeIdeas(w)} />
+                    <RowIconButton title={t('Analizar temas e ideas')} icon="layers" onClick={() => analyzeBoth(w)} />
                     <RowIconButton
-                      title="Ver esta obra en el grafo"
+                      title={t('Ver esta obra en el grafo')}
                       icon="map"
                       tone="cyan"
                       onClick={() =>
@@ -612,25 +613,25 @@ export function Library({
                           workId: w.nodus_id,
                           workTitle: w.title,
                           zoteroKey: w.zotero_key,
-                          label: `Lectura: ${w.title}`,
+                          label: `${t('Lectura:')} ${w.title}`,
                         })
                       }
                     />
                     <RowIconButton
-                      title="Preguntar al asistente sobre esta obra"
+                      title={t('Preguntar al asistente sobre esta obra')}
                       icon="wand"
                       tone="violet"
                       onClick={() =>
                         onOpenAssistant({
-                          title: `Lectura: ${w.title}`,
+                          title: `${t('Lectura:')} ${w.title}`,
                           selection: ASSISTANT_CONTEXTS.reading,
                           prompt:
-                            `Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.\n\n` +
+                            `${t('Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.')}\n\n` +
                             `${w.title}\n${w.authors.join(', ')}${w.year ? ` (${w.year})` : ''}`,
                         })
                       }
                     />
-                    <RowIconButton title="Abrir en Zotero" icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
+                    <RowIconButton title={t('Abrir en Zotero')} icon="external" tone="indigo" onClick={() => window.nodus.openInZotero(w.zotero_key)} />
                   </div>
                 </div>
               </div>
@@ -640,9 +641,9 @@ export function Library({
       </div>
       {confirmReindex && (
         <ConfirmModal
-          title="Reindexar todos los embeddings"
-          message="Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?"
-          confirmLabel="Reindexar todo"
+          title={t('Reindexar todos los embeddings')}
+          message={t('Se borrarán TODOS los embeddings existentes y se regenerarán desde cero. Esto consumirá tokens del proveedor de embeddings configurado. ¿Continuar?')}
+          confirmLabel={t('Reindexar todo')}
           danger
           onConfirm={() => void doReindexAll()}
           onCancel={() => setConfirmReindex(false)}

@@ -26,6 +26,34 @@ interface CallOpts {
 
 type TextDeltaHandler = (delta: string) => void;
 
+/**
+ * Output-language control. The prompts are written in Spanish; when the user picks
+ * English as the prompt language we append a high-priority directive instead of
+ * rewriting every prompt, so all generated free-text fields come back in English.
+ * `quote`/verbatim evidence always stays in the source language. Applied at the
+ * public entry points only (not the internal JSON-repair call, which must not
+ * translate existing content).
+ */
+const LANGUAGE_DIRECTIVE: Record<string, string> = {
+  en: `
+
+═══ OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
+Write ALL natural-language / free-text output fields in English, regardless of the
+source document's language. This includes label, statement, development, summary,
+rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT
+write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must
+be copied EXACTLY in the source language — never translate quotes. JSON keys and
+enum values stay exactly as specified.`,
+  es: '',
+};
+
+function withPromptLanguage<T extends { system: string }>(opts: T): T {
+  const lang = getSettings().promptLanguage === 'en' ? 'en' : 'es';
+  const directive = LANGUAGE_DIRECTIVE[lang];
+  if (!directive) return opts;
+  return { ...opts, system: `${opts.system}${directive}` };
+}
+
 /** Resolve which model to use: explicit override, else the configured default. */
 function resolveModel(override?: ModelRef | null): ModelRef {
   if (override?.provider && override.model) return override;
@@ -188,18 +216,19 @@ export async function completeJson<T>(
   model?: ModelRef | null
 ): Promise<T> {
   const resolved = resolveModel(model);
+  const langOpts = withPromptLanguage(opts);
   let lastErr: unknown;
   const attempts = [
-    { temperature: opts.temperature ?? 0.15, jsonMode: true },
+    { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
     { temperature: 0, jsonMode: true },
     { temperature: 0, jsonMode: false },
   ];
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
-    const retryDone = startPerf('JSON retry', opts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
+    const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
     let text: string;
     try {
-      text = await rawComplete(resolved, { ...opts, temperature: attempt.temperature }, attempt.jsonMode);
+      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode);
     } catch (e) {
       // Provider/transport failure (timeout, empty response, rate limit, 5xx, bad key).
       // Each call can burn the full 180s timeout, so looping here would let a hung
@@ -209,7 +238,7 @@ export async function completeJson<T>(
       throw e;
     }
     try {
-      const parsed = await parseOrRepair(resolved, text, guard, opts.perf);
+      const parsed = await parseOrRepair(resolved, text, guard, langOpts.perf);
       if (i > 0) retryDone({ status: 'ok' });
       return parsed;
     } catch (e) {
@@ -223,7 +252,7 @@ export async function completeJson<T>(
 /** Plain-text completion for conversational assistant responses. */
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
-  return rawComplete(resolved, opts, false);
+  return rawComplete(resolved, withPromptLanguage(opts), false);
 }
 
 /** Plain-text streaming completion. The returned string is the full accumulated answer. */
@@ -233,7 +262,7 @@ export async function completeTextStream(
   model?: ModelRef | null
 ): Promise<string> {
   const resolved = resolveModel(model);
-  return rawCompleteStream(resolved, opts, onDelta);
+  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta);
 }
 
 async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextDeltaHandler): Promise<string> {

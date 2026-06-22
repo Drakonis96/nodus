@@ -19,6 +19,7 @@ import { Badge, EDGE_LABELS, Icon, NODE_LABELS, modelLabel } from '../components
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { t, tx } from '../i18n';
 
 const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
   literature_review: 'Estado de la cuestión',
@@ -97,7 +98,7 @@ export function WritingWorkshopView({
       const next = await window.nodus.getWritingWorkshopSnapshot(brief);
       setSnapshot(next);
       setSelection(next.recommendedSelection);
-      setMessage('Mesa preparada con materiales recomendados.');
+      setMessage(t('Mesa preparada con materiales recomendados.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -116,7 +117,7 @@ export function WritingWorkshopView({
         model: selectedModel,
       });
       setDraft(result);
-      setMessage('Borrador generado con matriz y citas.');
+      setMessage(t('Borrador generado con matriz y citas.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -131,7 +132,7 @@ export function WritingWorkshopView({
     setMessage(null);
     try {
       const result = await window.nodus.exportWritingWorkshopDraft({ draft });
-      if (result) setMessage(`Exportado: ${result.path}`);
+      if (result) setMessage(`${t('Exportado')}: ${result.path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -142,7 +143,7 @@ export function WritingWorkshopView({
   const copyDraft = async () => {
     if (!draft) return;
     await navigator.clipboard.writeText(draft.draftMarkdown);
-    setMessage('Borrador copiado.');
+    setMessage(t('Borrador copiado.'));
   };
 
   const toggle = (key: keyof WritingWorkshopSelection, id: string) => {
@@ -189,9 +190,9 @@ export function WritingWorkshopView({
       <header className="border-b border-neutral-800 p-4 flex flex-wrap items-end gap-3">
         <div className="min-w-[16rem]">
           <h1 className="text-xl font-semibold flex items-center gap-2">
-            <Icon name="edit" className="text-indigo-300" /> Taller de escritura
+            <Icon name="edit" className="text-indigo-300" /> {t('Taller de escritura')}
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">Del grafo a un borrador con fuentes verificables.</p>
+          <p className="text-xs text-neutral-500 mt-1">{t('Del grafo a un borrador con fuentes verificables.')}</p>
         </div>
         <select
           className="input"
@@ -200,7 +201,7 @@ export function WritingWorkshopView({
         >
           {Object.entries(KIND_LABELS).map(([id, label]) => (
             <option key={id} value={id}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -211,7 +212,7 @@ export function WritingWorkshopView({
         >
           {Object.entries(TONE_LABELS).map(([id, label]) => (
             <option key={id} value={id}>
-              {label}
+              {t(label)}
             </option>
           ))}
         </select>
@@ -228,20 +229,20 @@ export function WritingWorkshopView({
         <div className="flex-1" />
         <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setShowTutorial((value) => !value)}>
           <Icon name="help" />
-          {showTutorial ? 'Ocultar tutorial' : 'Tutorial'}
+          {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
         <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={prepare} disabled={loadingMaterials}>
           <Icon name={loadingMaterials ? 'sync' : 'search'} className={loadingMaterials ? 'animate-spin' : ''} />
-          Preparar mesa
+          {t('Preparar mesa')}
         </button>
         <button
           className="btn btn-primary gap-1.5"
           onClick={generate}
           disabled={!hasModel || generating || selectedCount === 0}
-          title={!hasModel ? 'Configura un modelo de síntesis' : undefined}
+          title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
         >
           <Icon name={generating ? 'sync' : 'wand'} className={generating ? 'animate-spin' : ''} />
-          Generar borrador
+          {t('Generar borrador')}
         </button>
       </header>
 
@@ -250,38 +251,38 @@ export function WritingWorkshopView({
           className="input w-full min-h-20 resize-y"
           value={brief.objective}
           onChange={(e) => setBrief((current) => ({ ...current, objective: e.target.value }))}
-          placeholder="Describe el apartado que quieres construir..."
+          placeholder={t('Describe el apartado que quieres construir...')}
         />
         <div className="flex flex-wrap gap-2 mt-2 text-xs text-neutral-500">
           {snapshot && (
             <>
               <Badge>
-                {selection.ideaIds.length}/{snapshot.ideas.length} ideas en mesa
+                {tx('{a}/{b} ideas en mesa', { a: selection.ideaIds.length, b: snapshot.ideas.length })}
               </Badge>
-              <Badge>{snapshot.stats.ideas} ideas en el grafo</Badge>
+              <Badge>{tx('{n} ideas en el grafo', { n: snapshot.stats.ideas })}</Badge>
               <Badge>
-                {selectedCount}/{tableCount} materiales seleccionados
+                {tx('{a}/{b} materiales seleccionados', { a: selectedCount, b: tableCount })}
               </Badge>
-              <Badge>{snapshot.stats.gaps} huecos</Badge>
-              <Badge>{snapshot.stats.contradictions} contradicciones</Badge>
+              <Badge>{tx('{n} huecos', { n: snapshot.stats.gaps })}</Badge>
+              <Badge>{tx('{n} contradicciones', { n: snapshot.stats.contradictions })}</Badge>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={applyRecommended}>
-                Recomendados
+                {t('Recomendados')}
               </button>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={selectAllMaterials}>
-                Toda la mesa
+                {t('Toda la mesa')}
               </button>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={selectAllIdeas}>
-                Todas las ideas
+                {t('Todas las ideas')}
               </button>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={clearIdeas}>
-                Vaciar ideas
+                {t('Vaciar ideas')}
               </button>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={() => setSelection(EMPTY_SELECTION)}>
-                Vaciar
+                {t('Vaciar')}
               </button>
             </>
           )}
-          {selectedModel && <span>Modelo: {modelLabel(selectedModel)}</span>}
+          {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
         </div>
       </div>
 
@@ -296,37 +297,37 @@ export function WritingWorkshopView({
       <div className="flex-1 min-h-0 grid grid-cols-[22rem_minmax(0,1fr)_24rem] max-xl:grid-cols-1">
         <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
           <div className="p-3 border-b border-neutral-800 grid grid-cols-3 gap-1 text-xs">
-            <TabButton id="ideas" active={activeTab} setActive={setActiveTab} label={tabLabel('Ideas', selection.ideaIds.length, snapshot?.ideas.length)} />
-            <TabButton id="themes" active={activeTab} setActive={setActiveTab} label={tabLabel('Temas', selection.themeIds.length, snapshot?.themes.length)} />
-            <TabButton id="gaps" active={activeTab} setActive={setActiveTab} label={tabLabel('Huecos', selection.gapIds.length, snapshot?.gaps.length)} />
+            <TabButton id="ideas" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Ideas'), selection.ideaIds.length, snapshot?.ideas.length)} />
+            <TabButton id="themes" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Temas'), selection.themeIds.length, snapshot?.themes.length)} />
+            <TabButton id="gaps" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Huecos'), selection.gapIds.length, snapshot?.gaps.length)} />
             <TabButton
               id="contradictions"
               active={activeTab}
               setActive={setActiveTab}
-              label={tabLabel('Contrad.', selection.contradictionIds.length, snapshot?.contradictions.length)}
+              label={tabLabel(t('Contrad.'), selection.contradictionIds.length, snapshot?.contradictions.length)}
             />
-            <TabButton id="works" active={activeTab} setActive={setActiveTab} label={tabLabel('Obras', selection.workIds.length, snapshot?.works.length)} />
+            <TabButton id="works" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Obras'), selection.workIds.length, snapshot?.works.length)} />
             <TabButton
               id="routes"
               active={activeTab}
               setActive={setActiveTab}
-              label={tabLabel('Rutas', selection.tutorRouteIds.length, snapshot?.tutorRoutes.length)}
+              label={tabLabel(t('Rutas'), selection.tutorRouteIds.length, snapshot?.tutorRoutes.length)}
             />
           </div>
           {snapshot && (
             <div className="px-3 py-2 border-b border-neutral-800 text-xs text-neutral-500 space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <span>
-                  {activeTabSelected}/{activeTabTotal} en esta pestaña
+                  {tx('{a}/{b} en esta pestaña', { a: activeTabSelected, b: activeTabTotal })}
                 </span>
-                <span>{selection.ideaIds.length} ideas seleccionadas</span>
+                <span>{tx('{n} ideas seleccionadas', { n: selection.ideaIds.length })}</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <button className="btn btn-ghost border border-neutral-700 py-1 text-xs gap-1" onClick={selectActiveTab}>
-                  <Icon name="check" size={13} /> Seleccionar
+                  <Icon name="check" size={13} /> {t('Seleccionar')}
                 </button>
                 <button className="btn btn-ghost border border-neutral-700 py-1 text-xs gap-1" onClick={clearActiveTab}>
-                  <Icon name="minus" size={13} /> Vaciar
+                  <Icon name="minus" size={13} /> {t('Vaciar')}
                 </button>
               </div>
             </div>
@@ -334,7 +335,7 @@ export function WritingWorkshopView({
           <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
             {!snapshot && (
               <div className="text-sm text-neutral-500 p-3">
-                Escribe un objetivo y prepara la mesa para seleccionar materiales.
+                {t('Escribe un objetivo y prepara la mesa para seleccionar materiales.')}
               </div>
             )}
             {snapshot && activeTab === 'ideas' && snapshot.ideas.map((item) => (
@@ -372,7 +373,7 @@ export function WritingWorkshopView({
           {!draft && (
             <div className="h-full flex items-center justify-center">
               <div className="max-w-md text-center text-neutral-500 text-sm">
-                {generating ? 'Generando borrador...' : 'El borrador aparecerá aquí cuando selecciones materiales y lo generes.'}
+                {generating ? t('Generando borrador...') : t('El borrador aparecerá aquí cuando selecciones materiales y lo generes.')}
               </div>
             </div>
           )}
@@ -384,14 +385,14 @@ export function WritingWorkshopView({
                   <p className="text-sm text-neutral-400 mt-1">{draft.abstract}</p>
                 </div>
                 <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={copyDraft}>
-                  <Icon name="check" /> Copiar
+                  <Icon name="check" /> {t('Copiar')}
                 </button>
                 <button className="btn btn-primary gap-1.5" onClick={exportDraft} disabled={exporting}>
-                  <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> Exportar
+                  <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
                 </button>
               </div>
               <section className="card p-4">
-                <h3 className="font-semibold mb-3">Esquema</h3>
+                <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
                 <div className="space-y-3">
                   {draft.outline.map((section, index) => (
                     <div key={section.id} className="border-l-2 border-indigo-700 pl-3">
@@ -416,15 +417,15 @@ export function WritingWorkshopView({
         </main>
 
         <aside className="border-l border-neutral-800 min-h-0 overflow-y-auto p-4 max-xl:border-l-0 max-xl:border-t">
-          <h2 className="font-semibold text-sm mb-3">Matriz de apoyo</h2>
-          {!draft && <div className="text-sm text-neutral-500">Sin matriz todavía.</div>}
+          <h2 className="font-semibold text-sm mb-3">{t('Matriz de apoyo')}</h2>
+          {!draft && <div className="text-sm text-neutral-500">{t('Sin matriz todavía.')}</div>}
           {draft && (
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <Metric label="Ideas" value={draft.stats.selectedIdeas} />
-                <Metric label="Huecos" value={draft.stats.selectedGaps} />
-                <Metric label="Obras" value={draft.stats.selectedWorks} />
-                <Metric label="Contexto" value={formatChars(draft.stats.contextChars)} />
+                <Metric label={t('Ideas')} value={draft.stats.selectedIdeas} />
+                <Metric label={t('Huecos')} value={draft.stats.selectedGaps} />
+                <Metric label={t('Obras')} value={draft.stats.selectedWorks} />
+                <Metric label={t('Contexto')} value={formatChars(draft.stats.contextChars)} />
               </div>
               {draft.matrix.map((row, index) => (
                 <div key={index} className="card p-3">
@@ -437,16 +438,16 @@ export function WritingWorkshopView({
                   <div className="flex items-center gap-2 mt-2">
                     {row.citation && (
                       <button className="text-xs text-indigo-300 hover:underline" onClick={() => openMatrixCitation(row.citation, setCitation)}>
-                        abrir fuente
+                        {t('abrir fuente')}
                       </button>
                     )}
                     {row.notes && <span className="text-xs text-neutral-600">{row.notes}</span>}
                   </div>
                 </div>
               ))}
-              <PanelList title="Siguientes pasos" items={draft.nextSteps} />
-              <PanelList title="Limitaciones" items={draft.limitations} />
-              <PanelList title="Bibliografía" items={draft.bibliography} />
+              <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
+              <PanelList title={t('Limitaciones')} items={draft.limitations} />
+              <PanelList title={t('Bibliografía')} items={draft.bibliography} />
             </div>
           )}
         </aside>
@@ -472,23 +473,23 @@ function WritingWorkshopTutorial() {
       <div className="grid grid-cols-4 gap-3 max-2xl:grid-cols-2 max-md:grid-cols-1">
         <TutorialStep
           icon="search"
-          title="1. Delimita"
-          body="Escribe el apartado que quieres construir: pregunta, capítulo, debate, hueco o marco teórico. Cuanto más concreto sea el objetivo, mejor se ordena la mesa."
+          title={t('1. Delimita')}
+          body={t('Escribe el apartado que quieres construir: pregunta, capítulo, debate, hueco o marco teórico. Cuanto más concreto sea el objetivo, mejor se ordena la mesa.')}
         />
         <TutorialStep
           icon="layers"
-          title="2. Monta la mesa"
-          body="Pulsa Preparar mesa y revisa ideas, temas, huecos, contradicciones, obras y rutas. Usa Todas las ideas cuando quieras una revisión amplia del corpus encontrado."
+          title={t('2. Monta la mesa')}
+          body={t('Pulsa Preparar mesa y revisa ideas, temas, huecos, contradicciones, obras y rutas. Usa Todas las ideas cuando quieras una revisión amplia del corpus encontrado.')}
         />
         <TutorialStep
           icon="check"
-          title="3. Decide el foco"
-          body="Selecciona todo para explorar, vacía para empezar de cero o ajusta cada pestaña. La matriz final te dirá qué papel cumple cada material en el argumento."
+          title={t('3. Decide el foco')}
+          body={t('Selecciona todo para explorar, vacía para empezar de cero o ajusta cada pestaña. La matriz final te dirá qué papel cumple cada material en el argumento.')}
         />
         <TutorialStep
           icon="edit"
-          title="4. Convierte en texto"
-          body="Genera el borrador, abre las citas para verificar fuentes y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito."
+          title={t('4. Convierte en texto')}
+          body={t('Genera el borrador, abre las citas para verificar fuentes y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito.')}
         />
       </div>
     </section>
@@ -572,9 +573,9 @@ function IdeaCard({ item, selected, onToggle }: { item: WritingWorkshopIdeaCandi
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="flex flex-wrap gap-1 mt-2">
-        <Badge color="indigo">{NODE_LABELS[item.type]}</Badge>
-        <Badge>{item.workCount} obras</Badge>
-        <Badge>{item.evidenceCount} evidencias</Badge>
+        <Badge color="indigo">{t(NODE_LABELS[item.type])}</Badge>
+        <Badge>{tx('{n} obras', { n: item.workCount })}</Badge>
+        <Badge>{tx('{n} evidencias', { n: item.evidenceCount })}</Badge>
       </div>
     </CandidateShell>
   );
@@ -584,9 +585,9 @@ function ThemeCard({ item, selected, onToggle }: { item: WritingWorkshopThemeCan
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="flex flex-wrap gap-1 mt-2">
-        {item.pinned && <Badge color="amber">curado</Badge>}
-        <Badge>{item.ideaCount} ideas</Badge>
-        <Badge>{item.workCount} obras</Badge>
+        {item.pinned && <Badge color="amber">{t('curado')}</Badge>}
+        <Badge>{tx('{n} ideas', { n: item.ideaCount })}</Badge>
+        <Badge>{tx('{n} obras', { n: item.workCount })}</Badge>
       </div>
     </CandidateShell>
   );
@@ -596,7 +597,7 @@ function GapCard({ item, selected, onToggle }: { item: WritingWorkshopGapCandida
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="text-xs text-neutral-500 mt-2">
-        {item.work.authors[0] ?? 'Autoría no disponible'} {item.work.year ?? ''}
+        {item.work.authors[0] ?? t('Autoría no disponible')} {item.work.year ?? ''}
       </div>
     </CandidateShell>
   );
@@ -614,9 +615,9 @@ function ContradictionCard({
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="flex flex-wrap gap-1 mt-2">
-        <Badge color="red">{EDGE_LABELS[item.type as keyof typeof EDGE_LABELS] ?? item.type}</Badge>
+        <Badge color="red">{t(EDGE_LABELS[item.type as keyof typeof EDGE_LABELS]) ?? item.type}</Badge>
         <Badge>{item.basis}</Badge>
-        <Badge>conf {item.confidence.toFixed(2)}</Badge>
+        <Badge>{t('conf')} {item.confidence.toFixed(2)}</Badge>
       </div>
     </CandidateShell>
   );
@@ -626,9 +627,9 @@ function WorkCard({ item, selected, onToggle }: { item: WritingWorkshopWorkCandi
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="flex flex-wrap gap-1 mt-2">
-        <Badge color={item.deepStatus === 'done' ? 'green' : 'neutral'}>{item.deepStatus === 'done' ? 'analizada' : item.deepStatus}</Badge>
-        <Badge>{item.ideaCount} ideas</Badge>
-        <Badge>{item.gapCount} huecos</Badge>
+        <Badge color={item.deepStatus === 'done' ? 'green' : 'neutral'}>{item.deepStatus === 'done' ? t('analizada') : item.deepStatus}</Badge>
+        <Badge>{tx('{n} ideas', { n: item.ideaCount })}</Badge>
+        <Badge>{tx('{n} huecos', { n: item.gapCount })}</Badge>
       </div>
     </CandidateShell>
   );
@@ -638,7 +639,7 @@ function RouteCard({ item, selected, onToggle }: { item: WritingWorkshopRouteCan
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
       <div className="flex flex-wrap gap-1 mt-2">
-        <Badge color="indigo">{item.stops} paradas</Badge>
+        <Badge color="indigo">{tx('{n} paradas', { n: item.stops })}</Badge>
         {item.rating && <Badge color="amber">★ {item.rating}</Badge>}
       </div>
     </CandidateShell>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AiProvider, AppSettings, ModelInfo, ModelRef } from '@shared/types';
 import { AI_PROVIDERS, PROVIDER_LABELS, modelLabel, sameModel } from '../components/ui';
+import { t, tx } from '../i18n';
 
 export function ProvidersSettings({
   settings,
@@ -35,16 +36,16 @@ export function ProvidersSettings({
 
   return (
     <section className="card p-4 mb-4">
-      <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-3">Proveedores de IA y modelos</h2>
+      <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-3">{t('Proveedores de IA y modelos')}</h2>
 
       {/* Current default + favorites */}
       <div className="mb-4 text-sm">
         <div className="text-neutral-400">
-          Modelo predeterminado:{' '}
+          {t('Modelo predeterminado:')}{' '}
           {settings.defaultModel ? (
             <span className="text-neutral-100">📌 {modelLabel(settings.defaultModel)}</span>
           ) : (
-            <span className="text-amber-400">sin configurar</span>
+            <span className="text-amber-400">{t('sin configurar')}</span>
           )}
         </div>
         {favorites.length > 0 && (
@@ -58,11 +59,11 @@ export function ProvidersSettings({
               >
                 {sameModel(m, settings.defaultModel) ? '📌' : '⭐'} {modelLabel(m)}
                 {!sameModel(m, settings.defaultModel) && (
-                  <button className="text-neutral-500 hover:text-indigo-300" title="Marcar como predeterminado" onClick={() => setDefault(m)}>
+                  <button className="text-neutral-500 hover:text-indigo-300" title={t('Marcar como predeterminado')} onClick={() => setDefault(m)}>
                     📌
                   </button>
                 )}
-                <button className="text-neutral-500 hover:text-red-400" title="Quitar de favoritos" onClick={() => toggleFav(m)}>
+                <button className="text-neutral-500 hover:text-red-400" title={t('Quitar de favoritos')} onClick={() => toggleFav(m)}>
                   ✕
                 </button>
               </span>
@@ -147,9 +148,9 @@ function ProviderRow({
         <span className="text-neutral-500">{expanded ? '▾' : '▸'}</span>
         <span className="font-medium">{PROVIDER_LABELS[provider]}</span>
         <span className={hasKey ? 'text-emerald-400 text-xs' : 'text-neutral-600 text-xs'}>
-          {hasKey ? '● clave guardada' : '○ sin clave'}
+          {hasKey ? `● ${t('clave guardada')}` : `○ ${t('sin clave')}`}
         </span>
-        {provider === 'openrouter' && <span className="text-neutral-600 text-xs">(modelos públicos)</span>}
+        {provider === 'openrouter' && <span className="text-neutral-600 text-xs">{t('(modelos públicos)')}</span>}
       </button>
 
       {expanded && (
@@ -158,26 +159,26 @@ function ProviderRow({
             <input
               type="password"
               className="input flex-1"
-              placeholder={hasKey ? '•••••••• (guardada)' : 'clave del proveedor'}
+              placeholder={hasKey ? t('•••••••• (guardada)') : t('clave del proveedor')}
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
             />
             <button className="btn btn-primary" onClick={saveKey}>
-              Guardar
+              {t('Guardar')}
             </button>
             {hasKey && (
               <button className="btn btn-ghost text-red-400" onClick={() => window.nodus.clearApiKey(provider).then(onChange)}>
-                Borrar
+                {t('Borrar')}
               </button>
             )}
           </div>
 
           <div className="flex gap-2 items-center">
             <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
-              {loading ? 'Cargando…' : 'Cargar modelos'}
+              {loading ? t('Cargando…') : t('Cargar modelos')}
             </button>
             {models && (
-              <input className="input flex-1" placeholder="Buscar modelo…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <input className="input flex-1" placeholder={t('Buscar modelo…')} value={search} onChange={(e) => setSearch(e.target.value)} />
             )}
             {models && <span className="text-xs text-neutral-500">{filtered.length}</span>}
           </div>
@@ -188,7 +189,7 @@ function ProviderRow({
             <div className="max-h-64 overflow-y-auto border border-neutral-800 rounded">
               <ModelList provider={provider} models={shown} isFav={isFav} toggleFav={toggleFav} setDefault={setDefault} settings={settings} />
               {filtered.length > shown.length && (
-                <div className="text-xs text-neutral-600 p-2">Mostrando {shown.length}; refina la búsqueda para ver más.</div>
+                <div className="text-xs text-neutral-600 p-2">{tx('Mostrando {n}; refina la búsqueda para ver más.', { n: shown.length })}</div>
               )}
             </div>
           )}
@@ -230,10 +231,10 @@ function ModelList({
     const def = sameModel(ref, settings.defaultModel);
     rows.push(
       <div key={m.id} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-900/60">
-        <button className={fav ? 'text-amber-400' : 'text-neutral-600 hover:text-amber-300'} title="Favorito" onClick={() => toggleFav(ref)}>
+        <button className={fav ? 'text-amber-400' : 'text-neutral-600 hover:text-amber-300'} title={t('Favorito')} onClick={() => toggleFav(ref)}>
           {fav ? '⭐' : '☆'}
         </button>
-        <button className={def ? 'text-indigo-400' : 'text-neutral-600 hover:text-indigo-300'} title="Predeterminado" onClick={() => setDefault(ref)}>
+        <button className={def ? 'text-indigo-400' : 'text-neutral-600 hover:text-indigo-300'} title={t('Predeterminado')} onClick={() => setDefault(ref)}>
           📌
         </button>
         <span className="flex-1 truncate" title={m.name ?? m.id}>

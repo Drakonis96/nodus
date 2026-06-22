@@ -11,6 +11,7 @@ import type {
 } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
 import { useDataRefresh, useScanComplete } from '../hooks';
+import { t, tx } from '../i18n';
 
 type HomeTarget = 'library' | 'graph' | 'ideas' | 'gaps' | 'reading' | 'writing' | 'settings';
 
@@ -100,7 +101,7 @@ export function HomeView({
   if (loading && !snapshot) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Spinner label="Calculando estado del corpus..." />
+        <Spinner label={t('Calculando estado del corpus...')} />
       </div>
     );
   }
@@ -109,9 +110,9 @@ export function HomeView({
     <div className="h-full overflow-y-auto p-6">
       <div className="flex flex-wrap items-start gap-3 mb-5">
         <div>
-          <h1 className="text-xl font-semibold">Inicio</h1>
+          <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
           <p className="text-sm text-neutral-400 mt-1">
-            Estado operativo de Zotero, análisis, grafo y próximos pasos.
+            {t('Estado operativo de Zotero, análisis, grafo y próximos pasos.')}
           </p>
         </div>
       </div>
@@ -125,7 +126,7 @@ export function HomeView({
       <section className="card p-4 mb-4">
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex-1 min-w-[18rem]">
-            <div className="text-xs uppercase text-neutral-500 mb-1">Siguiente paso recomendado</div>
+            <div className="text-xs uppercase text-neutral-500 mb-1">{t('Siguiente paso recomendado')}</div>
             <h2 className="text-lg font-semibold">{recommendation.title}</h2>
             <p className="text-sm text-neutral-400 mt-1 max-w-2xl">{recommendation.body}</p>
           </div>
@@ -151,126 +152,126 @@ export function HomeView({
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <StatusCard
-          title="Corpus"
+          title={t('Corpus')}
           icon="book"
           tone="indigo"
           metric={stats.totalWorks}
-          metricLabel="obras sincronizadas"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>Biblioteca</button>}
+          metricLabel={t('obras sincronizadas')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Biblioteca')}</button>}
         >
-          <ProgressLine label="con tag de lectura" value={stats.readTaggedWorks} total={stats.totalWorks} />
+          <ProgressLine label={t('con tag de lectura')} value={stats.readTaggedWorks} total={stats.totalWorks} />
           <div className="flex flex-wrap gap-1.5 mt-3">
-            <Badge>{settings.monitoredCollections.length} colecciones</Badge>
-            <Badge>{settings.syncMode === 'realtime' ? 'tiempo real' : 'manual'}</Badge>
+            <Badge>{tx('{n} colecciones', { n: settings.monitoredCollections.length })}</Badge>
+            <Badge>{settings.syncMode === 'realtime' ? t('tiempo real') : t('manual')}</Badge>
           </div>
           <p className="text-xs text-neutral-500 mt-3">
-            {latestSync ? `Última sincronización: ${latestSync.summary}` : 'Sin sincronización registrada todavía.'}
+            {latestSync ? `${t('Última sincronización:')} ${latestSync.summary}` : t('Sin sincronización registrada todavía.')}
           </p>
         </StatusCard>
 
         <StatusCard
-          title="Análisis"
+          title={t('Análisis')}
           icon="layers"
           tone="green"
           metric={`${stats.lightDone}/${stats.totalWorks}`}
-          metricLabel="con temas"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>Analizar</button>}
+          metricLabel={t('con temas')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Analizar')}</button>}
         >
-          <ProgressLine label="temas" value={stats.lightDone} total={stats.totalWorks} />
-          <ProgressLine label="ideas" value={stats.deepDone} total={stats.deepTarget} />
+          <ProgressLine label={t('temas')} value={stats.lightDone} total={stats.totalWorks} />
+          <ProgressLine label={t('ideas')} value={stats.deepDone} total={stats.deepTarget} />
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {stats.lightPending > 0 && <Badge color="amber">{stats.lightPending} temas en cola</Badge>}
-            {stats.deepPending > 0 && <Badge color="amber">{stats.deepPending} ideas en cola</Badge>}
-            {stats.failedWorks > 0 && <Badge color="red">{stats.failedWorks} fallos</Badge>}
-            {stats.skippedNoText > 0 && <Badge color="amber">{stats.skippedNoText} sin texto</Badge>}
+            {stats.lightPending > 0 && <Badge color="amber">{tx('{n} temas en cola', { n: stats.lightPending })}</Badge>}
+            {stats.deepPending > 0 && <Badge color="amber">{tx('{n} ideas en cola', { n: stats.deepPending })}</Badge>}
+            {stats.failedWorks > 0 && <Badge color="red">{tx('{n} fallos', { n: stats.failedWorks })}</Badge>}
+            {stats.skippedNoText > 0 && <Badge color="amber">{tx('{n} sin texto', { n: stats.skippedNoText })}</Badge>}
           </div>
         </StatusCard>
 
         <StatusCard
-          title="Cola"
+          title={t('Cola')}
           icon={stats.queueActive ? 'sync' : 'check'}
           tone={stats.queueFailed > 0 ? 'red' : stats.queueActive ? 'amber' : 'cyan'}
           metric={snapshot?.queue?.total ?? 0}
-          metricLabel={stats.queueActive ? 'trabajos en cola' : 'trabajos registrados'}
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>Ver obras</button>}
+          metricLabel={stats.queueActive ? t('trabajos en cola') : t('trabajos registrados')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('library')}>{t('Ver obras')}</button>}
         >
-          <ProgressLine label="progreso" value={stats.queueDone + stats.queueFailed} total={snapshot?.queue?.total ?? 0} />
+          <ProgressLine label={t('progreso')} value={stats.queueDone + stats.queueFailed} total={snapshot?.queue?.total ?? 0} />
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {snapshot?.queue?.paused && <Badge color="amber">pausada</Badge>}
-            {stats.queueActive && <Badge color="indigo">activa</Badge>}
-            {stats.queueFailed > 0 && <Badge color="red">{stats.queueFailed} fallidos</Badge>}
-            {!stats.queueActive && stats.queueFailed === 0 && <Badge color="green">sin pendientes</Badge>}
+            {snapshot?.queue?.paused && <Badge color="amber">{t('pausada')}</Badge>}
+            {stats.queueActive && <Badge color="indigo">{t('activa')}</Badge>}
+            {stats.queueFailed > 0 && <Badge color="red">{tx('{n} fallidos', { n: stats.queueFailed })}</Badge>}
+            {!stats.queueActive && stats.queueFailed === 0 && <Badge color="green">{t('sin pendientes')}</Badge>}
           </div>
           {snapshot?.queue?.current && (
             <p className="text-xs text-neutral-500 mt-3 truncate">
-              Procesando: {snapshot.queue.current.title}
+              {t('Procesando:')} {snapshot.queue.current.title}
             </p>
           )}
         </StatusCard>
 
         <StatusCard
-          title="Grafo"
+          title={t('Grafo')}
           icon="map"
           tone="cyan"
           metric={stats.ideaNodes}
-          metricLabel="ideas navegables"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('graph')}>Abrir grafo</button>}
+          metricLabel={t('ideas navegables')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('graph')}>{t('Abrir grafo')}</button>}
         >
-          <ProgressLine label="relaciones" value={stats.semanticEdges} total={Math.max(stats.semanticEdges, stats.ideaNodes)} />
+          <ProgressLine label={t('relaciones')} value={stats.semanticEdges} total={Math.max(stats.semanticEdges, stats.ideaNodes)} />
           <div className="flex flex-wrap gap-1.5 mt-3">
-            <Badge>{stats.themeNodes} temas</Badge>
-            <Badge>{stats.semanticEdges} relaciones</Badge>
-            <Badge color={stats.contradictions > 0 ? 'red' : 'neutral'}>{stats.contradictions} contradicciones</Badge>
+            <Badge>{tx('{n} temas', { n: stats.themeNodes })}</Badge>
+            <Badge>{tx('{n} relaciones', { n: stats.semanticEdges })}</Badge>
+            <Badge color={stats.contradictions > 0 ? 'red' : 'neutral'}>{tx('{n} contradicciones', { n: stats.contradictions })}</Badge>
           </div>
         </StatusCard>
 
         <StatusCard
-          title="Huecos y lectura"
+          title={t('Huecos y lectura')}
           icon="gap"
           tone="amber"
           metric={stats.gaps}
-          metricLabel="huecos minados"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('gaps')}>Revisar</button>}
+          metricLabel={t('huecos minados')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('gaps')}>{t('Revisar')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
-            <MiniMetric label="contradicciones" value={stats.contradictions} />
-            <MiniMetric label="por leer" value={stats.unreadWorks} />
+            <MiniMetric label={t('contradicciones')} value={stats.contradictions} />
+            <MiniMetric label={t('por leer')} value={stats.unreadWorks} />
           </div>
           <button className="btn btn-ghost border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('reading')}>
-            <Icon name="route" /> Ruta de lectura
+            <Icon name="route" /> {t('Ruta de lectura')}
           </button>
         </StatusCard>
 
         <StatusCard
-          title="Escritura"
+          title={t('Escritura')}
           icon="edit"
           tone="indigo"
-          metric={stats.ideaNodes > 0 ? 'lista' : 'pendiente'}
-          metricLabel="taller académico"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('writing')}>Abrir</button>}
+          metric={stats.ideaNodes > 0 ? t('lista') : t('pendiente')}
+          metricLabel={t('taller académico')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('writing')}>{t('Abrir')}</button>}
         >
           <div className="grid grid-cols-2 gap-2">
-            <MiniMetric label="ideas" value={stats.ideaNodes} />
-            <MiniMetric label="huecos" value={stats.gaps} />
+            <MiniMetric label={t('ideas')} value={stats.ideaNodes} />
+            <MiniMetric label={t('huecos')} value={stats.gaps} />
           </div>
           <p className="text-xs text-neutral-500 mt-3">
-            Convierte ideas, contradicciones, huecos y rutas del Tutor en un borrador con citas verificables.
+            {t('Convierte ideas, contradicciones, huecos y rutas del Tutor en un borrador con citas verificables.')}
           </p>
         </StatusCard>
 
         <StatusCard
-          title="Configuración IA"
+          title={t('Configuración IA')}
           icon={settings.defaultModel ? 'check' : 'alert'}
           tone={settings.defaultModel ? 'green' : 'red'}
-          metric={settings.defaultModel ? 'lista' : 'pendiente'}
-          metricLabel="modelo predeterminado"
-          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>Ajustes</button>}
+          metric={settings.defaultModel ? t('lista') : t('pendiente')}
+          metricLabel={t('modelo predeterminado')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
-          <ProgressLine label="embeddings" value={stats.embeddedIdeas} total={stats.totalEmbeddableIdeas} />
+          <ProgressLine label={t('embeddings')} value={stats.embeddedIdeas} total={stats.totalEmbeddableIdeas} />
           <div className="flex flex-wrap gap-1.5 mt-3">
             {settings.defaultModel && <Badge color="green">{settings.defaultModel.provider}</Badge>}
-            {stats.embeddingIncompleteWorks > 0 && <Badge color="amber">{stats.embeddingIncompleteWorks} obras por indexar</Badge>}
-            {!settings.zoteroStoragePath && <Badge color="amber">storage no configurado</Badge>}
+            {stats.embeddingIncompleteWorks > 0 && <Badge color="amber">{tx('{n} obras por indexar', { n: stats.embeddingIncompleteWorks })}</Badge>}
+            {!settings.zoteroStoragePath && <Badge color="amber">{t('storage no configurado')}</Badge>}
           </div>
         </StatusCard>
       </div>
@@ -403,64 +404,64 @@ function renderPrimaryAction(
 function getRecommendation(settings: AppSettings, stats: ReturnType<typeof buildStats>): Recommendation {
   if (!settings.defaultModel) {
     return {
-      title: 'Configura un modelo de IA',
-      body: 'La sincronización puede funcionar, pero Nodus necesita un modelo predeterminado para extraer temas, ideas y evidencias.',
-      action: { kind: 'view', target: 'settings', icon: 'settings', label: 'Configurar IA' },
+      title: t('Configura un modelo de IA'),
+      body: t('La sincronización puede funcionar, pero Nodus necesita un modelo predeterminado para extraer temas, ideas y evidencias.'),
+      action: { kind: 'view', target: 'settings', icon: 'settings', label: t('Configurar IA') },
     };
   }
   if (stats.totalWorks === 0) {
     return {
-      title: 'Sincroniza Zotero para crear el corpus',
-      body: 'Todavía no hay obras locales. Revisa las colecciones monitorizadas y ejecuta una sincronización para poblar la biblioteca.',
-      action: { kind: 'sync', label: 'Sincronizar ahora' },
-      secondary: { target: 'library', icon: 'book', label: 'Biblioteca' },
+      title: t('Sincroniza Zotero para crear el corpus'),
+      body: t('Todavía no hay obras locales. Revisa las colecciones monitorizadas y ejecuta una sincronización para poblar la biblioteca.'),
+      action: { kind: 'sync', label: t('Sincronizar ahora') },
+      secondary: { target: 'library', icon: 'book', label: t('Biblioteca') },
     };
   }
   if (stats.lightMissing > 0 || stats.lightPending > 0 || stats.lightDone === 0) {
     return {
-      title: 'Completa el análisis ligero',
-      body: 'El primer resultado visible del mapa depende de los temas extraídos a partir de título y resumen. Analiza temas antes de profundizar.',
-      action: { kind: 'view', target: 'library', icon: 'tag', label: 'Analizar temas' },
-      secondary: { target: 'graph', icon: 'map', label: 'Ver grafo' },
+      title: t('Completa el análisis ligero'),
+      body: t('El primer resultado visible del mapa depende de los temas extraídos a partir de título y resumen. Analiza temas antes de profundizar.'),
+      action: { kind: 'view', target: 'library', icon: 'tag', label: t('Analizar temas') },
+      secondary: { target: 'graph', icon: 'map', label: t('Ver grafo') },
     };
   }
   if (stats.deepDone === 0 || (stats.deepTarget > 0 && stats.deepDone < stats.deepTarget)) {
     return {
-      title: 'Extrae ideas de las obras clave',
-      body: 'El grafo ya puede orientarte por temas; el siguiente salto de valor llega al analizar a fondo las obras leídas o seleccionadas.',
-      action: { kind: 'view', target: 'library', icon: 'bulb', label: 'Analizar ideas' },
-      secondary: { target: 'reading', icon: 'route', label: 'Ruta de lectura' },
+      title: t('Extrae ideas de las obras clave'),
+      body: t('El grafo ya puede orientarte por temas; el siguiente salto de valor llega al analizar a fondo las obras leídas o seleccionadas.'),
+      action: { kind: 'view', target: 'library', icon: 'bulb', label: t('Analizar ideas') },
+      secondary: { target: 'reading', icon: 'route', label: t('Ruta de lectura') },
     };
   }
   if (stats.embeddingIncompleteWorks > 0) {
     return {
-      title: 'Indexa embeddings pendientes',
-      body: 'Hay ideas extraídas sin índice semántico. Indexarlas mejora la fusión, las relaciones y el descubrimiento de puentes.',
-      action: { kind: 'embed', label: 'Indexar pendientes' },
-      secondary: { target: 'ideas', icon: 'bulb', label: 'Ver ideas' },
+      title: t('Indexa embeddings pendientes'),
+      body: t('Hay ideas extraídas sin índice semántico. Indexarlas mejora la fusión, las relaciones y el descubrimiento de puentes.'),
+      action: { kind: 'embed', label: t('Indexar pendientes') },
+      secondary: { target: 'ideas', icon: 'bulb', label: t('Ver ideas') },
     };
   }
   if (stats.ideaNodes >= 12 && stats.deepDone > 0) {
     return {
-      title: 'Convierte el grafo en escritura',
-      body: 'Ya hay suficientes ideas y fuentes para montar un estado de la cuestión, un marco teórico o una justificación de hueco con citas verificables.',
-      action: { kind: 'view', target: 'writing', icon: 'edit', label: 'Abrir taller' },
-      secondary: { target: stats.gaps > 0 || stats.contradictions > 0 ? 'gaps' : 'ideas', icon: stats.gaps > 0 ? 'gap' : 'bulb', label: stats.gaps > 0 ? 'Ver huecos' : 'Ver ideas' },
+      title: t('Convierte el grafo en escritura'),
+      body: t('Ya hay suficientes ideas y fuentes para montar un estado de la cuestión, un marco teórico o una justificación de hueco con citas verificables.'),
+      action: { kind: 'view', target: 'writing', icon: 'edit', label: t('Abrir taller') },
+      secondary: { target: stats.gaps > 0 || stats.contradictions > 0 ? 'gaps' : 'ideas', icon: stats.gaps > 0 ? 'gap' : 'bulb', label: stats.gaps > 0 ? t('Ver huecos') : t('Ver ideas') },
     };
   }
   if (stats.gaps > 0 || stats.contradictions > 0) {
     return {
-      title: 'Revisa huecos y contradicciones',
-      body: 'El corpus ya tiene material interpretativo. El siguiente paso útil es convertir huecos y tensiones en una ruta de lectura o pregunta de investigación.',
-      action: { kind: 'view', target: 'gaps', icon: 'gap', label: 'Ver huecos' },
-      secondary: { target: 'reading', icon: 'route', label: 'Ruta de lectura' },
+      title: t('Revisa huecos y contradicciones'),
+      body: t('El corpus ya tiene material interpretativo. El siguiente paso útil es convertir huecos y tensiones en una ruta de lectura o pregunta de investigación.'),
+      action: { kind: 'view', target: 'gaps', icon: 'gap', label: t('Ver huecos') },
+      secondary: { target: 'reading', icon: 'route', label: t('Ruta de lectura') },
     };
   }
   return {
-    title: 'Explora el grafo con el Tutor',
-    body: 'El corpus está en buen estado para una lectura guiada. Abre el grafo o pregunta al asistente con el contexto completo.',
-    action: { kind: 'view', target: 'graph', icon: 'map', label: 'Abrir grafo' },
-    secondary: { target: 'ideas', icon: 'bulb', label: 'Ver ideas' },
+    title: t('Explora el grafo con el Tutor'),
+    body: t('El corpus está en buen estado para una lectura guiada. Abre el grafo o pregunta al asistente con el contexto completo.'),
+    action: { kind: 'view', target: 'graph', icon: 'map', label: t('Abrir grafo') },
+    secondary: { target: 'ideas', icon: 'bulb', label: t('Ver ideas') },
   };
 }
 

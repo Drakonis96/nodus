@@ -19,6 +19,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   zoteroStoragePath: '',
   monitoredCollections: [],
   theme: 'dark',
+  uiLanguage: 'es',
+  promptLanguage: 'es',
   animationSpeed: 1,
   concurrency: 1,
   unpaywallEmail: '',

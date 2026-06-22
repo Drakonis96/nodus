@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { t } from '../i18n';
 
 type ViewId = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
 
@@ -174,14 +175,14 @@ export function Tour({ onClose, onNavigate }: { onClose: () => void; onNavigate:
       >
         <div className="flex items-center justify-between mb-2">
           <div className="text-[11px] uppercase tracking-wide text-indigo-400">
-            Tutorial · {i + 1}/{STEPS.length}
+            {t('Tutorial')} · {i + 1}/{STEPS.length}
           </div>
           <button className="text-neutral-500 hover:text-white text-xs" onClick={onClose}>
-            Saltar ✕
+            {t('Saltar')} ✕
           </button>
         </div>
-        <h3 className="font-semibold text-base mb-1">{step.title}</h3>
-        <p className="text-neutral-300 leading-relaxed">{step.body}</p>
+        <h3 className="font-semibold text-base mb-1">{t(step.title)}</h3>
+        <p className="text-neutral-300 leading-relaxed">{t(step.body)}</p>
 
         <div className="flex items-center justify-between mt-4">
           <div className="flex gap-1">
@@ -195,25 +196,25 @@ export function Tour({ onClose, onNavigate }: { onClose: () => void; onNavigate:
           <div className="flex gap-2">
             {!isFirst && (
               <button className="btn btn-ghost" onClick={() => setI((n) => Math.max(0, n - 1))}>
-                Atrás
+                {t('Atrás')}
               </button>
             )}
             {isFirst ? (
               <>
                 <button className="btn btn-ghost" onClick={onClose}>
-                  Ahora no
+                  {t('Ahora no')}
                 </button>
                 <button className="btn btn-primary" onClick={() => setI(1)}>
-                  Sí, enséñame
+                  {t('Sí, enséñame')}
                 </button>
               </>
             ) : isLast ? (
               <button className="btn btn-primary" onClick={onClose}>
-                Empezar
+                {t('Empezar')}
               </button>
             ) : (
               <button className="btn btn-primary" onClick={() => setI((n) => n + 1)}>
-                Siguiente
+                {t('Siguiente')}
               </button>
             )}
           </div>

@@ -192,6 +192,10 @@ export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'g
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
 export type DeepContextMode = 'standard' | 'long';
+/** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
+ *  is injected into the AI prompts and so determines the language of generated content
+ *  (ideas, themes, tutor narrative, drafts, assistant answers). */
+export type AppLanguage = 'es' | 'en';
 
 /** A concrete model selection: which provider + which model id. */
 export interface ModelRef {
@@ -232,6 +236,10 @@ export interface AppSettings {
   zoteroStoragePath: string;
   monitoredCollections: string[]; // collection keys
   theme: ThemeMode;
+  // Interface language (localizes all UI text).
+  uiLanguage: AppLanguage;
+  // Language injected into AI prompts → language of generated ideas/themes/answers.
+  promptLanguage: AppLanguage;
   animationSpeed: number; // 0..1
   concurrency: number;
   unpaywallEmail: string;
