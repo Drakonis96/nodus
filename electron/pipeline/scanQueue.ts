@@ -59,12 +59,35 @@ class ScanQueue {
     };
   }
 
+  /** Keep active/pending work at the top and completed history at the bottom. */
+  private insertPending(item: QueueItem): void {
+    const firstTerminal = this.items.findIndex((candidate) =>
+      candidate.state === 'done' || candidate.state === 'failed' || candidate.state === 'cancelled'
+    );
+    this.items.splice(firstTerminal >= 0 ? firstTerminal : this.items.length, 0, item);
+  }
+
+  private moveRunningToFront(item: QueueItem): void {
+    const index = this.items.indexOf(item);
+    if (index < 0) return;
+    this.items.splice(index, 1);
+    const firstNonRunning = this.items.findIndex((candidate) => candidate.state !== 'running');
+    this.items.splice(firstNonRunning >= 0 ? firstNonRunning : this.items.length, 0, item);
+  }
+
+  private moveTerminalToEnd(item: QueueItem): void {
+    const index = this.items.indexOf(item);
+    if (index < 0) return;
+    this.items.splice(index, 1);
+    this.items.push(item);
+  }
+
   enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null): void {
     // Avoid duplicate pending/running jobs for the same work+kind.
     if (this.items.some((i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running'))) {
       return;
     }
-    this.items.push({
+    this.insertPending({
       id: uuid(),
       nodus_id: nodusId,
       title,
@@ -82,7 +105,7 @@ class ScanQueue {
     if (this.items.some((i) => i.kind === 'bridge' && (i.state === 'queued' || i.state === 'running'))) {
       return;
     }
-    this.items.push({
+    this.insertPending({
       id: uuid(),
       nodus_id: '',
       title: 'Descubrir relaciones semánticas',
@@ -113,6 +136,7 @@ class ScanQueue {
     if (item && (item.state === 'queued' || item.state === 'paused')) {
       item.state = 'cancelled';
       this.resetPendingStatus(item);
+      this.moveTerminalToEnd(item);
     }
     this.emit();
   }
@@ -255,6 +279,7 @@ class ScanQueue {
 
   private async process(item: QueueItem): Promise<void> {
     item.state = 'running';
+    this.moveRunningToFront(item);
     this.emit();
     if (item.kind === 'bridge') {
       try {
@@ -265,6 +290,7 @@ class ScanQueue {
         item.state = 'failed';
         item.error = (e as Error).message;
       }
+      this.moveTerminalToEnd(item);
       this.emit();
       return;
     }
@@ -272,6 +298,7 @@ class ScanQueue {
     if (!work) {
       item.state = 'failed';
       item.error = 'Obra no encontrada';
+      this.moveTerminalToEnd(item);
       this.emit();
       return;
     }
@@ -319,6 +346,7 @@ class ScanQueue {
         }
       }
     }
+    if (item.state === 'done' || item.state === 'failed') this.moveTerminalToEnd(item);
     this.emit();
   }
 

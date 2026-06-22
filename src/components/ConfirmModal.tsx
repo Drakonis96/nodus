@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
@@ -32,7 +33,7 @@ export function ConfirmModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={onCancel}>
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
@@ -57,6 +58,7 @@ export function ConfirmModal({
           </button>
         </div>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }

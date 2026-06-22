@@ -14,7 +14,6 @@ import type {
 import { getDb } from '../db/database';
 import { aggregateGaps } from '../db/gapsRepo';
 import { getEdgeDetail, getIdeaDetail } from '../db/ideasRepo';
-import { saveTutorPlan } from '../db/tutorRepo';
 import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { completeJson, completeText, completeTextStream } from './aiClient';
 
@@ -72,6 +71,25 @@ function isPlanResult(v: unknown): v is PlanResult {
 function clip(text: string, max = STATEMENT_CLIP): string {
   const clean = (text ?? '').replace(/\s+/g, ' ').trim();
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
+}
+
+/** The conclusion, not the beginning, is what a following stop needs to link to. */
+function clipTail(text: string, max: number): string {
+  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  return clean.length > max ? clean.slice(-max) : clean;
+}
+
+/**
+ * A streamed model can occasionally emit a literal continuation marker despite
+ * the prompt. It has no semantic value in a separately displayed Tutor stop.
+ */
+function normalizeStepNarration(text: string): string {
+  const normalized = text
+    .trim()
+    .replace(/^(?:\s*(?:…|\.\.\.))+\s*/u, '')
+    .replace(/(?:\s*(?:…|\.\.\.))+\s*$/u, '')
+    .trim();
+  return normalized || text.trim();
 }
 
 function yearRange(years: number[]): string | null {
@@ -532,7 +550,6 @@ export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPl
     routes,
     truncated,
   };
-  saveTutorPlan(plan, request.model ?? null);
   return plan;
 }
 
@@ -643,18 +660,25 @@ function buildStepPrompt(request: TutorStepRequest): { system: string; user: str
     'Apóyate ÚNICAMENTE en el contexto recibido (ideas, obras, evidencia, conexiones); no inventes datos.',
     '',
     'CONTINUIDAD (muy importante):',
-    '- Retoma el hilo desde donde quedó el fragmento anterior ("texto_previo") y enlaza esta idea con',
-    '  lo ya explicado mediante el SENTIDO (conceptos, relaciones del grafo), avanzando el argumento.',
+    '- Cada parada se muestra por separado en pantalla. Escribe por tanto un BLOQUE AUTÓNOMO y cerrado',
+    '  que se entienda por sí solo, pero que prolongue el mismo argumento a través del SENTIDO',
+    '  (conceptos y relaciones reales del grafo).',
+    '- "cierre_previo_para_contexto" es una referencia semántica: NO es una frase que debas terminar ni',
+    '  un texto que debas copiar. Empieza este bloque con una oración completa, gramatical y con mayúscula.',
+    '- PROHIBIDO empezar o terminar con "…" / "...", con una oración cortada o con conectores que',
+    '  dependan de una frase no visible ("pero…", "por ello…", "de ahí…", "frente a ello…").',
+    '- Cierra el bloque con un párrafo y una idea completos. La siguiente parada enlazará después a partir',
+    '  de ese cierre; nunca dejes una frase suspendida para que otra parada la complete.',
     '- NO repitas lo ya dicho ni vuelvas a presentar ideas anteriores; añade algo nuevo.',
     '- PROHIBIDO usar fórmulas de navegación o meta-comentarios sobre el recorrido. No escribas',
     '  "bienvenido", "empecemos", "en esta parada", "la primera/segunda/última parada", "seguimos con",',
     '  "a continuación veremos", "para terminar", "como vimos antes", ni números de parada. Habla SIEMPRE',
     '  del contenido (los conceptos), nunca de la mecánica del recorrido.',
-    '- Las transiciones deben ser naturales y argumentales (p. ej. "esta distinción permite…",',
-    '  "frente a ello…", "de ahí se sigue…"), no anuncios de cambio de parada.',
+    '- Las transiciones deben ser naturales y argumentales: nombra la relación que une ambos conceptos',
+    '  (p. ej. "La distinción entre X e Y permite relacionar ambos conceptos."), no anuncies un cambio de parada.',
     stopIndex === 0
       ? 'Es el ARRANQUE del hilo: entra directamente en la materia y deja encuadrado el tema sin saludos ni preámbulos.'
-      : 'Es un tramo INTERMEDIO del hilo: continúa con naturalidad desde "texto_previo".',
+      : 'Es un tramo INTERMEDIO del hilo: enlaza con el bloque anterior mediante una relación conceptual explícita, sin continuar literalmente su última frase.',
     stopIndex === total - 1
       ? 'Es el CIERRE del hilo: integra y cierra el argumento de forma natural, sin anunciar que es el final.'
       : '',
@@ -669,7 +693,7 @@ function buildStepPrompt(request: TutorStepRequest): { system: string; user: str
     {
       recorrido: { titulo: route.title, descripcion: route.description },
       panorama: clip(request.overview, 600),
-      texto_previo: request.previousText ? clip(request.previousText, 900) : null,
+      cierre_previo_para_contexto: request.previousText ? clipTail(request.previousText, 900) : null,
       ya_tratado: (request.history ?? []).slice(-12),
       nodo_anterior: prev ? prev.title : null,
       nodo_actual: { titulo: stop.title, foco: stop.focus, contexto: resolveStopContext(stop) },
@@ -685,7 +709,7 @@ function buildStepPrompt(request: TutorStepRequest): { system: string; user: str
 export async function answerTutorStep(request: TutorStepRequest): Promise<TutorStepResponse> {
   const { system, user } = buildStepPrompt(request);
   const explanation = await completeText({ system, user, temperature: 0.35, maxTokens: 1600 }, request.model);
-  return { explanation: explanation.trim() };
+  return { explanation: normalizeStepNarration(explanation) };
 }
 
 export async function streamTutorStep(
@@ -694,5 +718,5 @@ export async function streamTutorStep(
 ): Promise<TutorStepResponse> {
   const { system, user } = buildStepPrompt(request);
   const explanation = await completeTextStream({ system, user, temperature: 0.35, maxTokens: 1600 }, onDelta, request.model);
-  return { explanation: explanation.trim() };
+  return { explanation: normalizeStepNarration(explanation) };
 }

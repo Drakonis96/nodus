@@ -148,6 +148,7 @@ export function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Writi
 }
 
 export async function generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft> {
+  citationLabelCache.clear();
   const snapshot = buildWritingWorkshopSnapshot(request.brief);
   const selection = normalizeSelection(request.selection, snapshot.recommendedSelection);
   const context = buildSelectedContext(request.brief, selection);
@@ -166,8 +167,8 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     'Longitud orientativa del draftMarkdown: 700-1000 palabras si hay pocas ideas, 1200-1800 si hay 8-20 ideas, y 1800-3000 si hay mas de 20 ideas y el contexto lo permite.',
     'La matriz debe cubrir las ideas y tensiones principales; si una idea seleccionada no entra en el borrador, incluyela en matrix o limitations explicando por que.',
     'Formatos de cita permitidos:',
-    '- Ideas: [Autor, año](nodus://idea/<global_id>)',
-    '- Obras: [Autor, año](nodus://work/<nodus_id>)',
+    '- Ideas: [Apellido, I. (año)](nodus://idea/<global_id>)',
+    '- Obras: [Apellido, I. (año)](nodus://work/<nodus_id>)',
     '- Huecos: [hueco](nodus://gap/<gap_id>)',
     '- Contradicciones: [contradiccion](nodus://contradiction/<edge_id>)',
     'Si no hay evidencia suficiente para una seccion, dilo como limitacion o siguiente paso; no rellenes.',
@@ -177,13 +178,13 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     '  "title": "titulo academico breve",',
     '  "abstract": "5-8 lineas que resumen la tesis del apartado",',
     '  "outline": [',
-    '    {"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sources":["[Autor, ano](nodus://idea/g-0001)"]}',
+    '    {"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sources":["[Apellido, I. (año)](nodus://idea/g-0001)"]}',
     '  ],',
     '  "draftMarkdown": "borrador en Markdown con H2/H3, parrafos y citas nodus://",',
     '  "matrix": [',
-    '    {"claim":"...","role":"support|contrast|gap|method|definition|context","sourceLabel":"Autor, ano","citation":"nodus://idea/g-0001","evidence":"cita o resumen anclado","notes":"uso en el argumento"}',
+    '    {"claim":"...","role":"support|contrast|gap|method|definition|context","sourceLabel":"Apellido, I. (año)","citation":"nodus://idea/g-0001","evidence":"cita o resumen anclado","notes":"uso en el argumento"}',
     '  ],',
-    '  "bibliography": ["Autor (ano). Titulo."],',
+    '  "bibliography": ["Apellido, I. (año). Titulo."],',
     '  "nextSteps": ["..."],',
     '  "limitations": ["..."]',
     '}',
@@ -799,16 +800,24 @@ function sanitizeDraft(
   selection: WritingWorkshopSelection,
   context: ReturnType<typeof buildSelectedContext>
 ): WritingWorkshopDraft {
-  const draftMarkdown = ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context);
+  const draftMarkdown = normalizeCitationLabels(ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context));
+  const outline = sanitizeOutline(ai.outline).map((section) => ({
+    ...section,
+    sources: section.sources.map(normalizeCitationLabels),
+  }));
+  const matrix = sanitizeMatrix(ai.matrix).map((row) => ({
+    ...row,
+    sourceLabel: citationLabelForUrl(row.citation) ?? row.sourceLabel,
+  }));
   return {
     generatedAt: new Date().toISOString(),
     brief,
     selection,
     title: cleanString(ai.title, 'Borrador de escritura'),
     abstract: cleanString(ai.abstract, ''),
-    outline: sanitizeOutline(ai.outline),
+    outline,
     draftMarkdown,
-    matrix: sanitizeMatrix(ai.matrix),
+    matrix,
     bibliography: stringList(ai.bibliography),
     nextSteps: stringList(ai.nextSteps),
     limitations: stringList(ai.limitations),
@@ -1076,12 +1085,73 @@ function stringList(value: unknown): string[] {
     : [];
 }
 
-function sourceLabel(work: { autores?: string[]; authors?: string[]; ano?: number | null; year?: number | null } | undefined): string {
+type CitationWork = { autores?: string[]; authors?: string[]; ano?: number | null; year?: number | null };
+
+const citationLabelCache = new Map<string, string | null>();
+
+function sourceLabel(work: CitationWork | undefined): string {
   if (!work) return 'Fuente del corpus';
   const authors = 'autores' in work ? work.autores : work.authors;
   const year = 'ano' in work ? work.ano : work.year;
-  const first = authors?.[0]?.split(/\s+/).slice(-1)[0] ?? 'Autor';
-  return year ? `${first}, ${year}` : first;
+  return authorYearLabel(authors?.[0], year);
+}
+
+/** Convert Nodus's stored `Apellido, I.` name into a readable inline citation. */
+function authorYearLabel(author: string | undefined, year: number | null | undefined): string {
+  const raw = author?.replace(/\s+/g, ' ').trim();
+  if (!raw) return year ? `Autor (${year})` : 'Autor';
+
+  const comma = raw.indexOf(',');
+  const surname = (comma >= 0 ? raw.slice(0, comma) : raw.split(' ').slice(-1).join(' ')).trim() || raw;
+  const given = (comma >= 0 ? raw.slice(comma + 1) : raw.split(' ').slice(0, -1).join(' ')).trim();
+  const initial = given.match(/[\p{L}]/u)?.[0]?.toLocaleUpperCase('es-ES');
+  const name = initial ? `${surname}, ${initial}.` : surname;
+  return year ? `${name} (${year})` : name;
+}
+
+/** Resolve a `nodus://idea` or `nodus://work` citation to its canonical label. */
+function citationLabelForUrl(citation: string): string | null {
+  const cached = citationLabelCache.get(citation);
+  if (cached !== undefined) return cached;
+
+  const match = citation.match(/^nodus:\/\/(idea|work)\/(.+)$/);
+  if (!match) return null;
+  let id: string;
+  try {
+    id = decodeURIComponent(match[2]);
+  } catch {
+    return null;
+  }
+
+  const db = getDb();
+  let row: { authors_json: string; year: number | null } | undefined;
+  if (match[1] === 'work') {
+    row = db
+      .prepare('SELECT authors_json, year FROM works WHERE nodus_id = ?')
+      .get(id) as typeof row;
+  } else {
+    row = db
+      .prepare(
+        `SELECT w.authors_json, w.year
+           FROM idea_occurrences io
+           JOIN works w ON w.nodus_id = io.nodus_id
+          WHERE io.global_id = ? AND w.archived = 0
+          ORDER BY io.role = 'principal' DESC, io.confidence DESC, w.year DESC
+          LIMIT 1`
+      )
+      .get(id) as typeof row;
+  }
+  const label = row ? sourceLabel({ authors: parseAuthors(row.authors_json), year: row.year }) : null;
+  citationLabelCache.set(citation, label);
+  return label;
+}
+
+/** Never display a model-invented or abbreviated label when its nodus target is known. */
+function normalizeCitationLabels(markdown: string): string {
+  return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
+    const label = citationLabelForUrl(citation);
+    return label ? `[${label}](${citation})` : full;
+  });
 }
 
 function citationMarkdown(work: any, fallbackCitation: string): string {

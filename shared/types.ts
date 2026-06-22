@@ -1031,8 +1031,11 @@ export interface NodusApi {
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */
   tutorPlan(request: TutorPlanRequest): Promise<TutorPlan>;
   listTutorRoutes(): Promise<TutorSavedRoute[]>;
+  /** Save a completed route with the user's required 1–5 rating. */
+  saveTutorRoute(plan: TutorPlan, route: TutorRoute, model: ModelRef | null, rating: number): Promise<TutorSavedRoute | null>;
   rateTutorRoute(routeId: string, rating: number | null): Promise<TutorSavedRoute | null>;
   markTutorRoutePlayed(routeId: string): Promise<TutorSavedRoute | null>;
+  deleteTutorRoute(routeId: string): Promise<void>;
   /** Narrate one stop of a route, grounded in that node's ideas/evidence. */
   tutorStep(request: TutorStepRequest): Promise<TutorStepResponse>;
   tutorStepStream(request: TutorStepRequest, handlers: TutorStepStreamHandlers): Promise<TutorStepResponse>;
@@ -1076,6 +1079,8 @@ export interface NodusApi {
   pauseEmbedding(): Promise<void>;
   resumeEmbedding(): Promise<void>;
   stopEmbedding(): Promise<void>;
+  /** Hide a completed/stopped embedding queue without deleting generated embeddings. */
+  clearEmbeddingProgress(): Promise<void>;
   getEmbeddingStatus(): Promise<EmbeddingPipelineProgress>;
   /** Per-work embedding counts for the library table. */
   getWorkEmbeddingStatuses(nodusIds?: string[]): Promise<WorkEmbeddingStatus[]>;

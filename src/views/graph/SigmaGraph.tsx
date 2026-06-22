@@ -26,6 +26,8 @@ export interface SigmaGraphApi {
   zoomBy: (factor: number) => void;
   focusNode: (id: string) => boolean;
   focusEdge: (id: string) => boolean;
+  /** Spotlight a Tutor stop and keep it visible while the user moves the camera. */
+  focusTutor: (nodeIds: string[], edgeId?: string | null) => boolean;
   clearFocus: () => void;
   /** Re-scatter, re-run the layout from scratch and reset the camera. */
   reset: () => void;
@@ -58,6 +60,51 @@ interface FocusState {
   edgeId: string | null;
 }
 
+interface GraphPosition {
+  x: number;
+  y: number;
+}
+
+interface DragState {
+  nodeId: string;
+  /** Positions at the beginning of this gesture. They are the source of truth
+   * for temporary collision offsets, so a drag cannot leave a widening hole. */
+  origin: Map<string, GraphPosition>;
+  /** The node being dragged plus its direct neighbours. This small local group
+   * is translated as a unit, preserving the original edge geometry. */
+  connectedIds: Set<string>;
+  cellSize: number;
+  cells: Map<string, string[]>;
+  collisionRadius: number;
+  target: GraphPosition | null;
+  transientIds: Set<string>;
+  frameId: number | null;
+}
+
+interface DragReleaseState {
+  start: Map<string, GraphPosition>;
+  target: Map<string, GraphPosition>;
+  frameId: number | null;
+  startedAt: number;
+}
+
+const DRAG_COLLISION_RADIUS_PX = 64;
+const DRAG_COLLISION_RELEASE_MS = 190;
+
+function dragCellKey(position: GraphPosition, cellSize: number): string {
+  return `${Math.floor(position.x / cellSize)}:${Math.floor(position.y / cellSize)}`;
+}
+
+function stableDragDirection(a: string, b: string): GraphPosition {
+  let hash = 2166136261;
+  for (const char of `${a}:${b}`) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  const angle = ((hash >>> 0) % 6283) / 1000;
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+}
+
 export function SigmaGraph({
   data,
   filters,
@@ -80,9 +127,12 @@ export function SigmaGraph({
   const prevPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const modeRef = useRef<'detail' | 'overview'>('detail');
   const focusRef = useRef<FocusState>({ active: false, local: null, edgeId: null });
+  const tutorFocusRef = useRef<{ nodeIds: string[]; edgeId?: string | null } | null>(null);
   const hoverRef = useRef<string | null>(null);
   const hoverLocalRef = useRef<{ neighbors: Set<string>; edges: Set<string> } | null>(null);
   const draggingRef = useRef<string | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const dragReleaseRef = useRef<DragReleaseState | null>(null);
   const cameraRafRef = useRef<number | null>(null);
   const clusterTimerRef = useRef<number | null>(null);
 
@@ -239,8 +289,9 @@ export function SigmaGraph({
   );
 
   const clearFocus = useCallback(() => {
-    if (!focusRef.current.active && !hoverRef.current) return;
+    if (!focusRef.current.active && !hoverRef.current && !tutorFocusRef.current) return;
     focusRef.current = { active: false, local: null, edgeId: null };
+    tutorFocusRef.current = null;
     hoverRef.current = null;
     sigmaRef.current?.refresh({ skipIndexation: true });
   }, []);
@@ -282,6 +333,10 @@ export function SigmaGraph({
     (next: 'detail' | 'overview') => {
       const sigma = sigmaRef.current;
       if (!sigma || modeRef.current === next) return;
+      // A focus (including the Tutor's active stop) refers to concrete detail
+      // nodes. The aggregated overview has different ids, so switching to it
+      // would make that focus appear to disappear while panning or zooming.
+      if (next === 'overview' && focusRef.current.active) return;
       if (next === 'overview') {
         if (!overviewGraphRef.current) ensureClusters();
         if (!overviewGraphRef.current) return;
@@ -298,12 +353,35 @@ export function SigmaGraph({
     [ensureClusters]
   );
 
+  const focusTutor = useCallback(
+    (nodeIds: string[], edgeId?: string | null): boolean => {
+      const graph = detailGraphRef.current;
+      if (!graph) return false;
+      switchMode('detail');
+      if (edgeId && graph.hasEdge(edgeId)) {
+        tutorFocusRef.current = { nodeIds, edgeId };
+        applyFocusForEdge(edgeId);
+        return true;
+      }
+      const nodeId = nodeIds.find((id) => graph.hasNode(id));
+      if (!nodeId) return false;
+      tutorFocusRef.current = { nodeIds, edgeId };
+      applyFocusForNode(nodeId);
+      return true;
+    },
+    [applyFocusForEdge, applyFocusForNode, switchMode]
+  );
+
   const onCameraUpdated = useCallback(() => {
     if (cameraRafRef.current != null) return;
     cameraRafRef.current = window.requestAnimationFrame(() => {
       cameraRafRef.current = null;
       const sigma = sigmaRef.current;
       if (!sigma) return;
+      if (focusRef.current.active) {
+        switchMode('detail');
+        return;
+      }
       const ratio = sigma.getCamera().ratio;
       // Only collapse to the (still-rough) overview for very large corpora where
       // the full graph genuinely can't be drawn legibly. Below this, always show
@@ -350,18 +428,21 @@ export function SigmaGraph({
         void attrs;
         return;
       }
+      tutorFocusRef.current = null;
       const attrs = g.getNodeAttributes(node);
       applyFocusForNode(node);
       onOpenNode(node, String(attrs.label ?? ''), String(attrs.kind ?? ''));
     });
     sigma.on('clickEdge', ({ edge }) => {
       if (modeRef.current === 'overview') return;
+      tutorFocusRef.current = null;
       const g = sigmaRef.current?.getGraph();
       const attrs = g?.getEdgeAttributes(edge);
       applyFocusForEdge(edge);
       onOpenEdge(edge, String(attrs?.kind ?? ''));
     });
     sigma.on('clickStage', () => {
+      if (tutorFocusRef.current) return;
       clearFocus();
       onClearFocus();
     });
@@ -385,54 +466,266 @@ export function SigmaGraph({
       sigma.refresh({ skipIndexation: true });
     });
 
-    // Drag: freeze the worker (so it can't overwrite the position → no snap-back,
-    // and the graph stops drifting), then move the node and shove nearby nodes
-    // aside on the main thread so they "open a path", like the old renderer.
+    // Dragging has two distinct kinds of movement:
+    // - the dragged node and its direct relations move as a rigid local group;
+    // - nodes merely displaced to clear a path are temporary and settle back.
+    // The previous implementation accumulated a push onto every nearby node on
+    // every mouse event. That made the space vacated by a drag permanently grow.
+    const finishDragRelease = () => {
+      const release = dragReleaseRef.current;
+      const g = sigmaRef.current?.getGraph();
+      if (!release || !g) return;
+      if (release.frameId != null) window.cancelAnimationFrame(release.frameId);
+      release.target.forEach((position, id) => {
+        if (g.hasNode(id)) g.mergeNodeAttributes(id, position);
+      });
+      dragReleaseRef.current = null;
+      sigmaRef.current?.refresh();
+    };
+
+    const applyDragFrame = () => {
+      const state = dragStateRef.current;
+      const g = sigmaRef.current?.getGraph();
+      if (!state || !g || !state.target || !g.hasNode(state.nodeId)) return;
+      state.frameId = null;
+
+      // Remove only the displacement from the preceding frame. The connected
+      // group is written below from its original coordinates on every frame, so
+      // neither its movement nor collision offsets can compound over time.
+      for (const id of state.transientIds) {
+        if (state.connectedIds.has(id) || !g.hasNode(id)) continue;
+        const origin = state.origin.get(id);
+        if (origin) g.mergeNodeAttributes(id, origin);
+      }
+      state.transientIds = new Set(state.connectedIds);
+
+      const rootOrigin = state.origin.get(state.nodeId);
+      if (!rootOrigin) return;
+      const delta = {
+        x: state.target.x - rootOrigin.x,
+        y: state.target.y - rootOrigin.y,
+      };
+
+      // Preserve the original vectors between the active node and every direct
+      // neighbour. This keeps linked nodes proportionally spaced while the
+      // cluster is carried through the rest of the graph.
+      for (const id of state.connectedIds) {
+        const origin = state.origin.get(id);
+        if (!origin || !g.hasNode(id)) continue;
+        g.mergeNodeAttributes(id, { x: origin.x + delta.x, y: origin.y + delta.y });
+      }
+
+      // The grid is built from the gesture's stable starting positions. Looking
+      // only in adjacent cells keeps collision work local even in large graphs.
+      // Obstacles absorb the displacement; the connected group keeps its shape.
+      for (const id of state.connectedIds) {
+        if (!g.hasNode(id)) continue;
+        const moving = g.getNodeAttributes(id);
+        const position = { x: Number(moving.x), y: Number(moving.y) };
+        const cx = Math.floor(position.x / state.cellSize);
+        const cy = Math.floor(position.y / state.cellSize);
+
+        for (let x = cx - 1; x <= cx + 1; x++) {
+          for (let y = cy - 1; y <= cy + 1; y++) {
+            const candidates = state.cells.get(`${x}:${y}`);
+            if (!candidates) continue;
+            for (const otherId of candidates) {
+              if (state.connectedIds.has(otherId) || !g.hasNode(otherId)) continue;
+              const other = g.getNodeAttributes(otherId);
+              const otherPosition = { x: Number(other.x), y: Number(other.y) };
+              let dx = otherPosition.x - position.x;
+              let dy = otherPosition.y - position.y;
+              let distance = Math.hypot(dx, dy);
+              if (distance < 0.0001) {
+                const direction = stableDragDirection(id, otherId);
+                dx = direction.x;
+                dy = direction.y;
+                distance = 1;
+              }
+              if (distance >= state.collisionRadius) continue;
+              const push = state.collisionRadius - distance + 0.001;
+              g.mergeNodeAttributes(otherId, {
+                x: otherPosition.x + (dx / distance) * push,
+                y: otherPosition.y + (dy / distance) * push,
+              });
+              state.transientIds.add(otherId);
+            }
+          }
+        }
+      }
+      sigmaRef.current?.refresh();
+    };
+
+    const scheduleDragFrame = () => {
+      const state = dragStateRef.current;
+      if (!state || state.frameId != null) return;
+      state.frameId = window.requestAnimationFrame(applyDragFrame);
+    };
+
+    const releaseTemporaryNodes = (state: DragState) => {
+      const g = sigmaRef.current?.getGraph();
+      if (!g) return;
+      const rootOrigin = state.origin.get(state.nodeId);
+      if (!rootOrigin) return;
+      const root = g.getNodeAttributes(state.nodeId);
+      const delta = {
+        x: Number(root.x) - rootOrigin.x,
+        y: Number(root.y) - rootOrigin.y,
+      };
+      const groupPositions = [...state.connectedIds]
+        .map((id) => state.origin.get(id))
+        .filter((position): position is GraphPosition => Boolean(position))
+        .map((position) => ({ x: position.x + delta.x, y: position.y + delta.y }));
+      const start = new Map<string, GraphPosition>();
+      const target = new Map<string, GraphPosition>();
+
+      for (const id of state.transientIds) {
+        if (state.connectedIds.has(id) || !g.hasNode(id)) continue;
+        const origin = state.origin.get(id);
+        if (!origin) continue;
+        const current = g.getNodeAttributes(id);
+        const from = { x: Number(current.x), y: Number(current.y) };
+        const settled = { ...origin };
+
+        // Restore each incidental obstacle to its source position unless the
+        // relocated connected group now occupies it. In that case it retains
+        // only the minimum offset needed to avoid an overlap.
+        for (const groupPosition of groupPositions) {
+          let dx = settled.x - groupPosition.x;
+          let dy = settled.y - groupPosition.y;
+          let distance = Math.hypot(dx, dy);
+          if (distance < 0.0001) {
+            const direction = stableDragDirection(state.nodeId, id);
+            dx = direction.x;
+            dy = direction.y;
+            distance = 1;
+          }
+          if (distance < state.collisionRadius) {
+            const push = state.collisionRadius - distance + 0.001;
+            settled.x += (dx / distance) * push;
+            settled.y += (dy / distance) * push;
+          }
+        }
+        if (Math.hypot(from.x - settled.x, from.y - settled.y) > 0.01) {
+          start.set(id, from);
+          target.set(id, settled);
+        }
+      }
+      if (target.size === 0) return;
+
+      const release: DragReleaseState = {
+        start,
+        target,
+        frameId: null,
+        startedAt: performance.now(),
+      };
+      dragReleaseRef.current = release;
+      const animateRelease = () => {
+        const current = dragReleaseRef.current;
+        const releaseGraph = sigmaRef.current?.getGraph();
+        if (current !== release || !releaseGraph) return;
+        const progress = Math.min(1, (performance.now() - release.startedAt) / DRAG_COLLISION_RELEASE_MS);
+        const eased = 1 - (1 - progress) ** 3;
+        release.target.forEach((position, id) => {
+          const from = release.start.get(id);
+          if (!from || !releaseGraph.hasNode(id)) return;
+          releaseGraph.mergeNodeAttributes(id, {
+            x: from.x + (position.x - from.x) * eased,
+            y: from.y + (position.y - from.y) * eased,
+          });
+        });
+        sigmaRef.current?.refresh();
+        if (progress < 1) {
+          release.frameId = window.requestAnimationFrame(animateRelease);
+        } else {
+          release.frameId = null;
+          dragReleaseRef.current = null;
+        }
+      };
+      release.frameId = window.requestAnimationFrame(animateRelease);
+    };
+
     sigma.on('downNode', ({ node }) => {
+      const g = sigmaRef.current?.getGraph();
+      if (!g || !g.hasNode(node)) return;
+      finishDragRelease();
       draggingRef.current = node;
       layoutRef.current?.stop();
-    });
-    const mouse = sigma.getMouseCaptor();
-    mouse.on('mousemovebody', (e) => {
-      const node = draggingRef.current;
-      const g = sigmaRef.current?.getGraph();
-      if (!node || !g || !g.hasNode(node)) return;
-      const pos = sigma.viewportToGraph(e);
-      g.setNodeAttribute(node, 'x', pos.x);
-      g.setNodeAttribute(node, 'y', pos.y);
-      // Pixel-based push radius (~70px) so it stays consistent regardless of the
-      // layout's coordinate scale or current zoom.
-      const rim = sigma.viewportToGraph({ x: e.x + 70, y: e.y });
-      const radius = Math.hypot(rim.x - pos.x, rim.y - pos.y);
-      g.forEachNode((other, a) => {
-        if (other === node) return;
-        const ox = Number(a.x);
-        const oy = Number(a.y);
-        const dx = ox - pos.x;
-        const dy = oy - pos.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 0.0001 && dist < radius) {
-          const push = (radius - dist) * 0.5; // soft, settles within a few frames
-          g.setNodeAttribute(other, 'x', ox + (dx / dist) * push);
-          g.setNodeAttribute(other, 'y', oy + (dy / dist) * push);
-        }
+
+      const origin = new Map<string, GraphPosition>();
+      g.forEachNode((id, attrs) => {
+        origin.set(id, { x: Number(attrs.x), y: Number(attrs.y) });
       });
+      const root = origin.get(node);
+      if (!root) return;
+      const rootViewport = sigma.graphToViewport(root);
+      const rim = sigma.viewportToGraph({ x: rootViewport.x + DRAG_COLLISION_RADIUS_PX, y: rootViewport.y });
+      const collisionRadius = Math.max(0.0001, Math.hypot(rim.x - root.x, rim.y - root.y));
+      const cellSize = collisionRadius * 2;
+      const cells = new Map<string, string[]>();
+      origin.forEach((position, id) => {
+        const key = dragCellKey(position, cellSize);
+        const bucket = cells.get(key) ?? [];
+        bucket.push(id);
+        cells.set(key, bucket);
+      });
+      const connectedIds = new Set<string>([node]);
+      for (const neighbor of g.neighbors(node)) {
+        if (g.hasNode(neighbor)) connectedIds.add(neighbor);
+      }
+      dragStateRef.current = {
+        nodeId: node,
+        origin,
+        connectedIds,
+        cellSize,
+        cells,
+        collisionRadius,
+        target: null,
+        transientIds: new Set(connectedIds),
+        frameId: null,
+      };
+    });
+
+    const mouse = sigma.getMouseCaptor();
+    const onMouseMove = (e: any) => {
+      const state = dragStateRef.current;
+      if (!state) return;
+      state.target = sigma.viewportToGraph(e);
+      scheduleDragFrame();
       e.preventSigmaDefault();
       e.original.preventDefault();
       e.original.stopPropagation();
-    });
+    };
+    mouse.on('mousemovebody', onMouseMove);
     const endDrag = () => {
+      const state = dragStateRef.current;
+      if (!state) return;
+      if (state.frameId != null) {
+        window.cancelAnimationFrame(state.frameId);
+        state.frameId = null;
+        applyDragFrame();
+      }
+      dragStateRef.current = null;
       draggingRef.current = null;
+      releaseTemporaryNodes(state);
     };
     mouse.on('mouseup', endDrag);
     sigma.getCamera().on('updated', onCameraUpdated);
 
     return () => {
+      const drag = dragStateRef.current;
+      if (drag?.frameId != null) window.cancelAnimationFrame(drag.frameId);
+      const release = dragReleaseRef.current;
+      if (release?.frameId != null) window.cancelAnimationFrame(release.frameId);
+      dragStateRef.current = null;
+      dragReleaseRef.current = null;
+      draggingRef.current = null;
+      mouse.removeListener('mousemovebody', onMouseMove);
+      mouse.removeListener('mouseup', endDrag);
       sigma.getCamera().removeListener('updated', onCameraUpdated);
       sigma.kill();
       sigmaRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep reducers fresh (they capture theme + depth via closures).
@@ -454,6 +747,28 @@ export function SigmaGraph({
     // Persist current positions so re-filtering / growth is incremental.
     const existing = detailGraphRef.current;
     if (existing) {
+      // A filter/data change can arrive while a node is being dragged or while
+      // incidental obstacles are settling. Finalise that transient state before
+      // taking the persistent position snapshot for the rebuilt graph.
+      const drag = dragStateRef.current;
+      if (drag) {
+        if (drag.frameId != null) window.cancelAnimationFrame(drag.frameId);
+        for (const id of drag.transientIds) {
+          if (drag.connectedIds.has(id) || !existing.hasNode(id)) continue;
+          const origin = drag.origin.get(id);
+          if (origin) existing.mergeNodeAttributes(id, origin);
+        }
+        dragStateRef.current = null;
+        draggingRef.current = null;
+      }
+      const release = dragReleaseRef.current;
+      if (release) {
+        if (release.frameId != null) window.cancelAnimationFrame(release.frameId);
+        release.target.forEach((position, id) => {
+          if (existing.hasNode(id)) existing.mergeNodeAttributes(id, position);
+        });
+        dragReleaseRef.current = null;
+      }
       existing.forEachNode((id, attrs) => {
         if (typeof attrs.x === 'number' && typeof attrs.y === 'number') {
           prevPositionsRef.current.set(id, { x: attrs.x, y: attrs.y });
@@ -523,6 +838,7 @@ export function SigmaGraph({
         applyFocusForEdge(id);
         return true;
       },
+      focusTutor,
       clearFocus,
       reset: () => {
         const g = detailGraphRef.current;
@@ -547,7 +863,7 @@ export function SigmaGraph({
     };
     onApiReady(api);
     return () => onApiReady(null);
-  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, switchMode]);
+  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, focusTutor, switchMode]);
 
   // Final teardown.
   useEffect(() => {

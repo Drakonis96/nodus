@@ -89,6 +89,16 @@ export function EmbeddingProgressBar() {
             <Icon name="stop" size={16} />
           </button>
         )}
+        {!active && (
+          <button
+            className="btn btn-ghost"
+            title="Ocultar cola de embeddings terminada"
+            aria-label="Ocultar cola de embeddings terminada"
+            onClick={() => void window.nodus.clearEmbeddingProgress()}
+          >
+            <Icon name="trash" size={16} />
+          </button>
+        )}
       </div>
     </div>
   );

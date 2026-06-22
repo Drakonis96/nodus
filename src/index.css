@@ -88,7 +88,8 @@ body {
   border-color: #fecaca;
 }
 
-.light .bg-neutral-950 {
+.light .bg-neutral-950,
+.light .bg-neutral-950\/95 {
   background-color: #f8fafc;
 }
 .light .bg-neutral-950\/35 {

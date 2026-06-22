@@ -73,6 +73,23 @@ export function stopEmbedding(): void {
   state.paused = false;
 }
 
+/**
+ * Dismiss the finished embedding queue without touching the embeddings already
+ * written to the database. A live pipeline must be stopped first.
+ */
+export function clearEmbeddingProgress(): void {
+  if (state.running) return;
+  state.paused = false;
+  state.stopRequested = false;
+  state.works = [];
+  state.currentWorkIndex = 0;
+  state.ideasEmbedded = 0;
+  state.totalIdeas = 0;
+  state.currentIdeaIndex = 0;
+  state.error = null;
+  emit();
+}
+
 async function waitIfPaused(): Promise<boolean> {
   while (state.paused && !state.stopRequested) {
     await new Promise((r) => setTimeout(r, PAUSE_POLL_MS));

@@ -435,16 +435,11 @@ export function ResearchAssistantModal({
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
-  const handleCitation = useCallback(
-    (c: MarkdownCitation) => {
-      if (c.kind === 'idea' && onOpenGraph) {
-        onOpenGraph({ preset: 'overview', nodeId: c.id, label: 'Idea citada por el asistente' });
-        return;
-      }
-      setCitation({ kind: c.kind, id: c.id });
-    },
-    [onOpenGraph]
-  );
+  // Citations always open their evidence first. Navigation to the graph remains
+  // available from that detail modal, rather than unexpectedly closing the chat.
+  const handleCitation = useCallback((c: MarkdownCitation) => {
+    setCitation({ kind: c.kind, id: c.id });
+  }, []);
   const openGraphFromCitation = useCallback(
     (target: PendingGraphNavigationTarget) => {
       setCitation(null);

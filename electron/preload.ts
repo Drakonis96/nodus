@@ -97,8 +97,10 @@ const api: NodusApi = {
 
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
   listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
+  saveTutorRoute: (plan, route, model, rating) => ipcRenderer.invoke('tutor:routes:save', plan, route, model, rating),
   rateTutorRoute: (routeId, rating) => ipcRenderer.invoke('tutor:routes:rate', routeId, rating),
   markTutorRoutePlayed: (routeId) => ipcRenderer.invoke('tutor:routes:played', routeId),
+  deleteTutorRoute: (routeId) => ipcRenderer.invoke('tutor:routes:delete', routeId).then(() => undefined),
   tutorStep: (request) => ipcRenderer.invoke('tutor:step', request),
   tutorStepStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -135,6 +137,7 @@ const api: NodusApi = {
   pauseEmbedding: () => ipcRenderer.invoke('embeddings:pause').then(() => undefined),
   resumeEmbedding: () => ipcRenderer.invoke('embeddings:resume').then(() => undefined),
   stopEmbedding: () => ipcRenderer.invoke('embeddings:stop').then(() => undefined),
+  clearEmbeddingProgress: () => ipcRenderer.invoke('embeddings:clearProgress').then(() => undefined),
   getEmbeddingStatus: () => ipcRenderer.invoke('embeddings:status'),
   getWorkEmbeddingStatuses: (nodusIds) => ipcRenderer.invoke('embeddings:workStatuses', nodusIds),
   onEmbeddingProgress: (cb) => {

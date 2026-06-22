@@ -58,7 +58,7 @@ export function SourceCitationModal({
         </header>
         <div className="flex-1 min-h-0 overflow-y-auto p-4">
           {target?.kind === 'idea' && <IdeaBody globalId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
-          {target?.kind === 'work' && <WorkBody nodusId={target.id} />}
+          {target?.kind === 'work' && <WorkBody nodusId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
           {target?.kind === 'gap' && <GapBody gapId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
           {target?.kind === 'contradiction' && (
             <ContradictionBody edgeId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />
@@ -367,7 +367,15 @@ const ITEM_TYPE_ES: Record<string, string> = {
   encyclopediaArticle: 'entrada de enciclopedia',
 };
 
-function WorkBody({ nodusId }: { nodusId: string }) {
+function WorkBody({
+  nodusId,
+  onClose,
+  onOpenGraph,
+}: {
+  nodusId: string;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
   const [work, setWork] = useState<WorkView | null>(null);
   const [meta, setMeta] = useState<WorkMeta | null>(null);
   const [missing, setMissing] = useState(false);
@@ -429,13 +437,39 @@ function WorkBody({ nodusId }: { nodusId: string }) {
         {year && <div className="text-xs text-neutral-500 mt-0.5">{year}</div>}
         {venue.length > 0 && <div className="text-xs text-neutral-400 mt-1">{venue.join(' · ')}</div>}
         {meta?.doi && <div className="text-xs font-mono text-neutral-500 mt-1 truncate">doi:{meta.doi}</div>}
+        {work.themes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {work.themes.slice(0, 8).map((theme) => (
+              <Badge key={theme}>{theme}</Badge>
+            ))}
+          </div>
+        )}
       </div>
-      <button
-        className="btn btn-primary gap-1.5 self-start"
-        onClick={() => void window.nodus.openInZotero(work.zotero_key)}
-      >
-        <Icon name="external" size={14} /> Abrir en Zotero
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="btn btn-primary gap-1.5"
+          onClick={() => void window.nodus.openInZotero(work.zotero_key)}
+        >
+          <Icon name="external" size={14} /> Abrir en Zotero
+        </button>
+        {onOpenGraph && (
+          <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5"
+            onClick={() => {
+              onClose();
+              onOpenGraph({
+                preset: 'reading',
+                workId: work.nodus_id,
+                workTitle: work.title,
+                zoteroKey: work.zotero_key,
+                label: `Ideas y conexiones: ${work.title}`,
+              });
+            }}
+          >
+            <Icon name="layers" size={14} /> Ver ideas y conexiones
+          </button>
+        )}
+      </div>
     </div>
   );
 }

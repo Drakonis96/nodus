@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorSavedRoute, TutorStop } from '@shared/types';
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { Markdown } from '../components/Markdown';
+import { ConfirmModal } from '../components/ConfirmModal';
 
 type Phase = 'setup' | 'routes' | 'touring';
 type SetupTab = 'generate' | 'saved';
@@ -46,8 +47,15 @@ export function TutorPanel({
   const [steps, setSteps] = useState<Record<string, StepState>>({});
   const [savedRoutes, setSavedRoutes] = useState<TutorSavedRoute[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
-  // Guards against duplicate in-flight requests for the same stop.
-  const inFlight = useRef<Set<string>>(new Set());
+  const [completionRating, setCompletionRating] = useState<number | null>(null);
+  const [savingRoute, setSavingRoute] = useState(false);
+  const [savedCurrentRouteId, setSavedCurrentRouteId] = useState<string | null>(null);
+  const [pendingRouteDelete, setPendingRouteDelete] = useState<TutorSavedRoute | null>(null);
+  // Keep the latest text outside the render closure and retain the in-flight
+  // promise. A user can advance before streaming ends; the next stop must wait
+  // for the preceding conclusion instead of narrating against stale state.
+  const stepsRef = useRef<Record<string, StepState>>({});
+  const stepRequestsRef = useRef<Map<string, Promise<string | null>>>(new Map());
 
   const availableModels = useMemo(() => {
     const models: ModelRef[] = [];
@@ -77,39 +85,60 @@ export function TutorPanel({
     void loadSavedRoutes();
   }, [loadSavedRoutes]);
 
-  const loadStep = useCallback(
-    async (activeRoute: TutorRoute, index: number) => {
-      const key = stepKey(activeRoute.id, index);
-      if (inFlight.current.has(key)) return;
-      if (steps[key]?.text && !steps[key].error) return;
-      inFlight.current.add(key);
-      setSteps((cur) => ({ ...cur, [key]: { text: '', loading: true, error: false } }));
+  const updateSteps = useCallback((update: (current: Record<string, StepState>) => Record<string, StepState>) => {
+    setSteps((current) => {
+      const next = update(current);
+      stepsRef.current = next;
+      return next;
+    });
+  }, []);
+
+  const loadStep = useCallback((activeRoute: TutorRoute, index: number): Promise<string | null> => {
+    const key = stepKey(activeRoute.id, index);
+    const existing = stepsRef.current[key];
+    if (existing?.text && !existing.error) return Promise.resolve(existing.text);
+    const pending = stepRequestsRef.current.get(key);
+    if (pending) return pending;
+
+    const request = (async (): Promise<string | null> => {
+      let previousText: string | undefined;
+      if (index > 0) {
+        const previousKey = stepKey(activeRoute.id, index - 1);
+        previousText = stepsRef.current[previousKey]?.text;
+        // Do not generate skipped stops just to fill context, but when the
+        // preceding stop is already streaming, wait for its complete ending.
+        if (!previousText) previousText = (await stepRequestsRef.current.get(previousKey)) ?? undefined;
+      }
+
+      updateSteps((current) => ({ ...current, [key]: { text: '', loading: true, error: false } }));
       try {
         const history = activeRoute.stops.slice(0, index).map((s) => s.title);
-        const previousText = index > 0 ? steps[stepKey(activeRoute.id, index - 1)]?.text : undefined;
         const response = await window.nodus.tutorStepStream(
           { route: activeRoute, stopIndex: index, overview: tourOverview, history, previousText, model: tourModel },
           {
             onDelta: (delta) => {
-              setSteps((cur) => {
-                const prev = cur[key] ?? { text: '', loading: true, error: false };
-                return { ...cur, [key]: { ...prev, text: prev.text + delta } };
+              updateSteps((current) => {
+                const previous = current[key] ?? { text: '', loading: true, error: false };
+                return { ...current, [key]: { ...previous, text: previous.text + delta } };
               });
             },
           }
         );
-        setSteps((cur) => ({ ...cur, [key]: { text: response.explanation, loading: false, error: false } }));
+        updateSteps((current) => ({ ...current, [key]: { text: response.explanation, loading: false, error: false } }));
+        return response.explanation;
       } catch (e) {
-        setSteps((cur) => ({
-          ...cur,
+        updateSteps((current) => ({
+          ...current,
           [key]: { text: e instanceof Error ? e.message : String(e), loading: false, error: true },
         }));
+        return null;
       } finally {
-        inFlight.current.delete(key);
+        stepRequestsRef.current.delete(key);
       }
-    },
-    [steps, tourModel, tourOverview]
-  );
+    })();
+    stepRequestsRef.current.set(key, request);
+    return request;
+  }, [tourModel, tourOverview, updateSteps]);
 
   // Spotlight the current stop on the real graph and ensure its narration is loaded.
   useEffect(() => {
@@ -147,6 +176,8 @@ export function TutorPanel({
         model: selectedModel,
       });
       setPlan(result);
+      stepsRef.current = {};
+      stepRequestsRef.current.clear();
       setSteps({});
       await loadSavedRoutes();
       setPhase('routes');
@@ -168,10 +199,14 @@ export function TutorPanel({
     setTourOverview(overview);
     setTourModel(model);
     setStopIndex(0);
+    setCompletionRating(null);
+    setSavedCurrentRouteId(origin === 'saved' ? r.id : null);
     setPhase('touring');
-    const saved = await window.nodus.markTutorRoutePlayed(r.id).catch(() => null);
-    if (saved) {
-      setSavedRoutes((cur) => [saved, ...cur.filter((item) => item.id !== saved.id)]);
+    if (origin === 'saved') {
+      const saved = await window.nodus.markTutorRoutePlayed(r.id).catch(() => null);
+      if (saved) {
+        setSavedRoutes((cur) => [saved, ...cur.filter((item) => item.id !== saved.id)]);
+      }
     }
   };
 
@@ -189,6 +224,27 @@ export function TutorPanel({
       const next = [saved, ...cur.filter((item) => item.id !== saved.id)];
       return next.sort((a, b) => (b.lastPlayedAt ?? b.generatedAt).localeCompare(a.lastPlayedAt ?? a.generatedAt));
     });
+  };
+
+  const saveCompletedRoute = async () => {
+    if (!route || !plan || !completionRating || savingRoute || savedCurrentRouteId) return;
+    setSavingRoute(true);
+    try {
+      const saved = await window.nodus.saveTutorRoute(plan, route, tourModel, completionRating);
+      if (!saved) return;
+      setSavedCurrentRouteId(saved.id);
+      setSavedRoutes((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+    } finally {
+      setSavingRoute(false);
+    }
+  };
+
+  const deleteSavedRoute = async () => {
+    const saved = pendingRouteDelete;
+    if (!saved) return;
+    await window.nodus.deleteTutorRoute(saved.id);
+    setSavedRoutes((current) => current.filter((item) => item.id !== saved.id));
+    setPendingRouteDelete(null);
   };
 
   const close = () => {
@@ -253,6 +309,7 @@ export function TutorPanel({
                 loading={savedLoading}
                 onStart={(saved) => void startRoute(saved.route, 'saved', saved.overview, saved.model ?? selectedModel)}
                 onRate={(routeId, rating) => void rateRoute(routeId, rating)}
+                onDelete={setPendingRouteDelete}
                 onRefresh={() => void loadSavedRoutes()}
               />
             )}
@@ -262,9 +319,7 @@ export function TutorPanel({
         {phase === 'routes' && plan && (
           <RoutesPanel
             plan={plan}
-            savedRoutes={savedRoutes}
             onStart={(r) => void startRoute(r, 'generated', plan.overview, selectedModel)}
-            onRate={(routeId, rating) => void rateRoute(routeId, rating)}
           />
         )}
 
@@ -276,6 +331,12 @@ export function TutorPanel({
             step={currentStep}
             onJump={setStopIndex}
             onRetry={() => void loadStep(route, stopIndex)}
+            showSavePrompt={tourOrigin === 'generated' && !savedCurrentRouteId}
+            isSaved={!!savedCurrentRouteId}
+            completionRating={completionRating}
+            savingRoute={savingRoute}
+            onCompletionRating={setCompletionRating}
+            onSave={() => void saveCompletedRoute()}
           />
         )}
       </div>
@@ -300,6 +361,16 @@ export function TutorPanel({
             Siguiente <Icon name="chevronRight" />
           </button>
         </footer>
+      )}
+      {pendingRouteDelete && (
+        <ConfirmModal
+          title="Eliminar recorrido guardado"
+          message={<>Se eliminará «{pendingRouteDelete.route.title}». Esta acción no se puede deshacer.</>}
+          confirmLabel="Eliminar"
+          danger
+          onConfirm={() => void deleteSavedRoute()}
+          onCancel={() => setPendingRouteDelete(null)}
+        />
       )}
     </aside>
   );
@@ -447,16 +518,11 @@ function ModeCard({
 
 function RoutesPanel({
   plan,
-  savedRoutes,
   onStart,
-  onRate,
 }: {
   plan: TutorPlan;
-  savedRoutes: TutorSavedRoute[];
   onStart: (route: TutorRoute) => void;
-  onRate: (routeId: string, rating: number | null) => void;
 }) {
-  const ratingByRoute = new Map(savedRoutes.map((saved) => [saved.id, saved.rating]));
   return (
     <div className="p-4 space-y-4">
       <div className="space-y-2">
@@ -491,10 +557,6 @@ function RoutesPanel({
               </div>
               {route.description && <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">{route.description}</p>}
             </button>
-            <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-800/70 pt-2">
-              <span className="text-[11px] text-neutral-500">Valoración</span>
-              <RatingStars rating={ratingByRoute.get(route.id) ?? null} onChange={(rating) => onRate(route.id, rating)} />
-            </div>
           </div>
         ))}
       </div>
@@ -507,12 +569,14 @@ function SavedRoutesPanel({
   loading,
   onStart,
   onRate,
+  onDelete,
   onRefresh,
 }: {
   routes: TutorSavedRoute[];
   loading: boolean;
   onStart: (route: TutorSavedRoute) => void;
   onRate: (routeId: string, rating: number | null) => void;
+  onDelete: (route: TutorSavedRoute) => void;
   onRefresh: () => void;
 }) {
   return (
@@ -528,7 +592,7 @@ function SavedRoutesPanel({
         <Spinner label="Cargando recorridos…" />
       ) : routes.length === 0 ? (
         <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-4 text-sm text-neutral-500">
-          Todavía no hay recorridos guardados. Genera uno con el Tutor y aparecerá aquí para repetirlo sin volver a llamar al modelo.
+          Todavía no hay recorridos guardados. Completa una ruta, puntúala y elige guardarla para repetirla sin volver a llamar al modelo.
         </div>
       ) : (
         <div className="space-y-2">
@@ -545,13 +609,23 @@ function SavedRoutesPanel({
                   </div>
                   {saved.prompt && <p className="mt-1 text-xs text-neutral-500 line-clamp-2">{saved.prompt}</p>}
                 </div>
-                <button className="btn btn-primary px-2 py-1 gap-1 shrink-0" onClick={() => onStart(saved)} title="Iniciar recorrido">
-                  <Icon name="play" size={14} /> Play
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button className="btn btn-primary px-2 py-1 gap-1" onClick={() => onStart(saved)} title="Iniciar recorrido">
+                    <Icon name="play" size={14} /> Play
+                  </button>
+                  <button
+                    className="btn btn-ghost px-2 py-1 text-red-400 hover:text-red-300"
+                    onClick={() => onDelete(saved)}
+                    title="Eliminar recorrido guardado"
+                    aria-label={`Eliminar recorrido guardado: ${saved.route.title}`}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
               </div>
               <div className="mt-2 flex items-center justify-between gap-2 border-t border-neutral-800/70 pt-2">
                 <span className="text-[11px] text-neutral-500">Valoración</span>
-                <RatingStars rating={saved.rating} onChange={(rating) => onRate(saved.id, rating)} />
+                <RatingStars rating={saved.rating} onChange={(rating) => onRate(saved.id, rating)} allowClear={false} />
               </div>
             </div>
           ))}
@@ -561,7 +635,15 @@ function SavedRoutesPanel({
   );
 }
 
-function RatingStars({ rating, onChange }: { rating: number | null; onChange: (rating: number | null) => void }) {
+function RatingStars({
+  rating,
+  onChange,
+  allowClear = true,
+}: {
+  rating: number | null;
+  onChange: (rating: number | null) => void;
+  allowClear?: boolean;
+}) {
   return (
     <div className="flex items-center gap-1">
       {[1, 2, 3, 4, 5].map((value) => (
@@ -571,7 +653,7 @@ function RatingStars({ rating, onChange }: { rating: number | null; onChange: (r
           title={`${value}/5`}
           onClick={(e) => {
             e.stopPropagation();
-            onChange(rating === value ? null : value);
+            onChange(allowClear && rating === value ? null : value);
           }}
         >
           <Icon name="star" size={15} />
@@ -596,6 +678,12 @@ function TourPanel({
   step,
   onJump,
   onRetry,
+  showSavePrompt,
+  isSaved,
+  completionRating,
+  savingRoute,
+  onCompletionRating,
+  onSave,
 }: {
   route: TutorRoute;
   stop: TutorStop;
@@ -603,7 +691,14 @@ function TourPanel({
   step: StepState | undefined;
   onJump: (index: number) => void;
   onRetry: () => void;
+  showSavePrompt: boolean;
+  isSaved: boolean;
+  completionRating: number | null;
+  savingRoute: boolean;
+  onCompletionRating: (rating: number | null) => void;
+  onSave: () => void;
 }) {
+  const finished = stopIndex === route.stops.length - 1;
   return (
     <div className="p-4 space-y-3">
       <div>
@@ -650,6 +745,24 @@ function TourPanel({
           <Spinner label="El Tutor está preparando la explicación…" />
         )}
       </div>
+
+      {finished && showSavePrompt && (
+        <div className="rounded-lg border border-indigo-700/70 bg-indigo-950/20 p-3">
+          <div className="text-sm font-medium">¿Quieres guardar este recorrido?</div>
+          <p className="mt-1 text-xs text-neutral-400">Puntúalo para guardarlo y poder repetirlo después.</p>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <RatingStars rating={completionRating} onChange={onCompletionRating} />
+            <button className="btn btn-primary text-xs gap-1.5" disabled={!completionRating || savingRoute || step?.loading} onClick={onSave}>
+              <Icon name="star" size={14} /> {savingRoute ? 'Guardando…' : 'Guardar ruta'}
+            </button>
+          </div>
+        </div>
+      )}
+      {finished && isSaved && (
+        <div className="rounded-lg border border-emerald-800/60 bg-emerald-900/20 px-3 py-2 text-xs text-emerald-300">
+          <Icon name="check" size={13} className="mr-1 inline-block" /> Recorrido guardado en tu colección.
+        </div>
+      )}
     </div>
   );
 }

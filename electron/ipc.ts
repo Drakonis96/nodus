@@ -14,6 +14,8 @@ import type {
   ResearchContextSelection,
   ReprocessConnectionsOptions,
   TutorPlanRequest,
+  TutorPlan,
+  TutorRoute,
   TutorStepRequest,
   ArgumentMapRequest,
   WritingWorkshopBrief,
@@ -40,7 +42,7 @@ import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { reprocessConnections } from './ai/reprocessConnections';
-import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
+import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
@@ -291,8 +293,12 @@ export function registerIpc(
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));
   h('tutor:routes:list', async () => tutorRoutes.listTutorRoutes());
+  h('tutor:routes:save', async (_e, plan: TutorPlan, route: TutorRoute, model: ModelRef | null, rating: number) =>
+    tutorRoutes.saveTutorRoute(plan, route, model, rating)
+  );
   h('tutor:routes:rate', async (_e, routeId: string, rating: number | null) => tutorRoutes.rateTutorRoute(routeId, rating));
   h('tutor:routes:played', async (_e, routeId: string) => tutorRoutes.markTutorRoutePlayed(routeId));
+  h('tutor:routes:delete', async (_e, routeId: string) => tutorRoutes.deleteTutorRoute(routeId));
   h('tutor:step', async (_e, request: TutorStepRequest) => answerTutorStep(request));
   h('tutor:stepStream', async (e, requestId: string, request: TutorStepRequest) =>
     streamTutorStep(request, (delta) => {
@@ -338,6 +344,7 @@ export function registerIpc(
   h('embeddings:pause', async () => pauseEmbedding());
   h('embeddings:resume', async () => resumeEmbedding());
   h('embeddings:stop', async () => stopEmbedding());
+  h('embeddings:clearProgress', async () => clearEmbeddingProgress());
   h('embeddings:status', async () => getEmbeddingSnapshot());
   h('embeddings:workStatuses', async (_e, nodusIds?: string[]) => getWorkEmbeddingStatuses(nodusIds));
 

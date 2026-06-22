@@ -2438,7 +2438,7 @@ export function GraphView({
           hoverFocusTimerRef.current = null;
           if (dragStateRef.current) return;
           hoverActiveRef.current = true;
-          if (lastUserFocusRef.current) {
+          if (lastUserFocusRef.current || lastTutorFocusRef.current) {
             applyHoverAugment(target);
           } else {
             focusOnNode(target, 1);
@@ -2452,7 +2452,7 @@ export function GraphView({
         }
         if (!hoverActiveRef.current) return;
         hoverActiveRef.current = false;
-        if (lastUserFocusRef.current) clearHoverAugment();
+        if (lastUserFocusRef.current || lastTutorFocusRef.current) clearHoverAugment();
         else clearFocus();
       });
 
@@ -3391,6 +3391,11 @@ export function GraphView({
                 onClearFocus={onSigmaClear}
                 onApiReady={(api) => {
                   sigmaApiRef.current = api;
+                  clearFocusRef.current = () => api?.clearFocus();
+                  focusByIdRef.current = (nodeIds, edgeId) => {
+                    if (!api) return;
+                    api.focusTutor(nodeIds, edgeId);
+                  };
                 }}
               />
             </GraphErrorBoundary>
