@@ -10,16 +10,11 @@ import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 
-// Opt-in flag for the new Sigma (WebGL) + worker-layout + LOD renderer. The
-// Cytoscape path stays the default until the migration is verified end-to-end.
-// Precedence: an explicit localStorage choice wins (so you can A/B compare in a
-// running app), otherwise fall back to the VITE_GRAPH_ENGINE build/dev env var.
-//   • localStorage.setItem('nodus.graph.engine', 'sigma' | 'cytoscape')
-//   • VITE_GRAPH_ENGINE=sigma npm run dev
+// The Sigma (WebGL) + worker-layout + LOD renderer is the default engine.
+// Fall back to the legacy Cytoscape canvas renderer by setting:
+//   localStorage.setItem('nodus.graph.engine', 'cytoscape')
 const enginePref = typeof localStorage !== 'undefined' ? localStorage.getItem('nodus.graph.engine') : null;
-const USE_SIGMA = enginePref
-  ? enginePref === 'sigma'
-  : (import.meta as any).env?.VITE_GRAPH_ENGINE === 'sigma';
+const USE_SIGMA = enginePref !== 'cytoscape';
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
