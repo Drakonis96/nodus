@@ -156,6 +156,30 @@ body {
   background-color: #fee2e2;
 }
 
+/* Zotero tag filters use an explicit light palette so selected tags never inherit
+   dark indigo surfaces from the dark-mode utility classes. */
+.light .zotero-tag-filter.is-active {
+  background-color: #eef2ff;
+  border-color: #818cf8;
+  color: #3730a3;
+}
+.light .zotero-tag-filter.is-active .zotero-tag-filter-count {
+  background-color: #c7d2fe;
+  color: #312e81;
+}
+.light .zotero-tag-option.is-selected {
+  background-color: #eef2ff;
+  color: #3730a3;
+}
+.light .zotero-tag-chip {
+  background-color: #eef2ff;
+  border-color: #a5b4fc;
+  color: #3730a3;
+}
+.light .zotero-tag-chip:hover {
+  background-color: #e0e7ff;
+}
+
 /* Subtle, minimalist scrollbars. */
 ::-webkit-scrollbar {
   width: 8px;

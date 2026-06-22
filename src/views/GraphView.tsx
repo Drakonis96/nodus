@@ -3,7 +3,7 @@ import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
 import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT } from '../components/NodeDetailPanel';
-import { useScanComplete } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { TutorPanel } from './TutorPanel';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
@@ -1356,6 +1356,7 @@ export function GraphView({
 
   // Refresh the graph when scans finish so freshly analysed works appear without
   // having to leave and re-open the view.
+  useDataRefresh(reload);
   useScanComplete(reload);
 
   const cancelPendingDragFrame = useCallback(() => {

@@ -3,7 +3,7 @@ import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@sh
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
 import { VirtualList } from '../components/VirtualList';
-import { useScanComplete } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -38,6 +38,7 @@ export function IdeasView({
   useEffect(() => {
     reload();
   }, [reload]);
+  useDataRefresh(reload);
   useScanComplete(reload);
 
   const ideaNodes = useMemo(() => data.nodes.filter((n) => n.type !== 'theme' && n.type !== 'author'), [data.nodes]);

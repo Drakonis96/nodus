@@ -16,6 +16,7 @@ import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { Tour } from './views/Tour';
 import { Icon } from './components/ui';
+import { notifyDataChanged } from './hooks';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
@@ -78,7 +79,9 @@ export function App() {
   const onSync = async () => {
     setSyncing(true);
     try {
-      setLastSync(await window.nodus.syncNow());
+      const result = await window.nodus.syncNow();
+      setLastSync(result);
+      notifyDataChanged();
     } finally {
       setSyncing(false);
     }
@@ -214,7 +217,6 @@ export function App() {
               syncing={syncing}
               onSync={onSync}
               onNavigate={(target) => navigate(target)}
-              onOpenCollections={() => setCollectionsOpen(true)}
               onOpenAssistant={() => openAssistant()}
             />
           )}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
-import { useScanComplete } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -46,6 +46,7 @@ export function GapsView({
   useEffect(() => {
     reload();
   }, [reload]);
+  useDataRefresh(reload);
   useScanComplete(reload);
 
   const openEvidenceInZotero = async (nodusId: string) => {

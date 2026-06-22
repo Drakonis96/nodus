@@ -10,7 +10,7 @@ import type {
   WorkView,
 } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
-import { useScanComplete } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 
 type HomeTarget = 'library' | 'graph' | 'ideas' | 'gaps' | 'reading' | 'writing' | 'settings';
 
@@ -20,7 +20,6 @@ interface HomeViewProps {
   syncing: boolean;
   onSync: () => Promise<void>;
   onNavigate: (target: HomeTarget) => void;
-  onOpenCollections: () => void;
   onOpenAssistant: () => void;
 }
 
@@ -40,7 +39,6 @@ export function HomeView({
   syncing,
   onSync,
   onNavigate,
-  onOpenCollections,
   onOpenAssistant,
 }: HomeViewProps) {
   const [snapshot, setSnapshot] = useState<HomeSnapshot | null>(null);
@@ -73,6 +71,7 @@ export function HomeView({
   useEffect(() => {
     void reload();
   }, [reload]);
+  useDataRefresh(reload);
 
   useEffect(() => {
     return window.nodus.onQueueProgress((queue) => {
@@ -91,7 +90,6 @@ export function HomeView({
 
   const runSync = async () => {
     await onSync();
-    await reload();
   };
 
   const indexPending = async () => {
@@ -116,14 +114,6 @@ export function HomeView({
             Estado operativo de Zotero, análisis, grafo y próximos pasos.
           </p>
         </div>
-        <div className="flex-1" />
-        <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onOpenCollections}>
-          <Icon name="folder" /> Colecciones
-        </button>
-        <button className="btn btn-primary gap-1.5" onClick={() => void runSync()} disabled={syncing || refreshing}>
-          <Icon name="sync" className={syncing || refreshing ? 'animate-spin' : ''} />
-          {syncing ? 'Actualizando...' : 'Actualizar'}
-        </button>
       </div>
 
       {error && (

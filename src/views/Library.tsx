@@ -13,6 +13,7 @@ import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
+import { useDataRefresh } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -105,6 +106,7 @@ export function Library({
   useEffect(() => {
     void load();
   }, [load]);
+  useDataRefresh(load);
 
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light', scanModel);
@@ -281,14 +283,14 @@ export function Library({
           <div className="relative">
             <button
               type="button"
-              className={`btn border gap-1.5 ${selectedZoteroTags.length ? 'border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+              className={`zotero-tag-filter btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
               onClick={() => setTagFilterOpen((open) => !open)}
               aria-expanded={tagFilterOpen}
               aria-haspopup="dialog"
             >
               <Icon name="tag" /> Etiquetas Zotero
               {selectedZoteroTags.length > 0 && (
-                <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                <span className="zotero-tag-filter-count rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
                   {selectedZoteroTags.length}
                 </span>
               )}
@@ -336,8 +338,8 @@ export function Library({
                       <button
                         key={tag.label}
                         type="button"
-                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
-                          checked ? 'bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
+                        className={`zotero-tag-option flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                          checked ? 'is-selected bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
                         }`}
                         onClick={() => toggleZoteroTag(tag.label)}
                       >
@@ -383,7 +385,7 @@ export function Library({
               <button
                 key={tag}
                 type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
+                className="zotero-tag-chip inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
                 onClick={() => toggleZoteroTag(tag)}
                 title={`Quitar ${tag}`}
               >

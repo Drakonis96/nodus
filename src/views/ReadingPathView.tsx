@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReadingPathEntry, ReadingPathPlan, ReadingPathStrategy } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
-import { useScanComplete } from '../hooks';
+import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -54,6 +54,7 @@ export function ReadingPathView({
   useEffect(() => {
     void reload();
   }, []);
+  useDataRefresh(reload);
   useScanComplete(reload);
 
   const phases = plan?.phases ?? [];
