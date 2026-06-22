@@ -10,13 +10,13 @@
 //
 // Sigma reserves the `type` display attribute to pick the drawing program, so
 // the *semantic* node/edge type is stored under `kind`.
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from 'react';
 import Graph from 'graphology';
 import Sigma from 'sigma';
 import type { GraphData, GraphNodeType } from '@shared/types';
 import { NODE_COLORS } from '../../components/ui';
 import type { GraphPresetId } from '../../navigation';
-import { buildGraphModel, EDGE_TYPE_COLORS, clampUnit, type GraphFilters, type GraphLens } from './model';
+import { buildGraphModel, EDGE_TYPE_COLORS, clampUnit, type GraphFilters, type GraphLens, type GraphModel } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
 import { WorkerLayout, seedMissingPositions, scatterPositions } from './layout';
 import { computeClusters, type AggregatedGraph } from './lod';
@@ -24,6 +24,8 @@ import { computeClusters, type AggregatedGraph } from './lod';
 export interface SigmaGraphApi {
   fit: () => void;
   zoomBy: (factor: number) => void;
+  /** Toggle the manual LOD view. Returns whether communities are now collapsed. */
+  toggleCommunities: () => boolean;
   focusNode: (id: string) => boolean;
   focusEdge: (id: string) => boolean;
   /** Spotlight a Tutor stop and keep it visible while the user moves the camera. */
@@ -38,11 +40,13 @@ interface SigmaGraphProps {
   filters: GraphFilters;
   lens: GraphLens;
   preset: GraphPresetId;
+  layoutMode: 'force' | 'radial';
   highlightDepth: number | null;
   lightTheme: boolean;
   onOpenNode: (id: string, label: string, type: string) => void;
   onOpenEdge: (id: string, type: string) => void;
   onClearFocus: () => void;
+  onCommunitiesChange?: (collapsed: boolean) => void;
   onApiReady?: (api: SigmaGraphApi | null) => void;
 }
 
@@ -63,6 +67,14 @@ interface FocusState {
 interface GraphPosition {
   x: number;
   y: number;
+}
+
+interface MinimapFrame {
+  x1: number;
+  y1: number;
+  scale: number;
+  offX: number;
+  offY: number;
 }
 
 interface DragState {
@@ -91,6 +103,181 @@ interface DragReleaseState {
 const DRAG_COLLISION_RADIUS_PX = 64;
 const DRAG_COLLISION_RELEASE_MS = 190;
 
+function stableUnit(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ((hash >>> 0) % 10000) / 10000;
+}
+
+/**
+ * The model-only version of the legacy radial layout. Keeping it independent of
+ * Cytoscape makes the placement deterministic for either renderer.
+ */
+function computeIdeaRadialPositions(model: GraphModel): Map<string, GraphPosition> {
+  const themes = model.nodes.filter((node) => node.type === 'theme');
+  const positions = new Map<string, GraphPosition>();
+  if (themes.length === 0) {
+    // A filtered graph can contain no themes. Stay deterministic in radial mode
+    // instead of silently starting ForceAtlas2.
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+    model.nodes.forEach((node, index) => {
+      const radius = 96 * Math.sqrt(index);
+      const angle = index * goldenAngle;
+      positions.set(node.id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+    });
+    return positions;
+  }
+
+  const themeAngle = new Map<string, number>();
+  const themeRadius = themes.length === 1 ? 0 : Math.min(1040, 320 + themes.length * 44);
+  themes.forEach((theme, index) => {
+    const angle = ((-90 + (index * 360) / themes.length) * Math.PI) / 180;
+    themeAngle.set(theme.id, angle);
+    positions.set(theme.id, { x: themeRadius * Math.cos(angle), y: themeRadius * Math.sin(angle) });
+  });
+
+  const nodeById = new Map(model.nodes.map((node) => [node.id, node]));
+  const themesByIdea = new Map<string, string[]>();
+  for (const edge of model.edges) {
+    if (edge.type !== 'contains') continue;
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    if (source?.type !== 'theme' || !target || target.type === 'theme') continue;
+    const list = themesByIdea.get(target.id) ?? [];
+    list.push(source.id);
+    themesByIdea.set(target.id, list);
+  }
+
+  const groups = new Map<string, string[]>();
+  themes.forEach((theme) => groups.set(theme.id, []));
+  const orphans: string[] = [];
+  for (const node of model.nodes) {
+    if (node.type === 'theme') continue;
+    const themeId = (themesByIdea.get(node.id) ?? []).find((id) => themeAngle.has(id));
+    if (themeId) groups.get(themeId)?.push(node.id);
+    else orphans.push(node.id);
+  }
+
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const clusterStep = 134;
+  let maxRadius = themeRadius + 220;
+  for (const [themeId, members] of groups) {
+    const angle = themeAngle.get(themeId)!;
+    const themePosition = positions.get(themeId)!;
+    const clusterDistance = 360 + Math.min(420, Math.sqrt(members.length) * 76);
+    const center = {
+      x: themePosition.x + clusterDistance * Math.cos(angle),
+      y: themePosition.y + clusterDistance * Math.sin(angle),
+    };
+    members.forEach((id, index) => {
+      const jitter = (stableUnit(id) - 0.5) * 0.7;
+      const radius = members.length === 1 ? 0 : 42 + clusterStep * Math.sqrt(index + 1);
+      const memberAngle = angle + index * goldenAngle + jitter;
+      const position = {
+        x: center.x + radius * Math.cos(memberAngle),
+        y: center.y + radius * Math.sin(memberAngle),
+      };
+      positions.set(id, position);
+      maxRadius = Math.max(maxRadius, Math.hypot(position.x, position.y));
+    });
+  }
+
+  const orphanRadius = maxRadius + 340;
+  orphans.forEach((id, index) => {
+    const radius = orphanRadius + 58 * Math.sqrt(index);
+    const angle = index * goldenAngle;
+    positions.set(id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+  });
+
+  // Preserve the legacy layout's small deterministic pull between related ideas
+  // without allowing the result to drift like a force simulation.
+  const relationEdges = model.edges.filter((edge) => {
+    if (edge.type === 'contains') return false;
+    const source = nodeById.get(edge.source);
+    const target = nodeById.get(edge.target);
+    return source?.type !== 'theme' && target?.type !== 'theme';
+  });
+  const strengthByType: Record<string, number> = {
+    contradicts: 0.42,
+    refutes: 0.42,
+    supports: 0.38,
+    extends: 0.34,
+    applies_to: 0.3,
+    shares_method: 0.26,
+    measures_same: 0.26,
+    precondition_of: 0.3,
+  };
+  for (let iteration = 0; iteration < 70; iteration++) {
+    for (const edge of relationEdges) {
+      const source = positions.get(edge.source);
+      const target = positions.get(edge.target);
+      if (!source || !target) continue;
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const confidence = Math.min(1, Math.max(0.1, edge.confidence));
+      const ideal = edge.type === 'contradicts' || edge.type === 'refutes' ? 190 : 145 + (1 - confidence) * 70;
+      const pull = ((distance - ideal) / distance) * (strengthByType[edge.type] ?? 0.24) * confidence * 0.045;
+      const moveX = dx * pull;
+      const moveY = dy * pull;
+      source.x += moveX;
+      source.y += moveY;
+      target.x -= moveX;
+      target.y -= moveY;
+    }
+  }
+
+  return positions;
+}
+
+function computeAuthorRadialPositions(model: GraphModel): Map<string, GraphPosition> {
+  const nodes = model.nodes
+    .filter((node) => node.type === 'author')
+    .map((node) => ({
+      id: node.id,
+      score: Math.max(0, node.degree) * 5 + Math.max(0, node.workCount) * 2 + node.labelRank,
+    }))
+    .sort((a, b) => b.score - a.score || stableUnit(a.id) - stableUnit(b.id));
+  const positions = new Map<string, GraphPosition>();
+  if (nodes.length === 0) return positions;
+  if (nodes.length === 1) {
+    positions.set(nodes[0].id, { x: 0, y: 0 });
+    return positions;
+  }
+
+  let index = 0;
+  if (nodes.length >= 12) {
+    positions.set(nodes[index].id, { x: 0, y: 0 });
+    index++;
+  }
+  const spacing = nodes.length > 140 ? 132 : nodes.length > 80 ? 150 : 172;
+  const ringGap = nodes.length > 140 ? 176 : nodes.length > 80 ? 198 : 224;
+  for (let ring = 1; index < nodes.length; ring++) {
+    const radius = 230 + (ring - 1) * ringGap;
+    const capacity = Math.max(8 + ring * 4, Math.floor((2 * Math.PI * radius) / spacing));
+    const count = Math.min(capacity, nodes.length - index);
+    const offset = stableUnit(`author-ring:${ring}:${nodes.length}`) * Math.PI * 2;
+    for (let slot = 0; slot < count; slot++) {
+      const id = nodes[index + slot].id;
+      const angle = offset + (slot / count) * Math.PI * 2;
+      const jitter = (stableUnit(`author-jitter:${id}`) - 0.5) * Math.min(26, spacing * 0.16);
+      positions.set(id, {
+        x: (radius + jitter) * Math.cos(angle),
+        y: (radius + jitter) * Math.sin(angle),
+      });
+    }
+    index += count;
+  }
+  return positions;
+}
+
+function computeRadialLayoutPositions(model: GraphModel, lens: GraphLens): Map<string, GraphPosition> {
+  return lens === 'authors' ? computeAuthorRadialPositions(model) : computeIdeaRadialPositions(model);
+}
+
 function dragCellKey(position: GraphPosition, cellSize: number): string {
   return `${Math.floor(position.x / cellSize)}:${Math.floor(position.y / cellSize)}`;
 }
@@ -110,14 +297,17 @@ export function SigmaGraph({
   filters,
   lens,
   preset,
+  layoutMode,
   highlightDepth,
   lightTheme,
   onOpenNode,
   onOpenEdge,
   onClearFocus,
+  onCommunitiesChange,
   onApiReady,
 }: SigmaGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const detailGraphRef = useRef<Graph | null>(null);
   const overviewGraphRef = useRef<Graph | null>(null);
@@ -135,10 +325,22 @@ export function SigmaGraph({
   const dragReleaseRef = useRef<DragReleaseState | null>(null);
   const cameraRafRef = useRef<number | null>(null);
   const clusterTimerRef = useRef<number | null>(null);
+  const minimapRafRef = useRef<number | null>(null);
+  const minimapFrameRef = useRef<MinimapFrame | null>(null);
+  const radialFitRafRef = useRef<number | null>(null);
+  // null keeps automatic LOD. A boolean explicitly forces the corresponding
+  // mode after every camera event until the graph is rebuilt or reset.
+  const manualOverviewRef = useRef<boolean | null>(null);
+  const lightThemeRef = useRef(lightTheme);
+  const onCameraUpdatedRef = useRef<() => void>(() => {});
 
   const model = useMemo(() => buildGraphModel(data, filters, lens, preset), [data, filters, lens, preset]);
 
   const fadeNode = lightTheme ? '#d8d8d8' : '#2b2b2b';
+
+  useEffect(() => {
+    lightThemeRef.current = lightTheme;
+  }, [lightTheme]);
 
   // ── Build the graphology detail graph from the current model ────────────────
   const buildDetailGraph = useCallback((): Graph => {
@@ -314,7 +516,8 @@ export function SigmaGraph({
         if (!graph.hasNode(e.source) || !graph.hasNode(e.target) || graph.hasEdge(e.source, e.target)) continue;
         graph.addEdge(e.source, e.target, {
           size: 0.5 + Math.min(4, Math.log2(e.weight + 1)),
-          color: lightTheme ? 'rgba(120,120,120,0.4)' : 'rgba(150,150,150,0.3)',
+          // Sigma's WebGL edge programs require opaque hex colours.
+          color: lightTheme ? '#a3a3a3' : '#4b5563',
         });
       }
       return graph;
@@ -322,35 +525,39 @@ export function SigmaGraph({
     [lightTheme]
   );
 
-  const ensureClusters = useCallback(() => {
+  const ensureClusters = useCallback((): AggregatedGraph | null => {
     const detail = detailGraphRef.current;
-    if (!detail) return;
+    if (!detail) return null;
     clustersRef.current = computeClusters(detail);
     overviewGraphRef.current = buildOverviewGraph(clustersRef.current);
+    return clustersRef.current;
   }, [buildOverviewGraph]);
 
   const switchMode = useCallback(
-    (next: 'detail' | 'overview') => {
+    (next: 'detail' | 'overview'): boolean => {
       const sigma = sigmaRef.current;
-      if (!sigma || modeRef.current === next) return;
+      if (!sigma) return false;
+      if (modeRef.current === next) return true;
       // A focus (including the Tutor's active stop) refers to concrete detail
       // nodes. The aggregated overview has different ids, so switching to it
       // would make that focus appear to disappear while panning or zooming.
-      if (next === 'overview' && focusRef.current.active) return;
+      if (next === 'overview' && focusRef.current.active) return false;
       if (next === 'overview') {
         if (!overviewGraphRef.current) ensureClusters();
-        if (!overviewGraphRef.current) return;
+        if (!overviewGraphRef.current) return false;
         modeRef.current = 'overview';
         sigma.setGraph(overviewGraphRef.current);
       } else {
         const detail = detailGraphRef.current;
-        if (!detail) return;
+        if (!detail) return false;
         modeRef.current = 'detail';
         sigma.setGraph(detail);
       }
       sigma.refresh();
+      onCommunitiesChange?.(next === 'overview');
+      return true;
     },
-    [ensureClusters]
+    [ensureClusters, onCommunitiesChange]
   );
 
   const focusTutor = useCallback(
@@ -382,6 +589,11 @@ export function SigmaGraph({
         switchMode('detail');
         return;
       }
+      const manualOverview = manualOverviewRef.current;
+      if (manualOverview != null) {
+        switchMode(manualOverview ? 'overview' : 'detail');
+        return;
+      }
       const ratio = sigma.getCamera().ratio;
       // Only collapse to the (still-rough) overview for very large corpora where
       // the full graph genuinely can't be drawn legibly. Below this, always show
@@ -391,6 +603,157 @@ export function SigmaGraph({
       else switchMode('detail');
     });
   }, [model.nodes.length, switchMode]);
+
+  // The Sigma instance is intentionally created once. Keep its camera listener
+  // pointed at the current LOD policy when filters, theme, or callbacks change.
+  useEffect(() => {
+    onCameraUpdatedRef.current = onCameraUpdated;
+  }, [onCameraUpdated]);
+
+  const applyRadialLayout = useCallback(
+    (graph: Graph) => {
+      const positions = computeRadialLayoutPositions(model, lens);
+      positions.forEach((position, id) => {
+        if (graph.hasNode(id)) graph.mergeNodeAttributes(id, position);
+      });
+      return positions.size > 0;
+    },
+    [lens, model]
+  );
+
+  const fitRadialGraph = useCallback((graph: Graph) => {
+    if (radialFitRafRef.current != null) window.cancelAnimationFrame(radialFitRafRef.current);
+    radialFitRafRef.current = window.requestAnimationFrame(() => {
+      radialFitRafRef.current = null;
+      if (detailGraphRef.current !== graph) return;
+      void sigmaRef.current?.getCamera().animatedReset({ duration: 320 });
+    });
+  }, []);
+
+  // ── Sigma minimap ───────────────────────────────────────────────────────────
+  const drawMinimap = useCallback(() => {
+    const sigma = sigmaRef.current;
+    const graph = detailGraphRef.current;
+    const canvas = minimapRef.current;
+    if (!sigma || !graph || !canvas || graph.order === 0) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    const nodes: Array<{ id: string; x: number; y: number; size: number; color: string }> = [];
+    let x1 = Infinity;
+    let y1 = Infinity;
+    let x2 = -Infinity;
+    let y2 = -Infinity;
+    graph.forEachNode((id, attrs) => {
+      const x = Number(attrs.x);
+      const y = Number(attrs.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      nodes.push({
+        id,
+        x,
+        y,
+        size: Math.max(1, Number(attrs.size ?? 1)),
+        color: String(attrs.color ?? nodeColor(String(attrs.kind ?? ''))),
+      });
+      x1 = Math.min(x1, x);
+      y1 = Math.min(y1, y);
+      x2 = Math.max(x2, x);
+      y2 = Math.max(y2, y);
+    });
+    if (nodes.length === 0) return;
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 20;
+    const graphWidth = Math.max(x2 - x1, 1);
+    const graphHeight = Math.max(y2 - y1, 1);
+    const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight);
+    const offX = padding + (width - padding * 2 - graphWidth * scale) / 2;
+    const offY = padding + (height - padding * 2 - graphHeight * scale) / 2;
+    const toMinimap = (x: number, y: number) => ({
+      x: offX + (x - x1) * scale,
+      y: offY + (y - y1) * scale,
+    });
+    minimapFrameRef.current = { x1, y1, scale, offX, offY };
+
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = lightThemeRef.current ? '#ffffff' : '#0a0a0a';
+    context.fillRect(0, 0, width, height);
+
+    // Edges are deliberately one path: drawing each relation separately makes
+    // the minimap expensive precisely when the graph is at its largest.
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    context.strokeStyle = lightThemeRef.current ? '#a3a3a3' : '#525252';
+    context.lineWidth = 0.5;
+    context.beginPath();
+    graph.forEachEdge((_edge, _attrs, source, target) => {
+      const a = byId.get(source);
+      const b = byId.get(target);
+      if (!a || !b) return;
+      const from = toMinimap(a.x, a.y);
+      const to = toMinimap(b.x, b.y);
+      context.moveTo(from.x, from.y);
+      context.lineTo(to.x, to.y);
+    });
+    context.stroke();
+
+    for (const node of nodes) {
+      const point = toMinimap(node.x, node.y);
+      context.fillStyle = node.color;
+      context.beginPath();
+      context.arc(point.x, point.y, Math.max(1.3, Math.min(3.4, Math.sqrt(node.size))), 0, Math.PI * 2);
+      context.fill();
+    }
+
+    // Use Sigma's coordinate conversion so the viewport rectangle remains
+    // correct after its internal graph normalization.
+    const camera = sigma.getCamera();
+    const cameraState = camera.getState();
+    if (!Number.isFinite(cameraState.ratio)) return;
+    const dimensions = sigma.getDimensions();
+    const corners = [
+      sigma.viewportToGraph({ x: 0, y: 0 }),
+      sigma.viewportToGraph({ x: dimensions.width, y: 0 }),
+      sigma.viewportToGraph({ x: 0, y: dimensions.height }),
+      sigma.viewportToGraph({ x: dimensions.width, y: dimensions.height }),
+    ];
+    const viewportX1 = Math.min(...corners.map((point) => point.x));
+    const viewportY1 = Math.min(...corners.map((point) => point.y));
+    const viewportX2 = Math.max(...corners.map((point) => point.x));
+    const viewportY2 = Math.max(...corners.map((point) => point.y));
+    const topLeft = toMinimap(viewportX1, viewportY1);
+    const bottomRight = toMinimap(viewportX2, viewportY2);
+    context.strokeStyle = lightThemeRef.current ? '#171717' : '#ffffff';
+    context.lineWidth = 1.5;
+    context.strokeRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+  }, []);
+
+  const scheduleMinimapDraw = useCallback(() => {
+    if (minimapRafRef.current != null) return;
+    minimapRafRef.current = window.requestAnimationFrame(() => {
+      minimapRafRef.current = null;
+      drawMinimap();
+    });
+  }, [drawMinimap]);
+
+  const onMinimapClick = useCallback((event: ReactMouseEvent<HTMLCanvasElement>) => {
+    const sigma = sigmaRef.current;
+    const canvas = minimapRef.current;
+    const frame = minimapFrameRef.current;
+    if (!sigma || !canvas || !frame) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+    const graphPosition = {
+      x: frame.x1 + (x - frame.offX) / frame.scale,
+      y: frame.y1 + (y - frame.offY) / frame.scale,
+    };
+    // Camera coordinates use Sigma's framed graph space. Composing the two
+    // public converters gives the exact framed coordinate for the clicked raw
+    // graph position without reaching into Sigma internals.
+    const framedPosition = sigma.viewportToFramedGraph(sigma.graphToViewport(graphPosition));
+    sigma.getCamera().animate({ x: framedPosition.x, y: framedPosition.y }, { duration: 300 });
+  }, []);
 
   // ── Create the Sigma instance once ──────────────────────────────────────────
   useEffect(() => {
@@ -710,7 +1073,8 @@ export function SigmaGraph({
       releaseTemporaryNodes(state);
     };
     mouse.on('mouseup', endDrag);
-    sigma.getCamera().on('updated', onCameraUpdated);
+    const handleCameraUpdated = () => onCameraUpdatedRef.current();
+    sigma.getCamera().on('updated', handleCameraUpdated);
 
     return () => {
       const drag = dragStateRef.current;
@@ -722,11 +1086,28 @@ export function SigmaGraph({
       draggingRef.current = null;
       mouse.removeListener('mousemovebody', onMouseMove);
       mouse.removeListener('mouseup', endDrag);
-      sigma.getCamera().removeListener('updated', onCameraUpdated);
+      sigma.getCamera().removeListener('updated', handleCameraUpdated);
       sigma.kill();
       sigmaRef.current = null;
     };
   }, []);
+
+  // Sigma can render many times during a camera gesture or worker-layout tick.
+  // Coalescing afterRender updates keeps the 2D minimap from becoming a second
+  // render loop on the main thread.
+  useEffect(() => {
+    const sigma = sigmaRef.current;
+    if (!sigma) return;
+    sigma.on('afterRender', scheduleMinimapDraw);
+    scheduleMinimapDraw();
+    return () => {
+      sigma.removeListener('afterRender', scheduleMinimapDraw);
+      if (minimapRafRef.current != null) {
+        window.cancelAnimationFrame(minimapRafRef.current);
+        minimapRafRef.current = null;
+      }
+    };
+  }, [scheduleMinimapDraw]);
 
   // Keep reducers fresh (they capture theme + depth via closures).
   useEffect(() => {
@@ -786,11 +1167,25 @@ export function SigmaGraph({
     focusRef.current = { active: false, local: null, edgeId: null };
     hoverRef.current = null;
     modeRef.current = 'detail';
+    manualOverviewRef.current = null;
+    onCommunitiesChange?.(false);
 
     sigma.setGraph(graph);
-    sigma.refresh();
 
     if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
+    if (layoutMode === 'radial') {
+      // Radial is a complete preset layout. Do not instantiate the FA2 worker
+      // here: switching modes must not leave a background force simulation
+      // overwriting the deterministic positions.
+      layoutRef.current = null;
+      applyRadialLayout(graph);
+      ensureClusters();
+      sigma.refresh();
+      fitRadialGraph(graph);
+      return;
+    }
+
+    sigma.refresh();
     if (graph.order > 0) {
       const layout = new WorkerLayout(graph);
       layoutRef.current = layout;
@@ -807,7 +1202,7 @@ export function SigmaGraph({
     } else {
       layoutRef.current = null;
     }
-  }, [buildDetailGraph, ensureClusters, model]);
+  }, [applyRadialLayout, buildDetailGraph, ensureClusters, fitRadialGraph, layoutMode, model, onCommunitiesChange]);
 
   // ── Imperative API for the toolbar / navigation ─────────────────────────────
   useEffect(() => {
@@ -820,6 +1215,34 @@ export function SigmaGraph({
         const camera = sigmaRef.current?.getCamera();
         if (!camera) return;
         camera.animate({ ratio: camera.getBoundedRatio(camera.ratio / factor) }, { duration: 180 });
+      },
+      toggleCommunities: () => {
+        const detail = detailGraphRef.current;
+        if (!detail || detail.order === 0) {
+          manualOverviewRef.current = false;
+          onCommunitiesChange?.(false);
+          return false;
+        }
+        const nextCollapsed = modeRef.current !== 'overview';
+        if (nextCollapsed) {
+          const clusters = ensureClusters();
+          // Match the legacy control: a lone fallback cluster is not a useful
+          // "communities" view, so leave the detailed graph in place.
+          if (!clusters || clusters.clusters.length < 2) {
+            manualOverviewRef.current = false;
+            onCommunitiesChange?.(false);
+            return false;
+          }
+          if (focusRef.current.active) {
+            clearFocus();
+            onClearFocus();
+          }
+        }
+        manualOverviewRef.current = nextCollapsed;
+        const switched = switchMode(nextCollapsed ? 'overview' : 'detail');
+        const collapsed = switched && modeRef.current === 'overview';
+        onCommunitiesChange?.(collapsed);
+        return collapsed;
       },
       focusNode: (id) => {
         const g = detailGraphRef.current;
@@ -847,33 +1270,56 @@ export function SigmaGraph({
         hoverRef.current = null;
         hoverLocalRef.current = null;
         modeRef.current = 'detail';
+        manualOverviewRef.current = null;
+        onCommunitiesChange?.(false);
         if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
         const sigma = sigmaRef.current;
         if (g && g.order > 0) {
           if (sigma && sigma.getGraph() !== g) sigma.setGraph(g);
-          scatterPositions(g);
           layoutRef.current?.kill();
-          const layout = new WorkerLayout(g);
-          layoutRef.current = layout;
-          layout.start({ durationMs: Math.min(8000, 2500 + g.order * 1.5) });
+          if (layoutMode === 'radial') {
+            layoutRef.current = null;
+            applyRadialLayout(g);
+            ensureClusters();
+            fitRadialGraph(g);
+          } else {
+            scatterPositions(g);
+            const layout = new WorkerLayout(g);
+            layoutRef.current = layout;
+            layout.start({ durationMs: Math.min(8000, 2500 + g.order * 1.5) });
+          }
         }
         sigma?.refresh();
-        sigma?.getCamera().animatedReset({ duration: 320 });
+        if (layoutMode !== 'radial') void sigma?.getCamera().animatedReset({ duration: 320 });
       },
     };
     onApiReady(api);
     return () => onApiReady(null);
-  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, focusTutor, switchMode]);
+  }, [onApiReady, applyFocusForNode, applyFocusForEdge, applyRadialLayout, clearFocus, ensureClusters, fitRadialGraph, focusTutor, layoutMode, onClearFocus, onCommunitiesChange, switchMode]);
 
   // Final teardown.
   useEffect(() => {
     return () => {
       if (cameraRafRef.current != null) window.cancelAnimationFrame(cameraRafRef.current);
       if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
+      if (minimapRafRef.current != null) window.cancelAnimationFrame(minimapRafRef.current);
+      if (radialFitRafRef.current != null) window.cancelAnimationFrame(radialFitRafRef.current);
       layoutRef.current?.kill();
       layoutRef.current = null;
     };
   }, []);
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return (
+    <>
+      <div ref={containerRef} className="absolute inset-0" />
+      <canvas
+        ref={minimapRef}
+        width={156}
+        height={104}
+        className="absolute bottom-3 right-3 z-10 cursor-pointer rounded-lg border border-neutral-300/70 opacity-70 hover:opacity-95 dark:border-neutral-700"
+        title="Mini-mapa · click para navegar"
+        onClick={onMinimapClick}
+      />
+    </>
+  );
 }

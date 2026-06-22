@@ -3055,6 +3055,15 @@ export function GraphView({
     }
   }, [communitiesCollapsed, removeCommunityGuides, stopActiveLayout]);
 
+  const handleCommunitiesToggle = useCallback(() => {
+    if (USE_SIGMA) {
+      const collapsed = sigmaApiRef.current?.toggleCommunities();
+      if (collapsed !== undefined) setCommunitiesCollapsed(collapsed);
+      return;
+    }
+    toggleCommunities();
+  }, [toggleCommunities]);
+
   // Tutor stop → frame the node on the graph and open its info in the right sidebar so
   // it can be read alongside the narration. A sequence token avoids a stale async detail
   // landing after the user has already advanced to the next stop.
@@ -3351,7 +3360,7 @@ export function GraphView({
               <button
                 className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
                 title={communitiesCollapsed ? 'Expandir comunidades' : 'Colapsar en comunidades (Louvain)'}
-                onClick={toggleCommunities}
+                onClick={handleCommunitiesToggle}
               >
                 <Icon name="layers" /> {communitiesCollapsed ? 'Expandir' : 'Comunidades'}
               </button>
@@ -3384,11 +3393,13 @@ export function GraphView({
                 filters={filters}
                 lens={lens}
                 preset={activePreset}
+                layoutMode={layoutMode}
                 highlightDepth={highlightDepth}
                 lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')}
                 onOpenNode={onSigmaOpenNode}
                 onOpenEdge={onSigmaOpenEdge}
                 onClearFocus={onSigmaClear}
+                onCommunitiesChange={setCommunitiesCollapsed}
                 onApiReady={(api) => {
                   sigmaApiRef.current = api;
                   clearFocusRef.current = () => api?.clearFocus();
