@@ -15,6 +15,7 @@ import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { Tour } from './views/Tour';
+import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
 import { notifyDataChanged } from './hooks';
 import type {
@@ -266,6 +267,16 @@ export function App() {
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.tourComplete && !settings.advancedTourComplete && (
+        <AdvancedTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ advancedTourComplete: true });
             void reloadSettings();
           }}
         />

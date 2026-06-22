@@ -223,12 +223,27 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
 
           <Section title="Ayuda">
             <div className="flex items-center justify-between gap-4">
-              <label className="text-sm text-neutral-300">Tutorial de uso</label>
+              <div>
+                <label className="text-sm text-neutral-300">Tutorial de uso</label>
+                <p className="text-xs text-neutral-500 mt-0.5">Lo básico: sincronizar, escanear y moverte por el grafo.</p>
+              </div>
               <button
                 className="btn btn-ghost border border-neutral-700"
                 onClick={() => patch({ tourComplete: false }).then(() => flash('Se mostrará el tutorial.'))}
               >
                 <Icon name="help" /> Ver de nuevo
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="text-sm text-neutral-300">Tutorial avanzado de investigación</label>
+                <p className="text-xs text-neutral-500 mt-0.5">El flujo completo: leer con criterio, comprender el corpus, encontrar tu aportación y escribir.</p>
+              </div>
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                onClick={() => patch({ advancedTourComplete: false }).then(() => flash('Se mostrará el tutorial avanzado.'))}
+              >
+                <Icon name="route" /> Empezar
               </button>
             </div>
             <div className="flex items-center justify-between gap-4">

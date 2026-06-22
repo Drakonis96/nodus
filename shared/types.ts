@@ -238,6 +238,9 @@ export interface AppSettings {
   onboardingComplete: boolean;
   // First-run usage tour (distinct from the setup onboarding above).
   tourComplete: boolean;
+  // Advanced research-workflow walkthrough. Opt-in (never auto-shown): defaults
+  // to true so it only appears when the researcher launches it from Settings.
+  advancedTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;

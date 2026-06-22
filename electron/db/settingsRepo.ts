@@ -24,6 +24,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   unpaywallEmail: '',
   onboardingComplete: false,
   tourComplete: false,
+  advancedTourComplete: true,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',
