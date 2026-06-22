@@ -72,7 +72,7 @@ interface GraphPosition {
 
 interface MinimapFrame {
   x1: number;
-  y1: number;
+  y2: number;
   scale: number;
   offX: number;
   offY: number;
@@ -671,11 +671,13 @@ export function SigmaGraph({
     const scale = Math.min((width - padding * 2) / graphWidth, (height - padding * 2) / graphHeight);
     const offX = padding + (width - padding * 2 - graphWidth * scale) / 2;
     const offY = padding + (height - padding * 2 - graphHeight * scale) / 2;
+    // Sigma's graph coordinates grow upward, while canvas coordinates grow
+    // downward. Mirror Y here so north in the graph stays north in the minimap.
     const toMinimap = (x: number, y: number) => ({
       x: offX + (x - x1) * scale,
-      y: offY + (y - y1) * scale,
+      y: offY + (y2 - y) * scale,
     });
-    minimapFrameRef.current = { x1, y1, scale, offX, offY };
+    minimapFrameRef.current = { x1, y2, scale, offX, offY };
 
     context.clearRect(0, 0, width, height);
     context.fillStyle = lightThemeRef.current ? '#ffffff' : '#0a0a0a';
@@ -722,11 +724,16 @@ export function SigmaGraph({
     const viewportY1 = Math.min(...corners.map((point) => point.y));
     const viewportX2 = Math.max(...corners.map((point) => point.x));
     const viewportY2 = Math.max(...corners.map((point) => point.y));
-    const topLeft = toMinimap(viewportX1, viewportY1);
-    const bottomRight = toMinimap(viewportX2, viewportY2);
+    const viewportA = toMinimap(viewportX1, viewportY1);
+    const viewportB = toMinimap(viewportX2, viewportY2);
     context.strokeStyle = lightThemeRef.current ? '#171717' : '#ffffff';
     context.lineWidth = 1.5;
-    context.strokeRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
+    context.strokeRect(
+      Math.min(viewportA.x, viewportB.x),
+      Math.min(viewportA.y, viewportB.y),
+      Math.abs(viewportB.x - viewportA.x),
+      Math.abs(viewportB.y - viewportA.y)
+    );
   }, []);
 
   const scheduleMinimapDraw = useCallback(() => {
@@ -747,7 +754,7 @@ export function SigmaGraph({
     const y = (event.clientY - rect.top) * (canvas.height / rect.height);
     const graphPosition = {
       x: frame.x1 + (x - frame.offX) / frame.scale,
-      y: frame.y1 + (y - frame.offY) / frame.scale,
+      y: frame.y2 - (y - frame.offY) / frame.scale,
     };
     // Camera coordinates use Sigma's framed graph space. Composing the two
     // public converters gives the exact framed coordinate for the clicked raw
