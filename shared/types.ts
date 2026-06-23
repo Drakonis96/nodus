@@ -1028,6 +1028,8 @@ export interface NodusApi {
   summarizeBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
   summarizeAll(model?: ModelRef | null): Promise<void>;
   getWorkSummary(nodusId: string): Promise<WorkSummary | null>;
+  /** Zotero collections (with work counts) available as Library filters. */
+  listCollectionFacets(): Promise<CollectionFacet[]>;
   /** Groups of works that look like the same work (same DOI, or same title+year+authors). */
   listDuplicateWorks(): Promise<DuplicateWorkGroup[]>;
   /** Merge duplicate works into the chosen canonical, re-pointing all derived data. */
@@ -1173,9 +1175,23 @@ export interface WorkFilter {
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];
   zoteroTagMode?: 'any' | 'all';
+  /** Zotero collection keys to match (selecting a parent includes its subcollections). */
+  collections?: string[];
+  collectionMode?: 'any' | 'all';
   yearMin?: number;
   yearMax?: number;
   includeArchived?: boolean;
+}
+
+/** A Zotero collection available as a Library filter, flattened with its depth. */
+export interface CollectionFacet {
+  key: string;
+  name: string;
+  parentKey: string | null;
+  /** Indentation level in the flattened tree (0 = top-level). */
+  depth: number;
+  /** Works in this collection and its subcollections. */
+  workCount: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

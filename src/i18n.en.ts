@@ -504,6 +504,16 @@ export const EN: Record<string, string> = {
   'Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola.':
     'Uses embeddings and AI to validate semantic bridges between ideas not yet connected. Progress shows in the queue.',
   Descubrir: 'Discover',
+  // ── Collection filter ───────────────────────────────────────────────────────
+  Colección: 'Collection',
+  'Filtrar por colección': 'Filter by collection',
+  'Sincroniza para poder filtrar por colección.': 'Sync to enable filtering by collection.',
+  'Buscar colección…': 'Search collection…',
+  'Combinar colecciones': 'Combine collections',
+  'Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.':
+    'No collections yet. Press “Sync” to read the collection structure from Zotero.',
+  'No hay colecciones que coincidan.': 'No matching collections.',
+  'Colecciones:': 'Collections:',
   // ── Duplicate works · review and merge ──────────────────────────────────────
   'Buscar y fusionar duplicados': 'Find and merge duplicates',
   'Detecta obras repetidas (mismo DOI, o mismo título, año y autores) y te deja revisarlas y fusionarlas conservando una sola copia. La misma obra en varias colecciones de Zotero no se duplica.':

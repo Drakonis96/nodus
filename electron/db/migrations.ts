@@ -397,6 +397,25 @@ export const migrations: Migration[] = [
         ON work_summaries(embedding_provider, embedding_model, embedding_dim, embedding_text_hash);
     `,
   },
+  {
+    version: 13,
+    up: /* sql */ `
+      CREATE TABLE collections (
+        collection_key TEXT PRIMARY KEY,
+        name           TEXT,
+        parent_key     TEXT
+      );
+
+      CREATE TABLE work_collections (
+        nodus_id       TEXT NOT NULL,
+        collection_key TEXT NOT NULL,
+        PRIMARY KEY (nodus_id, collection_key),
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_work_collections_coll ON work_collections(collection_key, nodus_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

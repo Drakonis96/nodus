@@ -5,13 +5,16 @@ import {
   upsertWork,
   getWorkByZoteroKey,
   getWorkByDoi,
+  getWorkByAliasKey,
   addAlias,
   setReadTag,
   recomputeDeepTrigger,
   setLightPending,
   setDeepPending,
 } from '../db/worksRepo';
-import { collectionItemsRecursive, libraryVersion } from '../zotero/zoteroClient';
+import { setWorkCollections, addWorkCollections, upsertCollections } from '../db/collectionsRepo';
+import { collectionItemsRecursive, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
+import type { ZoteroCollection } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, ZoteroItem } from '@shared/types';
 import { getDb } from '../db/database';
@@ -30,22 +33,33 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
   const existing = getWorkByZoteroKey(item.key);
   const hasTag = item.tags.some((t) => t.toLowerCase() === readTagName.toLowerCase());
 
-  // The SAME Zotero item (same key) belonging to several collections never
-  // duplicates — its key is unique, so the branch below just updates it once.
-  // A *different* Zotero item that shares an existing work's DOI is a true
-  // duplicate: unify it under that work's nodus_id as an alias instead of
-  // inserting a second works row (which is what previously leaked duplicates).
-  if (!existing && item.doi) {
-    const byDoi = getWorkByDoi(item.doi);
-    if (byDoi) {
-      addAlias(byDoi.nodus_id, item.key);
-      // Carry the read tag over so the canonical work stays deep-eligible.
-      if (hasTag) setReadTag(byDoi.nodus_id, true);
-      const trigger = recomputeDeepTrigger(byDoi.nodus_id);
-      return { nodusId: byDoi.nodus_id, isNew: false, hasReadTag: trigger === 'tag' || trigger === 'both' };
+  if (!existing) {
+    // (1) This key was previously merged into another work: keep it merged so a
+    // resync never resurrects a duplicate the user already cleaned up.
+    const aliased = getWorkByAliasKey(item.key);
+    if (aliased) {
+      if (hasTag) setReadTag(aliased.nodus_id, true);
+      addWorkCollections(aliased.nodus_id, item.collections);
+      const trigger = recomputeDeepTrigger(aliased.nodus_id);
+      return { nodusId: aliased.nodus_id, isNew: false, hasReadTag: trigger === 'tag' || trigger === 'both' };
+    }
+    // (2) A *different* Zotero item that shares an existing work's DOI is a true
+    // duplicate: unify it under that work's nodus_id as an alias instead of
+    // inserting a second works row (which previously leaked duplicates).
+    if (item.doi) {
+      const byDoi = getWorkByDoi(item.doi);
+      if (byDoi) {
+        addAlias(byDoi.nodus_id, item.key);
+        if (hasTag) setReadTag(byDoi.nodus_id, true);
+        addWorkCollections(byDoi.nodus_id, item.collections);
+        const trigger = recomputeDeepTrigger(byDoi.nodus_id);
+        return { nodusId: byDoi.nodus_id, isNew: false, hasReadTag: trigger === 'tag' || trigger === 'both' };
+      }
     }
   }
 
+  // The SAME Zotero item (same key) belonging to several collections never
+  // duplicates — its key is unique, so this path just updates the one row.
   const nodusId = existing?.nodus_id ?? uuid();
 
   upsertWork({
@@ -60,9 +74,43 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
     read_tag: hasTag,
     zoteroTags: item.tags,
   });
+  setWorkCollections(nodusId, item.collections);
 
   const trigger = recomputeDeepTrigger(nodusId);
   return { nodusId, isNew: !existing, hasReadTag: trigger === 'tag' || trigger === 'both' };
+}
+
+/** Refresh the stored collection tree (key → name, parent) for every monitored
+ *  collection and its descendants, so the Library collection filter shows names. */
+async function refreshCollectionTree(userId: string, monitored: string[]): Promise<void> {
+  if (monitored.length === 0) return;
+  const all = new Map<string, ZoteroCollection>();
+  let top: ZoteroCollection[] = [];
+  try {
+    top = await topCollections(userId);
+  } catch {
+    return;
+  }
+  for (const c of top) all.set(c.key, c);
+  const visited = new Set<string>();
+  const visit = async (key: string): Promise<void> => {
+    if (visited.has(key)) return;
+    visited.add(key);
+    let children: ZoteroCollection[] = [];
+    try {
+      children = await childCollections(userId, key);
+    } catch {
+      return;
+    }
+    for (const c of children) {
+      all.set(c.key, c);
+      await visit(c.key);
+    }
+  };
+  // Walk from monitored roots (and any top collection, so names resolve fully).
+  for (const c of top) await visit(c.key);
+  for (const key of monitored) if (!visited.has(key)) await visit(key);
+  if (all.size > 0) upsertCollections(Array.from(all.values()));
 }
 
 export interface SyncResult {
@@ -82,6 +130,10 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   let deepQueued = 0;
 
   const seen = new Set<string>();
+
+  // Keep the collection tree current so the Library collection filter shows names
+  // and can expand a parent to its subcollections.
+  await refreshCollectionTree(userId, settings.monitoredCollections);
 
   for (const collectionKey of settings.monitoredCollections) {
     let items: ZoteroItem[] = [];

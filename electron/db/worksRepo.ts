@@ -1,4 +1,5 @@
 import { getDb } from './database';
+import { expandCollectionKeys } from './collectionsRepo';
 import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus } from '@shared/types';
 
 function normalizeZoteroTag(tag: string): string {
@@ -60,6 +61,21 @@ export function getWorkByDoi(doi: string): Work | null {
   const db = getDb();
   if (!doi) return null;
   return (db.prepare('SELECT * FROM works WHERE doi = ? AND doi IS NOT NULL').get(doi) as Work) ?? null;
+}
+
+/**
+ * Resolve a Zotero key that was previously merged into another work. Once a
+ * duplicate is merged its key lives in work_aliases, so a later sync must route
+ * the item back to the canonical work instead of re-creating the duplicate.
+ */
+export function getWorkByAliasKey(zoteroKey: string): Work | null {
+  const db = getDb();
+  if (!zoteroKey) return null;
+  return (
+    (db
+      .prepare('SELECT w.* FROM work_aliases a JOIN works w ON w.nodus_id = a.nodus_id WHERE a.zotero_key = ?')
+      .get(zoteroKey) as Work) ?? null
+  );
 }
 
 function themesFor(nodusId: string): string[] {
@@ -180,6 +196,26 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
            WHERE ${tagWhere}
         )`
       );
+    }
+  }
+
+  const collections = Array.from(new Set((filter.collections ?? []).filter((k): k is string => !!k)));
+  if (collections.length > 0) {
+    let counter = 0;
+    const inClause = (keys: string[]): string => {
+      const names = keys.map((key) => {
+        const name = `coll${counter++}`;
+        params[name] = key;
+        return `@${name}`;
+      });
+      return `nodus_id IN (SELECT nodus_id FROM work_collections WHERE collection_key IN (${names.join(', ')}))`;
+    };
+    if (filter.collectionMode === 'all') {
+      // Every selected collection (each expanded to its own subtree) must match.
+      for (const key of collections) clauses.push(inClause(expandCollectionKeys([key])));
+    } else {
+      // Any selected collection or its subcollections.
+      clauses.push(inClause(expandCollectionKeys(collections)));
     }
   }
 

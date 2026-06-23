@@ -67,19 +67,72 @@ export function findDuplicateWorkGroups(db: Database.Database): DuplicateWorkGro
     )
     .all() as WorkRow[];
 
-  const buckets = new Map<string, WorkRow[]>();
+  // Union-find over works: two works are unified when they share a content key
+  // (DOI, or title+year+authors) OR when one's key is already an alias of the
+  // other — the latter catches duplicates a sync resurrected after a merge.
+  const parent = new Map<string, string>();
+  for (const r of rows) parent.set(r.nodus_id, r.nodus_id);
+  const find = (x: string): string => {
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cur = x;
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur)!;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a: string, b: string): void => {
+    if (!parent.has(a) || !parent.has(b)) return;
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+
+  // Content-key unification.
+  const keyToFirst = new Map<string, string>();
   for (const row of rows) {
     const key = groupKey(row);
     if (!key) continue;
-    const list = buckets.get(key) ?? [];
-    list.push(row);
-    buckets.set(key, list);
+    const first = keyToFirst.get(key);
+    if (first) union(row.nodus_id, first);
+    else keyToFirst.set(key, row.nodus_id);
   }
 
+  // Alias-link unification: a live work whose Zotero key points (via work_aliases)
+  // to another live work is the same work resurrected by a resync.
+  const aliasLinks = db
+    .prepare(
+      `SELECT w.nodus_id AS dup, a.nodus_id AS canon
+         FROM work_aliases a
+         JOIN works w ON w.zotero_key = a.zotero_key
+        WHERE w.nodus_id <> a.nodus_id AND w.archived = 0`
+    )
+    .all() as { dup: string; canon: string }[];
+  for (const link of aliasLinks) union(link.dup, link.canon);
+
+  const byRoot = new Map<string, WorkRow[]>();
+  for (const row of rows) {
+    const root = find(row.nodus_id);
+    const list = byRoot.get(root) ?? [];
+    list.push(row);
+    byRoot.set(root, list);
+  }
+
+  const normDoi = (row: WorkRow): string => (row.doi ?? '').trim().toLowerCase();
+
   const groups: DuplicateWorkGroup[] = [];
-  for (const [key, list] of buckets) {
+  for (const [root, list] of byRoot) {
     if (list.length < 2) continue;
     const best = list.reduce((a, b) => (richness(b) > richness(a) ? b : a));
+    // 'doi' when at least two members share an identical DOI; else 'metadata'.
+    const doiCounts = new Map<string, number>();
+    for (const r of list) {
+      const d = normDoi(r);
+      if (d) doiCounts.set(d, (doiCounts.get(d) ?? 0) + 1);
+    }
+    const reason: 'doi' | 'metadata' = [...doiCounts.values()].some((c) => c >= 2) ? 'doi' : 'metadata';
     const members: DuplicateWorkMember[] = list
       .map((row) => ({
         nodus_id: row.nodus_id,
@@ -93,7 +146,6 @@ export function findDuplicateWorkGroups(db: Database.Database): DuplicateWorkGro
         ideaCount: row.idea_count,
         suggestedCanonical: row.nodus_id === best.nodus_id,
       }))
-      // Richest first, then more ideas, then stable by key/id.
       .sort(
         (a, b) =>
           Number(b.suggestedCanonical) - Number(a.suggestedCanonical) ||
@@ -101,7 +153,7 @@ export function findDuplicateWorkGroups(db: Database.Database): DuplicateWorkGro
           (a.zotero_key ?? '').localeCompare(b.zotero_key ?? '') ||
           a.nodus_id.localeCompare(b.nodus_id)
       );
-    groups.push({ reason: key.startsWith('doi:') ? 'doi' : 'metadata', key, members });
+    groups.push({ reason, key: `g:${root}`, members });
   }
 
   // Most-populous groups first so the worst offenders surface at the top.

@@ -9,6 +9,7 @@ import type {
   ModelRef,
   WorkEmbeddingStatus,
   ZoteroTag,
+  CollectionFacet,
 } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -102,6 +103,9 @@ export function Library({
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
+  const [availableCollections, setAvailableCollections] = useState<CollectionFacet[]>([]);
+  const [collectionFilterOpen, setCollectionFilterOpen] = useState(false);
+  const [collectionSearch, setCollectionSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -117,10 +121,11 @@ export function Library({
     const requestId = ++loadRequestRef.current;
     if (initialLoadRef.current) setLoading(true);
     try {
-      const [w, tags, statuses] = await Promise.all([
+      const [w, tags, statuses, collections] = await Promise.all([
         window.nodus.listWorks(filter),
         window.nodus.listZoteroTags(),
         window.nodus.getWorkEmbeddingStatuses(),
+        window.nodus.listCollectionFacets(),
       ]);
       // A newer filter or refresh may have completed while this request was in
       // flight.  Never replace its results with stale rows.
@@ -128,6 +133,7 @@ export function Library({
       setWorks(w);
       setAvailableZoteroTags(tags);
       setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
+      setAvailableCollections(collections);
     } finally {
       if (requestId === loadRequestRef.current) {
         initialLoadRef.current = false;
@@ -276,6 +282,29 @@ export function Library({
   const clearZoteroTags = () => {
     setFilter((current) => ({ ...current, zoteroTags: [], zoteroTagMode: 'any' }));
     setTagSearch('');
+  };
+
+  const selectedCollections = filter.collections ?? [];
+  const collectionNameByKey = useMemo(
+    () => new Map(availableCollections.map((c) => [c.key, c.name])),
+    [availableCollections]
+  );
+  const visibleCollections = useMemo(() => {
+    const query = collectionSearch.trim().toLocaleLowerCase();
+    return query ? availableCollections.filter((c) => c.name.toLocaleLowerCase().includes(query)) : availableCollections;
+  }, [availableCollections, collectionSearch]);
+
+  const toggleCollection = (key: string) => {
+    setFilter((current) => {
+      const selected = current.collections ?? [];
+      const exists = selected.includes(key);
+      return { ...current, collections: exists ? selected.filter((k) => k !== key) : [...selected, key] };
+    });
+  };
+
+  const clearCollections = () => {
+    setFilter((current) => ({ ...current, collections: [], collectionMode: 'any' }));
+    setCollectionSearch('');
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -467,6 +496,96 @@ export function Library({
               </div>
             )}
           </div>
+          <div className="relative">
+            <button
+              type="button"
+              className={`collection-filter btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
+              onClick={() => setCollectionFilterOpen((open) => !open)}
+              aria-expanded={collectionFilterOpen}
+              aria-haspopup="dialog"
+              disabled={availableCollections.length === 0}
+              title={availableCollections.length === 0 ? t('Sincroniza para poder filtrar por colección.') : t('Filtrar por colección')}
+            >
+              <Icon name="folder" /> {t('Colección')}
+              {selectedCollections.length > 0 && (
+                <span className="rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                  {selectedCollections.length}
+                </span>
+              )}
+            </button>
+            {collectionFilterOpen && (
+              <div
+                role="dialog"
+                aria-label={t('Filtrar por colección')}
+                className="absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+              >
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    className="input min-w-0 flex-1"
+                    value={collectionSearch}
+                    onChange={(e) => setCollectionSearch(e.target.value)}
+                    placeholder={t('Buscar colección…')}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost text-xs"
+                    disabled={selectedCollections.length === 0}
+                    onClick={clearCollections}
+                  >
+                    {t('Limpiar')}
+                  </button>
+                </div>
+                {selectedCollections.length > 1 && (
+                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                    {t('Combinar colecciones')}
+                    <select
+                      className="input py-1 text-xs"
+                      value={filter.collectionMode ?? 'any'}
+                      onChange={(e) => setFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
+                    >
+                      <option value="any">{t('Cualquiera')}</option>
+                      <option value="all">{t('Todas')}</option>
+                    </select>
+                  </label>
+                )}
+                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                  {visibleCollections.map((collection) => {
+                    const checked = selectedCollections.includes(collection.key);
+                    return (
+                      <button
+                        key={collection.key}
+                        type="button"
+                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                          checked ? 'bg-cyan-950/50 text-cyan-100' : 'text-neutral-300'
+                        }`}
+                        style={{ paddingLeft: `${0.5 + collection.depth * 0.85}rem` }}
+                        onClick={() => toggleCollection(collection.key)}
+                      >
+                        <span
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                            checked ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-neutral-600'
+                          }`}
+                        >
+                          {checked && <Icon name="check" size={12} />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+                        <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
+                      </button>
+                    );
+                  })}
+                  {availableCollections.length === 0 && (
+                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                      {t('Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.')}
+                    </p>
+                  )}
+                  {availableCollections.length > 0 && visibleCollections.length === 0 && (
+                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay colecciones que coincidan.')}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="flex-1" />
           <span className="text-xs text-neutral-500">{t('Modelo para análisis')}</span>
           <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
@@ -496,6 +615,27 @@ export function Library({
             {selectedZoteroTags.length > 1 && (
               <span className="ml-1">
                 {filter.zoteroTagMode === 'all' ? t('deben estar todas') : t('basta cualquiera')}
+              </span>
+            )}
+          </div>
+        )}
+        {selectedCollections.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+            <span>{t('Colecciones:')}</span>
+            {selectedCollections.map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border border-cyan-800/70 bg-cyan-950/30 px-2 py-1 text-cyan-200 hover:bg-cyan-950/60"
+                onClick={() => toggleCollection(key)}
+                title={`${t('Quitar')} ${collectionNameByKey.get(key) ?? key}`}
+              >
+                {collectionNameByKey.get(key) ?? key} <Icon name="x" size={12} />
+              </button>
+            ))}
+            {selectedCollections.length > 1 && (
+              <span className="ml-1">
+                {filter.collectionMode === 'all' ? t('deben estar todas') : t('basta cualquiera')}
               </span>
             )}
           </div>

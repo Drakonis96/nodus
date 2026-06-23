@@ -28,6 +28,7 @@ import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import * as dedupe from './db/dedupeRepo';
+import { listCollectionFacets } from './db/collectionsRepo';
 import * as ideas from './db/ideasRepo';
 import * as themes from './db/themesRepo';
 import { aggregateGaps, getGapDetail } from './db/gapsRepo';
@@ -233,6 +234,7 @@ export function registerIpc(
     return enqueued;
   });
   h('works:getSummary', async (_e, nodusId: string) => workSummaries.getWorkSummary(nodusId));
+  h('works:collectionFacets', async () => listCollectionFacets());
   h('works:listDuplicates', async () => dedupe.listDuplicateWorks());
   h('works:merge', async (_e, canonicalId: string, duplicateIds: string[]) =>
     dedupe.mergeWorks(canonicalId, duplicateIds)
