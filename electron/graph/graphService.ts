@@ -72,6 +72,7 @@ interface IdeaRow {
   type: IdeaType;
   label: string;
   statement: string;
+  created_at: string;
 }
 
 interface ThemeMembership {
@@ -84,7 +85,7 @@ export function buildIdeaGraph(): GraphData {
   const db = getDb();
   const ideas = db
     .prepare(
-      `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
+      `SELECT DISTINCT i.global_id, i.type, i.label, i.statement, i.created_at
        FROM ideas i
        JOIN idea_occurrences io ON io.global_id = i.global_id
        JOIN works w ON w.nodus_id = io.nodus_id
@@ -150,6 +151,7 @@ export function buildIdeaGraph(): GraphData {
       id: idea.global_id,
       label: idea.label,
       type: idea.type,
+      createdAt: idea.created_at,
       statement: idea.statement,
       workCount: agg?.works.size ?? 0,
       workIds: agg ? Array.from(agg.works) : [],
@@ -197,6 +199,7 @@ export function buildIdeaGraph(): GraphData {
       id: `theme:${theme.theme_id}`,
       label: theme.label.toUpperCase(),
       type: 'theme',
+      createdAt: theme.created_at,
       statement: `Familia temática: ${theme.label}`,
       workCount: agg?.works.size ?? theme.work_count,
       workIds: agg ? Array.from(agg.works) : [],
@@ -532,6 +535,7 @@ export function buildAuthorGraph(): GraphData {
       id: a.author_id,
       label: a.name,
       type: 'author',
+      createdAt: null,
       workCount: works.length,
       workIds: works.map((w) => w.nodus_id),
       read,

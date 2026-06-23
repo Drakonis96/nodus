@@ -10,7 +10,7 @@
 //
 // Sigma reserves the `type` display attribute to pick the drawing program, so
 // the *semantic* node/edge type is stored under `kind`.
-import { useCallback, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Graph from 'graphology';
 import Sigma from 'sigma';
 import type { NodeLabelDrawingFunction } from 'sigma/rendering';
@@ -26,6 +26,8 @@ import { computeClusters, type AggregatedGraph } from './lod';
 export interface SigmaGraphApi {
   fit: () => void;
   zoomBy: (factor: number) => void;
+  /** Replay the graph as an incremental, chronological build-up. */
+  playHistory: () => boolean;
   /** Toggle the manual LOD view. Returns whether communities are now collapsed. */
   toggleCommunities: () => boolean;
   focusNode: (id: string) => boolean;
@@ -54,6 +56,13 @@ interface SigmaGraphProps {
 
 // Camera ratio above which we show the aggregated overview instead of every node.
 const OVERVIEW_RATIO = 0.6;
+const HISTORY_DURATION_MS = 7_200;
+
+// Obsidian lets a graph breathe while its forces settle. Keep that perceptible
+// without spending an unbounded amount of CPU on large research libraries.
+function obsidianSettleMs(nodeCount: number): number {
+  return Math.min(24_000, Math.max(7_500, 4_500 + nodeCount * 4));
+}
 
 function nodeColor(type: string): string {
   if (type === 'author') return '#a3a3a3';
@@ -71,18 +80,28 @@ interface GraphPosition {
   y: number;
 }
 
+interface DragConstraint {
+  source: string;
+  target: string;
+  restLength: number;
+}
+
+interface DragState {
+  nodeId: string;
+  pointer: GraphPosition;
+  target: GraphPosition;
+  constraints: DragConstraint[];
+  maxStep: number;
+  frameId: number | null;
+  moved: boolean;
+}
+
 interface MinimapFrame {
   x1: number;
   y2: number;
   scale: number;
   offX: number;
   offY: number;
-}
-
-interface DragState {
-  nodeId: string;
-  target: GraphPosition | null;
-  frameId: number | null;
 }
 
 interface RenderedLabelBox {
@@ -393,24 +412,48 @@ export function SigmaGraph({
   const hoverLocalRef = useRef<{ neighbors: Set<string>; edges: Set<string> } | null>(null);
   const draggingRef = useRef<string | null>(null);
   const dragStateRef = useRef<DragState | null>(null);
+  const historyTimerRef = useRef<number | null>(null);
   const cameraRafRef = useRef<number | null>(null);
   const clusterTimerRef = useRef<number | null>(null);
   const minimapRafRef = useRef<number | null>(null);
   const minimapFrameRef = useRef<MinimapFrame | null>(null);
   const radialFitRafRef = useRef<number | null>(null);
+  const searchRef = useRef(filters.search);
+  const [revealedNodeIds, setRevealedNodeIds] = useState<Set<string>>(() => new Set());
   // null keeps automatic LOD. A boolean explicitly forces the corresponding
   // mode after every camera event until the graph is rebuilt or reset.
   const manualOverviewRef = useRef<boolean | null>(null);
   const lightThemeRef = useRef(lightTheme);
   const onCameraUpdatedRef = useRef<() => void>(() => {});
 
-  const model = useMemo(() => buildGraphModel(data, filters, lens, preset), [data, filters, lens, preset]);
+  const model = useMemo(() => buildGraphModel(data, filters, lens, preset, revealedNodeIds), [data, filters, lens, preset, revealedNodeIds]);
 
   const fadeNode = lightTheme ? '#d8d8d8' : '#2b2b2b';
 
   useEffect(() => {
     lightThemeRef.current = lightTheme;
   }, [lightTheme]);
+
+  useEffect(() => {
+    searchRef.current = filters.search;
+  }, [filters.search]);
+
+  // A reveal belongs to one precise filtered view. Changing the search or any
+  // other filter starts a fresh result set instead of carrying old context into
+  // an unrelated query.
+  useEffect(() => {
+    setRevealedNodeIds((current) => (current.size > 0 ? new Set() : current));
+  }, [data, filters, lens, preset]);
+
+  const revealNodeConnections = useCallback((nodeId: string) => {
+    if (!searchRef.current.trim()) return;
+    setRevealedNodeIds((current) => {
+      if (current.has(nodeId)) return current;
+      const next = new Set(current);
+      next.add(nodeId);
+      return next;
+    });
+  }, []);
 
   // ── Build the graphology detail graph from the current model ────────────────
   const buildDetailGraph = useCallback((): Graph => {
@@ -425,6 +468,7 @@ export function SigmaGraph({
         degree: n.degree,
         labelRank: n.labelRank,
         read: n.read,
+        historyVisible: true,
         // No x/y here on purpose: seedMissingPositions() scatters new nodes on a
         // spiral (and restores prior positions) so ForceAtlas2 has a valid,
         // non-coincident starting layout.
@@ -440,6 +484,7 @@ export function SigmaGraph({
         confidence: e.confidence,
         layoutEdge: e.layoutEdge,
         weight,
+        historyVisible: true,
         size: 0.4 + e.confidence * 0.5,
         // Default edges are uniform and faint (Obsidian-style) so the overview
         // reads as nodes-with-links; the semantic edge-type colour is revealed on
@@ -457,6 +502,11 @@ export function SigmaGraph({
       // so we must spread the original attributes — otherwise x/y/size/label are
       // lost and Sigma throws "could not find a valid position".
       const res: { [k: string]: unknown } = { ...dataAttrs };
+      if (dataAttrs.historyVisible === false) {
+        res.hidden = true;
+        res.label = '';
+        return res;
+      }
       const focus = focusRef.current;
       const hover = hoverRef.current;
       if (focus.active && focus.local) {
@@ -493,6 +543,10 @@ export function SigmaGraph({
   const edgeReducer = useCallback(
     (edge: string, dataAttrs: { [k: string]: unknown }) => {
       const res: { [k: string]: unknown } = { ...dataAttrs };
+      if (dataAttrs.historyVisible === false) {
+        res.hidden = true;
+        return res;
+      }
       const focus = focusRef.current;
       // All hex — Sigma's WebGL edge program mis-renders rgba() (shows white).
       const faded = lightTheme ? '#ededed' : '#161616';
@@ -567,6 +621,21 @@ export function SigmaGraph({
     hoverRef.current = null;
     sigmaRef.current?.refresh({ skipIndexation: true });
   }, []);
+
+  // Rebuilding for an expanded search result replaces the graphology instance.
+  // Keep a stable indirection so that rebuild can reapply the currently focused
+  // node using the new (larger) adjacency index without making the rebuild
+  // effect itself depend on the selected-route depth.
+  const focusActionsRef = useRef({
+    node: (_nodeId: string) => {},
+    edge: (_edgeId: string) => {},
+  });
+  useEffect(() => {
+    focusActionsRef.current = {
+      node: applyFocusForNode,
+      edge: applyFocusForEdge,
+    };
+  }, [applyFocusForEdge, applyFocusForNode]);
 
   // ── LOD: build the aggregated overview graph from clusters ──────────────────
   const buildOverviewGraph = useCallback(
@@ -876,6 +945,7 @@ export function SigmaGraph({
       }
       tutorFocusRef.current = null;
       const attrs = g.getNodeAttributes(node);
+      revealNodeConnections(node);
       applyFocusForNode(node);
       onOpenNode(node, String(attrs.label ?? ''), String(attrs.kind ?? ''));
     });
@@ -912,17 +982,100 @@ export function SigmaGraph({
       sigma.refresh({ skipIndexation: true });
     });
 
-    // A drag pins exactly the selected node. Moving its whole neighbourhood and
-    // shoving every obstacle created the large circular voids visible in dense
-    // graphs: a single hub could displace a sizeable subgraph on each gesture.
-    // Keeping the rest still makes the interaction stable; the edges already
-    // communicate the moved node's relations without rewriting the layout.
+    // Obsidian preserves the apparent spring length of a dragged node's links.
+    // Model that as a small position-based constraint system rather than letting
+    // a free-running force solver keep adding energy after the pointer is up.
+    const buildDragConstraints = (nodeId: string): DragConstraint[] => {
+      const g = sigmaRef.current?.getGraph();
+      if (!g || !g.hasNode(nodeId)) return [];
+      const seen = new Set([nodeId]);
+      const direct = g
+        .neighbors(nodeId)
+        .filter((id) => g.getNodeAttribute(id, 'historyVisible') !== false)
+        .sort((a, b) => stableUnit(a) - stableUnit(b) || a.localeCompare(b))
+        .slice(0, 96);
+      for (const id of direct) {
+        seen.add(id);
+      }
+
+      const secondCandidates = new Set<string>();
+      for (const id of direct) {
+        for (const candidate of g.neighbors(id)) {
+          if (seen.has(candidate) || g.getNodeAttribute(candidate, 'historyVisible') === false) continue;
+          secondCandidates.add(candidate);
+        }
+      }
+      for (const id of Array.from(secondCandidates).sort((a, b) => stableUnit(a) - stableUnit(b) || a.localeCompare(b)).slice(0, 120)) {
+        seen.add(id);
+      }
+
+      const edgeIds = new Set<string>();
+      for (const id of seen) {
+        for (const edgeId of g.edges(id)) edgeIds.add(edgeId);
+      }
+      const constraints: DragConstraint[] = [];
+      for (const edgeId of edgeIds) {
+        const source = g.source(edgeId);
+        const target = g.target(edgeId);
+        if (!seen.has(source) || !seen.has(target)) continue;
+        const a = g.getNodeAttributes(source);
+        const b = g.getNodeAttributes(target);
+        const restLength = Math.hypot(Number(b.x) - Number(a.x), Number(b.y) - Number(a.y));
+        if (Number.isFinite(restLength) && restLength > 0.0001) constraints.push({ source, target, restLength });
+      }
+      return constraints;
+    };
+
     const applyDragFrame = () => {
       const state = dragStateRef.current;
       const g = sigmaRef.current?.getGraph();
-      if (!state || !g || !state.target || !g.hasNode(state.nodeId)) return;
+      if (!state || !g || !g.hasNode(state.nodeId)) return;
       state.frameId = null;
+      const current = g.getNodeAttributes(state.nodeId);
+      const x = Number(current.x);
+      const y = Number(current.y);
+      const dx = state.target.x - x;
+      const dy = state.target.y - y;
+      if (!Number.isFinite(dx) || !Number.isFinite(dy) || Math.hypot(dx, dy) < 0.01) return;
+
+      state.moved = true;
       g.mergeNodeAttributes(state.nodeId, state.target);
+
+      const solve = (constraint: DragConstraint) => {
+        if (!g.hasNode(constraint.source) || !g.hasNode(constraint.target)) return;
+        const a = g.getNodeAttributes(constraint.source);
+        const b = g.getNodeAttributes(constraint.target);
+        const vx = Number(b.x) - Number(a.x);
+        const vy = Number(b.y) - Number(a.y);
+        const distance = Math.hypot(vx, vy);
+        if (!Number.isFinite(distance) || distance < 0.0001) return;
+        // Limit a single pass so a fast pointer event cannot throw a node beyond
+        // the neighbourhood before its own constraints have a chance to respond.
+        const correction = Math.max(-constraint.restLength * 0.28, Math.min(constraint.restLength * 0.28, distance - constraint.restLength));
+        if (Math.abs(correction) < 0.0001) return;
+        const ux = vx / distance;
+        const uy = vy / distance;
+        const sourceIsRoot = constraint.source === state.nodeId;
+        const targetIsRoot = constraint.target === state.nodeId;
+        if (sourceIsRoot) {
+          g.mergeNodeAttributes(constraint.target, { x: Number(b.x) - ux * correction, y: Number(b.y) - uy * correction });
+        } else if (targetIsRoot) {
+          g.mergeNodeAttributes(constraint.source, { x: Number(a.x) + ux * correction, y: Number(a.y) + uy * correction });
+        } else {
+          const half = correction * 0.46;
+          g.mergeNodeAttributes(constraint.source, { x: Number(a.x) + ux * half, y: Number(a.y) + uy * half });
+          g.mergeNodeAttributes(constraint.target, { x: Number(b.x) - ux * half, y: Number(b.y) - uy * half });
+        }
+      };
+
+      // The first passes distribute the pulled space through the local graph;
+      // a final root pass keeps every direct edge visibly at its rest length.
+      for (let pass = 0; pass < 4; pass++) {
+        for (const constraint of state.constraints) solve(constraint);
+      }
+      for (const constraint of state.constraints) {
+        if (constraint.source === state.nodeId || constraint.target === state.nodeId) solve(constraint);
+      }
       sigmaRef.current?.refresh();
     };
 
@@ -932,27 +1085,56 @@ export function SigmaGraph({
       state.frameId = window.requestAnimationFrame(applyDragFrame);
     };
 
-    sigma.on('downNode', ({ node }) => {
+    sigma.on('downNode', ({ node, event }) => {
       const g = sigmaRef.current?.getGraph();
-      if (!g || !g.hasNode(node)) return;
+      if (!g || !g.hasNode(node) || g.getNodeAttribute(node, 'historyVisible') === false) return;
+      event.preventSigmaDefault();
       draggingRef.current = node;
+      // The layout would otherwise overwrite the cursor position from its worker
+      // tick. Keep it paused after release: Obsidian leaves the dragged shape at
+      // rest instead of injecting a new, visibly trembling simulation.
       layoutRef.current?.stop();
+      const position = g.getNodeAttributes(node);
+      const constraints = buildDragConstraints(node);
+      const directLengths = constraints
+        .filter((constraint) => constraint.source === node || constraint.target === node)
+        .map((constraint) => constraint.restLength);
+      const averageLength = directLengths.length
+        ? directLengths.reduce((total, length) => total + length, 0) / directLengths.length
+        : 1;
       dragStateRef.current = {
         nodeId: node,
-        target: null,
+        pointer: { x: event.x, y: event.y },
+        target: { x: Number(position.x), y: Number(position.y) },
+        constraints,
+        // Max distance moved per input event, expressed as a fraction of the
+        // node's existing link length. This prevents runaway control at edges.
+        maxStep: Math.max(averageLength * 0.22, 0.0001),
         frameId: null,
+        moved: false,
       };
     });
 
     const mouse = sigma.getMouseCaptor();
-    const onMouseMove = (e: any) => {
+    const onMouseMove = (event: any) => {
       const state = dragStateRef.current;
       if (!state) return;
-      state.target = sigma.viewportToGraph(e);
+      const previous = sigma.viewportToGraph(state.pointer);
+      const next = sigma.viewportToGraph({ x: event.x, y: event.y });
+      let dx = next.x - previous.x;
+      let dy = next.y - previous.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > state.maxStep) {
+        const scale = state.maxStep / distance;
+        dx *= scale;
+        dy *= scale;
+      }
+      state.pointer = { x: event.x, y: event.y };
+      state.target = { x: state.target.x + dx, y: state.target.y + dy };
       scheduleDragFrame();
-      e.preventSigmaDefault();
-      e.original.preventDefault();
-      e.original.stopPropagation();
+      event.preventSigmaDefault();
+      event.original?.preventDefault();
+      event.original?.stopPropagation();
     };
     mouse.on('mousemovebody', onMouseMove);
     const endDrag = () => {
@@ -965,8 +1147,23 @@ export function SigmaGraph({
       }
       dragStateRef.current = null;
       draggingRef.current = null;
+
+      // Sigma deliberately suppresses its native click event after a drag. A
+      // direct press-drag-release must nevertheless leave the moved node as the
+      // active selection, exactly like a click followed by a drag would.
+      if (state.moved) {
+        const g = sigmaRef.current?.getGraph();
+        if (g?.hasNode(state.nodeId)) {
+          tutorFocusRef.current = null;
+          const attrs = g.getNodeAttributes(state.nodeId);
+          revealNodeConnections(state.nodeId);
+          applyFocusForNode(state.nodeId);
+          onOpenNode(state.nodeId, String(attrs.label ?? ''), String(attrs.kind ?? ''));
+        }
+      }
     };
     mouse.on('mouseup', endDrag);
+
     const handleCameraUpdated = () => onCameraUpdatedRef.current();
     sigma.getCamera().on('updated', handleCameraUpdated);
 
@@ -1016,18 +1213,20 @@ export function SigmaGraph({
   useEffect(() => {
     const sigma = sigmaRef.current;
     if (!sigma) return;
+    const focusBeforeRebuild = focusRef.current;
+
+    if (historyTimerRef.current != null) {
+      window.clearInterval(historyTimerRef.current);
+      historyTimerRef.current = null;
+    }
 
     // Persist current positions so re-filtering / growth is incremental.
     const existing = detailGraphRef.current;
     if (existing) {
-      // A filter/data change can arrive while a node is being dragged. Cancel a
-      // pending frame before taking the persistent position snapshot.
       const drag = dragStateRef.current;
-      if (drag) {
-        if (drag.frameId != null) window.cancelAnimationFrame(drag.frameId);
-        dragStateRef.current = null;
-        draggingRef.current = null;
-      }
+      if (drag?.frameId != null) window.cancelAnimationFrame(drag.frameId);
+      dragStateRef.current = null;
+      draggingRef.current = null;
       existing.forEachNode((id, attrs) => {
         if (typeof attrs.x === 'number' && typeof attrs.y === 'number') {
           prevPositionsRef.current.set(id, { x: attrs.x, y: attrs.y });
@@ -1050,6 +1249,20 @@ export function SigmaGraph({
 
     sigma.setGraph(graph);
 
+    // Selecting a search result expands the graph on the following render.
+    // Restore that selection after the new graph/index are installed, otherwise
+    // the reducer sees no focus and paints the whole graph at full colour.
+    if (focusBeforeRebuild.active) {
+      const focusedNodeId = focusBeforeRebuild.local?.center;
+      if (focusBeforeRebuild.edgeId && graph.hasEdge(focusBeforeRebuild.edgeId)) {
+        focusActionsRef.current.edge(focusBeforeRebuild.edgeId);
+      } else if (focusedNodeId && graph.hasNode(focusedNodeId)) {
+        focusActionsRef.current.node(focusedNodeId);
+      } else {
+        onClearFocus();
+      }
+    }
+
     if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
     if (layoutMode === 'radial') {
       // Radial is a complete preset layout. Do not instantiate the FA2 worker
@@ -1067,10 +1280,9 @@ export function SigmaGraph({
     if (graph.order > 0) {
       const layout = new WorkerLayout(graph);
       layoutRef.current = layout;
-      // Bounded settle, then freeze: the graph organises for a few seconds and
-      // then stops so it doesn't drift/jitter forever. Dragging re-activates a
-      // light main-thread repulsion (see the drag handlers), not the worker.
-      const settleMs = Math.min(8000, 2500 + graph.order * 1.5);
+      // Let the network visibly breathe while it settles, like Obsidian's graph,
+      // but cap the worker budget so very large libraries remain economical.
+      const settleMs = obsidianSettleMs(graph.order);
       layout.start({ durationMs: settleMs });
       // Precompute LOD clusters once settled, so a future zoom-out is instant.
       clusterTimerRef.current = window.setTimeout(() => {
@@ -1081,6 +1293,89 @@ export function SigmaGraph({
       layoutRef.current = null;
     }
   }, [applyRadialLayout, buildDetailGraph, ensureClusters, fitRadialGraph, layoutMode, model, onCommunitiesChange]);
+
+  // ── Obsidian-style chronological playback ──────────────────────────────────
+  const playHistory = useCallback((): boolean => {
+    const sigma = sigmaRef.current;
+    const graph = detailGraphRef.current;
+    if (!sigma || !graph || graph.order === 0 || lens === 'authors' || layoutMode === 'radial') return false;
+
+    if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
+    if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
+    historyTimerRef.current = null;
+    clusterTimerRef.current = null;
+    layoutRef.current?.kill();
+    layoutRef.current = null;
+    manualOverviewRef.current = false;
+    switchMode('detail');
+    focusRef.current = { active: false, local: null, edgeId: null };
+    tutorFocusRef.current = null;
+    hoverRef.current = null;
+    hoverLocalRef.current = null;
+    onClearFocus();
+    onCommunitiesChange?.(false);
+
+    // Start from a fresh, neutral cloud so the gradual reveal has the same
+    // "network coming into being" quality as Obsidian's history animation.
+    scatterPositions(graph);
+    graph.forEachNode((id) => graph.setNodeAttribute(id, 'historyVisible', false));
+    graph.forEachEdge((edge) => graph.setEdgeAttribute(edge, 'historyVisible', false));
+    sigma.refresh();
+    void sigma.getCamera().animatedReset({ duration: 320 });
+
+    const chronologicalNodes = [...model.nodes].sort((a, b) => {
+      const aTime = a.createdAt ? Date.parse(a.createdAt) : Number.NaN;
+      const bTime = b.createdAt ? Date.parse(b.createdAt) : Number.NaN;
+      const aOrder = Number.isFinite(aTime) ? aTime : Number.MAX_SAFE_INTEGER;
+      const bOrder = Number.isFinite(bTime) ? bTime : Number.MAX_SAFE_INTEGER;
+      return aOrder - bOrder || stableUnit(a.id) - stableUnit(b.id) || a.id.localeCompare(b.id);
+    });
+    const edgesByNode = new Map<string, typeof model.edges>();
+    for (const edge of model.edges) {
+      const sourceEdges = edgesByNode.get(edge.source) ?? [];
+      sourceEdges.push(edge);
+      edgesByNode.set(edge.source, sourceEdges);
+      const targetEdges = edgesByNode.get(edge.target) ?? [];
+      targetEdges.push(edge);
+      edgesByNode.set(edge.target, targetEdges);
+    }
+    const visible = new Set<string>();
+    const steps = Math.min(72, Math.max(18, Math.ceil(chronologicalNodes.length / 14)));
+    const batchSize = Math.max(1, Math.ceil(chronologicalNodes.length / steps));
+    const intervalMs = Math.max(80, Math.round(HISTORY_DURATION_MS / steps));
+    let cursor = 0;
+
+    const revealBatch = () => {
+      const next = chronologicalNodes.slice(cursor, cursor + batchSize);
+      cursor += next.length;
+      for (const node of next) {
+        visible.add(node.id);
+        graph.setNodeAttribute(node.id, 'historyVisible', true);
+        for (const edge of edgesByNode.get(node.id) ?? []) {
+          if (visible.has(edge.source) && visible.has(edge.target) && graph.hasEdge(edge.id)) {
+            graph.setEdgeAttribute(edge.id, 'historyVisible', true);
+          }
+        }
+      }
+      sigma.refresh();
+      if (cursor < chronologicalNodes.length) return;
+      if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
+      historyTimerRef.current = null;
+    };
+
+    revealBatch();
+    if (cursor < chronologicalNodes.length) historyTimerRef.current = window.setInterval(revealBatch, intervalMs);
+
+    const layout = new WorkerLayout(graph);
+    layoutRef.current = layout;
+    const settleMs = HISTORY_DURATION_MS + obsidianSettleMs(graph.order);
+    layout.start({ durationMs: settleMs });
+    clusterTimerRef.current = window.setTimeout(() => {
+      clusterTimerRef.current = null;
+      ensureClusters();
+    }, settleMs + 300);
+    return true;
+  }, [ensureClusters, layoutMode, lens, model, onClearFocus, onCommunitiesChange, switchMode]);
 
   // ── Imperative API for the toolbar / navigation ─────────────────────────────
   useEffect(() => {
@@ -1094,6 +1389,7 @@ export function SigmaGraph({
         if (!camera) return;
         camera.animate({ ratio: camera.getBoundedRatio(camera.ratio / factor) }, { duration: 180 });
       },
+      playHistory,
       toggleCommunities: () => {
         const detail = detailGraphRef.current;
         if (!detail || detail.order === 0) {
@@ -1143,6 +1439,10 @@ export function SigmaGraph({
       clearFocus,
       reset: () => {
         const g = detailGraphRef.current;
+        if (historyTimerRef.current != null) {
+          window.clearInterval(historyTimerRef.current);
+          historyTimerRef.current = null;
+        }
         prevPositionsRef.current.clear();
         focusRef.current = { active: false, local: null, edgeId: null };
         hoverRef.current = null;
@@ -1164,7 +1464,7 @@ export function SigmaGraph({
             scatterPositions(g);
             const layout = new WorkerLayout(g);
             layoutRef.current = layout;
-            layout.start({ durationMs: Math.min(8000, 2500 + g.order * 1.5) });
+            layout.start({ durationMs: obsidianSettleMs(g.order) });
           }
         }
         sigma?.refresh();
@@ -1173,7 +1473,7 @@ export function SigmaGraph({
     };
     onApiReady(api);
     return () => onApiReady(null);
-  }, [onApiReady, applyFocusForNode, applyFocusForEdge, applyRadialLayout, clearFocus, ensureClusters, fitRadialGraph, focusTutor, layoutMode, onClearFocus, onCommunitiesChange, switchMode]);
+  }, [onApiReady, applyFocusForNode, applyFocusForEdge, applyRadialLayout, clearFocus, ensureClusters, fitRadialGraph, focusTutor, layoutMode, onClearFocus, onCommunitiesChange, playHistory, switchMode]);
 
   // Final teardown.
   useEffect(() => {
@@ -1182,6 +1482,7 @@ export function SigmaGraph({
       if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
       if (minimapRafRef.current != null) window.cancelAnimationFrame(minimapRafRef.current);
       if (radialFitRafRef.current != null) window.cancelAnimationFrame(radialFitRafRef.current);
+      if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
       layoutRef.current?.kill();
       layoutRef.current = null;
     };

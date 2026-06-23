@@ -3147,6 +3147,10 @@ export function GraphView({
     }
   }, [applyPreset, frameGraph, onSigmaClear]);
 
+  const playGraphHistory = useCallback(() => {
+    sigmaApiRef.current?.playHistory();
+  }, []);
+
   useEffect(() => {
     if (!target || target.nonce === lastNavigationNonceRef.current) return;
     lastNavigationNonceRef.current = target.nonce;
@@ -3435,6 +3439,15 @@ export function GraphView({
             <button className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800" title={t('Ajustar a la pantalla')} onClick={fitGraph}>
               <Icon name="fit" size={16} />
             </button>
+            {USE_SIGMA && lens === 'ideas' && layoutMode === 'force' && (
+              <button
+                className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
+                title={t('Animar la evolución del grafo por fecha de creación')}
+                onClick={playGraphHistory}
+              >
+                <Icon name="play" size={16} />
+              </button>
+            )}
             <button
               className="card bg-neutral-900/90 p-1.5 hover:bg-neutral-800"
               title={t('Reiniciar grafo (vista y disposición originales)')}

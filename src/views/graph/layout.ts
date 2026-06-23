@@ -5,9 +5,9 @@
 // Sigma re-renders automatically. This is the core scalability win: growing the
 // corpus no longer freezes the UI thread while the layout settles.
 //
-// We keep the supervisor bounded — it runs for a budget of time then auto-stops
-// so it never burns the worker forever once the graph has visually settled. A
-// manual `start()` (e.g. after a drag or a "re-layout") can re-run it.
+// We keep the supervisor bounded — it runs long enough for a visibly physical
+// settle, then auto-stops so it never burns the worker forever once the graph
+// has visually settled. A manual `start()` (e.g. after a re-layout) can re-run it.
 import Graph from 'graphology';
 import FA2Layout from 'graphology-layout-forceatlas2/worker';
 import { inferSettings } from 'graphology-layout-forceatlas2';
@@ -52,8 +52,9 @@ export class WorkerLayout {
       edgeWeightInfluence: 1,
       scalingRatio: options.scalingRatio ?? 14,
       gravity: options.gravity ?? 0.8,
-      // High slowDown → the live simulation settles calm and only reacts to drags.
-      slowDown: 9,
+      // Critical-feeling damping: the initial layout visibly breathes but sheds
+      // energy quickly instead of leaving nodes quivering after a gesture.
+      slowDown: 12,
     };
     this.supervisor = new FA2Layout(this.graph, {
       settings,
@@ -63,8 +64,8 @@ export class WorkerLayout {
   }
 
   /**
-   * Start the simulation. Runs continuously (live, Obsidian-style) so dragging a
-   * node repels its neighbours; pass `durationMs` for a bounded settle instead.
+   * Start the simulation. Pass `durationMs` for the bounded, visibly settling
+   * behaviour used by the graph view.
    */
   start(options: FA2Options = {}, onStop?: () => void): void {
     if (this.graph.order === 0) {

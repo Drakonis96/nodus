@@ -1004,6 +1004,7 @@ export const EN: Record<string, string> = {
   Acercar: 'Zoom in',
   Alejar: 'Zoom out',
   'Ajustar a la pantalla': 'Fit to screen',
+  'Animar la evolución del grafo por fecha de creación': 'Animate graph growth by creation date',
   'Reiniciar grafo (vista y disposición originales)': 'Reset graph (original view and layout)',
   'Mini-mapa · click para navegar': 'Minimap · click to navigate',
   Leyenda: 'Legend',

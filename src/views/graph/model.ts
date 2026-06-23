@@ -52,6 +52,7 @@ export interface NodeModel {
   id: string;
   label: string;
   type: GraphNodeType;
+  createdAt?: string | null;
   workCount: number;
   degree: number;
   /** 0..1 importance used to drive semantic-zoom label reveal order. */
@@ -211,11 +212,12 @@ export function buildGraphModel(
   data: GraphData,
   filters: GraphFilters,
   lens: GraphLens,
-  preset: GraphPresetId
+  preset: GraphPresetId,
+  revealedNodeIds: ReadonlySet<string> = new Set()
 ): GraphModel {
   const f = filters;
   const q = f.search.toLowerCase();
-  let visibleNodes = data.nodes.filter((n) => {
+  const nodeMatchesFilters = (n: GraphData['nodes'][number], includeSearch: boolean) => {
     if (lens === 'ideas' && !f.nodeTypes.includes(n.type)) return false;
     if (lens === 'ideas' && f.theme && !n.themes.includes(f.theme)) return false;
     if (f.workIds.length > 0 && !(n.workIds ?? []).some((id) => f.workIds.includes(id))) return false;
@@ -225,21 +227,51 @@ export function buildGraphModel(
     if (f.authors.length && !n.authors.some((a) => f.authors.includes(a))) return false;
     if (f.yearMin != null && !n.years.some((y) => y >= f.yearMin!)) return false;
     if (f.yearMax != null && !n.years.some((y) => y <= f.yearMax!)) return false;
-    if (q && !(n.label.toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => a.toLowerCase().includes(q)))) {
+    if (includeSearch && q && !(n.label.toLowerCase().includes(q) || (n.statement ?? '').toLowerCase().includes(q) || n.authors.some((a) => a.toLowerCase().includes(q)))) {
       return false;
     }
     return true;
-  });
-  let nodeIds = new Set(visibleNodes.map((n) => n.id));
-  let visibleEdges = primaryThemeEdges(
-    data.edges.filter((e) => {
-      if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) return false;
-      if (lens === 'ideas' && !f.edgeTypes.includes(e.type)) return false;
-      if (f.minConfidence > 0 && e.confidence < f.minConfidence) return false;
-      if (lens === 'ideas' && f.basis === 'explicit' && e.basis !== 'explicit') return false;
-      return true;
-    })
+  };
+
+  // Text search initially shows only matching ideas. A deliberate click on one
+  // of those ideas may reveal its local connections, but all other filters stay
+  // authoritative: search becomes the only condition relaxed for that context.
+  let visibleNodes = data.nodes.filter((node) => nodeMatchesFilters(node, true));
+  const contextEligibleNodeIds = new Set(
+    data.nodes
+      .filter((node) => nodeMatchesFilters(node, false))
+      .map((node) => node.id)
   );
+  let nodeIds = new Set(visibleNodes.map((n) => n.id));
+  const eligibleEdges = data.edges.filter((edge) => {
+    if (!contextEligibleNodeIds.has(edge.source) || !contextEligibleNodeIds.has(edge.target)) return false;
+    if (lens === 'ideas' && !f.edgeTypes.includes(edge.type)) return false;
+    if (f.minConfidence > 0 && edge.confidence < f.minConfidence) return false;
+    if (lens === 'ideas' && f.basis === 'explicit' && edge.basis !== 'explicit') return false;
+    return true;
+  });
+
+  const revealedEdges = q && revealedNodeIds.size > 0
+    ? eligibleEdges.filter((edge) => revealedNodeIds.has(edge.source) || revealedNodeIds.has(edge.target))
+    : [];
+
+  if (revealedEdges.length > 0) {
+    for (const edge of revealedEdges) {
+      nodeIds.add(edge.source);
+      nodeIds.add(edge.target);
+    }
+    visibleNodes = data.nodes.filter((node) => nodeIds.has(node.id));
+  }
+
+  const primaryVisibleEdges = primaryThemeEdges(eligibleEdges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)));
+  const primaryVisibleEdgeIds = new Set(primaryVisibleEdges.map((edge) => edge.id));
+  let visibleEdges = [
+    ...primaryVisibleEdges,
+    // The default view collapses redundant theme membership links. A manually
+    // revealed idea is an explicit request for its full local neighbourhood, so
+    // retain every direct edge that passed the active non-text filters.
+    ...revealedEdges.filter((edge) => !primaryVisibleEdgeIds.has(edge.id)),
+  ];
 
   if (lens === 'ideas' && preset === 'contradictions') {
     const contradictionNodeIds = new Set<string>();
@@ -288,6 +320,7 @@ export function buildGraphModel(
       id: n.id,
       label: n.label,
       type: n.type,
+      createdAt: n.createdAt,
       workCount: n.workCount,
       degree,
       labelRank: n.type === 'theme' ? 1.2 : labelRankById.get(n.id) ?? 0,

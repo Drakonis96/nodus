@@ -381,6 +381,8 @@ export interface GraphNode {
   id: string; // global_id (idea) or author_id (author lens)
   label: string;
   type: GraphNodeType;
+  /** When the underlying research object entered Nodus; drives graph history playback. */
+  createdAt?: string | null;
   statement?: string;
   workCount: number;
   workIds?: string[];
