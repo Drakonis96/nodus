@@ -228,6 +228,26 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
     }));
 }
 
+/**
+ * When the work item is itself a file attachment — a standalone file (PDF, .md,
+ * .docx…) added directly to a collection with no parent reference — it has no
+ * children, so its text must be read from the item itself. Returns the item as a
+ * ZoteroAttachment, or null when it is not an attachment.
+ */
+export async function itemAsAttachment(userId: string, itemKey: string): Promise<ZoteroAttachment | null> {
+  const res = await zfetch(`${BASE}/users/${userId}/items/${itemKey}`);
+  if (!res.ok) return null;
+  const raw = (await res.json().catch(() => null)) as any;
+  const d = raw?.data;
+  if (!d || d.itemType !== 'attachment') return null;
+  return {
+    key: d.key ?? itemKey,
+    contentType: d.contentType ?? null,
+    linkMode: d.linkMode ?? null,
+    filename: d.filename ?? null,
+  };
+}
+
 /** Incremental diff: items changed since a library version. */
 export async function itemsSince(userId: string, since: number): Promise<{ items: ZoteroItem[]; version: number }> {
   const out: ZoteroItem[] = [];

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { DeepContextMode, SourceType, PdfAnalysis } from '@shared/types';
-import { itemChildren, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
+import { itemChildren, itemAsAttachment, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
 import { analyzePdf } from './pdfAnalyzer';
 import { ocrPdfPages } from './ocr';
@@ -304,17 +304,26 @@ export async function resolveWorkText(
   storagePath: string,
   abstract: string | null,
   doi: string | null,
-  opts: ResolveOptions
+  opts: ResolveOptions,
+  itemType?: string | null
 ): Promise<ExtractedDoc> {
-  let children: ZoteroAttachment[] = [];
+  let attachments: ZoteroAttachment[] = [];
   const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey });
   try {
-    children = await itemChildren(userId, zoteroKey);
-    metadataDone({ attachments: children.length });
+    if ((itemType ?? '').toLowerCase() === 'attachment') {
+      // A standalone attachment item IS the file — it has no children, so read it
+      // directly. This is what makes markdown/PDF files dropped straight into a
+      // collection scannable as full text.
+      const self = await itemAsAttachment(userId, zoteroKey);
+      if (self) attachments = [self];
+    } else {
+      attachments = await itemChildren(userId, zoteroKey);
+    }
+    metadataDone({ attachments: attachments.length });
   } catch (e) {
     metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
   }
-  const textAttachments = children.filter(isTextAttachment);
+  const textAttachments = attachments.filter(isTextAttachment);
   // Fall back to the standard Zotero storage location when the user left it blank,
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
   const effectiveStorage = storagePath || defaultZoteroStorage();

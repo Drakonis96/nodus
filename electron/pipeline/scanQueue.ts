@@ -384,17 +384,25 @@ class ScanQueue {
       metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
       /* offline: rely on stored attachments */
     }
-    const doc = await resolveWorkText(settings.zoteroUserId, work.zotero_key, settings.zoteroStoragePath, abstract, work.doi, {
-      unpaywallEmail: settings.unpaywallEmail,
-      preferZoteroFulltext: settings.preferZoteroFulltext,
-      ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
-      perf,
-      onProgress: (p) => {
-        queueItem.detail = p.detail;
-        queueItem.subPct = p.pct;
-        this.emit();
+    const doc = await resolveWorkText(
+      settings.zoteroUserId,
+      work.zotero_key,
+      settings.zoteroStoragePath,
+      abstract,
+      work.doi,
+      {
+        unpaywallEmail: settings.unpaywallEmail,
+        preferZoteroFulltext: settings.preferZoteroFulltext,
+        ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+        perf,
+        onProgress: (p) => {
+          queueItem.detail = p.detail;
+          queueItem.subPct = p.pct;
+          this.emit();
+        },
       },
-    });
+      work.item_type
+    );
     queueItem.detail = 'Analizando con IA…';
     queueItem.subPct = null;
     this.emit();
