@@ -55,6 +55,17 @@ import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { reprocessConnections } from './ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
+import {
+  startPassageEmbedding,
+  pausePassageEmbedding,
+  resumePassageEmbedding,
+  stopPassageEmbedding,
+  clearPassageProgress,
+  getPassageSnapshot,
+  onPassageProgress,
+  getWorkPassageStatuses,
+} from './ai/passageEmbeddingPipeline';
+import { getPassageDetail } from './db/passagesRepo';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
@@ -425,6 +436,16 @@ export function registerIpc(
   h('embeddings:status', async () => getEmbeddingSnapshot());
   h('embeddings:workStatuses', async (_e, nodusIds?: string[]) => getWorkEmbeddingStatuses(nodusIds));
 
+  // Full-text passage index
+  h('passages:start', async (_e, nodusIds?: string[]) => startPassageEmbedding(nodusIds));
+  h('passages:pause', async () => pausePassageEmbedding());
+  h('passages:resume', async () => resumePassageEmbedding());
+  h('passages:stop', async () => stopPassageEmbedding());
+  h('passages:clearProgress', async () => clearPassageProgress());
+  h('passages:status', async () => getPassageSnapshot());
+  h('passages:workStatuses', async (_e, nodusIds?: string[]) => getWorkPassageStatuses(nodusIds));
+  h('passages:get', async (_e, passageId: string) => getPassageDetail(passageId));
+
   // semantic bridge discovery
   h('bridges:discover', async (_e, model?: ModelRef | null) => discoverSemanticBridges(model));
   h('bridges:isRunning', async () => isSemanticBridgeRunning());
@@ -449,6 +470,10 @@ export function registerIpc(
   // Stream embedding pipeline progress to the renderer.
   onEmbeddingProgress((p) => {
     getWindow()?.webContents.send('embeddings:progress', p);
+  });
+
+  onPassageProgress((p) => {
+    getWindow()?.webContents.send('passages:progress', p);
   });
 
   // Stream semantic bridge progress to the renderer.

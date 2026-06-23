@@ -15,7 +15,7 @@ const nodusUrlTransform = (value: string) => {
  * react-markdown does not render raw HTML by default, so this is XSS-safe.
  */
 export interface MarkdownCitation {
-  kind: 'idea' | 'work' | 'gap' | 'contradiction';
+  kind: 'idea' | 'work' | 'gap' | 'contradiction' | 'passage';
   id: string;
 }
 
@@ -82,6 +82,8 @@ function parseCitation(href: string | undefined): MarkdownCitation | null {
   if (gap) return { kind: 'gap', id: decodeURIComponent(gap[1]) };
   const contradiction = href.match(/^nodus:\/\/contradiction\/(.+)$/);
   if (contradiction) return { kind: 'contradiction', id: decodeURIComponent(contradiction[1]) };
+  const passage = href.match(/^nodus:\/\/passage\/(.+)$/);
+  if (passage) return { kind: 'passage', id: decodeURIComponent(passage[1]) };
   return null;
 }
 
@@ -95,5 +97,7 @@ function citationLabel(kind: MarkdownCitation['kind']): string {
       return t('hueco de investigación');
     case 'contradiction':
       return t('contradicción');
+    case 'passage':
+      return t('pasaje');
   }
 }

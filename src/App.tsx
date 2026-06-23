@@ -16,6 +16,7 @@ import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
+import { PassageProgressBar } from './components/PassageProgressBar';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
@@ -271,6 +272,7 @@ export function App() {
       <div data-tour="queue">
         <QueueBar />
         <EmbeddingProgressBar />
+        <PassageProgressBar />
       </div>
 
       {collectionsOpen && (

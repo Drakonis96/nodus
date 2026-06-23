@@ -8,6 +8,7 @@ import type {
   AppSettings,
   ModelRef,
   WorkEmbeddingStatus,
+  WorkPassageStatus,
   ZoteroTag,
   CollectionFacet,
 } from '@shared/types';
@@ -27,7 +28,7 @@ import { t, tx } from '../i18n';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 14.5rem';
+  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">{t('ligero')} ✓</Badge>;
@@ -87,6 +88,12 @@ function embeddingBadge(status: WorkEmbeddingStatus | undefined) {
   );
 }
 
+function passageBadge(status: WorkPassageStatus | undefined) {
+  if (!status || status.status === 'missing') return <Badge color="neutral">—</Badge>;
+  if (status.status === 'complete') return <Badge color="green">✓ {status.totalPassages}</Badge>;
+  return <Badge color="amber" title={t('El texto o el modelo de embeddings cambió.')}>{t('obsoleto')}</Badge>;
+}
+
 export function Library({
   settings,
   onOpenCollections,
@@ -110,6 +117,7 @@ export function Library({
   const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
+  const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -121,10 +129,11 @@ export function Library({
     const requestId = ++loadRequestRef.current;
     if (initialLoadRef.current) setLoading(true);
     try {
-      const [w, tags, statuses, collections] = await Promise.all([
+      const [w, tags, statuses, passageIndexStatuses, collections] = await Promise.all([
         window.nodus.listWorks(filter),
         window.nodus.listZoteroTags(),
         window.nodus.getWorkEmbeddingStatuses(),
+        window.nodus.getWorkPassageStatuses(),
         window.nodus.listCollectionFacets(),
       ]);
       // A newer filter or refresh may have completed while this request was in
@@ -133,6 +142,7 @@ export function Library({
       setWorks(w);
       setAvailableZoteroTags(tags);
       setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
+      setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
       setAvailableCollections(collections);
     } finally {
       if (requestId === loadRequestRef.current) {
@@ -149,6 +159,9 @@ export function Library({
   // Once a queued analysis finishes, reapply the active tag/status predicate
   // without remounting the virtual list or losing the reader's scroll position.
   useScanComplete(() => void load());
+  useEffect(() => window.nodus.onPassageProgress((progress) => {
+    if (!progress.running) void load();
+  }), [load]);
 
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light', scanModel);
@@ -238,6 +251,21 @@ export function Library({
     await window.nodus.startEmbedding();
   };
 
+  const indexPassageWork = async (nodusId: string) => {
+    await window.nodus.startPassageEmbedding([nodusId]);
+  };
+
+  const indexMissingPassages = async () => {
+    const ids = works
+      .filter((work) => work.deep_status === 'done' && passageStatuses.get(work.nodus_id)?.status !== 'complete')
+      .map((work) => work.nodus_id);
+    if (ids.length > 0) await window.nodus.startPassageEmbedding(ids);
+  };
+
+  const indexAllPassages = async () => {
+    await window.nodus.startPassageEmbedding();
+  };
+
   const doReindexAll = async () => {
     setConfirmReindex(false);
     await window.nodus.reindexAll();
@@ -247,6 +275,9 @@ export function Library({
     const s = embeddingStatuses.get(w.nodus_id);
     return w.deep_status === 'done' && s && !s.complete && s.totalIdeas > 0;
   };
+
+  const needsPassageIndex = (w: WorkView) =>
+    w.deep_status === 'done' && passageStatuses.get(w.nodus_id)?.status !== 'complete';
 
   const discoverBridges = async () => {
     await window.nodus.enqueueBridgeDiscovery(scanModel);
@@ -675,6 +706,9 @@ export function Library({
           <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
             <Icon name="search" /> {t('Indexar')}
           </button>
+          <button className="btn btn-ghost border border-green-800 text-green-300" onClick={() => void window.nodus.startPassageEmbedding(selectedVisibleIds)}>
+            <Icon name="book" /> {t('Indexar pasajes')}
+          </button>
           <div className="flex-1" />
           <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
             {t('Limpiar selección')}
@@ -706,6 +740,22 @@ export function Library({
             buttonLabel={t('Indexar pendientes')}
             tone="cyan"
             onClick={embedPending}
+          />
+          <OperationCard
+            icon="book"
+            title={t('Procesar pasajes faltantes')}
+            description={t('Indexa fragmentos de texto completo en las obras profundas que faltan o están obsoletas. El texto se mantiene como evidencia citable.')}
+            buttonLabel={t('Procesar faltantes')}
+            tone="cyan"
+            onClick={indexMissingPassages}
+          />
+          <OperationCard
+            icon="book"
+            title={t('Pasajes (texto completo)')}
+            description={t('Recorre toda la biblioteca profunda y actualiza solo los índices que hayan cambiado. Los ya actuales se omiten.')}
+            buttonLabel={t('Indexar todo')}
+            tone="cyan"
+            onClick={indexAllPassages}
           />
           <OperationCard
             icon="search"
@@ -759,6 +809,7 @@ export function Library({
           <div className="font-medium">{t('Profundo')}</div>
           <div className="font-medium">{t('Resumen')}</div>
           <div className="font-medium">{t('Embeddings')}</div>
+          <div className="font-medium">{t('Pasajes')}</div>
           <div className="font-medium" data-tour="library-actions">{t('Acciones')}</div>
         </div>
         {loading ? (
@@ -797,6 +848,18 @@ export function Library({
                 <div className="p-1">{lightBadge(w.light_status)}</div>
                 <div className="p-1 whitespace-nowrap">
                   {deepBadge(w.deep_status)} {triggerBadge(w)}
+                </div>
+                <div className="p-1 whitespace-nowrap">
+                  {w.deep_status === 'done' ? passageBadge(passageStatuses.get(w.nodus_id)) : <Badge color="neutral">—</Badge>}
+                  {needsPassageIndex(w) && (
+                    <button
+                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-green-400 hover:text-green-300"
+                      title={t('Indexar pasajes de esta obra')}
+                      onClick={() => indexPassageWork(w.nodus_id)}
+                    >
+                      <Icon name="book" size={11} />
+                    </button>
+                  )}
                 </div>
                 <div className="p-1 whitespace-nowrap">{summaryBadge(w.summary_status)}</div>
                 <div className="p-1 whitespace-nowrap">

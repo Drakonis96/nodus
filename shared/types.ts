@@ -750,6 +750,8 @@ export interface ResearchContextSelection {
   readingPath: boolean;
   authors: boolean;
   documents: boolean;
+  /** Fine-grained full-text evidence retrieved from the local passage index. */
+  passages: boolean;
   graph: boolean;
   graphParts: ResearchGraphPartsSelection;
 }
@@ -770,6 +772,7 @@ export interface ResearchContextStats {
   works: number;
   documents: number;
   summaries: number;
+  passages: number;
   contextChars: number;
   truncated: boolean;
 }
@@ -990,6 +993,8 @@ export interface WritingWorkshopSelection {
   gapIds: string[];
   contradictionIds: string[];
   workIds: string[];
+  /** Full-text evidence deliberately selected from semantic retrieval. */
+  passageIds: string[];
   tutorRouteIds: string[];
 }
 
@@ -1044,6 +1049,15 @@ export interface WritingWorkshopWorkCandidate extends WritingWorkshopCandidateBa
   gapCount: number;
 }
 
+export interface WritingWorkshopPassageCandidate extends WritingWorkshopCandidateBase {
+  nodus_id: string;
+  pageLabel: string | null;
+  authors: string[];
+  year: number | null;
+  zotero_key: string;
+  citation: string;
+}
+
 export interface WritingWorkshopRouteCandidate extends WritingWorkshopCandidateBase {
   routeTitle: string;
   mode: TutorMode;
@@ -1062,6 +1076,7 @@ export interface WritingWorkshopSnapshot {
     gaps: number;
     contradictions: number;
     works: number;
+    passages: number;
     tutorRoutes: number;
   };
   recommendedSelection: WritingWorkshopSelection;
@@ -1070,6 +1085,7 @@ export interface WritingWorkshopSnapshot {
   gaps: WritingWorkshopGapCandidate[];
   contradictions: WritingWorkshopContradictionCandidate[];
   works: WritingWorkshopWorkCandidate[];
+  passages: WritingWorkshopPassageCandidate[];
   tutorRoutes: WritingWorkshopRouteCandidate[];
 }
 
@@ -1108,6 +1124,7 @@ export interface WritingWorkshopDraft {
     selectedGaps: number;
     selectedContradictions: number;
     selectedWorks: number;
+    selectedPassages: number;
     selectedTutorRoutes: number;
     contextChars: number;
     truncated: boolean;
@@ -1343,6 +1360,17 @@ export interface NodusApi {
   getWorkEmbeddingStatuses(nodusIds?: string[]): Promise<WorkEmbeddingStatus[]>;
   onEmbeddingProgress(cb: (p: EmbeddingPipelineProgress) => void): () => void;
 
+  // full-text passage index
+  startPassageEmbedding(nodusIds?: string[]): Promise<void>;
+  pausePassageEmbedding(): Promise<void>;
+  resumePassageEmbedding(): Promise<void>;
+  stopPassageEmbedding(): Promise<void>;
+  clearPassageProgress(): Promise<void>;
+  getPassageStatus(): Promise<PassageEmbeddingProgress>;
+  getWorkPassageStatuses(nodusIds?: string[]): Promise<WorkPassageStatus[]>;
+  onPassageProgress(cb: (p: PassageEmbeddingProgress) => void): () => void;
+  getPassage(passageId: string): Promise<PassageDetail | null>;
+
   // semantic bridge discovery
   discoverSemanticBridges(model?: ModelRef | null): Promise<SemanticBridgeResult>;
   isSemanticBridgeRunning(): Promise<boolean>;
@@ -1414,6 +1442,40 @@ export interface WorkEmbeddingStatus {
   embeddedIdeas: number;
   /** true if all ideas have embeddings. */
   complete: boolean;
+}
+
+/** Progress state for the manual full-text passage indexing pipeline. */
+export interface PassageEmbeddingProgress {
+  running: boolean;
+  paused: boolean;
+  currentWorkIndex: number;
+  totalWorks: number;
+  currentWorkTitle: string | null;
+  passagesEmbedded: number;
+  totalPassages: number;
+  currentPassageIndex: number;
+  currentWorkPassages: number;
+  error: string | null;
+}
+
+export interface WorkPassageStatus {
+  nodus_id: string;
+  totalPassages: number;
+  status: 'complete' | 'outdated' | 'missing';
+}
+
+export interface PassageDetail {
+  passage_id: string;
+  nodus_id: string;
+  text: string;
+  page_label: string | null;
+  chunk_index: number;
+  work: {
+    title: string;
+    authors: string[];
+    year: number | null;
+    zotero_key: string;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

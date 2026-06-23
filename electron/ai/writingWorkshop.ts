@@ -9,6 +9,7 @@ import type {
   WritingWorkshopGapCandidate,
   WritingWorkshopIdeaCandidate,
   WritingWorkshopMatrixRow,
+  WritingWorkshopPassageCandidate,
   WritingWorkshopRouteCandidate,
   WritingWorkshopSection,
   WritingWorkshopSelection,
@@ -20,14 +21,20 @@ import { getDb } from '../db/database';
 import { getContradictions } from '../graph/graphService';
 import { listTutorRoutes } from '../db/tutorRepo';
 import { completeJson } from './aiClient';
+import { embed } from './aiClient';
+import { findSimilarIdeas } from '../db/ideasRepo';
+import { findSimilarWorks } from '../db/workSummariesRepo';
+import { findSimilarPassages, type SimilarPassage } from '../db/passagesRepo';
 
 const MAX_IDEAS = 120;
 const MAX_THEMES = 30;
 const MAX_GAPS = 36;
 const MAX_CONTRADICTIONS = 30;
 const MAX_WORKS = 80;
+const MAX_PASSAGES = 24;
 const MAX_ROUTES = 12;
 const MAX_CONTEXT_CHARS = 420_000;
+const MAX_PASSAGE_CONTEXT_CHARS = 30_000;
 
 interface Scored<T> {
   item: T;
@@ -43,6 +50,7 @@ interface IdeaRow {
   themes: string | null;
   work_count: number;
   evidence_count: number;
+  work_ids: string | null;
 }
 
 interface WorkLinkRow {
@@ -59,6 +67,19 @@ interface ThemeRow {
   pinned: number | null;
   work_count: number;
   idea_count: number;
+  work_ids: string | null;
+}
+
+interface WorkshopSemanticRanking {
+  active: boolean;
+  ideaScores: Map<string, number>;
+  workScores: Map<string, number>;
+  passages: WritingWorkshopPassageCandidate[];
+}
+
+interface WorkshopContext {
+  payload: Record<string, unknown>;
+  stats: WritingWorkshopDraft['stats'];
 }
 
 interface GapRow {
@@ -118,13 +139,14 @@ function isAiWorkshopResult(value: unknown): value is AiWorkshopResult {
   return typeof v.title === 'string' && typeof v.draftMarkdown === 'string' && Array.isArray(v.outline);
 }
 
-export function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): WritingWorkshopSnapshot {
+export async function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot> {
   const tokens = tokenize(`${brief.objective} ${kindLabel(brief.kind)}`);
-  const ideas = rankedIdeas(tokens);
-  const themes = rankedThemes(tokens);
-  const gaps = rankedGaps(tokens, brief.kind);
-  const contradictions = rankedContradictions(tokens);
-  const works = rankedWorks(tokens);
+  const semantic = await buildSemanticRanking(brief.objective);
+  const ideas = rankedIdeas(tokens, semantic);
+  const themes = rankedThemes(tokens, semantic);
+  const gaps = rankedGaps(tokens, brief.kind, semantic);
+  const contradictions = rankedContradictions(tokens, semantic);
+  const works = rankedWorks(tokens, semantic);
   const tutorRoutes = rankedTutorRoutes(tokens);
 
   return {
@@ -136,6 +158,7 @@ export function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Writi
       gaps: countTable('gaps'),
       contradictions: getContradictions().length,
       works: countTable('works'),
+      passages: countTable('passages'),
       tutorRoutes: listTutorRoutes().length,
     },
     recommendedSelection: recommendSelection(brief, { ideas, themes, gaps, contradictions, works, tutorRoutes }),
@@ -144,15 +167,16 @@ export function buildWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Writi
     gaps,
     contradictions,
     works,
+    passages: semantic.passages,
     tutorRoutes,
   };
 }
 
 export async function generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft> {
   citationLabelCache.clear();
-  const snapshot = buildWritingWorkshopSnapshot(request.brief);
+  const snapshot = await buildWritingWorkshopSnapshot(request.brief);
   const selection = normalizeSelection(request.selection, snapshot.recommendedSelection);
-  const context = buildSelectedContext(request.brief, selection);
+  const context = await buildSelectedContext(request.brief, selection);
   const user = JSON.stringify(context.payload, null, 2);
 
   const system = [
@@ -173,6 +197,8 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
     '- Obras: [Apellido, I. (año)](nodus://work/<nodus_id>)',
     '- Huecos: [hueco](nodus://gap/<gap_id>)',
     '- Contradicciones: [contradiccion](nodus://contradiction/<edge_id>)',
+    '- Pasajes de texto completo: [Apellido, año, p. N](nodus://passage/<passage_id>)',
+    'Los `pasajes_evidencia` son texto literal: úsalos para sostener afirmaciones verificables y cítalos con su campo `cita` exacto. No inventes páginas ni extiendas su sentido.',
     'Si no hay evidencia suficiente para una seccion, dilo como limitacion o siguiente paso; no rellenes.',
     '',
     'Devuelve EXCLUSIVAMENTE JSON valido con esta forma:',
@@ -216,13 +242,82 @@ function countTable(table: string): number {
   return row.n;
 }
 
-function rankedIdeas(tokens: Set<string>): WritingWorkshopIdeaCandidate[] {
+/**
+ * One query embedding drives the entire workshop table. We use the existing
+ * idea/work vectors for broad ranking and the fine passage index for direct
+ * evidence candidates; lexical matching remains only as an offline fallback.
+ */
+async function buildSemanticRanking(objective: string): Promise<WorkshopSemanticRanking> {
+  const empty: WorkshopSemanticRanking = { active: false, ideaScores: new Map(), workScores: new Map(), passages: [] };
+  if (!objective.trim()) return empty;
+  try {
+    const query = await embed(objective.trim());
+    if (!query) return empty;
+    const ideaScores = new Map(findSimilarIdeas(query, -1, MAX_IDEAS).map((hit) => [hit.global_id, semanticStrength(hit.similarity)]));
+    const workScores = new Map(findSimilarWorks(query, -1, MAX_WORKS).map((hit) => [hit.nodus_id, semanticStrength(hit.similarity)]));
+    const passageHits = findSimilarPassages(query, -1, MAX_PASSAGES);
+    for (const hit of passageHits) {
+      const current = workScores.get(hit.nodus_id) ?? 0;
+      workScores.set(hit.nodus_id, Math.max(current, semanticStrength(hit.similarity)));
+    }
+    return {
+      active: ideaScores.size > 0 || workScores.size > 0 || passageHits.length > 0,
+      ideaScores,
+      workScores,
+      passages: passageHits.map(toPassageCandidate),
+    };
+  } catch (error) {
+    console.warn('[writingWorkshop] semantic ranking unavailable:', error instanceof Error ? error.message : String(error));
+    return empty;
+  }
+}
+
+function semanticStrength(similarity: number): number {
+  return Math.max(0, Math.min(0.65, similarity));
+}
+
+function scoreForIds(ids: string[], scores: Map<string, number>): number | null {
+  let best: number | null = null;
+  for (const id of ids) {
+    const score = scores.get(id);
+    if (score != null && (best == null || score > best)) best = score;
+  }
+  return best;
+}
+
+function semanticOrLexical(semantic: WorkshopSemanticRanking, semanticScore: number | null, lexicalScore: number): number {
+  return semantic.active ? semanticScore ?? 0 : lexicalScore;
+}
+
+function semanticReason(semantic: WorkshopSemanticRanking, score: number, support: number): string {
+  if (semantic.active && score > support) return 'Recuperado por similitud semántica con el objetivo.';
+  return reasonFor(score, support, semantic.active ? 0 : score - support);
+}
+
+function toPassageCandidate(hit: SimilarPassage): WritingWorkshopPassageCandidate {
+  return {
+    id: hit.passage_id,
+    label: `${hit.title}${hit.page_label ? ` · ${hit.page_label}` : ''}`,
+    summary: clip(hit.text, 520),
+    score: semanticStrength(hit.similarity),
+    reason: 'Pasaje recuperado por similitud semántica con el objetivo.',
+    nodus_id: hit.nodus_id,
+    pageLabel: hit.page_label,
+    authors: parseAuthors(hit.authors_json),
+    year: hit.year,
+    zotero_key: hit.zotero_key,
+    citation: `nodus://passage/${encodeURIComponent(hit.passage_id)}`,
+  };
+}
+
+function rankedIdeas(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopIdeaCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT i.global_id, i.type, i.label, i.statement,
               COALESCE(GROUP_CONCAT(DISTINCT t.label), '') AS themes,
               COUNT(DISTINCT io.nodus_id) AS work_count,
-              COUNT(DISTINCT e.id) AS evidence_count
+              COUNT(DISTINCT e.id) AS evidence_count,
+              COALESCE(GROUP_CONCAT(DISTINCT io.nodus_id), '') AS work_ids
          FROM ideas i
          LEFT JOIN idea_occurrences io ON io.global_id = i.global_id
          LEFT JOIN evidence e ON e.global_id = i.global_id
@@ -237,12 +332,13 @@ function rankedIdeas(tokens: Set<string>): WritingWorkshopIdeaCandidate[] {
     .map((row): Scored<WritingWorkshopIdeaCandidate> => {
       const themeList = splitList(row.themes);
       const baseText = [row.label, row.statement, themeList.join(' ')].join(' ');
-      const semantic = relevance(tokens, baseText);
+      const lexical = relevance(tokens, baseText);
+      const semantic = semanticOrLexical(semanticIndex, semanticIndex.ideaScores.get(row.global_id) ?? scoreForIds(splitList(row.work_ids), semanticIndex.workScores), lexical);
       const support = Math.min(0.22, row.work_count * 0.035) + Math.min(0.16, row.evidence_count * 0.018);
       const score = semantic + support;
       return {
         score,
-        reason: reasonFor(score, support, semantic),
+        reason: semanticReason(semanticIndex, score, support),
         item: {
           id: row.global_id,
           label: row.label,
@@ -283,12 +379,13 @@ function ideaWorks(globalId: string): WritingWorkshopIdeaCandidate['works'] {
   }));
 }
 
-function rankedThemes(tokens: Set<string>): WritingWorkshopThemeCandidate[] {
+function rankedThemes(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopThemeCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT t.theme_id, t.label, t.pinned,
               COUNT(DISTINCT wt.nodus_id) AS work_count,
-              COUNT(DISTINCT itl.global_id) AS idea_count
+              COUNT(DISTINCT itl.global_id) AS idea_count,
+              COALESCE(GROUP_CONCAT(DISTINCT wt.nodus_id), '') AS work_ids
          FROM themes t
          LEFT JOIN work_themes wt ON wt.theme_id = t.theme_id
          LEFT JOIN idea_theme_links itl ON itl.theme_id = t.theme_id
@@ -299,12 +396,13 @@ function rankedThemes(tokens: Set<string>): WritingWorkshopThemeCandidate[] {
 
   return rows
     .map((row): Scored<WritingWorkshopThemeCandidate> => {
-      const semantic = relevance(tokens, row.label);
+      const lexical = relevance(tokens, row.label);
+      const semantic = semanticOrLexical(semanticIndex, scoreForIds(splitList(row.work_ids), semanticIndex.workScores), lexical);
       const support = Math.min(0.22, row.work_count * 0.018) + Math.min(0.18, row.idea_count * 0.025) + (row.pinned ? 0.08 : 0);
       const score = semantic + support;
       return {
         score,
-        reason: row.pinned ? 'Tema curado y con material conectado.' : reasonFor(score, support, semantic),
+        reason: row.pinned ? 'Tema curado y con material conectado.' : semanticReason(semanticIndex, score, support),
         item: {
           id: row.theme_id,
           label: row.label,
@@ -322,7 +420,7 @@ function rankedThemes(tokens: Set<string>): WritingWorkshopThemeCandidate[] {
     .map(({ item, score, reason }) => ({ ...item, score, reason }));
 }
 
-function rankedGaps(tokens: Set<string>, kind: WritingWorkshopBrief['kind']): WritingWorkshopGapCandidate[] {
+function rankedGaps(tokens: Set<string>, kind: WritingWorkshopBrief['kind'], semanticIndex: WorkshopSemanticRanking): WritingWorkshopGapCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT g.id, g.kind, g.statement, g.related_idea, g.confidence,
@@ -337,13 +435,18 @@ function rankedGaps(tokens: Set<string>, kind: WritingWorkshopBrief['kind']): Wr
 
   return rows
     .map((row): Scored<WritingWorkshopGapCandidate> => {
-      const semantic = relevance(tokens, [row.statement, row.idea_label ?? '', row.title].join(' '));
+      const lexical = relevance(tokens, [row.statement, row.idea_label ?? '', row.title].join(' '));
+      const semantic = semanticOrLexical(
+        semanticIndex,
+        Math.max(semanticIndex.workScores.get(row.nodus_id) ?? 0, semanticIndex.ideaScores.get(row.related_idea ?? '') ?? 0) || null,
+        lexical
+      );
       const gapBoost = kind === 'gap_justification' || kind === 'research_question' ? 0.22 : 0.05;
       const support = gapBoost + Math.min(0.16, row.confidence * 0.16);
       const score = semantic + support;
       return {
         score,
-        reason: kind === 'gap_justification' ? 'Hueco útil para justificar contribución.' : reasonFor(score, support, semantic),
+        reason: kind === 'gap_justification' ? 'Hueco útil para justificar contribución.' : semanticReason(semanticIndex, score, support),
         item: {
           id: row.id,
           label: clip(row.statement, 90),
@@ -368,10 +471,16 @@ function rankedGaps(tokens: Set<string>, kind: WritingWorkshopBrief['kind']): Wr
     .map(({ item, score, reason }) => ({ ...item, score, reason }));
 }
 
-function rankedContradictions(tokens: Set<string>): WritingWorkshopContradictionCandidate[] {
+function rankedContradictions(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopContradictionCandidate[] {
   return getContradictions()
     .map((detail): Scored<WritingWorkshopContradictionCandidate> => {
-      const semantic = relevance(tokens, [detail.fromLabel, detail.toLabel, detail.explanation ?? ''].join(' '));
+      const lexical = relevance(tokens, [detail.fromLabel, detail.toLabel, detail.explanation ?? ''].join(' '));
+      const semantic = semanticOrLexical(
+        semanticIndex,
+        scoreForIds(detail.evidence.map((e) => e.nodus_id), semanticIndex.workScores) ??
+          scoreForIds([detail.edge.from_id, detail.edge.to_id], semanticIndex.ideaScores),
+        lexical
+      );
       const support = Math.min(0.22, detail.edge.confidence * 0.2) + (detail.evidence.length > 0 ? 0.06 : 0);
       const score = semantic + support;
       return {
@@ -396,7 +505,7 @@ function rankedContradictions(tokens: Set<string>): WritingWorkshopContradiction
     .map(({ item, score, reason }) => ({ ...item, score, reason }));
 }
 
-function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
+function rankedWorks(tokens: Set<string>, semanticIndex: WorkshopSemanticRanking): WritingWorkshopWorkCandidate[] {
   const rows = getDb()
     .prepare(
       `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.deep_status,
@@ -419,12 +528,13 @@ function rankedWorks(tokens: Set<string>): WritingWorkshopWorkCandidate[] {
   return rows
     .map((row): Scored<WritingWorkshopWorkCandidate> => {
       const themes = splitList(row.themes);
-      const semantic = relevance(tokens, [row.title, themes.join(' '), row.orientation_summary ?? ''].join(' '));
+      const lexical = relevance(tokens, [row.title, themes.join(' '), row.orientation_summary ?? ''].join(' '));
+      const semantic = semanticOrLexical(semanticIndex, semanticIndex.workScores.get(row.nodus_id) ?? null, lexical);
       const support = Math.min(0.18, row.idea_count * 0.03) + Math.min(0.14, row.gap_count * 0.035) + (row.deep_status === 'done' ? 0.08 : 0);
       const score = semantic + support;
       return {
         score,
-        reason: row.deep_status === 'done' ? 'Obra con ideas y evidencias extraídas.' : reasonFor(score, support, semantic),
+        reason: row.deep_status === 'done' ? (semanticIndex.active ? 'Obra recuperada semánticamente con evidencia indexada.' : 'Obra con ideas y evidencias extraídas.') : semanticReason(semanticIndex, score, support),
         item: {
           id: row.nodus_id,
           label: row.title,
@@ -504,6 +614,7 @@ function recommendSelection(
     gapIds: candidates.gaps.slice(0, gapHeavy ? 8 : 4).map((g) => g.id),
     contradictionIds: candidates.contradictions.slice(0, debateHeavy ? 8 : 4).map((c) => c.id),
     workIds: candidates.works.slice(0, 10).map((w) => w.id),
+    passageIds: [],
     tutorRouteIds: candidates.tutorRoutes.slice(0, 2).map((r) => r.id),
   };
 }
@@ -519,6 +630,7 @@ function normalizeSelection(selection: WritingWorkshopSelection, fallback: Writi
     selection.gapIds,
     selection.contradictionIds,
     selection.workIds,
+    selection.passageIds,
     selection.tutorRouteIds,
   ].some((list) => list.length > 0);
   if (!anySelected) return fallback;
@@ -528,14 +640,13 @@ function normalizeSelection(selection: WritingWorkshopSelection, fallback: Writi
     gapIds: clean(selection.gapIds, []),
     contradictionIds: clean(selection.contradictionIds, []),
     workIds: clean(selection.workIds, []),
+    passageIds: clean(selection.passageIds, []),
     tutorRouteIds: clean(selection.tutorRouteIds, []),
   };
 }
 
-function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWorkshopSelection): {
-  payload: Record<string, unknown>;
-  stats: WritingWorkshopDraft['stats'];
-} {
+async function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWorkshopSelection): Promise<WorkshopContext> {
+  const passages = await selectedPassagesForDraft(brief.objective, selection);
   const context = {
     brief: {
       tipo: kindLabel(brief.kind),
@@ -549,8 +660,9 @@ function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWor
     huecos: selectedGaps(selection.gapIds),
     contradicciones: selectedContradictions(selection.contradictionIds),
     obras: selectedWorks(selection.workIds),
+    pasajes_evidencia: passages,
     rutas_tutor: selectedRoutes(selection.tutorRouteIds),
-    regla: 'Cada id incluido aqui puede citarse con nodus://idea, nodus://work, nodus://gap o nodus://contradiction.',
+    regla: 'Cada id incluido aqui puede citarse con nodus://idea, nodus://work, nodus://gap, nodus://contradiction o nodus://passage. Los pasajes son evidencia literal y deben citarse de manera exacta.',
   };
   const raw = JSON.stringify(context);
   const truncated = raw.length > MAX_CONTEXT_CHARS;
@@ -564,6 +676,7 @@ function buildSelectedContext(brief: WritingWorkshopBrief, selection: WritingWor
       selectedGaps: context.huecos.length,
       selectedContradictions: context.contradicciones.length,
       selectedWorks: context.obras.length,
+      selectedPassages: context.pasajes_evidencia.length,
       selectedTutorRoutes: context.rutas_tutor.length,
       contextChars,
       truncated,
@@ -767,6 +880,103 @@ function selectedWorks(ids: string[]) {
   }));
 }
 
+/**
+ * Passage evidence is fetched only when the writer explicitly generates a
+ * draft. Selected passages are honored first; then the objective retrieves a
+ * small semantic set constrained to the materials the writer chose.
+ */
+async function selectedPassagesForDraft(
+  objective: string,
+  selection: WritingWorkshopSelection
+): Promise<Record<string, unknown>[]> {
+  const selected = selectedPassages(selection.passageIds ?? []);
+  const byId = new Map(selected.map((passage) => [String(passage.id), passage]));
+  if (!objective.trim()) return capPassageContext([...byId.values()]);
+
+  try {
+    const query = await embed(objective.trim());
+    if (!query) return capPassageContext([...byId.values()]);
+    const scope = selectedWorkScope(selection);
+    for (const passage of selected) {
+      const work = passage.obra;
+      if (work && typeof work === 'object' && 'id' in work && typeof work.id === 'string') scope.add(work.id);
+    }
+    const hits = findSimilarPassages(query, 0.18, 12, scope.size ? { nodusIds: [...scope] } : {});
+    for (const hit of hits) {
+      if (!byId.has(hit.passage_id)) byId.set(hit.passage_id, passageContext(hit));
+    }
+  } catch (error) {
+    console.warn('[writingWorkshop] passage evidence unavailable:', error instanceof Error ? error.message : String(error));
+  }
+  return capPassageContext([...byId.values()]);
+}
+
+function selectedPassages(ids: string[]): Record<string, unknown>[] {
+  if (ids.length === 0) return [];
+  const rows = getDb()
+    .prepare(
+      `SELECT p.passage_id, p.nodus_id, p.text, p.page_label, w.title, w.authors_json, w.year, w.zotero_key
+         FROM passages p
+         JOIN works w ON w.nodus_id = p.nodus_id
+        WHERE p.passage_id IN (${placeholders(ids)})
+          AND w.archived = 0
+          AND p.content_hash = w.deep_hash
+        ORDER BY p.nodus_id, p.chunk_index`
+    )
+    .all(...ids) as Array<Omit<SimilarPassage, 'similarity'>>;
+  return rows.map((row) => passageContext({ ...row, similarity: 0 }));
+}
+
+function selectedWorkScope(selection: WritingWorkshopSelection): Set<string> {
+  const ids = new Set(selection.workIds ?? []);
+  const db = getDb();
+  const addRows = (sql: string, values: string[]) => {
+    if (values.length === 0) return;
+    const rows = db.prepare(sql.replace(':ids', placeholders(values))).all(...values) as { nodus_id: string }[];
+    for (const row of rows) ids.add(row.nodus_id);
+  };
+  addRows('SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id IN (:ids)', selection.ideaIds ?? []);
+  addRows('SELECT DISTINCT nodus_id FROM gaps WHERE id IN (:ids)', selection.gapIds ?? []);
+  addRows('SELECT DISTINCT nodus_id FROM work_themes WHERE theme_id IN (:ids)', selection.themeIds ?? []);
+  const contradictionIds = new Set(selection.contradictionIds ?? []);
+  for (const detail of getContradictions()) {
+    if (!contradictionIds.has(detail.edge.id)) continue;
+    for (const evidence of detail.evidence) ids.add(evidence.nodus_id);
+  }
+  return ids;
+}
+
+function passageContext(hit: SimilarPassage): Record<string, unknown> {
+  return {
+    id: hit.passage_id,
+    texto: hit.text,
+    localizacion: hit.page_label,
+    obra: {
+      id: hit.nodus_id,
+      titulo: hit.title,
+      autores: parseAuthors(hit.authors_json),
+      ano: hit.year,
+      zotero_key: hit.zotero_key,
+    },
+    cita: `nodus://passage/${encodeURIComponent(hit.passage_id)}`,
+  };
+}
+
+function capPassageContext(passages: Record<string, unknown>[]): Record<string, unknown>[] {
+  let chars = 0;
+  const result: Record<string, unknown>[] = [];
+  for (const passage of passages) {
+    const text = typeof passage.texto === 'string' ? passage.texto : '';
+    const remaining = MAX_PASSAGE_CONTEXT_CHARS - chars;
+    if (remaining <= 0) break;
+    const clipped = clip(text, remaining);
+    if (!clipped) continue;
+    chars += clipped.length;
+    result.push({ ...passage, texto: clipped, recortado: clipped.length < text.length });
+  }
+  return result;
+}
+
 function selectedRoutes(ids: string[]) {
   const wanted = new Set(ids);
   return listTutorRoutes()
@@ -799,6 +1009,9 @@ function trimContext<T extends Record<string, any>>(context: T): T {
     huecos: context.huecos.slice(0, 20),
     contradicciones: context.contradicciones.slice(0, 16),
     obras: context.obras.slice(0, 42),
+    pasajes_evidencia: context.pasajes_evidencia
+      .slice(0, 12)
+      .map((passage: any) => ({ ...passage, texto: clip(String(passage.texto ?? ''), 1800) })),
     rutas_tutor: context.rutas_tutor.slice(0, 4).map((route: any) => ({ ...route, paradas: route.paradas.slice(0, 22) })),
   };
 }
@@ -807,7 +1020,7 @@ function sanitizeDraft(
   ai: AiWorkshopResult,
   brief: WritingWorkshopBrief,
   selection: WritingWorkshopSelection,
-  context: ReturnType<typeof buildSelectedContext>
+  context: WorkshopContext
 ): WritingWorkshopDraft {
   const draftMarkdown = normalizeCitationLabels(ensureSubstantialMarkdown(cleanString(ai.draftMarkdown, ''), brief, context));
   const outline = sanitizeOutline(ai.outline).map((section) => ({
@@ -837,7 +1050,7 @@ function sanitizeDraft(
 function structuralFallback(
   brief: WritingWorkshopBrief,
   selection: WritingWorkshopSelection,
-  context: ReturnType<typeof buildSelectedContext>
+  context: WorkshopContext
 ): WritingWorkshopDraft {
   const payload = context.payload as any;
   const title = `${kindLabel(brief.kind)}: ${brief.objective || 'borrador'}`;
@@ -845,7 +1058,15 @@ function structuralFallback(
   const gaps = (payload.huecos ?? []) as any[];
   const contradictions = (payload.contradicciones ?? []) as any[];
   const works = (payload.obras ?? []) as any[];
+  const passages = (payload.pasajes_evidencia ?? []) as any[];
   const outline: WritingWorkshopSection[] = [
+    {
+      id: 's0',
+      title: 'Evidencia textual recuperada',
+      purpose: 'Anclar el argumento en fragmentos verificables del texto completo.',
+      keyClaims: passages.slice(0, 3).map((passage) => passage.texto),
+      sources: passages.slice(0, 3).map((passage) => citationMarkdown(passage.obra, passage.cita)),
+    },
     {
       id: 's1',
       title: 'Planteamiento',
@@ -885,12 +1106,28 @@ function structuralFallback(
       evidence: 'Hueco minado de la obra indicada.',
       notes: 'Usar para justificar la contribución.',
     })),
+    ...passages.slice(0, 10).map((passage): WritingWorkshopMatrixRow => ({
+      claim: clip(passage.texto, 220),
+      role: 'support',
+      sourceLabel: sourceLabel(passage.obra),
+      citation: passage.cita,
+      evidence: passage.texto,
+      notes: passage.localizacion ? `Evidencia literal (${passage.localizacion}).` : 'Evidencia literal del texto completo.',
+    })),
   ];
   const draftMarkdown = [
     `## ${title}`,
     '',
     '## Planteamiento',
     ideas.length ? narrativeParagraph(ideas.slice(0, 5), 'El punto de partida del corpus es que') : 'No hay ideas seleccionadas suficientes para desarrollar este apartado.',
+    '',
+    '## Evidencia textual recuperada',
+    passages.length
+      ? passages
+          .slice(0, 5)
+          .map((passage) => `El corpus contiene esta evidencia literal: “${passage.texto}” ${citationMarkdown(passage.obra, passage.cita)}.`)
+          .join('\n\n')
+      : 'No hay pasajes indexados disponibles para anclar este borrador en texto completo.',
     '',
     '## Lineas de desarrollo',
     ...ideaDevelopmentSections(ideas.slice(5)),
@@ -963,7 +1200,7 @@ function sanitizeMatrix(items: AiWorkshopResult['matrix']): WritingWorkshopMatri
 function ensureSubstantialMarkdown(
   draftMarkdown: string,
   brief: WritingWorkshopBrief,
-  context: ReturnType<typeof buildSelectedContext>
+  context: WorkshopContext
 ): string {
   const clean = draftMarkdown.trim();
   const payload = context.payload as any;
@@ -1118,12 +1355,12 @@ function authorYearLabel(author: string | undefined, year: number | null | undef
   return year ? `${name} (${year})` : name;
 }
 
-/** Resolve a `nodus://idea` or `nodus://work` citation to its canonical label. */
+/** Resolve a Nodus citation to its canonical source label. */
 function citationLabelForUrl(citation: string): string | null {
   const cached = citationLabelCache.get(citation);
   if (cached !== undefined) return cached;
 
-  const match = citation.match(/^nodus:\/\/(idea|work)\/(.+)$/);
+  const match = citation.match(/^nodus:\/\/(idea|work|passage)\/(.+)$/);
   if (!match) return null;
   let id: string;
   try {
@@ -1134,6 +1371,20 @@ function citationLabelForUrl(citation: string): string | null {
 
   const db = getDb();
   let row: { authors_json: string; year: number | null } | undefined;
+  if (match[1] === 'passage') {
+    const passage = db
+      .prepare(
+        `SELECT w.authors_json, w.year, p.page_label
+           FROM passages p JOIN works w ON w.nodus_id = p.nodus_id
+          WHERE p.passage_id = ?`
+      )
+      .get(id) as { authors_json: string; year: number | null; page_label: string | null } | undefined;
+    const label = passage
+      ? `${sourceLabel({ authors: parseAuthors(passage.authors_json), year: passage.year })}${passage.page_label ? `, ${passage.page_label}` : ''}`
+      : null;
+    citationLabelCache.set(citation, label);
+    return label;
+  }
   if (match[1] === 'work') {
     row = db
       .prepare('SELECT authors_json, year FROM works WHERE nodus_id = ?')
@@ -1157,7 +1408,7 @@ function citationLabelForUrl(citation: string): string | null {
 
 /** Never display a model-invented or abbreviated label when its nodus target is known. */
 function normalizeCitationLabels(markdown: string): string {
-  return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
+  return markdown.replace(/\[([^\]]*)\]\((nodus:\/\/(?:idea|work|passage)\/[^)]+)\)/g, (full, _label: string, citation: string) => {
     const label = citationLabelForUrl(citation);
     return label ? `[${label}](${citation})` : full;
   });

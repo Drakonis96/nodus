@@ -24,6 +24,7 @@ const DEFAULT_SELECTION: ResearchContextSelection = {
   readingPath: false,
   authors: false,
   documents: false,
+  passages: false,
   graph: false,
   graphParts: {
     ideaNodes: false,
@@ -41,6 +42,7 @@ const ALL_SELECTION: ResearchContextSelection = {
   readingPath: true,
   authors: true,
   documents: true,
+  passages: true,
   graph: true,
   graphParts: {
     ideaNodes: true,
@@ -61,6 +63,7 @@ const AUTHOR_SELECTION: ResearchContextSelection = {
   readingPath: false,
   authors: true,
   documents: true,
+  passages: true,
   graph: true,
   graphParts: {
     ideaNodes: false,
@@ -78,6 +81,7 @@ const DOCUMENT_SELECTION: ResearchContextSelection = {
   readingPath: false,
   authors: false,
   documents: true,
+  passages: true,
   graph: false,
   graphParts: {
     ideaNodes: false,
@@ -95,6 +99,7 @@ const SYNTHESIS_SELECTION: ResearchContextSelection = {
   readingPath: false,
   authors: false,
   documents: false,
+  passages: true,
   graph: true,
   graphParts: {
     ideaNodes: true,
@@ -276,6 +281,7 @@ export function ResearchAssistantModal({
         selection.readingPath,
         selection.authors,
         selection.documents,
+        selection.passages,
         selection.graph,
       ].filter(Boolean).length,
     [selection]
@@ -587,6 +593,7 @@ export function ResearchAssistantModal({
               <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
               <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
               <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
+              <ContextCheckbox label={t('Pasajes de texto completo')} checked={selection.passages} onChange={(v) => updateSelection('passages', v)} />
               <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
             </div>
 
@@ -664,7 +671,7 @@ export function ResearchAssistantModal({
                       {message.stats && (
                         <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
                           {message.stats.sections.join(', ') || t('Sin secciones')} · {tx('{n} obras', { n: message.stats.works })} ·{' '}
-                          {tx('{n} docs', { n: message.stats.documents })} · {formatChars(message.stats.contextChars)}
+                          {tx('{n} docs', { n: message.stats.documents })} · {tx('{n} pasajes', { n: message.stats.passages })} · {formatChars(message.stats.contextChars)}
                           {message.stats.truncated ? ` · ${t('recortado')}` : ''}
                         </div>
                       )}
@@ -834,6 +841,7 @@ function sameModelRef(a: ModelRef, b: ModelRef): boolean {
 function cloneSelection(selection: ResearchContextSelection): ResearchContextSelection {
   return {
     ...selection,
+    passages: selection.passages ?? true,
     graphParts: { ...selection.graphParts },
   };
 }

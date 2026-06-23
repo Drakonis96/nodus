@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 15;
 
 export const migrations: Migration[] = [
   {
@@ -458,6 +458,31 @@ export const migrations: Migration[] = [
 
       CREATE INDEX idx_research_subq_rq ON research_subquestions(rq_id, order_idx);
       CREATE INDEX idx_research_links_subq ON research_coverage_links(subq_id);
+    `,
+  },
+  {
+    version: 15,
+    up: /* sql */ `
+      CREATE TABLE passages (
+        passage_id         TEXT PRIMARY KEY,
+        nodus_id           TEXT NOT NULL,
+        chunk_index        INTEGER NOT NULL,
+        text               TEXT NOT NULL,
+        page_label         TEXT,
+        char_len           INTEGER NOT NULL,
+        content_hash       TEXT NOT NULL,
+        embedding          BLOB,
+        embedding_provider TEXT,
+        embedding_model    TEXT,
+        embedding_dim      INTEGER,
+        embedding_text_hash TEXT,
+        created_at         TEXT NOT NULL,
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_passages_nodus ON passages(nodus_id);
+      CREATE INDEX idx_passages_embedding_meta
+        ON passages(embedding_provider, embedding_model, embedding_dim, embedding_text_hash);
     `,
   },
 ];

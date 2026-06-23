@@ -19,14 +19,19 @@ import { resolveWorkText } from '../extraction/textExtractor';
 import { completeText, completeTextStream } from './aiClient';
 import { embed } from './aiClient';
 import { findSimilarWorks } from '../db/workSummariesRepo';
+import { findSimilarPassages } from '../db/passagesRepo';
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
-const MAX_DOCUMENT_CHARS = 45_000;
-const MAX_DOCUMENT_TOTAL_CHARS = 800_000;
+const MAX_DOCUMENT_CHARS = 12_000;
+const MAX_DOCUMENT_TOTAL_CHARS = 160_000;
 const MAX_SUMMARIES = 180;
 const MAX_SUMMARY_CHARS = 5_000;
 const MAX_SUMMARY_TOTAL_CHARS = 180_000;
+const PASSAGE_SIM_THRESHOLD = 0.32;
+const TOP_K_SCOPED_PASSAGES = 8;
+const TOP_K_GLOBAL_PASSAGES = 6;
+const MAX_PASSAGE_CONTEXT_CHARS = 24_000;
 
 type SectionPayload = Record<string, unknown>;
 
@@ -160,6 +165,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
     '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
     '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
+    '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
     '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
     '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
     '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
@@ -226,8 +232,21 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
     sections.push('Grafo');
   }
 
+  const passageScopeWorkIds = new Set(linkedWorkIds);
+  const needsSemanticRetrieval = selection.documents || selection.passages !== false;
+  let queryEmbedding: number[] | null = null;
+  if (needsSemanticRetrieval && question.trim()) {
+    try {
+      queryEmbedding = await embed(question.trim());
+    } catch (error) {
+      // Passage retrieval is an evidence layer, not a reason to block a graph
+      // answer when the user has not configured an embedding provider yet.
+      console.warn('[researchAssistant] semantic retrieval unavailable:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
   if (selection.documents) {
-    const documentContext = await listDocuments(linkedWorkIds, question);
+    const documentContext = await listDocuments(linkedWorkIds, queryEmbedding);
     context.documentos_relacionados = documentContext.documents;
     context.documentos_resumidos = documentContext.summaries;
     if (documentContext.omitted > 0) {
@@ -235,6 +254,14 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
     }
     sections.push('Documentos relacionados');
     truncated = truncated || documentContext.truncated;
+  }
+
+  // Default to enabled for historic saved selections created before the passage
+  // toggle existed. Explicit false still gives the reader full control.
+  if (selection.passages !== false) {
+    const passages = listRelevantPassages(queryEmbedding, passageScopeWorkIds);
+    context.pasajes_relevantes = passages;
+    sections.push('Pasajes de texto completo');
   }
 
   const contextChars = JSON.stringify(context).length;
@@ -249,6 +276,7 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
       summaries: selection.documents && Array.isArray(context.documentos_resumidos)
         ? context.documentos_resumidos.length
         : 0,
+      passages: Array.isArray(context.pasajes_relevantes) ? context.pasajes_relevantes.length : 0,
       contextChars,
       truncated,
     },
@@ -532,9 +560,9 @@ function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<strin
 
 async function listDocuments(
   linkedWorkIds: Set<string>,
-  question: string
+  queryEmbedding: number[] | null
 ): Promise<{ documents: unknown[]; summaries: unknown[]; omitted: number; truncated: boolean }> {
-  const candidateWorks = await selectDocumentWorks(linkedWorkIds, question);
+  const candidateWorks = selectDocumentWorks(linkedWorkIds, queryEmbedding);
   const works = candidateWorks.slice(0, MAX_DOCUMENTS);
   const omitted = Math.max(0, candidateWorks.length - works.length);
   const settings = getSettings();
@@ -581,7 +609,7 @@ async function listDocuments(
   return { documents, summaries, omitted, truncated };
 }
 
-async function selectDocumentWorks(linkedWorkIds: Set<string>, question: string): Promise<WorkRow[]> {
+function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[] | null): WorkRow[] {
   const db = getDb();
   let works: WorkRow[];
   if (linkedWorkIds.size > 0) {
@@ -598,9 +626,6 @@ async function selectDocumentWorks(linkedWorkIds: Set<string>, question: string)
     Number(b.deep_status === 'done') - Number(a.deep_status === 'done') ||
     (b.year ?? 0) - (a.year ?? 0) ||
     a.title.localeCompare(b.title);
-  if (!question.trim()) return works.sort(fallback);
-
-  const queryEmbedding = await embed(question.trim());
   if (!queryEmbedding) return works.sort(fallback);
   const similarities = new Map(findSimilarWorks(queryEmbedding, -1, Math.max(works.length, MAX_SUMMARIES)).map((row) => [row.nodus_id, row.similarity]));
   return works.sort((a, b) => {
@@ -609,6 +634,45 @@ async function selectDocumentWorks(linkedWorkIds: Set<string>, question: string)
     if (aSimilarity != null || bSimilarity != null) return (bSimilarity ?? -Infinity) - (aSimilarity ?? -Infinity) || fallback(a, b);
     return fallback(a, b);
   });
+}
+
+function listRelevantPassages(queryEmbedding: number[] | null, linkedWorkIds: Set<string>): unknown[] {
+  if (!queryEmbedding) return [];
+  const scoped = linkedWorkIds.size
+    ? findSimilarPassages(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_SCOPED_PASSAGES, {
+        nodusIds: [...linkedWorkIds],
+      })
+    : [];
+  const global = findSimilarPassages(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_GLOBAL_PASSAGES);
+  const unique = new Map<string, (typeof global)[number]>();
+  for (const passage of [...scoped, ...global]) {
+    if (!unique.has(passage.passage_id)) unique.set(passage.passage_id, passage);
+  }
+
+  let chars = 0;
+  const passages: unknown[] = [];
+  for (const passage of unique.values()) {
+    const remaining = MAX_PASSAGE_CONTEXT_CHARS - chars;
+    if (remaining <= 0) break;
+    const clipped = clipText(passage.text, remaining);
+    if (!clipped.text) continue;
+    chars += clipped.text.length;
+    passages.push({
+      text: clipped.text,
+      truncated: clipped.truncated,
+      similarity: Number(passage.similarity.toFixed(3)),
+      location: passage.page_label,
+      work: {
+        nodus_id: passage.nodus_id,
+        title: passage.title,
+        authors: parseAuthors(passage.authors_json),
+        year: passage.year,
+        zotero_key: passage.zotero_key,
+      },
+      citation: `nodus://passage/${encodeURIComponent(passage.passage_id)}`,
+    });
+  }
+  return passages;
 }
 
 function listDocumentSummaries(candidateWorks: WorkRow[]): unknown[] {

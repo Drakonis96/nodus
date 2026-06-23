@@ -3,6 +3,7 @@ import { getDb } from '../db/database';
 import { clearAllEmbeddings, embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
 import { allWorkSummaryRows, clearAllWorkSummaryEmbeddings, summaryNeedsEmbedding, updateWorkSummaryEmbedding } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
+import { clearAllPassages } from '../db/passagesRepo';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
 
@@ -269,6 +270,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
 export async function reindexAll(): Promise<void> {
   clearAllEmbeddings();
   clearAllWorkSummaryEmbeddings();
+  clearAllPassages();
   await startEmbedding();
   await reembedAllSummaries();
 }

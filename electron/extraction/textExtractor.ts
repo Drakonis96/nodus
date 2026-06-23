@@ -33,6 +33,8 @@ const MIN_CHARS_TEXT_PAGE = 50;
 const STANDARD_CHUNK_WORDS = 1800;
 const STANDARD_OVERLAP_WORDS = 100;
 const LONG_CHUNK_WORDS = 30000;
+export const RETRIEVAL_CHUNK_WORDS = 280;
+export const RETRIEVAL_OVERLAP_WORDS = 60;
 
 export interface ChunkOptions {
   mode?: DeepContextMode;
@@ -110,6 +112,47 @@ export function planTextChunks(text: string, opts: ChunkOptions = {}): ChunkPlan
     start = end - config.overlapWords;
   }
   return { ...config, chunks, wordCount: words.length };
+}
+
+export interface RetrievalChunk {
+  text: string;
+  /** The most recent PDF page marker that precedes this chunk, if present. */
+  pageLabel: string | null;
+}
+
+/**
+ * Fine-grained chunks for semantic retrieval. PDF page markers are retained in
+ * extraction text, but stripped from the embedded passage and converted to a
+ * compact citation location.
+ */
+export function planRetrievalChunks(
+  text: string,
+  opts: { chunkWords?: number; overlapWords?: number } = {}
+): RetrievalChunk[] {
+  const chunkWords = clampInt(opts.chunkWords, RETRIEVAL_CHUNK_WORDS, 80, 1000);
+  const overlapWords = clampInt(opts.overlapWords, RETRIEVAL_OVERLAP_WORDS, 0, Math.max(0, chunkWords - 1));
+  const tokens: { value: string; pageLabel: string | null }[] = [];
+  let pageLabel: string | null = null;
+  const rawTokens = text.match(/\[\[p\.\s*\d+\]\]|\S+/gi) ?? [];
+  for (const raw of rawTokens) {
+    const marker = raw.match(/^\[\[p\.\s*(\d+)\]\]$/i);
+    if (marker) {
+      pageLabel = `p. ${marker[1]}`;
+      continue;
+    }
+    tokens.push({ value: raw, pageLabel });
+  }
+  if (tokens.length === 0) return [];
+
+  const chunks: RetrievalChunk[] = [];
+  for (let start = 0; start < tokens.length; ) {
+    const end = Math.min(start + chunkWords, tokens.length);
+    const slice = tokens.slice(start, end);
+    chunks.push({ text: slice.map((token) => token.value).join(' '), pageLabel: slice[0]?.pageLabel ?? null });
+    if (end >= tokens.length) break;
+    start = end - overlapWords;
+  }
+  return chunks;
 }
 
 // ── PDF: streaming extraction with page markers + optional OCR ────────────────

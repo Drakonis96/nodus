@@ -8,6 +8,7 @@ import type {
   WritingWorkshopDraft,
   WritingWorkshopGapCandidate,
   WritingWorkshopIdeaCandidate,
+  WritingWorkshopPassageCandidate,
   WritingWorkshopRouteCandidate,
   WritingWorkshopSelection,
   WritingWorkshopSnapshot,
@@ -43,10 +44,11 @@ const EMPTY_SELECTION: WritingWorkshopSelection = {
   gapIds: [],
   contradictionIds: [],
   workIds: [],
+  passageIds: [],
   tutorRouteIds: [],
 };
 
-type MaterialTab = 'ideas' | 'themes' | 'gaps' | 'contradictions' | 'works' | 'routes';
+type MaterialTab = 'ideas' | 'themes' | 'gaps' | 'contradictions' | 'works' | 'passages' | 'routes';
 
 const TAB_SELECTION_KEYS: Record<MaterialTab, keyof WritingWorkshopSelection> = {
   ideas: 'ideaIds',
@@ -54,6 +56,7 @@ const TAB_SELECTION_KEYS: Record<MaterialTab, keyof WritingWorkshopSelection> = 
   gaps: 'gapIds',
   contradictions: 'contradictionIds',
   works: 'workIds',
+  passages: 'passageIds',
   routes: 'tutorRouteIds',
 };
 
@@ -265,6 +268,7 @@ export function WritingWorkshopView({
               </Badge>
               <Badge>{tx('{n} huecos', { n: snapshot.stats.gaps })}</Badge>
               <Badge>{tx('{n} contradicciones', { n: snapshot.stats.contradictions })}</Badge>
+              <Badge color="green">{tx('{n} pasajes indexados', { n: snapshot.stats.passages })}</Badge>
               <button className="btn btn-ghost border border-neutral-700 py-1 text-xs" onClick={applyRecommended}>
                 {t('Recomendados')}
               </button>
@@ -307,6 +311,7 @@ export function WritingWorkshopView({
               label={tabLabel(t('Contrad.'), selection.contradictionIds.length, snapshot?.contradictions.length)}
             />
             <TabButton id="works" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Obras'), selection.workIds.length, snapshot?.works.length)} />
+            <TabButton id="passages" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Pasajes'), selection.passageIds.length, snapshot?.passages.length)} />
             <TabButton
               id="routes"
               active={activeTab}
@@ -357,6 +362,9 @@ export function WritingWorkshopView({
             ))}
             {snapshot && activeTab === 'works' && snapshot.works.map((item) => (
               <WorkCard key={item.id} item={item} selected={selection.workIds.includes(item.id)} onToggle={() => toggle('workIds', item.id)} />
+            ))}
+            {snapshot && activeTab === 'passages' && snapshot.passages.map((item) => (
+              <PassageCard key={item.id} item={item} selected={selection.passageIds.includes(item.id)} onToggle={() => toggle('passageIds', item.id)} />
             ))}
             {snapshot && activeTab === 'routes' && snapshot.tutorRoutes.map((item) => (
               <RouteCard
@@ -425,6 +433,7 @@ export function WritingWorkshopView({
                 <Metric label={t('Ideas')} value={draft.stats.selectedIdeas} />
                 <Metric label={t('Huecos')} value={draft.stats.selectedGaps} />
                 <Metric label={t('Obras')} value={draft.stats.selectedWorks} />
+                <Metric label={t('Pasajes')} value={draft.stats.selectedPassages} />
                 <Metric label={t('Contexto')} value={formatChars(draft.stats.contextChars)} />
               </div>
               {draft.matrix.map((row, index) => (
@@ -635,6 +644,18 @@ function WorkCard({ item, selected, onToggle }: { item: WritingWorkshopWorkCandi
   );
 }
 
+function PassageCard({ item, selected, onToggle }: { item: WritingWorkshopPassageCandidate; selected: boolean; onToggle: () => void }) {
+  return (
+    <CandidateShell item={item} selected={selected} onToggle={onToggle}>
+      <div className="mt-2 flex flex-wrap gap-1">
+        <Badge color="green">{t('texto completo')}</Badge>
+        {item.pageLabel && <Badge>{item.pageLabel}</Badge>}
+        <Badge>{item.authors[0] ?? t('Autoría no disponible')}{item.year ? `, ${item.year}` : ''}</Badge>
+      </div>
+    </CandidateShell>
+  );
+}
+
 function RouteCard({ item, selected, onToggle }: { item: WritingWorkshopRouteCandidate; selected: boolean; onToggle: () => void }) {
   return (
     <CandidateShell item={item} selected={selected} onToggle={onToggle}>
@@ -676,6 +697,7 @@ function countSelection(selection: WritingWorkshopSelection): number {
     selection.gapIds.length +
     selection.contradictionIds.length +
     selection.workIds.length +
+    selection.passageIds.length +
     selection.tutorRouteIds.length
   );
 }
@@ -687,6 +709,7 @@ function countSnapshot(snapshot: WritingWorkshopSnapshot): number {
     snapshot.gaps.length +
     snapshot.contradictions.length +
     snapshot.works.length +
+    snapshot.passages.length +
     snapshot.tutorRoutes.length
   );
 }
@@ -698,6 +721,7 @@ function selectionFromSnapshot(snapshot: WritingWorkshopSnapshot): WritingWorksh
     gapIds: snapshot.gaps.map((item) => item.id),
     contradictionIds: snapshot.contradictions.map((item) => item.id),
     workIds: snapshot.works.map((item) => item.id),
+    passageIds: snapshot.passages.map((item) => item.id),
     tutorRouteIds: snapshot.tutorRoutes.map((item) => item.id),
   };
 }
@@ -714,6 +738,8 @@ function candidateIdsForTab(snapshot: WritingWorkshopSnapshot, tab: MaterialTab)
       return snapshot.contradictions.map((item) => item.id);
     case 'works':
       return snapshot.works.map((item) => item.id);
+    case 'passages':
+      return snapshot.passages.map((item) => item.id);
     case 'routes':
       return snapshot.tutorRoutes.map((item) => item.id);
   }
@@ -754,6 +780,8 @@ function parseNodusCitation(value: string): Exclude<CitationTarget, null> | null
   if (gap) return { kind: 'gap', id: decodeURIComponent(gap[1]) };
   const contradiction = value.match(/^nodus:\/\/contradiction\/(.+)$/);
   if (contradiction) return { kind: 'contradiction', id: decodeURIComponent(contradiction[1]) };
+  const passage = value.match(/^nodus:\/\/passage\/(.+)$/);
+  if (passage) return { kind: 'passage', id: decodeURIComponent(passage[1]) };
   return null;
 }
 

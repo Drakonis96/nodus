@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView } from '@shared/types';
+import type { EdgeDetail, GapDetail, GapKind, IdeaDetail, IdeaType, PassageDetail, WorkMeta, WorkSummary, WorkView } from '@shared/types';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS } from './ui';
 import { OccurrenceCard } from './NodeDetailPanel';
@@ -10,6 +10,7 @@ export type CitationTarget =
   | { kind: 'work'; id: string }
   | { kind: 'gap'; id: string }
   | { kind: 'contradiction'; id: string }
+  | { kind: 'passage'; id: string }
   | null;
 
 const GAP_LABELS: Record<GapKind, string> = {
@@ -64,7 +65,79 @@ export function SourceCitationModal({
           {target?.kind === 'contradiction' && (
             <ContradictionBody edgeId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />
           )}
+          {target?.kind === 'passage' && <PassageBody passageId={target.id} onClose={onClose} onOpenGraph={onOpenGraph} />}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PassageBody({
+  passageId,
+  onClose,
+  onOpenGraph,
+}: {
+  passageId: string;
+  onClose: () => void;
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
+  const [detail, setDetail] = useState<PassageDetail | null>(null);
+  const [missing, setMissing] = useState(false);
+
+  useEffect(() => {
+    let on = true;
+    setDetail(null);
+    setMissing(false);
+    void window.nodus.getPassage(passageId).then((value) => {
+      if (!on) return;
+      if (value) setDetail(value);
+      else setMissing(true);
+    });
+    return () => {
+      on = false;
+    };
+  }, [passageId]);
+
+  if (missing) return <p className="text-sm text-neutral-400">{t('No se encontró el pasaje citado. Puede haberse reindexado.')}</p>;
+  if (!detail) {
+    return <div className="space-y-3 animate-pulse"><div className="h-4 w-2/3 rounded bg-neutral-800" /><div className="h-28 rounded bg-neutral-800" /></div>;
+  }
+
+  const authors = detail.work.authors.length ? detail.work.authors.join('; ') : t('Autoría no disponible');
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge color="green">{t('Pasaje de texto completo')}</Badge>
+          {detail.page_label && <Badge>{detail.page_label}</Badge>}
+        </div>
+        <h3 className="mt-2 font-semibold">{detail.work.title}</h3>
+        <p className="mt-1 text-sm text-neutral-400">{authors}{detail.work.year ? ` · ${detail.work.year}` : ''}</p>
+      </div>
+      <blockquote className="rounded-r-md border-l-2 border-green-700 bg-neutral-950/35 py-3 pl-4 pr-3 text-sm leading-relaxed text-neutral-200 whitespace-pre-wrap">
+        {detail.text}
+      </blockquote>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn btn-primary gap-1.5" onClick={() => void window.nodus.openInZotero(detail.work.zotero_key)}>
+          <Icon name="external" size={14} /> {t('Abrir en Zotero')}
+        </button>
+        {onOpenGraph && (
+          <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5"
+            onClick={() => {
+              onClose();
+              onOpenGraph({
+                preset: 'reading',
+                workId: detail.nodus_id,
+                workTitle: detail.work.title,
+                zoteroKey: detail.work.zotero_key,
+                label: `${t('Ideas y conexiones:')} ${detail.work.title}`,
+              });
+            }}
+          >
+            <Icon name="layers" size={14} /> {t('Ver ideas y conexiones')}
+          </button>
+        )}
       </div>
     </div>
   );

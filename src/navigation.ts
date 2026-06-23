@@ -37,6 +37,7 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     readingPath: false,
     authors: false,
     documents: false,
+    passages: true,
     graph: true,
     graphParts: {
       ideaNodes: true,
@@ -53,6 +54,7 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     readingPath: true,
     authors: false,
     documents: false,
+    passages: true,
     graph: true,
     graphParts: {
       ideaNodes: true,
@@ -69,6 +71,7 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     readingPath: false,
     authors: false,
     documents: true,
+    passages: true,
     graph: true,
     graphParts: {
       ideaNodes: true,
@@ -85,6 +88,7 @@ export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'read
     readingPath: true,
     authors: true,
     documents: true,
+    passages: true,
     graph: true,
     graphParts: {
       ideaNodes: true,
