@@ -31,6 +31,8 @@ const api: NodusApi = {
   summarizeBulk: (nodusIds, model) => ipcRenderer.invoke('works:summarizeBulk', nodusIds, model).then(() => undefined),
   summarizeAll: (model) => ipcRenderer.invoke('works:summarizeAll', model).then(() => undefined),
   getWorkSummary: (nodusId) => ipcRenderer.invoke('works:getSummary', nodusId),
+  listDuplicateWorks: () => ipcRenderer.invoke('works:listDuplicates'),
+  mergeWorks: (canonicalId, duplicateIds) => ipcRenderer.invoke('works:merge', canonicalId, duplicateIds),
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),

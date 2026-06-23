@@ -6,6 +6,7 @@ import {
   getWorkByZoteroKey,
   getWorkByDoi,
   addAlias,
+  setReadTag,
   recomputeDeepTrigger,
   setLightPending,
   setDeepPending,
@@ -27,16 +28,24 @@ function authorsOf(item: ZoteroItem): string[] {
 /** Ingest a single Zotero item into Nodus. Analysis is enqueued separately by explicit settings. */
 export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodusId: string; isNew: boolean; hasReadTag: boolean } {
   const existing = getWorkByZoteroKey(item.key);
+  const hasTag = item.tags.some((t) => t.toLowerCase() === readTagName.toLowerCase());
 
-  // Duplicate detection by DOI: union under the same nodus_id via alias.
+  // The SAME Zotero item (same key) belonging to several collections never
+  // duplicates — its key is unique, so the branch below just updates it once.
+  // A *different* Zotero item that shares an existing work's DOI is a true
+  // duplicate: unify it under that work's nodus_id as an alias instead of
+  // inserting a second works row (which is what previously leaked duplicates).
   if (!existing && item.doi) {
     const byDoi = getWorkByDoi(item.doi);
     if (byDoi) {
       addAlias(byDoi.nodus_id, item.key);
+      // Carry the read tag over so the canonical work stays deep-eligible.
+      if (hasTag) setReadTag(byDoi.nodus_id, true);
+      const trigger = recomputeDeepTrigger(byDoi.nodus_id);
+      return { nodusId: byDoi.nodus_id, isNew: false, hasReadTag: trigger === 'tag' || trigger === 'both' };
     }
   }
 
-  const hasTag = item.tags.some((t) => t.toLowerCase() === readTagName.toLowerCase());
   const nodusId = existing?.nodus_id ?? uuid();
 
   upsertWork({

@@ -12,6 +12,8 @@ import type {
 } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { WorkGraphModal } from './WorkGraphModal';
+import { DuplicatesModal } from './DuplicatesModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import { useDataRefresh, useScanComplete } from '../hooks';
@@ -106,6 +108,8 @@ export function Library({
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
+  const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
 
@@ -579,6 +583,14 @@ export function Library({
             tone="violet"
             onClick={discoverBridges}
           />
+          <OperationCard
+            icon="copy"
+            title={t('Buscar y fusionar duplicados')}
+            description={t('Detecta obras repetidas (mismo DOI, o mismo título, año y autores) y te deja revisarlas y fusionarlas conservando una sola copia. La misma obra en varias colecciones de Zotero no se duplica.')}
+            buttonLabel={t('Revisar duplicados')}
+            tone="violet"
+            onClick={() => setDuplicatesOpen(true)}
+          />
         </div>
       )}
 
@@ -671,6 +683,17 @@ export function Library({
                       onClick={() => summarizeWork(w)}
                     />
                     <RowIconButton
+                      title={
+                        w.deep_status === 'done'
+                          ? t('Ver el grafo de ideas de esta obra')
+                          : t('Requiere análisis profundo para ver el grafo de ideas')
+                      }
+                      icon="network"
+                      tone="cyan"
+                      disabled={w.deep_status !== 'done'}
+                      onClick={() => setGraphWork({ nodus_id: w.nodus_id, title: w.title })}
+                    />
+                    <RowIconButton
                       title={t('Ver esta obra en el grafo')}
                       icon="map"
                       tone="cyan"
@@ -716,6 +739,8 @@ export function Library({
           onCancel={() => setConfirmReindex(false)}
         />
       )}
+      {graphWork && <WorkGraphModal work={graphWork} onClose={() => setGraphWork(null)} />}
+      {duplicatesOpen && <DuplicatesModal onClose={() => setDuplicatesOpen(false)} />}
     </div>
   );
 }
@@ -790,11 +815,13 @@ function RowIconButton({
   title,
   icon,
   tone = 'neutral',
+  disabled = false,
   onClick,
 }: {
   title: string;
   icon: string;
   tone?: 'neutral' | 'indigo' | 'cyan' | 'violet';
+  disabled?: boolean;
   onClick: () => void;
 }) {
   const toneClass =
@@ -807,9 +834,10 @@ function RowIconButton({
           : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
-      className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 ${toneClass}`}
+      className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${toneClass}`}
       title={title}
       aria-label={title}
+      disabled={disabled}
       onClick={onClick}
     >
       <Icon name={icon} size={13} />

@@ -65,6 +65,31 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   zoteroTags: string[];
 }
 
+/** One work inside a duplicate group, with enough metadata to choose a canonical. */
+export interface DuplicateWorkMember {
+  nodus_id: string;
+  zotero_key: string | null;
+  title: string;
+  authors: string[];
+  year: number | null;
+  doi: string | null;
+  light_status: LightStatus;
+  deep_status: DeepStatus;
+  /** How many ideas this work develops — a proxy for how much analysis it holds. */
+  ideaCount: number;
+  /** True for the richest member; pre-selected as the one to keep on merge. */
+  suggestedCanonical: boolean;
+}
+
+/** A set of works that look like the same work, grouped for review-and-merge. */
+export interface DuplicateWorkGroup {
+  /** Why they were grouped: identical DOI, or identical title + year + authors. */
+  reason: 'doi' | 'metadata';
+  /** Stable group key, used as a React key in the review modal. */
+  key: string;
+  members: DuplicateWorkMember[];
+}
+
 /** A non-citable orientation summary derived from already extracted material. */
 export interface WorkSummary {
   nodus_id: string;
@@ -1003,6 +1028,10 @@ export interface NodusApi {
   summarizeBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
   summarizeAll(model?: ModelRef | null): Promise<void>;
   getWorkSummary(nodusId: string): Promise<WorkSummary | null>;
+  /** Groups of works that look like the same work (same DOI, or same title+year+authors). */
+  listDuplicateWorks(): Promise<DuplicateWorkGroup[]>;
+  /** Merge duplicate works into the chosen canonical, re-pointing all derived data. */
+  mergeWorks(canonicalId: string, duplicateIds: string[]): Promise<{ merged: number }>;
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;

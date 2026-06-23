@@ -27,6 +27,7 @@ import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
+import * as dedupe from './db/dedupeRepo';
 import * as ideas from './db/ideasRepo';
 import * as themes from './db/themesRepo';
 import { aggregateGaps, getGapDetail } from './db/gapsRepo';
@@ -232,6 +233,10 @@ export function registerIpc(
     return enqueued;
   });
   h('works:getSummary', async (_e, nodusId: string) => workSummaries.getWorkSummary(nodusId));
+  h('works:listDuplicates', async () => dedupe.listDuplicateWorks());
+  h('works:merge', async (_e, canonicalId: string, duplicateIds: string[]) =>
+    dedupe.mergeWorks(canonicalId, duplicateIds)
+  );
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();
     await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);

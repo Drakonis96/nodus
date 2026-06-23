@@ -504,6 +504,28 @@ export const EN: Record<string, string> = {
   'Usa embeddings e IA para validar puentes semánticos entre ideas que aún no están conectadas. El progreso se muestra en la cola.':
     'Uses embeddings and AI to validate semantic bridges between ideas not yet connected. Progress shows in the queue.',
   Descubrir: 'Discover',
+  // ── Duplicate works · review and merge ──────────────────────────────────────
+  'Buscar y fusionar duplicados': 'Find and merge duplicates',
+  'Detecta obras repetidas (mismo DOI, o mismo título, año y autores) y te deja revisarlas y fusionarlas conservando una sola copia. La misma obra en varias colecciones de Zotero no se duplica.':
+    'Detects repeated works (same DOI, or same title, year and authors) and lets you review and merge them into a single copy. The same work in several Zotero collections is not duplicated.',
+  'Revisar duplicados': 'Review duplicates',
+  'Duplicados en la biblioteca': 'Duplicates in the library',
+  'Buscando duplicados…': 'Looking for duplicates…',
+  'No se han encontrado duplicados.': 'No duplicates found.',
+  '{g} grupo(s) · {n} obra(s) duplicadas a fusionar': '{g} group(s) · {n} duplicate work(s) to merge',
+  'Fusionar todos': 'Merge all',
+  'La misma obra en varias colecciones de Zotero no se duplica.':
+    'The same work in several Zotero collections is not duplicated.',
+  'Mismo DOI': 'Same DOI',
+  'Mismos metadatos': 'Same metadata',
+  '{n} copias': '{n} copies',
+  Fusionar: 'Merge',
+  'Se conserva': 'Kept',
+  '(sin título)': '(untitled)',
+  '{n} idea(s)': '{n} idea(s)',
+  'Fusionar todos los duplicados': 'Merge all duplicates',
+  'Se fusionarán {g} grupo(s), conservando en cada uno la copia marcada y reasignando sus ideas, evidencia y etiquetas. Las {n} copias sobrantes se eliminarán de la biblioteca de Nodus (Zotero no se modifica). ¿Continuar?':
+    'This will merge {g} group(s), keeping the marked copy in each and re-pointing its ideas, evidence and tags. The {n} surplus copies will be removed from the Nodus library (Zotero is not modified). Continue?',
   'Seleccionar los {n} resultados filtrados': 'Select the {n} filtered results',
   Título: 'Title',
   Autores: 'Authors',
@@ -519,6 +541,20 @@ export const EN: Record<string, string> = {
   'Reanalizar ideas': 'Re-analyze ideas',
   'Analizar temas e ideas': 'Analyze themes and ideas',
   'Ver esta obra en el grafo': 'View this work in the graph',
+  'Ver el grafo de ideas de esta obra': "View this work's idea graph",
+  'Requiere análisis profundo para ver el grafo de ideas': 'Deep analysis required to view the idea graph',
+  // ── Per-work idea graph modal ───────────────────────────────────────────────
+  'Grafo de la obra': "Work's graph",
+  'Grafo de ideas · {title}': 'Idea graph · {title}',
+  '{n} idea(s) de esta obra · haz clic en un nodo para expandir sus conexiones':
+    '{n} idea(s) from this work · click a node to expand its connections',
+  'Cargando grafo…': 'Loading graph…',
+  'Volver a las ideas de la obra': 'Back to the work’s ideas',
+  'Reiniciar vista': 'Reset view',
+  Ajustar: 'Fit',
+  'Esta obra aún no tiene ideas extraídas.': 'This work has no extracted ideas yet.',
+  'Ejecuta un análisis profundo de la obra para verla en el grafo.':
+    'Run a deep analysis of the work to see it in the graph.',
   'Lectura:': 'Reading:',
   'Preguntar al asistente sobre esta obra': 'Ask the assistant about this work',
   'Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.':

@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
-import { OccurrenceCard } from '../components/NodeDetailPanel';
+import {
+  OccurrenceCard,
+  loadNumber,
+  DETAIL_MIN_WIDTH,
+  DETAIL_MAX_WIDTH,
+} from '../components/NodeDetailPanel';
 import { VirtualList } from '../components/VirtualList';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import {
@@ -13,6 +18,8 @@ import { t, tx } from '../i18n';
 
 type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 const IDEA_ROW_HEIGHT = 116;
+const IDEAS_DETAIL_WIDTH_KEY = 'nodus.ideas.detailWidth';
+const IDEAS_DETAIL_DEFAULT_WIDTH = 420;
 
 export function IdeasView({
   onOpenGraph,
@@ -28,9 +35,32 @@ export function IdeasView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [connectedDetail, setConnectedDetail] = useState<IdeaDetail | null>(null);
-  const [connectedEdge, setConnectedEdge] = useState<EdgeDetail | null>(null);
-  const [connectedLoading, setConnectedLoading] = useState(false);
+  const [detailWidth, setDetailWidth] = useState(() =>
+    loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
+  );
+
+  const startResize = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = detailWidth;
+      const onMove = (evt: PointerEvent) => {
+        const next = Math.min(DETAIL_MAX_WIDTH, Math.max(DETAIL_MIN_WIDTH, startWidth + startX - evt.clientX));
+        setDetailWidth(next);
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        setDetailWidth((w) => {
+          localStorage.setItem(IDEAS_DETAIL_WIDTH_KEY, String(w));
+          return w;
+        });
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    },
+    [detailWidth]
+  );
 
   const reload = useCallback(() => {
     void window.nodus.getGraph('ideas').then(setData);
@@ -93,13 +123,9 @@ export function IdeasView({
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
-      setConnectedDetail(null);
-      setConnectedEdge(null);
       return;
     }
     setDetailLoading(true);
-    setConnectedDetail(null);
-    setConnectedEdge(null);
     let on = true;
     void window.nodus.getIdeaDetail(selectedId).then((d) => {
       if (on) {
@@ -111,19 +137,6 @@ export function IdeasView({
       on = false;
     };
   }, [selectedId]);
-
-  const openConnected = useCallback(async (edgeId: string, ideaId: string) => {
-    setConnectedLoading(true);
-    setConnectedDetail(null);
-    setConnectedEdge(null);
-    const [ideaD, edgeD] = await Promise.all([
-      window.nodus.getIdeaDetail(ideaId),
-      window.nodus.getEdgeDetail(edgeId),
-    ]);
-    setConnectedDetail(ideaD);
-    setConnectedEdge(edgeD);
-    setConnectedLoading(false);
-  }, []);
 
   const selectedNode = selectedId ? data.nodes.find((n) => n.id === selectedId) : null;
 
@@ -222,7 +235,17 @@ export function IdeasView({
 
       {/* Detail panel */}
       {selectedId && (
-        <div className="w-[420px] shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4">
+        <div
+          className="relative shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4"
+          style={{ width: detailWidth }}
+        >
+          <div
+            className="absolute left-0 top-0 h-full w-2 -translate-x-1/2 cursor-col-resize hover:bg-indigo-500/25 z-10"
+            role="separator"
+            aria-orientation="vertical"
+            title={t('Ajustar ancho')}
+            onPointerDown={startResize}
+          />
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-sm text-neutral-300">{t('Detalle')}</h2>
             <button className="text-neutral-500 hover:text-white text-sm" onClick={() => setSelectedId(null)}>
@@ -298,103 +321,169 @@ export function IdeasView({
                 </div>
               )}
 
-              {/* Connected ideas */}
+              {/* Connected ideas — each expands inline below its row */}
               {connectedIdeas.length > 0 && (
                 <div>
                   <div className="text-xs uppercase text-neutral-500 mb-1">
                     {tx('Ideas conectadas ({n})', { n: connectedIdeas.length })}
                   </div>
                   <div className="space-y-1.5">
-                    {connectedIdeas.map(({ edge, node }) => {
-                      if (!node) return null;
-                      const edgeLabel = t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type;
-                      return (
-                        <button
+                    {connectedIdeas.map(({ edge, node }) =>
+                      node ? (
+                        <ConnectedIdeaRow
                           key={edge.id}
-                          className="card p-2.5 w-full text-left hover:bg-neutral-800/60 transition-colors"
-                          onClick={() => openConnected(edge.id, node.id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            <TypeDot type={node.type} />
-                            <span className="text-sm font-medium truncate">{node.label}</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge color={edge.basis === 'explicit' ? 'green' : 'amber'}>{edgeLabel}</Badge>
-                            <span className="text-[11px] text-neutral-500">{t('conf')} {edge.confidence.toFixed(2)}</span>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          edge={edge}
+                          node={node}
+                          onSelectIdea={setSelectedId}
+                          onOpenGraph={onOpenGraph}
+                        />
+                      ) : null
+                    )}
                   </div>
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-          {/* Connected idea sub-detail */}
-          {connectedLoading && (
-            <div className="mt-4 pt-4 border-t border-neutral-800 animate-pulse">
-              <div className="h-3 bg-neutral-800 rounded w-2/3" />
-              <div className="h-3 bg-neutral-800 rounded w-full mt-2" />
+/**
+ * One row in the "connected ideas" list. Clicking the header expands the edge +
+ * idea detail inline, just below this row, and folds it back on a second click.
+ * Each row keeps its own open/loading state, so several can stay expanded at once
+ * and the detail loads lazily only when first opened.
+ */
+function ConnectedIdeaRow({
+  edge,
+  node,
+  onSelectIdea,
+  onOpenGraph,
+}: {
+  edge: GraphEdge;
+  node: NonNullable<GraphData['nodes'][number]>;
+  onSelectIdea: (id: string) => void;
+  onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
+  const [edgeDetail, setEdgeDetail] = useState<EdgeDetail | null>(null);
+  const loadedRef = useRef(false);
+
+  const toggle = useCallback(() => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next && !loadedRef.current) {
+        loadedRef.current = true;
+        setLoading(true);
+        void Promise.all([window.nodus.getIdeaDetail(node.id), window.nodus.getEdgeDetail(edge.id)]).then(
+          ([ideaD, edgeD]) => {
+            setIdeaDetail(ideaD);
+            setEdgeDetail(edgeD);
+            setLoading(false);
+          }
+        );
+      }
+      return next;
+    });
+  }, [edge.id, node.id]);
+
+  const edgeLabel = t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type;
+
+  return (
+    <div className={`card overflow-hidden ${open ? 'ring-1 ring-indigo-500/40' : ''}`}>
+      <button
+        className="w-full text-left p-2.5 hover:bg-neutral-800/60 transition-colors"
+        onClick={toggle}
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2">
+          <TypeDot type={node.type} />
+          <span className="text-sm font-medium truncate flex-1 min-w-0">{node.label}</span>
+          <Icon
+            name="chevronRight"
+            size={14}
+            className={`shrink-0 text-neutral-500 transition-transform ${open ? 'rotate-90' : ''}`}
+          />
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <Badge color={edge.basis === 'explicit' ? 'green' : 'amber'}>{edgeLabel}</Badge>
+          <span className="text-[11px] text-neutral-500">{t('conf')} {edge.confidence.toFixed(2)}</span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-neutral-800 bg-neutral-950/40 p-2.5">
+          {loading && (
+            <div className="animate-pulse space-y-2">
+              <div className="h-3 w-2/3 rounded bg-neutral-800" />
+              <div className="h-3 w-full rounded bg-neutral-800" />
             </div>
           )}
-          {connectedDetail && (
-            <div className="mt-4 pt-4 border-t border-neutral-800">
-              <div className="text-xs uppercase text-neutral-500 mb-2">{t('Idea conectada')}</div>
-              {connectedEdge && (
+          {!loading && (
+            <>
+              {edgeDetail && (edgeDetail.explanation || edgeDetail.evidence.length > 0) && (
                 <div className="mb-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge color="indigo">
-                      {t(EDGE_LABELS[connectedEdge.edge.type as keyof typeof EDGE_LABELS]) ?? connectedEdge.edge.type}
-                    </Badge>
-                    <Badge color={connectedEdge.edge.basis === 'explicit' ? 'green' : 'amber'}>
-                      {connectedEdge.edge.basis}
-                    </Badge>
-                    <Badge>{t('conf')} {connectedEdge.edge.confidence.toFixed(2)}</Badge>
-                  </div>
-                  {connectedEdge.explanation && (
-                    <p className="text-xs text-neutral-400 mb-2">{connectedEdge.explanation}</p>
-                  )}
                   <div className="text-xs text-neutral-500">
-                    <span className="text-neutral-300">{connectedEdge.fromLabel}</span> →{' '}
-                    <span className="text-neutral-300">{connectedEdge.toLabel}</span>
+                    <span className="text-neutral-300">{edgeDetail.fromLabel}</span> →{' '}
+                    <span className="text-neutral-300">{edgeDetail.toLabel}</span>
                   </div>
-                  {connectedEdge.evidence.length > 0 && connectedEdge.evidence.map((ev) => (
-                    <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-2 mt-1 text-xs italic text-neutral-400">
+                  {edgeDetail.explanation && (
+                    <p className="text-xs text-neutral-400 mt-1">{edgeDetail.explanation}</p>
+                  )}
+                  {edgeDetail.evidence.map((ev) => (
+                    <blockquote
+                      key={ev.id}
+                      className="border-l-2 border-indigo-700 pl-2 mt-1 text-xs italic text-neutral-400"
+                    >
                       "{ev.quote}" {ev.location ?? ''}
                     </blockquote>
                   ))}
                 </div>
               )}
-              <Badge color="indigo">{t(NODE_LABELS[connectedDetail.idea.type as IdeaType]) ?? connectedDetail.idea.type}</Badge>
-              <h4 className="font-semibold mt-1">{connectedDetail.idea.label}</h4>
-              <p className="text-neutral-400 text-xs mt-1">{connectedDetail.idea.statement}</p>
-              {connectedDetail.occurrences.length > 0 && (
-                <div className="mt-2">
-                  <div className="text-[11px] uppercase text-neutral-500 mb-1">{t('Obras')}</div>
-                  {connectedDetail.occurrences.slice(0, 3).map((o) => (
-                    <OccurrenceCard key={o.nodus_id} occurrence={o} />
-                  ))}
-                  {connectedDetail.occurrences.length > 3 && (
-                    <div className="text-[11px] text-neutral-500 mt-1">
-                      +{connectedDetail.occurrences.length - 3} {t('más')}
+              {ideaDetail && (
+                <>
+                  <Badge color="indigo">{t(NODE_LABELS[ideaDetail.idea.type as IdeaType]) ?? ideaDetail.idea.type}</Badge>
+                  <p className="text-neutral-400 text-xs mt-1">{ideaDetail.idea.statement}</p>
+                  {ideaDetail.occurrences.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-[11px] uppercase text-neutral-500 mb-1">{t('Obras')}</div>
+                      {ideaDetail.occurrences.slice(0, 3).map((o) => (
+                        <OccurrenceCard key={o.nodus_id} occurrence={o} />
+                      ))}
+                      {ideaDetail.occurrences.length > 3 && (
+                        <div className="text-[11px] text-neutral-500 mt-1">
+                          +{ideaDetail.occurrences.length - 3} {t('más')}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="btn btn-ghost text-xs gap-1"
+                      onClick={() => onSelectIdea(ideaDetail.idea.global_id)}
+                    >
+                      <Icon name="bulb" size={12} /> {t('Ver detalle completo')}
+                    </button>
+                    <button
+                      className="btn btn-ghost text-xs gap-1"
+                      onClick={() =>
+                        onOpenGraph({
+                          preset: 'overview',
+                          nodeId: ideaDetail.idea.global_id,
+                          label: `${t('Idea:')} ${ideaDetail.idea.label}`,
+                        })
+                      }
+                    >
+                      <Icon name="layers" size={12} /> {t('Ver en grafo')}
+                    </button>
+                  </div>
+                </>
               )}
-              <button
-                className="btn btn-ghost text-xs mt-3 gap-1"
-                onClick={() => setSelectedId(connectedDetail.idea.global_id)}
-              >
-                <Icon name="bulb" size={12} /> {t('Ver detalle completo')}
-              </button>
-              <button
-                className="btn btn-ghost text-xs mt-3 ml-2 gap-1"
-                onClick={() => onOpenGraph({ preset: 'overview', nodeId: connectedDetail.idea.global_id, label: `${t('Idea:')} ${connectedDetail.idea.label}` })}
-              >
-                <Icon name="layers" size={12} /> {t('Ver en grafo')}
-              </button>
-            </div>
+            </>
           )}
         </div>
       )}
