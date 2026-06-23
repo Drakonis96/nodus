@@ -331,9 +331,13 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
             </button>
           </div>
           <div className="relative">
-            <Icon name="search" size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-neutral-600" />
+            <Icon
+              name="search"
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+            />
             <input
-              className="input w-full text-xs py-1.5 pl-7"
+              className="input input-with-leading-icon w-full text-xs py-1.5"
               placeholder={t('Buscar en notas…')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -528,7 +532,7 @@ function ScopeRow({
   return (
     <button
       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors ${
-        active ? 'bg-indigo-600/20 text-indigo-100' : 'text-neutral-300 hover:bg-neutral-900'
+        active ? 'bg-indigo-600/15 text-indigo-300' : 'text-neutral-300 hover:bg-neutral-900'
       }`}
       onClick={onClick}
     >
@@ -576,7 +580,7 @@ function FolderRow({
     <div>
       <div
         className={`group flex items-center gap-1 rounded-md pr-1 transition-colors ${
-          isActive ? 'bg-indigo-600/20' : 'hover:bg-neutral-900'
+          isActive ? 'bg-indigo-600/15' : 'hover:bg-neutral-900'
         }`}
         style={{ paddingLeft: `${node.depth * 12}px` }}
       >
@@ -605,7 +609,7 @@ function FolderRow({
         ) : (
           <button
             className={`flex-1 min-w-0 flex items-center gap-1.5 py-1.5 text-sm text-left ${
-              isActive ? 'text-indigo-100' : 'text-neutral-300'
+              isActive ? 'text-indigo-300' : 'text-neutral-300'
             }`}
             onClick={() => onSelect(node.folder.id)}
             onDoubleClick={() => onStartRename(node.folder)}
