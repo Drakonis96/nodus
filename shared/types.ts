@@ -1346,7 +1346,7 @@ export interface NodusApi {
   resetGraph(): Promise<void>;
 
   // embedding pipeline
-  /** Start embedding generation for the given works (or all deep-scanned works if empty). */
+  /** Start embedding generation for the given works (or all non-archived works if empty). */
   startEmbedding(nodusIds?: string[]): Promise<void>;
   /** Clear all existing embeddings and regenerate from scratch. */
   reindexAll(): Promise<void>;
@@ -1361,6 +1361,7 @@ export interface NodusApi {
   onEmbeddingProgress(cb: (p: EmbeddingPipelineProgress) => void): () => void;
 
   // full-text passage index
+  /** Index full-text passages for the chosen works; analysis in the idea graph is not required. */
   startPassageEmbedding(nodusIds?: string[]): Promise<void>;
   pausePassageEmbedding(): Promise<void>;
   resumePassageEmbedding(): Promise<void>;

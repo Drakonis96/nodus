@@ -99,9 +99,9 @@ async function waitIfPaused(): Promise<boolean> {
 }
 
 /**
- * Builds/rebuilds fine retrieval chunks. Complete works are skipped using the
- * deep-scan content hash and embedding configuration; work text is only
- * re-extracted for missing or stale records.
+ * Builds/rebuilds fine retrieval chunks for any non-archived work. Passage
+ * indexing is deliberately independent from deep idea analysis: a work with
+ * text can be useful evidence even when it has never entered the graph.
  */
 export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> {
   if (state.running) return;
@@ -121,15 +121,15 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
     const db = getDb();
     const ids = [...new Set(nodusIds ?? [])];
     const candidates = (ids.length
-      ? db.prepare(`SELECT * FROM works WHERE nodus_id IN (${ids.map(() => '?').join(',')}) AND archived = 0 AND deep_status = 'done'`).all(...ids)
-      : db.prepare("SELECT * FROM works WHERE archived = 0 AND deep_status = 'done'").all()) as Work[];
+      ? db.prepare(`SELECT * FROM works WHERE nodus_id IN (${ids.map(() => '?').join(',')}) AND archived = 0`).all(...ids)
+      : db.prepare('SELECT * FROM works WHERE archived = 0').all()) as Work[];
     const statuses = new Map(workPassageStatuses(candidates.map((work) => work.nodus_id)).map((status) => [status.nodus_id, status]));
     state.works = candidates
       .filter((work) => statuses.get(work.nodus_id)?.status !== 'complete')
       .map((work) => ({ work, title: work.title, chunks: 0 }));
 
     if (state.works.length === 0) {
-      if (candidates.length === 0) state.error = 'No hay obras con análisis profundo para indexar.';
+      if (candidates.length === 0) state.error = 'No hay obras disponibles para indexar.';
       emit();
       return;
     }

@@ -920,7 +920,7 @@ function selectedPassages(ids: string[]): Record<string, unknown>[] {
          JOIN works w ON w.nodus_id = p.nodus_id
         WHERE p.passage_id IN (${placeholders(ids)})
           AND w.archived = 0
-          AND p.content_hash = w.deep_hash
+          AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
         ORDER BY p.nodus_id, p.chunk_index`
     )
     .all(...ids) as Array<Omit<SimilarPassage, 'similarity'>>;

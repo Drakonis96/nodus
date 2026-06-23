@@ -76,7 +76,7 @@ export function findSimilarPassages(
            JOIN works w ON w.nodus_id = p.nodus_id
           WHERE p.embedding IS NOT NULL
             AND w.archived = 0
-            AND p.content_hash = w.deep_hash
+            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
             AND p.embedding_provider = ?
             AND p.embedding_model = ?
             AND p.embedding_dim = ?${scoped}
@@ -135,7 +135,7 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
     .prepare(
       `SELECT w.nodus_id, w.deep_hash,
               COUNT(p.passage_id) AS total_passages,
-              SUM(CASE WHEN p.content_hash = w.deep_hash
+              SUM(CASE WHEN (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
                          AND p.embedding IS NOT NULL
                          AND p.embedding_provider = ?
                          AND p.embedding_model = ?
@@ -158,7 +158,7 @@ export function workPassageStatuses(nodusIds?: string[]): WorkPassageStatus[] {
     return {
       nodus_id: row.nodus_id,
       totalPassages,
-      status: totalPassages === 0 ? 'missing' : row.deep_hash && current === totalPassages ? 'complete' : 'outdated',
+      status: totalPassages === 0 ? 'missing' : current === totalPassages ? 'complete' : 'outdated',
     };
   });
 }

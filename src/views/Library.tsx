@@ -257,7 +257,7 @@ export function Library({
 
   const indexMissingPassages = async () => {
     const ids = works
-      .filter((work) => work.deep_status === 'done' && passageStatuses.get(work.nodus_id)?.status !== 'complete')
+      .filter((work) => passageStatuses.get(work.nodus_id)?.status !== 'complete')
       .map((work) => work.nodus_id);
     if (ids.length > 0) await window.nodus.startPassageEmbedding(ids);
   };
@@ -277,7 +277,7 @@ export function Library({
   };
 
   const needsPassageIndex = (w: WorkView) =>
-    w.deep_status === 'done' && passageStatuses.get(w.nodus_id)?.status !== 'complete';
+    passageStatuses.get(w.nodus_id)?.status !== 'complete';
 
   const discoverBridges = async () => {
     await window.nodus.enqueueBridgeDiscovery(scanModel);
@@ -744,7 +744,7 @@ export function Library({
           <OperationCard
             icon="book"
             title={t('Procesar pasajes faltantes')}
-            description={t('Indexa fragmentos de texto completo en las obras profundas que faltan o están obsoletas. El texto se mantiene como evidencia citable.')}
+            description={t('Indexa fragmentos de texto completo en las obras que faltan o están obsoletas. No requiere análisis de ideas; el texto se mantiene como evidencia citable.')}
             buttonLabel={t('Procesar faltantes')}
             tone="cyan"
             onClick={indexMissingPassages}
@@ -752,7 +752,7 @@ export function Library({
           <OperationCard
             icon="book"
             title={t('Pasajes (texto completo)')}
-            description={t('Recorre toda la biblioteca profunda y actualiza solo los índices que hayan cambiado. Los ya actuales se omiten.')}
+            description={t('Recorre toda la biblioteca y actualiza solo los índices que hayan cambiado. Los ya actuales se omiten.')}
             buttonLabel={t('Indexar todo')}
             tone="cyan"
             onClick={indexAllPassages}
@@ -850,7 +850,7 @@ export function Library({
                   {deepBadge(w.deep_status)} {triggerBadge(w)}
                 </div>
                 <div className="p-1 whitespace-nowrap">
-                  {w.deep_status === 'done' ? passageBadge(passageStatuses.get(w.nodus_id)) : <Badge color="neutral">—</Badge>}
+                  {passageBadge(passageStatuses.get(w.nodus_id))}
                   {needsPassageIndex(w) && (
                     <button
                       className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-green-400 hover:text-green-300"
