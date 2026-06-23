@@ -1141,6 +1141,25 @@ export interface WritingWorkshopExportRequest {
   draft: WritingWorkshopDraft;
 }
 
+/** A locally saved workshop draft, including the exact prompt and selected evidence. */
+export interface WritingWorkshopSavedDraft {
+  id: string;
+  title: string;
+  brief: WritingWorkshopBrief;
+  selection: WritingWorkshopSelection;
+  model: ModelRef | null;
+  draft: WritingWorkshopDraft;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WritingWorkshopSaveDraftRequest {
+  draft: WritingWorkshopDraft;
+  model?: ModelRef | null;
+  /** Defaults to the generated draft title when omitted. */
+  title?: string;
+}
+
 export interface WritingWorkshopStreamHandlers {
   onDelta(delta: string): void;
 }
@@ -1300,6 +1319,9 @@ export interface NodusApi {
   getWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
   generateWritingWorkshopDraft(request: WritingWorkshopDraftRequest): Promise<WritingWorkshopDraft>;
   exportWritingWorkshopDraft(request: WritingWorkshopExportRequest): Promise<{ path: string } | null>;
+  listWritingWorkshopDrafts(): Promise<WritingWorkshopSavedDraft[]>;
+  saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): Promise<WritingWorkshopSavedDraft>;
+  deleteWritingWorkshopDraft(id: string): Promise<void>;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

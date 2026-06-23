@@ -21,6 +21,7 @@ import type {
   WritingWorkshopBrief,
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
+  WritingWorkshopSaveDraftRequest,
   DebateAnalysisRequest,
   RqDecomposeRequest,
   RqMapRequest,
@@ -69,6 +70,7 @@ import { getPassageDetail } from './db/passagesRepo';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as tutorRoutes from './db/tutorRepo';
+import * as writingDrafts from './db/writingDraftsRepo';
 import * as workSummaries from './db/workSummariesRepo';
 import { getDb } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
@@ -377,6 +379,9 @@ export function registerIpc(
   h('writing:snapshot', async (_e, brief: WritingWorkshopBrief) => buildWritingWorkshopSnapshot(brief));
   h('writing:draft', async (_e, request: WritingWorkshopDraftRequest) => generateWritingWorkshopDraft(request));
   h('writing:export', async (_e, request: WritingWorkshopExportRequest) => exportWritingWorkshopDraft(request));
+  h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
+  h('writing:saved:save', async (_e, request: WritingWorkshopSaveDraftRequest) => writingDrafts.saveWritingWorkshopDraft(request));
+  h('writing:saved:delete', async (_e, id: string) => writingDrafts.deleteWritingWorkshopDraft(id));
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

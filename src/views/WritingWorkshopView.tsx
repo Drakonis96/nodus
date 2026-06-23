@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import type {
   AppSettings,
@@ -11,6 +11,7 @@ import type {
   WritingWorkshopPassageCandidate,
   WritingWorkshopRouteCandidate,
   WritingWorkshopSelection,
+  WritingWorkshopSavedDraft,
   WritingWorkshopSnapshot,
   WritingWorkshopThemeCandidate,
   WritingWorkshopWorkCandidate,
@@ -78,11 +79,15 @@ export function WritingWorkshopView({
   const [selection, setSelection] = useState<WritingWorkshopSelection>(EMPTY_SELECTION);
   const [activeTab, setActiveTab] = useState<MaterialTab>('ideas');
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
+  const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
+  const [reusingDraftId, setReusingDraftId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,6 +96,21 @@ export function WritingWorkshopView({
   const activeTabTotal = snapshot ? candidateIdsForTab(snapshot, activeTab).length : 0;
   const activeTabSelected = selection[TAB_SELECTION_KEYS[activeTab]].length;
   const hasModel = !!selectedModel;
+
+  const refreshSavedDrafts = useCallback(async () => {
+    setLoadingSavedDrafts(true);
+    try {
+      setSavedDrafts(await window.nodus.listWritingWorkshopDrafts());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingSavedDrafts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshSavedDrafts();
+  }, [refreshSavedDrafts]);
 
   const prepare = async () => {
     setError(null);
@@ -147,6 +167,68 @@ export function WritingWorkshopView({
     if (!draft) return;
     await navigator.clipboard.writeText(draft.draftMarkdown);
     setMessage(t('Borrador copiado.'));
+  };
+
+  const saveDraft = async () => {
+    if (!draft || savingDraft) return;
+    setError(null);
+    setMessage(null);
+    setSavingDraft(true);
+    try {
+      const saved = await window.nodus.saveWritingWorkshopDraft({ draft, model: selectedModel });
+      setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setMessage(t('Borrador guardado localmente.'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const openSavedDraft = (saved: WritingWorkshopSavedDraft) => {
+    setError(null);
+    setMessage(t('Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.'));
+    setBrief(saved.brief);
+    setSelection(saved.selection);
+    setSnapshot(null);
+    setDraft(saved.draft);
+    if (saved.model) setSelectedModel(saved.model);
+  };
+
+  const reuseSavedPrompt = async (saved: WritingWorkshopSavedDraft) => {
+    if (reusingDraftId) return;
+    setError(null);
+    setMessage(null);
+    setReusingDraftId(saved.id);
+    setLoadingMaterials(true);
+    try {
+      const next = await window.nodus.getWritingWorkshopSnapshot(saved.brief);
+      const restoredSelection = selectionAvailableInSnapshot(saved.selection, next);
+      setBrief(saved.brief);
+      setSnapshot(next);
+      setSelection(restoredSelection);
+      setDraft(null);
+      if (saved.model) setSelectedModel(saved.model);
+      setMessage(tx('Prompt reutilizado: {n} materiales siguen disponibles para generar un borrador actualizado.', { n: countSelection(restoredSelection) }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingMaterials(false);
+      setReusingDraftId(null);
+    }
+  };
+
+  const deleteSavedDraft = async (saved: WritingWorkshopSavedDraft) => {
+    if (!window.confirm(t('¿Eliminar este borrador guardado? Esta acción no se puede deshacer.'))) return;
+    setError(null);
+    setMessage(null);
+    try {
+      await window.nodus.deleteWritingWorkshopDraft(saved.id);
+      setSavedDrafts((current) => current.filter((item) => item.id !== saved.id));
+      setMessage(t('Borrador eliminado.'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const toggle = (key: keyof WritingWorkshopSelection, id: string) => {
@@ -395,6 +477,9 @@ export function WritingWorkshopView({
                 <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={copyDraft}>
                   <Icon name="check" /> {t('Copiar')}
                 </button>
+                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={saveDraft} disabled={savingDraft}>
+                  <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
+                </button>
                 <button className="btn btn-primary gap-1.5" onClick={exportDraft} disabled={exporting}>
                   <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
                 </button>
@@ -425,6 +510,16 @@ export function WritingWorkshopView({
         </main>
 
         <aside className="border-l border-neutral-800 min-h-0 overflow-y-auto p-4 max-xl:border-l-0 max-xl:border-t">
+          <SavedDraftsPanel
+            drafts={savedDrafts}
+            loading={loadingSavedDrafts}
+            reusingDraftId={reusingDraftId}
+            onOpen={openSavedDraft}
+            onReuse={(saved) => void reuseSavedPrompt(saved)}
+            onDelete={(saved) => void deleteSavedDraft(saved)}
+            onRefresh={() => void refreshSavedDrafts()}
+          />
+          <div className="my-4 border-t border-neutral-800" />
           <h2 className="font-semibold text-sm mb-3">{t('Matriz de apoyo')}</h2>
           {!draft && <div className="text-sm text-neutral-500">{t('Sin matriz todavía.')}</div>}
           {draft && (
@@ -498,7 +593,7 @@ function WritingWorkshopTutorial() {
         <TutorialStep
           icon="edit"
           title={t('4. Convierte en texto')}
-          body={t('Genera el borrador, abre las citas para verificar fuentes y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito.')}
+          body={t('Genera el borrador, abre las citas para verificar fuentes, guárdalo si quieres retomarlo y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito.')}
         />
       </div>
     </section>
@@ -667,6 +762,86 @@ function RouteCard({ item, selected, onToggle }: { item: WritingWorkshopRouteCan
   );
 }
 
+function SavedDraftsPanel({
+  drafts,
+  loading,
+  reusingDraftId,
+  onOpen,
+  onReuse,
+  onDelete,
+  onRefresh,
+}: {
+  drafts: WritingWorkshopSavedDraft[];
+  loading: boolean;
+  reusingDraftId: string | null;
+  onOpen: (draft: WritingWorkshopSavedDraft) => void;
+  onReuse: (draft: WritingWorkshopSavedDraft) => void;
+  onDelete: (draft: WritingWorkshopSavedDraft) => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <h2 className="font-semibold text-sm">{t('Borradores guardados')}</h2>
+          <p className="text-xs text-neutral-500 mt-0.5">{tx('{n} guardado(s) en este dispositivo', { n: drafts.length })}</p>
+        </div>
+        <button className="btn btn-ghost px-2 py-1 gap-1" onClick={onRefresh} disabled={loading} title={t('Actualizar borradores')}>
+          <Icon name="refresh" size={13} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-neutral-500">{t('Cargando borradores…')}</div>
+      ) : drafts.length === 0 ? (
+        <div className="rounded-md border border-dashed border-neutral-800 px-3 py-4 text-sm leading-5 text-neutral-500">
+          {t('Aún no hay borradores guardados. Genera uno y guárdalo para volver a abrirlo o reutilizar su prompt más adelante.')}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {drafts.map((saved) => {
+            const isReusing = reusingDraftId === saved.id;
+            return (
+              <div key={saved.id} className="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium leading-5 line-clamp-2">{saved.title}</div>
+                    <div className="mt-1 text-[11px] text-neutral-500">
+                      {t(KIND_LABELS[saved.brief.kind])} · {formatSavedDraftDate(saved.updatedAt)}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-ghost px-1.5 py-1 text-red-400 hover:text-red-300"
+                    onClick={() => onDelete(saved)}
+                    title={t('Eliminar borrador guardado')}
+                    aria-label={`${t('Eliminar borrador guardado')}: ${saved.title}`}
+                  >
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
+                {saved.brief.objective && <p className="mt-2 text-xs leading-5 text-neutral-500 line-clamp-3">{saved.brief.objective}</p>}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button className="btn btn-ghost border border-neutral-700 px-2 py-1.5 text-xs gap-1" onClick={() => onOpen(saved)}>
+                    <Icon name="edit" size={13} /> {t('Abrir')}
+                  </button>
+                  <button
+                    className="btn btn-primary px-2 py-1.5 text-xs gap-1"
+                    onClick={() => onReuse(saved)}
+                    disabled={reusingDraftId !== null}
+                  >
+                    <Icon name={isReusing ? 'sync' : 'refresh'} size={13} className={isReusing ? 'animate-spin' : ''} />
+                    {isReusing ? t('Preparando…') : t('Reutilizar prompt')}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-md border border-neutral-800 px-2 py-1.5">
@@ -724,6 +899,27 @@ function selectionFromSnapshot(snapshot: WritingWorkshopSnapshot): WritingWorksh
     passageIds: snapshot.passages.map((item) => item.id),
     tutorRouteIds: snapshot.tutorRoutes.map((item) => item.id),
   };
+}
+
+/** Keep only selected material that still appears in the freshly prepared table. */
+function selectionAvailableInSnapshot(
+  selection: WritingWorkshopSelection,
+  snapshot: WritingWorkshopSnapshot
+): WritingWorkshopSelection {
+  return {
+    ideaIds: availableIds(selection.ideaIds, snapshot.ideas),
+    themeIds: availableIds(selection.themeIds, snapshot.themes),
+    gapIds: availableIds(selection.gapIds, snapshot.gaps),
+    contradictionIds: availableIds(selection.contradictionIds, snapshot.contradictions),
+    workIds: availableIds(selection.workIds, snapshot.works),
+    passageIds: availableIds(selection.passageIds, snapshot.passages),
+    tutorRouteIds: availableIds(selection.tutorRouteIds, snapshot.tutorRoutes),
+  };
+}
+
+function availableIds(selectedIds: string[], candidates: WritingWorkshopCandidateBase[]): string[] {
+  const available = new Set(candidates.map((candidate) => candidate.id));
+  return Array.from(new Set(selectedIds.filter((id) => available.has(id))));
 }
 
 function candidateIdsForTab(snapshot: WritingWorkshopSnapshot, tab: MaterialTab): string[] {
@@ -788,4 +984,11 @@ function parseNodusCitation(value: string): Exclude<CitationTarget, null> | null
 function formatChars(value: number): string {
   if (value >= 1000) return `${Math.round(value / 1000)}k`;
   return String(value);
+}
+
+function formatSavedDraftDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }

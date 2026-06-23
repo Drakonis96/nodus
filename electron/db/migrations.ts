@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export const migrations: Migration[] = [
   {
@@ -483,6 +483,24 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_passages_nodus ON passages(nodus_id);
       CREATE INDEX idx_passages_embedding_meta
         ON passages(embedding_provider, embedding_model, embedding_dim, embedding_text_hash);
+    `,
+  },
+  {
+    version: 16,
+    up: /* sql */ `
+      CREATE TABLE writing_saved_drafts (
+        id             TEXT PRIMARY KEY,
+        title          TEXT NOT NULL,
+        brief_json     TEXT NOT NULL,
+        selection_json TEXT NOT NULL,
+        model_json     TEXT,
+        draft_json     TEXT NOT NULL,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_writing_saved_drafts_updated
+        ON writing_saved_drafts(updated_at DESC);
     `,
   },
 ];

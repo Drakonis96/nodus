@@ -1030,6 +1030,14 @@ export const EN: Record<string, string> = {
   'Mesa preparada con materiales recomendados.': 'Table prepared with recommended materials.',
   'Borrador generado con matriz y citas.': 'Draft generated with matrix and citations.',
   'Borrador copiado.': 'Draft copied.',
+  'Borrador guardado localmente.': 'Draft saved locally.',
+  'Borrador guardado abierto. Puedes exportarlo o reutilizar su prompt para actualizarlo.':
+    'Saved draft opened. You can export it or reuse its prompt to update it.',
+  'Prompt reutilizado: {n} materiales siguen disponibles para generar un borrador actualizado.':
+    'Prompt reused: {n} materials are still available to generate an updated draft.',
+  '¿Eliminar este borrador guardado? Esta acción no se puede deshacer.':
+    'Delete this saved draft? This action cannot be undone.',
+  'Borrador eliminado.': 'Draft deleted.',
   'Taller de escritura': 'Writing Workshop',
   'Del grafo a un borrador con fuentes verificables.': 'From the graph to a draft with verifiable sources.',
   'Ocultar tutorial': 'Hide tutorial',
@@ -1056,6 +1064,15 @@ export const EN: Record<string, string> = {
   'El borrador aparecerá aquí cuando selecciones materiales y lo generes.':
     'The draft will appear here once you select materials and generate it.',
   Copiar: 'Copy',
+  'Guardar borrador': 'Save draft',
+  'Borradores guardados': 'Saved drafts',
+  '{n} guardado(s) en este dispositivo': '{n} saved on this device',
+  'Actualizar borradores': 'Refresh drafts',
+  'Cargando borradores…': 'Loading drafts…',
+  'Aún no hay borradores guardados. Genera uno y guárdalo para volver a abrirlo o reutilizar su prompt más adelante.':
+    'There are no saved drafts yet. Generate one and save it to reopen it or reuse its prompt later.',
+  'Eliminar borrador guardado': 'Delete saved draft',
+  'Reutilizar prompt': 'Reuse prompt',
   Exportar: 'Export',
   Esquema: 'Outline',
   'Matriz de apoyo': 'Support matrix',
@@ -1074,8 +1091,8 @@ export const EN: Record<string, string> = {
   'Selecciona todo para explorar, vacía para empezar de cero o ajusta cada pestaña. La matriz final te dirá qué papel cumple cada material en el argumento.':
     'Select everything to explore, clear to start from scratch, or adjust each tab. The final matrix tells you what role each material plays in the argument.',
   '4. Convierte en texto': '4. Turn into text',
-  'Genera el borrador, abre las citas para verificar fuentes y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito.':
-    'Generate the draft, open the citations to verify sources, and export Markdown once the argument thread makes sense for your manuscript.',
+  'Genera el borrador, abre las citas para verificar fuentes, guárdalo si quieres retomarlo y exporta Markdown cuando el hilo argumental ya tenga sentido para tu manuscrito.':
+    'Generate the draft, open the citations to verify sources, save it if you want to return to it, and export Markdown once the argument thread makes sense for your manuscript.',
   '{n} evidencias': '{n} evidence',
   curado: 'curated',
   analizada: 'analyzed',

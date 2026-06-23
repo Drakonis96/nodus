@@ -143,6 +143,9 @@ const api: NodusApi = {
   getWritingWorkshopSnapshot: (brief) => ipcRenderer.invoke('writing:snapshot', brief),
   generateWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:draft', request),
   exportWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:export', request),
+  listWritingWorkshopDrafts: () => ipcRenderer.invoke('writing:saved:list'),
+  saveWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:saved:save', request),
+  deleteWritingWorkshopDraft: (id) => ipcRenderer.invoke('writing:saved:delete', id).then(() => undefined),
 
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
   listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
