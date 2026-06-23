@@ -147,8 +147,8 @@ export const EN: Record<string, string> = {
   Datos: 'Data',
   'Exportar (.nodus)': 'Export (.nodus)',
   'Importar (.nodus)': 'Import (.nodus)',
-  'La copia incluye base de datos, ajustes, modelos, grafo y claves API dentro de un archivo cifrado con contraseña generada.':
-    'The backup bundles the database, settings, models, graph and API keys into a file encrypted with a generated password.',
+  'La copia incluye todos los datos de Nodus: textos extraídos, embeddings de ideas, resúmenes y pasajes, modelos seleccionados, grafo, ajustes y claves API, dentro de un archivo cifrado.':
+    'The encrypted backup contains all Nodus data: extracted text, idea, summary and passage embeddings, selected models, graph, settings and API keys.',
   'IA avanzada': 'Advanced AI',
   'Modelo de extracción (extrae temas, ideas, evidencias y huecos)':
     'Extraction model (extracts themes, ideas, evidence and gaps)',

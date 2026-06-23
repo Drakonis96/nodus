@@ -323,7 +323,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               </button>
             </div>
             <p className="text-xs text-neutral-500">
-              {t('La copia incluye base de datos, ajustes, modelos, grafo y claves API dentro de un archivo cifrado con contraseña generada.')}
+              {t('La copia incluye todos los datos de Nodus: textos extraídos, embeddings de ideas, resúmenes y pasajes, modelos seleccionados, grafo, ajustes y claves API, dentro de un archivo cifrado.')}
             </p>
           </Section>
         </>

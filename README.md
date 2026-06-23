@@ -200,10 +200,18 @@ See `electron/db/migrations.ts` for the authoritative schema. Core tables:
 ## Export / import
 
 Settings → Data → **Export** produces a single self-contained `*.nodus` archive
-(`database.sqlite` + `manifest.json` + non-secret `settings.json`). The AI key is
-never exported. On a new machine, import the file, re-enter the AI key, and point
-Nodus at the local Zotero `storage` folder — the graph and all derived data are
-available immediately without rescanning.
+encrypted with a generated password. It contains a transactionally consistent
+SQLite snapshot plus the selected model settings and API keys. The snapshot
+preserves all Nodus data: works and graph, extracted-text cache, chat history,
+and the Float32 embeddings for ideas, work summaries and full-text passages.
+An internal inventory verifies table counts, embedding bytes and model selections
+before an import is accepted.
+
+On a new machine, import the file to restore the complete Nodus state without
+rescanning or reindexing. Original Zotero attachment files are intentionally not
+duplicated by Nodus; keep Zotero's own storage/sync available if you need to open
+the original PDFs. Extracted text and every computed Nodus artifact are restored
+from the backup.
 
 ## The three core prompts
 
