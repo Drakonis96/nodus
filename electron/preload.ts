@@ -180,6 +180,17 @@ const api: NodusApi = {
   archiveConversation: (id, archived) => ipcRenderer.invoke('chat:archive', id, archived).then(() => undefined),
   deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
 
+  getNotesTree: () => ipcRenderer.invoke('notes:tree'),
+  createNoteFolder: (input) => ipcRenderer.invoke('notes:folders:create', input),
+  renameNoteFolder: (id, name) => ipcRenderer.invoke('notes:folders:rename', id, name),
+  moveNoteFolder: (id, parentId) => ipcRenderer.invoke('notes:folders:move', id, parentId),
+  deleteNoteFolder: (id) => ipcRenderer.invoke('notes:folders:delete', id).then(() => undefined),
+  createNote: (input) => ipcRenderer.invoke('notes:create', input),
+  getNote: (id) => ipcRenderer.invoke('notes:get', id),
+  updateNote: (input) => ipcRenderer.invoke('notes:update', input),
+  moveNote: (id, folderId) => ipcRenderer.invoke('notes:move', id, folderId),
+  deleteNote: (id) => ipcRenderer.invoke('notes:delete', id).then(() => undefined),
+
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),

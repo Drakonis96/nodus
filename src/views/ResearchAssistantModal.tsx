@@ -11,6 +11,7 @@ import type {
 import { Icon, modelLabel } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget, type PendingGraphNavigationTarget } from '../navigation';
@@ -194,6 +195,7 @@ export function ResearchAssistantModal({
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string } | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -640,7 +642,7 @@ export function ResearchAssistantModal({
                     className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-9 text-sm ${
+                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-14 text-sm ${
                         message.role === 'user'
                           ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
                           : message.error
@@ -648,18 +650,31 @@ export function ResearchAssistantModal({
                             : 'bg-neutral-900 border-neutral-800 text-neutral-200'
                       }`}
                     >
-                      <button
-                        className={`absolute right-2 top-2 rounded p-1 opacity-70 transition hover:opacity-100 ${
-                          message.role === 'user'
-                            ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
-                            : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
-                        }`}
-                        title={copiedMessageId === message.id ? t('Copiado') : t('Copiar en Markdown')}
-                        onClick={() => void copyMessageMarkdown(message)}
-                        disabled={!message.content.trim()}
-                      >
-                        <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
-                      </button>
+                      <div className="absolute right-2 top-2 flex items-center gap-0.5">
+                        {message.role === 'assistant' && !message.error && message.content.trim() && (
+                          <button
+                            className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100"
+                            title={t('Guardar en notas')}
+                            onClick={() =>
+                              setNoteTarget({ content: message.content, title: deriveNoteTitle(message.content, contextTitle) })
+                            }
+                          >
+                            <Icon name="notebook" size={13} />
+                          </button>
+                        )}
+                        <button
+                          className={`rounded p-1 opacity-70 transition hover:opacity-100 ${
+                            message.role === 'user'
+                              ? 'text-indigo-100 hover:bg-indigo-500 hover:text-white'
+                              : 'text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200'
+                          }`}
+                          title={copiedMessageId === message.id ? t('Copiado') : t('Copiar en Markdown')}
+                          onClick={() => void copyMessageMarkdown(message)}
+                          disabled={!message.content.trim()}
+                        >
+                          <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
+                        </button>
+                      </div>
                       {message.role === 'assistant' && !message.error && message.content ? (
                         <Markdown
                           content={message.content}
@@ -741,8 +756,28 @@ export function ResearchAssistantModal({
           onOpenGraph={onOpenGraph ? openGraphFromCitation : undefined}
         />
       )}
+
+      {noteTarget && (
+        <SaveToNotesModal
+          content={noteTarget.content}
+          defaultTitle={noteTarget.title}
+          kind="assistant"
+          source={{ origin: 'assistant', model: selectedModel, note: contextTitle ?? null }}
+          onClose={() => setNoteTarget(null)}
+        />
+      )}
     </div>
   );
+}
+
+/** Build a short note title from the answer's first heading/line, falling back to the context. */
+function deriveNoteTitle(content: string, contextTitle: string | null): string {
+  const firstLine = content
+    .split('\n')
+    .map((line) => line.replace(/^#+\s*/, '').replace(/[*_`>#-]/g, '').trim())
+    .find((line) => line.length > 0);
+  const base = firstLine || contextTitle || 'Respuesta del asistente';
+  return base.length > 80 ? `${base.slice(0, 77)}…` : base;
 }
 
 function ConversationRow({

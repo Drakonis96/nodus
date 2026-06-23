@@ -21,6 +21,7 @@ import { Badge, EDGE_LABELS, Icon, NODE_LABELS, modelLabel } from '../components
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { t, tx } from '../i18n';
 
 const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -81,6 +82,7 @@ export function WritingWorkshopView({
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [savingToNotes, setSavingToNotes] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -480,6 +482,9 @@ export function WritingWorkshopView({
                 <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={saveDraft} disabled={savingDraft}>
                   <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
                 </button>
+                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setSavingToNotes(true)}>
+                  <Icon name="notebook" /> {t('Guardar en notas')}
+                </button>
                 <button className="btn btn-primary gap-1.5" onClick={exportDraft} disabled={exporting}>
                   <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
                 </button>
@@ -565,6 +570,16 @@ export function WritingWorkshopView({
             setCitation(null);
             onOpenGraph(target);
           }}
+        />
+      )}
+
+      {savingToNotes && draft && (
+        <SaveToNotesModal
+          content={`# ${draft.title}\n\n${draft.abstract ? `${draft.abstract}\n\n` : ''}${draft.draftMarkdown}`}
+          defaultTitle={draft.title}
+          kind="writing"
+          source={{ origin: 'writing', model: selectedModel, ref: draft.brief.kind }}
+          onClose={() => setSavingToNotes(false)}
         />
       )}
     </div>

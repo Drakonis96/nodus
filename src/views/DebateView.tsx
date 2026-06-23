@@ -3,6 +3,7 @@ import type { Debate, DebateSide, DebateSideKey, DebateTimelineEntry } from '@sh
 import { Badge, EDGE_LABELS, Icon, Spinner } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -37,6 +38,7 @@ export function DebateView({
   const [status, setStatus] = useState<StatusFilter>('all');
   const [analyses, setAnalyses] = useState<Record<string, AnalysisState>>({});
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [noteTarget, setNoteTarget] = useState<{ content: string; title: string } | null>(null);
 
   const reload = useCallback(() => {
     void window.nodus.getDebates().then(setDebates);
@@ -168,6 +170,12 @@ export function DebateView({
               onOpenGraph={onOpenGraph}
               onOpenAssistant={onOpenAssistant}
               onCite={setCitation}
+              onSaveToNotes={(text) =>
+                setNoteTarget({
+                  content: `# ${t('Debate')}: ${d.sideA.label} · ${d.sideB.label}\n\n> ${d.tension}\n\n${text}`,
+                  title: `${t('Debate')}: ${d.sideA.label} · ${d.sideB.label}`,
+                })
+              }
             />
           ));
           if (!isCluster) return <Fragment key={group[0].clusterId}>{cards}</Fragment>;
@@ -190,6 +198,16 @@ export function DebateView({
 
       {citation && (
         <SourceCitationModal target={citation} onClose={() => setCitation(null)} onOpenGraph={onOpenGraph} />
+      )}
+
+      {noteTarget && (
+        <SaveToNotesModal
+          content={noteTarget.content}
+          defaultTitle={noteTarget.title}
+          kind="debate"
+          source={{ origin: 'debate' }}
+          onClose={() => setNoteTarget(null)}
+        />
       )}
     </div>
   );
@@ -226,6 +244,7 @@ function DebateCard({
   onOpenGraph,
   onOpenAssistant,
   onCite,
+  onSaveToNotes,
 }: {
   debate: Debate;
   analysis?: AnalysisState;
@@ -233,6 +252,7 @@ function DebateCard({
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onCite: (c: CitationTarget) => void;
+  onSaveToNotes: (text: string) => void;
 }) {
   return (
     <div className="card p-4">
@@ -302,7 +322,19 @@ function DebateCard({
           {analysis.error ? (
             <p className="text-xs text-red-400">{analysis.error}</p>
           ) : (
-            <Markdown content={analysis.text} className="text-sm" onCitation={(c: MarkdownCitation) => onCite(c)} />
+            <>
+              <Markdown content={analysis.text} className="text-sm" onCitation={(c: MarkdownCitation) => onCite(c)} />
+              {!analysis.loading && analysis.text.trim() && (
+                <div className="mt-3">
+                  <button
+                    className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                    onClick={() => onSaveToNotes(analysis.text)}
+                  >
+                    <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

@@ -968,6 +968,74 @@ export interface ChatConversation extends ChatConversationSummary {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Notes (user-structured workspace: folders/subfolders + markdown/AI notes)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Where a note's content came from. `markdown` is a hand-written note; the others
+ * carry content captured from another surface (assistant answer, writing workshop
+ * draft, debate synthesis, or a single idea) whose Markdown keeps `nodus://`
+ * citations so they stay clickable inside the notes editor.
+ */
+export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea';
+
+/** Optional provenance metadata kept alongside a captured note (model, source ids…). */
+export interface NoteSource {
+  origin: NoteKind;
+  model?: ModelRef | null;
+  /** Free-form references back to the originating object (idea id, draft title…). */
+  ref?: string | null;
+  note?: string | null;
+}
+
+export interface NoteFolder {
+  id: string;
+  parentId: string | null;
+  name: string;
+  orderIdx: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Note {
+  id: string;
+  folderId: string | null;
+  title: string;
+  kind: NoteKind;
+  content: string;
+  source: NoteSource | null;
+  orderIdx: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Whole notes workspace in one payload so the view can build the tree client-side. */
+export interface NotesTree {
+  folders: NoteFolder[];
+  notes: Note[];
+}
+
+export interface CreateNoteFolderInput {
+  name: string;
+  parentId?: string | null;
+}
+
+export interface CreateNoteInput {
+  title: string;
+  content: string;
+  kind?: NoteKind;
+  folderId?: string | null;
+  source?: NoteSource | null;
+}
+
+export interface UpdateNoteInput {
+  id: string;
+  title?: string;
+  content?: string;
+  folderId?: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1359,6 +1427,22 @@ export interface NodusApi {
   renameConversation(id: string, title: string): Promise<void>;
   archiveConversation(id: string, archived: boolean): Promise<void>;
   deleteConversation(id: string): Promise<void>;
+
+  // notes (user-structured folders/subfolders with markdown + captured AI content)
+  /** Load every folder and note in one payload; the renderer builds the tree. */
+  getNotesTree(): Promise<NotesTree>;
+  createNoteFolder(input: CreateNoteFolderInput): Promise<NoteFolder>;
+  renameNoteFolder(id: string, name: string): Promise<NoteFolder | null>;
+  /** Re-parent a folder (null = root). Cycles are rejected and return the folder unchanged. */
+  moveNoteFolder(id: string, parentId: string | null): Promise<NoteFolder | null>;
+  /** Delete a folder and, recursively, its subfolders and all their notes. */
+  deleteNoteFolder(id: string): Promise<void>;
+  createNote(input: CreateNoteInput): Promise<Note>;
+  getNote(id: string): Promise<Note | null>;
+  updateNote(input: UpdateNoteInput): Promise<Note | null>;
+  /** Move a note to another folder (null = unfiled / root). */
+  moveNote(id: string, folderId: string | null): Promise<Note | null>;
+  deleteNote(id: string): Promise<void>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;

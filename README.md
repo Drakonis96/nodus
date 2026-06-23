@@ -137,6 +137,22 @@ limitations. Citations use the same `nodus://idea`, `nodus://work`, `nodus://gap
 open the real source/evidence in Nodus. The result exports as Markdown for further
 editing in an external writing tool.
 
+### Notes
+The **Notas** view is a local workspace to structure everything the rest of Nodus
+generates. You create **folders and subfolders** — use them as chapters and
+subheadings — and file notes into them:
+
+- hand-written **Markdown notes** with a formatting toolbar (headings, bold, lists,
+  quotes, code, links) and an edit/preview toggle;
+- **assistant answers**, **writing-workshop drafts**, **debate syntheses** and single
+  **ideas**, captured from their own surfaces with one click ("Guardar en notas").
+
+Captured content keeps its `nodus://idea`, `nodus://work`, `nodus://gap`,
+`nodus://contradiction` and `nodus://passage` citations, so they stay **clickable**
+inside the notes editor and open the real source/evidence — the same NotebookLM-style
+behaviour as the research assistant. Folders and notes live in `note_folders` / `notes`
+(`electron/db/notesRepo.ts`); deleting a folder cascades to its subfolders and notes.
+
 ### Sync
 Manual (button) or realtime (polls the Zotero library version every ~25s and diffs
 with `?since=`). Each sync writes a `sync_log` entry.

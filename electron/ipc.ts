@@ -27,6 +27,9 @@ import type {
   RqMapRequest,
   RqUpdateSubQuestionsRequest,
   RqExportRequest,
+  CreateNoteFolderInput,
+  CreateNoteInput,
+  UpdateNoteInput,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -69,6 +72,7 @@ import {
 import { getPassageDetail } from './db/passagesRepo';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
+import * as notes from './db/notesRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
 import * as workSummaries from './db/workSummariesRepo';
@@ -430,6 +434,22 @@ export function registerIpc(
   h('chat:rename', async (_e, id: string, title: string) => chat.renameConversation(id, title));
   h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
+
+  // notes (user-structured folders/subfolders with markdown + captured AI content)
+  h('notes:tree', async () => notes.getNotesTree());
+  h('notes:folders:create', async (_e, input: CreateNoteFolderInput) => notes.createNoteFolder(input));
+  h('notes:folders:rename', async (_e, id: string, name: string) => notes.renameNoteFolder(id, name));
+  h('notes:folders:move', async (_e, id: string, parentId: string | null) => notes.moveNoteFolder(id, parentId ?? null));
+  h('notes:folders:delete', async (_e, id: string) => {
+    notes.deleteNoteFolder(id);
+  });
+  h('notes:create', async (_e, input: CreateNoteInput) => notes.createNote(input));
+  h('notes:get', async (_e, id: string) => notes.getNote(id));
+  h('notes:update', async (_e, input: UpdateNoteInput) => notes.updateNote(input));
+  h('notes:move', async (_e, id: string, folderId: string | null) => notes.moveNote(id, folderId ?? null));
+  h('notes:delete', async (_e, id: string) => {
+    notes.deleteNote(id);
+  });
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export const migrations: Migration[] = [
   {
@@ -501,6 +501,37 @@ export const migrations: Migration[] = [
 
       CREATE INDEX idx_writing_saved_drafts_updated
         ON writing_saved_drafts(updated_at DESC);
+    `,
+  },
+  {
+    version: 17,
+    up: /* sql */ `
+      CREATE TABLE note_folders (
+        id         TEXT PRIMARY KEY,
+        parent_id  TEXT,
+        name       TEXT NOT NULL,
+        order_idx  INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_id) REFERENCES note_folders(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE notes (
+        id          TEXT PRIMARY KEY,
+        folder_id   TEXT,
+        title       TEXT NOT NULL,
+        kind        TEXT NOT NULL DEFAULT 'markdown',
+        content     TEXT NOT NULL DEFAULT '',
+        source_json TEXT,
+        order_idx   INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        FOREIGN KEY (folder_id) REFERENCES note_folders(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_note_folders_parent ON note_folders(parent_id, order_idx);
+      CREATE INDEX idx_notes_folder ON notes(folder_id, order_idx);
+      CREATE INDEX idx_notes_updated ON notes(updated_at DESC);
     `,
   },
 ];

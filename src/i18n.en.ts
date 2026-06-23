@@ -1150,5 +1150,56 @@ export const EN: Record<string, string> = {
   'Minimizar leyenda': 'Minimize legend',
   '○ borde punteado: no leída': '○ dotted border: unread',
   '— sólida: explícita · ·· punteada: inferida': '— solid: explicit · ·· dotted: inferred',
+
+  // ── Notes ──────────────────────────────────────────────────────────────────
+  Notas: 'Notes',
+  Nota: 'Note',
+  Carpeta: 'Folder',
+  Editar: 'Edit',
+  Vista: 'Preview',
+  Guardado: 'Saved',
+  Crear: 'Create',
+  Cita: 'Quote',
+  Lista: 'List',
+  Código: 'Code',
+  Enlace: 'Link',
+  Negrita: 'Bold',
+  Cursiva: 'Italic',
+  Encabezado: 'Heading',
+  Contraer: 'Collapse',
+  'Sin resultados.': 'No results.',
+  'Todas las notas': 'All notes',
+  'Sin carpeta': 'No folder',
+  'Nueva carpeta': 'New folder',
+  'Carpeta nueva': 'New folder',
+  'Nueva subcarpeta': 'New subfolder',
+  'Crear carpeta': 'Create folder',
+  'Nota sin título': 'Untitled note',
+  'Título de la nota': 'Note title',
+  'Mover a carpeta': 'Move to folder',
+  'Sin carpeta (raíz)': 'No folder (root)',
+  'Buscar en notas…': 'Search notes…',
+  'Guardar en notas': 'Save to notes',
+  'Guardar nota': 'Save note',
+  'Eliminar nota': 'Delete note',
+  'Eliminar carpeta': 'Delete folder',
+  'Esta acción no se puede deshacer.': 'This action cannot be undone.',
+  'junto con sus subcarpetas y todas sus notas. Esta acción no se puede deshacer.':
+    'along with its subfolders and all their notes. This action cannot be undone.',
+  'Crea carpetas para organizar tus notas como capítulos y subepígrafes.':
+    'Create folders to organize your notes as chapters and subheadings.',
+  'No hay notas aquí todavía. Crea una o guarda respuestas del asistente.':
+    'No notes here yet. Create one or save assistant answers.',
+  'Selecciona una nota o crea una nueva para empezar a escribir.':
+    'Select a note or create a new one to start writing.',
+  'Escribe en Markdown… Las citas del asistente (nodus://) se mantienen clicables en la vista.':
+    'Write in Markdown… Assistant citations (nodus://) stay clickable in preview.',
+  'Nota vacía. Cambia a «Editar» para escribir.': 'Empty note. Switch to "Edit" to write.',
+  'Las citas clicables del contenido se conservan al guardar.':
+    'Clickable citations in the content are preserved when saving.',
+  'Subcarpeta dentro de la seleccionada': 'Subfolder inside the selected one',
+  'Carpeta nueva en la raíz': 'New folder at the root',
+  'Abrir idea en Nodus': 'Open idea in Nodus',
+  'Respuesta del asistente': 'Assistant answer',
   // <<END_EN>>
 };
