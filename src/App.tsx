@@ -5,6 +5,8 @@ import { HomeView } from './views/HomeView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
+import { DebateView } from './views/DebateView';
+import { ResearchMapView } from './views/ResearchMapView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
 import { ArgumentMapView } from './views/ArgumentMapView';
@@ -33,6 +35,8 @@ const NAV: { id: View; label: string; icon: string }[] = [
   { id: 'ideas', label: 'Ideas', icon: 'bulb' },
   { id: 'library', label: 'Biblioteca', icon: 'book' },
   { id: 'gaps', label: 'Huecos', icon: 'gap' },
+  { id: 'debate', label: 'Debates', icon: 'scale' },
+  { id: 'research', label: 'Cobertura', icon: 'compass' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
   { id: 'writing', label: 'Escritura', icon: 'edit' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
@@ -239,7 +243,23 @@ export function App() {
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
-          {view === 'gaps' && <GapsView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'gaps' && (
+            <GapsView
+              onOpenGraph={(target) => navigate('graph', target)}
+              onOpenAssistant={openAssistant}
+              onOpenDebates={() => setView('debate')}
+            />
+          )}
+          {view === 'debate' && (
+            <DebateView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
+          )}
+          {view === 'research' && (
+            <ResearchMapView
+              onOpenGraph={(target) => navigate('graph', target)}
+              onOpenAssistant={openAssistant}
+              onOpenDebates={() => setView('debate')}
+            />
+          )}
           {view === 'reading' && (
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}

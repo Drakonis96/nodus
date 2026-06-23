@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
-import { Badge, EDGE_LABELS, Icon } from '../components/ui';
+import { Badge, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import {
@@ -25,15 +25,16 @@ const KIND_COLOR: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
 };
 
 const GAP_ROW_HEIGHT = 172;
-const CONTRADICTION_ROW_HEIGHT = 218;
 const GAP_PROMPT_WORK_LIMIT = 8;
 
 export function GapsView({
   onOpenGraph,
   onOpenAssistant,
+  onOpenDebates,
 }: {
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  onOpenDebates: () => void;
 }) {
   const [gaps, setGaps] = useState<GapAggregate[]>([]);
   const [contradictions, setContradictions] = useState<EdgeDetail[]>([]);
@@ -49,11 +50,6 @@ export function GapsView({
   }, [reload]);
   useDataRefresh(reload);
   useScanComplete(reload);
-
-  const openEvidenceInZotero = async (nodusId: string) => {
-    const work = await window.nodus.getWork(nodusId);
-    if (work) await window.nodus.openInZotero(work.zotero_key);
-  };
 
   return (
     <div className="h-full flex flex-col min-h-0 p-6">
@@ -134,61 +130,23 @@ export function GapsView({
       )}
 
       {tab === 'contradictions' && (
-        <VirtualList
-          items={contradictions}
-          itemHeight={CONTRADICTION_ROW_HEIGHT}
-          getKey={(c) => c.edge.id}
-          className="flex-1 min-h-0"
-          empty={<div className="text-neutral-500 text-sm">{t('No se detectaron contradicciones sin resolver.')}</div>}
-          renderItem={(c) => (
-            <div className="card h-[206px] p-3 mr-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Badge color="red">{t(EDGE_LABELS[c.edge.type as keyof typeof EDGE_LABELS]) ?? c.edge.type}</Badge>
-                <Badge color={c.edge.basis === 'explicit' ? 'green' : 'amber'}>{c.edge.basis}</Badge>
-                <Badge>{t('conf')} {c.edge.confidence.toFixed(2)}</Badge>
-              </div>
-              {c.explanation && <p className="text-sm text-neutral-300 mb-2 line-clamp-2">{c.explanation}</p>}
-              <div className="text-sm">
-                <span className="text-neutral-200">{c.fromLabel}</span> ✕{' '}
-                <span className="text-neutral-200">{c.toLabel}</span>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <button
-                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                  onClick={() => onOpenGraph({ preset: 'contradictions', edgeId: c.edge.id, label: t('Contradicción seleccionada') })}
-                >
-                  <Icon name="layers" size={13} /> {t('Grafo')}
-                </button>
-                <button
-                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                  onClick={() =>
-                    onOpenAssistant({
-                      title: t('Contradicción'),
-                      selection: ASSISTANT_CONTEXTS.contradiction,
-                      prompt:
-                        `${t('Analiza esta contradicción del corpus. Resume las posiciones, evidencia y lecturas necesarias para decidir si es tensión real o diferencia de marco.')}\n\n` +
-                        `${c.fromLabel} vs. ${c.toLabel}\n${c.explanation ?? ''}`,
-                    })
-                  }
-                >
-                  <Icon name="wand" size={13} /> {t('Asistente')}
-                </button>
-              </div>
-              {c.evidence.slice(0, 2).map((ev) => (
-                <blockquote key={ev.id} className="border-l-2 border-red-700 pl-2 mt-2 text-xs italic text-neutral-400">
-                  <span className="block line-clamp-1">“{ev.quote}” {ev.location ?? ''}</span>
-                  <button
-                    className="ml-2 inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 not-italic"
-                    onClick={() => void openEvidenceInZotero(ev.nodus_id)}
-                  >
-                    <Icon name="external" size={12} /> Zotero
-                  </button>
-                </blockquote>
-              ))}
-              {c.evidence.length > 2 && <div className="mt-1 text-[11px] text-neutral-500">+{c.evidence.length - 2} {t('evidencias más')}</div>}
+        <div className="flex-1 min-h-0 flex items-start">
+          <div className="card p-5 max-w-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="scale" size={20} className="text-rose-300" />
+              <h2 className="text-base font-semibold">{t('Las contradicciones ahora viven en Debates')}</h2>
             </div>
-          )}
-        />
+            <p className="text-sm text-neutral-400 mb-4">
+              {tx(
+                'La vista de Debates enfrenta cada contradicción o refutación ({n}) mostrando las dos posiciones, los autores de cada bando, su evidencia y la cronología de la disputa.',
+                { n: contradictions.length }
+              )}
+            </p>
+            <button className="btn btn-primary text-sm gap-1.5" onClick={onOpenDebates}>
+              <Icon name="scale" size={14} /> {t('Abrir vista de Debates')}
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

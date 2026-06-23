@@ -21,6 +21,11 @@ import type {
   WritingWorkshopBrief,
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
+  DebateAnalysisRequest,
+  RqDecomposeRequest,
+  RqMapRequest,
+  RqUpdateSubQuestionsRequest,
+  RqExportRequest,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -35,7 +40,11 @@ import { aggregateGaps, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, ingestZoteroItem, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { scanQueue } from './pipeline/scanQueue';
-import { buildIdeaGraph, buildAuthorGraph, getContradictions, buildReadingPath } from './graph/graphService';
+import { buildIdeaGraph, buildAuthorGraph, getContradictions, getDebates, buildReadingPath } from './graph/graphService';
+import { streamDebateAnalysis } from './ai/debate';
+import * as rqRepo from './db/researchMapRepo';
+import { decomposeQuestion, mapCoverage } from './ai/researchMap';
+import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -317,6 +326,33 @@ export function registerIpc(
   h('gaps:detail', async (_e, gapId: string) => getGapDetail(gapId));
   h('gaps:contradictions', async () => getContradictions());
   h('reading:path', async (_e, request?: ReadingPathRequest) => buildReadingPath(request));
+
+  // debates (contradiction face-offs)
+  h('debates:list', async () => getDebates());
+  h('debates:analyzeStream', async (e, requestId: string, request: DebateAnalysisRequest) =>
+    streamDebateAnalysis(request, (delta) => {
+      e.sender.send('debates:analyzeStream:delta', requestId, delta);
+    })
+  );
+
+  // research coverage map (question-driven research)
+  h('research:rq:list', async () => rqRepo.listResearchQuestions());
+  h('research:rq:get', async (_e, id: string) => rqRepo.getResearchQuestionDetail(id));
+  h('research:rq:create', async (_e, input: { question: string; notes?: string }) =>
+    rqRepo.createResearchQuestion(input.question, input.notes)
+  );
+  h('research:rq:decompose', async (_e, request: RqDecomposeRequest) => decomposeQuestion(request));
+  h('research:rq:updateSubs', async (_e, request: RqUpdateSubQuestionsRequest) => {
+    rqRepo.replaceSubQuestions(request.rqId, request.subQuestions);
+    return rqRepo.getResearchQuestionDetail(request.rqId);
+  });
+  h('research:rq:map', async (e, requestId: string, request: RqMapRequest) =>
+    mapCoverage(request, (p) => e.sender.send('research:rq:map:progress', requestId, p))
+  );
+  h('research:rq:delete', async (_e, id: string) => {
+    rqRepo.deleteResearchQuestion(id);
+  });
+  h('research:rq:export', async (_e, request: RqExportRequest) => exportResearchCoverage(request));
 
   // research assistant
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));

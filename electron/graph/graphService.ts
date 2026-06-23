@@ -5,12 +5,21 @@ import type {
   GraphEdge,
   IdeaType,
   EdgeDetail,
+  EdgeBasis,
+  Evidence,
+  Debate,
+  DebateRelation,
+  DebateSide,
+  DebateSideKey,
+  DebateStatus,
+  DebateTimelineEntry,
+  DebateWork,
   ReadingPathPlan,
   ReadingPathRequest,
   ReadingPathStrategy,
   ReadingPathEntry,
 } from '@shared/types';
-import { getEdgeDetail, findSimilarIdeas, currentEmbeddingConfig } from '../db/ideasRepo';
+import { getEdgeDetail, getEdgeTrace, getIdeaDetail, findSimilarIdeas, currentEmbeddingConfig } from '../db/ideasRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
@@ -573,6 +582,219 @@ export function getContradictions(): EdgeDetail[] {
   // getEdgeDetail makes 4 queries per edge; batch the edge rows and idea lookups
   // to reduce round-trips when there are many contradictions.
   return rows.map((r) => getEdgeDetail(r.id)).filter((x): x is EdgeDetail => x !== null);
+}
+
+// ─── Debates (contradiction face-offs) ───────────────────────────────────────
+
+interface DebateEdgeRow {
+  id: string;
+  from_id: string;
+  to_id: string;
+  type: DebateRelation;
+  basis: EdgeBasis;
+  confidence: number;
+  source_work: string | null;
+}
+
+const DEBATE_TENSION_CLIP = 180;
+
+function debateTensionText(relation: DebateRelation, a: DebateSide, b: DebateSide): string {
+  const noun = relation === 'refutes' ? 'refutación' : 'contradicción';
+  const left = clip(a.statement || a.label, DEBATE_TENSION_CLIP);
+  const right = clip(b.statement || b.label, DEBATE_TENSION_CLIP);
+  return `La ${noun} detectada es que «${left}» entra en tensión con «${right}».`;
+}
+
+function clip(value: string, max: number): string {
+  const clean = (value || '').replace(/\s+/g, ' ').trim();
+  return clean.length <= max ? clean : `${clean.slice(0, max - 1).trim()}…`;
+}
+
+/** Build one side of a debate (idea + backing works/authors/evidence) from the DB. */
+function buildDebateSide(ideaId: string): DebateSide | null {
+  const detail = getIdeaDetail(ideaId);
+  if (!detail) return null;
+  const evidenceByWork = new Map<string, Evidence[]>();
+  for (const ev of detail.evidence) {
+    if (!evidenceByWork.has(ev.nodus_id)) evidenceByWork.set(ev.nodus_id, []);
+    evidenceByWork.get(ev.nodus_id)!.push(ev);
+  }
+  const works: DebateWork[] = detail.occurrences.map((o) => ({
+    nodus_id: o.nodus_id,
+    title: o.work.title,
+    zotero_key: o.work.zotero_key,
+    authors: o.work.authors,
+    year: o.work.year,
+    role: o.role,
+    development: o.development,
+    evidence: evidenceByWork.get(o.nodus_id) ?? [],
+  }));
+  const authors = Array.from(new Set(works.flatMap((w) => w.authors).filter(Boolean)));
+  const years = works.map((w) => w.year).filter((y): y is number => typeof y === 'number');
+  return {
+    ideaId: detail.idea.global_id,
+    type: detail.idea.type,
+    label: detail.idea.label,
+    statement: detail.idea.statement,
+    authors,
+    works,
+    earliestYear: years.length ? Math.min(...years) : null,
+    latestYear: years.length ? Math.max(...years) : null,
+  };
+}
+
+function debateTimeline(sideA: DebateSide, sideB: DebateSide): DebateTimelineEntry[] {
+  const entries: DebateTimelineEntry[] = [];
+  const push = (side: DebateSideKey, works: DebateWork[]) => {
+    for (const w of works) {
+      entries.push({ year: w.year, side, nodus_id: w.nodus_id, title: w.title, authors: w.authors });
+    }
+  };
+  push('A', sideA.works);
+  push('B', sideB.works);
+  // Year-ascending; undated works sink to the end so the dated chronology reads first.
+  return entries.sort((x, y) => {
+    if (x.year == null && y.year == null) return 0;
+    if (x.year == null) return 1;
+    if (y.year == null) return -1;
+    return x.year - y.year;
+  });
+}
+
+/** Assemble the full Debate object for a contradicts/refutes edge row. */
+function assembleDebate(
+  row: DebateEdgeRow,
+  clusterId: string,
+  clusterSize: number,
+  supportCount: Map<string, number>,
+  themesByIdea: Map<string, Set<string>>
+): Debate | null {
+  const sideA = buildDebateSide(row.from_id);
+  const sideB = buildDebateSide(row.to_id);
+  if (!sideA || !sideB) return null;
+
+  const themesA = themesByIdea.get(row.from_id) ?? new Set<string>();
+  const themesB = themesByIdea.get(row.to_id) ?? new Set<string>();
+  const sharedThemes = Array.from(themesA).filter((label) => themesB.has(label));
+
+  const supportA = supportCount.get(row.from_id) ?? 0;
+  const supportB = supportCount.get(row.to_id) ?? 0;
+  let status: DebateStatus = 'open';
+  let leaningSide: DebateSideKey | null = null;
+  if (supportA !== supportB) {
+    status = 'leaning';
+    leaningSide = supportA > supportB ? 'A' : 'B';
+  }
+
+  const worksA = new Set(sideA.works.map((w) => w.nodus_id));
+  const internal = sideB.works.some((w) => worksA.has(w.nodus_id));
+
+  return {
+    id: row.id,
+    relation: row.type,
+    basis: row.basis,
+    confidence: row.confidence,
+    clusterId,
+    clusterSize,
+    status,
+    leaningSide,
+    sharedThemes,
+    internal,
+    sideA,
+    sideB,
+    timeline: debateTimeline(sideA, sideB),
+    tension: debateTensionText(row.type, sideA, sideB),
+    trace: getEdgeTrace(row.id),
+  };
+}
+
+/** Group contradiction edges into multi-sided debates via union-find over idea ids. */
+function clusterDebateEdges(rows: DebateEdgeRow[]): { clusterId: Map<string, string>; clusterSize: Map<string, number> } {
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    if (!parent.has(x)) parent.set(x, x);
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    let cur = x;
+    while (parent.get(cur) !== root) {
+      const next = parent.get(cur)!;
+      parent.set(cur, root);
+      cur = next;
+    }
+    return root;
+  };
+  const union = (a: string, b: string) => {
+    parent.set(find(a), find(b));
+  };
+  for (const r of rows) union(r.from_id, r.to_id);
+
+  const clusterId = new Map<string, string>(); // edge id -> cluster root
+  const clusterSize = new Map<string, number>(); // cluster root -> edge count
+  for (const r of rows) {
+    const root = find(r.from_id);
+    clusterId.set(r.id, root);
+    clusterSize.set(root, (clusterSize.get(root) ?? 0) + 1);
+  }
+  return { clusterId, clusterSize };
+}
+
+function loadSupportCounts(db: ReturnType<typeof getDb>): Map<string, number> {
+  const rows = db
+    .prepare("SELECT to_id, COUNT(*) AS n FROM edges WHERE type = 'supports' GROUP BY to_id")
+    .all() as { to_id: string; n: number }[];
+  const map = new Map<string, number>();
+  for (const r of rows) map.set(r.to_id, r.n);
+  return map;
+}
+
+function loadThemesByIdea(db: ReturnType<typeof getDb>): Map<string, Set<string>> {
+  const rows = db
+    .prepare('SELECT l.global_id AS gid, t.label AS label FROM idea_theme_links l JOIN themes t ON t.theme_id = l.theme_id')
+    .all() as { gid: string; label: string }[];
+  const map = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!map.has(r.gid)) map.set(r.gid, new Set());
+    map.get(r.gid)!.add(r.label);
+  }
+  return map;
+}
+
+/**
+ * All contradicts/refutes edges as two-sided debates: each side carries the works,
+ * authors and verbatim evidence backing it, plus a year-sorted chronology. Edges are
+ * grouped into clusters (connected components over shared ideas) so multi-sided
+ * debates surface together. Pure DB reads — no AI, no new persistence.
+ */
+export function getDebates(): Debate[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM edges WHERE type IN ('contradicts','refutes')")
+    .all() as DebateEdgeRow[];
+  if (rows.length === 0) return [];
+
+  const { clusterId, clusterSize } = clusterDebateEdges(rows);
+  const supportCount = loadSupportCounts(db);
+  const themesByIdea = loadThemesByIdea(db);
+
+  const debates = rows
+    .map((row) => {
+      const root = clusterId.get(row.id)!;
+      return assembleDebate(row, root, clusterSize.get(root) ?? 1, supportCount, themesByIdea);
+    })
+    .filter((d): d is Debate => d !== null);
+
+  // Multi-sided debates first, then by confidence — the richest disputes lead.
+  return debates.sort((a, b) => b.clusterSize - a.clusterSize || b.confidence - a.confidence);
+}
+
+/** A single debate by its edge id (used by the optional AI synthesis). */
+export function getDebate(edgeId: string): Debate | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM edges WHERE id = ? AND type IN ('contradicts','refutes')")
+    .get(edgeId) as DebateEdgeRow | undefined;
+  if (!row) return null;
+  return assembleDebate(row, row.from_id, 1, loadSupportCounts(db), loadThemesByIdea(db));
 }
 
 const DEFAULT_READING_LIMIT = 72;

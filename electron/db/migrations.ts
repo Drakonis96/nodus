@@ -416,6 +416,50 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_work_collections_coll ON work_collections(collection_key, nodus_id);
     `,
   },
+  {
+    version: 14,
+    up: /* sql */ `
+      CREATE TABLE research_questions (
+        id           TEXT PRIMARY KEY,
+        question     TEXT NOT NULL,
+        notes        TEXT,
+        model_json   TEXT,
+        status       TEXT NOT NULL DEFAULT 'draft',
+        corpus_ideas INTEGER NOT NULL DEFAULT 0,
+        corpus_works INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        mapped_at    TEXT
+      );
+
+      CREATE TABLE research_subquestions (
+        id              TEXT PRIMARY KEY,
+        rq_id           TEXT NOT NULL,
+        text            TEXT NOT NULL,
+        rationale       TEXT,
+        order_idx       INTEGER NOT NULL,
+        coverage_status TEXT,
+        justification   TEXT,
+        created_at      TEXT NOT NULL,
+        FOREIGN KEY (rq_id) REFERENCES research_questions(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE research_coverage_links (
+        id         TEXT PRIMARY KEY,
+        subq_id    TEXT NOT NULL,
+        kind       TEXT NOT NULL,
+        ref_id     TEXT NOT NULL,
+        label      TEXT,
+        score      REAL,
+        read_state TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (subq_id) REFERENCES research_subquestions(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_research_subq_rq ON research_subquestions(rq_id, order_idx);
+      CREATE INDEX idx_research_links_subq ON research_coverage_links(subq_id);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

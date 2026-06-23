@@ -458,6 +458,175 @@ export interface EdgeTrace {
   createdAt: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Debate (contradiction face-off) — a contradicts/refutes edge rendered as two
+// opposing positions, each with the works/authors/evidence that back it, plus a
+// chronology of the dispute. All derived from existing edges/ideas/works — no
+// new persistence is required.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type DebateRelation = 'contradicts' | 'refutes';
+/** `leaning` when later `supports` edges favour one side; otherwise `open`. */
+export type DebateStatus = 'open' | 'leaning';
+export type DebateSideKey = 'A' | 'B';
+
+/** One work that develops a side of a debate, with its anchored evidence. */
+export interface DebateWork {
+  nodus_id: string;
+  title: string;
+  zotero_key: string;
+  authors: string[];
+  year: number | null;
+  role: 'principal' | 'secondary';
+  development: string;
+  evidence: Evidence[];
+}
+
+/** One position in a debate: an idea plus the works/authors/evidence backing it. */
+export interface DebateSide {
+  ideaId: string; // global_id
+  type: IdeaType;
+  label: string;
+  statement: string;
+  authors: string[]; // union of authors across backing works (the "bando")
+  works: DebateWork[];
+  earliestYear: number | null;
+  latestYear: number | null;
+}
+
+/** One marker on the dispute timeline: a work taking a side in a given year. */
+export interface DebateTimelineEntry {
+  year: number | null;
+  side: DebateSideKey;
+  nodus_id: string;
+  title: string;
+  authors: string[];
+}
+
+/** A contradicts/refutes relation rendered as a face-off with chronology. */
+export interface Debate {
+  id: string; // edge id
+  relation: DebateRelation;
+  basis: EdgeBasis;
+  confidence: number;
+  /** Connected-component id grouping debates that share ideas (multi-sided debates). */
+  clusterId: string;
+  clusterSize: number;
+  status: DebateStatus;
+  leaningSide: DebateSideKey | null;
+  sharedThemes: string[];
+  /** True when the same single work develops both sides (internal tension, not a cross-author debate). */
+  internal: boolean;
+  sideA: DebateSide;
+  sideB: DebateSide;
+  timeline: DebateTimelineEntry[];
+  /** Rule-based, no-AI summary of the tension (always present). */
+  tension: string;
+  trace?: EdgeTrace | null;
+}
+
+/** Optional, user-triggered AI synthesis of a single debate. */
+export interface DebateAnalysisRequest {
+  debateId: string;
+  model?: ModelRef | null;
+}
+export interface DebateAnalysisStreamHandlers {
+  onDelta(delta: string): void;
+}
+export interface DebateAnalysisResponse {
+  analysis: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Research coverage map (question-driven research) — decompose a thesis question
+// into sub-questions and map which the local corpus answers, partially answers,
+// leaves uncovered, or only covers with internal disputes. Persisted artifact.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type RqStatus = 'draft' | 'decomposed' | 'mapped';
+export type RqCoverageStatus = 'covered' | 'partial' | 'uncovered' | 'disputed';
+export type RqLinkKind = 'idea' | 'work' | 'gap' | 'debate';
+
+export interface ResearchQuestion {
+  id: string;
+  question: string;
+  notes: string | null;
+  model: ModelRef | null;
+  status: RqStatus;
+  /** Corpus size snapshot at the last mapping — used to flag stale coverage. */
+  corpusIdeas: number;
+  corpusWorks: number;
+  createdAt: string;
+  updatedAt: string;
+  mappedAt: string | null;
+}
+
+export interface RqCoverageLink {
+  id: string;
+  kind: RqLinkKind;
+  refId: string;
+  label: string;
+  score: number | null;
+  /** For idea/work links: whether the backing work(s) have been deep-read (priority #2). */
+  readState: 'read' | 'unread' | null;
+}
+
+export interface RqSubQuestion {
+  id: string;
+  text: string;
+  rationale: string | null;
+  orderIdx: number;
+  coverageStatus: RqCoverageStatus | null;
+  justification: string | null;
+  links: RqCoverageLink[];
+}
+
+export interface ResearchCoverageSummary {
+  covered: number;
+  partial: number;
+  uncovered: number;
+  disputed: number;
+  unmapped: number;
+}
+
+export interface ResearchQuestionDetail {
+  rq: ResearchQuestion;
+  subQuestions: RqSubQuestion[];
+  /** True when the corpus grew since the last mapping (freshness hint). */
+  stale: boolean;
+  summary: ResearchCoverageSummary;
+}
+
+export interface RqDecomposeRequest {
+  rqId: string;
+  model?: ModelRef | null;
+}
+export interface RqMapRequest {
+  rqId: string;
+  model?: ModelRef | null;
+}
+export interface RqSubQuestionInput {
+  id?: string;
+  text: string;
+  rationale?: string | null;
+}
+export interface RqUpdateSubQuestionsRequest {
+  rqId: string;
+  subQuestions: RqSubQuestionInput[];
+}
+export interface RqExportRequest {
+  rqId: string;
+}
+export interface RqMapProgress {
+  index: number;
+  total: number;
+  phase: 'retrieving' | 'classifying' | 'done';
+  subQuestion: string;
+}
+export interface RqMapHandlers {
+  onProgress?(progress: RqMapProgress): void;
+}
+
 export interface GapAggregate {
   kind: GapKind;
   statement: string;
@@ -1086,6 +1255,25 @@ export interface NodusApi {
   getGapDetail(gapId: string): Promise<GapDetail | null>;
   getContradictions(): Promise<EdgeDetail[]>;
   getReadingPath(request?: ReadingPathRequest): Promise<ReadingPathPlan>;
+
+  // debates (contradiction face-offs)
+  /** Contradicts/refutes edges as two-sided debates with authors, evidence and chronology. */
+  getDebates(): Promise<Debate[]>;
+  /** Optional, user-triggered streamed AI synthesis of one debate (grounded in its evidence). */
+  analyzeDebate(request: DebateAnalysisRequest, handlers: DebateAnalysisStreamHandlers): Promise<DebateAnalysisResponse>;
+
+  // research coverage map (question-driven research)
+  listResearchQuestions(): Promise<ResearchQuestion[]>;
+  getResearchQuestion(id: string): Promise<ResearchQuestionDetail | null>;
+  createResearchQuestion(input: { question: string; notes?: string }): Promise<ResearchQuestionDetail>;
+  /** Break the question into sub-questions with the model (replaces existing ones). */
+  decomposeResearchQuestion(request: RqDecomposeRequest): Promise<ResearchQuestionDetail>;
+  /** Manually edit the sub-questions; coverage is preserved where the text is unchanged. */
+  updateResearchSubQuestions(request: RqUpdateSubQuestionsRequest): Promise<ResearchQuestionDetail>;
+  /** Map each sub-question against the local corpus (semantic + lexical retrieval + classification). */
+  mapResearchCoverage(request: RqMapRequest, handlers?: RqMapHandlers): Promise<ResearchQuestionDetail>;
+  deleteResearchQuestion(id: string): Promise<void>;
+  exportResearchCoverage(request: RqExportRequest): Promise<{ path: string } | null>;
 
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;

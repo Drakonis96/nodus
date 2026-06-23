@@ -82,6 +82,40 @@ const api: NodusApi = {
   getGapDetail: (gapId) => ipcRenderer.invoke('gaps:detail', gapId),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
   getReadingPath: (request) => ipcRenderer.invoke('reading:path', request),
+
+  getDebates: () => ipcRenderer.invoke('debates:list'),
+  analyzeDebate: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('debates:analyzeStream:delta', onDelta);
+    try {
+      return await ipcRenderer.invoke('debates:analyzeStream', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('debates:analyzeStream:delta', onDelta);
+    }
+  },
+
+  listResearchQuestions: () => ipcRenderer.invoke('research:rq:list'),
+  getResearchQuestion: (id) => ipcRenderer.invoke('research:rq:get', id),
+  createResearchQuestion: (input) => ipcRenderer.invoke('research:rq:create', input),
+  decomposeResearchQuestion: (request) => ipcRenderer.invoke('research:rq:decompose', request),
+  updateResearchSubQuestions: (request) => ipcRenderer.invoke('research:rq:updateSubs', request),
+  mapResearchCoverage: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onProgress = (_e: unknown, id: string, p: import('@shared/types').RqMapProgress) => {
+      if (id === requestId) handlers?.onProgress?.(p);
+    };
+    ipcRenderer.on('research:rq:map:progress', onProgress);
+    try {
+      return await ipcRenderer.invoke('research:rq:map', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('research:rq:map:progress', onProgress);
+    }
+  },
+  deleteResearchQuestion: (id) => ipcRenderer.invoke('research:rq:delete', id).then(() => undefined),
+  exportResearchCoverage: (request) => ipcRenderer.invoke('research:rq:export', request),
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
