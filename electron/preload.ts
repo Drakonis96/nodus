@@ -35,6 +35,8 @@ const api: NodusApi = {
   setManualDeepBulk: (nodusIds, value, model) => ipcRenderer.invoke('works:setManualDeepBulk', nodusIds, value, model),
   analyzeBoth: (nodusId, model) => ipcRenderer.invoke('works:analyzeBoth', nodusId, model).then(() => undefined),
   analyzeBothBulk: (nodusIds, model) => ipcRenderer.invoke('works:analyzeBothBulk', nodusIds, model).then(() => undefined),
+  processFull: (nodusId, model) => ipcRenderer.invoke('works:processFull', nodusId, model).then(() => undefined),
+  processFullBulk: (nodusIds, model) => ipcRenderer.invoke('works:processFullBulk', nodusIds, model).then(() => undefined),
   reassignThemes: (model) => ipcRenderer.invoke('works:reassignThemes', model),
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
   summarizeWork: (nodusId, model) => ipcRenderer.invoke('works:summarize', nodusId, model).then(() => undefined),
@@ -71,6 +73,8 @@ const api: NodusApi = {
   getGraph: (lens) => ipcRenderer.invoke('graph:get', lens),
   getIdeaDetail: (globalId) => ipcRenderer.invoke('graph:ideaDetail', globalId),
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
+  getIdeaEdges: (globalId) => ipcRenderer.invoke('graph:ideaEdges', globalId),
+  getIdeasByWork: (nodusId, limit, offset) => ipcRenderer.invoke('works:ideasByWork', nodusId, limit, offset),
   getThemes: () => ipcRenderer.invoke('graph:themes'),
 
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),

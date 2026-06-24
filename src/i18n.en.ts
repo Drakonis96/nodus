@@ -124,6 +124,8 @@ export const EN: Record<string, string> = {
   'Automatización de análisis': 'Analysis automation',
   'Analizar temas al sincronizar': 'Analyze themes on sync',
   'Analizar a fondo obras con tag': 'Deep-scan tagged works',
+  'Resumir tras análisis profundo': 'Summarize after deep analysis',
+  'Descubrir relaciones al vaciar la cola': 'Discover relationships when the queue empties',
   'Reanudar cola al abrir': 'Resume queue on launch',
   'Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.':
     'Off by default: syncing only ingests metadata. Manual analyses from Library or Collections always run.',
@@ -586,6 +588,16 @@ export const EN: Record<string, string> = {
   '{n} resultados con los filtros actuales': '{n} results with the current filters',
   'Quitar selección': 'Clear selection',
   'Seleccionar los {n} filtrados': 'Select the {n} filtered',
+  'Procesar biblioteca': 'Process library',
+  'Procesar todo': 'Process everything',
+  'Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.':
+    'Chains themes, ideas, summary, indexing (ideas and passages) and relationship discovery.',
+  'Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.':
+    'Chains themes, ideas, summary, indexing (ideas and passages) and relationship discovery for the whole filtered library.',
+  'Procesar todo encadena para las {n} obra(s) filtrada(s): temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones. Es una operación larga que consume tokens del modelo seleccionado. ¿Continuar?':
+    'Process everything chains for the {n} filtered work(s): themes, ideas, summary, indexing (ideas and passages) and relationship discovery. It is a long operation that consumes tokens from the selected model. Continue?',
+  'Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.':
+    'Full processing queued for {n} work(s). You will see progress in the queue.',
   'Después elige Temas, Ideas o Ambos.': 'Then choose Themes, Ideas or Both.',
   '{n} seleccionadas': '{n} selected',
   Temas: 'Themes',
@@ -665,6 +677,25 @@ export const EN: Record<string, string> = {
   'Esta obra aún no tiene ideas extraídas.': 'This work has no extracted ideas yet.',
   'Ejecuta un análisis profundo de la obra para verla en el grafo.':
     'Run a deep analysis of the work to see it in the graph.',
+  // ── Per-work ideas modal ────────────────────────────────────────────────────
+  'Ideas de la obra': "Work's ideas",
+  'Ver las ideas de esta obra': "See this work's ideas",
+  'Procesar todo: temas, ideas, resumen, indexado y relaciones':
+    'Process everything: themes, ideas, summary, indexing and relationships',
+  'Ideas · {title}': 'Ideas · {title}',
+  '{n} idea(s) extraída(s) de esta obra': '{n} idea(s) extracted from this work',
+  'Abrir el grafo de ideas de esta obra': "Open this work's idea graph",
+  'Ejecuta un análisis profundo de la obra para extraer sus ideas.':
+    'Run a deep analysis of the work to extract its ideas.',
+  'Cargar más ({n} restantes)': 'Load more ({n} remaining)',
+  'Selecciona una idea para ver su detalle y sus conexiones.':
+    'Select an idea to see its detail and connections.',
+  'Ver este nodo y sus conexiones en el grafo': 'See this node and its connections in the graph',
+  'Ver en el grafo': 'View in the graph',
+  'Conexiones ({n})': 'Connections ({n})',
+  'Esta idea aún no tiene conexiones con otras ideas.': 'This idea has no connections to other ideas yet.',
+  'Ver esta idea conectada': 'See this connected idea',
+  'No se pudo cargar el detalle de la idea.': 'Could not load the idea detail.',
   'Lectura:': 'Reading:',
   'Preguntar al asistente sobre esta obra': 'Ask the assistant about this work',
   'Analiza esta lectura dentro del corpus: ideas extraídas, temas, huecos, contradicciones y próximas lecturas relacionadas.':

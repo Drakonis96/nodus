@@ -80,6 +80,24 @@ import * as workSummaries from './db/workSummariesRepo';
 import { getDb } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
 
+/**
+ * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
+ * with `chain: true` so the scan queue continues into summary, indexing (ideas +
+ * passages) and semantic bridge discovery even when the auto-* settings are off.
+ */
+function processFullChain(nodusId: string, model?: ModelRef | null): void {
+  const w = works.getWork(nodusId);
+  if (!w) return;
+  if (w.light_status !== 'done') {
+    works.setLightPending(nodusId);
+    scanQueue.enqueue(nodusId, w.title, 'light', model);
+  }
+  if (w.deep_status === 'done') ideas.purgeDeepData(nodusId);
+  works.setManualDeep(nodusId, true);
+  works.setDeepPending(nodusId);
+  scanQueue.enqueue(nodusId, w.title, 'deep', model, { chain: true });
+}
+
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -202,6 +220,12 @@ export function registerIpc(
       scanQueue.enqueue(id, w.title, 'deep', model);
     }
   });
+  h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null) => {
+    processFullChain(nodusId, model);
+  });
+  h('works:processFullBulk', async (_e, nodusIds: string[], model?: ModelRef | null) => {
+    for (const id of nodusIds) processFullChain(id, model);
+  });
   h('works:reassignThemes', async (_e, model?: ModelRef | null) => {
     // Re-run the cheap (title+abstract) theme scan for every work so older works pick
     // up the broad parent themes that group their ideas in the graph. Each light scan
@@ -317,6 +341,10 @@ export function registerIpc(
   );
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
+  h('graph:ideaEdges', async (_e, globalId: string) => ideas.getIdeaEdges(globalId));
+  h('works:ideasByWork', async (_e, nodusId: string, limit: number, offset: number) =>
+    ideas.getIdeasByWork(nodusId, limit, offset)
+  );
   h('graph:themes', async () => themes.listGraphThemes());
 
   // main-theme management ("temas principales")

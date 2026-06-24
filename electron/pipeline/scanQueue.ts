@@ -15,6 +15,7 @@ import { purgeDeepData } from '../db/ideasRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
 import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
+import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 
 type ProgressListener = (p: QueueProgress) => void;
@@ -35,6 +36,10 @@ class ScanQueue {
   private deepSinceReprocess = false;
   /** Guards against concurrent reprocess runs. */
   private reprocessing = false;
+  /** Works whose deep scan completed this cycle, awaiting (re-)indexing on drain. */
+  private pendingIndexWorks = new Set<string>();
+  /** True when a completed deep scan requested semantic bridge discovery on drain. */
+  private bridgeAfterDrain = false;
 
   onProgress(cb: ProgressListener): () => void {
     this.listeners.add(cb);
@@ -84,9 +89,14 @@ class ScanQueue {
     this.items.push(item);
   }
 
-  enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null): void {
+  enqueue(nodusId: string, title: string, kind: QueueKind, model?: ModelRef | null, opts?: { chain?: boolean }): void {
     // Avoid duplicate pending/running jobs for the same work+kind.
-    if (this.items.some((i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running'))) {
+    const existing = this.items.find(
+      (i) => i.nodus_id === nodusId && i.kind === kind && (i.state === 'queued' || i.state === 'running')
+    );
+    if (existing) {
+      // Preserve a chain request even when the job is already queued.
+      if (opts?.chain) existing.chain = true;
       return;
     }
     this.insertPending({
@@ -98,6 +108,7 @@ class ScanQueue {
       error: null,
       enqueued_at: new Date().toISOString(),
       model: model ?? null,
+      chain: opts?.chain ?? false,
     });
     this.emit();
     void this.run();
@@ -191,6 +202,9 @@ class ScanQueue {
     this.items = [];
     this.retries.clear();
     this.lastKind = null;
+    this.pendingIndexWorks.clear();
+    this.bridgeAfterDrain = false;
+    this.deepSinceReprocess = false;
     this.paused = false;
     this.pausedReason = null;
     this.emit();
@@ -240,9 +254,46 @@ class ScanQueue {
     if (!this.paused && this.nextQueued()) {
       void this.run();
     } else if (!this.paused && this.deepSinceReprocess && !this.reprocessing) {
-      // Queue drained after deep scans → re-trace inter-work idea relations and
-      // theme memberships automatically so the global graph stays connected.
-      void this.autoReprocessConnections().then(() => this.autoEmbed());
+      // Queue drained after deep scans → re-trace relations, (re-)index and
+      // discover semantic bridges so the global graph stays connected.
+      void this.runPostBatch();
+    }
+  }
+
+  /**
+   * Post-batch chain that runs once the queue drains after deep scans: re-trace
+   * inter-work relations + theme memberships, (re-)index the just-scanned works
+   * (idea embeddings + full-text passages), then discover semantic bridges. Each
+   * step is best-effort; failures are logged and never block the queue.
+   */
+  private async runPostBatch(): Promise<void> {
+    await this.autoReprocessConnections();
+    const ids = Array.from(this.pendingIndexWorks);
+    this.pendingIndexWorks.clear();
+    await this.autoIndex(ids);
+    if (this.bridgeAfterDrain) {
+      this.bridgeAfterDrain = false;
+      this.maybeEnqueueBridge();
+    }
+  }
+
+  /**
+   * Chain the remaining pipeline steps after a deep scan finishes: regenerate the
+   * orientation summary (so it reflects the fresh analysis), schedule the work for
+   * re-indexing, and arm bridge discovery for the next drain. `item.chain` forces
+   * the chain even when the auto-* settings are off (used by "Procesar todo").
+   */
+  private chainAfterDeep(work: Work, item: QueueItem): void {
+    try {
+      const settings = getSettings();
+      this.pendingIndexWorks.add(work.nodus_id);
+      if (item.chain || settings.autoBridgeAfterQueue) this.bridgeAfterDrain = true;
+      if (item.chain || settings.autoSummaryAfterDeep) {
+        setSummaryPending(work.nodus_id);
+        this.enqueue(work.nodus_id, work.title, 'summary', item.model ?? null);
+      }
+    } catch (e) {
+      console.error('[scanQueue] encadenado tras profundo falló:', e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -266,20 +317,37 @@ class ScanQueue {
     }
   }
 
+  /** True when an embedding provider + model are configured for indexing. */
+  private embeddingConfigured(): boolean {
+    const settings = getSettings();
+    return Boolean(settings.embeddingProvider || settings.embeddingModel);
+  }
+
   /**
-   * Trigger embedding for pending ideas after deep scans complete, if an
-   * embedding model is configured and the pipeline is not already running.
+   * Index the given works after their deep scan: idea embeddings first (needed by
+   * bridge discovery), then full-text passages. Awaits completion so a subsequent
+   * bridge job runs against fresh embeddings. Skips when there is nothing to index
+   * or no embedding model is configured; each pipeline is best-effort.
    */
-  private autoEmbed(): void {
+  private async autoIndex(nodusIds: string[]): Promise<void> {
+    if (nodusIds.length === 0 || !this.embeddingConfigured()) return;
     try {
-      const settings = getSettings();
-      if (!settings.embeddingProvider && !settings.embeddingModel) return;
-      const snapshot = getEmbeddingSnapshot();
-      if (snapshot.running) return;
-      void startEmbedding();
+      if (!getEmbeddingSnapshot().running) await startEmbedding(nodusIds);
     } catch (e) {
-      console.error('[scanQueue] auto-indexación de embeddings falló:', e instanceof Error ? e.message : String(e));
+      console.error('[scanQueue] auto-indexación de ideas falló:', e instanceof Error ? e.message : String(e));
     }
+    try {
+      if (!getPassageSnapshot().running) await startPassageEmbedding(nodusIds);
+    } catch (e) {
+      console.error('[scanQueue] auto-indexación de pasajes falló:', e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Enqueue semantic bridge discovery once indexing is done, if configured. */
+  private maybeEnqueueBridge(): void {
+    if (!this.embeddingConfigured()) return;
+    const settings = getSettings();
+    this.enqueueBridge(settings.synthesisModel ?? settings.defaultModel ?? null);
   }
 
   private async process(item: QueueItem): Promise<void> {
@@ -353,6 +421,10 @@ class ScanQueue {
         }
       }
     }
+    // After a successful deep scan, chain the rest of the pipeline (summary now;
+    // index + bridge on drain). Kept outside the try/catch so a chaining hiccup
+    // can never re-mark the completed deep scan as failed.
+    if (item.kind === 'deep' && item.state === 'done') this.chainAfterDeep(work, item);
     if (item.state === 'done' || item.state === 'failed') this.moveTerminalToEnd(item);
     this.emit();
   }

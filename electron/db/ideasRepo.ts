@@ -10,6 +10,7 @@ import type {
   Evidence,
   EvidenceKind,
   IdeaDetail,
+  IdeaByWork,
   EdgeDetail,
   EdgeTrace,
   ModelRef,
@@ -564,16 +565,6 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const evidence = db.prepare('SELECT * FROM evidence WHERE global_id = ?').all(globalId) as Evidence[];
   return { idea, occurrences, evidence };
-}
-
-export interface IdeaByWork {
-  global_id: string;
-  type: IdeaType;
-  label: string;
-  statement: string;
-  role: 'principal' | 'secondary';
-  confidence: number;
-  development: string;
 }
 
 /**

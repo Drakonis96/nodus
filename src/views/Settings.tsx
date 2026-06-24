@@ -244,6 +244,20 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                 onChange={(e) => patch({ autoDeepScanOnReadTag: e.target.checked })}
               />
             </Row>
+            <Row label={t('Resumir tras análisis profundo')}>
+              <input
+                type="checkbox"
+                checked={settings.autoSummaryAfterDeep}
+                onChange={(e) => patch({ autoSummaryAfterDeep: e.target.checked })}
+              />
+            </Row>
+            <Row label={t('Descubrir relaciones al vaciar la cola')}>
+              <input
+                type="checkbox"
+                checked={settings.autoBridgeAfterQueue}
+                onChange={(e) => patch({ autoBridgeAfterQueue: e.target.checked })}
+              />
+            </Row>
             <Row label={t('Reanudar cola al abrir')}>
               <input type="checkbox" checked={settings.autoResumeQueue} onChange={(e) => patch({ autoResumeQueue: e.target.checked })} />
             </Row>

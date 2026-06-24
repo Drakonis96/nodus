@@ -15,6 +15,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   readTag: 'leído',
   autoLightScan: false,
   autoDeepScanOnReadTag: false,
+  autoSummaryAfterDeep: true,
+  autoBridgeAfterQueue: true,
   autoResumeQueue: false,
   zoteroUserId: '0',
   zoteroStoragePath: '',

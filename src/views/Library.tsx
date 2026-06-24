@@ -15,6 +15,7 @@ import type {
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { WorkGraphModal } from './WorkGraphModal';
+import { WorkIdeasModal } from './WorkIdeasModal';
 import { DuplicatesModal } from './DuplicatesModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
@@ -121,6 +122,7 @@ export function Library({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
+  const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
@@ -182,6 +184,12 @@ export function Library({
     await load();
   };
 
+  // Full chain for a single work: themes → ideas → summary → index → relationships.
+  const processFullWork = async (w: WorkView) => {
+    await window.nodus.processFull(w.nodus_id, scanModel);
+    await load();
+  };
+
   const summarizeWork = async (w: WorkView) => {
     await window.nodus.summarizeWork(w.nodus_id, scanModel);
     await load();
@@ -211,6 +219,31 @@ export function Library({
     await window.nodus.analyzeBothBulk(ids, scanModel);
     setSelected(new Set());
     await load();
+  };
+
+  // Full chain: themes → ideas → summary → index (ideas + passages) → discover relationships.
+  const processFullSelected = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    await window.nodus.processFullBulk(ids, scanModel);
+    setSelected(new Set());
+    await load();
+  };
+
+  const processFullLibrary = async () => {
+    const ids = works.map((w) => w.nodus_id);
+    if (ids.length === 0) return;
+    const ok = window.confirm(
+      tx(
+        'Procesar todo encadena para las {n} obra(s) filtrada(s): temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones. Es una operación larga que consume tokens del modelo seleccionado. ¿Continuar?',
+        { n: ids.length }
+      )
+    );
+    if (!ok) return;
+    await window.nodus.processFullBulk(ids, scanModel);
+    setSelected(new Set());
+    await load();
+    window.alert(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
   };
 
   const summarizeSelected = async () => {
@@ -683,6 +716,13 @@ export function Library({
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
             {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} filtrados', { n: works.length })}
           </button>
+          <button
+            className="btn btn-primary px-2 py-1 text-xs"
+            onClick={processFullLibrary}
+            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
+          >
+            <Icon name="compass" size={13} /> {t('Procesar biblioteca')}
+          </button>
           <span className="text-neutral-600">{t('Después elige Temas, Ideas o Ambos.')}</span>
         </div>
       )}
@@ -691,13 +731,21 @@ export function Library({
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          <button
+            className="btn btn-primary"
+            onClick={processFullSelected}
+            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')}
+          >
+            <Icon name="compass" /> {t('Procesar todo')}
+          </button>
+          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
             <Icon name="tag" /> {t('Temas')}
           </button>
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedIdeas}>
             <Icon name="bulb" /> {t('Ideas')}
           </button>
-          <button className="btn btn-primary" onClick={analyzeSelectedBoth}>
+          <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedBoth}>
             <Icon name="layers" /> {t('Temas + ideas')}
           </button>
           <button className="btn btn-ghost border border-violet-800 text-violet-300" onClick={summarizeSelected}>
@@ -834,9 +882,13 @@ export function Library({
                   />
                 </div>
                 <div className="min-w-0 p-1">
-                  <div className="truncate" title={w.title}>
+                  <button
+                    className="block w-full truncate text-left hover:text-indigo-300 hover:underline"
+                    title={t('Ver las ideas de esta obra')}
+                    onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })}
+                  >
                     {w.title}
-                  </div>
+                  </button>
                   <div className="text-[10px] text-neutral-600 font-mono">{w.nodus_id.slice(0, 8)}</div>
                 </div>
                 <div className="p-1 min-w-0 truncate text-neutral-400">
@@ -876,6 +928,13 @@ export function Library({
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
+                    <RowIconButton
+                      title={t('Procesar todo: temas, ideas, resumen, indexado y relaciones')}
+                      icon="compass"
+                      tone="indigo"
+                      onClick={() => processFullWork(w)}
+                    />
+                    <RowIconButton title={t('Ver las ideas de esta obra')} icon="list" onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })} />
                     <RowIconButton title={t('Analizar temas')} icon="tag" onClick={() => analyzeThemes(w)} />
                     <RowIconButton title={w.deep_status === 'done' ? t('Reanalizar ideas') : t('Analizar ideas')} icon="bulb" onClick={() => analyzeIdeas(w)} />
                     <RowIconButton title={t('Analizar temas e ideas')} icon="layers" onClick={() => analyzeBoth(w)} />
@@ -943,6 +1002,17 @@ export function Library({
         />
       )}
       {graphWork && <WorkGraphModal work={graphWork} onClose={() => setGraphWork(null)} />}
+      {ideasWork && (
+        <WorkIdeasModal
+          work={ideasWork}
+          onClose={() => setIdeasWork(null)}
+          onOpenGraph={onOpenGraph}
+          onOpenWorkGraph={(w) => {
+            setIdeasWork(null);
+            setGraphWork(w);
+          }}
+        />
+      )}
       {duplicatesOpen && <DuplicatesModal onClose={() => setDuplicatesOpen(false)} />}
     </div>
   );

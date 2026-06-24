@@ -271,6 +271,10 @@ export interface AppSettings {
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
   autoLightScan: boolean;
   autoDeepScanOnReadTag: boolean;
+  // After a deep scan completes, auto-generate the work's orientation summary.
+  autoSummaryAfterDeep: boolean;
+  // When the queue drains after deep scans, auto-run semantic bridge discovery.
+  autoBridgeAfterQueue: boolean;
   autoResumeQueue: boolean;
   zoteroUserId: string;
   zoteroStoragePath: string;
@@ -392,6 +396,11 @@ export interface QueueItem {
   subPct?: number | null;
   /** Optional model override for this job; falls back to the default model when null. */
   model?: ModelRef | null;
+  /**
+   * When set on a deep job, forces the full chain (summary + index + bridge discovery)
+   * to run on completion regardless of the auto-* settings. Used by "Procesar todo".
+   */
+  chain?: boolean;
 }
 
 export interface QueueProgress {
@@ -450,6 +459,23 @@ export interface IdeaDetail {
   idea: Idea;
   occurrences: (IdeaOccurrence & { work: WorkView })[];
   evidence: Evidence[];
+}
+
+/** One idea anchored to a work, with that idea↔work occurrence's fields. */
+export interface IdeaByWork {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  role: 'principal' | 'secondary';
+  confidence: number;
+  development: string;
+}
+
+/** A page of a work's ideas plus the total count, for paginated listing. */
+export interface IdeaByWorkPage {
+  ideas: IdeaByWork[];
+  total: number;
 }
 
 export interface EdgeDetail {
@@ -1312,6 +1338,9 @@ export interface NodusApi {
   /** Analyse themes (light) and then ideas (deep) for one work, as two queue jobs. */
   analyzeBoth(nodusId: string, model?: ModelRef | null): Promise<void>;
   analyzeBothBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
+  /** Run the full chain (themes + ideas + summary + index + relationship discovery) for one work. */
+  processFull(nodusId: string, model?: ModelRef | null): Promise<void>;
+  processFullBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
@@ -1354,6 +1383,10 @@ export interface NodusApi {
   getGraph(lens: 'ideas' | 'authors'): Promise<GraphData>;
   getIdeaDetail(globalId: string): Promise<IdeaDetail | null>;
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
+  /** Every direct idea↔idea edge touching an idea (its connections). */
+  getIdeaEdges(globalId: string): Promise<EdgeDetail[]>;
+  /** Paginated list of the ideas a work develops. */
+  getIdeasByWork(nodusId: string, limit: number, offset: number): Promise<IdeaByWorkPage>;
   getThemes(): Promise<Theme[]>;
 
   // main-theme management ("temas principales")
