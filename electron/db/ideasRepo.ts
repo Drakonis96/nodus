@@ -566,6 +566,39 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
   return { idea, occurrences, evidence };
 }
 
+export interface IdeaByWork {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  role: 'principal' | 'secondary';
+  confidence: number;
+  development: string;
+}
+
+/**
+ * Inverse of getIdeaDetail's occurrences: given a work's nodus_id, return every
+ * idea anchored to it, paired with the fields specific to that idea↔work
+ * occurrence (role, confidence, development). Read-only; no generation.
+ */
+export function getIdeasByWork(nodusId: string, limit: number, offset: number): { ideas: IdeaByWork[]; total: number } {
+  const db = getDb();
+  const total = (
+    db.prepare('SELECT COUNT(*) AS count FROM idea_occurrences WHERE nodus_id = ?').get(nodusId) as { count: number }
+  ).count;
+  const ideas = db
+    .prepare(
+      `SELECT i.global_id, i.type, i.label, i.statement, o.role, o.confidence, o.development
+         FROM idea_occurrences o
+         JOIN ideas i ON i.global_id = o.global_id
+        WHERE o.nodus_id = ?
+        ORDER BY i.global_id
+        LIMIT ? OFFSET ?`
+    )
+    .all(nodusId, limit, offset) as IdeaByWork[];
+  return { ideas, total };
+}
+
 /** Every direct idea↔idea edge touching an idea, with its evidence and trace. */
 export function getIdeaEdges(globalId: string): EdgeDetail[] {
   const rows = getDb()

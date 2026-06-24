@@ -9,6 +9,7 @@ import type {
 } from '@shared/types';
 import { getDb } from '../db/database';
 import * as ideas from '../db/ideasRepo';
+import { getWork, getWorkByZoteroKey, getWorkByAliasKey } from '../db/worksRepo';
 import * as gaps from '../db/gapsRepo';
 import * as notes from '../db/notesRepo';
 import * as researchQuestions from '../db/researchMapRepo';
@@ -172,6 +173,14 @@ function asModel(model?: z.infer<typeof modelSchema>): ModelRef | undefined {
   return model as ModelRef | undefined;
 }
 
+/** Resolve a work reference that may be a nodus_id, a Zotero key, or a merged alias key. */
+function resolveWorkNodusId(workId: string): string | null {
+  const byNodusId = getWork(workId);
+  if (byNodusId) return byNodusId.nodus_id;
+  const byZoteroKey = getWorkByZoteroKey(workId) ?? getWorkByAliasKey(workId);
+  return byZoteroKey?.nodus_id ?? null;
+}
+
 function asBrief(brief: z.infer<typeof writingBriefSchema>): WritingWorkshopBrief {
   return brief as WritingWorkshopBrief;
 }
@@ -243,6 +252,27 @@ export function registerTools(server: McpServer): void {
         const detail = ideas.getIdeaDetail(ideaId);
         if (!detail) throw notFound('una idea', ideaId);
         return { ...detail, relations: ideas.getIdeaEdges(ideaId) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_ideas_by_work',
+    {
+      title: 'Get ideas by work',
+      description:
+        'Lists every derived idea (claim, finding, construct, method, framework) with an occurrence anchored to a given work. The inverse of nodus_get_idea: instead of the works of an idea, it returns the ideas of a work. Deterministic and exhaustive over the existing idea↔work relation; use it instead of nodus_search_ideas when you need the complete set for one work. workId accepts a nodus_id or a Zotero key. Each idea also carries the fields specific to its occurrence in this work: role, confidence and development. An unknown workId yields an empty list, not an error. Read-only.',
+      inputSchema: {
+        workId: z.string().trim().min(1),
+        limit: z.number().int().min(1).max(200).default(100),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ workId, limit, offset }) =>
+      tool(() => {
+        const nodusId = resolveWorkNodusId(workId);
+        if (!nodusId) return { ideas: [], total: 0 };
+        return ideas.getIdeasByWork(nodusId, limit, offset);
       })()
   );
 
