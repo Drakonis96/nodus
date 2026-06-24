@@ -9,6 +9,7 @@ import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
+import { startMcpServer, stopMcpServer } from './mcp';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 
 const require = createRequire(__filename);
@@ -349,6 +350,7 @@ app.whenReady().then(() => {
   if (settings.autoResumeQueue) scanQueue.resumePending();
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
+  if (settings.mcpEnabled) void startMcpServer();
   setupAutoUpdates();
 
   app.on('activate', () => {
@@ -368,6 +370,7 @@ app.on('before-quit', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
   stopRealtimeSync();
+  void stopMcpServer();
   closeDb();
 });
 
@@ -375,5 +378,6 @@ const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update',
 updateAwareApp.on('before-quit-for-update', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   stopRealtimeSync();
+  void stopMcpServer();
   closeDb();
 });

@@ -144,6 +144,31 @@ export const EN: Record<string, string> = {
   Reiniciar: 'Restart',
   'Buscando…': 'Checking…',
   'Buscar actualización': 'Check for updates',
+  'Servidor MCP': 'MCP server',
+  'Activar servidor MCP': 'Enable MCP server',
+  'Ayuda para conectar un cliente MCP': 'Help connecting an MCP client',
+  'Puerto local': 'Local port',
+  Activo: 'Running',
+  'Error del servidor MCP': 'MCP server error',
+  Apagado: 'Off',
+  'Ver datos de conexión': 'View connection details',
+  'Regenerar token': 'Regenerate token',
+  'Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.':
+    'It listens only on this computer. Write tools are active while the server is on.',
+  'Token MCP regenerado. Reconecta los clientes con el nuevo token.': 'MCP token regenerated. Reconnect clients with the new token.',
+  'Conectar un cliente MCP': 'Connect an MCP client',
+  'Usa la URL y el bearer token actuales. No necesitas claves adicionales.':
+    'Use the current URL and bearer token. You do not need additional keys.',
+  'URL del servidor': 'Server URL',
+  'Bearer token': 'Bearer token',
+  'Activa el servidor para generar un token.': 'Enable the server to generate a token.',
+  'Si tu versión permite conectores MCP remotos, añade la URL y la cabecera de autorización. Como alternativa compatible, usa este puente stdio y reinicia Claude Desktop:':
+    'If your version supports remote MCP connectors, add the URL and authorization header. As a compatible alternative, use this stdio bridge and restart Claude Desktop:',
+  'Añade un servidor MCP con esta URL y la cabecera de autorización en Connectors/Developer mode. ChatGPT web no puede acceder a 127.0.0.1: necesitarías un túnel HTTPS externo, que no forma parte de Nodus. Si expones el servidor, protege el token.':
+    'Add an MCP server with this URL and authorization header in Connectors/Developer mode. ChatGPT web cannot access 127.0.0.1: you would need an external HTTPS tunnel, which is outside Nodus. If you expose the server, protect the token.',
+  'Cliente genérico': 'Generic client',
+  'Transporte: Streamable HTTP. Endpoint: la URL anterior. Auth: la cabecera Authorization: Bearer <token>.':
+    'Transport: Streamable HTTP. Endpoint: the URL above. Auth: the Authorization: Bearer <token> header.',
   Datos: 'Data',
   'Exportar (.nodus)': 'Export (.nodus)',
   'Importar (.nodus)': 'Import (.nodus)',

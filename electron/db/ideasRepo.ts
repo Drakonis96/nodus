@@ -566,6 +566,14 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
   return { idea, occurrences, evidence };
 }
 
+/** Every direct idea↔idea edge touching an idea, with its evidence and trace. */
+export function getIdeaEdges(globalId: string): EdgeDetail[] {
+  const rows = getDb()
+    .prepare('SELECT id FROM edges WHERE from_id = ? OR to_id = ? ORDER BY confidence DESC, id')
+    .all(globalId, globalId) as { id: string }[];
+  return rows.map((row) => getEdgeDetail(row.id)).filter((detail): detail is EdgeDetail => detail !== null);
+}
+
 export function getEdgeDetail(edgeId: string): EdgeDetail | null {
   const db = getDb();
   const edge = db.prepare('SELECT * FROM edges WHERE id = ?').get(edgeId) as Edge | undefined;

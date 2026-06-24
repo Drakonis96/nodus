@@ -13,6 +13,8 @@ import type {
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
+  getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
+  regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
 

@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.6.17",
+  "version": "0.6.18",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^0.1.65",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.5.0",
@@ -40,7 +41,8 @@
     "remark-gfm": "^4.0.1",
     "sigma": "^3.0.3",
     "tesseract.js": "^5.1.1",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

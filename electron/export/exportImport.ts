@@ -62,6 +62,9 @@ interface BackupInventory {
   apiKeyProviders: AiProvider[];
 }
 
+/** Local MCP access credentials must never leave the machine in a backup. */
+type BackupSettings = Omit<AppSettings, 'providerKeys' | 'mcpToken'>;
+
 /**
  * Export a self-contained encrypted `*.nodus` archive. The SQLite snapshot is
  * the source of truth and includes every Nodus table, including Float32 BLOB
@@ -82,7 +85,10 @@ export async function exportData(): Promise<{ path: string; password: string } |
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
-  const { providerKeys: _providerKeys, ...nonSecret } = settings; // strip derived key-presence flags
+  const { providerKeys: _providerKeys, mcpToken: _mcpToken, ...withoutToken } = settings;
+  // A restored backup must not silently re-enable an endpoint with a credential
+  // copied from another machine. The port is retained as a convenience.
+  const nonSecret: BackupSettings = { ...withoutToken, mcpEnabled: false };
   const apiKeys = readApiKeys();
   const { database, inventory } = await createDatabaseSnapshot(nonSecret, apiKeys);
 
@@ -172,7 +178,7 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
   const dbEntry = payload.getEntry('database.sqlite');
   if (!dbEntry) return { ok: false, message: 'Copia inválida: falta la base de datos.' };
 
-  const importedSettings = readJsonEntry<Omit<AppSettings, 'providerKeys'>>(payload, 'settings.json');
+  const importedSettings = readJsonEntry<BackupSettings>(payload, 'settings.json');
   const importedKeys = readJsonEntry<Partial<Record<AiProvider, string>>>(payload, 'api-keys.json') ?? {};
   const inventory = readJsonEntry<BackupInventory>(payload, 'backup-inventory.json');
   if (manifest.formatVersion === 2 && !inventory) {
@@ -197,9 +203,12 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
   const settingsEntry = payload.getEntry('settings.json');
   if (settingsEntry) {
     const imported = JSON.parse(payload.readAsText(settingsEntry));
+    // Backups created before MCP support may not have these fields; backups from
+    // any version must never restore a listener or a bearer credential.
+    const restoredSettings = { ...imported, mcpEnabled: false, mcpToken: '' };
     getDb()
       .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
-      .run('app', JSON.stringify(imported));
+      .run('app', JSON.stringify(restoredSettings));
   }
   restoreApiKeys(importedKeys);
 
@@ -211,12 +220,22 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
 
 /** Make a transactionally consistent SQLite snapshot, including active WAL data. */
 async function createDatabaseSnapshot(
-  settings: Omit<AppSettings, 'providerKeys'>,
+  settings: BackupSettings,
   apiKeys: Partial<Record<AiProvider, string>>
 ): Promise<{ database: Buffer; inventory: BackupInventory }> {
   const snapshotPath = path.join(app.getPath('temp'), `nodus-export-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
   try {
     await getDb().backup(snapshotPath);
+    // The DB also contains the `app` settings row. Replace it in the snapshot so
+    // the bearer token is absent from both payload copies, not only settings.json.
+    const snapshotDb = new Database(snapshotPath);
+    try {
+      snapshotDb
+        .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+        .run('app', JSON.stringify(settings));
+    } finally {
+      snapshotDb.close();
+    }
     return {
       database: fs.readFileSync(snapshotPath),
       inventory: databaseInventory(snapshotPath, settings, apiKeys),
@@ -228,7 +247,7 @@ async function createDatabaseSnapshot(
 
 function databaseInventory(
   databasePath: string,
-  settings: Omit<AppSettings, 'providerKeys'>,
+  settings: BackupSettings,
   apiKeys: Partial<Record<AiProvider, string>>
 ): BackupInventory {
   const db = new Database(databasePath, { readonly: true, fileMustExist: true });
@@ -282,7 +301,7 @@ function databaseMatchesInventory(databasePath: string, expected: BackupInventor
 }
 
 function settingsMatchInventory(
-  settings: Omit<AppSettings, 'providerKeys'> | null,
+  settings: BackupSettings | null,
   apiKeys: Partial<Record<AiProvider, string>>,
   expected: BackupInventory
 ): boolean {

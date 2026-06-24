@@ -301,6 +301,20 @@ export interface AppSettings {
   // When true, light/deep scans only assign works to the existing curated themes and
   // never invent new ones. Toggled from the "Temas principales" manager.
   themesLocked: boolean;
+  /** Opt-in local Model Context Protocol server for external AI clients. */
+  mcpEnabled: boolean;
+  /** Localhost TCP port used by the MCP Streamable HTTP endpoint. */
+  mcpPort: number;
+  /** Bearer token for the local MCP endpoint. This is intentionally visible in Settings. */
+  mcpToken: string;
+}
+
+/** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
+export interface McpServerStatus {
+  running: boolean;
+  port: number | null;
+  url: string | null;
+  error: string | null;
 }
 
 export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';
@@ -632,6 +646,8 @@ export interface GapAggregate {
   statement: string;
   count: number;
   works: { nodus_id: string; title: string; zotero_key: string }[];
+  /** Individual records behind this normalized aggregate; use one with `nodus_get_gap`. */
+  gapIds: string[];
 }
 
 export interface GapDetail {
@@ -1268,6 +1284,8 @@ export interface NodusApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  getMcpStatus(): Promise<McpServerStatus>;
+  regenerateMcpToken(): Promise<string>;
   setApiKey(provider: AiProvider, key: string): Promise<void>;
   clearApiKey(provider: AiProvider): Promise<void>;
 

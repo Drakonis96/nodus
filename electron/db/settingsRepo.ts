@@ -36,6 +36,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   deepStandardChunkWords: 1800,
   deepLongChunkWords: 30000,
   themesLocked: false,
+  mcpEnabled: false,
+  mcpPort: 4319,
+  mcpToken: '',
 };
 
 function readRaw(key: string): string | undefined {

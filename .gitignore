@@ -6,3 +6,13 @@ release/
 .DS_Store
 .vite/
 *.nodus
+
+# Local credentials and signing material must never be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.mobileprovision

@@ -32,6 +32,7 @@ import type {
   UpdateNoteInput,
 } from '@shared/types';
 import { getSettings, updateSettings } from './db/settingsRepo';
+import { getMcpStatus, regenerateMcpToken, restartMcpServer, stopMcpServer } from './mcp';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
@@ -95,8 +96,14 @@ export function registerIpc(
       if (next.syncMode === 'realtime') startRealtimeSync();
       else stopRealtimeSync();
     }
+    if (patch.mcpEnabled !== undefined || patch.mcpPort !== undefined || patch.mcpToken !== undefined) {
+      if (next.mcpEnabled) await restartMcpServer();
+      else await stopMcpServer();
+    }
     return next;
   });
+  h('mcp:status', async () => getMcpStatus());
+  h('mcp:regenerateToken', async () => regenerateMcpToken());
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 
@@ -477,7 +484,13 @@ export function registerIpc(
 
   // export / import
   h('data:export', async () => exportData());
-  h('data:import', async (_e, password: string) => importData(password));
+  h('data:import', async (_e, password: string) => {
+    const result = await importData(password);
+    // Imports intentionally restore MCP as disabled and tokenless. Stop any
+    // listener from the previous local profile once the swap succeeds.
+    if (result.ok) await stopMcpServer();
+    return result;
+  });
   h('data:resetGraph', async () => {
     // Stop any pending scans first so a finishing job can't repopulate after the wipe.
     scanQueue.clear();

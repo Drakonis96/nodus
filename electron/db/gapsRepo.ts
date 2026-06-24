@@ -38,20 +38,21 @@ export function aggregateGaps(): GapAggregate[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT g.kind, g.statement, g.nodus_id, w.title, w.zotero_key
+      `SELECT g.id, g.kind, g.statement, g.nodus_id, w.title, w.zotero_key
        FROM gaps g JOIN works w ON w.nodus_id = g.nodus_id`
     )
-    .all() as { kind: GapKind; statement: string; nodus_id: string; title: string; zotero_key: string }[];
+    .all() as { id: string; kind: GapKind; statement: string; nodus_id: string; title: string; zotero_key: string }[];
 
   const map = new Map<string, GapAggregate>();
   for (const r of rows) {
     const key = `${r.kind}::${normalize(r.statement)}`;
     let agg = map.get(key);
     if (!agg) {
-      agg = { kind: r.kind, statement: r.statement, count: 0, works: [] };
+      agg = { kind: r.kind, statement: r.statement, count: 0, works: [], gapIds: [] };
       map.set(key, agg);
     }
     agg.count += 1;
+    agg.gapIds.push(r.id);
     if (!agg.works.some((w) => w.nodus_id === r.nodus_id)) {
       agg.works.push({ nodus_id: r.nodus_id, title: r.title, zotero_key: r.zotero_key });
     }

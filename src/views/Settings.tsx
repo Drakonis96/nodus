@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings, EmbeddingProvider, ModelInfo, UpdateProgressEvent } from '@shared/types';
+import type { AppSettings, EmbeddingProvider, McpServerStatus, ModelInfo, UpdateProgressEvent } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
@@ -31,6 +31,10 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [importOpen, setImportOpen] = useState(false);
   const [importPassword, setImportPassword] = useState('');
   const [importingBackup, setImportingBackup] = useState(false);
+  const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
+  const [mcpPortInput, setMcpPortInput] = useState(String(settings.mcpPort));
+  const [mcpHelpOpen, setMcpHelpOpen] = useState(false);
+  const [mcpCopied, setMcpCopied] = useState<'url' | 'token' | null>(null);
 
   useEffect(() => {
     return window.nodus.onUpdateProgress((event) => {
@@ -39,6 +43,31 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       setCheckingUpdate(event.status === 'checking');
     });
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const next = await window.nodus.getMcpStatus();
+      if (active) setMcpStatus(next);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 1500);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
+
+  useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
+
+  useEffect(() => {
+    if (!mcpHelpOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMcpHelpOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mcpHelpOpen]);
 
   const patch = async (p: Partial<AppSettings>) => {
     await window.nodus.updateSettings(p);
@@ -115,6 +144,26 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     if (!backupResult) return;
     await navigator.clipboard.writeText(backupResult.password);
     setBackupCopied(true);
+  };
+
+  const commitMcpPort = () => {
+    const parsed = Math.min(65535, Math.max(1024, parseInt(mcpPortInput, 10) || 4319));
+    setMcpPortInput(String(parsed));
+    if (parsed !== settings.mcpPort) void patch({ mcpPort: parsed });
+  };
+
+  const regenerateMcpToken = async () => {
+    await window.nodus.regenerateMcpToken();
+    await onChange();
+    setMcpStatus(await window.nodus.getMcpStatus());
+    flash(t('Token MCP regenerado. Reconecta los clientes con el nuevo token.'));
+  };
+
+  const copyMcpValue = async (kind: 'url' | 'token', value: string) => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setMcpCopied(kind);
+    setTimeout(() => setMcpCopied(null), 1500);
   };
 
   const importBackup = async () => {
@@ -307,6 +356,58 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </div>
           </Section>
 
+          <Section title={t('Servidor MCP')}>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-neutral-300">{t('Activar servidor MCP')}</label>
+                <button
+                  type="button"
+                  className="text-neutral-500 hover:text-neutral-200"
+                  aria-label={t('Ayuda para conectar un cliente MCP')}
+                  title={t('Ayuda para conectar un cliente MCP')}
+                  onClick={() => setMcpHelpOpen(true)}
+                >
+                  <Icon name="help" size={15} />
+                </button>
+              </div>
+              <input type="checkbox" checked={settings.mcpEnabled} onChange={(e) => void patch({ mcpEnabled: e.target.checked })} />
+            </div>
+            <Row label={t('Puerto local')}>
+              <input
+                className="input w-24"
+                type="number"
+                min={1024}
+                max={65535}
+                value={mcpPortInput}
+                onChange={(e) => setMcpPortInput(e.target.value)}
+                onBlur={commitMcpPort}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
+              />
+            </Row>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-xs">
+              {mcpStatus.running ? (
+                <span className="text-emerald-400">{t('Activo')}: {mcpStatus.url}</span>
+              ) : mcpStatus.error ? (
+                <span className="text-red-400">{t('Error del servidor MCP')}: {mcpStatus.error}</span>
+              ) : (
+                <span className="text-neutral-500">{t('Apagado')}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => void setMcpHelpOpen(true)}>
+                <Icon name="link" /> {t('Ver datos de conexión')}
+              </button>
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => void regenerateMcpToken()}>
+                <Icon name="refresh" /> {t('Regenerar token')}
+              </button>
+            </div>
+            <p className="text-xs text-neutral-500">
+              {t('Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.')}
+            </p>
+          </Section>
+
           <Section title={t('Datos')}>
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-ghost border border-neutral-700" onClick={exportBackup}>
@@ -491,6 +592,15 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
       )}
 
       {saved && <div className="fixed bottom-20 right-6 card px-4 py-2 text-sm text-emerald-400">{saved}</div>}
+      {mcpHelpOpen && (
+        <McpConnectionModal
+          url={mcpStatus.url ?? `http://127.0.0.1:${settings.mcpPort}/mcp`}
+          token={settings.mcpToken}
+          copied={mcpCopied}
+          onCopy={copyMcpValue}
+          onClose={() => setMcpHelpOpen(false)}
+        />
+      )}
       {backupResult && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
           <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -555,6 +665,89 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           onCancel={() => setConfirmReindex(false)}
         />
       )}
+    </div>
+  );
+}
+
+function McpConnectionModal({
+  url,
+  token,
+  copied,
+  onCopy,
+  onClose,
+}: {
+  url: string;
+  token: string;
+  copied: 'url' | 'token' | null;
+  onCopy: (kind: 'url' | 'token', value: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const auth = `Authorization: Bearer ${token || '<token>'}`;
+  const claudeConfig = JSON.stringify(
+    {
+      mcpServers: {
+        nodus: {
+          command: 'npx',
+          args: ['mcp-remote', url, '--header', auth],
+        },
+      },
+    },
+    null,
+    2
+  );
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5" role="dialog" aria-modal="true" aria-label={t('Conectar un cliente MCP')} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">{t('Conectar un cliente MCP')}</h2>
+            <p className="mt-1 text-sm text-neutral-400">{t('Usa la URL y el bearer token actuales. No necesitas claves adicionales.')}</p>
+          </div>
+          <button className="btn btn-ghost" aria-label={t('Cerrar')} onClick={onClose}>
+            <Icon name="x" />
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <ConnectionValue label={t('URL del servidor')} value={url} copied={copied === 'url'} onCopy={() => void onCopy('url', url)} />
+          <ConnectionValue label={t('Bearer token')} value={token || t('Activa el servidor para generar un token.')} copied={copied === 'token'} onCopy={() => void onCopy('token', token)} />
+
+          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
+            <h3 className="font-medium text-neutral-100">Claude Desktop</h3>
+            <p className="mt-1 text-neutral-400">{t('Si tu versión permite conectores MCP remotos, añade la URL y la cabecera de autorización. Como alternativa compatible, usa este puente stdio y reinicia Claude Desktop:')}</p>
+            <pre className="mt-3 overflow-x-auto rounded bg-neutral-950 p-3 text-xs text-neutral-300">{claudeConfig}</pre>
+          </div>
+
+          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
+            <h3 className="font-medium text-neutral-100">ChatGPT</h3>
+            <p className="mt-1 text-neutral-400">{t('Añade un servidor MCP con esta URL y la cabecera de autorización en Connectors/Developer mode. ChatGPT web no puede acceder a 127.0.0.1: necesitarías un túnel HTTPS externo, que no forma parte de Nodus. Si expones el servidor, protege el token.')}</p>
+          </div>
+
+          <div className="rounded-lg border border-neutral-800 p-3 text-sm text-neutral-300">
+            <h3 className="font-medium text-neutral-100">{t('Cliente genérico')}</h3>
+            <p className="mt-1 text-neutral-400">{t('Transporte: Streamable HTTP. Endpoint: la URL anterior. Auth: la cabecera Authorization: Bearer <token>.')}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex justify-end">
+          <button className="btn btn-primary" onClick={onClose}>{t('Cerrar')}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConnectionValue({ label, value, copied, onCopy }: { label: string; value: string; copied: boolean; onCopy: () => void }) {
+  return (
+    <div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
+      <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-950/60 p-2">
+        <code className="min-w-0 flex-1 break-all text-xs text-neutral-200">{value}</code>
+        <button className="btn btn-ghost shrink-0" disabled={!value} onClick={onCopy}>
+          <Icon name={copied ? 'check' : 'copy'} /> {copied ? t('Copiado') : t('Copiar')}
+        </button>
+      </div>
     </div>
   );
 }

@@ -22,6 +22,10 @@ const mainExternals = [
   'tesseract.js',
   '@napi-rs/canvas',
   '@anthropic-ai/sdk',
+  '@modelcontextprotocol/sdk',
+  '@modelcontextprotocol/sdk/server/mcp.js',
+  '@modelcontextprotocol/sdk/server/streamableHttp.js',
+  '@modelcontextprotocol/sdk/types.js',
   'openai',
   'electron-updater',
 ];
