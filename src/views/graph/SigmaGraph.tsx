@@ -1119,18 +1119,12 @@ export function SigmaGraph({
     const onMouseMove = (event: any) => {
       const state = dragStateRef.current;
       if (!state) return;
-      const previous = sigma.viewportToGraph(state.pointer);
-      const next = sigma.viewportToGraph({ x: event.x, y: event.y });
-      let dx = next.x - previous.x;
-      let dy = next.y - previous.y;
-      const distance = Math.hypot(dx, dy);
-      if (distance > state.maxStep) {
-        const scale = state.maxStep / distance;
-        dx *= scale;
-        dy *= scale;
-      }
+      // Pin the node directly under the pointer so it tracks the cursor 1:1 until
+      // release, instead of trailing behind a spring-limited step (which made the
+      // node "get lost" on fast drags). Neighbours still follow via the edge
+      // constraints solved in applyDragFrame; only the grabbed node is pinned.
       state.pointer = { x: event.x, y: event.y };
-      state.target = { x: state.target.x + dx, y: state.target.y + dy };
+      state.target = sigma.viewportToGraph({ x: event.x, y: event.y });
       scheduleDragFrame();
       event.preventSigmaDefault();
       event.original?.preventDefault();
