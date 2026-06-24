@@ -141,7 +141,18 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
       return;
     }
 
-    if (req.method !== 'POST' || sessionId || !isInitializeRequest(parsedBody)) {
+    // A session id was supplied but no live session matches it. This is the normal
+    // state after the Nodus app restarts (e.g. an update): the HTTP server loses its
+    // in-memory sessions while the client still holds the old id. The Streamable HTTP
+    // spec requires HTTP 404 here so the client transparently starts a fresh session
+    // with a new InitializeRequest. Answering 400 instead leaves clients like
+    // mcp-remote stuck retrying the dead session until they are restarted by hand.
+    if (sessionId) {
+      sendJsonRpcError(res, 404, 'La sesión MCP ya no existe. Inicia una nueva sesión MCP.');
+      return;
+    }
+
+    if (req.method !== 'POST' || !isInitializeRequest(parsedBody)) {
       sendJsonRpcError(res, 400, 'Se requiere una inicialización MCP sin sesión o una sesión MCP válida.');
       return;
     }
