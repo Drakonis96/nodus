@@ -633,14 +633,18 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   );
 }
 
-/** Drag handle on a column's right edge to resize it. */
+/**
+ * Drag handle on a column's right edge to resize it. Kept fully inside the column
+ * (no horizontal overflow) so it never overlaps the neighbouring editor content,
+ * and uses `aria-label` rather than `title` so no tooltip floats over the panel.
+ */
 function ColumnResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void }) {
   return (
     <div
-      className="absolute right-0 top-0 z-10 h-full w-1.5 translate-x-1/2 cursor-col-resize hover:bg-indigo-500/30"
+      className="absolute right-0 top-0 z-10 h-full w-1 cursor-col-resize hover:bg-indigo-500/40"
       role="separator"
       aria-orientation="vertical"
-      title={t('Ajustar ancho')}
+      aria-label={t('Ajustar ancho')}
       onPointerDown={onPointerDown}
     />
   );
