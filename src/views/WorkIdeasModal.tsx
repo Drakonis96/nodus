@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { EdgeDetail, IdeaByWork, IdeaDetail, IdeaType } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
+import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { buildIdeaNote } from '../notes';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
@@ -35,10 +37,45 @@ export function WorkIdeasModal({
   const [ideas, setIdeas] = useState<IdeaByWork[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Navigation history for the detail pane. Each entry is an idea id; `pos`
+  // points at the idea currently shown. Picking an idea from the list starts a
+  // fresh trail (its origin); following a connection pushes onto the trail, so
+  // back/forward/origin let the reader retrace where they came from.
+  const [history, setHistory] = useState<string[]>([]);
+  const [pos, setPos] = useState(0);
+  const selectedId = history[pos] ?? null;
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
   const [edges, setEdges] = useState<EdgeDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [savingNote, setSavingNote] = useState<IdeaDetail | null>(null);
+
+  // Start a fresh navigation trail rooted at `id` (origin = this idea).
+  const selectFromList = useCallback((id: string) => {
+    setHistory([id]);
+    setPos(0);
+  }, []);
+
+  // Follow a connection: drop any forward history, push the new idea, advance.
+  const navigateTo = useCallback(
+    (id: string) => {
+      setHistory((h) => [...h.slice(0, pos + 1), id]);
+      setPos((p) => p + 1);
+    },
+    [pos]
+  );
+
+  const canGoBack = pos > 0;
+  const canGoForward = pos < history.length - 1;
+
+  // Open the save-to-notes dialog for any idea, reusing the loaded detail when it
+  // is the one already shown, otherwise fetching it on demand.
+  const saveIdeaToNotes = useCallback(
+    async (id: string) => {
+      const d = id === selectedId && detail ? detail : await window.nodus.getIdeaDetail(id);
+      if (d) setSavingNote(d);
+    },
+    [selectedId, detail]
+  );
 
   // Load the first page of ideas; auto-select the first so the panel is never empty.
   useEffect(() => {
@@ -48,7 +85,11 @@ export function WorkIdeasModal({
       if (!on) return;
       setIdeas(page.ideas);
       setTotal(page.total);
-      setSelectedId((current) => current ?? page.ideas[0]?.global_id ?? null);
+      setHistory((current) => {
+        if (current.length > 0) return current;
+        const first = page.ideas[0]?.global_id;
+        return first ? [first] : current;
+      });
       setLoading(false);
     });
     return () => {
@@ -166,14 +207,14 @@ export function WorkIdeasModal({
                   {ideas.map((idea) => {
                     const active = idea.global_id === selectedId;
                     return (
-                      <li key={idea.global_id}>
+                      <li key={idea.global_id} className="group/idea relative">
                         <button
-                          className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${
+                          className={`w-full rounded-md border px-3 py-2 pr-9 text-left transition-colors ${
                             active
                               ? 'border-indigo-700 bg-indigo-950/40'
                               : 'border-transparent hover:border-neutral-700 hover:bg-neutral-900/60'
                           }`}
-                          onClick={() => setSelectedId(idea.global_id)}
+                          onClick={() => selectFromList(idea.global_id)}
                         >
                           <div className="flex items-center gap-1.5">
                             <TypeDot type={idea.type} />
@@ -186,6 +227,16 @@ export function WorkIdeasModal({
                           </div>
                           <div className="mt-0.5 text-sm font-medium leading-snug text-neutral-100">{idea.label}</div>
                           <div className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{idea.statement}</div>
+                        </button>
+                        <button
+                          className="absolute right-1.5 top-1.5 rounded p-1 text-neutral-500 opacity-0 transition-opacity hover:bg-neutral-800 hover:text-indigo-300 focus:opacity-100 group-hover/idea:opacity-100"
+                          title={t('Guardar en notas')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void saveIdeaToNotes(idea.global_id);
+                          }}
+                        >
+                          <Icon name="notebook" size={14} />
                         </button>
                       </li>
                     );
@@ -207,6 +258,38 @@ export function WorkIdeasModal({
 
           {/* Idea detail */}
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
+            {selectedId && (
+              <div className="mb-3 flex items-center gap-1.5">
+                <button
+                  className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs disabled:opacity-40"
+                  title={t('Idea anterior')}
+                  disabled={!canGoBack}
+                  onClick={() => setPos((p) => Math.max(0, p - 1))}
+                >
+                  <Icon name="chevronLeft" size={14} />
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs disabled:opacity-40"
+                  title={t('Idea siguiente')}
+                  disabled={!canGoForward}
+                  onClick={() => setPos((p) => Math.min(history.length - 1, p + 1))}
+                >
+                  <Icon name="chevronRight" size={14} />
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 gap-1.5 px-2 py-1 text-xs disabled:opacity-40"
+                  title={t('Volver a la idea de origen')}
+                  disabled={!canGoBack}
+                  onClick={() => setPos(0)}
+                >
+                  <Icon name="home" size={13} /> {t('Origen')}
+                </button>
+                <div className="flex-1" />
+                <span className="text-[10px] text-neutral-600">
+                  {tx('{i} de {n}', { i: pos + 1, n: history.length })}
+                </span>
+              </div>
+            )}
             {!selectedId ? (
               <div className="flex h-full items-center justify-center text-sm text-neutral-500">
                 {t('Selecciona una idea para ver su detalle y sus conexiones.')}
@@ -244,6 +327,13 @@ export function WorkIdeasModal({
                   >
                     <Icon name="network" size={13} /> {t('Grafo de la obra')}
                   </button>
+                  <button
+                    className="btn btn-ghost gap-1.5 border border-neutral-700 text-xs"
+                    title={t('Guardar esta idea en notas')}
+                    onClick={() => setSavingNote(detail)}
+                  >
+                    <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+                  </button>
                 </div>
 
                 {/* Connections */}
@@ -260,7 +350,7 @@ export function WorkIdeasModal({
                           <button
                             className="flex w-full items-center gap-2 rounded-md border border-neutral-800 px-3 py-2 text-left hover:border-neutral-700 hover:bg-neutral-900/60"
                             title={t('Ver esta idea conectada')}
-                            onClick={() => setSelectedId(c.otherId)}
+                            onClick={() => navigateTo(c.otherId)}
                           >
                             <Badge color="cyan">{edgeTypeLabel(c.type)}</Badge>
                             <Icon
@@ -315,6 +405,16 @@ export function WorkIdeasModal({
           </div>
         </div>
       </div>
+
+      {savingNote && (
+        <SaveToNotesModal
+          content={buildIdeaNote(savingNote)}
+          defaultTitle={savingNote.idea.label}
+          kind="idea"
+          source={{ origin: 'idea', ref: savingNote.idea.global_id }}
+          onClose={() => setSavingNote(null)}
+        />
+      )}
     </div>
   );
 }

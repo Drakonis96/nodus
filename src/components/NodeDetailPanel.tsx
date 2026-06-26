@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView } from '@shared/types';
 import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
+import { SaveToNotesModal } from './SaveToNotesModal';
+import { buildEdgeNote, buildIdeaNote } from '../notes';
 import { t } from '../i18n';
 
 // Persisted detail-panel sizing, shared by the graph view and the argument map.
@@ -51,6 +53,9 @@ export function NodeDetailPanel({
   onFontChange: (delta: number) => void;
   onClose: () => void;
 }) {
+  // A note pending capture: built lazily from whichever detail is open.
+  const [saving, setSaving] = useState<{ content: string; title: string; ref: string } | null>(null);
+
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     const startX = e.clientX;
@@ -76,6 +81,29 @@ export function NodeDetailPanel({
         onPointerDown={startResize}
       />
       <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex items-center justify-end gap-1 border-b border-neutral-800 bg-neutral-900/95 px-4 py-2">
+        {(ideaDetail || edgeDetail) && (
+          <button
+            className="card mr-auto inline-flex items-center gap-1.5 bg-neutral-900 px-2 py-1 text-xs hover:bg-neutral-800"
+            title={t('Guardar en notas')}
+            onClick={() => {
+              if (ideaDetail) {
+                setSaving({
+                  content: buildIdeaNote(ideaDetail),
+                  title: ideaDetail.idea.label,
+                  ref: ideaDetail.idea.global_id,
+                });
+              } else if (edgeDetail) {
+                setSaving({
+                  content: buildEdgeNote(edgeDetail),
+                  title: `${edgeDetail.fromLabel} → ${edgeDetail.toLabel}`,
+                  ref: edgeDetail.edge.id,
+                });
+              }
+            }}
+          >
+            <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+          </button>
+        )}
         <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-xs" title={t('Disminuir texto')} onClick={() => onFontChange(-1)}>
           a
         </button>
@@ -175,6 +203,15 @@ export function NodeDetailPanel({
             </blockquote>
           ))}
         </div>
+      )}
+      {saving && (
+        <SaveToNotesModal
+          content={saving.content}
+          defaultTitle={saving.title}
+          kind="idea"
+          source={{ origin: 'idea', ref: saving.ref }}
+          onClose={() => setSaving(null)}
+        />
       )}
     </div>
   );

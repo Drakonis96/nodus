@@ -9,6 +9,7 @@ import {
 } from '../components/NodeDetailPanel';
 import { VirtualList } from '../components/VirtualList';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { buildIdeaNote } from '../notes';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -366,38 +367,6 @@ export function IdeasView({
       )}
     </div>
   );
-}
-
-/** Compose a Markdown note for an idea, keeping a clickable `nodus://idea/...` citation. */
-function buildIdeaNote(detail: IdeaDetail): string {
-  const { idea, occurrences, evidence } = detail;
-  const lines: string[] = [];
-  lines.push(`# ${idea.label}`);
-  lines.push('');
-  lines.push(`[${t('Abrir idea en Nodus')}](nodus://idea/${idea.global_id})`);
-  lines.push('');
-  if (idea.statement) {
-    lines.push(idea.statement);
-    lines.push('');
-  }
-  if (occurrences.length > 0) {
-    lines.push(`## ${t('Obras que la desarrollan')}`);
-    for (const o of occurrences) {
-      const authors = o.work.authors.length ? o.work.authors.join('; ') : t('Autoría no disponible');
-      const year = o.work.year ? ` (${o.work.year})` : '';
-      lines.push(`- [${o.work.title}](nodus://work/${o.nodus_id}) — ${authors}${year}`);
-    }
-    lines.push('');
-  }
-  if (evidence.length > 0) {
-    lines.push(`## ${t('Evidencia anclada')}`);
-    for (const ev of evidence) {
-      const loc = ev.location ? ` — ${ev.location}` : '';
-      lines.push(`> "${ev.quote}"${loc}`);
-      lines.push('');
-    }
-  }
-  return lines.join('\n').trim();
 }
 
 /**

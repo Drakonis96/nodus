@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import type { GapAggregate, EdgeDetail, GapKind } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
+import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { buildGapNote } from '../notes';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
@@ -39,6 +41,7 @@ export function GapsView({
   const [gaps, setGaps] = useState<GapAggregate[]>([]);
   const [contradictions, setContradictions] = useState<EdgeDetail[]>([]);
   const [tab, setTab] = useState<'mined' | 'contradictions'>('mined');
+  const [savingGap, setSavingGap] = useState<GapAggregate | null>(null);
 
   const reload = useCallback(() => {
     void window.nodus.getGaps().then(setGaps);
@@ -110,6 +113,12 @@ export function GapsView({
                 >
                   <Icon name="wand" size={13} /> {t('Asistente')}
                 </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                  onClick={() => setSavingGap(g)}
+                >
+                  <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+                </button>
               </div>
               <div className="text-xs text-neutral-500 mt-2">
                 {tx('Mencionado en {n} obra(s):', { n: g.count })}{' '}
@@ -147,6 +156,16 @@ export function GapsView({
             </button>
           </div>
         </div>
+      )}
+
+      {savingGap && (
+        <SaveToNotesModal
+          content={buildGapNote(savingGap)}
+          defaultTitle={`${t('Hueco:')} ${t(KIND_LABELS[savingGap.kind])}`}
+          kind="markdown"
+          source={{ origin: 'markdown', note: 'gap' }}
+          onClose={() => setSavingGap(null)}
+        />
       )}
     </div>
   );
