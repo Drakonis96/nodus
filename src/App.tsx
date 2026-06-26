@@ -10,6 +10,7 @@ import { ResearchMapView } from './views/ResearchMapView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
 import { NotesView } from './views/NotesView';
+import { SearchView } from './views/SearchView';
 import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { Settings } from './views/Settings';
@@ -39,6 +40,9 @@ export function App() {
   const [researchOpen, setResearchOpen] = useState(false);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
+  // A note the user opened from global search; the nonce re-triggers even if the
+  // same note is chosen twice.
+  const [noteTarget, setNoteTarget] = useState<{ id: string; nonce: number } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -90,6 +94,11 @@ export function App() {
   const navigate = useCallback((nextView: View, graph?: PendingGraphNavigationTarget) => {
     if (graph) setGraphTarget({ ...graph, nonce: Date.now() });
     setView(nextView);
+  }, []);
+
+  const openNoteFromSearch = useCallback((id: string) => {
+    setNoteTarget({ id, nonce: Date.now() });
+    setView('notes');
   }, []);
 
   const openAssistant = useCallback(
@@ -256,7 +265,16 @@ export function App() {
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'notes' && <NotesView onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'search' && (
+            <SearchView
+              onOpenGraph={(target) => navigate('graph', target)}
+              onOpenNote={openNoteFromSearch}
+              onOpenGaps={() => setView('gaps')}
+            />
+          )}
+          {view === 'notes' && (
+            <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
+          )}
           {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}
         </main>
       </div>

@@ -64,7 +64,14 @@ const KIND_COLORS: Record<NoteKind, 'neutral' | 'indigo' | 'cyan' | 'red' | 'gre
   idea: 'green',
 };
 
-export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraphNavigationTarget) => void }) {
+export function NotesView({
+  onOpenGraph,
+  focusNote,
+}: {
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+  /** A note to open (e.g. from global search); the nonce re-triggers on repeats. */
+  focusNote?: { id: string; nonce: number } | null;
+}) {
   const [folders, setFolders] = useState<NoteFolder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +197,18 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
     },
     [persistBuffer, refresh]
   );
+
+  // Open a note requested from outside (global search). Retries when `notes`
+  // arrives if it wasn't loaded yet at navigation time; the nonce guards repeats.
+  const lastFocusNonce = useRef<number | null>(null);
+  useEffect(() => {
+    if (!focusNote || lastFocusNonce.current === focusNote.nonce) return;
+    const note = notes.find((n) => n.id === focusNote.id);
+    if (!note) return;
+    lastFocusNonce.current = focusNote.nonce;
+    setScope(note.folderId ? { kind: 'folder', id: note.folderId } : { kind: 'all' });
+    void openNote(note);
+  }, [focusNote, notes, openNote]);
 
   const saveActive = useCallback(async () => {
     if (!activeId || !dirty || saving) return;

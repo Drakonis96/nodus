@@ -62,6 +62,8 @@ import { exportData, importData } from './export/exportImport';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { verifyCitations } from './citations/verifyCitations';
+import { globalSearch } from './db/searchRepo';
+import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { summaryContentHash } from './ai/summaryScan';
@@ -525,6 +527,12 @@ export function registerIpc(
   });
   h('notes:reorderByAI', async (_e, noteIds: string[]) => reorderNotesByAI(noteIds));
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
+  h('search:global', async (_e, query: string, limitPerKind?: number) =>
+    globalSearch(query ?? '', limitPerKind ?? 8)
+  );
+  h('gaps:suggestSearch', async (_e, statement: string, workTitles?: string[]) =>
+    suggestGapSearch(statement ?? '', workTitles ?? [])
+  );
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));

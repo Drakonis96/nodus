@@ -207,6 +207,9 @@ const api: NodusApi = {
   reorderNotes: (noteIds) => ipcRenderer.invoke('notes:reorder', noteIds).then(() => undefined),
   reorderNotesByAI: (noteIds) => ipcRenderer.invoke('notes:reorderByAI', noteIds),
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
+  globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
+  suggestGapSearch: (statement, workTitles) =>
+    ipcRenderer.invoke('gaps:suggestSearch', statement, workTitles),
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),

@@ -1173,6 +1173,42 @@ export interface CitationRef {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Global search
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The entity types the global search spans, each of which links elsewhere. */
+export type SearchResultKind = 'note' | 'idea' | 'work' | 'gap' | 'theme' | 'author';
+
+/** A single match. `id` and the optional fields carry what the UI needs to route
+ * to the right destination (graph node, work, note, gaps view, …). */
+export interface GlobalSearchResult {
+  kind: SearchResultKind;
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  snippet?: string | null;
+  /** Works only: to open in Zotero / focus the reading graph. */
+  zoteroKey?: string | null;
+  /** Ideas only: node type, for the badge. */
+  ideaType?: string | null;
+  /** Gaps only: gap kind, for the badge. */
+  gapKind?: GapKind | null;
+  /** Themes only: the theme label used as a graph filter. */
+  themeLabel?: string | null;
+}
+
+export interface GlobalSearchResponse {
+  query: string;
+  results: GlobalSearchResult[];
+}
+
+/** AI-suggested ways to find literature that would fill a research gap. */
+export interface GapSearchSuggestions {
+  keywords: string[];
+  queries: string[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1608,6 +1644,10 @@ export interface NodusApi {
   reorderNotesByAI(noteIds: string[]): Promise<NotesReorderResult>;
   /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
+  /** Search across ideas, works, gaps, themes, authors and notes. */
+  globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
+  /** Ask the AI for keywords/queries to find literature filling a research gap. */
+  suggestGapSearch(statement: string, workTitles: string[]): Promise<GapSearchSuggestions>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;
