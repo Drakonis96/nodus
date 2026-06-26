@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Note, NoteFolder, NoteKind, NotesTree } from '@shared/types';
-import { Badge, Icon } from '../components/ui';
+import type { EdgeDetail, Note, NoteFolder, NoteKind, NotesTree } from '@shared/types';
+import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -9,6 +9,23 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
 type FolderScope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'folder'; id: string };
+
+// Persisted, draggable widths for the folder tree and note list columns so long
+// chapter/idea titles can be read in full when the user wants.
+const TREE_WIDTH_KEY = 'nodus.notes.treeWidth';
+const LIST_WIDTH_KEY = 'nodus.notes.listWidth';
+const TREE_MIN = 180;
+const TREE_MAX = 520;
+const TREE_DEFAULT = 240;
+const LIST_MIN = 220;
+const LIST_MAX = 620;
+const LIST_DEFAULT = 288;
+
+function loadWidth(key: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(localStorage.getItem(key));
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
 
 const KIND_LABELS: Record<NoteKind, string> = {
   markdown: 'Nota',
@@ -46,6 +63,14 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   const [renameValue, setRenameValue] = useState('');
   const [pendingFolderDelete, setPendingFolderDelete] = useState<NoteFolder | null>(null);
   const [pendingNoteDelete, setPendingNoteDelete] = useState<Note | null>(null);
+  const [movingNote, setMovingNote] = useState<Note | null>(null);
+
+  const [treeWidth, setTreeWidth] = useState(() => loadWidth(TREE_WIDTH_KEY, TREE_DEFAULT, TREE_MIN, TREE_MAX));
+  const [listWidth, setListWidth] = useState(() => loadWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX));
+
+  // Connections of the idea behind the open note (idea notes carry the idea id in
+  // `source.ref`); empty for plain notes.
+  const [ideaEdges, setIdeaEdges] = useState<EdgeDetail[]>([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   // Mirror editor buffers so the auto-save-before-switch path reads fresh values.
@@ -66,6 +91,54 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   const tree = useMemo(() => buildNotesTree(folders, notes), [folders, notes]);
   const flatFolders = useMemo(() => flattenFolders(folders), [folders]);
   const activeNote = useMemo(() => notes.find((n) => n.id === activeId) ?? null, [notes, activeId]);
+
+  // The idea id this note was captured from, if any (idea notes only).
+  const ideaRef = activeNote?.kind === 'idea' ? activeNote.source?.ref ?? null : null;
+
+  useEffect(() => {
+    if (!ideaRef) {
+      setIdeaEdges([]);
+      return;
+    }
+    let on = true;
+    void window.nodus.getIdeaEdges(ideaRef).then((edges) => {
+      if (on) setIdeaEdges(edges);
+    });
+    return () => {
+      on = false;
+    };
+  }, [ideaRef]);
+
+  useEffect(() => {
+    localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
+  }, [treeWidth]);
+  useEffect(() => {
+    localStorage.setItem(LIST_WIDTH_KEY, String(listWidth));
+  }, [listWidth]);
+
+  // Drag a column's right edge to resize it; clamped to sane bounds.
+  const startColumnResize = useCallback(
+    (
+      e: React.PointerEvent<HTMLDivElement>,
+      current: number,
+      min: number,
+      max: number,
+      apply: (width: number) => void
+    ) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const onMove = (evt: PointerEvent) => {
+        apply(Math.min(max, Math.max(min, current + evt.clientX - startX)));
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    },
+    []
+  );
 
   const persistBuffer = useCallback(async () => {
     const { title, content, dirty: isDirty, activeId: id } = bufferRef.current;
@@ -183,6 +256,16 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
     [activeId, persistBuffer, refresh]
   );
 
+  const moveNoteToFolder = useCallback(
+    async (noteId: string, folderId: string | null) => {
+      // Flush the editor first if the moved note is the one being edited.
+      if (noteId === bufferRef.current.activeId) await persistBuffer();
+      await window.nodus.moveNote(noteId, folderId);
+      await refresh();
+    },
+    [persistBuffer, refresh]
+  );
+
   const applyFormat = useCallback(
     (kind: 'bold' | 'italic' | 'heading' | 'list' | 'quote' | 'code' | 'link') => {
       const el = textareaRef.current;
@@ -254,7 +337,10 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   return (
     <div className="h-full flex min-h-0">
       {/* Folder tree */}
-      <aside className="w-60 shrink-0 border-r border-neutral-800 flex flex-col min-h-0">
+      <aside
+        className="relative shrink-0 border-r border-neutral-800 flex flex-col min-h-0"
+        style={{ width: treeWidth }}
+      >
         <div className="p-3 border-b border-neutral-800 flex items-center gap-2">
           <Icon name="notebook" className="text-indigo-300" />
           <span className="font-semibold text-sm flex-1">{t('Notas')}</span>
@@ -317,10 +403,16 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
             </div>
           )}
         </div>
+        <ColumnResizeHandle
+          onPointerDown={(e) => startColumnResize(e, treeWidth, TREE_MIN, TREE_MAX, setTreeWidth)}
+        />
       </aside>
 
       {/* Note list */}
-      <aside className="w-72 shrink-0 border-r border-neutral-800 flex flex-col min-h-0">
+      <aside
+        className="relative shrink-0 border-r border-neutral-800 flex flex-col min-h-0"
+        style={{ width: listWidth }}
+      >
         <div className="p-3 border-b border-neutral-800 space-y-2">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-sm flex-1 truncate" title={scopeTitle}>
@@ -356,10 +448,14 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
               note={note}
               active={note.id === activeId}
               onOpen={() => void openNote(note)}
+              onMove={() => setMovingNote(note)}
               onDelete={() => setPendingNoteDelete(note)}
             />
           ))}
         </div>
+        <ColumnResizeHandle
+          onPointerDown={(e) => startColumnResize(e, listWidth, LIST_MIN, LIST_MAX, setListWidth)}
+        />
       </aside>
 
       {/* Editor */}
@@ -462,6 +558,14 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
                 </div>
               )}
             </div>
+
+            {ideaRef && (
+              <IdeaConnectionsPanel
+                ideaRef={ideaRef}
+                edges={ideaEdges}
+                onOpenGraph={onOpenGraph}
+              />
+            )}
           </>
         )}
       </section>
@@ -512,7 +616,33 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
           onCancel={() => setPendingNoteDelete(null)}
         />
       )}
+
+      {movingNote && (
+        <MoveNoteModal
+          note={movingNote}
+          folders={flatFolders}
+          onMove={async (folderId) => {
+            const id = movingNote.id;
+            setMovingNote(null);
+            await moveNoteToFolder(id, folderId);
+          }}
+          onClose={() => setMovingNote(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Drag handle on a column's right edge to resize it. */
+function ColumnResizeHandle({ onPointerDown }: { onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void }) {
+  return (
+    <div
+      className="absolute right-0 top-0 z-10 h-full w-1.5 translate-x-1/2 cursor-col-resize hover:bg-indigo-500/30"
+      role="separator"
+      aria-orientation="vertical"
+      title={t('Ajustar ancho')}
+      onPointerDown={onPointerDown}
+    />
   );
 }
 
@@ -671,11 +801,13 @@ function NoteListItem({
   note,
   active,
   onOpen,
+  onMove,
   onDelete,
 }: {
   note: Note;
   active: boolean;
   onOpen: () => void;
+  onMove: () => void;
   onDelete: () => void;
 }) {
   const snippet = useMemo(() => plainSnippet(note.content), [note.content]);
@@ -688,7 +820,19 @@ function NoteListItem({
     >
       <div className="flex items-center gap-1.5">
         <Badge color={KIND_COLORS[note.kind]}>{t(KIND_LABELS[note.kind])}</Badge>
-        <span className="flex-1 min-w-0 truncate text-sm font-medium">{note.title}</span>
+        <span className="flex-1 min-w-0 truncate text-sm font-medium" title={note.title}>
+          {note.title}
+        </span>
+        <button
+          className="p-1 rounded text-neutral-600 hover:text-indigo-300 hover:bg-neutral-800 opacity-0 group-hover:opacity-100 transition-opacity"
+          title={t('Mover a carpeta')}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove();
+          }}
+        >
+          <Icon name="folder" size={12} />
+        </button>
         <button
           className="p-1 rounded text-neutral-600 hover:text-red-400 hover:bg-neutral-800 opacity-0 group-hover:opacity-100 transition-opacity"
           title={t('Eliminar nota')}
@@ -702,6 +846,152 @@ function NoteListItem({
       </div>
       {snippet && <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2">{snippet}</p>}
       <div className="text-[10px] text-neutral-600 mt-1">{formatRelative(note.updatedAt)}</div>
+    </div>
+  );
+}
+
+/**
+ * Connections of the idea a note was captured from, shown as a collapsible footer
+ * under the editor so saved ideas keep their graph context. Clicking a connection
+ * opens that idea focused in the graph.
+ */
+function IdeaConnectionsPanel({
+  ideaRef,
+  edges,
+  onOpenGraph,
+}: {
+  ideaRef: string;
+  edges: EdgeDetail[];
+  onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const connections = useMemo(
+    () =>
+      edges.map((e) => {
+        const outgoing = e.edge.from_id === ideaRef;
+        return {
+          edgeId: e.edge.id,
+          otherId: outgoing ? e.edge.to_id : e.edge.from_id,
+          otherLabel: outgoing ? e.toLabel : e.fromLabel,
+          type: e.edge.type,
+          confidence: e.edge.confidence,
+          outgoing,
+        };
+      }),
+    [edges, ideaRef]
+  );
+
+  return (
+    <div className="shrink-0 border-t border-neutral-800 bg-neutral-950/40">
+      <button
+        className="flex w-full items-center gap-2 px-4 py-2 text-xs uppercase tracking-wide text-neutral-400 hover:text-neutral-200"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} />
+        <Icon name="network" size={13} className="text-indigo-300" />
+        {tx('Conexiones ({n})', { n: connections.length })}
+      </button>
+      {open && (
+        <div className="max-h-44 overflow-y-auto px-3 pb-3">
+          {connections.length === 0 ? (
+            <p className="px-1 text-xs text-neutral-500">{t('Esta idea aún no tiene conexiones con otras ideas.')}</p>
+          ) : (
+            <ul className="space-y-1">
+              {connections.map((c) => (
+                <li key={c.edgeId}>
+                  <button
+                    className="flex w-full items-center gap-2 rounded-md border border-neutral-800 px-3 py-2 text-left hover:border-neutral-700 hover:bg-neutral-900/60 disabled:cursor-default"
+                    title={onOpenGraph ? t('Ver esta idea conectada en el grafo') : undefined}
+                    disabled={!onOpenGraph}
+                    onClick={() =>
+                      onOpenGraph?.({ preset: 'overview', nodeId: c.otherId, label: c.otherLabel })
+                    }
+                  >
+                    <Badge color="cyan">{t(EDGE_LABELS[c.type as keyof typeof EDGE_LABELS]) ?? c.type}</Badge>
+                    <Icon
+                      name={c.outgoing ? 'arrowDown' : 'arrowUp'}
+                      size={12}
+                      className={c.outgoing ? 'rotate-90 text-neutral-500' : '-rotate-90 text-neutral-500'}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm text-neutral-200">{c.otherLabel}</span>
+                    <span className="shrink-0 text-[10px] text-neutral-500">
+                      {t('conf')} {c.confidence.toFixed(2)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Small modal to move a note into any folder (or to the root), launched from the list. */
+function MoveNoteModal({
+  note,
+  folders,
+  onMove,
+  onClose,
+}: {
+  note: Note;
+  folders: { folder: NoteFolder; depth: number }[];
+  onMove: (folderId: string | null) => void;
+  onClose: () => void;
+}) {
+  const [folderId, setFolderId] = useState<string | null>(note.folderId);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-md overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
+          <Icon name="folder" className="text-indigo-300" />
+          <span className="text-sm font-semibold">{t('Mover a carpeta')}</span>
+          <div className="flex-1" />
+          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </header>
+        <div className="space-y-3 p-4">
+          <p className="truncate text-xs text-neutral-500" title={note.title}>
+            «{note.title}»
+          </p>
+          <select
+            className="input w-full"
+            value={folderId ?? ''}
+            onChange={(e) => setFolderId(e.target.value || null)}
+          >
+            <option value="">{t('Sin carpeta (raíz)')}</option>
+            {folders.map(({ folder, depth }) => (
+              <option key={folder.id} value={folder.id}>
+                {`${'  '.repeat(depth)}${depth > 0 ? '↳ ' : ''}${folder.name}`}
+              </option>
+            ))}
+          </select>
+        </div>
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-800 px-4 py-3">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t('Cancelar')}
+          </button>
+          <button className="btn btn-primary gap-1.5" onClick={() => onMove(folderId)}>
+            <Icon name="check" /> {t('Mover')}
+          </button>
+        </footer>
+      </div>
     </div>
   );
 }
