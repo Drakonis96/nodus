@@ -1163,6 +1163,15 @@ export interface NotesReorderResult {
   orderedIds: string[];
 }
 
+/** The kinds of sources an inline `nodus://` citation can point to. */
+export type CitationKind = 'idea' | 'work' | 'gap' | 'contradiction' | 'passage';
+
+/** A single inline citation to verify against the local graph/corpus. */
+export interface CitationRef {
+  kind: CitationKind;
+  id: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1597,6 +1606,8 @@ export interface NodusApi {
   reorderNotes(noteIds: string[]): Promise<void>;
   /** Ask the AI to order the given notes into a logical sequence; persists and returns it. */
   reorderNotesByAI(noteIds: string[]): Promise<NotesReorderResult>;
+  /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
+  verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;

@@ -91,6 +91,9 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   const [aiReordering, setAiReordering] = useState(false);
   // After an AI reorder we keep the previous manual order so the user can undo.
   const [reorderUndo, setReorderUndo] = useState<string[] | null>(null);
+  // Drag-to-reorder (manual sort only): id being dragged and the row hovered over.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const [treeWidth, setTreeWidth] = useState(() => loadWidth(TREE_WIDTH_KEY, TREE_DEFAULT, TREE_MIN, TREE_MAX));
   const [listWidth, setListWidth] = useState(() => loadWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX));
@@ -423,6 +426,24 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
     await refresh();
   }, [reorderUndo, refresh]);
 
+  // Manual drag reorder: move `draggedId` to where `targetId` sits, persist the new
+  // order_idx sequence for the visible scope. Only meaningful in manual sort.
+  const reorderByDrag = useCallback(
+    async (draggedId: string, targetId: string) => {
+      if (draggedId === targetId) return;
+      const ids = reorderableIds;
+      const from = ids.indexOf(draggedId);
+      const to = ids.indexOf(targetId);
+      if (from < 0 || to < 0) return;
+      const next = [...ids];
+      next.splice(from, 1);
+      next.splice(to, 0, draggedId);
+      await window.nodus.reorderNotes(next);
+      await refresh();
+    },
+    [reorderableIds, refresh]
+  );
+
   return (
     <div className="h-full flex min-h-0">
       {/* Folder tree */}
@@ -591,9 +612,23 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
               key={note.id}
               note={note}
               active={note.id === activeId}
+              draggable={sortMode === 'manual' && !search.trim()}
+              dragging={draggingId === note.id}
+              dragOver={dragOverId === note.id && draggingId !== note.id}
               onOpen={() => void openNote(note)}
               onMove={() => setMovingNote(note)}
               onDelete={() => setPendingNoteDelete(note)}
+              onDragStart={() => setDraggingId(note.id)}
+              onDragEnterRow={() => setDragOverId(note.id)}
+              onDropRow={() => {
+                if (draggingId) void reorderByDrag(draggingId, note.id);
+                setDraggingId(null);
+                setDragOverId(null);
+              }}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setDragOverId(null);
+              }}
             />
           ))}
         </div>
@@ -964,25 +999,65 @@ function FolderRow({
 function NoteListItem({
   note,
   active,
+  draggable,
+  dragging,
+  dragOver,
   onOpen,
   onMove,
   onDelete,
+  onDragStart,
+  onDragEnterRow,
+  onDropRow,
+  onDragEnd,
 }: {
   note: Note;
   active: boolean;
+  draggable: boolean;
+  dragging: boolean;
+  dragOver: boolean;
   onOpen: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onDragStart: () => void;
+  onDragEnterRow: () => void;
+  onDropRow: () => void;
+  onDragEnd: () => void;
 }) {
   const snippet = useMemo(() => plainSnippet(note.content), [note.content]);
   return (
     <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        // Firefox requires data to be set for the drag to start.
+        e.dataTransfer.setData('text/plain', note.id);
+        onDragStart();
+      }}
+      onDragEnter={() => {
+        if (draggable) onDragEnterRow();
+      }}
+      onDragOver={(e) => {
+        if (draggable) e.preventDefault(); // allow drop
+      }}
+      onDrop={(e) => {
+        if (!draggable) return;
+        e.preventDefault();
+        onDropRow();
+      }}
+      onDragEnd={onDragEnd}
       className={`group rounded-md border px-2.5 py-2 cursor-pointer transition-colors ${
         active ? 'bg-indigo-600/15 border-indigo-700' : 'border-transparent hover:bg-neutral-900'
-      }`}
+      } ${dragging ? 'opacity-40' : ''} ${dragOver ? 'border-indigo-500 border-dashed' : ''}`}
       onClick={onOpen}
     >
       <div className="flex items-center gap-1.5">
+        {draggable && (
+          <Icon
+            name="list"
+            size={12}
+            className="shrink-0 cursor-grab text-neutral-700 group-hover:text-neutral-500"
+          />
+        )}
         <Badge color={KIND_COLORS[note.kind]}>{t(KIND_LABELS[note.kind])}</Badge>
         <span className="flex-1 min-w-0 truncate text-sm font-medium" title={note.title}>
           {note.title}

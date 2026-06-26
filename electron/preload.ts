@@ -206,6 +206,7 @@ const api: NodusApi = {
   exportNotes: (options) => ipcRenderer.invoke('notes:export', options),
   reorderNotes: (noteIds) => ipcRenderer.invoke('notes:reorder', noteIds).then(() => undefined),
   reorderNotesByAI: (noteIds) => ipcRenderer.invoke('notes:reorderByAI', noteIds),
+  verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),

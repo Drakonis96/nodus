@@ -32,6 +32,7 @@ import type {
   UpdateNoteInput,
   ManualIdeaPayload,
   NotesExportOptions,
+  CitationRef,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -60,6 +61,7 @@ import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
+import { verifyCitations } from './citations/verifyCitations';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { summaryContentHash } from './ai/summaryScan';
@@ -522,6 +524,7 @@ export function registerIpc(
     notes.reorderNotes(noteIds);
   });
   h('notes:reorderByAI', async (_e, noteIds: string[]) => reorderNotesByAI(noteIds));
+  h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));

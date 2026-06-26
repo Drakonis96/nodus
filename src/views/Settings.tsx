@@ -789,6 +789,8 @@ function SidebarOrderEditor({
   onReorder: (ids: string[]) => void;
 }) {
   const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const move = (index: number, dir: -1 | 1) => {
     const target = index + dir;
@@ -798,13 +800,49 @@ function SidebarOrderEditor({
     onReorder(ids);
   };
 
+  const drop = (targetId: string) => {
+    if (!draggingId || draggingId === targetId) return;
+    const ids: string[] = items.map((n) => n.id);
+    const from = ids.indexOf(draggingId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, draggingId);
+    onReorder(ids);
+  };
+
   return (
     <ul className="space-y-1">
       {items.map((item, index) => (
         <li
           key={item.id}
-          className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-1.5"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', item.id);
+            setDraggingId(item.id);
+          }}
+          onDragEnter={() => setDragOverId(item.id)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            drop(item.id);
+            setDraggingId(null);
+            setDragOverId(null);
+          }}
+          onDragEnd={() => {
+            setDraggingId(null);
+            setDragOverId(null);
+          }}
+          className={`flex items-center gap-2 rounded-md border bg-neutral-900/40 px-3 py-1.5 transition-colors ${
+            draggingId === item.id ? 'opacity-40' : ''
+          } ${
+            dragOverId === item.id && draggingId !== item.id
+              ? 'border-indigo-500 border-dashed'
+              : 'border-neutral-800'
+          }`}
         >
+          <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
           <Icon name={item.icon} size={15} className="text-neutral-500 shrink-0" />
           <span className="flex-1 min-w-0 truncate text-sm text-neutral-200">{t(item.label)}</span>
           <button

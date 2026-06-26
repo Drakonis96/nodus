@@ -514,3 +514,33 @@ body {
   background: rgba(217, 119, 6, 0.2);
   color: #78350f;
 }
+/* Unverified citation: the cited source did not resolve in the corpus (stale id
+   or a hallucinated reference). Overrides the per-kind colours, so it is placed
+   after them to win on equal specificity. */
+.md .citation-link[data-verified='false'] {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
+  border-style: dashed;
+}
+.md .citation-link[data-verified='false']::before {
+  content: '?';
+}
+.md .citation-link[data-verified='false']:hover {
+  background: rgba(239, 68, 68, 0.24);
+  color: #fecaca;
+  border-color: rgba(252, 165, 165, 0.8);
+}
+.md .citation-link[data-verified='false'] .citation-warn {
+  font-size: 0.9em;
+  line-height: 1;
+}
+.light .md .citation-link[data-verified='false'] {
+  background: rgba(220, 38, 38, 0.1);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.45);
+}
+.light .md .citation-link[data-verified='false']:hover {
+  background: rgba(220, 38, 38, 0.18);
+  color: #991b1b;
+}
