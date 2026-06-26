@@ -527,9 +527,17 @@ export function purgeDeepData(nodusId: string): void {
     db.prepare('DELETE FROM gaps WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM external_refs WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM work_authors WHERE nodus_id = ?').run(nodusId);
-    // Drop ideas that no longer have any occurrence.
+    // Drop ideas that no longer have any occurrence — but never user-authored
+    // manual ideas, which are owned by a note and may legitimately have no works
+    // linked yet. Without this guard a deep re-scan of any work would silently
+    // delete a manual idea that has no occurrences.
     db.prepare(
-      'DELETE FROM ideas WHERE global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)'
+      `DELETE FROM ideas
+         WHERE global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
+           AND global_id NOT IN (
+             SELECT json_extract(source_json, '$.ref') FROM notes
+              WHERE json_extract(source_json, '$.note') = 'manual-idea'
+           )`
     ).run();
     db.prepare(
       `DELETE FROM edges

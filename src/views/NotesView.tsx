@@ -4,7 +4,9 @@ import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { MANUAL_IDEA_MARKER } from '@shared/types';
 import { buildNotesTree, countNotesInSubtree, flattenFolders, type FolderNode } from '../notesTree';
+import { ManualIdeaEditor } from './ManualIdeaEditor';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
@@ -216,6 +218,18 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
     window.setTimeout(() => textareaRef.current?.focus(), 0);
   }, [persistBuffer, refresh, targetFolderId]);
 
+  const createManualIdeaNote = useCallback(async () => {
+    await persistBuffer();
+    const { note } = await window.nodus.createManualIdea({ folderId: targetFolderId() });
+    const tree = await refresh();
+    const fresh = tree.notes.find((n) => n.id === note.id) ?? note;
+    setActiveId(fresh.id);
+    setEditTitle(fresh.title);
+    setEditContent(fresh.content);
+    setDirty(false);
+    setMode('preview');
+  }, [persistBuffer, refresh, targetFolderId]);
+
   const commitRename = useCallback(async () => {
     if (!renamingFolderId) return;
     const id = renamingFolderId;
@@ -418,6 +432,13 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
             <span className="font-semibold text-sm flex-1 truncate" title={scopeTitle}>
               {scopeTitle}
             </span>
+            <button
+              className="btn btn-ghost border border-neutral-700 text-xs gap-1 py-1"
+              title={t('Crear una idea manual indexable')}
+              onClick={() => void createManualIdeaNote()}
+            >
+              <Icon name="bulb" size={13} /> {t('Idea')}
+            </button>
             <button className="btn btn-primary text-xs gap-1 py-1" onClick={() => void createNote()}>
               <Icon name="plus" size={13} /> {t('Nota')}
             </button>
@@ -464,6 +485,14 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
           <div className="flex-1 flex items-center justify-center text-neutral-500 text-sm px-8 text-center">
             {t('Selecciona una nota o crea una nueva para empezar a escribir.')}
           </div>
+        ) : activeNote.source?.note === MANUAL_IDEA_MARKER && activeNote.source.ref ? (
+          <ManualIdeaEditor
+            key={activeNote.id}
+            note={activeNote}
+            globalId={activeNote.source.ref}
+            onSaved={() => void refresh()}
+            onOpenGraph={onOpenGraph}
+          />
         ) : (
           <>
             <header className="px-4 py-3 border-b border-neutral-800 flex flex-wrap items-center gap-2">

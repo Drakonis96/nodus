@@ -197,6 +197,12 @@ const api: NodusApi = {
   moveNote: (id, folderId) => ipcRenderer.invoke('notes:move', id, folderId),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id).then(() => undefined),
 
+  createManualIdea: (input) => ipcRenderer.invoke('manualIdeas:create', input),
+  saveManualIdea: (payload) => ipcRenderer.invoke('manualIdeas:save', payload).then(() => undefined),
+  autoIndexManualIdea: (input) => ipcRenderer.invoke('manualIdeas:autoIndex', input),
+  searchIdeaCandidates: (query, excludeIds, limit) =>
+    ipcRenderer.invoke('manualIdeas:searchCandidates', query, excludeIds, limit),
+
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),

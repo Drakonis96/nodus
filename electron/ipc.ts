@@ -30,7 +30,13 @@ import type {
   CreateNoteFolderInput,
   CreateNoteInput,
   UpdateNoteInput,
+  ManualIdeaPayload,
 } from '@shared/types';
+
+// Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
+// electron sub-build erases type-only @shared imports but cannot resolve the
+// alias for a runtime value import.
+const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, stopMcpServer } from './mcp';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
@@ -74,6 +80,7 @@ import { getPassageDetail } from './db/passagesRepo';
 import { discoverSemanticBridges, isSemanticBridgeRunning, onSemanticBridgeProgress } from './ai/semanticBridges';
 import * as chat from './db/chatRepo';
 import * as notes from './db/notesRepo';
+import * as manualIdeas from './db/manualIdeasRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
 import * as workSummaries from './db/workSummariesRepo';
@@ -483,8 +490,28 @@ export function registerIpc(
   h('notes:update', async (_e, input: UpdateNoteInput) => notes.updateNote(input));
   h('notes:move', async (_e, id: string, folderId: string | null) => notes.moveNote(id, folderId ?? null));
   h('notes:delete', async (_e, id: string) => {
+    // A manual idea is owned by its note: deleting the note purges the idea and
+    // everything indexed for it (occurrences, evidence, edges, embedding).
+    const note = notes.getNote(id);
+    if (note?.source?.note === MANUAL_IDEA_MARKER && note.source.ref) {
+      manualIdeas.deleteManualIdea(note.source.ref);
+    }
     notes.deleteNote(id);
   });
+
+  // manual ideas (user-authored, note-owned graph ideas)
+  h('manualIdeas:create', async (_e, input: { folderId: string | null; title?: string }) =>
+    manualIdeas.createManualIdea(input)
+  );
+  h('manualIdeas:save', async (_e, payload: ManualIdeaPayload) => {
+    manualIdeas.saveManualIdea(payload);
+  });
+  h('manualIdeas:autoIndex', async (_e, input: { globalId: string; title: string; summary: string; excludeIds?: string[] }) =>
+    manualIdeas.autoIndexManualIdea(input)
+  );
+  h('manualIdeas:searchCandidates', async (_e, query: string, excludeIds?: string[], limit?: number) =>
+    manualIdeas.searchIdeaCandidates(query, excludeIds ?? [], limit ?? 20)
+  );
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));

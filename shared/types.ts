@@ -1078,6 +1078,63 @@ export interface UpdateNoteInput {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Manual ideas — user-authored ideas that live in the graph, owned by a note.
+// The note's `source.note` carries MANUAL_IDEA_MARKER and `source.ref` the idea
+// id, so deleting the note also purges the idea and its indexing.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const MANUAL_IDEA_MARKER = 'manual-idea';
+
+/** A work the manual idea is developed in, plus the user's note on how. */
+export interface ManualIdeaWorkLink {
+  nodusId: string;
+  development: string;
+}
+
+/** An anchored quote, optionally tied to one of the linked works. */
+export interface ManualIdeaEvidence {
+  nodusId: string | null;
+  quote: string;
+  location: string | null;
+}
+
+/** A connection from this idea to another idea (manual or accepted suggestion). */
+export interface ManualIdeaConnection {
+  toId: string;
+  toLabel: string;
+  type: EdgeType;
+  confidence: number;
+  /** 'inferred' when accepted from the auto-index search, 'explicit' when hand-added. */
+  basis: EdgeBasis;
+}
+
+export interface ManualIdeaPayload {
+  globalId: string;
+  noteId: string;
+  title: string;
+  summary: string;
+  works: ManualIdeaWorkLink[];
+  evidence: ManualIdeaEvidence[];
+  connections: ManualIdeaConnection[];
+}
+
+/** A candidate idea returned by the connection search or the auto-index suggestions. */
+export interface IdeaCandidate {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  similarity?: number;
+}
+
+export interface AutoIndexResult {
+  indexed: boolean;
+  /** Null when no embedding provider is configured / embedding failed. */
+  message: string | null;
+  suggestions: IdeaCandidate[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1494,6 +1551,16 @@ export interface NodusApi {
   /** Move a note to another folder (null = unfiled / root). */
   moveNote(id: string, folderId: string | null): Promise<Note | null>;
   deleteNote(id: string): Promise<void>;
+
+  // manual ideas (user-authored, note-owned graph ideas)
+  /** Create an empty manual idea plus the note that owns it. */
+  createManualIdea(input: { folderId: string | null; title?: string }): Promise<{ note: Note; globalId: string }>;
+  /** Replace the structured data (title, summary, works, evidence, connections) of a manual idea. */
+  saveManualIdea(payload: ManualIdeaPayload): Promise<void>;
+  /** Embed the idea and return semantically related ideas to connect to. */
+  autoIndexManualIdea(input: { globalId: string; title: string; summary: string; excludeIds?: string[] }): Promise<AutoIndexResult>;
+  /** Keyword search over existing ideas to add a manual connection. */
+  searchIdeaCandidates(query: string, excludeIds?: string[], limit?: number): Promise<IdeaCandidate[]>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;
