@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, SyncLogEntry } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView } from './views/HomeView';
@@ -28,22 +28,8 @@ import type {
   PendingGraphNavigationTarget,
   View,
 } from './navigation';
+import { orderedNav } from './navigation';
 import nodusLogo from './assets/nodus-logo.svg';
-
-const NAV: { id: View; label: string; icon: string }[] = [
-  { id: 'home', label: 'Inicio', icon: 'home' },
-  { id: 'graph', label: 'Grafo', icon: 'layers' },
-  { id: 'argument', label: 'Mapa de argumentos', icon: 'map' },
-  { id: 'ideas', label: 'Ideas', icon: 'bulb' },
-  { id: 'library', label: 'Biblioteca', icon: 'book' },
-  { id: 'gaps', label: 'Huecos', icon: 'gap' },
-  { id: 'debate', label: 'Debates', icon: 'scale' },
-  { id: 'research', label: 'Cobertura', icon: 'compass' },
-  { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
-  { id: 'writing', label: 'Escritura', icon: 'edit' },
-  { id: 'notes', label: 'Notas', icon: 'notebook' },
-  { id: 'settings', label: 'Ajustes', icon: 'settings' },
-];
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -56,6 +42,9 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Sidebar sections in the user's chosen order (Home always pinned first).
+  const nav = useMemo(() => orderedNav(settings?.sidebarOrder ?? []), [settings?.sidebarOrder]);
 
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
@@ -207,7 +196,7 @@ export function App() {
         {/* Sidebar (collapsible via the Nodus logo) */}
         {!navCollapsed && (
           <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <button
                 key={n.id}
                 data-tour={`nav-${n.id}`}

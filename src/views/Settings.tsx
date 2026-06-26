@@ -4,6 +4,7 @@ import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { orderedNav } from '../navigation';
 import { t } from '../i18n';
 
 const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
@@ -309,6 +310,16 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                 onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
               />
             </Row>
+          </Section>
+
+          <Section title={t('Barra lateral')}>
+            <p className="text-xs text-neutral-500 -mt-1">
+              {t('Reordena las secciones del menú lateral. «Inicio» queda siempre la primera.')}
+            </p>
+            <SidebarOrderEditor
+              sidebarOrder={settings.sidebarOrder}
+              onReorder={(ids) => void patch({ sidebarOrder: ids })}
+            />
           </Section>
 
           <Section title={t('Ayuda')}>
@@ -763,6 +774,58 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Reorder the sidebar sections with up/down controls. Home is pinned first and
+ * not shown here; the saved order is the list of the remaining view ids.
+ */
+function SidebarOrderEditor({
+  sidebarOrder,
+  onReorder,
+}: {
+  sidebarOrder: string[];
+  onReorder: (ids: string[]) => void;
+}) {
+  const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home');
+
+  const move = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= items.length) return;
+    const ids = items.map((n) => n.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    onReorder(ids);
+  };
+
+  return (
+    <ul className="space-y-1">
+      {items.map((item, index) => (
+        <li
+          key={item.id}
+          className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-1.5"
+        >
+          <Icon name={item.icon} size={15} className="text-neutral-500 shrink-0" />
+          <span className="flex-1 min-w-0 truncate text-sm text-neutral-200">{t(item.label)}</span>
+          <button
+            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+            title={t('Subir')}
+            disabled={index === 0}
+            onClick={() => move(index, -1)}
+          >
+            <Icon name="arrowUp" size={14} />
+          </button>
+          <button
+            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+            title={t('Bajar')}
+            disabled={index === items.length - 1}
+            onClick={() => move(index, 1)}
+          >
+            <Icon name="arrowDown" size={14} />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 

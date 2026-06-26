@@ -229,3 +229,19 @@ export function moveNote(id: string, folderId: string | null): Note | null {
 export function deleteNote(id: string): boolean {
   return getDb().prepare('DELETE FROM notes WHERE id = ?').run(id).changes > 0;
 }
+
+/**
+ * Persist an explicit ordering for a set of notes: each note's order_idx becomes
+ * its position in `ids`. Used by the AI reorder and its undo. Notes are usually
+ * all from one scope (a folder, or the whole workspace); order_idx only needs to
+ * be consistent relative to the notes shown together.
+ */
+export function reorderNotes(ids: string[]): void {
+  const db = getDb();
+  // Reordering must not bump updated_at — that would corrupt the "by date" sort.
+  const stmt = db.prepare('UPDATE notes SET order_idx = ? WHERE id = ?');
+  const tx = db.transaction(() => {
+    ids.forEach((id, index) => stmt.run(index, id));
+  });
+  tx();
+}

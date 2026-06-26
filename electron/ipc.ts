@@ -31,6 +31,7 @@ import type {
   CreateNoteInput,
   UpdateNoteInput,
   ManualIdeaPayload,
+  NotesExportOptions,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -57,6 +58,8 @@ import * as rqRepo from './db/researchMapRepo';
 import { decomposeQuestion, mapCoverage } from './ai/researchMap';
 import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
+import { exportNotes } from './export/notesExport';
+import { reorderNotesByAI } from './ai/notesOrder';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { summaryContentHash } from './ai/summaryScan';
@@ -512,6 +515,13 @@ export function registerIpc(
   h('manualIdeas:searchCandidates', async (_e, query: string, excludeIds?: string[], limit?: number) =>
     manualIdeas.searchIdeaCandidates(query, excludeIds ?? [], limit ?? 20)
   );
+
+  // notes export + reordering
+  h('notes:export', async (_e, options: NotesExportOptions) => exportNotes(options));
+  h('notes:reorder', async (_e, noteIds: string[]) => {
+    notes.reorderNotes(noteIds);
+  });
+  h('notes:reorderByAI', async (_e, noteIds: string[]) => reorderNotesByAI(noteIds));
 
   // embedding pipeline
   h('embeddings:start', async (_e, nodusIds?: string[]) => startEmbedding(nodusIds));

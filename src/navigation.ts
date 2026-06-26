@@ -4,6 +4,51 @@ export type View = 'home' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' 
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
+export interface NavItem {
+  id: View;
+  label: string;
+  icon: string;
+}
+
+// Canonical sidebar sections in their default order. Home is always rendered
+// first and cannot be moved; the rest can be reordered from Settings.
+export const NAV_ITEMS: NavItem[] = [
+  { id: 'home', label: 'Inicio', icon: 'home' },
+  { id: 'graph', label: 'Grafo', icon: 'layers' },
+  { id: 'argument', label: 'Mapa de argumentos', icon: 'map' },
+  { id: 'ideas', label: 'Ideas', icon: 'bulb' },
+  { id: 'library', label: 'Biblioteca', icon: 'book' },
+  { id: 'gaps', label: 'Huecos', icon: 'gap' },
+  { id: 'debate', label: 'Debates', icon: 'scale' },
+  { id: 'research', label: 'Cobertura', icon: 'compass' },
+  { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
+  { id: 'writing', label: 'Escritura', icon: 'edit' },
+  { id: 'notes', label: 'Notas', icon: 'notebook' },
+  { id: 'settings', label: 'Ajustes', icon: 'settings' },
+];
+
+/**
+ * Resolve the sidebar items for a user-defined order. Home is pinned first and
+ * is never part of the saved order. Any sections missing from `sidebarOrder`
+ * (e.g. a view added in a newer version) are appended in their default order so
+ * the list always stays complete.
+ */
+export function orderedNav(sidebarOrder: string[]): NavItem[] {
+  const home = NAV_ITEMS.find((n) => n.id === 'home');
+  const rest = NAV_ITEMS.filter((n) => n.id !== 'home');
+  const remaining = new Map(rest.map((n) => [n.id, n] as const));
+  const ordered: NavItem[] = [];
+  for (const id of sidebarOrder) {
+    const item = remaining.get(id as View);
+    if (item) {
+      ordered.push(item);
+      remaining.delete(id as View);
+    }
+  }
+  for (const n of rest) if (remaining.has(n.id)) ordered.push(n);
+  return home ? [home, ...ordered] : ordered;
+}
+
 export interface GraphNavigationTarget {
   nonce: number;
   preset?: GraphPresetId;

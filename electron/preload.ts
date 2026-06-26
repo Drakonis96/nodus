@@ -203,6 +203,10 @@ const api: NodusApi = {
   searchIdeaCandidates: (query, excludeIds, limit) =>
     ipcRenderer.invoke('manualIdeas:searchCandidates', query, excludeIds, limit),
 
+  exportNotes: (options) => ipcRenderer.invoke('notes:export', options),
+  reorderNotes: (noteIds) => ipcRenderer.invoke('notes:reorder', noteIds).then(() => undefined),
+  reorderNotesByAI: (noteIds) => ipcRenderer.invoke('notes:reorderByAI', noteIds),
+
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),

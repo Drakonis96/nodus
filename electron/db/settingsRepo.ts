@@ -41,6 +41,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   mcpEnabled: false,
   mcpPort: 4319,
   mcpToken: '',
+  sidebarOrder: [],
 };
 
 function readRaw(key: string): string | undefined {

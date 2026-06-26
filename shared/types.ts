@@ -311,6 +311,12 @@ export interface AppSettings {
   mcpPort: number;
   /** Bearer token for the local MCP endpoint. This is intentionally visible in Settings. */
   mcpToken: string;
+  /**
+   * User-defined order of the sidebar sections, as view ids. Excludes 'home'
+   * (always pinned first). Empty means the default order. Unknown/missing ids
+   * are reconciled against the canonical nav list at render time.
+   */
+  sidebarOrder: string[];
 }
 
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
@@ -1134,6 +1140,29 @@ export interface AutoIndexResult {
   suggestions: IdeaCandidate[];
 }
 
+/** How a work's bibliography is rendered in a notes export. */
+export type NotesExportBibliography = 'full' | 'zotero' | 'none';
+
+/** Granular options for the structured notes export. */
+export interface NotesExportOptions {
+  format: 'markdown' | 'json';
+  /** Root of the export: a folder id (its whole subtree) or null for every note. */
+  folderId: string | null;
+  /** Include each note's raw Markdown body. */
+  includeContent: boolean;
+  /** Include anchored evidence for idea notes. */
+  includeEvidence: boolean;
+  /** Include the connections of idea notes. */
+  includeRelations: boolean;
+  /** Per-work bibliography detail: full citation, Zotero item key only, or nothing. */
+  bibliography: NotesExportBibliography;
+}
+
+/** Result of an AI logical reorder of the notes in one scope. */
+export interface NotesReorderResult {
+  orderedIds: string[];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1561,6 +1590,13 @@ export interface NodusApi {
   autoIndexManualIdea(input: { globalId: string; title: string; summary: string; excludeIds?: string[] }): Promise<AutoIndexResult>;
   /** Keyword search over existing ideas to add a manual connection. */
   searchIdeaCandidates(query: string, excludeIds?: string[], limit?: number): Promise<IdeaCandidate[]>;
+
+  /** Export notes (and their ideas/relations/bibliography) to a structured file. */
+  exportNotes(options: NotesExportOptions): Promise<{ path: string } | null>;
+  /** Persist an explicit note order (order_idx = position). Used for AI reorder + undo. */
+  reorderNotes(noteIds: string[]): Promise<void>;
+  /** Ask the AI to order the given notes into a logical sequence; persists and returns it. */
+  reorderNotesByAI(noteIds: string[]): Promise<NotesReorderResult>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;

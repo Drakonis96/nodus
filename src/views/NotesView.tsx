@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { EdgeDetail, Note, NoteFolder, NoteKind, NotesTree } from '@shared/types';
+import type {
+  EdgeDetail,
+  Note,
+  NoteFolder,
+  NoteKind,
+  NotesExportBibliography,
+  NotesExportOptions,
+  NotesTree,
+} from '@shared/types';
 import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -11,6 +19,17 @@ import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
 type FolderScope = { kind: 'all' } | { kind: 'unfiled' } | { kind: 'folder'; id: string };
+
+// How the note list is ordered. `manual` is the persisted order_idx (what the AI
+// reorder writes to); the others are non-destructive view sorts.
+type SortMode = 'manual' | 'alpha' | 'created-desc' | 'created-asc';
+
+const SORT_LABELS: Record<SortMode, string> = {
+  manual: 'Orden manual',
+  alpha: 'Alfabético (A–Z)',
+  'created-desc': 'Creación: recientes primero',
+  'created-asc': 'Creación: antiguas primero',
+};
 
 // Persisted, draggable widths for the folder tree and note list columns so long
 // chapter/idea titles can be read in full when the user wants.
@@ -66,6 +85,12 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
   const [pendingFolderDelete, setPendingFolderDelete] = useState<NoteFolder | null>(null);
   const [pendingNoteDelete, setPendingNoteDelete] = useState<Note | null>(null);
   const [movingNote, setMovingNote] = useState<Note | null>(null);
+
+  const [sortMode, setSortMode] = useState<SortMode>('manual');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [aiReordering, setAiReordering] = useState(false);
+  // After an AI reorder we keep the previous manual order so the user can undo.
+  const [reorderUndo, setReorderUndo] = useState<string[] | null>(null);
 
   const [treeWidth, setTreeWidth] = useState(() => loadWidth(TREE_WIDTH_KEY, TREE_DEFAULT, TREE_MIN, TREE_MAX));
   const [listWidth, setListWidth] = useState(() => loadWidth(LIST_WIDTH_KEY, LIST_DEFAULT, LIST_MIN, LIST_MAX));
@@ -345,8 +370,58 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
     else list = notes.filter((n) => n.folderId === scope.id);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
-    return [...list].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
-  }, [notes, scope, search]);
+    const sorted = [...list];
+    switch (sortMode) {
+      case 'alpha':
+        sorted.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }));
+        break;
+      case 'created-desc':
+        sorted.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+        break;
+      case 'created-asc':
+        sorted.sort((a, b) => (a.createdAt > b.createdAt ? 1 : a.createdAt < b.createdAt ? -1 : 0));
+        break;
+      case 'manual':
+      default:
+        // Persisted sequence; ties fall back to creation order for stability.
+        sorted.sort((a, b) => a.orderIdx - b.orderIdx || (a.createdAt < b.createdAt ? -1 : 1));
+        break;
+    }
+    return sorted;
+  }, [notes, scope, search, sortMode]);
+
+  // Notes eligible for an AI reorder: the visible scope in manual order. We snapshot
+  // their ids so the AI receives a concrete set and the undo can restore it.
+  const reorderableIds = useMemo(() => visibleNotes.map((n) => n.id), [visibleNotes]);
+
+  const runAiReorder = useCallback(async () => {
+    if (aiReordering || reorderableIds.length < 2) return;
+    await persistBuffer();
+    setAiReordering(true);
+    // Snapshot the persisted (manual) sequence of this set so undo restores it,
+    // regardless of the view sort the user is currently looking at.
+    const inScope = new Set(reorderableIds);
+    const previous = notes
+      .filter((n) => inScope.has(n.id))
+      .sort((a, b) => a.orderIdx - b.orderIdx || (a.createdAt < b.createdAt ? -1 : 1))
+      .map((n) => n.id);
+    try {
+      await window.nodus.reorderNotesByAI(reorderableIds);
+      setSortMode('manual');
+      setReorderUndo(previous);
+      await refresh();
+    } finally {
+      setAiReordering(false);
+    }
+  }, [aiReordering, notes, persistBuffer, refresh, reorderableIds]);
+
+  const undoReorder = useCallback(async () => {
+    if (!reorderUndo) return;
+    const order = reorderUndo;
+    setReorderUndo(null);
+    await window.nodus.reorderNotes(order);
+    await refresh();
+  }, [reorderUndo, refresh]);
 
   return (
     <div className="h-full flex min-h-0">
@@ -456,6 +531,54 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <select
+              className="input text-xs py-1 flex-1 min-w-0"
+              title={t('Ordenar notas')}
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+            >
+              {(Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+                <option key={m} value={m}>
+                  {t(SORT_LABELS[m])}
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn btn-ghost border border-neutral-700 text-xs gap-1 py-1 shrink-0"
+              title={t('Reordenar las notas con IA en una secuencia lógica')}
+              disabled={aiReordering || reorderableIds.length < 2}
+              onClick={() => void runAiReorder()}
+            >
+              <Icon name={aiReordering ? 'sync' : 'wand'} size={13} className={aiReordering ? 'animate-spin' : ''} />
+              {t('IA')}
+            </button>
+            <button
+              className="btn btn-ghost border border-neutral-700 text-xs py-1 shrink-0"
+              title={t('Exportar notas (Markdown o JSON)')}
+              onClick={() => setExportOpen(true)}
+            >
+              <Icon name="download" size={13} />
+            </button>
+          </div>
+          {reorderUndo && (
+            <div className="flex items-center gap-2 rounded-md border border-indigo-700/60 bg-indigo-600/10 px-2.5 py-1.5 text-xs">
+              <Icon name="wand" size={13} className="text-indigo-300 shrink-0" />
+              <span className="flex-1 text-indigo-200">{t('Notas reordenadas por IA.')}</span>
+              <button
+                className="text-neutral-400 hover:text-neutral-100"
+                onClick={() => void undoReorder()}
+              >
+                {t('Deshacer')}
+              </button>
+              <button
+                className="font-medium text-indigo-300 hover:text-indigo-200"
+                onClick={() => setReorderUndo(null)}
+              >
+                {t('Mantener')}
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
           {visibleNotes.length === 0 && (
@@ -656,6 +779,14 @@ export function NotesView({ onOpenGraph }: { onOpenGraph?: (target: PendingGraph
             await moveNoteToFolder(id, folderId);
           }}
           onClose={() => setMovingNote(null)}
+        />
+      )}
+
+      {exportOpen && (
+        <ExportNotesModal
+          folders={flatFolders}
+          defaultFolderId={scope.kind === 'folder' ? scope.id : null}
+          onClose={() => setExportOpen(false)}
         />
       )}
     </div>
@@ -1026,6 +1157,208 @@ function MoveNoteModal({
         </footer>
       </div>
     </div>
+  );
+}
+
+/**
+ * Granular export of the notes workspace. The user picks the scope (a folder
+ * subtree or everything), the format, and which structured pieces to include
+ * (bodies, anchored evidence, idea connections, bibliography detail). The actual
+ * file is written by the main process via a native save dialog.
+ */
+function ExportNotesModal({
+  folders,
+  defaultFolderId,
+  onClose,
+}: {
+  folders: { folder: NoteFolder; depth: number }[];
+  defaultFolderId: string | null;
+  onClose: () => void;
+}) {
+  const [options, setOptions] = useState<NotesExportOptions>({
+    format: 'markdown',
+    folderId: defaultFolderId,
+    includeContent: true,
+    includeEvidence: true,
+    includeRelations: true,
+    bibliography: 'full',
+  });
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const set = <K extends keyof NotesExportOptions>(key: K, value: NotesExportOptions[K]) =>
+    setOptions((prev) => ({ ...prev, [key]: value }));
+
+  const runExport = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await window.nodus.exportNotes(options);
+      if (result) setDone(result.path);
+      else onClose(); // user cancelled the save dialog
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-lg overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
+          <Icon name="download" className="text-indigo-300" />
+          <span className="text-sm font-semibold">{t('Exportar notas')}</span>
+          <div className="flex-1" />
+          <button className="btn btn-ghost" onClick={onClose} title={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </header>
+
+        {done ? (
+          <div className="space-y-3 p-4">
+            <p className="flex items-center gap-2 text-sm text-green-300">
+              <Icon name="check" /> {t('Exportación completada.')}
+            </p>
+            <p className="break-all rounded-md border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs text-neutral-400">
+              {done}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4 p-4 text-sm">
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-neutral-400">{t('Alcance')}</span>
+              <select
+                className="input w-full"
+                value={options.folderId ?? ''}
+                onChange={(e) => set('folderId', e.target.value || null)}
+              >
+                <option value="">{t('Todo el espacio de notas')}</option>
+                {folders.map(({ folder, depth }) => (
+                  <option key={folder.id} value={folder.id}>
+                    {`${'  '.repeat(depth)}${depth > 0 ? '↳ ' : ''}${folder.name}`}
+                  </option>
+                ))}
+              </select>
+              <span className="text-[11px] text-neutral-600">
+                {t('Se incluyen las subcarpetas del alcance elegido.')}
+              </span>
+            </label>
+
+            <div className="space-y-1">
+              <span className="text-xs font-medium text-neutral-400">{t('Formato')}</span>
+              <div className="flex rounded-md border border-neutral-700 overflow-hidden">
+                {(['markdown', 'json'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    className={`flex-1 px-3 py-1.5 text-xs ${
+                      options.format === fmt ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'
+                    }`}
+                    onClick={() => set('format', fmt)}
+                  >
+                    {fmt === 'markdown' ? t('Markdown') : t('JSON')}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-neutral-600">
+                {options.format === 'markdown'
+                  ? t('Jerarquía legible, ideal para entregar a una IA.')
+                  : t('Estructura completa con ids y metadatos, ideal para procesar.')}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-medium text-neutral-400">{t('Contenido')}</span>
+              <ExportCheck
+                label={t('Cuerpo de cada nota')}
+                checked={options.includeContent}
+                onChange={(v) => set('includeContent', v)}
+              />
+              <ExportCheck
+                label={t('Evidencia anclada de las ideas')}
+                checked={options.includeEvidence}
+                onChange={(v) => set('includeEvidence', v)}
+              />
+              <ExportCheck
+                label={t('Conexiones entre ideas')}
+                checked={options.includeRelations}
+                onChange={(v) => set('includeRelations', v)}
+              />
+            </div>
+
+            <label className="block space-y-1">
+              <span className="text-xs font-medium text-neutral-400">{t('Bibliografía')}</span>
+              <select
+                className="input w-full"
+                value={options.bibliography}
+                onChange={(e) => set('bibliography', e.target.value as NotesExportBibliography)}
+              >
+                <option value="full">{t('Cita completa (autores, año, tipo, clave Zotero)')}</option>
+                <option value="zotero">{t('Solo clave de Zotero (item id)')}</option>
+                <option value="none">{t('Sin datos bibliográficos')}</option>
+              </select>
+            </label>
+
+            {error && <p className="text-xs text-red-400">{error}</p>}
+          </div>
+        )}
+
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-800 px-4 py-3">
+          {done ? (
+            <button className="btn btn-primary" onClick={onClose}>
+              {t('Cerrar')}
+            </button>
+          ) : (
+            <>
+              <button className="btn btn-ghost" onClick={onClose}>
+                {t('Cancelar')}
+              </button>
+              <button className="btn btn-primary gap-1.5" onClick={() => void runExport()} disabled={busy}>
+                <Icon name={busy ? 'sync' : 'download'} className={busy ? 'animate-spin' : ''} />
+                {busy ? t('Exportando…') : t('Exportar')}
+              </button>
+            </>
+          )}
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function ExportCheck({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-neutral-300 cursor-pointer">
+      <input
+        type="checkbox"
+        className="accent-indigo-500"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      {label}
+    </label>
   );
 }
 
