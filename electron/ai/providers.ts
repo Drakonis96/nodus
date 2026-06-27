@@ -30,10 +30,56 @@ export function openAiCompatBase(provider: AiProvider): string | null {
   }
 }
 
-/** Providers whose chat models reliably honor OpenAI's response_format: json_object. */
+/**
+ * Providers whose chat models accept OpenAI's response_format: json_object.
+ * openai/deepseek honor it natively; openrouter and gemini accept it through their
+ * OpenAI-compatible surfaces. A model that ignores/rejects it is caught by the
+ * caller's 400 fallback, which strips the optional params and retries plainly — so
+ * enabling it broadly trades a rare extra round-trip for far fewer JSON-repair calls.
+ */
 export function supportsJsonMode(provider: AiProvider): boolean {
-  return provider === 'openai' || provider === 'deepseek';
+  return provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'gemini';
 }
+
+/** How hard a model should "think" before answering. `off` asks reasoning models to
+ *  skip the chain-of-thought (much faster) where the provider supports it. */
+export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
+
+/**
+ * Extra request-body fields that control a model's reasoning, per provider. Returns
+ * an empty object when the provider exposes no usable OpenAI-compat knob. The caller
+ * retries without these on a 400, so it is safe to be slightly optimistic here.
+ */
+export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Record<string, unknown> {
+  switch (provider) {
+    case 'openrouter':
+      // OpenRouter's unified `reasoning` param: disable entirely, or pick an effort.
+      return effort === 'off' ? { reasoning: { enabled: false } } : { reasoning: { effort } };
+    case 'gemini':
+      // Gemini's OpenAI-compat surface accepts reasoning_effort, including "none".
+      return { reasoning_effort: effort === 'off' ? 'none' : effort };
+    case 'openai':
+      // Only the reasoning (o-series / gpt-5) models honor reasoning_effort; sending
+      // it elsewhere 400s and the caller strips it. Omit for "off" (the default).
+      return effort === 'off' ? {} : { reasoning_effort: effort };
+    case 'deepseek':
+    case 'anthropic':
+      // DeepSeek selects thinking via the model id (chat vs reasoner); Anthropic uses
+      // its own SDK path. Neither has a usable OpenAI-compat reasoning knob here.
+      return {};
+  }
+}
+
+/** OpenRouter-only provider routing preference: bias toward the fastest upstream. */
+export function openRouterRoutingBody(sortByThroughput: boolean): Record<string, unknown> {
+  return sortByThroughput ? { provider: { sort: 'throughput' } } : {};
+}
+
+/** Attribution headers OpenRouter uses for ranking/rate-limit identity. */
+export const OPENROUTER_HEADERS: Record<string, string> = {
+  'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
+  'X-Title': 'Nodus',
+};
 
 function byId(a: ModelInfo, b: ModelInfo): number {
   return a.id.localeCompare(b.id);
@@ -109,11 +155,13 @@ async function listOpenRouter(): Promise<ModelInfo[]> {
   // OpenRouter's model list is public (no key required).
   const res = await fetch('https://openrouter.ai/api/v1/models');
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: { id: string; name?: string }[] };
+  const data = (await res.json()) as { data?: { id: string; name?: string; supported_parameters?: string[] }[] };
   const models: ModelInfo[] = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
+    // Flag reasoning models so the picker can warn they are slower for scanning.
+    reasoning: (m.supported_parameters ?? []).includes('reasoning'),
   }));
   // Sort by upstream provider, then model id.
   return models.sort((a, b) => (a.group! === b.group! ? a.id.localeCompare(b.id) : a.group!.localeCompare(b.group!)));

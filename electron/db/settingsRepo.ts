@@ -26,6 +26,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   promptLanguage: 'es',
   animationSpeed: 1,
   concurrency: 1,
+  chatReasoning: 'off',
+  openRouterThroughput: true,
   unpaywallEmail: '',
   onboardingComplete: false,
   tourComplete: false,

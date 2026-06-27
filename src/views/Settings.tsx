@@ -502,6 +502,31 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
                 onChange={(e) => patch({ concurrency: parseInt(e.target.value) || 1 })}
               />
             </Row>
+            <Row
+              label={t('Razonamiento (chat/tutor/escritura)')}
+              hint={t('Los escaneos siempre usan razonamiento desactivado para ir más rápido. Esto solo afecta a las respuestas conversacionales.')}
+            >
+              <select
+                className="input"
+                value={settings.chatReasoning}
+                onChange={(e) => patch({ chatReasoning: e.target.value as AppSettings['chatReasoning'] })}
+              >
+                <option value="off">{t('Desactivado (más rápido)')}</option>
+                <option value="low">{t('Bajo')}</option>
+                <option value="medium">{t('Medio')}</option>
+                <option value="high">{t('Alto (más lento)')}</option>
+              </select>
+            </Row>
+            <Row
+              label={t('OpenRouter: priorizar velocidad')}
+              hint={t('Enruta hacia el proveedor más rápido disponible. Puede aumentar ligeramente el coste.')}
+            >
+              <input
+                type="checkbox"
+                checked={settings.openRouterThroughput}
+                onChange={(e) => patch({ openRouterThroughput: e.target.checked })}
+              />
+            </Row>
             <Row label={t('Email Unpaywall (fallback de texto)')}>
               <input className="input" value={settings.unpaywallEmail} onChange={(e) => patch({ unpaywallEmail: e.target.value })} />
             </Row>
@@ -877,10 +902,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <label className="text-sm text-neutral-300">{label}</label>
+      <label className="text-sm text-neutral-300">
+        {label}
+        {hint && <span className="mt-0.5 block text-xs text-neutral-500">{hint}</span>}
+      </label>
       <div>{children}</div>
     </div>
   );

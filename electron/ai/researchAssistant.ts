@@ -78,7 +78,7 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
 
 export async function streamResearchChat(
   request: ResearchChatRequest,
-  onDelta: (delta: string) => void
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void
 ): Promise<ResearchChatResponse> {
   const { system, user, stats } = await buildResearchChatPrompt(request);
   const answer = await completeTextStream(

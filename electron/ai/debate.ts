@@ -82,7 +82,7 @@ function buildDebatePrompt(debate: Debate): { system: string; user: string } {
  */
 export async function streamDebateAnalysis(
   request: DebateAnalysisRequest,
-  onDelta: (delta: string) => void
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void
 ): Promise<DebateAnalysisResponse> {
   const debate = getDebate(request.debateId);
   if (!debate) throw new AiError('No se encontró el debate solicitado.', false, false);

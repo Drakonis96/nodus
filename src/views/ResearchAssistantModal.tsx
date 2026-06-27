@@ -170,6 +170,8 @@ const ASSISTANT_MODES: {
 
 interface UiMessage extends ChatMessageRecord {
   id: string;
+  /** Live reasoning/thinking trace from the model. Transient — never persisted. */
+  reasoning?: string;
 }
 
 export function ResearchAssistantModal({
@@ -412,6 +414,13 @@ export function ResearchAssistantModal({
               )
             );
             window.setTimeout(updateJumpIndicator, 0);
+          },
+          onReasoning: (delta) => {
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantId ? { ...message, reasoning: (message.reasoning ?? '') + delta } : message
+              )
+            );
           },
         }
       );
@@ -675,6 +684,16 @@ export function ResearchAssistantModal({
                           <Icon name={copiedMessageId === message.id ? 'check' : 'copy'} size={13} />
                         </button>
                       </div>
+                      {message.role === 'assistant' && message.reasoning?.trim() && (
+                        <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
+                          <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
+                            {t('Razonamiento')}
+                          </summary>
+                          <div className="max-h-48 overflow-y-auto whitespace-pre-wrap px-2 pb-2 text-[11px] text-neutral-500">
+                            {message.reasoning}
+                          </div>
+                        </details>
+                      )}
                       {message.role === 'assistant' && !message.error && message.content ? (
                         <Markdown
                           content={message.content}

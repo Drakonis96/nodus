@@ -247,7 +247,13 @@ export interface ModelInfo {
   name?: string;
   /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */
   group?: string;
+  /** For OpenRouter: true when the model is a reasoning model (slower for scans). */
+  reasoning?: boolean;
 }
+
+/** How hard a model should "think" before answering. `off` skips the chain-of-thought
+ *  on reasoning models where the provider supports it (much faster for scanning). */
+export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
 
 export interface AppSettings {
   embeddingProvider: EmbeddingProvider;
@@ -286,6 +292,11 @@ export interface AppSettings {
   promptLanguage: AppLanguage;
   animationSpeed: number; // 0..1
   concurrency: number;
+  // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
+  // Scans always run with reasoning off for speed, regardless of this value.
+  chatReasoning: ReasoningEffort;
+  // When using OpenRouter, bias routing toward the fastest upstream provider.
+  openRouterThroughput: boolean;
   unpaywallEmail: string;
   onboardingComplete: boolean;
   // First-run usage tour (distinct from the setup onboarding above).
@@ -578,6 +589,8 @@ export interface DebateAnalysisRequest {
 }
 export interface DebateAnalysisStreamHandlers {
   onDelta(delta: string): void;
+  /** Reasoning/thinking trace, streamed for live display only. */
+  onReasoning?(delta: string): void;
 }
 export interface DebateAnalysisResponse {
   analysis: string;
@@ -832,6 +845,8 @@ export interface ResearchChatResponse {
 
 export interface ResearchChatStreamHandlers {
   onDelta(delta: string): void;
+  /** Reasoning/thinking trace, streamed for live display only. */
+  onReasoning?(delta: string): void;
   onStats?(stats: ResearchContextStats): void;
 }
 
@@ -925,6 +940,8 @@ export interface TutorStepResponse {
 
 export interface TutorStepStreamHandlers {
   onDelta(delta: string): void;
+  /** Reasoning/thinking trace, streamed for live display only. */
+  onReasoning?(delta: string): void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

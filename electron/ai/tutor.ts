@@ -714,7 +714,7 @@ export async function answerTutorStep(request: TutorStepRequest): Promise<TutorS
 
 export async function streamTutorStep(
   request: TutorStepRequest,
-  onDelta: (delta: string) => void
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void
 ): Promise<TutorStepResponse> {
   const { system, user } = buildStepPrompt(request);
   const explanation = await completeTextStream({ system, user, temperature: 0.35, maxTokens: 1600 }, onDelta, request.model);

@@ -103,11 +103,16 @@ const api: NodusApi = {
     const onDelta = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onDelta(delta);
     };
+    const onReasoning = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onReasoning?.(delta);
+    };
     ipcRenderer.on('debates:analyzeStream:delta', onDelta);
+    ipcRenderer.on('debates:analyzeStream:reasoning', onReasoning);
     try {
       return await ipcRenderer.invoke('debates:analyzeStream', requestId, request);
     } finally {
       ipcRenderer.removeListener('debates:analyzeStream:delta', onDelta);
+      ipcRenderer.removeListener('debates:analyzeStream:reasoning', onReasoning);
     }
   },
 
@@ -136,13 +141,18 @@ const api: NodusApi = {
     const onDelta = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onDelta(delta);
     };
+    const onReasoning = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onReasoning?.(delta);
+    };
     ipcRenderer.on('research:chatStream:delta', onDelta);
+    ipcRenderer.on('research:chatStream:reasoning', onReasoning);
     try {
       const response = await ipcRenderer.invoke('research:chatStream', requestId, request);
       handlers.onStats?.(response.stats);
       return response;
     } finally {
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
+      ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
     }
   },
 
@@ -165,11 +175,16 @@ const api: NodusApi = {
     const onDelta = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onDelta(delta);
     };
+    const onReasoning = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onReasoning?.(delta);
+    };
     ipcRenderer.on('tutor:stepStream:delta', onDelta);
+    ipcRenderer.on('tutor:stepStream:reasoning', onReasoning);
     try {
       return await ipcRenderer.invoke('tutor:stepStream', requestId, request);
     } finally {
       ipcRenderer.removeListener('tutor:stepStream:delta', onDelta);
+      ipcRenderer.removeListener('tutor:stepStream:reasoning', onReasoning);
     }
   },
 

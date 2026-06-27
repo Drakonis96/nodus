@@ -240,6 +240,14 @@ function ModelList({
         <span className="flex-1 truncate" title={m.name ?? m.id}>
           {m.name ? `${m.id}` : m.id}
         </span>
+        {m.reasoning && (
+          <span
+            className="shrink-0 rounded bg-amber-950/60 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-400/90"
+            title={t('Modelo de razonamiento: más lento para escanear.')}
+          >
+            {t('razona')}
+          </span>
+        )}
       </div>
     );
   }

@@ -397,8 +397,9 @@ export function registerIpc(
   // debates (contradiction face-offs)
   h('debates:list', async () => getDebates());
   h('debates:analyzeStream', async (e, requestId: string, request: DebateAnalysisRequest) =>
-    streamDebateAnalysis(request, (delta) => {
-      e.sender.send('debates:analyzeStream:delta', requestId, delta);
+    streamDebateAnalysis(request, (delta, kind) => {
+      const channel = kind === 'reasoning' ? 'debates:analyzeStream:reasoning' : 'debates:analyzeStream:delta';
+      e.sender.send(channel, requestId, delta);
     })
   );
 
@@ -424,8 +425,9 @@ export function registerIpc(
   // research assistant
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) =>
-    streamResearchChat(request, (delta) => {
-      e.sender.send('research:chatStream:delta', requestId, delta);
+    streamResearchChat(request, (delta, kind) => {
+      const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
+      e.sender.send(channel, requestId, delta);
     })
   );
 
@@ -448,8 +450,9 @@ export function registerIpc(
   h('tutor:routes:delete', async (_e, routeId: string) => tutorRoutes.deleteTutorRoute(routeId));
   h('tutor:step', async (_e, request: TutorStepRequest) => answerTutorStep(request));
   h('tutor:stepStream', async (e, requestId: string, request: TutorStepRequest) =>
-    streamTutorStep(request, (delta) => {
-      e.sender.send('tutor:stepStream:delta', requestId, delta);
+    streamTutorStep(request, (delta, kind) => {
+      const channel = kind === 'reasoning' ? 'tutor:stepStream:reasoning' : 'tutor:stepStream:delta';
+      e.sender.send(channel, requestId, delta);
     })
   );
 

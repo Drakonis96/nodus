@@ -23,6 +23,8 @@ interface AnalysisState {
   text: string;
   loading: boolean;
   error?: string;
+  /** Live reasoning/thinking trace from the model. Transient — never persisted. */
+  reasoning?: string;
 }
 
 export function DebateView({
@@ -82,7 +84,17 @@ export function DebateView({
           onDelta: (delta) =>
             setAnalyses((prev) => ({
               ...prev,
-              [debate.id]: { text: (prev[debate.id]?.text ?? '') + delta, loading: true },
+              [debate.id]: { ...prev[debate.id], text: (prev[debate.id]?.text ?? '') + delta, loading: true },
+            })),
+          onReasoning: (delta) =>
+            setAnalyses((prev) => ({
+              ...prev,
+              [debate.id]: {
+                ...prev[debate.id],
+                text: prev[debate.id]?.text ?? '',
+                loading: true,
+                reasoning: (prev[debate.id]?.reasoning ?? '') + delta,
+              },
             })),
         }
       )
@@ -323,6 +335,16 @@ function DebateCard({
             <p className="text-xs text-red-400">{analysis.error}</p>
           ) : (
             <>
+              {analysis.reasoning?.trim() && (
+                <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!analysis.text.trim()}>
+                  <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
+                    {t('Razonamiento')}
+                  </summary>
+                  <div className="max-h-48 overflow-y-auto whitespace-pre-wrap px-2 pb-2 text-[11px] text-neutral-500">
+                    {analysis.reasoning}
+                  </div>
+                </details>
+              )}
               <Markdown content={analysis.text} className="text-sm" onCitation={(c: MarkdownCitation) => onCite(c)} />
               {!analysis.loading && analysis.text.trim() && (
                 <div className="mt-3">

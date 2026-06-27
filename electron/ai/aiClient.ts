@@ -1,7 +1,13 @@
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
-import { openAiCompatBase, supportsJsonMode } from './providers';
-import type { EmbeddingProvider, ModelRef } from '@shared/types';
+import {
+  openAiCompatBase,
+  supportsJsonMode,
+  reasoningBody,
+  openRouterRoutingBody,
+  OPENROUTER_HEADERS,
+} from './providers';
+import type { EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -22,9 +28,14 @@ interface CallOpts {
   temperature?: number;
   maxTokens?: number;
   perf?: PerfContext;
+  /** Reasoning effort. Defaults to `off` for JSON/scan calls and to the configured
+   *  `chatReasoning` for conversational calls. */
+  reasoning?: ReasoningEffort;
 }
 
-type TextDeltaHandler = (delta: string) => void;
+/** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
+ *  the model's reasoning/thinking trace (`reasoning`). */
+type TextDeltaHandler = (delta: string, kind?: 'content' | 'reasoning') => void;
 
 /**
  * Output-language control. The prompts are written in Spanish; when the user picks
@@ -64,7 +75,34 @@ function resolveModel(override?: ModelRef | null): ModelRef {
   return def;
 }
 
-async function rawComplete(model: ModelRef, opts: CallOpts, jsonMode = true): Promise<string> {
+/**
+ * Optional, model-specific request-body fields layered onto an OpenAI-compatible
+ * call: JSON mode, reasoning control, and OpenRouter throughput routing. These can
+ * be rejected by some models, so callers retry once without them on a 400.
+ */
+function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEffort): Record<string, unknown> {
+  return {
+    ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
+    ...reasoningBody(model.provider, reasoning),
+    ...(model.provider === 'openrouter' ? openRouterRoutingBody(getSettings().openRouterThroughput) : {}),
+  };
+}
+
+function openAiClientHeaders(model: ModelRef): Record<string, string> | undefined {
+  return model.provider === 'openrouter' ? OPENROUTER_HEADERS : undefined;
+}
+
+/** True for a provider 400 (bad request) — used to retry without the optional params. */
+function isBadRequest(e: any): boolean {
+  return (e?.status ?? e?.response?.status) === 400;
+}
+
+async function rawComplete(
+  model: ModelRef,
+  opts: CallOpts,
+  jsonMode = true,
+  reasoning: ReasoningEffort = 'off'
+): Promise<string> {
   const key = getApiKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
@@ -89,18 +127,36 @@ async function rawComplete(model: ModelRef, opts: CallOpts, jsonMode = true): Pr
   // OpenAI-compatible providers: openai, openrouter, deepseek, gemini.
   const baseURL = openAiCompatBase(model.provider);
   const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey: key, baseURL: baseURL ?? undefined, timeout: 180_000, maxRetries: 0 });
+  const client = new OpenAI({
+    apiKey: key,
+    baseURL: baseURL ?? undefined,
+    timeout: 180_000,
+    maxRetries: 0,
+    defaultHeaders: openAiClientHeaders(model),
+  });
+  const baseBody = {
+    model: model.model,
+    temperature: opts.temperature ?? 0.15,
+    max_tokens: opts.maxTokens ?? 8000,
+    messages: [
+      { role: 'system' as const, content: opts.system },
+      { role: 'user' as const, content: opts.user },
+    ],
+  };
+  const extras = optionalBody(model, jsonMode, reasoning);
   try {
-    const res = await client.chat.completions.create({
-      model: model.model,
-      temperature: opts.temperature ?? 0.15,
-      max_tokens: opts.maxTokens ?? 8000,
-      ...(jsonMode && supportsJsonMode(model.provider) ? { response_format: { type: 'json_object' as const } } : {}),
-      messages: [
-        { role: 'system', content: opts.system },
-        { role: 'user', content: opts.user },
-      ],
-    });
+    let res;
+    try {
+      res = await client.chat.completions.create({ ...baseBody, ...extras } as any);
+    } catch (e: any) {
+      // The optional reasoning/JSON/routing params may be unsupported by this model.
+      // Retry once as a plain request before surfacing the error.
+      if (isBadRequest(e) && Object.keys(extras).length > 0) {
+        res = await client.chat.completions.create(baseBody as any);
+      } else {
+        throw e;
+      }
+    }
     const choice = res.choices[0];
     const content = choice?.message?.content ?? '';
     if (!content.trim()) {
@@ -217,6 +273,8 @@ export async function completeJson<T>(
 ): Promise<T> {
   const resolved = resolveModel(model);
   const langOpts = withPromptLanguage(opts);
+  // JSON/structured calls (scans, extraction) default to reasoning off for speed.
+  const reasoning = langOpts.reasoning ?? 'off';
   let lastErr: unknown;
   const attempts = [
     { temperature: langOpts.temperature ?? 0.15, jsonMode: true },
@@ -228,7 +286,7 @@ export async function completeJson<T>(
     const retryDone = startPerf('JSON retry', langOpts.perf, { attempt: i + 1, jsonMode: attempt.jsonMode });
     let text: string;
     try {
-      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode);
+      text = await rawComplete(resolved, { ...langOpts, temperature: attempt.temperature }, attempt.jsonMode, reasoning);
     } catch (e) {
       // Provider/transport failure (timeout, empty response, rate limit, 5xx, bad key).
       // Each call can burn the full 180s timeout, so looping here would let a hung
@@ -252,7 +310,8 @@ export async function completeJson<T>(
 /** Plain-text completion for conversational assistant responses. */
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
-  return rawComplete(resolved, withPromptLanguage(opts), false);
+  const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
+  return rawComplete(resolved, withPromptLanguage(opts), false, reasoning);
 }
 
 /** Plain-text streaming completion. The returned string is the full accumulated answer. */
@@ -262,18 +321,30 @@ export async function completeTextStream(
   model?: ModelRef | null
 ): Promise<string> {
   const resolved = resolveModel(model);
-  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta);
+  const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
+  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta, reasoning);
 }
 
-async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextDeltaHandler): Promise<string> {
+async function rawCompleteStream(
+  model: ModelRef,
+  opts: CallOpts,
+  onDelta: TextDeltaHandler,
+  reasoning: ReasoningEffort = 'off'
+): Promise<string> {
   const key = getApiKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
   let full = '';
-  const emit = (delta: string | null | undefined) => {
+  // Content deltas accumulate into the returned answer; reasoning deltas are streamed
+  // for live display only and never become part of the saved answer.
+  const emitContent = (delta: string | null | undefined) => {
     if (!delta) return;
     full += delta;
-    onDelta(delta);
+    onDelta(delta, 'content');
+  };
+  const emitReasoning = (delta: string | null | undefined) => {
+    if (!delta) return;
+    onDelta(delta, 'reasoning');
   };
 
   if (model.provider === 'anthropic') {
@@ -289,8 +360,9 @@ async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextD
         messages: [{ role: 'user', content: opts.user }],
       });
       for await (const event of stream as AsyncIterable<any>) {
-        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emit(event.delta.text);
-        else if (event?.type === 'text') emit(event.text);
+        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
+        else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
+        else if (event?.type === 'text') emitContent(event.text);
       }
     } catch (e: any) {
       throw wrapProviderError(e);
@@ -301,23 +373,44 @@ async function rawCompleteStream(model: ModelRef, opts: CallOpts, onDelta: TextD
 
   const baseURL = openAiCompatBase(model.provider);
   const OpenAI = (await import('openai')).default;
-  const client = new OpenAI({ apiKey: key, baseURL: baseURL ?? undefined, timeout: 180_000, maxRetries: 0 });
+  const client = new OpenAI({
+    apiKey: key,
+    baseURL: baseURL ?? undefined,
+    timeout: 180_000,
+    maxRetries: 0,
+    defaultHeaders: openAiClientHeaders(model),
+  });
+  const baseBody = {
+    model: model.model,
+    temperature: opts.temperature ?? 0.15,
+    max_tokens: opts.maxTokens ?? 8000,
+    stream: true as const,
+    messages: [
+      { role: 'system' as const, content: opts.system },
+      { role: 'user' as const, content: opts.user },
+    ],
+  };
+  // Streaming is plain text (no JSON mode); only reasoning + routing apply.
+  const extras = optionalBody(model, false, reasoning);
   try {
-    const stream = await client.chat.completions.create({
-      model: model.model,
-      temperature: opts.temperature ?? 0.15,
-      max_tokens: opts.maxTokens ?? 8000,
-      stream: true,
-      messages: [
-        { role: 'system', content: opts.system },
-        { role: 'user', content: opts.user },
-      ],
-    });
+    let stream;
+    try {
+      stream = await client.chat.completions.create({ ...baseBody, ...extras } as any);
+    } catch (e: any) {
+      if (isBadRequest(e) && Object.keys(extras).length > 0) {
+        stream = await client.chat.completions.create(baseBody as any);
+      } else {
+        throw e;
+      }
+    }
     for await (const chunk of stream as any) {
       if (chunk?.error) {
         throw new AiError(chunk.error.message ?? 'Error del proveedor durante el streaming.', false);
       }
-      emit(chunk?.choices?.[0]?.delta?.content);
+      const delta = chunk?.choices?.[0]?.delta;
+      // Reasoning trace: OpenRouter exposes `reasoning`, DeepSeek `reasoning_content`.
+      emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
+      emitContent(delta?.content);
     }
   } catch (e: any) {
     if (e instanceof AiError) throw e;

@@ -13,6 +13,8 @@ interface StepState {
   text: string;
   loading: boolean;
   error: boolean;
+  /** Live reasoning/thinking trace from the model. Transient — never persisted. */
+  reasoning?: string;
 }
 
 const STOP_KIND_LABEL: Record<TutorStop['kind'], string> = {
@@ -121,6 +123,12 @@ export function TutorPanel({
               updateSteps((current) => {
                 const previous = current[key] ?? { text: '', loading: true, error: false };
                 return { ...current, [key]: { ...previous, text: previous.text + delta } };
+              });
+            },
+            onReasoning: (delta) => {
+              updateSteps((current) => {
+                const previous = current[key] ?? { text: '', loading: true, error: false };
+                return { ...current, [key]: { ...previous, reasoning: (previous.reasoning ?? '') + delta } };
               });
             },
           }
@@ -732,6 +740,16 @@ function TourPanel({
       </div>
 
       <div className="text-sm text-neutral-200 min-h-[3rem]">
+        {step?.reasoning?.trim() && !step.error && (
+          <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!step.text.trim()}>
+            <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
+              {t('Razonamiento')}
+            </summary>
+            <div className="max-h-48 overflow-y-auto whitespace-pre-wrap px-2 pb-2 text-[11px] text-neutral-500">
+              {step.reasoning}
+            </div>
+          </details>
+        )}
         {step?.error ? (
           <div className="text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2 text-sm">
             <div>{step.text}</div>

@@ -213,6 +213,13 @@ export async function runDeepScan(
       }
       onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA…`, pct: i / chunks.length });
       const chunkWordCount = chunks[i].split(/\s+/).filter(Boolean).length;
+      // Heartbeat: the LLM call is non-streaming and can take a long time on slow
+      // (e.g. reasoning) models, so tick the elapsed seconds to show it isn't frozen.
+      const chunkStart = Date.now();
+      const heartbeat = setInterval(() => {
+        const secs = Math.round((Date.now() - chunkStart) / 1000);
+        onProgress?.({ detail: `Analizando fragmento ${i + 1}/${chunks.length} con IA… (${secs}s)`, pct: i / chunks.length });
+      }, 1000);
       const input = {
         zotero_key: work.zotero_key,
         title: work.title,
@@ -260,6 +267,8 @@ export async function runDeepScan(
         chunkDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
         llmDone({ status: 'error', chunk: i + 1 });
         throw e;
+      } finally {
+        clearInterval(heartbeat);
       }
     }
     llmDone({ results: results.length });
