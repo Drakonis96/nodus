@@ -755,6 +755,17 @@ export function listSuggestions(chapterId: string): ProjectInsertionSuggestion[]
     .all(chapterId) as SuggestionRow[]).map(toSuggestion);
 }
 
+/**
+ * Remove un-acted suggestions (still 'suggested' or 'blocked') for a chapter so a
+ * re-generation starts from a clean slate, while preserving the user's decisions
+ * (accepted / rejected / applied).
+ */
+export function clearPendingSuggestions(chapterId: string): void {
+  getDb()
+    .prepare("DELETE FROM project_insertion_suggestions WHERE chapter_id = ? AND status IN ('suggested', 'blocked')")
+    .run(chapterId);
+}
+
 export function saveSuggestions(suggestions: Omit<ProjectInsertionSuggestion, 'id' | 'createdAt' | 'updatedAt'>[]): ProjectInsertionSuggestion[] {
   const db = getDb();
   const created = now();

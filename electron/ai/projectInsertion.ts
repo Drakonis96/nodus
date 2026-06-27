@@ -7,7 +7,7 @@ import type {
   ProjectInsertionSuggestion,
   ProjectLink,
 } from '@shared/types';
-import { completeJson } from './aiClient';
+import { completeJson, embedMany } from './aiClient';
 import {
   citationUrl,
   dedupeRefs,
@@ -17,15 +17,23 @@ import {
 } from './citationSanitize';
 import { verifyCitations } from '../citations/verifyCitations';
 import * as projects from '../db/projectsRepo';
-import { getIdeaDetail, getEdgeDetail, getIdeaEdges } from '../db/ideasRepo';
+import { getIdeaDetail, getEdgeDetail, getIdeaEdges, findSimilarIdeas } from '../db/ideasRepo';
 import { getGapDetail } from '../db/gapsRepo';
 import { getNote, getNotesTree } from '../db/notesRepo';
 import { getWork } from '../db/worksRepo';
 
-const MATERIAL_LIMIT = 36;
+const MATERIAL_LIMIT = 48;
 const SHORT_CHAPTER_WORDS = 3200;
 const FULL_CONTEXT_CHUNK_LIMIT = 30;
 const LONG_CONTEXT_CHUNK_LIMIT = 16;
+
+// Corpus-wide semantic retrieval: a long chapter should connect to relevant ideas
+// from the whole graph, not just the few materials explicitly linked to the
+// project. We embed a spread of chapter chunks and pull the closest ideas.
+const SEMANTIC_IDEA_LIMIT = 30;
+const SEMANTIC_CHUNK_SAMPLE = 14;
+const SEMANTIC_IDEAS_PER_CHUNK = 8;
+const SEMANTIC_MIN_SIMILARITY = 0.28;
 
 interface SourceMaterial {
   kind: ChapterSuggestionKind;
@@ -79,13 +87,24 @@ export async function generateProjectSuggestions(
   if (!detail || !chapter || chapter.projectId !== request.projectId) return [];
 
   const allChunks = projects.listChapterChunks(chapter.id);
-  const materials = gatherMaterials(detail.links, request.sectionId ?? chapter.sectionId).slice(0, MATERIAL_LIMIT);
-  if (materials.length === 0 || allChunks.length === 0) return [];
+  if (allChunks.length === 0) return [];
+
+  // Materials = the user's explicitly linked materials first, then ideas
+  // retrieved semantically from the whole corpus so a long chapter is not limited
+  // to a handful of pinned sources.
+  const linkedMaterials = gatherMaterials(detail.links, request.sectionId ?? chapter.sectionId);
+  const linkedRefIds = new Set(linkedMaterials.map((m) => m.refId));
+  const semanticMaterials = await retrieveCorpusIdeas(allChunks, linkedRefIds);
+  const materials = dedupeMaterials([...linkedMaterials, ...semanticMaterials]).slice(0, MATERIAL_LIMIT);
+  if (materials.length === 0) return [];
 
   const selectedChunks = selectRelevantChunks(chapter.wordCount, allChunks, materials);
   // Aim high so a single pass surfaces every well-grounded insertion at once
   // instead of dribbling them out one click at a time.
   const limit = Math.max(1, Math.min(request.limit ?? 16, 24));
+  // Ask the model for one insertion per relevant material (capped by the limit).
+  // Weak models under-deliver, so this also feeds the deterministic top-up below.
+  const target = Math.max(1, Math.min(materials.length, limit));
   let raw: AiSuggestion[] = [];
   try {
     const ai = await completeJson<AiResponse>(
@@ -93,7 +112,8 @@ export async function generateProjectSuggestions(
         system: [
           'Eres un asistente academico dentro de Nodus.',
           'Tu tarea es proponer inserciones puntuales para un capitulo de manuscrito usando SOLO los materiales del proyecto que recibes.',
-          'Se EXHAUSTIVO: genera todas las inserciones bien fundamentadas que encuentres, idealmente una por material relevante para el capitulo. No te limites a una sola sugerencia.',
+          'Se EXHAUSTIVO: genera UNA sugerencia por cada material relevante para el capitulo. No agrupes varios materiales en una sola sugerencia ni te limites a unas pocas.',
+          'Devuelve al menos objetivo.numero_minimo sugerencias siempre que haya materiales suficientes (hay tantos materiales como para cubrir ese minimo).',
           'No copies literalmente evidencia ni texto de las fuentes. Parafrasea siempre, salvo que se pida una cita textual, que aqui no se pide.',
           'Cada texto propuesto debe incluir al menos una cita Markdown nodus:// verificable.',
           'Cita SOLO con los ids exactos que aparecen en "citationRefs" y "relatedRefs" de cada material. Tipos de cita validos: idea, work, gap, contradiction. NO cites pasajes ni uses ids de chunk.',
@@ -103,6 +123,7 @@ export async function generateProjectSuggestions(
         ].join('\n'),
         user: JSON.stringify(
           {
+            objetivo: { numero_minimo: target, una_sugerencia_por_material: true },
             proyecto: {
               titulo: detail.project.title,
               brief: detail.project.brief,
@@ -158,19 +179,90 @@ export async function generateProjectSuggestions(
     raw = fallbackSuggestions(selectedChunks, materials, limit);
   }
 
-  // Accumulate across clicks: skip suggestions already stored for the same
-  // chunk+material so repeated runs add only what's new, then return the full set.
-  const existing = projects.listSuggestions(chapter.id);
-  const existingKeys = new Set(existing.map((s) => `${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
+  // Top up: weak models often return only a handful even when asked to be
+  // exhaustive, leaving most of the retrieved corpus unconnected. Add
+  // deterministic, citation-backed suggestions for the relevant materials the
+  // model skipped, up to the target, so a long chapter gets the breadth of
+  // connections the user expects.
+  if (raw.length < target) {
+    const covered = new Set(raw.map((item) => item.refId).filter(Boolean));
+    const uncovered = materials.filter((material) => material.strong && !covered.has(material.refId));
+    raw = [...raw, ...fallbackSuggestions(selectedChunks, uncovered, target - raw.length)];
+  }
+
+  // Refresh the pending set: drop previous un-acted (suggested/blocked)
+  // suggestions so a re-run shows the current batch rather than piling up stale
+  // ones, but keep what the user already accepted/rejected/applied and don't
+  // re-propose those.
+  projects.clearPendingSuggestions(chapter.id);
+  const kept = projects.listSuggestions(chapter.id);
+  const keptKeys = new Set(kept.map((s) => `${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
   const normalized = normalizeSuggestions(raw, {
     projectId: request.projectId,
     chapterId: chapter.id,
     chunks: allChunks,
     materials,
     limit,
-  }).filter((s) => !existingKeys.has(`${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
+  }).filter((s) => !keptKeys.has(`${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
   if (normalized.length > 0) projects.saveSuggestions(normalized);
   return projects.listSuggestions(chapter.id);
+}
+
+/**
+ * Pull the ideas most semantically similar to the chapter's own text from the
+ * whole corpus. We sample chunks across the chapter (so coverage isn't biased to
+ * the start), embed them, and union the closest ideas — each becomes a full idea
+ * material with verifiable citations and its graph connections. No-op when no
+ * embedding provider is configured (embeds come back null) or nothing clears the
+ * similarity floor, so the flow degrades gracefully to linked materials only.
+ */
+async function retrieveCorpusIdeas(
+  chunks: ProjectChapterChunk[],
+  excludeRefIds: Set<string>
+): Promise<SourceMaterial[]> {
+  if (chunks.length === 0) return [];
+  const sample = sampleEvenly(chunks, SEMANTIC_CHUNK_SAMPLE);
+  let vectors: (number[] | null)[];
+  try {
+    vectors = await embedMany(sample.map((chunk) => clip(chunk.text, 2000)));
+  } catch {
+    return [];
+  }
+  const bestSimilarity = new Map<string, number>();
+  sample.forEach((_chunk, index) => {
+    const vector = vectors[index];
+    if (!vector) return;
+    for (const hit of findSimilarIdeas(vector, SEMANTIC_MIN_SIMILARITY, SEMANTIC_IDEAS_PER_CHUNK)) {
+      if (excludeRefIds.has(hit.global_id)) continue;
+      const prev = bestSimilarity.get(hit.global_id) ?? 0;
+      if (hit.similarity > prev) bestSimilarity.set(hit.global_id, hit.similarity);
+    }
+  });
+  return [...bestSimilarity.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SEMANTIC_IDEA_LIMIT)
+    .flatMap(([globalId]) => materialFromIdea(globalId, '', 'context'));
+}
+
+/** Pick up to `count` items spread evenly across the array (always includes the first). */
+function sampleEvenly<T>(items: T[], count: number): T[] {
+  if (items.length <= count) return items;
+  const step = items.length / count;
+  const out: T[] = [];
+  for (let i = 0; i < count; i++) out.push(items[Math.floor(i * step)]);
+  return out;
+}
+
+function dedupeMaterials(materials: SourceMaterial[]): SourceMaterial[] {
+  const seen = new Set<string>();
+  const out: SourceMaterial[] = [];
+  for (const material of materials) {
+    const key = `${material.kind}:${material.refId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(material);
+  }
+  return out;
 }
 
 function gatherMaterials(links: ProjectLink[], sectionId: string | null | undefined): SourceMaterial[] {

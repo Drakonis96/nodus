@@ -46,14 +46,22 @@ export function extractCitationRefs(text: string): CitationRef[] {
 
 /** Drop any [label](nodus://kind/id) whose `kind:id` isn't allowed, then tidy spacing/punctuation. */
 export function stripDisallowedCitations(text: string, allowed: Set<string>): string {
-  return text
-    .replace(new RegExp(`\\[[^\\]]*\\]\\(nodus:\\/\\/${ALL_LINK_KINDS}\\/([^\\s)]+)\\)`, 'g'), (match, kind, id) => {
-      const key = `${kind}:${decodeURIComponent(id)}`;
-      return allowed.has(key) ? match : '';
-    })
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([.,;:)])/g, '$1')
-    .replace(/\(\s*\)/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    text
+      // 1) Markdown citation links: keep allowed kind/id, drop everything else.
+      .replace(new RegExp(`\\[[^\\]]*\\]\\(nodus:\\/\\/${ALL_LINK_KINDS}\\/([^\\s)]+)\\)`, 'g'), (match, kind, id) => {
+        const key = `${kind}:${decodeURIComponent(id)}`;
+        return allowed.has(key) ? match : '';
+      })
+      // 2) Any leftover bare nodus:// URL in prose — including malformed ones with
+      //    no kind (e.g. `nodus://<uuid>`). The lookbehind protects the `](nodus://…)`
+      //    of the allowed links kept above so we only remove stray prose URLs.
+      .replace(/(?<!\]\()nodus:\/\/[^\s)\]]+/g, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\s+([.,;:)])/g, '$1')
+      .replace(/\(\s*\)/g, '')
+      .replace(/\[\s*\]/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }

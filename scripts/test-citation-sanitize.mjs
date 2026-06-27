@@ -92,6 +92,27 @@ try {
   const stripped = stripDisallowedCitations('Idea [x](nodus://idea/zzz).', new Set());
   assert.equal(stripped, 'Idea.', 'all-disallowed collapses cleanly');
 
+  // Exact reported scenario: a stray bare nodus://<uuid> in prose followed by a
+  // blocked [pasaje] chip. Both must vanish, leaving clean prose.
+  const reported =
+    'una esencia nacional que se pretende eterna e inalterable ' +
+    'nodus://9b1afd69-1511-4d88-bb85-e87aa2fed62b ' +
+    '[pasaje](nodus://passage/9b1afd69-1511-4d88-bb85-e87aa2fed62b).';
+  const fixed = stripDisallowedCitations(reported, new Set());
+  assert.ok(!fixed.includes('nodus://'), 'no nodus:// URL of any form remains');
+  assert.ok(!fixed.includes('9b1afd69'), 'the stray uuid is gone');
+  assert.ok(!fixed.includes('pasaje'), 'the blocked passage chip is gone');
+  assert.equal(fixed, 'una esencia nacional que se pretende eterna e inalterable.');
+
+  // A bare malformed nodus://<uuid> (no kind) is removed even when other
+  // citations are allowed, and allowed links survive intact.
+  const mixed = stripDisallowedCitations(
+    'A [b](nodus://idea/g-1) y nodus://9b1afd69-1511-4d88-bb85-e87aa2fed62b cierran.',
+    new Set(['idea:g-1'])
+  );
+  assert.ok(mixed.includes('[b](nodus://idea/g-1)'), 'allowed link untouched by bare-url removal');
+  assert.ok(!mixed.includes('9b1afd69'), 'bare malformed url removed');
+
   console.log('citation sanitiser test passed');
 } finally {
   await rm(tmp, { recursive: true, force: true });
