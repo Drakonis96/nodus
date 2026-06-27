@@ -1290,21 +1290,18 @@ export const EN: Record<string, string> = {
   '{considered} candidatas analizadas · {excluded} ya en la carpeta':
     '{considered} candidates analyzed · {excluded} already in the folder',
 
-  // ── Library · analysis-state filter ─────────────────────────────────────
-  'Estado de análisis': 'Analysis state',
-  'Filtrar por estado de análisis': 'Filter by analysis state',
-  'Sin filtrar por estado de análisis.': 'No analysis-state filter.',
-  'Sin analizar': 'Not analyzed',
-  'Nunca se ha procesado.': 'Never processed.',
-  'Temas extraídos': 'Themes extracted',
-  'Análisis ligero hecho; aún sin ideas.': 'Light analysis done; no ideas yet.',
+  // ── Library · status-flags filter ─────────────────────────────────────
+  Estado: 'Status',
+  'Filtrar por estado': 'Filter by status',
+  'Análisis profundo hecho': 'Deep analysis done',
+  'deep_status = done': 'deep_status = done',
+  'Resumen hecho': 'Summary done',
+  'summary_status = done': 'summary_status = done',
   'Ideas extraídas': 'Ideas extracted',
-  'Análisis profundo completado.': 'Deep analysis completed.',
-  'Con resumen': 'With summary',
-  'Tiene un resumen de orientación.': 'Has an orientation summary.',
-  'En cola o procesando': 'Queued or processing',
-  'Hay un análisis en marcha o pendiente.': 'An analysis is running or pending.',
-  'Con errores': 'With errors',
-  'Algún análisis falló.': 'An analysis failed.',
+  'tiene al menos una idea': 'has at least one idea',
+  'Pasajes completos': 'Passages complete',
+  'todos los fragmentos indexados y actuales': 'all passages indexed and current',
+  'deben cumplir todas': 'all must be satisfied',
+  'Estado:': 'Status:',
   // <<END_EN>>
 };

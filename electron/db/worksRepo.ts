@@ -1,5 +1,6 @@
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
+import { currentEmbeddingConfig } from './ideasRepo';
 import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus } from '@shared/types';
 
 function normalizeZoteroTag(tag: string): string {
@@ -150,29 +151,41 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
     clauses.push('summary_status = @summaryStatus');
     params.summaryStatus = filter.summaryStatus;
   }
-  // Combined, user-facing analysis state. Each value maps to a clear stage of the
-  // pipeline so the UI never exposes the raw light/deep/summary status soup.
-  switch (filter.analysisState) {
-    case 'unanalyzed':
-      clauses.push("light_status = 'none' AND deep_status = 'none'");
-      break;
-    case 'themes':
-      clauses.push("light_status = 'done' AND deep_status != 'done'");
-      break;
-    case 'ideas':
-      clauses.push("deep_status = 'done'");
-      break;
-    case 'summary':
-      clauses.push("summary_status = 'done'");
-      break;
-    case 'processing':
-      clauses.push("(light_status = 'pending' OR deep_status = 'pending' OR summary_status = 'pending')");
-      break;
-    case 'failed':
-      clauses.push("(light_status = 'failed' OR deep_status = 'failed' OR summary_status = 'failed')");
-      break;
-    default:
-      break;
+  const statusFlags = filter.statusFlags ?? [];
+  if (statusFlags.length > 0) {
+    for (const flag of statusFlags) {
+      switch (flag) {
+        case 'deep':
+          clauses.push("w.deep_status = 'done'");
+          break;
+        case 'summary':
+          clauses.push("w.summary_status = 'done'");
+          break;
+        case 'ideas':
+          clauses.push('EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)');
+          break;
+        case 'passages': {
+          const config = currentEmbeddingConfig();
+          params.passProv = config.provider;
+          params.passModel = config.model;
+          clauses.push(
+            `EXISTS (
+              SELECT 1 FROM passages p
+               WHERE p.nodus_id = w.nodus_id
+              HAVING COUNT(*) > 0
+                 AND SUM(CASE
+                           WHEN p.embedding IS NOT NULL
+                            AND p.embedding_provider = @passProv
+                            AND p.embedding_model    = @passModel
+                            AND p.embedding_dim > 0
+                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+                          THEN 1 ELSE 0 END) = COUNT(*)
+            )`
+          );
+          break;
+        }
+      }
+    }
   }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');
@@ -244,7 +257,7 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = db.prepare(`SELECT * FROM works ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
+  const rows = db.prepare(`SELECT * FROM works w ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
   if (rows.length === 0) return [];
 
   // Batch-load themes for all works in one query instead of N+1.

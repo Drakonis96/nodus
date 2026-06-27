@@ -1759,26 +1759,13 @@ export interface NodusApi {
   onUpdateProgress(cb: (event: UpdateProgressEvent) => void): () => void;
 }
 
-/**
- * A single, plain-language view of where a work sits in the analysis pipeline.
- * Replaces juggling the three raw status axes (light/deep/summary) in the UI.
- */
-export type AnalysisStateFilter =
-  | 'all'
-  | 'unanalyzed'
-  | 'themes'
-  | 'ideas'
-  | 'summary'
-  | 'processing'
-  | 'failed';
-
 export interface WorkFilter {
   search?: string;
-  /** Combined, user-facing analysis state. Preferred over the raw status axes below. */
-  analysisState?: AnalysisStateFilter;
   lightStatus?: LightStatus | 'all';
   deepStatus?: DeepStatus | 'all';
   summaryStatus?: SummaryStatus | 'all';
+  /** Presence conditions that must all be satisfied (AND). */
+  statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

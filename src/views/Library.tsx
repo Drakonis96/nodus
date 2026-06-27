@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   WorkView,
   WorkFilter,
-  AnalysisStateFilter,
   DeepStatus,
   LightStatus,
   SummaryStatus,
@@ -32,27 +31,21 @@ const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
-/**
- * The analysis pipeline expressed as plain, mutually-exclusive stages instead of
- * three raw status axes (light/deep/summary). Each option explains itself so the
- * old "pendiente vs ninguno" confusion disappears.
- */
-const ANALYSIS_STATES: { value: AnalysisStateFilter; label: string; desc: string }[] = [
-  { value: 'all', label: 'Todas', desc: 'Sin filtrar por estado de análisis.' },
-  { value: 'unanalyzed', label: 'Sin analizar', desc: 'Nunca se ha procesado.' },
-  { value: 'themes', label: 'Temas extraídos', desc: 'Análisis ligero hecho; aún sin ideas.' },
-  { value: 'ideas', label: 'Ideas extraídas', desc: 'Análisis profundo completado.' },
-  { value: 'summary', label: 'Con resumen', desc: 'Tiene un resumen de orientación.' },
-  { value: 'processing', label: 'En cola o procesando', desc: 'Hay un análisis en marcha o pendiente.' },
-  { value: 'failed', label: 'Con errores', desc: 'Algún análisis falló.' },
+type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages';
+
+const STATUS_FLAGS: { value: StatusFlag; label: string; desc: string }[] = [
+  { value: 'deep', label: 'Análisis profundo hecho', desc: 'deep_status = done' },
+  { value: 'summary', label: 'Resumen hecho', desc: 'summary_status = done' },
+  { value: 'ideas', label: 'Ideas extraídas', desc: 'tiene al menos una idea' },
+  { value: 'passages', label: 'Pasajes completos', desc: 'todos los fragmentos indexados y actuales' },
 ];
 
-function AnalysisStatePicker({
+function StatusFlagsPicker({
   value,
-  onChange,
+  onToggle,
 }: {
-  value: AnalysisStateFilter;
-  onChange: (value: AnalysisStateFilter) => void;
+  value: StatusFlag[];
+  onToggle: (flag: StatusFlag) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -72,8 +65,7 @@ function AnalysisStatePicker({
     };
   }, [open]);
 
-  const active = value !== 'all';
-  const current = ANALYSIS_STATES.find((s) => s.value === value) ?? ANALYSIS_STATES[0];
+  const active = value.length > 0;
 
   return (
     <div className="relative" ref={ref}>
@@ -84,35 +76,36 @@ function AnalysisStatePicker({
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <Icon name="list" /> {t('Estado de análisis')}
+        <Icon name="list" /> {t('Estado')}
         {active && (
-          <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{t(current.label)}</span>
+          <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{value.length}</span>
         )}
         <Icon name="chevronDown" size={13} className="opacity-70" />
       </button>
       {open && (
         <div
           role="dialog"
-          aria-label={t('Filtrar por estado de análisis')}
-          className="absolute left-0 z-30 mt-2 w-[20rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
+          aria-label={t('Filtrar por estado')}
+          className="absolute left-0 z-30 mt-2 w-[22rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
         >
-          {ANALYSIS_STATES.map((s) => {
-            const selected = s.value === value;
+          {STATUS_FLAGS.map((s) => {
+            const checked = value.includes(s.value);
             return (
               <button
                 key={s.value}
                 type="button"
-                className={`flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${selected ? 'bg-indigo-600/15' : 'hover:bg-neutral-900'}`}
-                onClick={() => {
-                  onChange(s.value);
-                  setOpen(false);
-                }}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${checked ? 'bg-indigo-600/15' : 'hover:bg-neutral-900'}`}
+                onClick={() => onToggle(s.value)}
               >
                 <span
-                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${selected ? 'bg-indigo-400' : 'bg-transparent'}`}
-                />
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                    checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
+                  }`}
+                >
+                  {checked && <Icon name="check" size={12} />}
+                </span>
                 <span className="min-w-0">
-                  <span className={`block text-sm ${selected ? 'text-indigo-200' : 'text-neutral-200'}`}>
+                  <span className={`block text-sm ${checked ? 'text-indigo-200' : 'text-neutral-200'}`}>
                     {t(s.label)}
                   </span>
                   <span className="block text-xs text-neutral-500">{t(s.desc)}</span>
@@ -202,7 +195,7 @@ export function Library({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
-  const [filter, setFilter] = useState<WorkFilter>({ analysisState: 'all' });
+  const [filter, setFilter] = useState<WorkFilter>({});
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -466,6 +459,15 @@ export function Library({
     setCollectionSearch('');
   };
 
+  const selectedStatusFlags = filter.statusFlags ?? [];
+  const toggleStatusFlag = (f: StatusFlag) =>
+    setFilter((cur) => {
+      const set = new Set(cur.statusFlags ?? []);
+      if (set.has(f)) set.delete(f); else set.add(f);
+      return { ...cur, statusFlags: [...set] };
+    });
+  const _clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
+
   // A batch action must only operate on the current result set.  Otherwise a
   // selection made before changing a tag/status filter can silently enqueue
   // works that are no longer visible.
@@ -533,9 +535,9 @@ export function Library({
             placeholder={t('Buscar título o autor…')}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
           />
-          <AnalysisStatePicker
-            value={filter.analysisState ?? 'all'}
-            onChange={(v) => setFilter((f) => ({ ...f, analysisState: v }))}
+          <StatusFlagsPicker
+            value={selectedStatusFlags}
+            onToggle={toggleStatusFlag}
           />
           <div className="relative">
             <button
@@ -766,6 +768,26 @@ export function Library({
                 {filter.collectionMode === 'all' ? t('deben estar todas') : t('basta cualquiera')}
               </span>
             )}
+          </div>
+        )}
+        {selectedStatusFlags.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+            <span>{t('Estado:')}</span>
+            {selectedStatusFlags.map((flag) => {
+              const meta = STATUS_FLAGS.find((f) => f.value === flag);
+              return (
+                <button
+                  key={flag}
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
+                  onClick={() => toggleStatusFlag(flag)}
+                  title={`${t('Quitar')} ${meta ? t(meta.label) : flag}`}
+                >
+                  {meta ? t(meta.label) : flag} <Icon name="x" size={12} />
+                </button>
+              );
+            })}
+            <span className="ml-1">{t('deben cumplir todas')}</span>
           </div>
         )}
       </div>
