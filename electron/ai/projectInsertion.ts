@@ -8,9 +8,16 @@ import type {
   ProjectLink,
 } from '@shared/types';
 import { completeJson } from './aiClient';
+import {
+  citationUrl,
+  dedupeRefs,
+  extractCitationRefs,
+  normalizeRefs,
+  stripDisallowedCitations,
+} from './citationSanitize';
 import { verifyCitations } from '../citations/verifyCitations';
 import * as projects from '../db/projectsRepo';
-import { getIdeaDetail, getEdgeDetail } from '../db/ideasRepo';
+import { getIdeaDetail, getEdgeDetail, getIdeaEdges } from '../db/ideasRepo';
 import { getGapDetail } from '../db/gapsRepo';
 import { getNote, getNotesTree } from '../db/notesRepo';
 import { getWork } from '../db/worksRepo';
@@ -25,11 +32,23 @@ interface SourceMaterial {
   refId: string;
   label: string;
   summary: string;
+  /** Primary citation(s) for this material (the idea/work/gap/contradiction itself). */
   citationRefs: CitationRef[];
+  /** Ideas this one connects to in the graph — citable so a suggestion can link them too. */
+  relatedRefs: CitationRef[];
   citationMarkdown: string;
   strong: boolean;
   role: ProjectLink['role'] | 'section_note';
 }
+
+const RELATION_VERB: Record<string, string> = {
+  supports: 'apoya a',
+  refutes: 'refuta a',
+  contradicts: 'contradice a',
+  refines: 'matiza a',
+  extends: 'extiende a',
+  contains: 'engloba a',
+};
 
 interface AiSuggestion {
   targetChunkId?: string | null;
@@ -64,7 +83,9 @@ export async function generateProjectSuggestions(
   if (materials.length === 0 || allChunks.length === 0) return [];
 
   const selectedChunks = selectRelevantChunks(chapter.wordCount, allChunks, materials);
-  const limit = Math.max(1, Math.min(request.limit ?? 8, 12));
+  // Aim high so a single pass surfaces every well-grounded insertion at once
+  // instead of dribbling them out one click at a time.
+  const limit = Math.max(1, Math.min(request.limit ?? 16, 24));
   let raw: AiSuggestion[] = [];
   try {
     const ai = await completeJson<AiResponse>(
@@ -72,8 +93,11 @@ export async function generateProjectSuggestions(
         system: [
           'Eres un asistente academico dentro de Nodus.',
           'Tu tarea es proponer inserciones puntuales para un capitulo de manuscrito usando SOLO los materiales del proyecto que recibes.',
+          'Se EXHAUSTIVO: genera todas las inserciones bien fundamentadas que encuentres, idealmente una por material relevante para el capitulo. No te limites a una sola sugerencia.',
           'No copies literalmente evidencia ni texto de las fuentes. Parafrasea siempre, salvo que se pida una cita textual, que aqui no se pide.',
           'Cada texto propuesto debe incluir al menos una cita Markdown nodus:// verificable.',
+          'Cita SOLO con los ids exactos que aparecen en "citationRefs" y "relatedRefs" de cada material. Tipos de cita validos: idea, work, gap, contradiction. NO cites pasajes ni uses ids de chunk.',
+          'Cuando un material conecta con otras ideas (relatedRefs), enlaza tambien esas ideas en el texto con su cita nodus:// para mostrar la conexion.',
           'Nunca inventes ids, autores, anos, obras ni fuentes. Si no puedes sostener una propuesta con una fuente disponible, no la incluyas.',
           'Devuelve solo JSON valido con la forma {"suggestions":[...]}',
         ].join('\n'),
@@ -101,6 +125,7 @@ export async function generateProjectSuggestions(
               role: material.role,
               summary: clip(material.summary, 1400),
               citationRefs: material.citationRefs,
+              relatedRefs: material.relatedRefs,
               citationMarkdown: material.citationMarkdown,
               autoApplicable: material.strong,
             })),
@@ -111,8 +136,8 @@ export async function generateProjectSuggestions(
                   kind: 'idea|gap|debate|work|note',
                   refId: 'id exacto del material usado',
                   operation: 'insert_after',
-                  proposedText: '1 parrafo breve, parafraseado, con cita Markdown nodus://',
-                  citationRefs: [{ kind: 'idea|work|gap|contradiction|passage', id: 'id exacto' }],
+                  proposedText: '1 parrafo breve, parafraseado, con una o varias citas Markdown nodus:// (incluye las ideas conectadas cuando aporten)',
+                  citationRefs: [{ kind: 'idea|work|gap|contradiction', id: 'id exacto de citationRefs/relatedRefs' }],
                   rationale: 'por que encaja aqui',
                   confidence: 0.72,
                 },
@@ -123,7 +148,7 @@ export async function generateProjectSuggestions(
           2
         ),
         temperature: 0.1,
-        maxTokens: 5200,
+        maxTokens: 8000,
       },
       isAiResponse,
       request.model ?? detail.project.model
@@ -133,15 +158,19 @@ export async function generateProjectSuggestions(
     raw = fallbackSuggestions(selectedChunks, materials, limit);
   }
 
+  // Accumulate across clicks: skip suggestions already stored for the same
+  // chunk+material so repeated runs add only what's new, then return the full set.
+  const existing = projects.listSuggestions(chapter.id);
+  const existingKeys = new Set(existing.map((s) => `${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
   const normalized = normalizeSuggestions(raw, {
     projectId: request.projectId,
     chapterId: chapter.id,
     chunks: allChunks,
     materials,
     limit,
-  });
-  if (normalized.length === 0) return [];
-  return projects.saveSuggestions(normalized);
+  }).filter((s) => !existingKeys.has(`${s.targetChunkId ?? ''}:${s.kind}:${s.refId}`));
+  if (normalized.length > 0) projects.saveSuggestions(normalized);
+  return projects.listSuggestions(chapter.id);
 }
 
 function gatherMaterials(links: ProjectLink[], sectionId: string | null | undefined): SourceMaterial[] {
@@ -216,13 +245,36 @@ function materialFromIdea(refId: string, fallbackLabel: string, role: SourceMate
     .slice(0, 3)
     .map((o) => `${authorYear(o.work.authors, o.work.year)}: ${o.development}`)
     .join('\n');
+
+  // Surface the idea's graph connections so a suggestion can mention and link
+  // the ideas it relates to (idea↔idea edges), not just the idea in isolation.
+  const relatedRefs: CitationRef[] = [];
+  const connectionLines: string[] = [];
+  for (const edgeDetail of getIdeaEdges(refId).slice(0, 6)) {
+    const isFrom = edgeDetail.edge.from_id === refId;
+    const otherId = isFrom ? edgeDetail.edge.to_id : edgeDetail.edge.from_id;
+    const otherLabel = isFrom ? edgeDetail.toLabel : edgeDetail.fromLabel;
+    if (!otherId || otherId === refId) continue;
+    relatedRefs.push({ kind: 'idea', id: otherId });
+    const verb = RELATION_VERB[edgeDetail.edge.type] ?? `se relaciona (${edgeDetail.edge.type}) con`;
+    connectionLines.push(`${verb} ${otherLabel} (nodus://idea/${encodeURIComponent(otherId)})`);
+  }
+
   return [
     {
       kind: 'idea',
       refId,
       label: detail.idea.label || fallbackLabel || refId,
-      summary: [detail.idea.statement, occurrences, evidence].filter(Boolean).join('\n'),
+      summary: [
+        detail.idea.statement,
+        occurrences,
+        evidence,
+        connectionLines.length ? `Conexiones: ${connectionLines.join('; ')}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
       citationRefs: [citation],
+      relatedRefs: dedupeRefs(relatedRefs),
       citationMarkdown: citationMarkdown(citation, sourceLabel(firstWork?.authors, firstWork?.year)),
       strong: detail.occurrences.length > 0 || detail.evidence.length > 0,
       role,
@@ -241,6 +293,7 @@ function materialFromWork(refId: string, fallbackLabel: string, role: SourceMate
       label: work.title || fallbackLabel || refId,
       summary: [work.title, work.notes ?? '', work.themes.join(', ')].filter(Boolean).join('\n'),
       citationRefs: [citation],
+      relatedRefs: [],
       citationMarkdown: citationMarkdown(citation, sourceLabel(work.authors, work.year)),
       strong: true,
       role,
@@ -263,6 +316,7 @@ function materialFromGap(refId: string, fallbackLabel: string, role: SourceMater
         detail.evidence ? `Evidencia: ${detail.evidence.quote}` : '',
       ].filter(Boolean).join('\n'),
       citationRefs: [citation],
+      relatedRefs: [],
       citationMarkdown: citationMarkdown(citation, sourceLabel(detail.work.authors, detail.work.year, 'hueco')),
       strong: true,
       role,
@@ -285,6 +339,7 @@ function materialFromDebate(refId: string, fallbackLabel: string, role: SourceMa
         ...detail.evidence.slice(0, 2).map((e) => `Evidencia: ${e.quote}`),
       ].join('\n'),
       citationRefs: [citation],
+      relatedRefs: [],
       citationMarkdown: citationMarkdown(citation, sourceLabel(source?.authors, source?.year, 'contradiccion')),
       strong: true,
       role,
@@ -304,6 +359,7 @@ function materialFromNote(refId: string, role: SourceMaterial['role']): SourceMa
       label: note.title,
       summary: note.content,
       citationRefs: refs,
+      relatedRefs: [],
       citationMarkdown: refs[0] ? citationMarkdown(refs[0], labelForCitation(refs[0])) : '',
       strong,
       role,
@@ -363,8 +419,12 @@ function normalizeSuggestions(
 ): Omit<ProjectInsertionSuggestion, 'id' | 'createdAt' | 'updatedAt'>[] {
   const chunkIds = new Set(context.chunks.map((chunk) => chunk.id));
   const materialMap = new Map(context.materials.map((material) => [`${material.kind}:${material.refId}`, material]));
+  // A ref may be cited if it's either the material itself or one of its graph
+  // connections (relatedRefs) — anything else is treated as invented.
   const allowedRefs = new Set(
-    context.materials.flatMap((material) => material.citationRefs.map((ref) => `${ref.kind}:${ref.id}`))
+    context.materials.flatMap((material) =>
+      [...material.citationRefs, ...material.relatedRefs].map((ref) => `${ref.kind}:${ref.id}`)
+    )
   );
   const out: Omit<ProjectInsertionSuggestion, 'id' | 'createdAt' | 'updatedAt'>[] = [];
   const seen = new Set<string>();
@@ -376,19 +436,45 @@ function normalizeSuggestions(
     if (!refId) continue;
     const material = materialMap.get(`${kind}:${refId}`) ?? context.materials.find((m) => m.refId === refId);
     if (!material) continue;
-    const refs = normalizeRefs(item.citationRefs?.length ? item.citationRefs : material.citationRefs);
-    const targetChunkId = item.targetChunkId && chunkIds.has(item.targetChunkId) ? item.targetChunkId : bestChunkForMaterial(context.chunks, material)?.id ?? null;
-    const proposed = ensureCitation(cleanProposedText(item.proposedText || fallbackText(material)), refs, material);
-    const citationStatus = verifyCitations(refs);
-    const invented = refs.some((ref) => !allowedRefs.has(`${ref.kind}:${ref.id}`));
-    const invalid = refs.length === 0 || Object.values(citationStatus).some((ok) => !ok);
+
+    let proposed = cleanProposedText(item.proposedText || fallbackText(material));
+
+    // Keep only citations the model is allowed to use AND that resolve locally.
+    // The candidate set spans the model's declared refs, the material's own
+    // citation and every nodus:// link present in the text (so connected-idea
+    // links survive even if the model forgot to declare them). Everything else —
+    // hallucinated passages, invented ids, stale refs — is dropped so it never
+    // reaches the rendered text as a broken "⚠" link.
+    const candidateRefs = dedupeRefs([
+      ...normalizeRefs(item.citationRefs ?? []),
+      ...normalizeRefs(extractCitationRefs(proposed)),
+      ...material.citationRefs,
+    ]);
+    const verified = verifyCitations(candidateRefs);
+    const validRefs = dedupeRefs(
+      candidateRefs.filter((ref) => allowedRefs.has(`${ref.kind}:${ref.id}`) && verified[`${ref.kind}:${ref.id}`])
+    );
+    const allowedKeys = new Set(validRefs.map((ref) => `${ref.kind}:${ref.id}`));
+
+    const targetChunkId =
+      item.targetChunkId && chunkIds.has(item.targetChunkId)
+        ? item.targetChunkId
+        : bestChunkForMaterial(context.chunks, material)?.id ?? null;
+
+    proposed = stripDisallowedCitations(proposed, allowedKeys);
+    proposed = ensureCitation(proposed, validRefs);
+    proposed = normalizeCitationLabels(proposed, validRefs);
+
+    // The refs that genuinely remain in the sanitised text.
+    const finalRefs = dedupeRefs(
+      extractCitationRefs(proposed).filter((ref) => allowedKeys.has(`${ref.kind}:${ref.id}`))
+    );
     const blockedReason = !material.strong
       ? 'El material no contiene una fuente nodus:// verificable.'
-      : invented
-        ? 'La propuesta cita una fuente fuera del contexto del proyecto.'
-        : invalid
-          ? 'Una o mas citas no existen en la base local.'
-          : null;
+      : finalRefs.length === 0
+        ? 'No se pudo anclar la propuesta a una fuente verificable.'
+        : null;
+
     const key = `${targetChunkId}:${kind}:${refId}:${proposed}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -400,8 +486,8 @@ function normalizeSuggestions(
       refId: material.refId,
       refLabel: material.label,
       operation: normalizeOperation(item.operation),
-      proposedText: normalizeCitationLabels(proposed, refs),
-      citationRefs: refs,
+      proposedText: proposed,
+      citationRefs: finalRefs.length ? finalRefs : validRefs,
       rationale: clip(item.rationale || 'Sugerencia generada a partir de materiales vinculados al proyecto.', 600),
       confidence: clamp01(item.confidence),
       status: blockedReason ? 'blocked' : 'suggested',
@@ -435,10 +521,11 @@ function cleanProposedText(text: string): string {
   return text.replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function ensureCitation(text: string, refs: CitationRef[], material: SourceMaterial): string {
+function ensureCitation(text: string, refs: CitationRef[]): string {
+  if (refs.length === 0) return text;
   if (refs.some((ref) => text.includes(citationUrl(ref)))) return text;
-  const citation = refs[0] ? citationMarkdown(refs[0], labelForCitation(refs[0])) : material.citationMarkdown;
-  return citation ? `${text.replace(/[.。]\s*$/, '')} ${citation}.` : text;
+  const citation = citationMarkdown(refs[0], labelForCitation(refs[0]));
+  return `${text.replace(/[.。]\s*$/, '')} ${citation}.`;
 }
 
 function normalizeCitationLabels(text: string, refs: CitationRef[]): string {
@@ -447,20 +534,6 @@ function normalizeCitationLabels(text: string, refs: CitationRef[]): string {
     const url = citationUrl(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`\\[[^\\]]*\\]\\(${url}\\)`, 'g');
     out = out.replace(re, citationMarkdown(ref, labelForCitation(ref)));
-  }
-  return out;
-}
-
-function normalizeRefs(refs: CitationRef[]): CitationRef[] {
-  const seen = new Set<string>();
-  const out: CitationRef[] = [];
-  for (const ref of refs) {
-    if (!ref?.kind || !ref.id) continue;
-    if (!['idea', 'work', 'gap', 'contradiction', 'passage'].includes(ref.kind)) continue;
-    const key = `${ref.kind}:${ref.id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ kind: ref.kind, id: ref.id });
   }
   return out;
 }
@@ -477,27 +550,8 @@ function normalizeOperation(value: unknown): ChapterSuggestionOperation {
     : 'insert_after';
 }
 
-function extractCitationRefs(text: string): CitationRef[] {
-  const out: CitationRef[] = [];
-  const seen = new Set<string>();
-  const re = /nodus:\/\/(idea|work|gap|contradiction|passage)\/([^\s)"'<>]+)/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    const ref = { kind: match[1] as CitationRef['kind'], id: decodeURIComponent(match[2]) };
-    const key = `${ref.kind}:${ref.id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(ref);
-  }
-  return out;
-}
-
 function citationMarkdown(ref: CitationRef, label: string): string {
   return `[${label || labelForCitation(ref)}](${citationUrl(ref)})`;
-}
-
-function citationUrl(ref: CitationRef): string {
-  return `nodus://${ref.kind}/${encodeURIComponent(ref.id)}`;
 }
 
 function labelForCitation(ref: CitationRef): string {

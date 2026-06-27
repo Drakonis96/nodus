@@ -1284,6 +1284,8 @@ export const EN: Record<string, string> = {
   'No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).':
     'Text could not be extracted, but there is a recovery path (re-scan, OCR or fetch by DOI).',
   // ── Projects ───────────────────────────────────────────────────────────────
+  'No se encontraron nuevas sugerencias verificables para este capítulo.':
+    'No new verifiable suggestions were found for this chapter.',
   'Eliminar proyecto': 'Delete project',
   'Proyecto eliminado.': 'Project deleted.',
   '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':

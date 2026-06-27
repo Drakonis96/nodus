@@ -202,15 +202,17 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
         sectionId: selectedChapter.sectionId,
         mode,
         model: detail.project.model ?? settings.defaultModel,
-        limit: 8,
+        limit: 16,
       });
       setSuggestions(next);
       setTab('sugerencias');
       const blocked = next.filter((suggestion) => suggestion.status === 'blocked').length;
       setMessage(
-        blocked
-          ? t('Sugerencias generadas. Algunas quedaron bloqueadas porque sus citas no son verificables.')
-          : t('Sugerencias generadas con citas verificadas.')
+        next.length === 0
+          ? t('No se encontraron nuevas sugerencias verificables para este capítulo.')
+          : blocked
+            ? t('Sugerencias generadas. Algunas quedaron bloqueadas porque sus citas no son verificables.')
+            : t('Sugerencias generadas con citas verificadas.')
       );
     } finally {
       setBusy(null);
