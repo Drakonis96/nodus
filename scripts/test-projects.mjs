@@ -137,7 +137,7 @@ try {
 
 async function migration19Sql() {
   const source = await readFile(path.join(repoRoot, 'electron/db/migrations.ts'), 'utf8');
-  const match = source.match(/version:\s*19,\s*up:\s*\/\*\s*sql\s*\*\/\s*`([\s\S]*?)`\s*,\s*}\s*,?\s*];/);
+  const match = source.match(/version:\s*19,\s*up:\s*\/\*\s*sql\s*\*\/\s*`([\s\S]*?)`\s*,\s*}\s*,/);
   assert.ok(match?.[1], 'Could not find migration 19 SQL');
   return match[1];
 }

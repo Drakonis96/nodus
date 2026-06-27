@@ -225,6 +225,12 @@ const api: NodusApi = {
   suggestFolderIdeas: (folderId) => ipcRenderer.invoke('notes:folders:suggestIdeas', folderId),
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
   globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
+  semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
+  findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),
+  listSavedSearches: () => ipcRenderer.invoke('search:saved:list'),
+  saveSearch: (input) => ipcRenderer.invoke('search:saved:create', input),
+  deleteSavedSearch: (id) => ipcRenderer.invoke('search:saved:delete', id).then(() => undefined),
+  getCorpusHealth: () => ipcRenderer.invoke('corpus:health'),
   suggestGapSearch: (statement, workTitles) =>
     ipcRenderer.invoke('gaps:suggestSearch', statement, workTitles),
 

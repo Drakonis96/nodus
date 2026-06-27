@@ -1230,7 +1230,7 @@ export interface CitationRef {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The entity types the global search spans, each of which links elsewhere. */
-export type SearchResultKind = 'note' | 'idea' | 'work' | 'gap' | 'theme' | 'author';
+export type SearchResultKind = 'note' | 'idea' | 'work' | 'gap' | 'theme' | 'author' | 'passage';
 
 /** A single match. `id` and the optional fields carry what the UI needs to route
  * to the right destination (graph node, work, note, gaps view, …). */
@@ -1240,19 +1240,98 @@ export interface GlobalSearchResult {
   title: string;
   subtitle?: string | null;
   snippet?: string | null;
-  /** Works only: to open in Zotero / focus the reading graph. */
+  /** Works/passages: to open in Zotero / focus the reading graph. */
   zoteroKey?: string | null;
+  /** Passages: the work this passage belongs to, to route into its reading graph. */
+  nodusId?: string | null;
+  /** Passages: page label for the citation chip. */
+  pageLabel?: string | null;
   /** Ideas only: node type, for the badge. */
   ideaType?: string | null;
   /** Gaps only: gap kind, for the badge. */
   gapKind?: GapKind | null;
   /** Themes only: the theme label used as a graph filter. */
   themeLabel?: string | null;
+  /** Semantic results only: cosine similarity in [0,1]. */
+  similarity?: number | null;
 }
 
 export interface GlobalSearchResponse {
   query: string;
   results: GlobalSearchResult[];
+}
+
+/** Which retrieval strategy the search box uses. */
+export type SearchMode = 'text' | 'semantic';
+
+export interface SemanticSearchOptions {
+  /** Which result kinds to include. Empty/undefined ⇒ ideas, passages and works. */
+  kinds?: SearchResultKind[];
+  /** Max results per kind. */
+  limit?: number;
+  /** Minimum cosine similarity to keep a match. */
+  minSimilarity?: number;
+}
+
+export interface SemanticSearchResponse {
+  /** False when no embedding provider/key is configured, so nothing could be embedded. */
+  available: boolean;
+  results: GlobalSearchResult[];
+}
+
+/** A reusable search the user pinned: query + mode + kind filters. */
+export interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  mode: SearchMode;
+  kinds: SearchResultKind[];
+  created_at: string;
+}
+
+export interface SaveSearchInput {
+  name: string;
+  query: string;
+  mode: SearchMode;
+  kinds: SearchResultKind[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Corpus health (Home dashboard)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CorpusHealthWork {
+  nodus_id: string;
+  title: string;
+  year: number | null;
+  zotero_key: string | null;
+}
+
+/** One health dimension: how many works fall in it plus a small clickable sample. */
+export interface CorpusHealthBucket {
+  count: number;
+  sample: CorpusHealthWork[];
+}
+
+export interface CorpusHealth {
+  totalWorks: number;
+  /** Works with no usable full text (abstract-only, no source, or extraction skipped). */
+  withoutText: CorpusHealthBucket;
+  /** Works analysed only lightly (themes done) but never deep-analysed, although text exists. */
+  lightOnly: CorpusHealthBucket;
+  /** Works flagged as important (read tag or manual) still missing deep analysis. */
+  deepPriority: CorpusHealthBucket;
+  /** Works whose text could not be extracted but a recovery path (OCR / DOI) exists. */
+  pdfsToRecover: CorpusHealthBucket;
+  embeddings: {
+    totalIdeas: number;
+    embeddedIdeas: number;
+    pendingIdeas: number;
+    /** Non-archived works with at least one idea still lacking a current embedding. */
+    incompleteWorks: number;
+    /** Works with text whose full-text passage index is missing or outdated. */
+    passagesPendingWorks: number;
+  };
 }
 
 /** AI-suggested ways to find literature that would fill a research gap. */
@@ -1928,6 +2007,16 @@ export interface NodusApi {
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
   globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
+  /** Search by meaning over embedded ideas, passages and works. */
+  semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResponse>;
+  /** Find ideas whose meaning is closest to the given idea ("ideas parecidas a esta"). */
+  findSimilarToIdea(globalId: string, limit?: number): Promise<SemanticSearchResponse>;
+  /** Saved searches (query + mode + kind filters), newest first. */
+  listSavedSearches(): Promise<SavedSearch[]>;
+  saveSearch(input: SaveSearchInput): Promise<SavedSearch>;
+  deleteSavedSearch(id: string): Promise<void>;
+  /** Operational health of the corpus for the Home dashboard. */
+  getCorpusHealth(): Promise<CorpusHealth>;
   /** Ask the AI for keywords/queries to find literature filling a research gap. */
   suggestGapSearch(statement: string, workTitles: string[]): Promise<GapSearchSuggestions>;
 

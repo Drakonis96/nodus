@@ -37,6 +37,8 @@ import type {
   ManualIdeaPayload,
   NotesExportOptions,
   CitationRef,
+  SemanticSearchOptions,
+  SaveSearchInput,
   CreateProjectInput,
   ExportProjectChapterRequest,
   ExportProjectRequest,
@@ -76,6 +78,9 @@ import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
 import { verifyCitations } from './citations/verifyCitations';
 import { globalSearch } from './db/searchRepo';
+import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
+import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
+import { getCorpusHealth } from './db/corpusHealthRepo';
 import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -553,6 +558,18 @@ export function registerIpc(
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)
   );
+  h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>
+    semanticSearch(query ?? '', options ?? {})
+  );
+  h('search:similarIdea', async (_e, globalId: string, limit?: number) =>
+    findSimilarToIdea(globalId, limit ?? 12)
+  );
+  h('search:saved:list', async () => listSavedSearches());
+  h('search:saved:create', async (_e, input: SaveSearchInput) => saveSearch(input));
+  h('search:saved:delete', async (_e, id: string) => {
+    deleteSavedSearch(id);
+  });
+  h('corpus:health', async () => getCorpusHealth());
   h('gaps:suggestSearch', async (_e, statement: string, workTitles?: string[]) =>
     suggestGapSearch(statement ?? '', workTitles ?? [])
   );

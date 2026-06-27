@@ -1237,6 +1237,52 @@ export const EN: Record<string, string> = {
   Encabezado: 'Heading',
   Contraer: 'Collapse',
   'Sin resultados.': 'No results.',
+  // ── Search (text + semantic) ───────────────────────────────────────────────
+  'Búsqueda global': 'Global search',
+  Texto: 'Text',
+  Significado: 'Meaning',
+  'Busca en notas, ideas, obras, huecos, temas y autores…':
+    'Search across notes, ideas, works, gaps, themes and authors…',
+  'Describe una idea o pregunta; busca por significado en ideas, pasajes y obras…':
+    'Describe an idea or question; search by meaning across ideas, passages and works…',
+  'Describe una idea para encontrar pasajes, ideas y obras con significado parecido.':
+    'Describe an idea to find passages, ideas and works with similar meaning.',
+  'Escribe al menos dos caracteres para buscar en todo el espacio de trabajo.':
+    'Type at least two characters to search the whole workspace.',
+  'Ideas parecidas a:': 'Ideas similar to:',
+  'Buscar ideas parecidas a esta': 'Find ideas similar to this one',
+  'Guardar esta búsqueda y sus filtros': 'Save this search and its filters',
+  'Guardadas:': 'Saved:',
+  'Eliminar búsqueda guardada': 'Delete saved search',
+  'La búsqueda por significado necesita embeddings. Configura el proveedor y la clave de embeddings en Ajustes e indexa la biblioteca.':
+    'Semantic search needs embeddings. Configure the embeddings provider and key in Settings and index the library.',
+  // ── Corpus health (Home) ───────────────────────────────────────────────────
+  'Salud del corpus': 'Corpus health',
+  'Qué falta por analizar, indexar o recuperar.': 'What is left to analyse, index or recover.',
+  'Sin texto': 'No text',
+  'Solo análisis ligero': 'Light analysis only',
+  'Prioritarias por analizar': 'Priority to analyse',
+  'Recuperar texto': 'Recover text',
+  'ideas pend.': 'ideas pending',
+  '{n} obras con pasajes pendientes': '{n} works with pending passages',
+  'Próximas acciones': 'Next actions',
+  'Todo en orden: no hay análisis, indexado ni recuperación pendientes.':
+    'All clear: no pending analysis, indexing or recovery.',
+  'Analiza a fondo {n} obra(s) prioritaria(s)': 'Deep-analyse {n} priority work(s)',
+  'Marcadas como leídas o seleccionadas, pero todavía sin ideas extraídas.':
+    'Flagged as read or selected, but no ideas extracted yet.',
+  'Profundiza {n} obra(s) con solo análisis ligero': 'Deepen {n} work(s) with light analysis only',
+  'Tienen temas pero aún no ideas; son las candidatas naturales al análisis profundo.':
+    'They have themes but no ideas yet; the natural candidates for deep analysis.',
+  'Indexa {n} idea(s) sin embedding': 'Index {n} idea(s) without embeddings',
+  'La búsqueda por significado, la fusión y los puentes dependen del índice semántico.':
+    'Semantic search, fusion and bridges all depend on the semantic index.',
+  'Indexa pasajes de {n} obra(s) con texto': 'Index passages of {n} work(s) with text',
+  'Sin pasajes no hay búsqueda semántica de evidencia ni citas a nivel de fragmento.':
+    'Without passages there is no semantic evidence search or fragment-level citation.',
+  'Recupera el texto de {n} obra(s)': 'Recover the text of {n} work(s)',
+  'No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).':
+    'Text could not be extracted, but there is a recovery path (re-scan, OCR or fetch by DOI).',
   'Todas las notas': 'All notes',
   'Sin carpeta': 'No folder',
   'Nueva carpeta': 'New folder',

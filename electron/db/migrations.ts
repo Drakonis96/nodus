@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 export const migrations: Migration[] = [
   {
@@ -662,6 +662,21 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_project_chunks_chapter ON project_chapter_chunks(chapter_id, order_idx);
       CREATE INDEX idx_project_suggestions_chapter ON project_insertion_suggestions(chapter_id, status, created_at DESC);
       CREATE INDEX idx_project_versions_chapter ON project_chapter_versions(chapter_id, created_at DESC);
+    `,
+  },
+  {
+    version: 20,
+    up: /* sql */ `
+      CREATE TABLE saved_searches (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        query      TEXT NOT NULL,
+        mode       TEXT NOT NULL DEFAULT 'semantic',
+        kinds_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_saved_searches_created ON saved_searches(created_at DESC);
     `,
   },
 ];

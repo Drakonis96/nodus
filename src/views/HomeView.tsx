@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AppSettings,
+  CorpusHealth,
+  CorpusHealthBucket,
   EdgeDetail,
   GapAggregate,
   GraphData,
@@ -36,6 +38,7 @@ interface HomeSnapshot {
   embeddings: WorkEmbeddingStatus[];
   queue: QueueProgress | null;
   syncLog: SyncLogEntry[];
+  health: CorpusHealth | null;
 }
 
 export function HomeView({
@@ -58,7 +61,7 @@ export function HomeView({
     setRefreshing(true);
     setError(null);
     try {
-      const [works, graph, gaps, contradictions, embeddings, queue, syncLog] = await Promise.all([
+      const [works, graph, gaps, contradictions, embeddings, queue, syncLog, health] = await Promise.all([
         window.nodus.listWorks(),
         window.nodus.getGraph('ideas'),
         window.nodus.getGaps(),
@@ -66,8 +69,9 @@ export function HomeView({
         window.nodus.getWorkEmbeddingStatuses(),
         window.nodus.getQueue(),
         window.nodus.getSyncLog(),
+        window.nodus.getCorpusHealth(),
       ]);
-      setSnapshot({ works, graph, gaps, contradictions, embeddings, queue, syncLog });
+      setSnapshot({ works, graph, gaps, contradictions, embeddings, queue, syncLog, health });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -102,6 +106,11 @@ export function HomeView({
 
   const indexPending = async () => {
     await window.nodus.startEmbedding();
+    await reload();
+  };
+
+  const indexPassages = async () => {
+    await window.nodus.startPassageEmbedding();
     await reload();
   };
 
@@ -177,6 +186,15 @@ export function HomeView({
           </div>
         </div>
       </section>
+
+      {snapshot?.health && snapshot.health.totalWorks > 0 && (
+        <CorpusHealthPanel
+          health={snapshot.health}
+          onNavigate={onNavigate}
+          onIndexIdeas={indexPending}
+          onIndexPassages={indexPassages}
+        />
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <StatusCard
@@ -491,6 +509,218 @@ function getRecommendation(settings: AppSettings, stats: ReturnType<typeof build
     action: { kind: 'view', target: 'graph', icon: 'map', label: t('Abrir grafo') },
     secondary: { target: 'ideas', icon: 'bulb', label: t('Ver ideas') },
   };
+}
+
+interface HealthAction {
+  label: string;
+  detail: string;
+  tone: 'amber' | 'red' | 'indigo' | 'cyan';
+  run: () => void;
+}
+
+function buildHealthActions(
+  health: CorpusHealth,
+  handlers: { onNavigate: (t: HomeTarget) => void; onIndexIdeas: () => void; onIndexPassages: () => void }
+): HealthAction[] {
+  const actions: HealthAction[] = [];
+  if (health.deepPriority.count > 0) {
+    actions.push({
+      label: tx('Analiza a fondo {n} obra(s) prioritaria(s)', { n: health.deepPriority.count }),
+      detail: t('Marcadas como leídas o seleccionadas, pero todavía sin ideas extraídas.'),
+      tone: 'indigo',
+      run: () => handlers.onNavigate('library'),
+    });
+  }
+  if (health.lightOnly.count > 0) {
+    actions.push({
+      label: tx('Profundiza {n} obra(s) con solo análisis ligero', { n: health.lightOnly.count }),
+      detail: t('Tienen temas pero aún no ideas; son las candidatas naturales al análisis profundo.'),
+      tone: 'cyan',
+      run: () => handlers.onNavigate('library'),
+    });
+  }
+  if (health.embeddings.pendingIdeas > 0) {
+    actions.push({
+      label: tx('Indexa {n} idea(s) sin embedding', { n: health.embeddings.pendingIdeas }),
+      detail: t('La búsqueda por significado, la fusión y los puentes dependen del índice semántico.'),
+      tone: 'amber',
+      run: handlers.onIndexIdeas,
+    });
+  }
+  if (health.embeddings.passagesPendingWorks > 0) {
+    actions.push({
+      label: tx('Indexa pasajes de {n} obra(s) con texto', { n: health.embeddings.passagesPendingWorks }),
+      detail: t('Sin pasajes no hay búsqueda semántica de evidencia ni citas a nivel de fragmento.'),
+      tone: 'amber',
+      run: handlers.onIndexPassages,
+    });
+  }
+  if (health.pdfsToRecover.count > 0) {
+    actions.push({
+      label: tx('Recupera el texto de {n} obra(s)', { n: health.pdfsToRecover.count }),
+      detail: t('No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).'),
+      tone: 'red',
+      run: () => handlers.onNavigate('library'),
+    });
+  }
+  return actions;
+}
+
+function CorpusHealthPanel({
+  health,
+  onNavigate,
+  onIndexIdeas,
+  onIndexPassages,
+}: {
+  health: CorpusHealth;
+  onNavigate: (target: HomeTarget) => void;
+  onIndexIdeas: () => void;
+  onIndexPassages: () => void;
+}) {
+  const actions = buildHealthActions(health, { onNavigate, onIndexIdeas, onIndexPassages });
+  const embeddedPct =
+    health.embeddings.totalIdeas > 0
+      ? Math.round((health.embeddings.embeddedIdeas / health.embeddings.totalIdeas) * 100)
+      : 100;
+
+  return (
+    <section className="card p-4 mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="h-8 w-8 rounded-lg inline-flex items-center justify-center text-emerald-300 bg-emerald-900/40">
+          <Icon name="layers" />
+        </span>
+        <div>
+          <h2 className="font-semibold text-sm">{t('Salud del corpus')}</h2>
+          <p className="text-xs text-neutral-500">{t('Qué falta por analizar, indexar o recuperar.')}</p>
+        </div>
+        <span className="ml-auto text-xs text-neutral-500 tabular-nums">
+          {tx('{n} obras', { n: health.totalWorks })}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2">
+        <HealthBucketTile
+          icon="book"
+          label={t('Sin texto')}
+          bucket={health.withoutText}
+          tone={health.withoutText.count > 0 ? 'amber' : 'neutral'}
+          onClick={() => onNavigate('library')}
+        />
+        <HealthBucketTile
+          icon="tag"
+          label={t('Solo análisis ligero')}
+          bucket={health.lightOnly}
+          tone={health.lightOnly.count > 0 ? 'cyan' : 'neutral'}
+          onClick={() => onNavigate('library')}
+        />
+        <HealthBucketTile
+          icon="bulb"
+          label={t('Prioritarias por analizar')}
+          bucket={health.deepPriority}
+          tone={health.deepPriority.count > 0 ? 'indigo' : 'neutral'}
+          onClick={() => onNavigate('library')}
+        />
+        <HealthBucketTile
+          icon="download"
+          label={t('Recuperar texto')}
+          bucket={health.pdfsToRecover}
+          tone={health.pdfsToRecover.count > 0 ? 'red' : 'neutral'}
+          onClick={() => onNavigate('library')}
+        />
+        <div className="rounded-lg border border-neutral-800 px-3 py-2">
+          <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+            <Icon name="search" size={13} /> {t('Embeddings')}
+          </div>
+          <div className="mt-1 text-lg font-semibold tabular-nums">
+            {health.embeddings.pendingIdeas}
+            <span className="text-xs text-neutral-500 font-normal"> {t('ideas pend.')}</span>
+          </div>
+          <div className="mt-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500" style={{ width: `${embeddedPct}%` }} />
+          </div>
+          <div className="mt-1 text-[11px] text-neutral-600">
+            {tx('{n} obras con pasajes pendientes', { n: health.embeddings.passagesPendingWorks })}
+          </div>
+        </div>
+      </div>
+
+      {actions.length > 0 && (
+        <div className="mt-4">
+          <div className="text-xs uppercase tracking-wide text-neutral-500 mb-2">{t('Próximas acciones')}</div>
+          <ul className="space-y-1.5">
+            {actions.map((a, i) => {
+              const dot = {
+                amber: 'bg-amber-400',
+                red: 'bg-red-400',
+                indigo: 'bg-indigo-400',
+                cyan: 'bg-cyan-400',
+              }[a.tone];
+              return (
+                <li key={i}>
+                  <button
+                    className="flex w-full items-start gap-2.5 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900"
+                    onClick={a.run}
+                  >
+                    <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm text-neutral-100">{a.label}</span>
+                      <span className="block text-xs text-neutral-500">{a.detail}</span>
+                    </span>
+                    <Icon name="chevronRight" size={14} className="mt-1 shrink-0 text-neutral-700" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {actions.length === 0 && (
+        <p className="mt-3 text-xs text-emerald-400/80">
+          {t('Todo en orden: no hay análisis, indexado ni recuperación pendientes.')}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function HealthBucketTile({
+  icon,
+  label,
+  bucket,
+  tone,
+  onClick,
+}: {
+  icon: string;
+  label: string;
+  bucket: CorpusHealthBucket;
+  tone: 'amber' | 'red' | 'indigo' | 'cyan' | 'neutral';
+  onClick: () => void;
+}) {
+  const toneClass = {
+    amber: 'text-amber-300',
+    red: 'text-red-300',
+    indigo: 'text-indigo-300',
+    cyan: 'text-cyan-300',
+    neutral: 'text-neutral-400',
+  }[tone];
+  const sampleTitles = bucket.sample.map((w) => w.title).join('\n');
+  return (
+    <button
+      className="rounded-lg border border-neutral-800 px-3 py-2 text-left transition-colors hover:border-neutral-700 hover:bg-neutral-900/60"
+      onClick={onClick}
+      title={sampleTitles || undefined}
+    >
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+        <Icon name={icon} size={13} /> {label}
+      </div>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${bucket.count > 0 ? toneClass : 'text-neutral-600'}`}>
+        {bucket.count}
+      </div>
+      {bucket.sample[0] && (
+        <div className="mt-0.5 text-[11px] text-neutral-600 truncate">{bucket.sample[0].title}</div>
+      )}
+    </button>
+  );
 }
 
 function StatusCard({
