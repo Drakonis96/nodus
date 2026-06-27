@@ -23,7 +23,7 @@ import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
 import { t, tx, setActiveLang } from './i18n';
-import { notifyDataChanged } from './hooks';
+import { notifyDataChanged, useDataRefresh } from './hooks';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
@@ -46,6 +46,9 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // null while unknown; true when the DB holds any real or demo content.
+  const [hasData, setHasData] = useState<boolean | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
 
   // Sidebar sections in the user's chosen order (Home always pinned first).
   const nav = useMemo(() => orderedNav(settings?.sidebarOrder ?? []), [settings?.sidebarOrder]);
@@ -72,6 +75,45 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  const refreshHasData = useCallback(async () => {
+    if (!window.nodus) return;
+    try {
+      setHasData(await window.nodus.hasAnyData());
+    } catch {
+      /* leave previous value */
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshHasData();
+  }, [refreshHasData]);
+  useDataRefresh(refreshHasData);
+
+  const loadDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      await window.nodus.seedDemoData();
+      await reloadSettings();
+      await refreshHasData();
+      notifyDataChanged();
+      setView('home');
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
+  const exitDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      await window.nodus.clearDemoData();
+      await reloadSettings();
+      await refreshHasData();
+      notifyDataChanged();
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
 
   const toggleNav = () => {
     setNavCollapsed((v) => {
@@ -201,6 +243,18 @@ export function App() {
         </button>
       </header>
 
+      {settings.demoMode && (
+        <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs">
+          <Icon name="alert" size={14} />
+          <span className="flex-1">
+            {t('Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
+          </span>
+          <button className="btn btn-ghost border border-amber-500/40 text-amber-200 py-0.5" onClick={() => void exitDemo()} disabled={demoBusy}>
+            {demoBusy ? t('Saliendo…') : t('Salir del modo demo')}
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo) */}
         {!navCollapsed && (
@@ -231,6 +285,9 @@ export function App() {
               onSync={onSync}
               onNavigate={(target) => navigate(target)}
               onOpenAssistant={() => openAssistant()}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadDemo}
             />
           )}
           {view === 'library' && (

@@ -232,6 +232,10 @@ const api: NodusApi = {
   importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
+  hasAnyData: () => ipcRenderer.invoke('data:hasData'),
+  seedDemoData: () => ipcRenderer.invoke('data:seedDemo'),
+  clearDemoData: () => ipcRenderer.invoke('data:clearDemo').then(() => undefined),
+
   startEmbedding: (nodusIds) => ipcRenderer.invoke('embeddings:start', nodusIds).then(() => undefined),
   reindexAll: () => ipcRenderer.invoke('embeddings:reindexAll').then(() => undefined),
   pauseEmbedding: () => ipcRenderer.invoke('embeddings:pause').then(() => undefined),

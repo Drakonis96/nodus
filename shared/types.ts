@@ -304,6 +304,9 @@ export interface AppSettings {
   // Advanced research-workflow walkthrough. Opt-in (never auto-shown): defaults
   // to true so it only appears when the researcher launches it from Settings.
   advancedTourComplete: boolean;
+  // True while the app is showing the seeded sample corpus. Only ever set on an
+  // empty database; cleared (and the demo rows wiped) when the user leaves demo mode.
+  demoMode: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -1709,6 +1712,14 @@ export interface NodusApi {
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
+
+  // demo mode
+  /** Whether the database holds any user content (works, notes or ideas). */
+  hasAnyData(): Promise<boolean>;
+  /** Seed the curated demo corpus. Returns false (no-op) if data already exists. */
+  seedDemoData(): Promise<boolean>;
+  /** Remove every demo row and leave demo mode. */
+  clearDemoData(): Promise<void>;
 
   // embedding pipeline
   /** Start embedding generation for the given works (or all non-archived works if empty). */

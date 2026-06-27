@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { t } from '../i18n';
 
-type ViewId = 'library' | 'graph' | 'gaps' | 'reading' | 'settings';
+type ViewId = 'library' | 'graph' | 'gaps' | 'reading' | 'settings' | 'search' | 'ideas' | 'notes';
 
 export interface TourStep {
   /** A `data-tour="…"` value to spotlight. Omit for a centered, target-less step. */
@@ -51,6 +51,12 @@ const STEPS: TourStep[] = [
     body: 'Selecciona una obra o varias y pulsa «Analizar ideas». Nodus lee el texto, extrae temas padre, ideas con evidencia y relaciones, y las añade al grafo.',
   },
   {
+    target: 'nav-ideas',
+    view: 'ideas',
+    title: 'Verificar ideas extraídas',
+    body: 'Cada idea aparece con su tipo (afirmación, hallazgo, constructo, método o marco), la obra de la que procede y la cita textual que la sostiene. Abre el detalle para comprobar si la lectura automática coincide con la tuya.',
+  },
+  {
     target: 'queue',
     title: 'La cola de escaneo',
     body: 'Sigue aquí el progreso. Si falta el modelo de IA o la clave, la cola se pausa y te avisa en vez de fallar en silencio: lo arreglas en Ajustes y pulsas «Reanudar».',
@@ -59,6 +65,18 @@ const STEPS: TourStep[] = [
     target: 'model',
     title: 'Modelo de IA',
     body: 'Comprueba que hay un modelo seleccionado: sin él, Nodus no puede escanear. Puedes cambiarlo aquí o en Ajustes, y marcar tus favoritos.',
+  },
+  {
+    target: 'nav-search',
+    view: 'search',
+    title: 'Búsqueda global',
+    body: 'Busca por palabras clave a través de ideas, obras, huecos, temas, autores y notas. Los resultados te llevan directamente al detalle correspondiente en cada vista.',
+  },
+  {
+    target: 'nav-notes',
+    view: 'notes',
+    title: 'Tu espacio de notas',
+    body: 'Crea carpetas y notas en Markdown. Captura respuestas del asistente, borradores del taller de escritura, síntesis de debates e ideas individuales. Las citas internas (nodus://) permanecen clicables.',
   },
   {
     title: '¡Listo para empezar!',

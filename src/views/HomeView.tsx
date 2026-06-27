@@ -22,6 +22,10 @@ interface HomeViewProps {
   onSync: () => Promise<void>;
   onNavigate: (target: HomeTarget) => void;
   onOpenAssistant: () => void;
+  /** Show the "load sample data" card (empty database, not already in demo mode). */
+  showDemoOffer: boolean;
+  demoBusy: boolean;
+  onLoadDemo: () => Promise<void>;
 }
 
 interface HomeSnapshot {
@@ -41,6 +45,9 @@ export function HomeView({
   onSync,
   onNavigate,
   onOpenAssistant,
+  showDemoOffer,
+  demoBusy,
+  onLoadDemo,
 }: HomeViewProps) {
   const [snapshot, setSnapshot] = useState<HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +123,27 @@ export function HomeView({
           </p>
         </div>
       </div>
+
+      {showDemoOffer && (
+        <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="flex-1 min-w-[18rem]">
+              <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
+              <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
+              <p className="text-sm text-neutral-400 mt-1 max-w-2xl">
+                {t('Carga un corpus de demostración de seis obras sobre la ciencia del aprendizaje. Podrás recorrer el grafo, ideas, debates, huecos y notas sin conectar Zotero ni configurar una clave de IA.')}
+              </p>
+            </div>
+            <button
+              className="btn btn-primary gap-1.5"
+              onClick={() => void onLoadDemo()}
+              disabled={demoBusy}
+            >
+              <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo')}
+            </button>
+          </div>
+        </section>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">

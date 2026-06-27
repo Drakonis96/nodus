@@ -59,6 +59,7 @@ import * as rqRepo from './db/researchMapRepo';
 import { decomposeQuestion, mapCoverage } from './ai/researchMap';
 import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
+import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
@@ -579,6 +580,14 @@ export function registerIpc(
     // Stop any pending scans first so a finishing job can't repopulate after the wipe.
     scanQueue.clear();
     ideas.resetGraphData();
+  });
+
+  // demo mode: a curated sample corpus, only offered on an empty database.
+  h('data:hasData', async () => hasAnyData());
+  h('data:seedDemo', async () => seedDemoData());
+  h('data:clearDemo', async () => {
+    scanQueue.clear();
+    clearDemoData();
   });
 
   h('updates:check', async () => checkForUpdates());

@@ -32,6 +32,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   onboardingComplete: false,
   tourComplete: false,
   advancedTourComplete: true,
+  demoMode: false,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',

@@ -1,233 +1,250 @@
 # Nodus
 
-**Local-first desktop app for doctoral researchers.** Nodus connects to your local
-Zotero library, analyses your works on two levels, and weaves a navigable graph of
-ideas and authors that helps you orient yourself in the literature, follow debates,
-and detect research gaps.
+Desktop app that turns a local Zotero library into a navigable idea graph.
+Extracts typed claims, evidence and relations from your readings, then lets you
+browse contradictions, detect research gaps, map coverage of a thesis question,
+and generate structured academic drafts — all grounded in verbatim citations from
+your sources.
 
-Everything is local-first: your data lives on your machine. The only thing that
-leaves your computer are the calls to the AI provider you configure.
+Everything runs locally. The only external calls are to the AI provider you
+configure. Your data, API keys and embeddings stay on your machine.
 
-> Quality priorities, in order: **(1)** data precision and traceability — every idea
-> and connection traces back to a real passage; **(2)** unread works stay visible on
-> the map; **(3)** a minimalist, fluid interface; **(4)** performance with libraries
-> of thousands of items.
+> **v0.7.0** adds a demo mode (explore with sample data, no Zotero or API key
+> needed), expanded tutorial coverage, and a global search across all entities.
+
+---
+
+## What it does
+
+| Phase | What Nodus provides |
+|-------|---------------------|
+| **Read** | Two-level scanning: light (title + abstract, cheap) and deep (full text, ideas + evidence + relations). Automatic or manual, your choice. |
+| **Understand** | Idea graph (Cytoscape.js), author graph, debate view (contradictions as two-sided face-offs), Tutor mode (AI-guided step-by-step walkthrough). |
+| **Orient** | Research gap mining, reading path planner, research coverage map (decompose a thesis question, map which sub-questions your corpus covers). |
+| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. |
+| **Converse** | Research assistant chat grounded in your corpus (ideas, passages, contradictions, gaps, author graph — you pick the context). |
+
+### Demo mode
+
+On a fresh install with an empty database, Nodus offers to load a curated
+sample corpus: six works on the science of learning, nine ideas, six relations,
+four research gaps, and notes. You can explore every static view without Zotero
+or an API key. Exit demo mode from the banner or Settings > Data to clear the
+sample and start with your own library.
 
 ---
 
 ## Stack
 
 | Layer | Technology |
-| --- | --- |
-| Shell | Electron + electron-builder (`dmg` / `nsis`), `contextIsolation: true`, `nodeIntegration: false` |
-| Renderer | React + TypeScript + Vite |
+|-------|------------|
+| Shell | Electron + electron-builder (DMG / NSIS), `contextIsolation: true`, `nodeIntegration: false` |
+| Renderer | React 18 + TypeScript + Vite |
 | UI | Tailwind CSS, Framer Motion (respects `prefers-reduced-motion`) |
 | Graph | Cytoscape.js |
 | Database | SQLite via `better-sqlite3` (main process, transactional, versioned migrations) |
-| Embeddings | Stored per idea; in-memory cosine similarity for fusion (sqlite-vec ready) |
-| AI | Anthropic and/or OpenAI clients in main process; key stored with Electron `safeStorage` |
-| Text extraction | `pdfjs-dist` (text only), `mammoth` (docx) |
+| Embeddings | Per-idea Float32 vectors; in-memory cosine similarity for fusion (sqlite-vec ready) |
+| AI | Anthropic, OpenAI, OpenRouter, DeepSeek, Gemini clients in main process; keys stored with Electron `safeStorage` |
+| Text extraction | `pdfjs-dist` (text), `mammoth` (docx), Tesseract OCR (opt-in, local) |
 
 ## Architecture
 
 ```
 electron/                Main process (Node)
-  db/                    better-sqlite3, versioned migrations, repository pattern
+  db/                    better-sqlite3, migrations, repository pattern
   zotero/                Read-only Zotero 7 local API client (pagination + diff)
-  ai/                    aiClient, the 3 core prompts, light/deep scan, fusion, research assistant, tutor
-  extraction/            Clean text extraction (PDF/MD/docx) + chunking + Unpaywall
-  pipeline/              Priority queue, retries w/ backoff, resume-after-restart
+  ai/                    Providers, prompts, light/deep scan, fusion, tutor,
+                         debate, research map, writing workshop, embedding pipeline
+  extraction/            PDF/MD/docx text extraction + chunking + Unpaywall fallback
+  pipeline/              Priority queue, retries with backoff, resume-after-restart
   sync/                  Full + realtime incremental sync with Zotero
-  graph/                 Idea graph, derived author graph, gaps, reading path
-  export/                .nodus export / import
-  secrets/               Encrypted API-key storage (never crosses IPC)
+  graph/                 Idea graph, author graph, contradictions, reading path
+  export/                .nodus encrypted backup, notes export, research coverage export
+  secrets/               safeStorage-backed API key encryption (never crosses IPC)
+  mcp/                   Local Model Context Protocol server for external AI clients
   ipc.ts, preload.ts, main.ts
-shared/types.ts          Domain types + the typed window.nodus IPC contract
-src/                     React renderer (views, components)
+shared/types.ts          Domain types + typed window.nodus IPC contract
+src/                     React renderer (views, components, i18n)
 ```
 
-The renderer never touches Node, the filesystem, or the network directly. Every
+The renderer never touches Node, the filesystem, or the network. Every
 sensitive operation goes through the typed `window.nodus` bridge exposed by the
 preload script.
 
+---
+
 ## Prerequisites
 
-- **Zotero 7+** running, with the local API enabled (it listens on
-  `http://localhost:23119/api/`). Nodus is **read-only** and never writes to Zotero
-  or touches `zotero.sqlite`.
-- An **AI API key** for Anthropic or OpenAI. Embeddings (used for idea fusion)
-  currently require an OpenAI key; with Anthropic only, fusion falls back to a
-  conservative "new idea" policy.
+- **Zotero 7+** running with the local API enabled (`http://localhost:23119/api/`).
+  Nodus is read-only and never writes to Zotero.
+- An **AI API key** for at least one provider (Anthropic, OpenAI, OpenRouter,
+  DeepSeek, or Gemini). Embeddings currently require OpenAI, OpenRouter, or
+  Gemini; with Anthropic only, fusion falls back to a conservative "new idea"
+  policy.
 - Node.js 20+.
+
+Or skip all of the above: launch the app, click **Cargar demo**, and explore.
 
 ## Setup
 
 ```bash
 npm install
-npm run dev      # launches Vite + Electron in development
+npm run dev      # Vite + Electron in development
 ```
 
 ## Build
 
 ```bash
-npm run dist:mac   # produces a .dmg
-npm run dist:win   # produces an NSIS installer
+npm run dist:mac   # .dmg + .zip (arm64)
+npm run dist:win   # NSIS installer
 npm run dist       # current platform
 ```
 
-## How it works
+---
+
+## Features
 
 ### Two-level scanning
-- **Light scan** — title + abstract only, for *every* monitored work (read or not).
-  Assigns coarse themes (Prompt 0). Cheap and incremental; this is what keeps unread
-  works on the map so gaps stay visible.
-- **Deep scan** — full clean text, for works that match either trigger:
-  - **Tag** (configurable, default `leído`), or
-  - **Manual selection** in the Collections modal / Library (`manual_deep`).
 
-  A work is deep-scanned if it satisfies **either** condition. Deep scan extracts
-  typed ideas (claim / finding / construct / method / framework), evidence anchored
-  to exact passages (Prompt 1), then fuses each idea against the global graph
-  (Prompt 2). The author layer is **derived** post-process from edges and external
-  references — the model is never asked to infer global author relations.
+**Light scan** — title + abstract only, for every monitored work. Assigns
+coarse-grained parent themes. Cheap, incremental, and what keeps unread works
+visible on the map so gaps stay visible.
+
+**Deep scan** — full clean text. Triggered per-work by a configurable read tag
+(default: `leído`) or by manual selection. Extracts typed ideas (claim, finding,
+construct, method, framework), verbatim evidence anchored to exact passages,
+then fuses each idea against the global graph. The author layer is derived
+post-process — the model is never asked to infer global author relations.
+
+### Idea graph
+
+Interactive Cytoscape.js graph with multiple lenses (ideas, authors), presets
+(contradictions, gaps, reading focus, unread works), theme-based filtering,
+search, and history playback. Every node opens a detail sidebar with occurrences,
+evidence and relations.
 
 ### Tutor mode
-A guided, step-by-step walkthrough of your own idea graph (`electron/ai/tutor.ts`,
-launched from the graph toolbar). A long-context model you choose analyses **all**
-ideas, themes and connections and proposes guided **routes**:
-- **Recorrido completo** — several routes ordered by weight whose union covers the whole
-  graph (so a single pass surfaces everything important and which lines weigh most).
-- **Desde un objetivo** — you describe what you want to review and the Tutor traces a
-  route through only the relevant ideas and connections.
 
-There is **no artificial cap on stops**: the planner is told to traverse every relevant,
-connected node and only skip what's clearly redundant — long, well-connected lines get
-long routes rather than over-summarised ones.
+AI-guided, step-by-step walkthrough of your idea graph. A long-context model
+analyses all ideas, themes and connections and proposes weighted routes:
 
-You move with **previous/next** arrows (or ←/→). The narration is written as **one
-continuous, progressive discourse** (each stop receives the tail of the previous one and
-is told to avoid navigation filler like "stop 4" / "welcome" / "to finish"), grounded in
-that node's ideas, occurrences and verbatim evidence and rendered as **Markdown**. As you
-move, the real graph spotlights and frames the current node(s) with a slightly wide
-perspective (close enough to read the label, wide enough to show the neighbourhood), and
-the node's detail opens in the right sidebar so you can read it alongside the explanation.
-The plan is one structured JSON call; each stop's explanation is streamed.
+- **Recorrido completo** — full coverage, ordered by weight.
+- **Desde un objetivo** — routes traced from a specific research interest.
 
-The left navigation collapses by clicking the **Nodus logo**, freeing space for the graph
-and the tutor/detail panels. The research-assistant chat answers also render as Markdown.
+No artificial stop cap. Narration streams as one continuous discourse grounded
+in the node's evidence. The graph spotlights and frames each stop live.
+
+### Debates
+
+Contradiction and refutation edges rendered as two-sided face-offs with authors,
+evidence, and a chronology. Optional AI synthesis (streamed) to understand the
+tension and decide how your work fits.
+
+### Research coverage map
+
+Write a thesis question; Nodus decomposes it into sub-questions and maps each
+against your corpus: covered, partially covered, uncovered, or internally
+disputed. Tracks corpus growth and flags stale mappings. Exports to Markdown.
+
+### Reading path
+
+Describe your research priorities; Nodus orders what to read and in what phase,
+justifying each choice with gap, foundational, recency, and connectivity scores.
 
 ### Writing workshop
-The **Taller de escritura** turns the graph into an editable academic artifact rather
-than another exploratory view. You choose the target form (state of the art,
-theoretical framework, debate, gap justification, chapter section or research
-question), describe the objective, and Nodus prepares a workbench of relevant
-materials from the local graph:
 
-- idea nodes with their developing works and anchored evidence,
-- curated themes,
-- mined gaps,
-- contradictions,
-- works from Zotero,
-- saved Tutor routes.
-
-You select what belongs in the draft, then the synthesis model generates a structured
+Choose the target form (literature review, theoretical framework, debate
+synthesis, gap justification, chapter section, research question), describe the
+objective, select from the suggested materials (ideas, themes, gaps,
+contradictions, works, passages, saved Tutor routes), and generate a structured
 result: outline, Markdown draft, support matrix, bibliography, next steps and
-limitations. Citations use the same `nodus://idea`, `nodus://work`, `nodus://gap` and
-`nodus://contradiction` links as the research assistant, so every important claim can
-open the real source/evidence in Nodus. The result exports as Markdown for further
-editing in an external writing tool.
+limitations. All citations use `nodus://` links that resolve to the real
+source/evidence inside Nodus. Exports to Markdown. Drafts can be saved locally
+and re-opened.
 
-### Notes
-The **Notas** view is a local workspace to structure everything the rest of Nodus
-generates. You create **folders and subfolders** — use them as chapters and
-subheadings — and file notes into them:
+### Notes workspace
 
-- hand-written **Markdown notes** with a formatting toolbar (headings, bold, lists,
-  quotes, code, links) and an edit/preview toggle;
-- **assistant answers**, **writing-workshop drafts**, **debate syntheses** and single
-  **ideas**, captured from their own surfaces with one click ("Guardar en notas").
+Folders and subfolders with a Markdown editor. Capture content from the research
+assistant, writing workshop, debate view, and individual ideas with one click.
+`nodus://` citations stay clickable inside the editor. Manual ideas created from
+notes are integrated into the graph. Supports export (structured Markdown or
+JSON), AI-assisted reordering, and folder-level idea suggestions.
 
-Captured content keeps its `nodus://idea`, `nodus://work`, `nodus://gap`,
-`nodus://contradiction` and `nodus://passage` citations, so they stay **clickable**
-inside the notes editor and open the real source/evidence — the same NotebookLM-style
-behaviour as the research assistant. Folders and notes live in `note_folders` / `notes`
-(`electron/db/notesRepo.ts`); deleting a folder cascades to its subfolders and notes.
+### Argument map
+
+Trace the logical structure around any idea. Two modes: **AI** (model-driven
+hierarchical outline) or **auto** (structural, using real graph edges — no
+model needed). Surfaces debate hubs and connectivity-ranked seed candidates.
+
+### Global search
+
+Keyword search across ideas, works, gaps, themes, authors and notes. Results
+link directly to the relevant detail in each view.
+
+### Research assistant
+
+Conversational AI grounded in your corpus. Pick the context: ideas, themes,
+contradictions, gaps, reading path, authors, documents, passages, and the full
+graph. Answers render as Markdown with `nodus://` citations. Streamed with
+optional reasoning trace. Conversation history is persisted.
 
 ### Sync
-Manual (button) or realtime (polls the Zotero library version every ~25s and diffs
-with `?since=`). Each sync writes a `sync_log` entry.
 
-### Large-PDF handling (detector chain)
-Deep-scan text resolution escalates only as far as needed, so big/scanned PDFs stay
-cheap and memory-safe:
+Manual (button) or realtime (polls the Zotero library version every ~25s and
+diffs with `?since=`). Each sync writes a log entry.
 
-1. **Zotero's own indexed full text** (`/items/{key}/fulltext`) — if Zotero already
-   extracted the text, reuse it (no parsing). Used only when it's substantial and
-   reasonably complete (≥90% of pages indexed).
-2. **PDF analyzer** (`pdfAnalyzer.ts`) samples evenly-spaced pages to estimate
-   text-layer coverage and classifies the document: `digital` / `hybrid` / `scanned`.
-3. **Streaming extraction** (`extractPdfStreaming`) parses page-by-page (never loads
-   all page text up front), prefixing each page with a `[[p. N]]` marker so the model
-   can cite accurate `location`s.
-4. **OCR** (opt-in, `ocrEnabled`) — only the image pages of `scanned`/`hybrid` PDFs are
-   OCR-ed locally with Tesseract, with a per-work page cap (`ocrMaxPages`) and live
-   per-page progress. A `scanned` PDF with OCR disabled exits fast (no full read) and
-   is marked `skipped_no_text` with an explanatory badge.
+### Large-PDF handling
+
+Deep-scan text resolution escalates only as far as needed:
+
+1. **Zotero indexed full text** — reuse if substantial (≥90% of pages).
+2. **PDF analyzer** — samples pages, classifies as digital / hybrid / scanned.
+3. **Streaming extraction** — page-by-page, `[[p. N]]` markers for model grounding.
+4. **OCR** (opt-in) — only image pages of scanned/hybrid PDFs, locally via Tesseract.
 5. **Fallbacks** — Unpaywall (by DOI) → abstract-only → none.
 
-We deliberately do **not** pre-convert PDFs to Markdown: a separate conversion pass
-adds cost and risks precision (priority #1). Preserving page markers + paragraph
-breaks gives the model better `location` grounding at lower risk.
+All phases report live progress through the queue bar.
 
-All phases report progress through the queue (`Extrayendo p. 8/22`, `OCR p. 12/340`),
-shown live in the queue bar.
+### MCP server
 
-> OCR is local but Tesseract downloads its language data on first use (cached
-> afterwards). It is **off by default**; enable it in Settings → *Extracción de texto*.
+Optional local Model Context Protocol server (Streamable HTTP) for external AI
+clients (Claude Desktop, ChatGPT, generic MCP clients). Bearer-token auth,
+localhost only.
 
-### Zotero API conformance
-Verified against the Zotero 7 local API: base `http://localhost:23119/api/`, the
-library is always addressed as **`users/0`** (the real numeric userID is not used
-locally), and every request sends **`Zotero-Allowed-Request: 1`** — required because
-Electron's `User-Agent` starts with `Mozilla/`, which Zotero otherwise rejects.
-Pagination uses `limit`/`start` with the `Total-Results` and `Last-Modified-Version`
-headers; incremental sync uses `?since=`. The client is strictly read-only.
+### Export / import
 
-### Traceability
-Every idea, edge, and gap stores its `evidence` (verbatim quote + location +
-`zotero_key`), so you can jump from any node or edge to the exact passage in Zotero.
+Settings > Data > Export produces a self-contained `*.nodus` archive encrypted
+with a generated password: transactionally consistent SQLite snapshot, selected
+model settings, API keys, embeddings, chat history, extracted text, summaries
+and passages. Import restores the complete state without rescanning.
+
+---
 
 ## Data schema
 
 See `electron/db/migrations.ts` for the authoritative schema. Core tables:
 
-- `works` — central registry; each work gets a stable `nodus_id` (UUID), independent
-  of its `zotero_key`. Tracks `light_status`/`deep_status`, `deep_trigger`, hashes.
-- `work_aliases` — duplicate works (same DOI) unified under one `nodus_id`.
+- `works` — central registry; stable `nodus_id` (UUID), tracks `light_status` / `deep_status`, hashes.
 - `themes` / `work_themes` — light-scan theme clusters.
-- `ideas` — canonical idea nodes with embeddings (`global_id` = `g-NNNN`, assigned by
-  the app, never by the model).
+- `ideas` — canonical idea nodes with embeddings.
 - `idea_occurrences` — how each work develops an idea.
-- `evidence` — anchored quotes.
+- `evidence` — anchored quotes with location and kind (explicit / paraphrased).
 - `edges` — typed, directed relations (solid = explicit, dashed = inferred).
-- `authors` / `author_relations` (derived) / `work_authors`.
-- `gaps`, `external_refs`, `settings`, `sync_log`.
+- `authors` / `author_relations` / `work_authors` — derived author layer.
+- `gaps` — future work, limitation, open question, unresolved contradiction.
+- `notes` / `note_folders` — user-structured workspace.
+- `research_questions` / `rq_sub_questions` — thesis decomposition + coverage map.
+- `chat_conversations` / `chat_messages` — research assistant history.
 
-## Export / import
+## Security
 
-Settings → Data → **Export** produces a single self-contained `*.nodus` archive
-encrypted with a generated password. It contains a transactionally consistent
-SQLite snapshot plus the selected model settings and API keys. The snapshot
-preserves all Nodus data: works and graph, extracted-text cache, chat history,
-and the Float32 embeddings for ideas, work summaries and full-text passages.
-An internal inventory verifies table counts, embedding bytes and model selections
-before an import is accepted.
-
-On a new machine, import the file to restore the complete Nodus state without
-rescanning or reindexing. Original Zotero attachment files are intentionally not
-duplicated by Nodus; keep Zotero's own storage/sync available if you need to open
-the original PDFs. Extracted text and every computed Nodus artifact are restored
-from the backup.
+- API keys are encrypted with Electron `safeStorage` and stored in `userData`
+  (outside the repo). They never cross the IPC boundary; the renderer only sees
+  a boolean `providerKeys` map.
+- The `.gitignore` excludes `*.sqlite`, `*.nodus`, `.env`, and key material.
+- Backups strip `providerKeys` from settings; the encrypted archive carries the
+  keys separately.
+- The MCP server binds to localhost only and requires a bearer token.
 
 ## The three core prompts
 
@@ -237,9 +254,9 @@ The verbatim system prompts live in `electron/ai/prompts.ts`:
 - **Prompt 1** — deep extraction (ideas, evidence, relations, gaps, authors).
 - **Prompt 2** — fusion / idea resolution against the global graph.
 
-All free-text fields are produced in Spanish; `quote` fields stay verbatim in the
-source language. JSON output is validated and retried at `temperature 0` on parse
-failure.
+All free-text fields are produced in the configured prompt language (Spanish or
+English); `quote` fields stay verbatim in the source language. JSON output is
+validated and retried at `temperature 0` on parse failure.
 
 ## License
 

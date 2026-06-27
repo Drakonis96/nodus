@@ -60,6 +60,18 @@ const STEPS: AdvancedTourStep[] = [
     body: 'Aquí Nodus señala preguntas abiertas, limitaciones declaradas y tensiones entre fuentes. No son errores: son los espacios donde cabe una contribución original. Un buen objeto de investigación suele nacer de un hueco bien delimitado o de una contradicción que nadie ha resuelto. Marca los que conecten con tu interés.',
   },
   {
+    stage: 'Paso 3 · Encontrar tu aportación',
+    view: 'debate',
+    title: 'Debates: la estructura de una contradicción',
+    body: 'Cada relación de contradicción o refutación se despliega como un debate de dos bandos con sus autores, evidencias y cronología. Pides una síntesis al modelo para entender la tensión y decides cómo tu trabajo puede resolverla o aprovecharla.',
+  },
+  {
+    stage: 'Paso 3 · Encontrar tu aportación',
+    view: 'research',
+    title: 'Mapa de cobertura: tu pregunta descompuesta',
+    body: 'Escribe tu pregunta de investigación y Nodus la desglosa en subpreguntas. Después mapea cuáles cubre tu corpus, cuáles parcialmente y cuáles quedan sin literatura. Es la herramienta para convertir una intuición vaga en un plan de búsqueda estructurado.',
+  },
+  {
     stage: 'Paso 4 · Planificar',
     view: 'reading',
     title: 'Una ruta de lectura a la medida de tu pregunta',
@@ -77,10 +89,16 @@ const STEPS: AdvancedTourStep[] = [
     body: 'El Taller de escritura convierte tus ideas y conexiones en un esquema y un borrador apartado por apartado, con citas que puedes comprobar contra el texto original. No escribe por ti: te da una estructura defendible y las referencias para sostenerla, de modo que mantienes el control intelectual del manuscrito.',
   },
   {
+    stage: 'Paso 7 · Organizar',
+    view: 'notes',
+    title: 'Notas: tu cuaderno de investigación',
+    body: 'A lo largo del proceso habrás generado hallazgos en el asistente, borradores en el taller y síntesis de debates. Las Notas te permiten organizar todo ello en carpetas jerárquicas — piensa en capítulos y secciones — con un editor Markdown que conserva las citas clicables. Las ideas manuales que crees aquí se integran directamente en el grafo.',
+  },
+  {
     stage: 'El ciclo se repite',
     view: 'home',
     title: 'Inicio: tu panel de mando',
-    body: 'Inicio resume el estado de tu corpus, los análisis pendientes y el siguiente paso recomendado. La investigación es iterativa: escaneas más obras, vuelven a aparecer ideas y huecos, refinas la ruta y el borrador. Vuelve aquí entre vueltas. Puedes relanzar este recorrido cuando quieras desde Ajustes → Ayuda.',
+    body: 'Inicio resume el estado de tu corpus, los análisis pendientes y el siguiente paso recomendado. La investigación es iterativa: escaneas más obras, vuelven a aparecer ideas y huecos, refinas la ruta y el borrador. Vuelve aquí entre vueltas. Puedes relanzar este recorrido desde Ajustes → Ayuda.',
   },
 ];
 

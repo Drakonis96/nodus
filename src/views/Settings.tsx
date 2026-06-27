@@ -435,6 +435,26 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           </Section>
 
           <Section title={t('Datos')}>
+            {settings.demoMode && (
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2">
+                <div>
+                  <label className="text-sm text-amber-300">{t('Modo demo activo')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {t('Estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
+                  </p>
+                </div>
+                <button
+                  className="btn border border-amber-700 text-amber-300 hover:bg-amber-950/50 shrink-0"
+                  onClick={async () => {
+                    await window.nodus.clearDemoData();
+                    await onChange();
+                    flash(t('Datos de demostración eliminados.'));
+                  }}
+                >
+                  <Icon name="trash" /> {t('Salir del modo demo')}
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <button className="btn btn-ghost border border-neutral-700" onClick={exportBackup}>
                 <Icon name="download" /> {t('Exportar (.nodus)')}
