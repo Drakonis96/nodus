@@ -15,6 +15,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { MANUAL_IDEA_MARKER } from '@shared/types';
 import { buildNotesTree, countNotesInSubtree, flattenFolders, type FolderNode } from '../notesTree';
 import { ManualIdeaEditor } from './ManualIdeaEditor';
+import { FolderIdeaSuggestionsModal } from './FolderIdeaSuggestionsModal';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
@@ -95,6 +96,11 @@ export function NotesView({
 
   const [sortMode, setSortMode] = useState<SortMode>('manual');
   const [exportOpen, setExportOpen] = useState(false);
+  // Folder summary editing + the "suggest ideas to integrate" modal.
+  const [suggestFor, setSuggestFor] = useState<NoteFolder | null>(null);
+  const [folderSummaryDraft, setFolderSummaryDraft] = useState('');
+  const [folderSummaryDirty, setFolderSummaryDirty] = useState(false);
+  const [savingSummary, setSavingSummary] = useState(false);
   const [aiReordering, setAiReordering] = useState(false);
   // After an AI reorder we keep the previous manual order so the user can undo.
   const [reorderUndo, setReorderUndo] = useState<string[] | null>(null);
@@ -385,6 +391,29 @@ export function NotesView({
     return folders.find((f) => f.id === scope.id)?.name ?? t('Carpeta');
   }, [folders, scope]);
 
+  const activeFolder = useMemo(
+    () => (scope.kind === 'folder' ? folders.find((f) => f.id === scope.id) ?? null : null),
+    [folders, scope]
+  );
+
+  // Keep the editable summary in sync with the selected folder.
+  useEffect(() => {
+    setFolderSummaryDraft(activeFolder?.summary ?? '');
+    setFolderSummaryDirty(false);
+  }, [activeFolder?.id]);
+
+  const saveFolderSummary = useCallback(async () => {
+    if (!activeFolder) return;
+    setSavingSummary(true);
+    try {
+      await window.nodus.updateNoteFolderSummary(activeFolder.id, folderSummaryDraft);
+      await refresh();
+      setFolderSummaryDirty(false);
+    } finally {
+      setSavingSummary(false);
+    }
+  }, [activeFolder, folderSummaryDraft, refresh]);
+
   const visibleNotes = useMemo(() => {
     let list: Note[];
     if (scope.kind === 'all') list = notes;
@@ -479,6 +508,13 @@ export function NotesView({
             onClick={() => void createFolder(null)}
           >
             <Icon name="folderPlus" size={15} />
+          </button>
+          <button
+            className="p-1 rounded text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
+            title={t('Exportar notas (Markdown o JSON)')}
+            onClick={() => setExportOpen(true)}
+          >
+            <Icon name="download" size={15} />
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-0.5">
@@ -593,14 +629,20 @@ export function NotesView({
               <Icon name={aiReordering ? 'sync' : 'wand'} size={13} className={aiReordering ? 'animate-spin' : ''} />
               {t('IA')}
             </button>
-            <button
-              className="btn btn-ghost border border-neutral-700 text-xs py-1 shrink-0"
-              title={t('Exportar notas (Markdown o JSON)')}
-              onClick={() => setExportOpen(true)}
-            >
-              <Icon name="download" size={13} />
-            </button>
           </div>
+          {scope.kind === 'folder' && activeFolder && (
+            <FolderSummaryPanel
+              value={folderSummaryDraft}
+              dirty={folderSummaryDirty}
+              saving={savingSummary}
+              onChange={(v) => {
+                setFolderSummaryDraft(v);
+                setFolderSummaryDirty(true);
+              }}
+              onSave={() => void saveFolderSummary()}
+              onSuggest={() => setSuggestFor(activeFolder)}
+            />
+          )}
           {reorderUndo && (
             <div className="flex items-center gap-2 rounded-md border border-indigo-700/60 bg-indigo-600/10 px-2.5 py-1.5 text-xs">
               <Icon name="wand" size={13} className="text-indigo-300 shrink-0" />
@@ -843,6 +885,83 @@ export function NotesView({
           onClose={() => setExportOpen(false)}
         />
       )}
+
+      {suggestFor && (
+        <FolderIdeaSuggestionsModal
+          folder={suggestFor}
+          onClose={() => setSuggestFor(null)}
+          onAdded={() => void refresh()}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Editable summary for a folder: the brief of which ideas it should hold. Collapsed
+ * by default to keep the note list clean; the "Sugerir" button is always visible and
+ * opens the AI suggestions modal driven by this summary.
+ */
+function FolderSummaryPanel({
+  value,
+  dirty,
+  saving,
+  onChange,
+  onSave,
+  onSuggest,
+}: {
+  value: string;
+  dirty: boolean;
+  saving: boolean;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onSuggest: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-900/40">
+      <div className="flex items-center gap-1.5 px-2 py-1.5">
+        <button
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-xs font-medium text-neutral-300 hover:text-neutral-100"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} />
+          <Icon name="bulb" size={13} className="text-indigo-300" />
+          <span className="truncate">{t('Resumen de la carpeta')}</span>
+          {!open && value.trim() && <span className="ml-1 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-400" />}
+        </button>
+        <button
+          className="btn btn-ghost shrink-0 border border-neutral-700 text-xs gap-1 py-1"
+          title={t('Sugerir ideas para integrar en esta carpeta')}
+          onClick={onSuggest}
+        >
+          <Icon name="wand" size={13} /> {t('Sugerir')}
+        </button>
+      </div>
+      {open && (
+        <div className="space-y-1.5 px-2 pb-2">
+          <textarea
+            className="input w-full text-xs leading-relaxed"
+            rows={4}
+            value={value}
+            placeholder={t('Describe las ideas que esta carpeta debería integrar…')}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => {
+              if (dirty) onSave();
+            }}
+          />
+          <div className="flex justify-end">
+            <button
+              className="btn btn-ghost border border-neutral-700 text-xs gap-1 py-1"
+              onClick={onSave}
+              disabled={!dirty || saving}
+            >
+              <Icon name={saving ? 'sync' : dirty ? 'save' : 'check'} size={13} className={saving ? 'animate-spin' : ''} />
+              {dirty ? t('Guardar resumen') : t('Guardado')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -964,6 +1083,11 @@ function FolderRow({
           >
             <Icon name="folder" size={14} className={isActive ? 'text-indigo-300' : 'text-neutral-500'} />
             <span className="truncate">{node.folder.name}</span>
+            {node.folder.summary.trim() && (
+              <span title={t('Esta carpeta tiene un resumen')} className="shrink-0 leading-none">
+                <Icon name="bulb" size={11} className="text-indigo-400" />
+              </span>
+            )}
             {total > 0 && <span className="text-[10px] text-neutral-500">{total}</span>}
           </button>
         )}

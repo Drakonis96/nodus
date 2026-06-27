@@ -378,7 +378,7 @@ export function registerTools(server: McpServer): void {
     'nodus_list_notes_tree',
     {
       title: 'List notes tree',
-      description: 'Returns the user-created notes and folders. This list omits note content; use nodus_get_note for a full note.',
+      description: 'Returns the user-created notes and folders. Each folder carries its summary brief (the ideas it is meant to hold). This list omits note content; use nodus_get_note for a full note.',
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -511,14 +511,37 @@ export function registerTools(server: McpServer): void {
     'nodus_create_folder',
     {
       title: 'Create notes folder',
-      description: 'Creates a user-owned folder in the Nodus notes workspace. This modifies Nodus data.',
-      inputSchema: { name: z.string().trim().min(1).max(500), parentId: z.string().trim().min(1).nullable().optional() },
+      description: 'Creates a user-owned folder in the Nodus notes workspace. An optional summary describes the ideas the folder is meant to hold. This modifies Nodus data.',
+      inputSchema: {
+        name: z.string().trim().min(1).max(500),
+        parentId: z.string().trim().min(1).nullable().optional(),
+        summary: z.string().trim().max(8_000).optional(),
+      },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ name, parentId }) =>
+    ({ name, parentId, summary }) =>
       tool(() => {
         if (parentId && !notes.getNoteFolder(parentId)) throw notFound('una carpeta', parentId);
-        return notes.createNoteFolder({ name, parentId });
+        const folder = notes.createNoteFolder({ name, parentId });
+        if (summary && summary.trim()) return notes.updateNoteFolderSummary(folder.id, summary) ?? folder;
+        return folder;
+      })()
+  );
+
+  server.registerTool(
+    'nodus_update_folder_summary',
+    {
+      title: 'Update folder summary',
+      description:
+        "Sets a notes folder's summary brief (the ideas the folder is meant to hold). Nodus reads this brief to suggest ideas to integrate into the folder. This modifies Nodus data.",
+      inputSchema: { id: z.string().trim().min(1), summary: z.string().max(8_000) },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ id, summary }) =>
+      tool(() => {
+        const folder = notes.updateNoteFolderSummary(id, summary);
+        if (!folder) throw notFound('una carpeta', id);
+        return folder;
       })()
   );
 

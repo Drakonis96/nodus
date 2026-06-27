@@ -1257,5 +1257,24 @@ export const EN: Record<string, string> = {
   'Carpeta nueva en la raíz': 'New folder at the root',
   'Abrir idea en Nodus': 'Open idea in Nodus',
   'Respuesta del asistente': 'Assistant answer',
+
+  // ── Notes · folder summary + AI idea suggestions ───────────────────────────
+  'Resumen de la carpeta': 'Folder summary',
+  'Describe las ideas que esta carpeta debería integrar…':
+    'Describe the ideas this folder should hold…',
+  'Guardar resumen': 'Save summary',
+  Sugerir: 'Suggest',
+  'Sugerir ideas para integrar en esta carpeta': 'Suggest ideas to integrate into this folder',
+  'Ideas para esta carpeta': 'Ideas for this folder',
+  'Volver a analizar': 'Re-analyze',
+  'Analizando ideas y conexiones…': 'Analyzing ideas and connections…',
+  'No hay ideas para sugerir ahora mismo.': 'No ideas to suggest right now.',
+  'vía conexión': 'via connection',
+  afinidad: 'affinity',
+  ajuste: 'fit',
+  'Añadir esta idea a la carpeta': 'Add this idea to the folder',
+  Añadida: 'Added',
+  '{considered} candidatas analizadas · {excluded} ya en la carpeta':
+    '{considered} candidates analyzed · {excluded} already in the folder',
   // <<END_EN>>
 };

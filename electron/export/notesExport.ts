@@ -43,6 +43,8 @@ interface ExportConnection {
 interface ExportFolder {
   id: string | null;
   name: string;
+  /** The folder's brief (which ideas it should hold); omitted when empty. */
+  summary?: string;
   path: string[];
   notes: ExportNote[];
   folders: ExportFolder[];
@@ -97,6 +99,7 @@ function buildExportTree(options: NotesExportOptions): ExportFolder {
     return {
       id: folder.id,
       name: folder.name,
+      summary: folder.summary.trim() || undefined,
       path: here,
       notes: (notesByFolder.get(folder.id) ?? []).map((n) => gatherNote(n, options)),
       folders: (byParent.get(folder.id) ?? []).map((child) => buildFolder(child, here)),
@@ -186,6 +189,7 @@ function renderMarkdown(root: ExportFolder, options: NotesExportOptions): string
 function renderFolder(lines: string[], folder: ExportFolder, depth: number, options: NotesExportOptions): void {
   const heading = '#'.repeat(Math.min(depth, 6));
   lines.push('', `${heading} ${folder.path.join(' › ') || folder.name}`, '');
+  if (folder.summary) lines.push(`**Resumen de la carpeta:** ${folder.summary}`, '');
   for (const note of folder.notes) renderNote(lines, note, depth + 1, options);
   for (const child of folder.folders) renderFolder(lines, child, depth + 1, options);
 }

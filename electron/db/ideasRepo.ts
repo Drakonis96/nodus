@@ -325,6 +325,54 @@ export function findSimilarIdeas(
   }[];
 }
 
+/**
+ * Cosine similarity of the query vector to a specific set of ideas (those that
+ * carry a current-model embedding). Used to score graph-expansion neighbours,
+ * where the candidate ids are already known and only need ranking.
+ */
+export function ideaEmbeddingSimilarities(
+  queryEmbedding: number[],
+  ids: string[]
+): { global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[] {
+  if (ids.length === 0) return [];
+  const buf = encodeEmbedding(queryEmbedding);
+  const config = currentEmbeddingConfig();
+  const placeholders = ids.map(() => '?').join(',');
+  return getDb()
+    .prepare(
+      `SELECT global_id, type, label, statement, vec_cosine(embedding, ?) AS similarity
+         FROM ideas
+        WHERE embedding IS NOT NULL
+          AND embedding_provider = ?
+          AND embedding_model = ?
+          AND embedding_dim = ?
+          AND global_id IN (${placeholders})
+        ORDER BY similarity DESC`
+    )
+    .all(buf, config.provider, config.model, queryEmbedding.length, ...ids) as {
+    global_id: string;
+    type: IdeaType;
+    label: string;
+    statement: string;
+    similarity: number;
+  }[];
+}
+
+/** How many ideas carry an embedding for the current provider/model (0 ⇒ library not indexed). */
+export function embeddedIdeaCount(): number {
+  const config = currentEmbeddingConfig();
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM ideas
+        WHERE embedding IS NOT NULL
+          AND embedding_provider = ?
+          AND embedding_model = ?`
+    )
+    .get(config.provider, config.model) as { count: number };
+  return row.count;
+}
+
 export function upsertOccurrence(
   globalId: string,
   nodusId: string,

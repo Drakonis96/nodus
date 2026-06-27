@@ -61,6 +61,7 @@ import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
+import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
 import { verifyCitations } from './citations/verifyCitations';
 import { globalSearch } from './db/searchRepo';
 import { suggestGapSearch } from './ai/gapSearch';
@@ -526,6 +527,10 @@ export function registerIpc(
     notes.reorderNotes(noteIds);
   });
   h('notes:reorderByAI', async (_e, noteIds: string[]) => reorderNotesByAI(noteIds));
+  h('notes:folders:updateSummary', async (_e, id: string, summary: string) =>
+    notes.updateNoteFolderSummary(id, summary ?? '')
+  );
+  h('notes:folders:suggestIdeas', async (_e, folderId: string) => suggestFolderIdeas(folderId));
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)

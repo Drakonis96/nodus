@@ -15,6 +15,7 @@ interface NoteFolderRow {
   id: string;
   parent_id: string | null;
   name: string;
+  summary: string | null;
   order_idx: number;
   created_at: string;
   updated_at: string;
@@ -43,6 +44,7 @@ function toFolder(row: NoteFolderRow): NoteFolder {
     id: row.id,
     parentId: row.parent_id,
     name: row.name,
+    summary: row.summary ?? '',
     orderIdx: row.order_idx,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -133,6 +135,15 @@ export function renameNoteFolder(id: string, name: string): NoteFolder | null {
   getDb()
     .prepare('UPDATE note_folders SET name = ?, updated_at = ? WHERE id = ?')
     .run(trimmed, new Date().toISOString(), id);
+  return getNoteFolder(id);
+}
+
+/** Set a folder's summary brief (the ideas it is meant to hold). Empty string clears it. */
+export function updateNoteFolderSummary(id: string, summary: string): NoteFolder | null {
+  if (!getNoteFolder(id)) return null;
+  getDb()
+    .prepare('UPDATE note_folders SET summary = ?, updated_at = ? WHERE id = ?')
+    .run(summary.trim(), new Date().toISOString(), id);
   return getNoteFolder(id);
 }
 

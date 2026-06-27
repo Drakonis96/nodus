@@ -1040,6 +1040,8 @@ export interface NoteFolder {
   id: string;
   parentId: string | null;
   name: string;
+  /** Free-text brief: the ideas this folder is meant to hold. Drives AI idea suggestions. */
+  summary: string;
   orderIdx: number;
   createdAt: string;
   updatedAt: string;
@@ -1161,6 +1163,37 @@ export interface NotesExportOptions {
 /** Result of an AI logical reorder of the notes in one scope. */
 export interface NotesReorderResult {
   orderedIds: string[];
+}
+
+/**
+ * One idea Nodus proposes integrating into a folder, with the AI's justification.
+ * Produced by matching the folder's summary against the whole idea base.
+ */
+export interface FolderIdeaSuggestion {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  /** Semantic cosine similarity to the folder summary (null when surfaced only via a graph edge). */
+  similarity: number | null;
+  /** True when the idea was reached by expanding a conceptual connection rather than direct similarity. */
+  viaConnection: boolean;
+  /** The AI's short reason for why this idea belongs in the folder. */
+  reason: string;
+  /** The AI's 0..1 fit score, used to order the list. */
+  score: number;
+}
+
+/** Result of analysing every available idea against a folder's summary. */
+export interface FolderIdeaSuggestionsResult {
+  ok: boolean;
+  /** Null on success; a human-readable explanation when no suggestions could be produced. */
+  message: string | null;
+  suggestions: FolderIdeaSuggestion[];
+  /** Ideas already present in the folder subtree, excluded from the analysis. */
+  excludedCount: number;
+  /** Candidate ideas considered before the AI curation step. */
+  consideredCount: number;
 }
 
 /** The kinds of sources an inline `nodus://` citation can point to. */
@@ -1642,6 +1675,10 @@ export interface NodusApi {
   reorderNotes(noteIds: string[]): Promise<void>;
   /** Ask the AI to order the given notes into a logical sequence; persists and returns it. */
   reorderNotesByAI(noteIds: string[]): Promise<NotesReorderResult>;
+  /** Update a folder's summary brief (the ideas it is meant to hold). */
+  updateNoteFolderSummary(id: string, summary: string): Promise<NoteFolder | null>;
+  /** Match the folder summary against every idea (semantic + connections + AI) and suggest ideas to integrate. */
+  suggestFolderIdeas(folderId: string): Promise<FolderIdeaSuggestionsResult>;
   /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
