@@ -1764,8 +1764,8 @@ export interface WorkFilter {
   lightStatus?: LightStatus | 'all';
   deepStatus?: DeepStatus | 'all';
   summaryStatus?: SummaryStatus | 'all';
-  /** Presence conditions that must all be satisfied (AND). */
-  statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages'>;
+  /** Presence conditions that must all be satisfied (AND). `!` prefix = NOT. */
+  statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages'>;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

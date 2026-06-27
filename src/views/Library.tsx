@@ -31,14 +31,33 @@ const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
-type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages';
+type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
 
-const STATUS_FLAGS: { value: StatusFlag; label: string; desc: string }[] = [
-  { value: 'deep', label: 'Análisis profundo hecho', desc: 'deep_status = done' },
-  { value: 'summary', label: 'Resumen hecho', desc: 'summary_status = done' },
-  { value: 'ideas', label: 'Ideas extraídas', desc: 'tiene al menos una idea' },
-  { value: 'passages', label: 'Pasajes completos', desc: 'todos los fragmentos indexados y actuales' },
+type StatusDimension = 'deep' | 'summary' | 'ideas' | 'passages';
+
+const STATUS_FLAGS: { dim: StatusDimension; label: string; negLabel: string; desc: string; negDesc: string }[] = [
+  { dim: 'deep', label: 'Análisis profundo hecho', negLabel: 'Análisis profundo NO hecho', desc: 'deep_status = done', negDesc: 'deep_status != done' },
+  { dim: 'summary', label: 'Resumen hecho', negLabel: 'Resumen NO hecho', desc: 'summary_status = done', negDesc: 'summary_status != done' },
+  { dim: 'ideas', label: 'Ideas extraídas', negLabel: 'Sin ideas extraídas', desc: 'tiene al menos una idea', negDesc: 'no tiene ninguna idea' },
+  { dim: 'passages', label: 'Pasajes completos', negLabel: 'Pasajes incompletos', desc: 'todos los fragmentos indexados y actuales', negDesc: 'faltan fragmentos o están obsoletos' },
 ];
+
+function flagFor(dim: StatusDimension, neg: boolean): StatusFlag {
+  return (neg ? `!${dim}` : dim) as StatusFlag;
+}
+
+function isNegated(f: StatusFlag): boolean {
+  return f.startsWith('!');
+}
+
+function dimensionOf(f: StatusFlag): StatusDimension {
+  return (isNegated(f) ? f.slice(1) : f) as StatusDimension;
+}
+
+function labelFor(f: StatusFlag): string {
+  const meta = STATUS_FLAGS.find((s) => s.dim === dimensionOf(f));
+  return meta ? (isNegated(f) ? meta.negLabel : meta.label) : f;
+}
 
 function StatusFlagsPicker({
   value,
@@ -67,6 +86,19 @@ function StatusFlagsPicker({
 
   const active = value.length > 0;
 
+  const currentFor = (dim: StatusDimension): 'off' | 'pos' | 'neg' => {
+    if (value.includes(dim)) return 'pos';
+    if (value.includes(`!${dim}` as StatusFlag)) return 'neg';
+    return 'off';
+  };
+
+  const cycle = (dim: StatusDimension) => {
+    const cur = currentFor(dim);
+    if (cur === 'off') onToggle(dim);
+    else if (cur === 'pos') { onToggle(dim); onToggle(flagFor(dim, true)); }
+    else onToggle(flagFor(dim, true));
+  };
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -86,29 +118,31 @@ function StatusFlagsPicker({
         <div
           role="dialog"
           aria-label={t('Filtrar por estado')}
-          className="absolute left-0 z-30 mt-2 w-[22rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
+          className="absolute left-0 z-30 mt-2 w-[24rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
         >
           {STATUS_FLAGS.map((s) => {
-            const checked = value.includes(s.value);
+            const state = currentFor(s.dim);
+            const bgClass = state === 'pos' ? 'bg-indigo-600/15' : state === 'neg' ? 'bg-red-600/15' : 'hover:bg-neutral-900';
+            const borderClass = state === 'pos' ? 'border-indigo-400 bg-indigo-500' : state === 'neg' ? 'border-red-400 bg-red-500' : 'border-neutral-600';
+            const textClass = state === 'pos' ? 'text-indigo-200' : state === 'neg' ? 'text-red-200' : 'text-neutral-200';
             return (
               <button
-                key={s.value}
+                key={s.dim}
                 type="button"
-                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${checked ? 'bg-indigo-600/15' : 'hover:bg-neutral-900'}`}
-                onClick={() => onToggle(s.value)}
+                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${bgClass}`}
+                onClick={() => cycle(s.dim)}
               >
                 <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                    checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
-                  }`}
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-white ${borderClass}`}
                 >
-                  {checked && <Icon name="check" size={12} />}
+                  {state === 'pos' && <Icon name="check" size={12} />}
+                  {state === 'neg' && <Icon name="x" size={12} />}
                 </span>
                 <span className="min-w-0">
-                  <span className={`block text-sm ${checked ? 'text-indigo-200' : 'text-neutral-200'}`}>
-                    {t(s.label)}
+                  <span className={`block text-sm ${textClass}`}>
+                    {state === 'neg' ? t(s.negLabel) : t(s.label)}
                   </span>
-                  <span className="block text-xs text-neutral-500">{t(s.desc)}</span>
+                  <span className="block text-xs text-neutral-500">{state === 'neg' ? t(s.negDesc) : t(s.desc)}</span>
                 </span>
               </button>
             );
@@ -463,6 +497,8 @@ export function Library({
   const toggleStatusFlag = (f: StatusFlag) =>
     setFilter((cur) => {
       const set = new Set(cur.statusFlags ?? []);
+      const opposite = isNegated(f) ? dimensionOf(f) : (`!${dimensionOf(f)}` as StatusFlag);
+      set.delete(opposite);
       if (set.has(f)) set.delete(f); else set.add(f);
       return { ...cur, statusFlags: [...set] };
     });
@@ -774,16 +810,20 @@ export function Library({
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
             <span>{t('Estado:')}</span>
             {selectedStatusFlags.map((flag) => {
-              const meta = STATUS_FLAGS.find((f) => f.value === flag);
+              const neg = isNegated(flag);
               return (
                 <button
                   key={flag}
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
+                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:opacity-80 ${
+                    neg
+                      ? 'border-red-800/70 bg-red-950/30 text-red-200'
+                      : 'border-indigo-800/70 bg-indigo-950/30 text-indigo-200'
+                  }`}
                   onClick={() => toggleStatusFlag(flag)}
-                  title={`${t('Quitar')} ${meta ? t(meta.label) : flag}`}
+                  title={`${t('Quitar')} ${labelFor(flag)}`}
                 >
-                  {meta ? t(meta.label) : flag} <Icon name="x" size={12} />
+                  {labelFor(flag)} <Icon name="x" size={12} />
                 </button>
               );
             })}

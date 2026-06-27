@@ -158,11 +158,20 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
         case 'deep':
           clauses.push("w.deep_status = 'done'");
           break;
+        case '!deep':
+          clauses.push("w.deep_status != 'done'");
+          break;
         case 'summary':
           clauses.push("w.summary_status = 'done'");
           break;
+        case '!summary':
+          clauses.push("w.summary_status != 'done'");
+          break;
         case 'ideas':
           clauses.push('EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)');
+          break;
+        case '!ideas':
+          clauses.push('NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)');
           break;
         case 'passages': {
           const config = currentEmbeddingConfig();
@@ -177,6 +186,26 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
                            WHEN p.embedding IS NOT NULL
                             AND p.embedding_provider = @passProv
                             AND p.embedding_model    = @passModel
+                            AND p.embedding_dim > 0
+                            AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
+                          THEN 1 ELSE 0 END) = COUNT(*)
+            )`
+          );
+          break;
+        }
+        case '!passages': {
+          const config = currentEmbeddingConfig();
+          params.passNegProv = config.provider;
+          params.passNegModel = config.model;
+          clauses.push(
+            `NOT EXISTS (
+              SELECT 1 FROM passages p
+               WHERE p.nodus_id = w.nodus_id
+              HAVING COUNT(*) > 0
+                 AND SUM(CASE
+                           WHEN p.embedding IS NOT NULL
+                            AND p.embedding_provider = @passNegProv
+                            AND p.embedding_model    = @passNegModel
                             AND p.embedding_dim > 0
                             AND (w.deep_hash IS NULL OR p.content_hash = w.deep_hash)
                           THEN 1 ELSE 0 END) = COUNT(*)
