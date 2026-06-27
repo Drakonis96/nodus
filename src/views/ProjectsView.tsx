@@ -511,7 +511,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
         )}
       </main>
 
-      <SourceCitationModal target={citation} onClose={() => setCitation(null)} />
+      {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>
   );
 }

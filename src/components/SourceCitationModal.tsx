@@ -42,6 +42,10 @@ export function SourceCitationModal({
   onClose: () => void;
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
 }) {
+  // No citation selected ⇒ render nothing. Without this guard a caller that
+  // mounts the modal unconditionally would show an empty, unclosable dialog
+  // (onClose can't change an already-null target).
+  if (!target) return null;
   return (
     <div className="fixed inset-0 z-[60] bg-black/70 p-4 flex items-center justify-center" onClick={onClose}>
       <div
