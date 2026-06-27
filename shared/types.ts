@@ -1262,6 +1262,231 @@ export interface GapSearchSuggestions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Projects / manuscripts — a project is a research-writing container layered on
+// top of Notes, coverage maps, writing drafts and verifiable graph material.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProjectKind = 'thesis' | 'article' | 'chapter' | 'literature_review' | 'theoretical_framework' | 'other';
+export type ProjectStatus = 'active' | 'paused' | 'done';
+export type ProjectSectionRole =
+  | 'brief'
+  | 'coverage'
+  | 'literature'
+  | 'debates'
+  | 'gaps'
+  | 'drafts'
+  | 'manuscript'
+  | 'custom';
+export type ProjectSectionStatus = 'empty' | 'in_progress' | 'review' | 'ready' | 'discarded';
+export type ProjectLinkKind =
+  | 'note'
+  | 'folder'
+  | 'idea'
+  | 'work'
+  | 'gap'
+  | 'debate'
+  | 'tutor_route'
+  | 'writing_draft'
+  | 'research_question'
+  | 'chapter';
+export type ProjectLinkRole =
+  | 'evidence'
+  | 'argument'
+  | 'counterargument'
+  | 'pending'
+  | 'discarded'
+  | 'key_citation'
+  | 'source'
+  | 'draft'
+  | 'context';
+export type ChapterSourceFormat = 'docx' | 'pdf' | 'markdown' | 'txt' | 'unknown';
+export type ChapterSuggestionKind = 'idea' | 'gap' | 'debate' | 'work' | 'note';
+export type ChapterSuggestionOperation = 'insert_after' | 'insert_before' | 'replace' | 'comment';
+export type ChapterSuggestionStatus = 'suggested' | 'accepted' | 'rejected' | 'applied' | 'blocked';
+export type ChapterSuggestionMode = 'suggest' | 'insert';
+export type ProjectExportFormat = 'markdown' | 'json';
+export type ChapterExportFormat = 'markdown' | 'txt' | 'docx' | 'pdf';
+
+export interface Project {
+  id: string;
+  title: string;
+  kind: ProjectKind;
+  status: ProjectStatus;
+  brief: string;
+  researchQuestionId: string | null;
+  rootFolderId: string | null;
+  model: ModelRef | null;
+  targetWords: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectSection {
+  id: string;
+  projectId: string;
+  folderId: string | null;
+  title: string;
+  role: ProjectSectionRole;
+  status: ProjectSectionStatus;
+  targetWords: number | null;
+  orderIdx: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectLink {
+  id: string;
+  projectId: string;
+  sectionId: string | null;
+  kind: ProjectLinkKind;
+  refId: string;
+  label: string;
+  role: ProjectLinkRole;
+  createdAt: string;
+}
+
+export interface ProjectChapter {
+  id: string;
+  projectId: string;
+  sectionId: string | null;
+  noteId: string | null;
+  title: string;
+  sourceFormat: ChapterSourceFormat;
+  originalFileName: string | null;
+  originalTextHash: string;
+  originalText: string;
+  currentMarkdown: string;
+  wordCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectChapterChunk {
+  id: string;
+  chapterId: string;
+  orderIdx: number;
+  headingPath: string;
+  text: string;
+  startOffset: number;
+  endOffset: number;
+  wordCount: number;
+  embeddingProvider: string | null;
+  embeddingModel: string | null;
+  embeddingDim: number | null;
+  embeddingTextHash: string | null;
+}
+
+export interface ProjectInsertionSuggestion {
+  id: string;
+  projectId: string;
+  chapterId: string;
+  targetChunkId: string | null;
+  kind: ChapterSuggestionKind;
+  refId: string;
+  refLabel: string;
+  operation: ChapterSuggestionOperation;
+  proposedText: string;
+  citationRefs: CitationRef[];
+  rationale: string;
+  confidence: number;
+  status: ChapterSuggestionStatus;
+  blockedReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectChapterVersion {
+  id: string;
+  chapterId: string;
+  label: string;
+  markdown: string;
+  createdAt: string;
+}
+
+export interface ProjectDetail {
+  project: Project;
+  sections: ProjectSection[];
+  links: ProjectLink[];
+  chapters: ProjectChapter[];
+  stats: {
+    sections: number;
+    links: number;
+    chapters: number;
+    suggestions: number;
+    appliedSuggestions: number;
+  };
+}
+
+export interface CreateProjectInput {
+  title: string;
+  kind?: ProjectKind;
+  brief?: string;
+  researchQuestionId?: string | null;
+  model?: ModelRef | null;
+  targetWords?: number | null;
+}
+
+export interface UpdateProjectInput {
+  id: string;
+  title?: string;
+  kind?: ProjectKind;
+  status?: ProjectStatus;
+  brief?: string;
+  researchQuestionId?: string | null;
+  model?: ModelRef | null;
+  targetWords?: number | null;
+}
+
+export interface UpdateProjectSectionInput {
+  id: string;
+  title?: string;
+  role?: ProjectSectionRole;
+  status?: ProjectSectionStatus;
+  targetWords?: number | null;
+}
+
+export interface AddProjectLinkInput {
+  projectId: string;
+  sectionId?: string | null;
+  kind: ProjectLinkKind;
+  refId: string;
+  label?: string;
+  role?: ProjectLinkRole;
+}
+
+export interface ImportProjectChapterInput {
+  projectId: string;
+  sectionId?: string | null;
+  /** Optional explicit file path; when omitted the main process opens a file picker. */
+  filePath?: string | null;
+  title?: string;
+}
+
+export interface GenerateProjectSuggestionsRequest {
+  projectId: string;
+  chapterId: string;
+  sectionId?: string | null;
+  mode: ChapterSuggestionMode;
+  model?: ModelRef | null;
+  limit?: number;
+}
+
+export interface ApplyProjectSuggestionsRequest {
+  chapterId: string;
+  suggestionIds: string[];
+}
+
+export interface ExportProjectRequest {
+  projectId: string;
+  format: ProjectExportFormat;
+}
+
+export interface ExportProjectChapterRequest {
+  chapterId: string;
+  format: ChapterExportFormat;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Writing workshop
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1705,6 +1930,26 @@ export interface NodusApi {
   globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
   /** Ask the AI for keywords/queries to find literature filling a research gap. */
   suggestGapSearch(statement: string, workTitles: string[]): Promise<GapSearchSuggestions>;
+
+  // projects / manuscripts
+  listProjects(): Promise<Project[]>;
+  getProject(id: string): Promise<ProjectDetail | null>;
+  createProject(input: CreateProjectInput): Promise<ProjectDetail>;
+  updateProject(input: UpdateProjectInput): Promise<Project | null>;
+  deleteProject(id: string): Promise<void>;
+  updateProjectSection(input: UpdateProjectSectionInput): Promise<ProjectSection | null>;
+  addProjectLink(input: AddProjectLinkInput): Promise<ProjectLink>;
+  deleteProjectLink(id: string): Promise<void>;
+  importProjectChapter(input: ImportProjectChapterInput): Promise<ProjectChapter | null>;
+  updateProjectChapter(chapterId: string, markdown: string): Promise<ProjectChapter | null>;
+  listProjectChapterSuggestions(chapterId: string): Promise<ProjectInsertionSuggestion[]>;
+  generateProjectSuggestions(request: GenerateProjectSuggestionsRequest): Promise<ProjectInsertionSuggestion[]>;
+  updateProjectSuggestionStatus(id: string, status: ChapterSuggestionStatus): Promise<ProjectInsertionSuggestion | null>;
+  applyProjectSuggestions(request: ApplyProjectSuggestionsRequest): Promise<ProjectChapter | null>;
+  listProjectChapterVersions(chapterId: string): Promise<ProjectChapterVersion[]>;
+  restoreProjectChapterVersion(versionId: string): Promise<ProjectChapter | null>;
+  exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
+  exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;

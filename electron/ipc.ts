@@ -1,6 +1,10 @@
-import { ipcMain, shell, BrowserWindow } from 'electron';
+import path from 'node:path';
+import { ipcMain, shell, BrowserWindow, dialog } from 'electron';
 import type {
   AppSettings,
+  AddProjectLinkInput,
+  ApplyProjectSuggestionsRequest,
+  ChapterSuggestionStatus,
   QueueKind,
   WorkFilter,
   AiProvider,
@@ -33,6 +37,13 @@ import type {
   ManualIdeaPayload,
   NotesExportOptions,
   CitationRef,
+  CreateProjectInput,
+  ExportProjectChapterRequest,
+  ExportProjectRequest,
+  GenerateProjectSuggestionsRequest,
+  ImportProjectChapterInput,
+  UpdateProjectInput,
+  UpdateProjectSectionInput,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -93,8 +104,11 @@ import * as manualIdeas from './db/manualIdeasRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
 import * as workSummaries from './db/workSummariesRepo';
+import * as projects from './db/projectsRepo';
 import { getDb } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
+import { generateProjectSuggestions } from './ai/projectInsertion';
+import { exportProject, exportProjectChapter } from './export/projectExport';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -541,6 +555,68 @@ export function registerIpc(
   );
   h('gaps:suggestSearch', async (_e, statement: string, workTitles?: string[]) =>
     suggestGapSearch(statement ?? '', workTitles ?? [])
+  );
+
+  // projects / manuscripts
+  h('projects:list', async () => projects.listProjects());
+  h('projects:get', async (_e, id: string) => projects.getProjectDetail(id));
+  h('projects:create', async (_e, input: CreateProjectInput) => projects.createProject(input));
+  h('projects:update', async (_e, input: UpdateProjectInput) => projects.updateProject(input));
+  h('projects:delete', async (_e, id: string) => {
+    projects.deleteProject(id);
+  });
+  h('projects:sections:update', async (_e, input: UpdateProjectSectionInput) => projects.updateSection(input));
+  h('projects:links:add', async (_e, input: AddProjectLinkInput) => projects.addLink(input));
+  h('projects:links:delete', async (_e, id: string) => {
+    projects.deleteLink(id);
+  });
+  h('projects:chapters:import', async (_e, input: ImportProjectChapterInput) => {
+    let filePath = input.filePath?.trim() || null;
+    if (!filePath) {
+      const result = await dialog.showOpenDialog({
+        title: 'Importar capitulo',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'md', 'markdown', 'txt'] },
+          { name: 'Todos los archivos', extensions: ['*'] },
+        ],
+      });
+      if (result.canceled || result.filePaths.length === 0) return null;
+      filePath = result.filePaths[0];
+    }
+    const settings = getSettings();
+    const doc = await extractFromPath(filePath, {
+      ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+      perf: { title: path.basename(filePath), nodusId: input.projectId },
+    });
+    if (!doc.text.trim()) throw new Error('No se pudo extraer texto util del capitulo.');
+    return projects.createChapter({
+      projectId: input.projectId,
+      sectionId: input.sectionId ?? null,
+      title: input.title?.trim() || path.basename(filePath, path.extname(filePath)),
+      sourceFormat: projects.sourceFormatFromPath(filePath),
+      originalFileName: path.basename(filePath),
+      text: doc.text,
+    });
+  });
+  h('projects:chapters:update', async (_e, chapterId: string, markdown: string) =>
+    projects.updateChapterMarkdown(chapterId, markdown, { versionLabel: 'Antes de guardar edicion manual' })
+  );
+  h('projects:suggestions:list', async (_e, chapterId: string) => projects.listSuggestions(chapterId));
+  h('projects:suggestions:generate', async (_e, request: GenerateProjectSuggestionsRequest) =>
+    generateProjectSuggestions(request)
+  );
+  h('projects:suggestions:updateStatus', async (_e, id: string, status: ChapterSuggestionStatus) =>
+    projects.updateSuggestionStatus(id, status)
+  );
+  h('projects:suggestions:apply', async (_e, request: ApplyProjectSuggestionsRequest) =>
+    projects.applySuggestions(request.chapterId, request.suggestionIds)
+  );
+  h('projects:versions:list', async (_e, chapterId: string) => projects.listChapterVersions(chapterId));
+  h('projects:versions:restore', async (_e, versionId: string) => projects.restoreChapterVersion(versionId));
+  h('projects:export', async (_e, request: ExportProjectRequest) => exportProject(request));
+  h('projects:chapters:export', async (_e, request: ExportProjectChapterRequest) =>
+    exportProjectChapter(request)
   );
 
   // embedding pipeline

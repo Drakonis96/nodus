@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
-    "test": "node scripts/test-backup-crypto.mjs && node scripts/test-macos-update-helper.mjs",
+    "test": "node scripts/test-backup-crypto.mjs && node scripts/test-macos-update-helper.mjs && node scripts/test-projects.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -26,6 +26,7 @@
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.5.0",
     "cytoscape": "^3.30.2",
+    "docx": "^9.7.1",
     "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.17",
     "graphology": "^0.26.0",

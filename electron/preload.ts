@@ -228,6 +228,26 @@ const api: NodusApi = {
   suggestGapSearch: (statement, workTitles) =>
     ipcRenderer.invoke('gaps:suggestSearch', statement, workTitles),
 
+  listProjects: () => ipcRenderer.invoke('projects:list'),
+  getProject: (id) => ipcRenderer.invoke('projects:get', id),
+  createProject: (input) => ipcRenderer.invoke('projects:create', input),
+  updateProject: (input) => ipcRenderer.invoke('projects:update', input),
+  deleteProject: (id) => ipcRenderer.invoke('projects:delete', id).then(() => undefined),
+  updateProjectSection: (input) => ipcRenderer.invoke('projects:sections:update', input),
+  addProjectLink: (input) => ipcRenderer.invoke('projects:links:add', input),
+  deleteProjectLink: (id) => ipcRenderer.invoke('projects:links:delete', id).then(() => undefined),
+  importProjectChapter: (input) => ipcRenderer.invoke('projects:chapters:import', input),
+  updateProjectChapter: (chapterId, markdown) => ipcRenderer.invoke('projects:chapters:update', chapterId, markdown),
+  listProjectChapterSuggestions: (chapterId) => ipcRenderer.invoke('projects:suggestions:list', chapterId),
+  generateProjectSuggestions: (request) => ipcRenderer.invoke('projects:suggestions:generate', request),
+  updateProjectSuggestionStatus: (id, status) =>
+    ipcRenderer.invoke('projects:suggestions:updateStatus', id, status),
+  applyProjectSuggestions: (request) => ipcRenderer.invoke('projects:suggestions:apply', request),
+  listProjectChapterVersions: (chapterId) => ipcRenderer.invoke('projects:versions:list', chapterId),
+  restoreProjectChapterVersion: (versionId) => ipcRenderer.invoke('projects:versions:restore', versionId),
+  exportProject: (request) => ipcRenderer.invoke('projects:export', request),
+  exportProjectChapter: (request) => ipcRenderer.invoke('projects:chapters:export', request),
+
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),

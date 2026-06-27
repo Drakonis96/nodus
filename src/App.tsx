@@ -9,6 +9,7 @@ import { DebateView } from './views/DebateView';
 import { ResearchMapView } from './views/ResearchMapView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
+import { ProjectsView } from './views/ProjectsView';
 import { NotesView } from './views/NotesView';
 import { SearchView } from './views/SearchView';
 import { ArgumentMapView } from './views/ArgumentMapView';
@@ -322,6 +323,7 @@ export function App() {
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'projects' && <ProjectsView settings={settings} />}
           {view === 'search' && (
             <SearchView
               onOpenGraph={(target) => navigate('graph', target)}

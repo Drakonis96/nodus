@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import type {
   AppSettings,
+  Project,
+  ProjectDetail,
   WritingWorkshopBrief,
   WritingWorkshopCandidateBase,
   WritingWorkshopContradictionCandidate,
@@ -51,6 +53,7 @@ const EMPTY_SELECTION: WritingWorkshopSelection = {
 };
 
 type MaterialTab = 'ideas' | 'themes' | 'gaps' | 'contradictions' | 'works' | 'passages' | 'routes';
+type ProjectSourceScope = 'none' | 'project' | 'section' | 'chapter';
 
 const TAB_SELECTION_KEYS: Record<MaterialTab, keyof WritingWorkshopSelection> = {
   ideas: 'ideaIds',
@@ -78,6 +81,13 @@ export function WritingWorkshopView({
   const [selectedModel, setSelectedModel] = useState(settings.synthesisModel ?? settings.defaultModel);
   const [snapshot, setSnapshot] = useState<WritingWorkshopSnapshot | null>(null);
   const [selection, setSelection] = useState<WritingWorkshopSelection>(EMPTY_SELECTION);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
+  const [sourceScope, setSourceScope] = useState<ProjectSourceScope>('none');
+  const [sourceProjectId, setSourceProjectId] = useState('');
+  const [sourceSectionId, setSourceSectionId] = useState('');
+  const [sourceChapterId, setSourceChapterId] = useState('');
+  const [activeProjectLinkScope, setActiveProjectLinkScope] = useState<{ projectId: string; sectionId: string | null } | null>(null);
   const [activeTab, setActiveTab] = useState<MaterialTab>('ideas');
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
@@ -113,6 +123,32 @@ export function WritingWorkshopView({
   useEffect(() => {
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
+
+  useEffect(() => {
+    void window.nodus.listProjects().then((list) => {
+      setProjects(list);
+      if (!sourceProjectId && list[0]) setSourceProjectId(list[0].id);
+    });
+  }, [sourceProjectId]);
+
+  useEffect(() => {
+    if (!sourceProjectId) {
+      setProjectDetail(null);
+      return;
+    }
+    let on = true;
+    void window.nodus.getProject(sourceProjectId).then((detail) => {
+      if (!on) return;
+      setProjectDetail(detail);
+      if (detail) {
+        setSourceSectionId((current) => current || detail.sections[0]?.id || '');
+        setSourceChapterId((current) => current || detail.chapters[0]?.id || '');
+      }
+    });
+    return () => {
+      on = false;
+    };
+  }, [sourceProjectId]);
 
   const prepare = async () => {
     setError(null);
@@ -179,6 +215,16 @@ export function WritingWorkshopView({
     try {
       const saved = await window.nodus.saveWritingWorkshopDraft({ draft, model: selectedModel });
       setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      if (activeProjectLinkScope) {
+        await window.nodus.addProjectLink({
+          projectId: activeProjectLinkScope.projectId,
+          sectionId: activeProjectLinkScope.sectionId,
+          kind: 'writing_draft',
+          refId: saved.id,
+          label: saved.draft.title,
+          role: 'draft',
+        });
+      }
       setMessage(t('Borrador guardado localmente.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -272,6 +318,28 @@ export function WritingWorkshopView({
     setSelection((current) => ({ ...current, [key]: [] }));
   };
 
+  const applyProjectSource = () => {
+    if (!projectDetail || sourceScope === 'none') {
+      setActiveProjectLinkScope(null);
+      return;
+    }
+    const sectionId = sourceScope === 'section' || sourceScope === 'chapter' ? sourceSectionId || null : null;
+    const chapter = sourceScope === 'chapter'
+      ? projectDetail.chapters.find((item) => item.id === sourceChapterId) ?? null
+      : null;
+    const nextSelection = selectionFromProject(projectDetail, sectionId);
+    setSelection(nextSelection);
+    setSnapshot(null);
+    setDraft(null);
+    setActiveProjectLinkScope({ projectId: projectDetail.project.id, sectionId });
+    setBrief((current) => ({
+      ...current,
+      kind: sourceScope === 'chapter' ? 'chapter_section' : current.kind,
+      objective: projectSourceObjective(projectDetail, sourceScope, sectionId, chapter),
+    }));
+    setMessage(tx('Origen aplicado: {n} materiales vinculados.', { n: countSelection(nextSelection) }));
+  };
+
   return (
     <div className="h-full flex flex-col min-h-0">
       <header className="border-b border-neutral-800 p-4 flex flex-wrap items-end gap-3">
@@ -340,6 +408,44 @@ export function WritingWorkshopView({
           onChange={(e) => setBrief((current) => ({ ...current, objective: e.target.value }))}
           placeholder={t('Describe el apartado que quieres construir...')}
         />
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <select className="input text-xs" value={sourceScope} onChange={(e) => setSourceScope(e.target.value as ProjectSourceScope)}>
+            <option value="none">{t('Sin origen de proyecto')}</option>
+            <option value="project">{t('Proyecto completo')}</option>
+            <option value="section">{t('Seccion del proyecto')}</option>
+            <option value="chapter">{t('Capitulo del proyecto')}</option>
+          </select>
+          {sourceScope !== 'none' && (
+            <>
+              <select className="input text-xs min-w-48" value={sourceProjectId} onChange={(e) => setSourceProjectId(e.target.value)}>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.title}</option>
+                ))}
+              </select>
+              {(sourceScope === 'section' || sourceScope === 'chapter') && projectDetail && (
+                <select className="input text-xs min-w-48" value={sourceSectionId} onChange={(e) => setSourceSectionId(e.target.value)}>
+                  {projectDetail.sections.map((section) => (
+                    <option key={section.id} value={section.id}>{section.title}</option>
+                  ))}
+                </select>
+              )}
+              {sourceScope === 'chapter' && projectDetail && (
+                <select className="input text-xs min-w-48" value={sourceChapterId} onChange={(e) => setSourceChapterId(e.target.value)}>
+                  {projectDetail.chapters.map((chapter) => (
+                    <option key={chapter.id} value={chapter.id}>{chapter.title}</option>
+                  ))}
+                </select>
+              )}
+              <button
+                className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
+                onClick={applyProjectSource}
+                disabled={!projectDetail}
+              >
+                <Icon name="folder" size={13} /> {t('Aplicar origen')}
+              </button>
+            </>
+          )}
+        </div>
         <div className="flex flex-wrap gap-2 mt-2 text-xs text-neutral-500">
           {snapshot && (
             <>
@@ -914,6 +1020,72 @@ function selectionFromSnapshot(snapshot: WritingWorkshopSnapshot): WritingWorksh
     passageIds: snapshot.passages.map((item) => item.id),
     tutorRouteIds: snapshot.tutorRoutes.map((item) => item.id),
   };
+}
+
+function selectionFromProject(detail: ProjectDetail, sectionId: string | null): WritingWorkshopSelection {
+  const selected: WritingWorkshopSelection = {
+    ideaIds: [],
+    themeIds: [],
+    gapIds: [],
+    contradictionIds: [],
+    workIds: [],
+    passageIds: [],
+    tutorRouteIds: [],
+  };
+  const include = (linkSectionId: string | null) => !sectionId || !linkSectionId || linkSectionId === sectionId;
+  for (const link of detail.links) {
+    if (!include(link.sectionId)) continue;
+    switch (link.kind) {
+      case 'idea':
+        selected.ideaIds.push(link.refId);
+        break;
+      case 'gap':
+        selected.gapIds.push(link.refId);
+        break;
+      case 'debate':
+        selected.contradictionIds.push(link.refId);
+        break;
+      case 'work':
+        selected.workIds.push(link.refId);
+        break;
+      case 'tutor_route':
+        selected.tutorRouteIds.push(link.refId);
+        break;
+      default:
+        break;
+    }
+  }
+  return {
+    ideaIds: unique(selected.ideaIds),
+    themeIds: [],
+    gapIds: unique(selected.gapIds),
+    contradictionIds: unique(selected.contradictionIds),
+    workIds: unique(selected.workIds),
+    passageIds: [],
+    tutorRouteIds: unique(selected.tutorRouteIds),
+  };
+}
+
+function projectSourceObjective(
+  detail: ProjectDetail,
+  scope: ProjectSourceScope,
+  sectionId: string | null,
+  chapter: ProjectDetail['chapters'][number] | null
+): string {
+  const section = sectionId ? detail.sections.find((item) => item.id === sectionId) ?? null : null;
+  const parts = [
+    `Proyecto: ${detail.project.title}`,
+    detail.project.brief ? `Brief: ${detail.project.brief}` : '',
+    scope === 'section' && section ? `Seccion: ${section.title}` : '',
+    scope === 'chapter' && chapter ? `Capitulo: ${chapter.title}` : '',
+    scope === 'chapter' && chapter ? `Texto actual del capitulo:\n${chapter.currentMarkdown.slice(0, 6000)}` : '',
+    'Objetivo: construir un borrador academico conectado, con citas nodus:// verificables, usando solo los materiales vinculados a este origen.',
+  ];
+  return parts.filter(Boolean).join('\n\n');
+}
+
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)));
 }
 
 /** Keep only selected material that still appears in the freshly prepared table. */

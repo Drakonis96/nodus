@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 export const migrations: Migration[] = [
   {
@@ -538,6 +538,130 @@ export const migrations: Migration[] = [
     version: 18,
     up: /* sql */ `
       ALTER TABLE note_folders ADD COLUMN summary TEXT NOT NULL DEFAULT '';
+    `,
+  },
+  {
+    version: 19,
+    up: /* sql */ `
+      CREATE TABLE projects (
+        id                   TEXT PRIMARY KEY,
+        title                TEXT NOT NULL,
+        kind                 TEXT NOT NULL DEFAULT 'other',
+        status               TEXT NOT NULL DEFAULT 'active',
+        brief                TEXT NOT NULL DEFAULT '',
+        research_question_id TEXT,
+        root_folder_id       TEXT,
+        model_json           TEXT,
+        target_words         INTEGER,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL,
+        FOREIGN KEY (research_question_id) REFERENCES research_questions(id) ON DELETE SET NULL,
+        FOREIGN KEY (root_folder_id) REFERENCES note_folders(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE project_sections (
+        id           TEXT PRIMARY KEY,
+        project_id   TEXT NOT NULL,
+        folder_id    TEXT,
+        title        TEXT NOT NULL,
+        role         TEXT NOT NULL DEFAULT 'custom',
+        status       TEXT NOT NULL DEFAULT 'empty',
+        target_words INTEGER,
+        order_idx    INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (folder_id) REFERENCES note_folders(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE project_links (
+        id          TEXT PRIMARY KEY,
+        project_id  TEXT NOT NULL,
+        section_id  TEXT,
+        kind        TEXT NOT NULL,
+        ref_id      TEXT NOT NULL,
+        label       TEXT NOT NULL DEFAULT '',
+        role        TEXT NOT NULL DEFAULT 'context',
+        created_at  TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (section_id) REFERENCES project_sections(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE project_chapters (
+        id                 TEXT PRIMARY KEY,
+        project_id         TEXT NOT NULL,
+        section_id         TEXT,
+        note_id            TEXT,
+        title              TEXT NOT NULL,
+        source_format      TEXT NOT NULL DEFAULT 'unknown',
+        original_file_name TEXT,
+        original_text_hash TEXT NOT NULL,
+        original_text      TEXT NOT NULL,
+        current_markdown   TEXT NOT NULL,
+        word_count         INTEGER NOT NULL DEFAULT 0,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (section_id) REFERENCES project_sections(id) ON DELETE SET NULL,
+        FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE project_chapter_chunks (
+        id                  TEXT PRIMARY KEY,
+        chapter_id          TEXT NOT NULL,
+        order_idx           INTEGER NOT NULL,
+        heading_path        TEXT NOT NULL DEFAULT '',
+        text                TEXT NOT NULL,
+        start_offset        INTEGER NOT NULL DEFAULT 0,
+        end_offset          INTEGER NOT NULL DEFAULT 0,
+        word_count          INTEGER NOT NULL DEFAULT 0,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        created_at          TEXT NOT NULL,
+        FOREIGN KEY (chapter_id) REFERENCES project_chapters(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE project_insertion_suggestions (
+        id              TEXT PRIMARY KEY,
+        project_id      TEXT NOT NULL,
+        chapter_id      TEXT NOT NULL,
+        target_chunk_id TEXT,
+        kind            TEXT NOT NULL,
+        ref_id          TEXT NOT NULL,
+        ref_label       TEXT NOT NULL DEFAULT '',
+        operation       TEXT NOT NULL DEFAULT 'insert_after',
+        proposed_text   TEXT NOT NULL,
+        citation_json   TEXT NOT NULL DEFAULT '[]',
+        rationale       TEXT NOT NULL DEFAULT '',
+        confidence      REAL NOT NULL DEFAULT 0.5,
+        status          TEXT NOT NULL DEFAULT 'suggested',
+        blocked_reason  TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        FOREIGN KEY (chapter_id) REFERENCES project_chapters(id) ON DELETE CASCADE,
+        FOREIGN KEY (target_chunk_id) REFERENCES project_chapter_chunks(id) ON DELETE SET NULL
+      );
+
+      CREATE TABLE project_chapter_versions (
+        id         TEXT PRIMARY KEY,
+        chapter_id TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        markdown   TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (chapter_id) REFERENCES project_chapters(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX idx_projects_updated ON projects(updated_at DESC);
+      CREATE INDEX idx_project_sections_project ON project_sections(project_id, order_idx);
+      CREATE INDEX idx_project_links_project ON project_links(project_id, section_id, kind);
+      CREATE INDEX idx_project_chapters_project ON project_chapters(project_id, updated_at DESC);
+      CREATE INDEX idx_project_chunks_chapter ON project_chapter_chunks(chapter_id, order_idx);
+      CREATE INDEX idx_project_suggestions_chapter ON project_insertion_suggestions(chapter_id, status, created_at DESC);
+      CREATE INDEX idx_project_versions_chapter ON project_chapter_versions(chapter_id, created_at DESC);
     `,
   },
 ];

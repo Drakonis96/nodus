@@ -1,6 +1,6 @@
 import type { ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'debate' | 'research' | 'reading' | 'writing' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'gaps' | 'debate' | 'research' | 'reading' | 'writing' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -24,6 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'research', label: 'Cobertura', icon: 'compass' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
   { id: 'writing', label: 'Escritura', icon: 'edit' },
+  { id: 'projects', label: 'Proyectos', icon: 'folder' },
   { id: 'notes', label: 'Notas', icon: 'notebook' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];

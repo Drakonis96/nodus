@@ -7,6 +7,7 @@ import type {
   NotesExportBibliography,
   NotesExportOptions,
   NotesTree,
+  ProjectDetail,
 } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
@@ -75,6 +76,7 @@ export function NotesView({
 }) {
   const [folders, setFolders] = useState<NoteFolder[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [projectDetails, setProjectDetails] = useState<ProjectDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState<FolderScope>({ kind: 'all' });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -127,9 +129,15 @@ export function NotesView({
     return tree;
   }, []);
 
+  const refreshProjectContext = useCallback(async () => {
+    const list = await window.nodus.listProjects();
+    const details = await Promise.all(list.map((project) => window.nodus.getProject(project.id)));
+    setProjectDetails(details.filter((item): item is ProjectDetail => item !== null));
+  }, []);
+
   useEffect(() => {
-    void refresh().finally(() => setLoading(false));
-  }, [refresh]);
+    void Promise.all([refresh(), refreshProjectContext()]).finally(() => setLoading(false));
+  }, [refresh, refreshProjectContext]);
 
   const tree = useMemo(() => buildNotesTree(folders, notes), [folders, notes]);
   const flatFolders = useMemo(() => flattenFolders(folders), [folders]);
@@ -396,6 +404,18 @@ export function NotesView({
     [folders, scope]
   );
 
+  const activeProjectContext = useMemo(() => {
+    if (!activeFolder) return null;
+    for (const detail of projectDetails) {
+      if (detail.project.rootFolderId === activeFolder.id) {
+        return { project: detail.project, section: null };
+      }
+      const section = detail.sections.find((item) => item.folderId === activeFolder.id);
+      if (section) return { project: detail.project, section };
+    }
+    return null;
+  }, [activeFolder, projectDetails]);
+
   // Keep the editable summary in sync with the selected folder.
   useEffect(() => {
     setFolderSummaryDraft(activeFolder?.summary ?? '');
@@ -631,17 +651,27 @@ export function NotesView({
             </button>
           </div>
           {scope.kind === 'folder' && activeFolder && (
-            <FolderSummaryPanel
-              value={folderSummaryDraft}
-              dirty={folderSummaryDirty}
-              saving={savingSummary}
-              onChange={(v) => {
-                setFolderSummaryDraft(v);
-                setFolderSummaryDirty(true);
-              }}
-              onSave={() => void saveFolderSummary()}
-              onSuggest={() => setSuggestFor(activeFolder)}
-            />
+            <>
+              {activeProjectContext && (
+                <ProjectFolderBanner
+                  context={activeProjectContext}
+                  onCreateNote={() => void createNote()}
+                  onCreateIdea={() => void createManualIdeaNote()}
+                  onSuggest={() => setSuggestFor(activeFolder)}
+                />
+              )}
+              <FolderSummaryPanel
+                value={folderSummaryDraft}
+                dirty={folderSummaryDirty}
+                saving={savingSummary}
+                onChange={(v) => {
+                  setFolderSummaryDraft(v);
+                  setFolderSummaryDirty(true);
+                }}
+                onSave={() => void saveFolderSummary()}
+                onSuggest={() => setSuggestFor(activeFolder)}
+              />
+            </>
           )}
           {reorderUndo && (
             <div className="flex items-center gap-2 rounded-md border border-indigo-700/60 bg-indigo-600/10 px-2.5 py-1.5 text-xs">
@@ -893,6 +923,43 @@ export function NotesView({
           onAdded={() => void refresh()}
         />
       )}
+    </div>
+  );
+}
+
+function ProjectFolderBanner({
+  context,
+  onCreateNote,
+  onCreateIdea,
+  onSuggest,
+}: {
+  context: { project: ProjectDetail['project']; section: ProjectDetail['sections'][number] | null };
+  onCreateNote: () => void;
+  onCreateIdea: () => void;
+  onSuggest: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-indigo-700/50 bg-indigo-600/10 px-2.5 py-2">
+      <div className="flex items-start gap-2">
+        <Icon name="folder" size={14} className="mt-0.5 shrink-0 text-indigo-300" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-xs font-semibold text-indigo-100">{context.project.title}</div>
+          <div className="truncate text-[11px] text-indigo-200/75">
+            {context.section ? `${t('Seccion')}: ${context.section.title}` : t('Carpeta raiz del proyecto')}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1" onClick={onCreateNote}>
+          {t('Nota')}
+        </button>
+        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1" onClick={onCreateIdea}>
+          {t('Idea')}
+        </button>
+        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1 gap-1" onClick={onSuggest}>
+          <Icon name="wand" size={12} /> {t('Sugerir')}
+        </button>
+      </div>
     </div>
   );
 }
