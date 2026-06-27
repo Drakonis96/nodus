@@ -1283,6 +1283,11 @@ export const EN: Record<string, string> = {
   'Recupera el texto de {n} obra(s)': 'Recover the text of {n} work(s)',
   'No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).':
     'Text could not be extracted, but there is a recovery path (re-scan, OCR or fetch by DOI).',
+  // ── Projects ───────────────────────────────────────────────────────────────
+  'Eliminar proyecto': 'Delete project',
+  'Proyecto eliminado.': 'Project deleted.',
+  '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':
+    'Delete the project “{title}”? Its sections, links and chapters will be removed. Notes and folders that were created are kept. This action cannot be undone.',
   'Todas las notas': 'All notes',
   'Sin carpeta': 'No folder',
   'Nueva carpeta': 'New folder',

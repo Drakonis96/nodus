@@ -16,7 +16,7 @@ import { Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { notifyDataChanged, useDataRefresh } from '../hooks';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 
 type ChapterTab = 'texto' | 'sugerencias' | 'versiones' | 'exportar';
 
@@ -128,6 +128,28 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       setNewBrief('');
       setActiveId(created.project.id);
       setMessage(t('Proyecto creado con carpeta y secciones en Notas.'));
+      notifyDataChanged();
+      await loadProjects();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const deleteActiveProject = async () => {
+    if (!detail) return;
+    const ok = window.confirm(
+      tx('¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.', {
+        title: detail.project.title,
+      })
+    );
+    if (!ok) return;
+    setBusy('delete-project');
+    try {
+      await window.nodus.deleteProject(detail.project.id);
+      setActiveId(null);
+      setDetail(null);
+      setSelectedChapterId(null);
+      setMessage(t('Proyecto eliminado.'));
       notifyDataChanged();
       await loadProjects();
     } finally {
@@ -328,6 +350,14 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                 </select>
                 <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={exportProjectFile} disabled={busy === 'export-project'}>
                   <Icon name={busy === 'export-project' ? 'sync' : 'download'} className={busy === 'export-project' ? 'animate-spin' : ''} /> {t('Exportar proyecto')}
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700 gap-1.5 text-red-300 hover:bg-red-950/40"
+                  onClick={deleteActiveProject}
+                  disabled={busy === 'delete-project'}
+                  title={t('Eliminar proyecto')}
+                >
+                  <Icon name={busy === 'delete-project' ? 'sync' : 'trash'} className={busy === 'delete-project' ? 'animate-spin' : ''} /> {t('Eliminar')}
                 </button>
               </div>
             </header>
