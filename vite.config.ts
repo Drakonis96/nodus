@@ -11,6 +11,7 @@ import { createRequire } from 'node:module';
 // Resolve `events` to the installed browser polyfill so it gets bundled instead.
 const require = createRequire(import.meta.url);
 const eventsPolyfill = require.resolve('events/');
+const pkg = require('./package.json') as { version: string };
 
 // Native node modules and Electron-only deps must stay external in the main process bundle.
 const mainExternals = [
@@ -31,6 +32,10 @@ const mainExternals = [
 ];
 
 export default defineConfig({
+  // Expose the app version to the renderer at build time (shown in Settings).
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   WorkView,
   WorkFilter,
+  AnalysisStateFilter,
   DeepStatus,
   LightStatus,
   SummaryStatus,
@@ -30,6 +31,100 @@ import { t, tx } from '../i18n';
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
+
+/**
+ * The analysis pipeline expressed as plain, mutually-exclusive stages instead of
+ * three raw status axes (light/deep/summary). Each option explains itself so the
+ * old "pendiente vs ninguno" confusion disappears.
+ */
+const ANALYSIS_STATES: { value: AnalysisStateFilter; label: string; desc: string }[] = [
+  { value: 'all', label: 'Todas', desc: 'Sin filtrar por estado de análisis.' },
+  { value: 'unanalyzed', label: 'Sin analizar', desc: 'Nunca se ha procesado.' },
+  { value: 'themes', label: 'Temas extraídos', desc: 'Análisis ligero hecho; aún sin ideas.' },
+  { value: 'ideas', label: 'Ideas extraídas', desc: 'Análisis profundo completado.' },
+  { value: 'summary', label: 'Con resumen', desc: 'Tiene un resumen de orientación.' },
+  { value: 'processing', label: 'En cola o procesando', desc: 'Hay un análisis en marcha o pendiente.' },
+  { value: 'failed', label: 'Con errores', desc: 'Algún análisis falló.' },
+];
+
+function AnalysisStatePicker({
+  value,
+  onChange,
+}: {
+  value: AnalysisStateFilter;
+  onChange: (value: AnalysisStateFilter) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const active = value !== 'all';
+  const current = ANALYSIS_STATES.find((s) => s.value === value) ?? ANALYSIS_STATES[0];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className={`btn border gap-1.5 ${active ? 'border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+      >
+        <Icon name="list" /> {t('Estado de análisis')}
+        {active && (
+          <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{t(current.label)}</span>
+        )}
+        <Icon name="chevronDown" size={13} className="opacity-70" />
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label={t('Filtrar por estado de análisis')}
+          className="absolute left-0 z-30 mt-2 w-[20rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
+        >
+          {ANALYSIS_STATES.map((s) => {
+            const selected = s.value === value;
+            return (
+              <button
+                key={s.value}
+                type="button"
+                className={`flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${selected ? 'bg-indigo-600/15' : 'hover:bg-neutral-900'}`}
+                onClick={() => {
+                  onChange(s.value);
+                  setOpen(false);
+                }}
+              >
+                <span
+                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${selected ? 'bg-indigo-400' : 'bg-transparent'}`}
+                />
+                <span className="min-w-0">
+                  <span className={`block text-sm ${selected ? 'text-indigo-200' : 'text-neutral-200'}`}>
+                    {t(s.label)}
+                  </span>
+                  <span className="block text-xs text-neutral-500">{t(s.desc)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function lightBadge(s: LightStatus) {
   if (s === 'done') return <Badge color="green">{t('ligero')} ✓</Badge>;
@@ -107,7 +202,7 @@ export function Library({
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
-  const [filter, setFilter] = useState<WorkFilter>({ lightStatus: 'all', deepStatus: 'all', summaryStatus: 'all' });
+  const [filter, setFilter] = useState<WorkFilter>({ analysisState: 'all' });
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -438,41 +533,10 @@ export function Library({
             placeholder={t('Buscar título o autor…')}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
           />
-          <select
-            className="input"
-            value={filter.lightStatus}
-            onChange={(e) => setFilter((f) => ({ ...f, lightStatus: e.target.value as any }))}
-          >
-            <option value="all">{t('Ligero: todos')}</option>
-            <option value="none">{t('Ligero: ninguno')}</option>
-            <option value="done">{t('Ligero: hecho')}</option>
-            <option value="pending">{t('Ligero: pendiente')}</option>
-            <option value="failed">{t('Ligero: fallido')}</option>
-          </select>
-          <select
-            className="input"
-            value={filter.deepStatus}
-            onChange={(e) => setFilter((f) => ({ ...f, deepStatus: e.target.value as any }))}
-          >
-            <option value="all">{t('Profundo: todos')}</option>
-            <option value="done">{t('Profundo: hecho')}</option>
-            <option value="pending">{t('Profundo: pendiente')}</option>
-            <option value="none">{t('Profundo: ninguno')}</option>
-            <option value="failed">{t('Profundo: fallido')}</option>
-            <option value="skipped_no_text">{t('Profundo: sin texto')}</option>
-          </select>
-          <select
-            className="input"
-            value={filter.summaryStatus}
-            onChange={(e) => setFilter((f) => ({ ...f, summaryStatus: e.target.value as any }))}
-          >
-            <option value="all">{t('Resumen: todos')}</option>
-            <option value="done">{t('Resumen: hecho')}</option>
-            <option value="pending">{t('Resumen: pendiente')}</option>
-            <option value="none">{t('Resumen: ninguno')}</option>
-            <option value="failed">{t('Resumen: fallido')}</option>
-            <option value="skipped_no_text">{t('Resumen: sin texto')}</option>
-          </select>
+          <AnalysisStatePicker
+            value={filter.analysisState ?? 'all'}
+            onChange={(v) => setFilter((f) => ({ ...f, analysisState: v }))}
+          />
           <div className="relative">
             <button
               type="button"

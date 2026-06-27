@@ -199,6 +199,7 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
           <p className="text-sm text-neutral-500 mt-1">
             {t('Lo básico queda separado de los parámetros técnicos de análisis y extracción.')}
           </p>
+          <p className="text-xs text-neutral-600 mt-1">Nodus v{__APP_VERSION__}</p>
         </div>
         <div className="flex-1" />
         <div className="inline-grid grid-cols-2 rounded-lg border border-neutral-800 bg-neutral-900/50 p-1">

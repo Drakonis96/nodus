@@ -93,7 +93,9 @@ body {
   background-color: #f8fafc;
 }
 .light .bg-neutral-950\/35,
-.light .bg-neutral-950\/40 {
+.light .bg-neutral-950\/40,
+.light .bg-neutral-950\/50,
+.light .bg-neutral-950\/60 {
   background-color: rgba(248, 250, 252, 0.86);
 }
 .light .bg-neutral-900,

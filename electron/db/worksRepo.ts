@@ -150,6 +150,30 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
     clauses.push('summary_status = @summaryStatus');
     params.summaryStatus = filter.summaryStatus;
   }
+  // Combined, user-facing analysis state. Each value maps to a clear stage of the
+  // pipeline so the UI never exposes the raw light/deep/summary status soup.
+  switch (filter.analysisState) {
+    case 'unanalyzed':
+      clauses.push("light_status = 'none' AND deep_status = 'none'");
+      break;
+    case 'themes':
+      clauses.push("light_status = 'done' AND deep_status != 'done'");
+      break;
+    case 'ideas':
+      clauses.push("deep_status = 'done'");
+      break;
+    case 'summary':
+      clauses.push("summary_status = 'done'");
+      break;
+    case 'processing':
+      clauses.push("(light_status = 'pending' OR deep_status = 'pending' OR summary_status = 'pending')");
+      break;
+    case 'failed':
+      clauses.push("(light_status = 'failed' OR deep_status = 'failed' OR summary_status = 'failed')");
+      break;
+    default:
+      break;
+  }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');
     params.yearMin = filter.yearMin;

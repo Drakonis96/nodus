@@ -1276,5 +1276,22 @@ export const EN: Record<string, string> = {
   Añadida: 'Added',
   '{considered} candidatas analizadas · {excluded} ya en la carpeta':
     '{considered} candidates analyzed · {excluded} already in the folder',
+
+  // ── Library · analysis-state filter ─────────────────────────────────────
+  'Estado de análisis': 'Analysis state',
+  'Filtrar por estado de análisis': 'Filter by analysis state',
+  'Sin filtrar por estado de análisis.': 'No analysis-state filter.',
+  'Sin analizar': 'Not analyzed',
+  'Nunca se ha procesado.': 'Never processed.',
+  'Temas extraídos': 'Themes extracted',
+  'Análisis ligero hecho; aún sin ideas.': 'Light analysis done; no ideas yet.',
+  'Ideas extraídas': 'Ideas extracted',
+  'Análisis profundo completado.': 'Deep analysis completed.',
+  'Con resumen': 'With summary',
+  'Tiene un resumen de orientación.': 'Has an orientation summary.',
+  'En cola o procesando': 'Queued or processing',
+  'Hay un análisis en marcha o pendiente.': 'An analysis is running or pending.',
+  'Con errores': 'With errors',
+  'Algún análisis falló.': 'An analysis failed.',
   // <<END_EN>>
 };
