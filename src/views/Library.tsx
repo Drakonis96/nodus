@@ -35,11 +35,11 @@ type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summar
 
 type StatusDimension = 'deep' | 'summary' | 'ideas' | 'passages';
 
-const STATUS_FLAGS: { dim: StatusDimension; label: string; negLabel: string; desc: string; negDesc: string }[] = [
-  { dim: 'deep', label: 'Análisis profundo hecho', negLabel: 'Análisis profundo NO hecho', desc: 'deep_status = done', negDesc: 'deep_status != done' },
-  { dim: 'summary', label: 'Resumen hecho', negLabel: 'Resumen NO hecho', desc: 'summary_status = done', negDesc: 'summary_status != done' },
-  { dim: 'ideas', label: 'Ideas extraídas', negLabel: 'Sin ideas extraídas', desc: 'tiene al menos una idea', negDesc: 'no tiene ninguna idea' },
-  { dim: 'passages', label: 'Pasajes completos', negLabel: 'Pasajes incompletos', desc: 'todos los fragmentos indexados y actuales', negDesc: 'faltan fragmentos o están obsoletos' },
+const STATUS_FLAGS: { dim: StatusDimension; title: string; label: string; negLabel: string; desc: string; negDesc: string }[] = [
+  { dim: 'deep', title: 'Análisis profundo', label: 'Análisis profundo hecho', negLabel: 'Análisis profundo NO hecho', desc: 'deep_status = done', negDesc: 'deep_status != done' },
+  { dim: 'summary', title: 'Resumen', label: 'Resumen hecho', negLabel: 'Resumen NO hecho', desc: 'summary_status = done', negDesc: 'summary_status != done' },
+  { dim: 'ideas', title: 'Ideas', label: 'Ideas extraídas', negLabel: 'Sin ideas extraídas', desc: 'tiene al menos una idea', negDesc: 'no tiene ninguna idea' },
+  { dim: 'passages', title: 'Pasajes', label: 'Pasajes completos', negLabel: 'Pasajes incompletos', desc: 'todos los fragmentos indexados y actuales', negDesc: 'faltan fragmentos o están obsoletos' },
 ];
 
 function isNegated(f: StatusFlag): boolean {
@@ -58,9 +58,11 @@ function labelFor(f: StatusFlag): string {
 function StatusFlagsPicker({
   value,
   setDimension,
+  onClear,
 }: {
   value: StatusFlag[];
   setDimension: (dim: StatusDimension, state: 'off' | 'pos' | 'neg') => void;
+  onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -88,25 +90,18 @@ function StatusFlagsPicker({
     return 'off';
   };
 
-  const cycle = (dim: StatusDimension) => {
-    const cur = currentFor(dim);
-    if (cur === 'off') setDimension(dim, 'pos');
-    else if (cur === 'pos') setDimension(dim, 'neg');
-    else setDimension(dim, 'off');
-  };
-
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
-        className={`btn border gap-1.5 ${active ? 'border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+        className={`library-filter-button tone-indigo btn border gap-1.5 ${active ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
         <Icon name="list" /> {t('Estado')}
         {active && (
-          <span className="rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{value.length}</span>
+          <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{value.length}</span>
         )}
         <Icon name="chevronDown" size={13} className="opacity-70" />
       </button>
@@ -114,33 +109,68 @@ function StatusFlagsPicker({
         <div
           role="dialog"
           aria-label={t('Filtrar por estado')}
-          className="absolute left-0 z-30 mt-2 w-[24rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-1.5 shadow-2xl"
+          className="library-filter-popover absolute left-0 z-30 mt-2 w-[27rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-2 shadow-2xl"
         >
+          <div className="mb-1 flex items-center justify-between gap-3 px-1.5 py-1">
+            <div>
+              <div className="text-xs font-medium text-neutral-300">{t('Estado de análisis')}</div>
+              <div className="text-[11px] text-neutral-500">{t('Cada fila acepta sí, no o cualquiera.')}</div>
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost px-2 py-1 text-xs"
+              disabled={!active}
+              onClick={onClear}
+            >
+              {t('Limpiar')}
+            </button>
+          </div>
           {STATUS_FLAGS.map((s) => {
             const state = currentFor(s.dim);
-            const bgClass = state === 'pos' ? 'bg-indigo-600/15' : state === 'neg' ? 'bg-red-600/15' : 'hover:bg-neutral-900';
-            const borderClass = state === 'pos' ? 'border-indigo-400 bg-indigo-500' : state === 'neg' ? 'border-red-400 bg-red-500' : 'border-neutral-600';
+            const stateClass = state === 'pos' ? 'is-pos bg-indigo-600/15' : state === 'neg' ? 'is-neg bg-red-600/15' : 'hover:bg-neutral-900';
+            const borderClass = state === 'pos' ? 'is-pos border-indigo-400 bg-indigo-500' : state === 'neg' ? 'is-neg border-red-400 bg-red-500' : 'border-neutral-600';
             const textClass = state === 'pos' ? 'text-indigo-200' : state === 'neg' ? 'text-red-200' : 'text-neutral-200';
             return (
-              <button
+              <div
                 key={s.dim}
-                type="button"
-                className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors ${bgClass}`}
-                onClick={() => cycle(s.dim)}
+                className={`library-status-option mb-1.5 flex items-start justify-between gap-3 rounded-md border border-transparent px-2.5 py-2 transition-colors ${stateClass}`}
               >
-                <span
-                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-white ${borderClass}`}
-                >
-                  {state === 'pos' && <Icon name="check" size={12} />}
-                  {state === 'neg' && <Icon name="x" size={12} />}
-                </span>
-                <span className="min-w-0">
-                  <span className={`block text-sm ${textClass}`}>
-                    {state === 'neg' ? t(s.negLabel) : t(s.label)}
+                <div className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`library-status-indicator flex h-4 w-4 shrink-0 items-center justify-center rounded border text-white ${borderClass}`}
+                    >
+                      {state === 'pos' && <Icon name="check" size={12} />}
+                      {state === 'neg' && <Icon name="x" size={12} />}
+                    </span>
+                    <span className={`block text-sm font-medium ${textClass}`}>{t(s.title)}</span>
                   </span>
-                  <span className="block text-xs text-neutral-500">{state === 'neg' ? t(s.negDesc) : t(s.desc)}</span>
-                </span>
-              </button>
+                  <span className="mt-0.5 block text-xs text-neutral-500">{state === 'neg' ? t(s.negDesc) : t(s.desc)}</span>
+                </div>
+                <div className="inline-flex shrink-0 rounded-md border border-neutral-700 bg-neutral-950/50 p-0.5">
+                  <button
+                    type="button"
+                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'pos' ? 'is-active is-pos bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setDimension(s.dim, 'pos')}
+                  >
+                    {t('Sí')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'neg' ? 'is-active is-neg bg-red-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setDimension(s.dim, 'neg')}
+                  >
+                    {t('No')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'off' ? 'is-active bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setDimension(s.dim, 'off')}
+                  >
+                    {t('Cualquiera')}
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -490,6 +520,12 @@ export function Library({
   };
 
   const selectedStatusFlags = filter.statusFlags ?? [];
+  const searchValue = filter.search ?? '';
+  const hasActiveFilters =
+    searchValue.trim().length > 0 ||
+    selectedStatusFlags.length > 0 ||
+    selectedZoteroTags.length > 0 ||
+    selectedCollections.length > 0;
   const toggleStatusFlag = (f: StatusFlag) =>
     setFilter((cur) => {
       const set = new Set(cur.statusFlags ?? []);
@@ -507,7 +543,12 @@ export function Library({
       else if (state === 'neg') set.add(`!${dim}` as StatusFlag);
       return { ...cur, statusFlags: [...set] };
     });
-  const _clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
+  const clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
+  const clearAllFilters = () => {
+    setFilter({});
+    setTagSearch('');
+    setCollectionSearch('');
+  };
 
   // A batch action must only operate on the current result set.  Otherwise a
   // selection made before changing a tag/status filter can silently enqueue
@@ -573,24 +614,26 @@ export function Library({
         <div className="flex flex-wrap gap-2 items-center">
           <input
             className="input"
+            value={searchValue}
             placeholder={t('Buscar título o autor…')}
             onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
           />
           <StatusFlagsPicker
             value={selectedStatusFlags}
             setDimension={setStatusDimension}
+            onClear={clearStatusFlags}
           />
           <div className="relative">
             <button
               type="button"
-              className={`zotero-tag-filter btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+              className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
               onClick={() => setTagFilterOpen((open) => !open)}
               aria-expanded={tagFilterOpen}
               aria-haspopup="dialog"
             >
               <Icon name="tag" /> {t('Etiquetas Zotero')}
               {selectedZoteroTags.length > 0 && (
-                <span className="zotero-tag-filter-count rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                <span className="library-filter-count zotero-tag-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
                   {selectedZoteroTags.length}
                 </span>
               )}
@@ -599,7 +642,7 @@ export function Library({
               <div
                 role="dialog"
                 aria-label={t('Filtrar por etiquetas de Zotero')}
-                className="absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
               >
                 <div className="flex items-center gap-2">
                   <input
@@ -670,7 +713,7 @@ export function Library({
           <div className="relative">
             <button
               type="button"
-              className={`collection-filter btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
+              className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
               onClick={() => setCollectionFilterOpen((open) => !open)}
               aria-expanded={collectionFilterOpen}
               aria-haspopup="dialog"
@@ -679,7 +722,7 @@ export function Library({
             >
               <Icon name="folder" /> {t('Colección')}
               {selectedCollections.length > 0 && (
-                <span className="rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                <span className="library-filter-count tone-cyan rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
                   {selectedCollections.length}
                 </span>
               )}
@@ -688,7 +731,7 @@ export function Library({
               <div
                 role="dialog"
                 aria-label={t('Filtrar por colección')}
-                className="absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
               >
                 <div className="flex items-center gap-2">
                   <input
@@ -757,6 +800,15 @@ export function Library({
               </div>
             )}
           </div>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn btn-ghost border border-neutral-700 gap-1.5"
+              onClick={clearAllFilters}
+            >
+              <Icon name="x" /> {t('Limpiar filtros')}
+            </button>
+          )}
           <div className="flex-1" />
           <span className="text-xs text-neutral-500">{t('Modelo para análisis')}</span>
           <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
@@ -776,7 +828,7 @@ export function Library({
               <button
                 key={tag}
                 type="button"
-                className="zotero-tag-chip inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
+                className="library-active-chip tone-indigo zotero-tag-chip inline-flex items-center gap-1 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2 py-1 text-indigo-200 hover:bg-indigo-950/60"
                 onClick={() => toggleZoteroTag(tag)}
                 title={`${t('Quitar')} ${tag}`}
               >
@@ -797,7 +849,7 @@ export function Library({
               <button
                 key={key}
                 type="button"
-                className="inline-flex items-center gap-1 rounded-md border border-cyan-800/70 bg-cyan-950/30 px-2 py-1 text-cyan-200 hover:bg-cyan-950/60"
+                className="library-active-chip tone-cyan inline-flex items-center gap-1 rounded-md border border-cyan-800/70 bg-cyan-950/30 px-2 py-1 text-cyan-200 hover:bg-cyan-950/60"
                 onClick={() => toggleCollection(key)}
                 title={`${t('Quitar')} ${collectionNameByKey.get(key) ?? key}`}
               >
@@ -820,7 +872,7 @@ export function Library({
                 <button
                   key={flag}
                   type="button"
-                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:opacity-80 ${
+                  className={`library-active-chip ${neg ? 'tone-red' : 'tone-indigo'} inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:opacity-80 ${
                     neg
                       ? 'border-red-800/70 bg-red-950/30 text-red-200'
                       : 'border-indigo-800/70 bg-indigo-950/30 text-indigo-200'

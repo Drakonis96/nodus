@@ -164,28 +164,101 @@ body {
   background-color: #fee2e2;
 }
 
-/* Zotero tag filters use an explicit light palette so selected tags never inherit
-   dark indigo surfaces from the dark-mode utility classes. */
-.light .zotero-tag-filter.is-active {
+/* Library filters use an explicit light palette so selected controls never inherit
+   dark surfaces from the dark-mode utility classes. */
+.light .library-filter-button.is-active.tone-indigo {
   background-color: #eef2ff;
   border-color: #818cf8;
   color: #3730a3;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.18);
 }
-.light .zotero-tag-filter.is-active .zotero-tag-filter-count {
+.light .library-filter-button.is-active.tone-cyan {
+  background-color: #ecfeff;
+  border-color: #67e8f9;
+  color: #155e75;
+  box-shadow: 0 0 0 1px rgba(6, 182, 212, 0.16);
+}
+.light .library-filter-count.tone-indigo {
   background-color: #c7d2fe;
   color: #312e81;
+}
+.light .library-filter-count.tone-cyan {
+  background-color: #a5f3fc;
+  color: #164e63;
+}
+.light .library-filter-popover {
+  background-color: #ffffff;
+  border-color: #d4d4d4;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.14);
 }
 .light .zotero-tag-option.is-selected {
   background-color: #eef2ff;
   color: #3730a3;
 }
-.light .zotero-tag-chip {
+.light .library-active-chip.tone-indigo {
   background-color: #eef2ff;
   border-color: #a5b4fc;
   color: #3730a3;
 }
-.light .zotero-tag-chip:hover {
+.light .library-active-chip.tone-indigo:hover {
   background-color: #e0e7ff;
+}
+.light .library-active-chip.tone-cyan {
+  background-color: #ecfeff;
+  border-color: #67e8f9;
+  color: #155e75;
+}
+.light .library-active-chip.tone-cyan:hover {
+  background-color: #cffafe;
+}
+.light .library-active-chip.tone-red {
+  background-color: #fff1f2;
+  border-color: #fda4af;
+  color: #9f1239;
+}
+.light .library-active-chip.tone-red:hover {
+  background-color: #ffe4e6;
+}
+.light .library-status-option {
+  color: #171717;
+}
+.light .library-status-option.is-pos {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+}
+.light .library-status-option.is-neg {
+  background-color: #fff1f2;
+  border-color: #fecdd3;
+}
+.light .library-status-indicator {
+  background-color: #ffffff;
+  border-color: #a3a3a3;
+  color: #ffffff;
+}
+.light .library-status-indicator.is-pos {
+  background-color: #4f46e5;
+  border-color: #6366f1;
+}
+.light .library-status-indicator.is-neg {
+  background-color: #e11d48;
+  border-color: #f43f5e;
+}
+.light .library-status-choice {
+  color: #525252;
+}
+.light .library-status-choice:hover {
+  background-color: #f5f5f5;
+}
+.light .library-status-choice.is-active {
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+.light .library-status-choice.is-pos {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+.light .library-status-choice.is-neg {
+  background-color: #fee2e2;
+  color: #991b1b;
 }
 
 /* The per-work analysis actions use neutral icons in dark mode.  Give their

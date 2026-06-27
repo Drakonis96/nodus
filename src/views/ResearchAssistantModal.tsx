@@ -94,18 +94,18 @@ const DOCUMENT_SELECTION: ResearchContextSelection = {
 
 const SYNTHESIS_SELECTION: ResearchContextSelection = {
   ideas: true,
-  themes: true,
+  themes: false,
   contradictions: true,
   gaps: true,
   readingPath: false,
   authors: false,
   documents: false,
-  passages: true,
-  graph: true,
+  passages: false,
+  graph: false,
   graphParts: {
-    ideaNodes: true,
-    themeNodes: true,
-    ideaEdges: true,
+    ideaNodes: false,
+    themeNodes: false,
+    ideaEdges: false,
     authorGraph: false,
   },
 };
@@ -122,9 +122,9 @@ const ASSISTANT_MODES: {
     id: 'synthesis',
     label: 'Síntesis',
     icon: 'layers',
-    description: 'Ideas, temas, tensiones y estructura del grafo.',
+    description: 'Ideas, huecos y contradicciones básicas.',
     selection: SYNTHESIS_SELECTION,
-    starter: 'Dame una síntesis crítica del corpus: líneas principales, tensiones, huecos y próximos pasos.',
+    starter: 'Dame una síntesis crítica del corpus: ideas principales, contradicciones, huecos y próximos pasos.',
   },
   {
     id: 'gaps',

@@ -149,7 +149,7 @@ export function App() {
         setView('settings');
         return;
       }
-      if (target) setAssistantTarget({ ...target, nonce: Date.now() });
+      setAssistantTarget(target ? { ...target, nonce: Date.now() } : null);
       setResearchOpen(true);
     },
     [settings?.defaultModel]

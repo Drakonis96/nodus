@@ -1026,9 +1026,9 @@ export const EN: Record<string, string> = {
   Peso: 'Weight',
   // ── Research assistant modal ───────────────────────────────────────────────
   Síntesis: 'Synthesis',
-  'Ideas, temas, tensiones y estructura del grafo.': 'Ideas, themes, tensions and graph structure.',
-  'Dame una síntesis crítica del corpus: líneas principales, tensiones, huecos y próximos pasos.':
-    'Give me a critical synthesis of the corpus: main lines, tensions, gaps and next steps.',
+  'Ideas, huecos y contradicciones básicas.': 'Ideas, gaps and basic contradictions.',
+  'Dame una síntesis crítica del corpus: ideas principales, contradicciones, huecos y próximos pasos.':
+    'Give me a critical synthesis of the corpus: main ideas, contradictions, gaps and next steps.',
   'Preguntas abiertas, limitaciones y trabajo futuro.': 'Open questions, limitations and future work.',
   'Prioriza los huecos de investigación del corpus y propón cómo atacarlos con lecturas o análisis.':
     'Prioritize the corpus research gaps and propose how to tackle them with readings or analysis.',
@@ -1293,10 +1293,17 @@ export const EN: Record<string, string> = {
   // ── Library · status-flags filter ─────────────────────────────────────
   Estado: 'Status',
   'Filtrar por estado': 'Filter by status',
+  'Estado de análisis': 'Analysis status',
+  'Cada fila acepta sí, no o cualquiera.': 'Each row accepts yes, no or any.',
+  Sí: 'Yes',
+  No: 'No',
+  'Limpiar filtros': 'Clear filters',
+  'Análisis profundo': 'Deep analysis',
   'Análisis profundo hecho': 'Deep analysis done',
   'Análisis profundo NO hecho': 'Deep analysis NOT done',
   'deep_status = done': 'deep_status = done',
   'deep_status != done': 'deep_status != done',
+  Resumen: 'Summary',
   'Resumen hecho': 'Summary done',
   'Resumen NO hecho': 'Summary NOT done',
   'summary_status = done': 'summary_status = done',
@@ -1305,6 +1312,7 @@ export const EN: Record<string, string> = {
   'Sin ideas extraídas': 'No ideas extracted',
   'tiene al menos una idea': 'has at least one idea',
   'no tiene ninguna idea': 'has no ideas at all',
+  Pasajes: 'Passages',
   'Pasajes completos': 'Passages complete',
   'Pasajes incompletos': 'Passages incomplete',
   'todos los fragmentos indexados y actuales': 'all passages indexed and current',
