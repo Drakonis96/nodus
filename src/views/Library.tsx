@@ -42,10 +42,6 @@ const STATUS_FLAGS: { dim: StatusDimension; label: string; negLabel: string; des
   { dim: 'passages', label: 'Pasajes completos', negLabel: 'Pasajes incompletos', desc: 'todos los fragmentos indexados y actuales', negDesc: 'faltan fragmentos o están obsoletos' },
 ];
 
-function flagFor(dim: StatusDimension, neg: boolean): StatusFlag {
-  return (neg ? `!${dim}` : dim) as StatusFlag;
-}
-
 function isNegated(f: StatusFlag): boolean {
   return f.startsWith('!');
 }
@@ -61,10 +57,10 @@ function labelFor(f: StatusFlag): string {
 
 function StatusFlagsPicker({
   value,
-  onToggle,
+  setDimension,
 }: {
   value: StatusFlag[];
-  onToggle: (flag: StatusFlag) => void;
+  setDimension: (dim: StatusDimension, state: 'off' | 'pos' | 'neg') => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -94,9 +90,9 @@ function StatusFlagsPicker({
 
   const cycle = (dim: StatusDimension) => {
     const cur = currentFor(dim);
-    if (cur === 'off') onToggle(dim);
-    else if (cur === 'pos') { onToggle(dim); onToggle(flagFor(dim, true)); }
-    else onToggle(flagFor(dim, true));
+    if (cur === 'off') setDimension(dim, 'pos');
+    else if (cur === 'pos') setDimension(dim, 'neg');
+    else setDimension(dim, 'off');
   };
 
   return (
@@ -502,6 +498,15 @@ export function Library({
       if (set.has(f)) set.delete(f); else set.add(f);
       return { ...cur, statusFlags: [...set] };
     });
+  const setStatusDimension = (dim: StatusDimension, state: 'off' | 'pos' | 'neg') =>
+    setFilter((cur) => {
+      const set = new Set(cur.statusFlags ?? []);
+      set.delete(dim);
+      set.delete(`!${dim}` as StatusFlag);
+      if (state === 'pos') set.add(dim);
+      else if (state === 'neg') set.add(`!${dim}` as StatusFlag);
+      return { ...cur, statusFlags: [...set] };
+    });
   const _clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -573,7 +578,7 @@ export function Library({
           />
           <StatusFlagsPicker
             value={selectedStatusFlags}
-            onToggle={toggleStatusFlag}
+            setDimension={setStatusDimension}
           />
           <div className="relative">
             <button
