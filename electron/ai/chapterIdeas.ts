@@ -146,14 +146,14 @@ function dedupeIdeas(ideas: RawIdea[]): RawIdea[] {
 }
 
 // ── Candidate retrieval across the library ───────────────────────────────────
-interface Candidate {
+export interface Candidate {
   kind: ChapterRelationTargetKind;
   id: string;
   similarity: number;
   text: string; // short text shown to the typing model
 }
 
-function gatherCandidates(vector: number[]): Candidate[] {
+export function gatherCandidates(vector: number[]): Candidate[] {
   const candidates: Candidate[] = [];
   for (const hit of findSimilarIdeas(vector, RELATION_MIN_SIMILARITY, CANDIDATES_PER_IDEA)) {
     candidates.push({ kind: 'idea', id: hit.global_id, similarity: hit.similarity, text: `${hit.label}: ${hit.statement}` });
@@ -171,7 +171,7 @@ function gatherCandidates(vector: number[]): Candidate[] {
 }
 
 // ── Typing ───────────────────────────────────────────────────────────────────
-interface RawRelation {
+export interface RawRelation {
   chapterIdeaId?: string;
   targetKind?: string;
   targetId?: string;
@@ -185,16 +185,16 @@ interface TypeResponse {
 function isTypeResponse(v: unknown): v is TypeResponse {
   return Boolean(v && typeof v === 'object' && Array.isArray((v as TypeResponse).relations));
 }
-function normalizeRelationType(value: unknown): ChapterRelationType {
+export function normalizeRelationType(value: unknown): ChapterRelationType {
   return RELATION_TYPES.includes(String(value) as ChapterRelationType) ? (value as ChapterRelationType) : 'related';
 }
-function clamp01(value: unknown): number {
+export function clamp01(value: unknown): number {
   const n = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(n)) return 0.5;
   return Math.max(0, Math.min(1, n));
 }
 
-async function typeRelations(
+export async function typeRelations(
   ideas: { id: string; label: string; statement: string }[],
   candidatesByIdea: Map<string, Candidate[]>,
   model: ModelRef | null | undefined
@@ -262,7 +262,7 @@ async function ensureNotesEmbedded(): Promise<void> {
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /** Resolve display metadata for a relation target. */
-function resolveTarget(kind: ChapterRelationTargetKind, id: string): { label: string; subtitle: string | null } {
+export function resolveTarget(kind: ChapterRelationTargetKind, id: string): { label: string; subtitle: string | null } {
   try {
     if (kind === 'idea') {
       const idea = getIdeaSummary(id);

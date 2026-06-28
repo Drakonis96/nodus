@@ -325,6 +325,12 @@ export interface AppSettings {
   mcpPort: number;
   /** Bearer token for the local MCP endpoint. This is intentionally visible in Settings. */
   mcpToken: string;
+  /** Opt-in local HTTPS server that serves the Word writing-copilot add-in + its JSON API. */
+  copilotEnabled: boolean;
+  /** Localhost TCP port for the copilot HTTPS server (serves /addin and /api). */
+  copilotPort: number;
+  /** Bearer token for the copilot API. Intentionally visible in Settings. */
+  copilotToken: string;
   /**
    * User-defined order of the sidebar sections, as view ids. Excludes 'home'
    * (always pinned first). Empty means the default order. Unknown/missing ids
@@ -339,6 +345,58 @@ export interface McpServerStatus {
   port: number | null;
   url: string | null;
   error: string | null;
+}
+
+/** Runtime state of the opt-in localhost copilot HTTPS server (for the Word add-in). */
+export interface CopilotServerStatus {
+  running: boolean;
+  port: number | null;
+  /** URL of the add-in task pane (what the Word manifest points at). */
+  addinUrl: string | null;
+  /** Whether a trusted localhost TLS certificate was found/loaded. */
+  certReady: boolean;
+  error: string | null;
+}
+
+/** Result of installing/updating the local Word add-in manifest from Settings. */
+export interface CopilotInstallResult {
+  ok: boolean;
+  message: string;
+  manifestPath: string | null;
+}
+
+/** Navigation request emitted by the local Word add-in server into the renderer. */
+export interface CopilotOpenIdeaTarget {
+  ideaId: string;
+  label: string | null;
+}
+
+/** One typed relation between the edited paragraph and a library entity (Word copilot). */
+export interface LiveRelation {
+  relation: ChapterRelationType;
+  targetKind: ChapterRelationTargetKind;
+  targetId: string;
+  targetLabel: string;
+  targetSubtitle: string | null;
+  similarity: number;
+  confidence: number;
+  rationale: string;
+  /** Zotero item key of the underlying work, when resolvable. */
+  zoteroKey: string | null;
+  /** "Surname, Year" style label for inline insertion. */
+  authorYear: string | null;
+  /** A precise search string (author + year + title) for Zotero's quick search. */
+  searchString: string | null;
+  /** Verifiable nodus:// citation for the target. */
+  citation: string;
+  /** Optional one-line paraphrase to insert. */
+  proposedText: string | null;
+}
+
+export interface LiveRelationsResult {
+  /** False when no embedding provider/key is configured. */
+  available: boolean;
+  relations: LiveRelation[];
 }
 
 export type ExtractStrategy = 'zotero_fulltext' | 'digital' | 'hybrid' | 'scanned' | 'empty';
@@ -1869,6 +1927,14 @@ export interface NodusApi {
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
+  getCopilotStatus(): Promise<CopilotServerStatus>;
+  regenerateCopilotToken(): Promise<string>;
+  /** Generate + trust a localhost TLS cert for the copilot server (idempotent). */
+  ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
+  /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */
+  installCopilotAddin(): Promise<CopilotInstallResult>;
+  /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
+  onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
   setApiKey(provider: AiProvider, key: string): Promise<void>;
   clearApiKey(provider: AiProvider): Promise<void>;
 

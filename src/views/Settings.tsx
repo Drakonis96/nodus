@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings, EmbeddingProvider, McpServerStatus, ModelInfo, UpdateProgressEvent } from '@shared/types';
+import type { AppSettings, CopilotServerStatus, EmbeddingProvider, McpServerStatus, ModelInfo, UpdateProgressEvent } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
@@ -33,6 +33,10 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   const [importPassword, setImportPassword] = useState('');
   const [importingBackup, setImportingBackup] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
+  const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
+  const [copilotBusy, setCopilotBusy] = useState(false);
+  const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
+  const [copilotInstallMessage, setCopilotInstallMessage] = useState<string | null>(null);
   const [mcpPortInput, setMcpPortInput] = useState(String(settings.mcpPort));
   const [mcpHelpOpen, setMcpHelpOpen] = useState(false);
   const [mcpCopied, setMcpCopied] = useState<'url' | 'token' | null>(null);
@@ -60,6 +64,20 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
   }, [settings.mcpEnabled, settings.mcpPort, settings.mcpToken]);
 
   useEffect(() => setMcpPortInput(String(settings.mcpPort)), [settings.mcpPort]);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      const next = await window.nodus.getCopilotStatus();
+      if (active) setCopilotStatus(next);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 1500);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [settings.copilotEnabled, settings.copilotPort, settings.copilotToken]);
 
   useEffect(() => {
     if (!mcpHelpOpen) return;
@@ -431,6 +449,64 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
             </div>
             <p className="text-xs text-neutral-500">
               {t('Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.')}
+            </p>
+          </Section>
+
+          <Section title={t('Copiloto de escritura (Word)')}>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-300">{t('Activar Nodus Copilot para Word')}</label>
+              <input type="checkbox" checked={settings.copilotEnabled} onChange={(e) => void patch({ copilotEnabled: e.target.checked })} />
+            </div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/50 px-3 py-2 text-xs">
+              {copilotStatus.running ? (
+                <span className="text-emerald-400">{t('Activo')}: {copilotStatus.addinUrl}</span>
+              ) : copilotStatus.error ? (
+                <span className="text-red-400">{t('Error')}: {copilotStatus.error}</span>
+              ) : (
+                <span className="text-neutral-500">{t('Apagado')}</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="btn btn-ghost border border-neutral-700"
+                disabled={copilotBusy}
+                onClick={async () => {
+                  setCopilotBusy(true);
+                  try {
+                    const r = await window.nodus.ensureCopilotCert();
+                    flash(r.message);
+                  } finally {
+                    setCopilotBusy(false);
+                  }
+                }}
+              >
+                <Icon name={copilotStatus.certReady ? 'check' : 'lock'} /> {copilotStatus.certReady ? t('Certificado listo') : t('Generar certificado')}
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={copilotInstallBusy}
+                onClick={async () => {
+                  setCopilotInstallBusy(true);
+                  setCopilotInstallMessage(null);
+                  try {
+                    const result = await window.nodus.installCopilotAddin();
+                    setCopilotInstallMessage(result.message);
+                    flash(result.message);
+                  } finally {
+                    setCopilotInstallBusy(false);
+                  }
+                }}
+              >
+                <Icon name={copilotInstallBusy ? 'sync' : 'download'} className={copilotInstallBusy ? 'animate-spin' : ''} />
+                {copilotInstallBusy ? t('Instalando…') : t('Instalar/actualizar en Word')}
+              </button>
+              <button className="btn btn-ghost border border-neutral-700" onClick={() => void window.nodus.regenerateCopilotToken().then(() => flash(t('Token del copiloto regenerado.')))}>
+                <Icon name="refresh" /> {t('Regenerar token')}
+              </button>
+            </div>
+            {copilotInstallMessage && <p className="text-xs text-emerald-400">{copilotInstallMessage}</p>}
+            <p className="text-xs text-neutral-500">
+              {t('Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.')}
             </p>
           </Section>
 

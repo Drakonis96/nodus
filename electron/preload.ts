@@ -16,6 +16,15 @@ const api: NodusApi = {
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
+  getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),
+  regenerateCopilotToken: () => ipcRenderer.invoke('copilot:regenerateToken'),
+  ensureCopilotCert: () => ipcRenderer.invoke('copilot:ensureCert'),
+  installCopilotAddin: () => ipcRenderer.invoke('copilot:installAddin'),
+  onCopilotOpenIdea: (cb) => {
+    const listener = (_e: unknown, target: import('@shared/types').CopilotOpenIdeaTarget) => cb(target);
+    ipcRenderer.on('copilot:openIdea', listener);
+    return () => ipcRenderer.removeListener('copilot:openIdea', listener);
+  },
   setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
 

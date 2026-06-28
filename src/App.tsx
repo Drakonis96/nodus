@@ -139,6 +139,17 @@ export function App() {
     setView(nextView);
   }, []);
 
+  useEffect(() => {
+    if (!window.nodus?.onCopilotOpenIdea) return undefined;
+    return window.nodus.onCopilotOpenIdea((target) => {
+      navigate('graph', {
+        preset: 'overview',
+        nodeId: target.ideaId,
+        label: target.label ? `${t('Idea:')} ${target.label}` : t('Idea de Nodus'),
+      });
+    });
+  }, [navigate]);
+
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
     setView('notes');

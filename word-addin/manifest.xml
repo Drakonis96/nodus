@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+  <Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>
+  <Version>0.1.0</Version>
+  <ProviderName>Nodus</ProviderName>
+  <DefaultLocale>es-ES</DefaultLocale>
+  <DisplayName DefaultValue="Nodus Copilot" />
+  <Description DefaultValue="Muestra cómo el párrafo que escribes se relaciona con tu biblioteca de Nodus, permite explorar ideas y conexiones, y te ayuda a insertar ideas citadas." />
+  <IconUrl DefaultValue="https://localhost:4320/addin/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:4320/addin/assets/icon-80.png" />
+  <SupportUrl DefaultValue="https://localhost:4320/addin/taskpane.html" />
+  <AppDomains>
+    <AppDomain>https://localhost:4320</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:4320/addin/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title" />
+            <Description resid="GetStarted.Description" />
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Nodus.Group">
+                <Label resid="Nodus.Group.Label" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16" />
+                  <bt:Image size="32" resid="Icon.32" />
+                  <bt:Image size="80" resid="Icon.80" />
+                </Icon>
+                <Control xsi:type="Button" id="Nodus.TaskpaneButton">
+                  <Label resid="Nodus.Taskpane.Label" />
+                  <Supertip>
+                    <Title resid="Nodus.Taskpane.Label" />
+                    <Description resid="Nodus.Taskpane.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>NodusTaskpane</TaskpaneId>
+                    <SourceLocation resid="Nodus.Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:4320/addin/assets/icon-16.png" />
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:4320/addin/assets/icon-32.png" />
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:4320/addin/assets/icon-80.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Nodus.Taskpane.Url" DefaultValue="https://localhost:4320/addin/taskpane.html" />
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://localhost:4320/addin/taskpane.html" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="Nodus Copilot" />
+        <bt:String id="Nodus.Group.Label" DefaultValue="Nodus" />
+        <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Abre el panel para ver cómo tu texto se relaciona con tu biblioteca." />
+        <bt:String id="Nodus.Taskpane.Tooltip" DefaultValue="Relaciona el párrafo actual con tu biblioteca de Nodus e inserta ideas citadas." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

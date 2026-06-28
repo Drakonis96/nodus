@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { ipcMain, shell, BrowserWindow, dialog } from 'electron';
+import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
   AddProjectLinkInput,
@@ -55,6 +55,9 @@ import type {
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, stopMcpServer } from './mcp';
+import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, stopCopilotServer } from './copilot/server';
+import { ensureCopilotCert } from './copilot/certs';
+import { installCopilotAddin } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
@@ -155,10 +158,22 @@ export function registerIpc(
       if (next.mcpEnabled) await restartMcpServer();
       else await stopMcpServer();
     }
+    if (patch.copilotEnabled !== undefined || patch.copilotPort !== undefined) {
+      if (next.copilotEnabled) await restartCopilotServer();
+      else await stopCopilotServer();
+    }
     return next;
   });
   h('mcp:status', async () => getMcpStatus());
   h('mcp:regenerateToken', async () => regenerateMcpToken());
+  h('copilot:status', async () => getCopilotStatus());
+  h('copilot:regenerateToken', async () => regenerateCopilotToken());
+  h('copilot:ensureCert', async () => {
+    const result = await ensureCopilotCert(app.getAppPath());
+    if (result.ok && getSettings().copilotEnabled) await restartCopilotServer();
+    return result;
+  });
+  h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath()));
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 

@@ -1,0 +1,287 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --surface: #f6f6f6;
+  --border: #d5d5d5;
+  --text: #1f1f1f;
+  --control-text: #1f1f1f;
+  --muted: #646464;
+  --primary: #4f46e5;
+  --primary-text: #ffffff;
+  --green: #168a46;
+  --red: #c4362e;
+  --amber: #a15c00;
+  --cyan: #007c89;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f1f1f;
+    --panel: #2b2b2b;
+    --surface: #242424;
+    --border: #454545;
+    --text: #f3f3f3;
+    --control-text: #f3f3f3;
+    --muted: #b8b8b8;
+    --primary: #7c83ff;
+    --primary-text: #ffffff;
+    --green: #4bd27b;
+    --red: #ff766d;
+    --amber: #ffbf5b;
+    --cyan: #55d6e1;
+    --shadow: none;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+main {
+  min-height: calc(100vh - 56px);
+  background: var(--bg);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+}
+
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-weight: 700;
+}
+
+.title { font-weight: 650; line-height: 1.15; }
+.caption { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.status { margin-left: auto; font-size: 11px; color: var(--muted); text-align: right; max-width: 118px; }
+.status.ok { color: var(--green); }
+.status.err { color: var(--red); }
+
+.controls {
+  padding: 10px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 6px;
+}
+
+.search input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--control-text);
+  border-radius: 6px;
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.search input::placeholder { color: var(--muted); }
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto {
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--control-text);
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.btn:hover { filter: brightness(0.97); }
+.dark .btn:hover { filter: brightness(1.08); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-text); }
+.btn:disabled { opacity: 0.56; cursor: default; }
+.btn.small { padding: 5px 7px; font-size: 11px; min-height: 26px; }
+.btn.tiny { padding: 3px 7px; font-size: 11px; min-height: 22px; }
+.btn.icon { padding: 0; font-size: 19px; font-weight: 600; }
+
+.paragraph {
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  max-height: 86px;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: var(--surface);
+}
+.paragraph:empty { display: none; }
+
+.results {
+  padding: 0 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty {
+  padding: 26px 18px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 5px;
+  white-space: nowrap;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.badge.supports { color: var(--green); border-color: color-mix(in srgb, var(--green) 42%, var(--border)); }
+.badge.contradicts,
+.badge.refutes { color: var(--red); border-color: color-mix(in srgb, var(--red) 42%, var(--border)); }
+.badge.refines { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 42%, var(--border)); }
+.badge.extends { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 42%, var(--border)); }
+.badge.idea { color: var(--primary); border-color: color-mix(in srgb, var(--primary) 42%, var(--border)); }
+
+.label {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.25;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.pct {
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.rationale,
+.statement {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.38;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.detail {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.detail-section { margin-top: 10px; }
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.source,
+.connection {
+  padding: 7px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.source:first-of-type,
+.connection:first-of-type { border-top: 0; }
+
+.source-title,
+.connection-title {
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.source-meta,
+.source-text,
+.connection-text,
+.muted {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.source-text,
+.connection-text { margin: 4px 0 5px; }
+.connection-head { display: flex; align-items: center; gap: 6px; }
+.spin { color: var(--muted); font-size: 12px; padding: 4px 0; }
+.copied { color: var(--green); font-size: 11px; align-self: center; }

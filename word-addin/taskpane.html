@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nodus Copilot</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <link rel="stylesheet" href="/addin/taskpane.css" />
+    <script>
+      // Injected by the Nodus copilot server when it serves this page.
+      window.NODUS = { token: '__COPILOT_TOKEN__' };
+    </script>
+  </head>
+  <body>
+    <header class="head">
+      <div class="mark">N</div>
+      <div>
+        <div class="title">Nodus Copilot</div>
+        <div class="caption">Word + Nodus</div>
+      </div>
+      <div id="status" class="status">Conectando…</div>
+    </header>
+
+    <main>
+      <section class="controls">
+        <div class="search">
+          <input id="searchBox" type="search" placeholder="Buscar ideas, autores u obras" autocomplete="off" />
+          <button id="searchBtn" class="btn icon" type="button" title="Buscar">⌕</button>
+        </div>
+        <div class="toolbar">
+          <label class="auto"><input type="checkbox" id="autoToggle" checked /> Auto</label>
+          <button id="analyzeBtn" class="btn primary" type="button">Analizar párrafo</button>
+        </div>
+      </section>
+
+      <div id="paragraph" class="paragraph"></div>
+      <div id="results" class="results"></div>
+      <div id="empty" class="empty">Coloca el cursor en un párrafo para ver ideas relacionadas.</div>
+    </main>
+
+    <script src="/addin/taskpane.js"></script>
+  </body>
+</html>

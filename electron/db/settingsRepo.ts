@@ -44,6 +44,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   mcpEnabled: false,
   mcpPort: 4319,
   mcpToken: '',
+  copilotEnabled: false,
+  copilotPort: 4320,
+  copilotToken: '',
   sidebarOrder: [],
 };
 

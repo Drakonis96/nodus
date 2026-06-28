@@ -10,6 +10,7 @@ import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startMcpServer, stopMcpServer } from './mcp';
+import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 
 const require = createRequire(__filename);
@@ -342,6 +343,7 @@ function setupAutoUpdates(): void {
 
 app.whenReady().then(() => {
   getDb(); // open + migrate before anything touches data
+  setCopilotWindowProvider(() => mainWindow);
   registerIpc(() => mainWindow, () => checkForUpdates('manual'), installDownloadedUpdate);
   createWindow();
 
@@ -351,6 +353,7 @@ app.whenReady().then(() => {
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
   if (settings.mcpEnabled) void startMcpServer();
+  if (settings.copilotEnabled) void startCopilotServer();
   setupAutoUpdates();
 
   app.on('activate', () => {
@@ -371,6 +374,7 @@ app.on('before-quit', () => {
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
   stopRealtimeSync();
   void stopMcpServer();
+  void stopCopilotServer();
   closeDb();
 });
 
@@ -379,5 +383,6 @@ updateAwareApp.on('before-quit-for-update', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   stopRealtimeSync();
   void stopMcpServer();
+  void stopCopilotServer();
   closeDb();
 });

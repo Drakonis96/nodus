@@ -148,6 +148,18 @@ export const EN: Record<string, string> = {
   'Buscar actualización': 'Check for updates',
   'Servidor MCP': 'MCP server',
   'Activar servidor MCP': 'Enable MCP server',
+  'Copiloto de escritura (Word)': 'Writing copilot (Word)',
+  'Activar copiloto para Word': 'Enable Word copilot',
+  'Activar Nodus Copilot para Word': 'Enable Nodus Copilot for Word',
+  'Generar certificado': 'Generate certificate',
+  'Certificado listo': 'Certificate ready',
+  'Instalando…': 'Installing…',
+  'Instalar/actualizar en Word': 'Install/update in Word',
+  'Token del copiloto regenerado.': 'Copilot token regenerated.',
+  'Sirve el complemento de Word en https://localhost y busca relaciones del párrafo con tu biblioteca. Carga el manifiesto (word-addin/manifest.xml) en Word para usarlo.':
+    'Serves the Word add-in over https://localhost and finds how the paragraph relates to your library. Sideload word-addin/manifest.xml in Word to use it.',
+  'Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.':
+    'Serves Nodus Copilot over https://localhost, searches corpus ideas, shows connections and inserts an idea with the AI configured in Nodus.',
   'Ayuda para conectar un cliente MCP': 'Help connecting an MCP client',
   'Puerto local': 'Local port',
   Activo: 'Running',
