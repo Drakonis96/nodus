@@ -9,8 +9,36 @@ your sources.
 Everything runs locally. The only external calls are to the AI provider you
 configure. Your data, API keys and embeddings stay on your machine.
 
-> **v0.7.0** adds a demo mode (explore with sample data, no Zotero or API key
-> needed), expanded tutorial coverage, and a global search across all entities.
+> **New in v0.7.x** — the writing copilot is now available over MCP: select a
+> passage and get its typed relations (supports / contradicts / refines …) with
+> the Zotero item to cite. The demo corpus is bilingual (English / Spanish) and
+> follows the app language. Plus demo mode (explore with sample data, no Zotero
+> or API key needed), expanded tutorial coverage, and global search.
+
+---
+
+## Screenshots
+
+A tour of the main sections, shown with the built-in demo corpus (a small
+science-of-learning sample — no real library required).
+
+<table>
+  <tr>
+    <td width="33%"><a href="docs/screenshots/01-home.png"><img src="docs/screenshots/01-home.png" alt="Home dashboard"></a><br/><sub><b>Home</b> — corpus status, analysis and next steps</sub></td>
+    <td width="33%"><a href="docs/screenshots/02-graph.png"><img src="docs/screenshots/02-graph.png" alt="Idea graph"></a><br/><sub><b>Idea graph</b> — typed relations between claims, findings and themes</sub></td>
+    <td width="33%"><a href="docs/screenshots/03-ideas.png"><img src="docs/screenshots/03-ideas.png" alt="Ideas"></a><br/><sub><b>Ideas</b> — extracted claims and findings with evidence and confidence</sub></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="docs/screenshots/04-debates.png"><img src="docs/screenshots/04-debates.png" alt="Debates"></a><br/><sub><b>Debates</b> — contradictions head to head, with verbatim evidence</sub></td>
+    <td width="33%"><a href="docs/screenshots/05-gaps.png"><img src="docs/screenshots/05-gaps.png" alt="Research gaps"></a><br/><sub><b>Research gaps</b> — future work, limitations and open questions</sub></td>
+    <td width="33%"><a href="docs/screenshots/09-argument-map.png"><img src="docs/screenshots/09-argument-map.png" alt="Argument map"></a><br/><sub><b>Argument map</b> — the logical structure around an idea</sub></td>
+  </tr>
+  <tr>
+    <td width="33%"><a href="docs/screenshots/07-library.png"><img src="docs/screenshots/07-library.png" alt="Library"></a><br/><sub><b>Library</b> — your Zotero works with scan and analysis status</sub></td>
+    <td width="33%"><a href="docs/screenshots/06-notes.png"><img src="docs/screenshots/06-notes.png" alt="Notes"></a><br/><sub><b>Notes</b> — Markdown workspace with clickable nodus:// citations</sub></td>
+    <td width="33%"><a href="docs/screenshots/08-writing.png"><img src="docs/screenshots/08-writing.png" alt="Writing workshop"></a><br/><sub><b>Writing workshop</b> — outline and draft from selected graph nodes</sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -28,9 +56,10 @@ configure. Your data, API keys and embeddings stay on your machine.
 
 On a fresh install with an empty database, Nodus offers to load a curated
 sample corpus: six works on the science of learning, nine ideas, six relations,
-four research gaps, and notes. You can explore every static view without Zotero
-or an API key. Exit demo mode from the banner or Settings > Data to clear the
-sample and start with your own library.
+four research gaps, and notes. The sample text follows the interface language
+(English or Spanish). You can explore every static view without Zotero or an API
+key. Exit demo mode from the banner or Settings > Data to clear the sample and
+start with your own library.
 
 ---
 
@@ -209,7 +238,20 @@ All phases report live progress through the queue bar.
 
 Optional local Model Context Protocol server (Streamable HTTP) for external AI
 clients (Claude Desktop, ChatGPT, generic MCP clients). Bearer-token auth,
-localhost only.
+localhost only. It exposes the derived graph **read-only** (ideas, debates,
+gaps, authors, coverage) plus write access to your own notes, folders and saved
+drafts.
+
+The **writing copilot** is part of this surface, mirroring the Word add-in so any
+MCP client can situate a draft passage in your corpus:
+
+- `nodus_analyze_passage` — takes an arbitrary passage and returns its typed
+  relations with the whole corpus (supports, contradicts, refines, extends …),
+  each with similarity, confidence, a rationale and the Zotero item to cite.
+- `nodus_get_copilot_idea` — one idea shaped for writing: statement, evidence,
+  connections and the ready-to-cite Zotero bridge (key + author-year).
+- `nodus_compose_insertion` — drafts a short, academic sentence that integrates
+  a chosen idea into your paragraph with the parenthetical citation in place.
 
 ### Export / import
 
