@@ -163,7 +163,7 @@
   }
 
   function scoreFor(item) {
-    var raw = item.confidence || item.similarity;
+    var raw = item.rankScore || item.confidence || item.similarity;
     if (!raw) return '';
     return Math.round(raw * 100) + '%';
   }
@@ -318,7 +318,7 @@
       var subtitle = subtitleFor(item);
       if (subtitle) card.appendChild(textEl('div', 'subtitle', subtitle));
 
-      var body = item.statement || item.rationale || '';
+      var body = item.statement || item.targetStatement || item.rationale || '';
       if (body) card.appendChild(textEl('p', 'rationale', body));
 
       var actions = textEl('div', 'actions', '');
@@ -336,9 +336,7 @@
 
   function renderRelations(relations) {
     var sorted = relations.slice().sort(function (a, b) {
-      if (a.targetKind === 'idea' && b.targetKind !== 'idea') return -1;
-      if (a.targetKind !== 'idea' && b.targetKind === 'idea') return 1;
-      return (b.confidence || b.similarity || 0) - (a.confidence || a.similarity || 0);
+      return (b.rankScore || b.confidence || b.similarity || 0) - (a.rankScore || a.confidence || a.similarity || 0);
     });
     renderItems(sorted, 'Sin ideas relacionadas para este párrafo.');
   }

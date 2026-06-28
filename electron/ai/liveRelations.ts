@@ -20,12 +20,260 @@ import { getWork } from '../db/worksRepo';
 import { getDb } from '../db/database';
 
 const PSEUDO_ID = 'paragraph';
-const LIVE_IDEA_LIMIT = 36;
-const LIVE_IDEA_MIN_SIMILARITY = 0.25;
+const LIVE_RESULT_LIMIT = 36;
+const LIVE_SEMANTIC_IDEA_LIMIT = 90;
+const LIVE_LEXICAL_IDEA_LIMIT = 90;
+const LIVE_GRAPH_SEED_LIMIT = 18;
+const LIVE_IDEA_MIN_SIMILARITY = 0.18;
+
+type CandidateSource = 'semantic' | 'lexical' | 'graph' | 'support';
+
+interface RankedCandidate extends Candidate {
+  rankScore: number;
+  source: CandidateSource;
+  targetStatement: string | null;
+}
+
+interface WeightedTerm {
+  term: string;
+  weight: number;
+}
+
+interface LexicalIdeaRow {
+  global_id: string;
+  type: Idea['type'];
+  label: string;
+  statement: string;
+  developments: string | null;
+  evidence: string | null;
+  titles: string | null;
+  authors: string | null;
+  years: string | null;
+  work_count: number;
+}
+
+const STOPWORDS = new Set([
+  'a',
+  'al',
+  'algo',
+  'ante',
+  'asi',
+  'aun',
+  'cada',
+  'como',
+  'con',
+  'contra',
+  'cual',
+  'cuando',
+  'de',
+  'del',
+  'desde',
+  'donde',
+  'dos',
+  'el',
+  'ella',
+  'ellas',
+  'ellos',
+  'en',
+  'entre',
+  'era',
+  'eran',
+  'es',
+  'esa',
+  'ese',
+  'eso',
+  'esta',
+  'este',
+  'esto',
+  'fue',
+  'han',
+  'hay',
+  'la',
+  'las',
+  'le',
+  'les',
+  'lo',
+  'los',
+  'mas',
+  'mismo',
+  'muchas',
+  'muy',
+  'no',
+  'o',
+  'para',
+  'pero',
+  'por',
+  'que',
+  'se',
+  'sin',
+  'solian',
+  'son',
+  'su',
+  'sus',
+  'tambien',
+  'tan',
+  'todo',
+  'una',
+  'unas',
+  'uno',
+  'unos',
+  'veces',
+  'y',
+]);
+
+const TERM_EXPANSIONS: { roots: string[]; terms: string[]; weight: number }[] = [
+  {
+    roots: ['fotograf', 'imagen', 'visual', 'album'],
+    terms: ['fotograf', 'imagen', 'visual', 'album', 'iconograf', 'representacion', 'mirada'],
+    weight: 1.25,
+  },
+  {
+    roots: ['mostr', 'represent', 'registr'],
+    terms: ['mostr', 'represent', 'registr', 'imagen', 'visual', 'relato'],
+    weight: 0.8,
+  },
+  {
+    roots: ['pobrez', 'pobre', 'miseria', 'hambre', 'precar', 'carencia'],
+    terms: ['pobrez', 'pobre', 'miseria', 'hambre', 'precar', 'privacion', 'carencia', 'desigualdad'],
+    weight: 1.35,
+  },
+  {
+    roots: ['elud', 'omit', 'omis', 'ignora', 'invisibil', 'ocult', 'censur', 'silenci'],
+    terms: ['elud', 'omit', 'omis', 'ignora', 'invisibil', 'ocult', 'censur', 'silenci', 'exclusion'],
+    weight: 1.25,
+  },
+  {
+    roots: ['viajer', 'turist', 'extranj'],
+    terms: ['viajer', 'turist', 'extranj', 'visitante'],
+    weight: 1.05,
+  },
+  {
+    roots: ['texto', 'relato', 'narrativ', 'literatur', 'escritur'],
+    terms: ['texto', 'relato', 'narrativ', 'literatur', 'escritur', 'discurso'],
+    weight: 0.9,
+  },
+  {
+    roots: ['cuidad', 'prudenc', 'cautel'],
+    terms: ['cuidad', 'prudenc', 'cautel', 'neutralidad', 'compostura'],
+    weight: 0.8,
+  },
+];
 
 function clip(text: string, max: number): string {
   const clean = text.replace(/\s+/g, ' ').trim();
   return clean.length <= max ? clean : `${clean.slice(0, max - 1).trim()}…`;
+}
+
+function normalizeSearchText(value: string | null | undefined): string {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function addWeightedTerm(terms: Map<string, number>, term: string, weight: number): void {
+  const clean = normalizeSearchText(term).replace(/\s+/g, '');
+  if (clean.length < 3 || STOPWORDS.has(clean)) return;
+  terms.set(clean, Math.max(terms.get(clean) ?? 0, weight));
+  if (clean.length > 5 && clean.endsWith('es')) terms.set(clean.slice(0, -2), Math.max(terms.get(clean.slice(0, -2)) ?? 0, weight * 0.9));
+  if (clean.length > 4 && clean.endsWith('s')) terms.set(clean.slice(0, -1), Math.max(terms.get(clean.slice(0, -1)) ?? 0, weight * 0.9));
+}
+
+function weightedTermsForQuery(text: string): WeightedTerm[] {
+  const terms = new Map<string, number>();
+  const normalized = normalizeSearchText(text);
+  for (const token of normalized.split(/\s+/)) {
+    if (!token || STOPWORDS.has(token) || token.length < 3) continue;
+    addWeightedTerm(terms, token, 1);
+    for (const expansion of TERM_EXPANSIONS) {
+      if (expansion.roots.some((root) => token.includes(root))) {
+        for (const expanded of expansion.terms) addWeightedTerm(terms, expanded, expansion.weight);
+      }
+    }
+  }
+  return [...terms.entries()].map(([term, weight]) => ({ term, weight }));
+}
+
+function lexicalIdeaRows(): LexicalIdeaRow[] {
+  return getDb()
+    .prepare(
+      `SELECT i.global_id,
+              i.type,
+              i.label,
+              i.statement,
+              occ.developments,
+              ev.evidence,
+              occ.titles,
+              occ.authors,
+              occ.years,
+              COALESCE(occ.work_count, 0) AS work_count
+         FROM ideas i
+         LEFT JOIN (
+           SELECT o.global_id,
+                  group_concat(o.development, ' ') AS developments,
+                  group_concat(w.title, ' ') AS titles,
+                  group_concat(w.authors_json, ' ') AS authors,
+                  group_concat(CAST(w.year AS TEXT), ' ') AS years,
+                  COUNT(DISTINCT o.nodus_id) AS work_count
+             FROM idea_occurrences o
+             LEFT JOIN works w ON w.nodus_id = o.nodus_id AND w.archived = 0
+            GROUP BY o.global_id
+         ) occ ON occ.global_id = i.global_id
+         LEFT JOIN (
+           SELECT global_id, group_concat(quote, ' ') AS evidence
+             FROM evidence
+            GROUP BY global_id
+         ) ev ON ev.global_id = i.global_id`
+    )
+    .all() as LexicalIdeaRow[];
+}
+
+function fieldHitScore(field: string, term: WeightedTerm, weight: number): number {
+  if (!field || !field.includes(term.term)) return 0;
+  return term.weight * weight;
+}
+
+function lexicalIdeaScore(row: LexicalIdeaRow, terms: WeightedTerm[], normalizedQuery: string): number {
+  if (terms.length === 0) return 0;
+  const label = normalizeSearchText(row.label);
+  const statement = normalizeSearchText(row.statement);
+  const developments = normalizeSearchText(row.developments);
+  const evidence = normalizeSearchText(row.evidence);
+  const titles = normalizeSearchText(row.titles);
+  const authors = normalizeSearchText(row.authors);
+  const combined = [label, statement, developments, evidence, titles, authors].join(' ');
+  let raw = 0;
+  let matchedWeight = 0;
+  let totalWeight = 0;
+
+  for (const term of terms) {
+    totalWeight += term.weight;
+    const score =
+      fieldHitScore(label, term, 5.2) +
+      fieldHitScore(statement, term, 4.2) +
+      fieldHitScore(developments, term, 2.8) +
+      fieldHitScore(evidence, term, 2.2) +
+      fieldHitScore(titles, term, 1.4) +
+      fieldHitScore(authors, term, 1.1);
+    if (score > 0) {
+      raw += score;
+      matchedWeight += term.weight;
+    }
+  }
+
+  if (normalizedQuery.includes('pobrez') && /(hambre|miseria|pobrez|precar|carencia|privacion)/.test(combined)) raw += 4.5;
+  if (normalizedQuery.includes('fotograf') && /(fotograf|album|imagen|visual|iconograf)/.test(combined)) raw += 4;
+  if (/(elud|omit|omis|invisibil|ocult|ignora)/.test(normalizedQuery) && /(omit|omis|invisibil|ocult|ignora|silenci|censur|exclusion)/.test(combined)) raw += 5;
+  if (/(viajer|extranj)/.test(normalizedQuery) && /(viajer|turist|extranj|visitante)/.test(combined)) raw += 2;
+  if (/(texto|relato)/.test(normalizedQuery) && /(texto|relato|narrativ|literatur|discurso)/.test(combined)) raw += 1.5;
+  if (row.work_count > 1) raw += Math.min(2, Math.log2(row.work_count + 1) * 0.45);
+
+  const coverage = matchedWeight / Math.max(totalWeight, 1);
+  const density = Math.min(1, raw / Math.max(Math.sqrt(totalWeight) * 12, 1));
+  return raw < 4 ? 0 : clamp01(0.18 + density * 0.58 + coverage * 0.26);
 }
 
 /** "Surname, Year" from a Zotero-style "Surname, Given" author plus a year. */
@@ -157,25 +405,119 @@ export interface CopilotInsertionResult {
   authorYear: string | null;
 }
 
-function gatherLiveCandidates(vector: number[]): Candidate[] {
-  const byKey = new Map<string, Candidate>();
+function statementForCandidate(candidate: Candidate): string | null {
+  try {
+    if (candidate.kind === 'idea') return getIdeaSummary(candidate.id)?.statement ?? null;
+    if (candidate.kind === 'passage') return clip(getPassageDetail(candidate.id)?.text ?? candidate.text, 700);
+  } catch {
+    /* best effort */
+  }
+  return null;
+}
 
-  for (const hit of findSimilarIdeas(vector, LIVE_IDEA_MIN_SIMILARITY, LIVE_IDEA_LIMIT)) {
-    const key = `idea:${hit.global_id}`;
+function upsertCandidate(byKey: Map<string, RankedCandidate>, candidate: Candidate, rankScore: number, source: CandidateSource): void {
+  const key = `${candidate.kind}:${candidate.id}`;
+  const safeRank = clamp01(rankScore);
+  const current = byKey.get(key);
+  if (!current) {
     byKey.set(key, {
+      ...candidate,
+      similarity: clamp01(candidate.similarity),
+      rankScore: safeRank,
+      source,
+      targetStatement: statementForCandidate(candidate),
+    });
+    return;
+  }
+  current.similarity = Math.max(current.similarity, clamp01(candidate.similarity));
+  if (safeRank >= current.rankScore) {
+    current.rankScore = safeRank;
+    current.source = source;
+    current.text = candidate.text || current.text;
+    current.targetStatement = statementForCandidate(candidate) ?? current.targetStatement;
+  }
+}
+
+function lexicalIdeaCandidates(text: string): RankedCandidate[] {
+  const terms = weightedTermsForQuery(text);
+  if (terms.length === 0) return [];
+  const normalizedQuery = normalizeSearchText(text);
+  const candidates: RankedCandidate[] = [];
+  for (const row of lexicalIdeaRows()) {
+    const rankScore = lexicalIdeaScore(row, terms, normalizedQuery);
+    if (rankScore <= 0) continue;
+    candidates.push({
       kind: 'idea',
-      id: hit.global_id,
-      similarity: hit.similarity,
-      text: `${hit.label}: ${hit.statement}`,
+      id: row.global_id,
+      similarity: rankScore,
+      rankScore,
+      source: 'lexical',
+      targetStatement: row.statement,
+      text: `${row.label}: ${row.statement}`,
     });
   }
+  return candidates
+    .sort((a, b) => b.rankScore - a.rankScore)
+    .slice(0, LIVE_LEXICAL_IDEA_LIMIT);
+}
 
-  for (const candidate of gatherCandidates(vector)) {
-    const key = `${candidate.kind}:${candidate.id}`;
-    if (!byKey.has(key)) byKey.set(key, candidate);
+function addGraphNeighbors(byKey: Map<string, RankedCandidate>): void {
+  const seeds = [...byKey.values()]
+    .filter((candidate) => candidate.kind === 'idea')
+    .sort((a, b) => b.rankScore - a.rankScore)
+    .slice(0, LIVE_GRAPH_SEED_LIMIT);
+  for (const seed of seeds) {
+    for (const edge of getIdeaEdges(seed.id)) {
+      const otherId = edge.edge.from_id === seed.id ? edge.edge.to_id : edge.edge.from_id;
+      if (!otherId || otherId === seed.id) continue;
+      const other = getIdeaSummary(otherId);
+      if (!other) continue;
+      const inheritedScore = seed.rankScore * 0.62 + edge.edge.confidence * 0.12;
+      const edgeScore = clamp01(Math.min(seed.rankScore * 0.88, inheritedScore));
+      upsertCandidate(
+        byKey,
+        {
+          kind: 'idea',
+          id: other.global_id,
+          similarity: Math.max(0.01, seed.similarity * 0.82),
+          text: `${other.label}: ${other.statement}`,
+        },
+        edgeScore,
+        'graph'
+      );
+    }
+  }
+}
+
+function gatherLiveCandidates(text: string, vector: number[]): RankedCandidate[] {
+  const byKey = new Map<string, RankedCandidate>();
+
+  for (const hit of findSimilarIdeas(vector, LIVE_IDEA_MIN_SIMILARITY, LIVE_SEMANTIC_IDEA_LIMIT)) {
+    upsertCandidate(
+      byKey,
+      {
+        kind: 'idea',
+        id: hit.global_id,
+        similarity: hit.similarity,
+        text: `${hit.label}: ${hit.statement}`,
+      },
+      clamp01(0.18 + hit.similarity * 0.78),
+      'semantic'
+    );
   }
 
-  return [...byKey.values()].sort((a, b) => b.similarity - a.similarity).slice(0, LIVE_IDEA_LIMIT);
+  for (const candidate of lexicalIdeaCandidates(text)) upsertCandidate(byKey, candidate, candidate.rankScore, candidate.source);
+
+  addGraphNeighbors(byKey);
+
+  for (const candidate of gatherCandidates(vector)) {
+    const isIdea = candidate.kind === 'idea';
+    upsertCandidate(byKey, candidate, clamp01(candidate.similarity * (isIdea ? 0.9 : 0.72)), isIdea ? 'semantic' : 'support');
+  }
+
+  return [...byKey.values()]
+    .sort((a, b) => b.rankScore - a.rankScore || b.similarity - a.similarity)
+    .slice(0, LIVE_RESULT_LIMIT);
 }
 
 function detailForSearchResult(globalId: string, similarity: number | null = null): CopilotIdeaSearchResult | null {
@@ -428,7 +770,7 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
   const vector = await embed(trimmed);
   if (!vector) return { available: false, relations: [] };
 
-  const candidates = gatherLiveCandidates(vector);
+  const candidates = gatherLiveCandidates(trimmed, vector);
   if (candidates.length === 0) return { available: true, relations: [] };
 
   // One LLM pass to type the paragraph↔candidate relations (degrades to 'related'
@@ -443,6 +785,8 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
     const hit = typed.get(`${PSEUDO_ID}|${candidate.kind}:${candidate.id}`);
     const target = resolveTarget(candidate.kind, candidate.id);
     const meta = citationMeta(candidate.kind, candidate.id);
+    const typedConfidence = hit ? clamp01(hit.confidence) : candidate.rankScore;
+    const rankScore = clamp01(candidate.rankScore * 0.86 + typedConfidence * 0.14);
     return {
       relation: normalizeRelationType(hit?.relation),
       targetKind: candidate.kind,
@@ -450,7 +794,10 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
       targetLabel: target.label,
       targetSubtitle: target.subtitle,
       similarity: candidate.similarity,
-      confidence: hit ? clamp01(hit.confidence) : candidate.similarity,
+      confidence: rankScore,
+      rankScore,
+      targetStatement: candidate.targetStatement,
+      source: candidate.source,
       rationale: clip(hit?.rationale ?? '', 300),
       zoteroKey: meta.zoteroKey,
       authorYear: meta.authorYear,
@@ -458,7 +805,7 @@ export async function analyzeText(text: string, model?: ModelRef | null): Promis
       citation: `nodus://${candidate.kind}/${candidate.id}`,
       proposedText: null,
     };
-  });
+  }).sort((a, b) => b.rankScore - a.rankScore || b.similarity - a.similarity);
 
   return { available: true, relations };
 }

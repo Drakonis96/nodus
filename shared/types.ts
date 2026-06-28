@@ -380,6 +380,12 @@ export interface LiveRelation {
   targetSubtitle: string | null;
   similarity: number;
   confidence: number;
+  /** Final affinity score used for ordering and display in the Word copilot. */
+  rankScore: number;
+  /** Statement/text of the target, so idea cards never render empty. */
+  targetStatement: string | null;
+  /** Retrieval route that surfaced the target. */
+  source: 'semantic' | 'lexical' | 'graph' | 'support';
   rationale: string;
   /** Zotero item key of the underlying work, when resolvable. */
   zoteroKey: string | null;
