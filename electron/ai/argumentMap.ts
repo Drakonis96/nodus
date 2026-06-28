@@ -2,6 +2,7 @@ import { v4 as uuid } from 'uuid';
 import type { ArgumentBlock, ArgumentMap, ArgumentMapRequest, ArgumentRouteSuggestion, EdgeType, IdeaType, ModelRef } from '@shared/types';
 import { getDb } from '../db/database';
 import { getIdeaSummary } from '../db/ideasRepo';
+import { getSettings } from '../db/settingsRepo';
 import { completeJson } from './aiClient';
 
 // The argument map is built from the LOCAL subgraph around the seed idea (BFS
@@ -26,6 +27,21 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
   measures_same: 'mide lo mismo',
   supports: 'apoya',
   refutes: 'refuta',
+};
+
+// English counterpart for the structural (auto-mode) overview/summary, which are
+// shown verbatim in the UI; picked by the interface language.
+const EDGE_TYPE_LABELS_EN: Record<string, string> = {
+  extends: 'extends',
+  variant_of: 'variant of',
+  refines: 'refines',
+  contradicts: 'contradicts',
+  applies_to: 'applies to',
+  shares_method: 'shares method',
+  precondition_of: 'precondition of',
+  measures_same: 'measures the same',
+  supports: 'supports',
+  refutes: 'refutes',
 };
 
 const VALID_RELATIONS = new Set<string>([
@@ -437,6 +453,9 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
     (adj.get(e.to_id) ?? adj.set(e.to_id, []).get(e.to_id)!).push({ other: e.from_id, edge: e });
   }
 
+  const lang: 'es' | 'en' = getSettings().uiLanguage === 'en' ? 'en' : 'es';
+  const relLabelOf = (rel: string): string =>
+    (lang === 'en' ? EDGE_TYPE_LABELS_EN[rel] : EDGE_TYPE_LABELS[rel]) ?? rel;
   const seedDegree = adj.get(seed.global_id)?.length ?? 0;
   const seedDebate =
     (adj.get(seed.global_id) ?? []).filter((n) => n.edge.type === 'contradicts' || n.edge.type === 'refutes').length;
@@ -464,10 +483,17 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
     const childCount = children.length;
     let summary: string;
     if (relation === 'root') {
-      summary = `${seedDegree} conexiones${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`;
+      summary =
+        lang === 'en'
+          ? `${seedDegree} connection(s)${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`
+          : `${seedDegree} conexiones${seedDebate ? ` · ${seedDebate} debate(s)` : ''}`;
     } else {
-      const relLabel = EDGE_TYPE_LABELS[relation] ?? relation;
-      summary = childCount > 0 ? `${relLabel} · ${childCount} derivación(es)` : `${relLabel} · conf ${parentEdge!.confidence.toFixed(2)}`;
+      const relLabel = relLabelOf(relation);
+      const branches =
+        childCount > 0
+          ? `${relLabel} · ${childCount} ${lang === 'en' ? 'derivation(s)' : 'derivación(es)'}`
+          : `${relLabel} · conf ${parentEdge!.confidence.toFixed(2)}`;
+      summary = branches;
     }
 
     return {
@@ -485,10 +511,16 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
   const root = buildNode(seed.global_id, null, new Set([seed.global_id]), 0);
   const overview =
     seedDegree === 0
-      ? 'La idea seleccionada no tiene conexiones directas con otras ideas.'
-      : `Recorrido automático: la idea central articula ${seedDegree} conexiones${
-          seedDebate ? `, de las cuales ${seedDebate} son debates (contradicciones/refutaciones)` : ''
-        }. Despliega las ramas para explorar la argumentación.`;
+      ? lang === 'en'
+        ? 'The selected idea has no direct connections to other ideas.'
+        : 'La idea seleccionada no tiene conexiones directas con otras ideas.'
+      : lang === 'en'
+        ? `Automatic walkthrough: the central idea links ${seedDegree} connection(s)${
+            seedDebate ? `, of which ${seedDebate} are debates (contradictions/refutations)` : ''
+          }. Expand the branches to explore the argument.`
+        : `Recorrido automático: la idea central articula ${seedDegree} conexiones${
+            seedDebate ? `, de las cuales ${seedDebate} son debates (contradicciones/refutaciones)` : ''
+          }. Despliega las ramas para explorar la argumentación.`;
 
   return {
     seedIdeaId: seed.global_id,

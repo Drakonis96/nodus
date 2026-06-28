@@ -15,6 +15,24 @@ export const EN: Record<string, string> = {
   Escritura: 'Writing',
   Debates: 'Debates',
   Ajustes: 'Settings',
+  Buscar: 'Search',
+  Proyectos: 'Projects',
+
+  // ── Demo mode ──────────────────────────────────────────────────────────────────
+  'Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.':
+    'Demo mode: you are viewing a sample corpus. Leave demo mode to start with your own library.',
+  'Salir del modo demo': 'Leave demo mode',
+  'Saliendo…': 'Leaving…',
+
+  // ── Leftover labels (gaps · library · writing · notes) ──────────────────────
+  'Buscar fuentes': 'Find sources',
+  'Buscar fuentes para el hueco': 'Find sources for the gap',
+  'resúmenes hechos': 'summaries done',
+  'Sin origen de proyecto': 'No project source',
+  'Orden manual': 'Manual order',
+  'Alfabético (A–Z)': 'Alphabetical (A–Z)',
+  'Creación: recientes primero': 'Created: newest first',
+  'Creación: antiguas primero': 'Created: oldest first',
 
   // ── Debate view (contradiction face-offs) ──────────────────────────────────
   '{n} sin reconciliar': '{n} unreconciled',
