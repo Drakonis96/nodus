@@ -1286,6 +1286,22 @@ export const EN: Record<string, string> = {
   // ── Projects ───────────────────────────────────────────────────────────────
   'No se encontraron nuevas sugerencias verificables para este capítulo.':
     'No new verifiable suggestions were found for this chapter.',
+  // Chapter relations (chapter ideas ↔ library)
+  Relaciones: 'Relations',
+  'Analizar relaciones': 'Analyze relations',
+  '{n} ideas del capítulo': '{n} chapter ideas',
+  'Extrae las ideas de este capítulo (no se añaden al grafo) y busca cómo se relacionan con tu biblioteca: ideas, notas, pasajes y obras.':
+    'Extract this chapter’s ideas (they are not added to the graph) and find how they relate to your library: ideas, notes, passages and works.',
+  'Analiza las relaciones para ver cómo conecta este capítulo con toda tu biblioteca.':
+    'Analyze relations to see how this chapter connects to your whole library.',
+  'Sin relaciones encontradas en la biblioteca.': 'No relations found in the library.',
+  'La búsqueda de relaciones necesita un proveedor de embeddings configurado en Ajustes.':
+    'Finding relations needs an embeddings provider configured in Settings.',
+  'No se pudieron extraer ideas de este capítulo.': 'No ideas could be extracted from this chapter.',
+  'Analizadas {n} idea(s) del capítulo y sus relaciones con la biblioteca.':
+    'Analyzed {n} chapter idea(s) and their relations with the library.',
+  matiza: 'refines',
+  'amplía': 'extends',
   'Eliminar proyecto': 'Delete project',
   'Proyecto eliminado.': 'Project deleted.',
   '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':

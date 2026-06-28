@@ -39,6 +39,7 @@ import type {
   CitationRef,
   SemanticSearchOptions,
   SaveSearchInput,
+  AnalyzeChapterRelationsRequest,
   CreateProjectInput,
   ExportProjectChapterRequest,
   ExportProjectRequest,
@@ -81,6 +82,7 @@ import { globalSearch } from './db/searchRepo';
 import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
+import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
 import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -631,6 +633,10 @@ export function registerIpc(
   );
   h('projects:versions:list', async (_e, chapterId: string) => projects.listChapterVersions(chapterId));
   h('projects:versions:restore', async (_e, versionId: string) => projects.restoreChapterVersion(versionId));
+  h('projects:chapterRelations:get', async (_e, chapterId: string) => getChapterRelations(chapterId));
+  h('projects:chapterRelations:analyze', async (_e, request: AnalyzeChapterRelationsRequest) =>
+    analyzeChapterRelations(request)
+  );
   h('projects:export', async (_e, request: ExportProjectRequest) => exportProject(request));
   h('projects:chapters:export', async (_e, request: ExportProjectChapterRequest) =>
     exportProjectChapter(request)
@@ -698,6 +704,10 @@ export function registerIpc(
 
   onPassageProgress((p) => {
     getWindow()?.webContents.send('passages:progress', p);
+  });
+
+  onChapterRelationsProgress((p) => {
+    getWindow()?.webContents.send('projects:chapterRelations:progress', p);
   });
 
   // Stream semantic bridge progress to the renderer.

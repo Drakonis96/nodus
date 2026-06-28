@@ -1482,6 +1482,75 @@ export interface ProjectChapterVersion {
   createdAt: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Chapter ideas: ideas distilled from the uploaded chapter text, kept separate
+// from the curated graph, and their typed relations with the library.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ChapterIdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
+/** How a chapter idea relates to a library entity. */
+export type ChapterRelationType = 'supports' | 'contradicts' | 'refines' | 'extends' | 'related';
+/** Which library entity a chapter idea relates to. */
+export type ChapterRelationTargetKind = 'idea' | 'note' | 'passage' | 'work';
+
+export interface ProjectChapterIdea {
+  id: string;
+  chapterId: string;
+  projectId: string;
+  type: ChapterIdeaType;
+  label: string;
+  statement: string;
+  orderIdx: number;
+  createdAt: string;
+}
+
+/** A typed relation from a chapter idea to a library entity, with display metadata. */
+export interface ChapterIdeaRelation {
+  id: string;
+  chapterIdeaId: string;
+  targetKind: ChapterRelationTargetKind;
+  targetId: string;
+  relation: ChapterRelationType;
+  similarity: number;
+  confidence: number;
+  rationale: string;
+  /** Human-readable title of the target (idea label, note title, work title…). */
+  targetLabel: string;
+  /** Short context for the target (author·year, snippet…). */
+  targetSubtitle: string | null;
+}
+
+/** A chapter idea bundled with its discovered relations, for the relations view. */
+export interface ChapterIdeaWithRelations {
+  idea: ProjectChapterIdea;
+  relations: ChapterIdeaRelation[];
+}
+
+export interface ChapterRelationsResult {
+  chapterId: string;
+  /** True once ideas have been extracted at least once for the current text. */
+  analyzed: boolean;
+  /** False when no embedding provider/key is configured. */
+  available: boolean;
+  ideas: ChapterIdeaWithRelations[];
+}
+
+/** Progress event while analysing a chapter's ideas and relations. */
+export interface ChapterRelationsProgress {
+  chapterId: string;
+  phase: 'extracting' | 'embedding' | 'relating' | 'done' | 'error';
+  current: number;
+  total: number;
+  message: string | null;
+}
+
+export interface AnalyzeChapterRelationsRequest {
+  chapterId: string;
+  model?: ModelRef | null;
+  /** Re-extract and recompute even if cached for the current text hash. */
+  force?: boolean;
+}
+
 export interface ProjectDetail {
   project: Project;
   sections: ProjectSection[];
@@ -2037,6 +2106,11 @@ export interface NodusApi {
   applyProjectSuggestions(request: ApplyProjectSuggestionsRequest): Promise<ProjectChapter | null>;
   listProjectChapterVersions(chapterId: string): Promise<ProjectChapterVersion[]>;
   restoreProjectChapterVersion(versionId: string): Promise<ProjectChapter | null>;
+  /** Cached chapter ideas + their typed relations with the library (no AI call). */
+  getChapterRelations(chapterId: string): Promise<ChapterRelationsResult>;
+  /** Extract chapter ideas, embed them and discover typed relations with the library. */
+  analyzeChapterRelations(request: AnalyzeChapterRelationsRequest): Promise<ChapterRelationsResult>;
+  onChapterRelationsProgress(cb: (p: ChapterRelationsProgress) => void): () => void;
   exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 

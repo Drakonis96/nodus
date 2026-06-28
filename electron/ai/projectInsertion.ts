@@ -18,6 +18,7 @@ import {
 import { verifyCitations } from '../citations/verifyCitations';
 import * as projects from '../db/projectsRepo';
 import { getIdeaDetail, getEdgeDetail, getIdeaEdges, findSimilarIdeas } from '../db/ideasRepo';
+import { relatedLibraryIdeaIds } from '../db/projectChapterIdeasRepo';
 import { getGapDetail } from '../db/gapsRepo';
 import { getNote, getNotesTree } from '../db/notesRepo';
 import { getWork } from '../db/worksRepo';
@@ -89,13 +90,21 @@ export async function generateProjectSuggestions(
   const allChunks = projects.listChapterChunks(chapter.id);
   if (allChunks.length === 0) return [];
 
-  // Materials = the user's explicitly linked materials first, then ideas
-  // retrieved semantically from the whole corpus so a long chapter is not limited
-  // to a handful of pinned sources.
+  // Materials, in priority order:
+  //  1. The user's explicitly linked materials.
+  //  2. Library ideas the chapter's OWN ideas relate to — typed, symmetric
+  //     idea↔idea matches from the chapter-relations analysis (Phase 2), if run.
+  //  3. Ideas retrieved by matching raw chapter chunks against the corpus, as a
+  //     fallback so a chapter that was never analysed still gets breadth.
   const linkedMaterials = gatherMaterials(detail.links, request.sectionId ?? chapter.sectionId);
   const linkedRefIds = new Set(linkedMaterials.map((m) => m.refId));
-  const semanticMaterials = await retrieveCorpusIdeas(allChunks, linkedRefIds);
-  const materials = dedupeMaterials([...linkedMaterials, ...semanticMaterials]).slice(0, MATERIAL_LIMIT);
+  const relatedMaterials = materialsFromIdeaIds(relatedLibraryIdeaIds(chapter.id), linkedRefIds);
+  const seededRefIds = new Set([...linkedRefIds, ...relatedMaterials.map((m) => m.refId)]);
+  const semanticMaterials = await retrieveCorpusIdeas(allChunks, seededRefIds);
+  const materials = dedupeMaterials([...linkedMaterials, ...relatedMaterials, ...semanticMaterials]).slice(
+    0,
+    MATERIAL_LIMIT
+  );
   if (materials.length === 0) return [];
 
   const selectedChunks = selectRelevantChunks(chapter.wordCount, allChunks, materials);
@@ -242,6 +251,13 @@ async function retrieveCorpusIdeas(
     .sort((a, b) => b[1] - a[1])
     .slice(0, SEMANTIC_IDEA_LIMIT)
     .flatMap(([globalId]) => materialFromIdea(globalId, '', 'context'));
+}
+
+/** Build idea materials from a list of library idea ids, skipping excluded refs. */
+function materialsFromIdeaIds(ideaIds: string[], excludeRefIds: Set<string>): SourceMaterial[] {
+  return ideaIds
+    .filter((id) => !excludeRefIds.has(id))
+    .flatMap((id) => materialFromIdea(id, '', 'context'));
 }
 
 /** Pick up to `count` items spread evenly across the array (always includes the first). */

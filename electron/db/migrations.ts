@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 export const migrations: Migration[] = [
   {
@@ -677,6 +677,59 @@ export const migrations: Migration[] = [
       );
 
       CREATE INDEX idx_saved_searches_created ON saved_searches(created_at DESC);
+    `,
+  },
+  {
+    version: 21,
+    up: /* sql */ `
+      -- Ideas distilled from an uploaded chapter. Deliberately separate from the
+      -- curated 'ideas' table and the graph: these are ephemeral working units of
+      -- the manuscript, re-extracted when the chapter text changes (source_hash).
+      CREATE TABLE project_chapter_ideas (
+        id                  TEXT PRIMARY KEY,
+        chapter_id          TEXT NOT NULL,
+        project_id          TEXT NOT NULL,
+        type                TEXT NOT NULL DEFAULT 'claim',
+        label               TEXT NOT NULL,
+        statement           TEXT NOT NULL,
+        order_idx           INTEGER NOT NULL DEFAULT 0,
+        source_hash         TEXT NOT NULL,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        created_at          TEXT NOT NULL,
+        FOREIGN KEY (chapter_id) REFERENCES project_chapters(id) ON DELETE CASCADE,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_chapter_ideas_chapter ON project_chapter_ideas(chapter_id, order_idx);
+
+      -- Typed relations between a chapter idea and a library entity (idea/note/
+      -- passage/work). Discovered by cosine shortlist + optional LLM typing.
+      CREATE TABLE project_chapter_idea_relations (
+        id              TEXT PRIMARY KEY,
+        chapter_idea_id TEXT NOT NULL,
+        chapter_id      TEXT NOT NULL,
+        target_kind     TEXT NOT NULL,
+        target_id       TEXT NOT NULL,
+        relation        TEXT NOT NULL DEFAULT 'related',
+        similarity      REAL NOT NULL DEFAULT 0,
+        confidence      REAL NOT NULL DEFAULT 0,
+        rationale       TEXT NOT NULL DEFAULT '',
+        created_at      TEXT NOT NULL,
+        FOREIGN KEY (chapter_idea_id) REFERENCES project_chapter_ideas(id) ON DELETE CASCADE,
+        FOREIGN KEY (chapter_id) REFERENCES project_chapters(id) ON DELETE CASCADE
+      );
+      CREATE INDEX idx_chapter_idea_relations_chapter ON project_chapter_idea_relations(chapter_id, chapter_idea_id);
+
+      -- Notes get embeddings too, so chapter ideas can find relations with the
+      -- user's own notes (not just corpus ideas/passages/work summaries).
+      ALTER TABLE notes ADD COLUMN embedding BLOB;
+      ALTER TABLE notes ADD COLUMN embedding_provider TEXT;
+      ALTER TABLE notes ADD COLUMN embedding_model TEXT;
+      ALTER TABLE notes ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE notes ADD COLUMN embedding_text_hash TEXT;
     `,
   },
 ];

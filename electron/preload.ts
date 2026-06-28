@@ -7,6 +7,7 @@ import type {
   EmbeddingPipelineProgress,
   PassageEmbeddingProgress,
   SemanticBridgeProgress,
+  ChapterRelationsProgress,
 } from '@shared/types';
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
@@ -251,6 +252,13 @@ const api: NodusApi = {
   applyProjectSuggestions: (request) => ipcRenderer.invoke('projects:suggestions:apply', request),
   listProjectChapterVersions: (chapterId) => ipcRenderer.invoke('projects:versions:list', chapterId),
   restoreProjectChapterVersion: (versionId) => ipcRenderer.invoke('projects:versions:restore', versionId),
+  getChapterRelations: (chapterId) => ipcRenderer.invoke('projects:chapterRelations:get', chapterId),
+  analyzeChapterRelations: (request) => ipcRenderer.invoke('projects:chapterRelations:analyze', request),
+  onChapterRelationsProgress: (cb) => {
+    const listener = (_e: unknown, p: ChapterRelationsProgress) => cb(p);
+    ipcRenderer.on('projects:chapterRelations:progress', listener);
+    return () => ipcRenderer.removeListener('projects:chapterRelations:progress', listener);
+  },
   exportProject: (request) => ipcRenderer.invoke('projects:export', request),
   exportProjectChapter: (request) => ipcRenderer.invoke('projects:chapters:export', request),
 

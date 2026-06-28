@@ -2,6 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type {
   AppSettings,
   ChapterExportFormat,
+  ChapterRelationsProgress,
+  ChapterRelationsResult,
+  ChapterIdeaRelation,
+  ChapterRelationType,
   ChapterSuggestionMode,
   ChapterSuggestionStatus,
   Project,
@@ -18,7 +22,7 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { notifyDataChanged, useDataRefresh } from '../hooks';
 import { t, tx } from '../i18n';
 
-type ChapterTab = 'texto' | 'sugerencias' | 'versiones' | 'exportar';
+type ChapterTab = 'texto' | 'relaciones' | 'sugerencias' | 'versiones' | 'exportar';
 
 const PROJECT_KIND_OPTIONS: { value: ProjectKind; label: string }[] = [
   { value: 'thesis', label: 'Tesis' },
@@ -37,6 +41,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [chapterMarkdown, setChapterMarkdown] = useState('');
   const [suggestions, setSuggestions] = useState<ProjectInsertionSuggestion[]>([]);
   const [versions, setVersions] = useState<ProjectChapterVersion[]>([]);
+  const [relations, setRelations] = useState<ChapterRelationsResult | null>(null);
+  const [relationsProgress, setRelationsProgress] = useState<ChapterRelationsProgress | null>(null);
   const [tab, setTab] = useState<ChapterTab>('texto');
   const [mode, setMode] = useState<ChapterSuggestionMode>('suggest');
   const [chapterExportFormat, setChapterExportFormat] = useState<ChapterExportFormat>('markdown');
@@ -84,16 +90,25 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       setChapterMarkdown('');
       setSuggestions([]);
       setVersions([]);
+      setRelations(null);
       return;
     }
     setChapterMarkdown(chapter.currentMarkdown);
-    const [nextSuggestions, nextVersions] = await Promise.all([
+    const [nextSuggestions, nextVersions, nextRelations] = await Promise.all([
       window.nodus.listProjectChapterSuggestions(chapter.id),
       window.nodus.listProjectChapterVersions(chapter.id),
+      window.nodus.getChapterRelations(chapter.id),
     ]);
     setSuggestions(nextSuggestions);
     setVersions(nextVersions);
+    setRelations(nextRelations);
   }, []);
+
+  useEffect(() => {
+    return window.nodus.onChapterRelationsProgress((p) => {
+      if (selectedChapterId && p.chapterId === selectedChapterId) setRelationsProgress(p);
+    });
+  }, [selectedChapterId]);
 
   useEffect(() => {
     void loadProjects();
@@ -216,6 +231,30 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       );
     } finally {
       setBusy(null);
+    }
+  };
+
+  const analyzeRelations = async (force: boolean) => {
+    if (!detail || !selectedChapter) return;
+    setBusy('relations');
+    setRelationsProgress(null);
+    try {
+      const result = await window.nodus.analyzeChapterRelations({
+        chapterId: selectedChapter.id,
+        model: detail.project.model ?? settings.defaultModel,
+        force,
+      });
+      setRelations(result);
+      setMessage(
+        !result.available
+          ? t('La búsqueda de relaciones necesita un proveedor de embeddings configurado en Ajustes.')
+          : result.ideas.length === 0
+            ? t('No se pudieron extraer ideas de este capítulo.')
+            : tx('Analizadas {n} idea(s) del capítulo y sus relaciones con la biblioteca.', { n: result.ideas.length })
+      );
+    } finally {
+      setBusy(null);
+      setRelationsProgress(null);
     }
   };
 
@@ -428,7 +467,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                         <div className="font-semibold truncate">{selectedChapter.title}</div>
                         <div className="text-xs text-neutral-500">{selectedChapter.wordCount} {t('palabras')} · {selectedChapter.originalFileName ?? selectedChapter.sourceFormat}</div>
                       </div>
-                      {(['texto', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
+                      {(['texto', 'relaciones', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
                         <button
                           key={item}
                           className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
@@ -456,6 +495,40 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                         </div>
                         <div className="min-h-0 overflow-y-auto p-5">
                           <Markdown content={chapterMarkdown} onCitation={(c: MarkdownCitation) => setCitation(c)} />
+                        </div>
+                      </div>
+                    )}
+
+                    {tab === 'relaciones' && (
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <button className="btn btn-primary gap-1.5" onClick={() => void analyzeRelations(true)} disabled={busy === 'relations'}>
+                            <Icon name={busy === 'relations' ? 'sync' : 'network'} className={busy === 'relations' ? 'animate-spin' : ''} /> {t('Analizar relaciones')}
+                          </button>
+                          {busy === 'relations' && relationsProgress && (
+                            <span className="text-xs text-neutral-400">
+                              {relationsProgress.message}
+                              {relationsProgress.total > 0 ? ` (${relationsProgress.current}/${relationsProgress.total})` : ''}
+                            </span>
+                          )}
+                          {relations && relations.analyzed && busy !== 'relations' && (
+                            <span className="text-xs text-neutral-500">
+                              {tx('{n} ideas del capítulo', { n: relations.ideas.length })}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-neutral-500 mb-4 max-w-3xl">
+                          {t('Extrae las ideas de este capítulo (no se añaden al grafo) y busca cómo se relacionan con tu biblioteca: ideas, notas, pasajes y obras.')}
+                        </p>
+                        <div className="space-y-3">
+                          {(relations?.ideas ?? []).map(({ idea, relations: rels }) => (
+                            <ChapterIdeaCard key={idea.id} idea={idea} relations={rels} onOpen={(c) => setCitation(c)} />
+                          ))}
+                          {(!relations || !relations.analyzed) && busy !== 'relations' && (
+                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
+                              {t('Analiza las relaciones para ver cómo conecta este capítulo con toda tu biblioteca.')}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -598,6 +671,74 @@ function SuggestionCard({
   );
 }
 
+const RELATION_META: Record<ChapterRelationType, { label: string; color: string }> = {
+  supports: { label: 'apoya', color: 'text-emerald-300 border-emerald-700/60 bg-emerald-900/20' },
+  contradicts: { label: 'contradice', color: 'text-red-300 border-red-700/60 bg-red-900/20' },
+  refines: { label: 'matiza', color: 'text-amber-300 border-amber-700/60 bg-amber-900/20' },
+  extends: { label: 'amplía', color: 'text-cyan-300 border-cyan-700/60 bg-cyan-900/20' },
+  related: { label: 'relacionada', color: 'text-neutral-300 border-neutral-700 bg-neutral-800/40' },
+};
+
+const RELATION_TARGET_ICON: Record<ChapterIdeaRelation['targetKind'], string> = {
+  idea: 'bulb',
+  note: 'notebook',
+  passage: 'quote',
+  work: 'book',
+};
+
+function ChapterIdeaCard({
+  idea,
+  relations,
+  onOpen,
+}: {
+  idea: { type: string; label: string; statement: string };
+  relations: ChapterIdeaRelation[];
+  onOpen: (citation: CitationTarget) => void;
+}) {
+  const openTarget = (relation: ChapterIdeaRelation) => {
+    if (relation.targetKind === 'note') return; // no citation viewer for notes
+    onOpen({ kind: relation.targetKind, id: relation.targetId });
+  };
+  return (
+    <div className="border border-neutral-800 rounded-lg p-4">
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wide rounded border border-indigo-700/60 bg-indigo-900/20 text-indigo-300 px-1.5 py-0.5">
+          {idea.type}
+        </span>
+        <div className="font-semibold text-sm">{idea.label}</div>
+      </div>
+      <p className="text-sm text-neutral-400 mt-1">{idea.statement}</p>
+      <div className="mt-3 space-y-1.5">
+        {relations.length === 0 && (
+          <div className="text-xs text-neutral-600">{t('Sin relaciones encontradas en la biblioteca.')}</div>
+        )}
+        {relations.map((relation) => {
+          const meta = RELATION_META[relation.relation];
+          const clickable = relation.targetKind !== 'note';
+          return (
+            <div
+              key={relation.id}
+              className={`flex items-start gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5 ${clickable ? 'cursor-pointer hover:border-neutral-700' : ''}`}
+              onClick={() => clickable && openTarget(relation)}
+            >
+              <span className={`shrink-0 mt-0.5 text-[10px] rounded border px-1.5 py-0.5 ${meta.color}`}>{t(meta.label)}</span>
+              <Icon name={RELATION_TARGET_ICON[relation.targetKind]} size={13} className="mt-1 shrink-0 text-neutral-500" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-sm text-neutral-100">{relation.targetLabel}</span>
+                  {relation.targetSubtitle && <span className="shrink-0 truncate text-xs text-neutral-500">{relation.targetSubtitle}</span>}
+                  <span className="ml-auto shrink-0 text-[10px] tabular-nums text-neutral-600">{Math.round((relation.confidence || relation.similarity) * 100)}%</span>
+                </div>
+                {relation.rationale && <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{relation.rationale}</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function kindLabel(kind: ProjectKind): string {
   return PROJECT_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
 }
@@ -606,6 +747,8 @@ function tabLabel(tab: ChapterTab): string {
   switch (tab) {
     case 'texto':
       return t('Texto');
+    case 'relaciones':
+      return t('Relaciones');
     case 'sugerencias':
       return t('Sugerencias');
     case 'versiones':

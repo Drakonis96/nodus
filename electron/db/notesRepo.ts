@@ -10,6 +10,7 @@ import type {
   UpdateNoteInput,
 } from '@shared/types';
 import { getDb } from './database';
+import { currentEmbeddingConfig, encodeEmbedding, embeddingTextHash } from './ideasRepo';
 
 interface NoteFolderRow {
   id: string;
@@ -255,4 +256,80 @@ export function reorderNotes(ids: string[]): void {
     ids.forEach((id, index) => stmt.run(index, id));
   });
   tx();
+}
+
+// ── Note embeddings: let chapter-idea relation discovery reach the user's notes ──
+
+/** The text we embed for a note: its title plus a clipped body. */
+export function noteEmbeddingText(note: { title: string; content: string }): string {
+  return `${note.title}\n${note.content}`.replace(/\s+/g, ' ').trim().slice(0, 8000);
+}
+
+/** Notes that lack a current-model embedding for their current text — i.e. need (re)embedding. */
+export function notesNeedingEmbedding(): { id: string; title: string; content: string }[] {
+  const config = currentEmbeddingConfig();
+  const rows = getDb()
+    .prepare(
+      `SELECT id, title, content, embedding, embedding_provider, embedding_model, embedding_text_hash
+         FROM notes
+        WHERE content <> '' OR title <> ''`
+    )
+    .all() as {
+    id: string;
+    title: string;
+    content: string;
+    embedding: Buffer | null;
+    embedding_provider: string | null;
+    embedding_model: string | null;
+    embedding_text_hash: string | null;
+  }[];
+  return rows
+    .filter((row) => {
+      const hash = embeddingTextHash(noteEmbeddingText(row));
+      return (
+        !row.embedding ||
+        row.embedding_provider !== config.provider ||
+        row.embedding_model !== config.model ||
+        row.embedding_text_hash !== hash
+      );
+    })
+    .map((row) => ({ id: row.id, title: row.title, content: row.content }));
+}
+
+export function updateNoteEmbedding(id: string, text: string, embedding: number[]): void {
+  const config = currentEmbeddingConfig();
+  getDb()
+    .prepare(
+      `UPDATE notes
+          SET embedding = ?, embedding_provider = ?, embedding_model = ?, embedding_dim = ?, embedding_text_hash = ?
+        WHERE id = ?`
+    )
+    .run(encodeEmbedding(embedding), config.provider, config.model, embedding.length, embeddingTextHash(text), id);
+}
+
+export interface SimilarNote {
+  id: string;
+  title: string;
+  content: string;
+  similarity: number;
+}
+
+/** Notes ranked by cosine similarity to the query vector (current-model embeddings only). */
+export function findSimilarNotes(queryEmbedding: number[], threshold: number, limit: number): SimilarNote[] {
+  if (limit <= 0) return [];
+  const config = currentEmbeddingConfig();
+  return getDb()
+    .prepare(
+      `SELECT * FROM (
+         SELECT id, title, content, vec_cosine(embedding, ?) AS similarity
+           FROM notes
+          WHERE embedding IS NOT NULL
+            AND embedding_provider = ?
+            AND embedding_model = ?
+            AND embedding_dim = ?
+       ) WHERE similarity >= ?
+       ORDER BY similarity DESC
+       LIMIT ?`
+    )
+    .all(encodeEmbedding(queryEmbedding), config.provider, config.model, queryEmbedding.length, threshold, limit) as SimilarNote[];
 }
