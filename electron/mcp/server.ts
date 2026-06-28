@@ -104,6 +104,7 @@ function makeMcpServer(): McpServer {
       'Use list tools before get tools. IDs returned by list tools are stable identifiers for the corresponding detail and writing tools.',
       'User-created folders, notes, coverage questions and saved writing drafts can be written through the dedicated tools. Writing and coverage tools may consume the AI provider already configured in Nodus.',
       'For writing, build a snapshot first, choose an explicit selection, then generate a draft with save=true if it should appear in Nodus.',
+      'To situate a draft passage in the corpus, nodus_analyze_passage returns its typed relations (supports/contradicts/refines/…) with citable Zotero items; nodus_get_copilot_idea expands one idea with its citation, and nodus_compose_insertion drafts a cited sentence to insert.',
       'All data remains on this machine. Do not claim a relation, evidence or source that is not returned by a Nodus tool.',
     ].join('\n'),
   });

@@ -18,6 +18,7 @@ import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../ai/writingWorkshop';
+import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail } from '../ai/liveRelations';
 
 const IDEA_TYPES = ['claim', 'finding', 'construct', 'method', 'framework'] as const;
 const EDGE_TYPES = [
@@ -297,6 +298,58 @@ export function registerTools(server: McpServer): void {
           );
         }
         return { ideas: ideas.findSimilarIdeas(vector, -1, limit) };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_analyze_passage',
+    {
+      title: 'Analyze a passage against the library',
+      description:
+        'Writing-copilot engine: takes an arbitrary passage (e.g. a paragraph being drafted) and returns how it relates to the whole corpus. For each candidate idea, work or passage it gives a typed relation (supports, contradicts, refines, extends, applies_to, …), a similarity and confidence, a short rationale, and — when the target resolves to a work — the Zotero item to cite (zoteroKey, an author-year label and a Zotero quick-search string). This is the symmetric, ad-hoc counterpart of the per-chapter analysis used by the Nodus writing copilot. Read-only over the derived graph: it does not create ideas or edges. Requires an embedding provider configured in Nodus and uses one AI pass to type the relations, so it may consume provider tokens. Returns { available: false } when no embedding provider is configured.',
+      inputSchema: {
+        text: z.string().trim().min(1).max(8_000),
+        model: modelSchema.optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ text, model }) => tool(() => analyzeText(text, asModel(model)))()
+  );
+
+  server.registerTool(
+    'nodus_get_copilot_idea',
+    {
+      title: 'Get idea with citation and connections',
+      description:
+        'Returns one derived idea shaped for writing: its statement, every occurrence, its evidence and its graph connections, plus the citation metadata needed to cite it — the Zotero item key, an author-year label and a Zotero quick-search string, both for the idea and for each occurrence. Complements nodus_get_idea (raw relations) with the ready-to-cite Zotero bridge used by the writing copilot. Pair it with nodus_analyze_passage, which returns the candidate ideas. Read-only.',
+      inputSchema: { ideaId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ ideaId }) =>
+      tool(() => {
+        const detail = getCopilotIdeaDetail(ideaId);
+        if (!detail) throw notFound('una idea', ideaId);
+        return detail;
+      })()
+  );
+
+  server.registerTool(
+    'nodus_compose_insertion',
+    {
+      title: 'Compose a cited insertion for a paragraph',
+      description:
+        'Uses Nodus AI to write one short, academic sentence that integrates a chosen library idea into the user’s paragraph, with the parenthetical (Author, Year) citation already in place and grounded only in that idea’s statement, evidence and connections. Returns the insertable plain text plus its nodus:// citation and the author-year label. Use the ideaId of a relation returned by nodus_analyze_passage. The model is taken from Nodus Settings; this consumes provider tokens.',
+      inputSchema: {
+        ideaId: z.string().trim().min(1),
+        paragraphText: z.string().trim().min(1).max(8_000),
+        selectionText: z.string().trim().max(4_000).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ ideaId, paragraphText, selectionText }) =>
+      tool(() => {
+        if (!getCopilotIdeaDetail(ideaId)) throw notFound('una idea', ideaId);
+        return composeCopilotIdeaInsertion({ ideaId, paragraphText, selectionText });
       })()
   );
 
