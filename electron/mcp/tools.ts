@@ -1,18 +1,30 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type {
+  LightStatus,
+  DeepStatus,
   ModelRef,
   NoteSource,
+  ProjectChapter,
+  ProjectKind,
+  ProjectStatus,
+  SummaryStatus,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
   WritingWorkshopSelection,
+  WorkFilter,
 } from '@shared/types';
 import { getDb } from '../db/database';
 import * as ideas from '../db/ideasRepo';
-import { getWork, getWorkByZoteroKey, getWorkByAliasKey } from '../db/worksRepo';
+import { getWork, getWorkByZoteroKey, getWorkByAliasKey, listWorks } from '../db/worksRepo';
 import * as gaps from '../db/gapsRepo';
 import * as notes from '../db/notesRepo';
+import * as passages from '../db/passagesRepo';
+import * as projects from '../db/projectsRepo';
 import * as researchQuestions from '../db/researchMapRepo';
+import * as themes from '../db/themesRepo';
+import * as tutorRoutes from '../db/tutorRepo';
+import * as workSummaries from '../db/workSummariesRepo';
 import * as writingDrafts from '../db/writingDraftsRepo';
 import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
@@ -35,8 +47,14 @@ const EDGE_TYPES = [
   'contains',
 ] as const;
 const GAP_KINDS = ['future_work', 'limitation', 'open_question', 'unresolved_contradiction'] as const;
+const LIGHT_STATUSES = ['all', 'none', 'pending', 'done', 'failed'] as const;
+const DEEP_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
+const SUMMARY_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
 const AI_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'] as const;
 const NOTE_KINDS = ['markdown', 'assistant', 'writing', 'debate', 'idea'] as const;
+const PROJECT_KINDS = ['thesis', 'article', 'chapter', 'literature_review', 'theoretical_framework', 'other'] as const;
+const PROJECT_STATUSES = ['active', 'paused', 'done'] as const;
+const TUTOR_MODES = ['overview', 'prompt'] as const;
 const WRITING_KINDS = [
   'literature_review',
   'theoretical_framework',
@@ -113,6 +131,13 @@ const writingDraftSchema = z.object({
   }),
 });
 
+const paginationSchema = {
+  limit: z.number().int().min(1).max(200).default(100),
+  offset: z.number().int().min(0).default(0),
+};
+const compactLimitSchema = z.number().int().min(1).max(100).default(25);
+const querySchema = z.string().trim().min(1).max(1_000).optional();
+
 class McpToolError extends Error {
   constructor(
     readonly category: 'not_found' | 'invalid_input' | 'ai_unconfigured' | 'ai_transient' | 'internal',
@@ -166,8 +191,89 @@ function tool<T>(fn: () => T | Promise<T>) {
   };
 }
 
+function page<T, K extends string>(key: K, rows: T[], limit: number, offset: number): Record<K, T[]> & {
+  total: number;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+} {
+  const slice = rows.slice(offset, offset + limit);
+  return {
+    [key]: slice,
+    total: rows.length,
+    limit,
+    offset,
+    hasMore: offset + slice.length < rows.length,
+  } as Record<K, T[]> & { total: number; limit: number; offset: number; hasMore: boolean };
+}
+
+function matchesQuery(value: unknown, query?: string): boolean {
+  if (!query?.trim()) return true;
+  return (JSON.stringify(value) ?? '').toLowerCase().includes(query.trim().toLowerCase());
+}
+
+function snippet(text: string | null | undefined, max = 360): string {
+  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  return `${clean.slice(0, max - 1).trim()}…`;
+}
+
+function parseAuthorsJson(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes'): number {
   return (getDb().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
+}
+
+function workCounts(nodusId: string) {
+  const db = getDb();
+  const scalar = (sql: string) => (db.prepare(sql).get(nodusId) as { n: number }).n;
+  return {
+    ideas: scalar('SELECT COUNT(DISTINCT global_id) AS n FROM idea_occurrences WHERE nodus_id = ?'),
+    evidence: scalar('SELECT COUNT(*) AS n FROM evidence WHERE nodus_id = ?'),
+    gaps: scalar('SELECT COUNT(*) AS n FROM gaps WHERE nodus_id = ?'),
+    passages: scalar('SELECT COUNT(*) AS n FROM passages WHERE nodus_id = ?'),
+  };
+}
+
+function compactProjectChapter(chapter: ProjectChapter, includeText = false) {
+  if (includeText) return chapter;
+  const { originalText: _originalText, currentMarkdown: _currentMarkdown, ...rest } = chapter;
+  return {
+    ...rest,
+    currentMarkdownSnippet: snippet(chapter.currentMarkdown, 500),
+  };
+}
+
+function compactTutorRoute(route: NonNullable<ReturnType<typeof tutorRoutes.getTutorRoute>>) {
+  return {
+    id: route.id,
+    planId: route.planId,
+    generatedAt: route.generatedAt,
+    updatedAt: route.updatedAt,
+    lastPlayedAt: route.lastPlayedAt,
+    mode: route.mode,
+    prompt: route.prompt,
+    overview: route.overview,
+    totalThemes: route.totalThemes,
+    totalIdeas: route.totalIdeas,
+    totalConnections: route.totalConnections,
+    rating: route.rating,
+    model: route.model,
+    routeTitle: route.route.title,
+    stopCount: route.route.stops.length,
+  };
+}
+
+function resolveTheme(value: string) {
+  const needle = value.trim().toLowerCase();
+  return themes.listManagedThemes().find((theme) => theme.theme_id === value || theme.label.toLowerCase() === needle) ?? null;
 }
 
 function asModel(model?: z.infer<typeof modelSchema>): ModelRef | undefined {
@@ -227,16 +333,18 @@ export function registerTools(server: McpServer): void {
         limit: z.number().int().min(1).max(200).default(100),
         offset: z.number().int().min(0).default(0),
         type: z.enum(IDEA_TYPES).optional(),
+        query: querySchema,
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ limit, offset, type }) =>
+    ({ limit, offset, type, query }) =>
       tool(() => {
         const all = ideas
           .allIdeaCandidates()
           .filter((idea) => !type || idea.type === type)
+          .filter((idea) => matchesQuery(idea, query))
           .sort((a, b) => a.global_id.localeCompare(b.global_id));
-        return { ideas: all.slice(offset, offset + limit), total: all.length };
+        return page('ideas', all, limit, offset);
       })()
   );
 
@@ -358,10 +466,14 @@ export function registerTools(server: McpServer): void {
     {
       title: 'List debates',
       description: 'Lists contradiction/refutation debates, including their opposing ideas, works, evidence, timeline and relation. Read-only.',
-      inputSchema: { limit: z.number().int().min(1).max(200).default(100) },
+      inputSchema: { ...paginationSchema, query: querySchema },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ limit }) => tool(() => ({ debates: getDebates().slice(0, limit) }))()
+    ({ limit, offset, query }) =>
+      tool(() => {
+        const all = getDebates().filter((debate) => matchesQuery(debate, query));
+        return page('debates', all, limit, offset);
+      })()
   );
 
   server.registerTool(
@@ -385,10 +497,14 @@ export function registerTools(server: McpServer): void {
     {
       title: 'List research gaps',
       description: 'Lists normalized research-gap aggregates. Use one returned gapIds value with nodus_get_gap for a full record. Read-only.',
-      inputSchema: {},
+      inputSchema: { ...paginationSchema, query: querySchema, kind: z.enum(GAP_KINDS).optional() },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool(() => ({ gaps: gaps.aggregateGaps() }))
+    ({ limit, offset, query, kind }) =>
+      tool(() => {
+        const all = gaps.aggregateGaps().filter((gap) => (!kind || gap.kind === kind) && matchesQuery(gap, query));
+        return page('gaps', all, limit, offset);
+      })()
   );
 
   server.registerTool(
@@ -428,17 +544,376 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    'nodus_list_works',
+    {
+      title: 'List works',
+      description:
+        'Lists Zotero/library works with pagination and operational filters. Use nodus_get_work for per-work counts, summary and passage status. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        includeArchived: z.boolean().default(false),
+        lightStatus: z.enum(LIGHT_STATUSES).default('all'),
+        deepStatus: z.enum(DEEP_STATUSES).default('all'),
+        summaryStatus: z.enum(SUMMARY_STATUSES).default('all'),
+        statusFlags: z
+          .array(z.enum(['deep', 'summary', 'ideas', 'passages', '!deep', '!summary', '!ideas', '!passages']))
+          .max(8)
+          .optional(),
+        theme: z.string().trim().min(1).max(500).optional(),
+        zoteroTags: z.array(z.string().trim().min(1).max(500)).max(25).optional(),
+        zoteroTagMode: z.enum(['any', 'all']).default('any'),
+        collections: z.array(z.string().trim().min(1).max(500)).max(50).optional(),
+        collectionMode: z.enum(['any', 'all']).default('any'),
+        yearMin: z.number().int().min(0).max(3000).optional(),
+        yearMax: z.number().int().min(0).max(3000).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({
+      limit,
+      offset,
+      query,
+      includeArchived,
+      lightStatus,
+      deepStatus,
+      summaryStatus,
+      statusFlags,
+      theme,
+      zoteroTags,
+      zoteroTagMode,
+      collections,
+      collectionMode,
+      yearMin,
+      yearMax,
+    }) =>
+      tool(() => {
+        const filter: WorkFilter = {
+          search: query,
+          includeArchived,
+          lightStatus: lightStatus as LightStatus | 'all',
+          deepStatus: deepStatus as DeepStatus | 'all',
+          summaryStatus: summaryStatus as SummaryStatus | 'all',
+          statusFlags,
+          theme,
+          zoteroTags,
+          zoteroTagMode,
+          collections,
+          collectionMode,
+          yearMin,
+          yearMax,
+        };
+        return page('works', listWorks(filter), limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_work',
+    {
+      title: 'Get work',
+      description:
+        'Gets one work by nodus_id, Zotero key or merged alias key, including themes/tags, orientation summary, passage status and derived entity counts. Read-only.',
+      inputSchema: { workId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ workId }) =>
+      tool(() => {
+        const nodusId = resolveWorkNodusId(workId);
+        if (!nodusId) throw notFound('una obra', workId);
+        const work = getWork(nodusId);
+        if (!work) throw notFound('una obra', workId);
+        return {
+          work,
+          summary: workSummaries.getWorkSummary(nodusId),
+          counts: workCounts(nodusId),
+          passageStatus: passages.workPassageStatuses([nodusId])[0] ?? null,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_work_passages',
+    {
+      title: 'List full-text passages',
+      description:
+        'Lists full-text passage chunks, optionally scoped to one work. Returns snippets only; use nodus_get_passage for full text. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        workId: z.string().trim().min(1).optional(),
+        query: querySchema,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, workId, query }) =>
+      tool(() => {
+        const nodusId = workId ? resolveWorkNodusId(workId) : null;
+        if (workId && !nodusId) throw notFound('una obra', workId);
+        const params: unknown[] = [];
+        const clauses: string[] = ['w.archived = 0'];
+        if (nodusId) {
+          clauses.push('p.nodus_id = ?');
+          params.push(nodusId);
+        }
+        if (query?.trim()) {
+          clauses.push('(LOWER(p.text) LIKE ? OR LOWER(w.title) LIKE ?)');
+          const q = `%${query.trim().toLowerCase()}%`;
+          params.push(q, q);
+        }
+        const rows = getDb()
+          .prepare(
+            `SELECT p.passage_id, p.nodus_id, p.chunk_index, p.page_label, p.char_len, p.text,
+                    w.title, w.authors_json, w.year, w.zotero_key
+               FROM passages p
+               JOIN works w ON w.nodus_id = p.nodus_id
+              WHERE ${clauses.join(' AND ')}
+              ORDER BY w.year DESC, w.title COLLATE NOCASE ASC, p.chunk_index ASC`
+          )
+          .all(...params) as {
+          passage_id: string;
+          nodus_id: string;
+          chunk_index: number;
+          page_label: string | null;
+          char_len: number;
+          text: string;
+          title: string;
+          authors_json: string;
+          year: number | null;
+          zotero_key: string;
+        }[];
+        const out = rows.map((row) => ({
+          passage_id: row.passage_id,
+          nodus_id: row.nodus_id,
+          chunk_index: row.chunk_index,
+          page_label: row.page_label,
+          char_len: row.char_len,
+          textSnippet: snippet(row.text),
+          work: {
+            title: row.title,
+            authors: parseAuthorsJson(row.authors_json),
+            year: row.year,
+            zotero_key: row.zotero_key,
+          },
+        }));
+        return page('passages', out, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_passage',
+    {
+      title: 'Get full-text passage',
+      description: 'Gets one full-text passage chunk by passage_id, including source-work citation metadata. Read-only.',
+      inputSchema: { passageId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ passageId }) =>
+      tool(() => {
+        const detail = passages.getPassageDetail(passageId);
+        if (!detail) throw notFound('un pasaje', passageId);
+        return detail;
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_themes',
+    {
+      title: 'List themes',
+      description: 'Lists graph/library themes with work and idea counts, pagination and filters. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        pinned: z.boolean().optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, pinned }) =>
+      tool(() => {
+        const all = themes
+          .listManagedThemes()
+          .filter((theme) => pinned === undefined || theme.pinned === pinned)
+          .filter((theme) => matchesQuery(theme, query));
+        return page('themes', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_theme',
+    {
+      title: 'Get theme',
+      description:
+        'Gets a theme by theme_id or exact label, with paged works and ideas connected to that theme. Read-only.',
+      inputSchema: {
+        theme: z.string().trim().min(1),
+        worksLimit: compactLimitSchema,
+        worksOffset: z.number().int().min(0).default(0),
+        ideasLimit: compactLimitSchema,
+        ideasOffset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ theme, worksLimit, worksOffset, ideasLimit, ideasOffset }) =>
+      tool(() => {
+        const resolved = resolveTheme(theme);
+        if (!resolved) throw notFound('un tema', theme);
+        const linkedWorks = listWorks({ theme: resolved.label });
+        const ideaRows = getDb()
+          .prepare(
+            `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
+               FROM idea_theme_links itl
+               JOIN ideas i ON i.global_id = itl.global_id
+              WHERE itl.theme_id = ?
+              ORDER BY i.label COLLATE NOCASE ASC`
+          )
+          .all(resolved.theme_id);
+        return {
+          theme: resolved,
+          works: page('items', linkedWorks, worksLimit, worksOffset),
+          ideas: page('items', ideaRows, ideasLimit, ideasOffset),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_tutor_routes',
+    {
+      title: 'List saved tutor routes',
+      description: 'Lists saved Tutor routes with pagination. The full route is omitted; use nodus_get_tutor_route for stops. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        mode: z.enum(TUTOR_MODES).optional(),
+        minRating: z.number().int().min(1).max(5).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, mode, minRating }) =>
+      tool(() => {
+        const all = tutorRoutes
+          .listTutorRoutes()
+          .filter((route) => !mode || route.mode === mode)
+          .filter((route) => minRating === undefined || (route.rating ?? 0) >= minRating)
+          .filter((route) => matchesQuery(route, query))
+          .map(compactTutorRoute);
+        return page('routes', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_tutor_route',
+    {
+      title: 'Get saved tutor route',
+      description: 'Gets a complete saved Tutor route, including route stops and graph context. Read-only.',
+      inputSchema: { routeId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ routeId }) =>
+      tool(() => {
+        const route = tutorRoutes.getTutorRoute(routeId);
+        if (!route) throw notFound('una ruta de Tutor', routeId);
+        return route;
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_projects',
+    {
+      title: 'List projects',
+      description: 'Lists research-writing projects/manuscripts with pagination and filters. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        kind: z.enum(PROJECT_KINDS).optional(),
+        status: z.enum(PROJECT_STATUSES).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, kind, status }) =>
+      tool(() => {
+        const all = projects
+          .listProjects()
+          .filter((project) => !kind || project.kind === (kind as ProjectKind))
+          .filter((project) => !status || project.status === (status as ProjectStatus))
+          .filter((project) => matchesQuery(project, query));
+        return page('projects', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_project',
+    {
+      title: 'Get project',
+      description:
+        'Gets one research-writing project with sections, links, chapter metadata and stats. Chapter bodies are summarized unless includeChapterText=true. Read-only.',
+      inputSchema: { projectId: z.string().trim().min(1), includeChapterText: z.boolean().default(false) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ projectId, includeChapterText }) =>
+      tool(() => {
+        const detail = projects.getProjectDetail(projectId);
+        if (!detail) throw notFound('un proyecto', projectId);
+        return {
+          ...detail,
+          chapters: detail.chapters.map((chapter) => compactProjectChapter(chapter, includeChapterText)),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_notes',
+    {
+      title: 'Search notes',
+      description:
+        'Searches user-created notes with pagination and snippets. Use nodus_get_note for full Markdown content. Read-only.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        kind: z.enum(NOTE_KINDS).optional(),
+        folderId: z.string().trim().min(1).nullable().optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, kind, folderId }) =>
+      tool(() => {
+        const tree = notes.getNotesTree();
+        const folderById = new Map(tree.folders.map((folder) => [folder.id, folder]));
+        const all = tree.notes
+          .filter((note) => !kind || note.kind === kind)
+          .filter((note) => folderId === undefined || note.folderId === folderId)
+          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .map((note) => ({
+            id: note.id,
+            folderId: note.folderId,
+            folderName: note.folderId ? folderById.get(note.folderId)?.name ?? null : null,
+            title: note.title,
+            kind: note.kind,
+            source: note.source,
+            orderIdx: note.orderIdx,
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+            contentSnippet: snippet(note.content, 400),
+          }));
+        return page('notes', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
     'nodus_list_notes_tree',
     {
       title: 'List notes tree',
       description: 'Returns the user-created notes and folders. Each folder carries its summary brief (the ideas it is meant to hold). This list omits note content; use nodus_get_note for a full note.',
-      inputSchema: {},
+      inputSchema: { ...paginationSchema, query: querySchema, kind: z.enum(NOTE_KINDS).optional(), folderId: z.string().trim().min(1).nullable().optional() },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool(() => {
-      const tree = notes.getNotesTree();
-      return { folders: tree.folders, notes: tree.notes.map(({ content: _content, ...note }) => note) };
-    })
+    ({ limit, offset, query, kind, folderId }) =>
+      tool(() => {
+        const tree = notes.getNotesTree();
+        const filteredNotes = tree.notes
+          .filter((note) => !kind || note.kind === kind)
+          .filter((note) => folderId === undefined || note.folderId === folderId)
+          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .map(({ content: _content, ...note }) => ({ ...note, contentSnippet: snippet(_content, 220) }));
+        return { folders: tree.folders, ...page('notes', filteredNotes, limit, offset) };
+      })()
   );
 
   server.registerTool(
