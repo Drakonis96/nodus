@@ -15,7 +15,10 @@ import type {
   ProjectExportFormat,
   ProjectInsertionSuggestion,
   ProjectKind,
+  ProjectSectionRole,
+  ProjectSectionStatus,
 } from '@shared/types';
+import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type ProjectGuideStepStatus } from '@shared/projectGuide';
 import { Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -50,6 +53,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [newTitle, setNewTitle] = useState('');
   const [newBrief, setNewBrief] = useState('');
   const [newKind, setNewKind] = useState<ProjectKind>('thesis');
+  const [briefEditing, setBriefEditing] = useState(false);
+  const [briefDraft, setBriefDraft] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
@@ -63,6 +68,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     () => detail?.sections.find((section) => section.role === 'manuscript') ?? detail?.sections[0] ?? null,
     [detail]
   );
+
+  const guide = useMemo(() => (detail ? buildProjectGuide(detail) : null), [detail]);
 
   const loadProjects = useCallback(async () => {
     const list = await window.nodus.listProjects();
@@ -123,11 +130,21 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     void loadChapterArtifacts(selectedChapter);
   }, [selectedChapter, loadChapterArtifacts]);
 
+  useEffect(() => {
+    setBriefDraft(detail?.project.brief ?? '');
+    setBriefEditing(false);
+  }, [detail?.project.id]);
+
   const refreshActiveProject = useCallback(async () => {
     await loadProjects();
     await loadDetail(activeId);
     if (selectedChapter) await loadChapterArtifacts(selectedChapter);
   }, [activeId, loadChapterArtifacts, loadDetail, loadProjects, selectedChapter]);
+
+  const sectionByRole = useCallback(
+    (role: ProjectSectionRole) => detail?.sections.find((section) => section.role === role) ?? null,
+    [detail]
+  );
 
   const createProject = async () => {
     if (!newTitle.trim()) return;
@@ -167,6 +184,56 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       setMessage(t('Proyecto eliminado.'));
       notifyDataChanged();
       await loadProjects();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveProjectBrief = async () => {
+    if (!detail) return;
+    setBusy('save-brief');
+    try {
+      await window.nodus.updateProject({ id: detail.project.id, brief: briefDraft.trim() });
+      setBriefEditing(false);
+      setMessage(t('Brief actualizado. El flujo guiado ya usa este objetivo.'));
+      notifyDataChanged();
+      await refreshActiveProject();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const updateSectionStatus = async (
+    role: ProjectSectionRole,
+    status: ProjectSectionStatus,
+    successMessage: string
+  ) => {
+    const section = sectionByRole(role);
+    if (!section) return;
+    setBusy(`section-${role}`);
+    try {
+      await window.nodus.updateProjectSection({ id: section.id, status });
+      setMessage(successMessage);
+      notifyDataChanged();
+      await refreshActiveProject();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const prepareOutline = async () => {
+    if (!detail) return;
+    const roles: ProjectSectionRole[] = ['debates', 'gaps', 'drafts'];
+    const sections = roles.flatMap((role) => {
+      const section = sectionByRole(role);
+      return section ? [section] : [];
+    });
+    setBusy('section-outline');
+    try {
+      await Promise.all(sections.map((section) => window.nodus.updateProjectSection({ id: section.id, status: 'in_progress' })));
+      setMessage(t('Estructura argumental preparada.'));
+      notifyDataChanged();
+      await refreshActiveProject();
     } finally {
       setBusy(null);
     }
@@ -316,6 +383,37 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     }
   };
 
+  const runGuideAction = (action: ProjectGuideAction) => {
+    if (action === 'edit_brief') {
+      setBriefEditing(true);
+      return;
+    }
+    if (action === 'mark_coverage') {
+      void updateSectionStatus('coverage', 'in_progress', t('Cobertura marcada como en curso.'));
+      return;
+    }
+    if (action === 'mark_materials') {
+      void updateSectionStatus('literature', 'in_progress', t('Materiales preparados para el estado de la cuestión.'));
+      return;
+    }
+    if (action === 'mark_outline') {
+      void prepareOutline();
+      return;
+    }
+    if (action === 'import_chapter') {
+      void importChapter();
+      return;
+    }
+    if (action === 'review_chapter') {
+      if (!selectedChapter) {
+        void importChapter();
+        return;
+      }
+      setTab('sugerencias');
+      void generateSuggestions();
+    }
+  };
+
   const verifiedSuggestionIds = suggestions
     .filter((suggestion) => (suggestion.status === 'suggested' || suggestion.status === 'accepted') && !suggestion.blockedReason)
     .map((suggestion) => suggestion.id);
@@ -409,6 +507,23 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                 <span className="flex-1">{message}</span>
                 <button className="text-neutral-500 hover:text-neutral-200" onClick={() => setMessage(null)}>x</button>
               </div>
+            )}
+
+            {guide && (
+              <ProjectGuidePanel
+                guide={guide}
+                busy={busy}
+                briefDraft={briefDraft}
+                briefEditing={briefEditing}
+                onBriefDraftChange={setBriefDraft}
+                onEditBrief={() => setBriefEditing(true)}
+                onCancelBrief={() => {
+                  setBriefDraft(detail.project.brief);
+                  setBriefEditing(false);
+                }}
+                onSaveBrief={() => void saveProjectBrief()}
+                onAction={(action) => runGuideAction(action)}
+              />
             )}
 
             <div className="grid grid-cols-[minmax(220px,300px)_1fr] gap-0 flex-1 min-h-0">
@@ -630,6 +745,99 @@ function Stat({ label, value }: { label: string; value: number }) {
   );
 }
 
+function ProjectGuidePanel({
+  guide,
+  busy,
+  briefDraft,
+  briefEditing,
+  onBriefDraftChange,
+  onEditBrief,
+  onCancelBrief,
+  onSaveBrief,
+  onAction,
+}: {
+  guide: ProjectGuide;
+  busy: string | null;
+  briefDraft: string;
+  briefEditing: boolean;
+  onBriefDraftChange: (value: string) => void;
+  onEditBrief: () => void;
+  onCancelBrief: () => void;
+  onSaveBrief: () => void;
+  onAction: (action: ProjectGuideAction) => void;
+}) {
+  const next = guide.nextStep;
+  const disabled = Boolean(busy);
+
+  return (
+    <section className="mx-5 mt-3 rounded-lg border border-neutral-800 bg-neutral-900/70 p-3">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Icon name="graduation" size={16} className="text-indigo-300" />
+            <h2 className="text-sm font-semibold">{t(guide.title)}</h2>
+            <span className="rounded-md border border-neutral-700 px-1.5 py-0.5 text-[11px] text-neutral-400">
+              {guide.doneCount}/{guide.totalCount}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">{next ? t(next.summary) : t(guide.subtitle)}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={onEditBrief} disabled={disabled}>
+            <Icon name="edit" size={13} /> {t('Editar brief')}
+          </button>
+          {next ? (
+            <button className="btn btn-primary text-xs gap-1.5" onClick={() => onAction(next.action)} disabled={disabled}>
+              <Icon name={busy ? 'sync' : actionIcon(next.action)} size={13} className={busy ? 'animate-spin' : ''} />
+              {t(next.actionLabel)}
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700/60 bg-emerald-900/20 px-2 py-1 text-xs text-emerald-300">
+              <Icon name="check" size={13} /> {t('Completado')}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-800">
+        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${guide.completion}%` }} />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-6">
+        {guide.steps.map((step) => (
+          <div key={step.id} className={`min-w-0 rounded-md border px-2.5 py-2 ${guideStepClass(step.status)}`}>
+            <div className="flex items-center gap-1.5">
+              <Icon name={guideStepIcon(step.status)} size={13} />
+              <span className="truncate text-xs font-medium">{t(step.title)}</span>
+            </div>
+            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">{step.evidence}</p>
+          </div>
+        ))}
+      </div>
+
+      {briefEditing && (
+        <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950 p-3">
+          <textarea
+            className="input min-h-20 w-full resize-y text-sm"
+            value={briefDraft}
+            onChange={(e) => onBriefDraftChange(e.target.value)}
+            placeholder={t('Objetivo, alcance, pregunta principal y criterio de selección')}
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={onCancelBrief} disabled={busy === 'save-brief'}>
+              {t('Cancelar')}
+            </button>
+            <button className="btn btn-primary text-xs gap-1.5" onClick={onSaveBrief} disabled={busy === 'save-brief'}>
+              <Icon name={busy === 'save-brief' ? 'sync' : 'check'} size={13} className={busy === 'save-brief' ? 'animate-spin' : ''} />
+              {t('Guardar brief')}
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SuggestionCard({
   suggestion,
   onCitation,
@@ -741,6 +949,35 @@ function ChapterIdeaCard({
 
 function kindLabel(kind: ProjectKind): string {
   return PROJECT_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
+}
+
+function actionIcon(action: ProjectGuideAction): string {
+  switch (action) {
+    case 'edit_brief':
+      return 'edit';
+    case 'mark_coverage':
+      return 'map';
+    case 'mark_materials':
+      return 'book';
+    case 'mark_outline':
+      return 'layers';
+    case 'import_chapter':
+      return 'upload';
+    case 'review_chapter':
+      return 'wand';
+  }
+}
+
+function guideStepIcon(status: ProjectGuideStepStatus): string {
+  if (status === 'done') return 'check';
+  if (status === 'current') return 'compass';
+  return 'lock';
+}
+
+function guideStepClass(status: ProjectGuideStepStatus): string {
+  if (status === 'done') return 'border-emerald-700/60 bg-emerald-900/20 text-emerald-200';
+  if (status === 'current') return 'border-indigo-600/70 bg-indigo-900/30 text-indigo-100';
+  return 'border-neutral-800 bg-neutral-950/70 text-neutral-500';
 }
 
 function tabLabel(tab: ChapterTab): string {

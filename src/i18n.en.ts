@@ -1314,6 +1314,42 @@ export const EN: Record<string, string> = {
   'No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).':
     'Text could not be extracted, but there is a recovery path (re-scan, OCR or fetch by DOI).',
   // ── Projects ───────────────────────────────────────────────────────────────
+  'Flujo guiado de tesis': 'Guided thesis flow',
+  'Flujo guiado de artículo': 'Guided article flow',
+  'Flujo guiado de manuscrito': 'Guided manuscript flow',
+  'Proyecto listo para revisar, exportar o cerrar.': 'Project ready to review, export, or close.',
+  'Brief y pregunta': 'Brief and question',
+  'Objetivo, alcance y criterio de lectura definidos.': 'Objective, scope, and reading criteria defined.',
+  'Pregunta y cobertura': 'Question and coverage',
+  'Pregunta principal conectada con la cobertura del corpus.': 'Main question connected to corpus coverage.',
+  'Corpus y materiales': 'Corpus and materials',
+  'Obras, ideas, notas, huecos o borradores listos para integrarse.':
+    'Works, ideas, notes, gaps, or drafts ready to integrate.',
+  'Estructura argumental': 'Argument structure',
+  'Debates, huecos y borradores organizados antes de intervenir el texto.':
+    'Debates, gaps, and drafts organized before editing the text.',
+  Manuscrito: 'Manuscript',
+  'Capítulo o artículo importado como texto editable y versionado.':
+    'Chapter or article imported as editable, versioned text.',
+  'Revisión y salida': 'Review and output',
+  'Relaciones, sugerencias verificables y exportación final.':
+    'Relations, verifiable suggestions, and final export.',
+  'Editar brief': 'Edit brief',
+  'Marcar cobertura': 'Mark coverage',
+  'Preparar materiales': 'Prepare materials',
+  'Preparar estructura': 'Prepare structure',
+  'Subir capítulo': 'Upload chapter',
+  'Revisar capítulo': 'Review chapter',
+  Completado: 'Complete',
+  'Objetivo, alcance, pregunta principal y criterio de selección':
+    'Objective, scope, main question, and selection criteria',
+  'Guardar brief': 'Save brief',
+  'Brief actualizado. El flujo guiado ya usa este objetivo.':
+    'Brief updated. The guided flow now uses this objective.',
+  'Cobertura marcada como en curso.': 'Coverage marked as in progress.',
+  'Materiales preparados para el estado de la cuestión.':
+    'Materials prepared for the literature review.',
+  'Estructura argumental preparada.': 'Argument structure prepared.',
   'No se encontraron nuevas sugerencias verificables para este capítulo.':
     'No new verifiable suggestions were found for this chapter.',
   // Chapter relations (chapter ideas ↔ library)
