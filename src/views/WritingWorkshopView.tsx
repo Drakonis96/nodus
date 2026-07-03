@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type React from 'react';
 import type {
   AppSettings,
+  DeepResearchMeta,
+  DeepResearchProgress,
+  DeepResearchTargetLength,
   Project,
   ProjectDetail,
   WritingWorkshopBrief,
@@ -33,6 +36,19 @@ const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
   gap_justification: 'Justificación de hueco',
   chapter_section: 'Apartado de capítulo',
   research_question: 'Pregunta / hipótesis',
+  deep_research: 'Deep Research',
+};
+
+/** Manual workshop kinds shown in the kind selector (deep_research is its own mode). */
+const WORKSHOP_KIND_ENTRIES = (Object.entries(KIND_LABELS) as [WritingWorkshopBrief['kind'], string][]).filter(
+  ([id]) => id !== 'deep_research'
+);
+
+const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
+  adaptive: 'Adaptativo (según corpus)',
+  concise: 'Conciso (5–8 pág.)',
+  standard: 'Estándar (9–14 pág.)',
+  exhaustive: 'Exhaustivo (15–20 pág.)',
 };
 
 const TONE_LABELS: Record<NonNullable<WritingWorkshopBrief['tone']>, string> = {
@@ -102,6 +118,13 @@ export function WritingWorkshopView({
   const [reusingDraftId, setReusingDraftId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Deep Research mode (orchestrated, coverage-guided multi-page report).
+  const [mode, setMode] = useState<'workshop' | 'deep'>('workshop');
+  const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
+  const [deepRunning, setDeepRunning] = useState(false);
+  const [deepProgress, setDeepProgress] = useState<DeepResearchProgress | null>(null);
+  const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
 
   const selectedCount = useMemo(() => countSelection(selection), [selection]);
   const tableCount = useMemo(() => (snapshot ? countSnapshot(snapshot) : 0), [snapshot]);
@@ -183,6 +206,44 @@ export function WritingWorkshopView({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const runDeepResearch = async () => {
+    if (!brief.objective.trim()) {
+      setError(t('Escribe la idea de investigación antes de generar el informe.'));
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    setDraft(null);
+    setDeepMeta(null);
+    setDeepProgress(null);
+    setDeepRunning(true);
+    try {
+      const report = await window.nodus.generateDeepResearchReport(
+        {
+          objective: brief.objective,
+          language: brief.language,
+          audience: brief.audience,
+          targetLength: deepTarget,
+          model: selectedModel,
+        },
+        { onProgress: (p) => setDeepProgress(p) }
+      );
+      setDraft(report.draft);
+      setDeepMeta(report.meta);
+      setMessage(
+        tx('Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.', {
+          s: report.meta.sections,
+          p: report.meta.pages,
+          i: report.meta.ideasCovered,
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeepRunning(false);
     }
   };
 
@@ -345,32 +406,68 @@ export function WritingWorkshopView({
       <header className="border-b border-neutral-800 p-4 flex flex-wrap items-end gap-3">
         <div className="min-w-[16rem]">
           <h1 className="text-xl font-semibold flex items-center gap-2">
-            <Icon name="edit" className="text-indigo-300" /> {t('Taller de escritura')}
+            <Icon name="edit" className="text-indigo-300" /> {mode === 'deep' ? t('Deep Research') : t('Taller de escritura')}
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">{t('Del grafo a un borrador con fuentes verificables.')}</p>
+          <p className="text-xs text-neutral-500 mt-1">
+            {mode === 'deep'
+              ? t('Informe académico de varias páginas, guiado por cobertura y con todas las fuentes citadas.')
+              : t('Del grafo a un borrador con fuentes verificables.')}
+          </p>
         </div>
-        <select
-          className="input"
-          value={brief.kind}
-          onChange={(e) => setBrief((current) => ({ ...current, kind: e.target.value as WritingWorkshopBrief['kind'] }))}
-        >
-          {Object.entries(KIND_LABELS).map(([id, label]) => (
-            <option key={id} value={id}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={brief.tone ?? 'academic'}
-          onChange={(e) => setBrief((current) => ({ ...current, tone: e.target.value as WritingWorkshopBrief['tone'] }))}
-        >
-          {Object.entries(TONE_LABELS).map(([id, label]) => (
-            <option key={id} value={id}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
+        <div className="flex rounded-lg border border-neutral-700 overflow-hidden text-sm">
+          <button
+            className={`px-3 py-1.5 ${mode === 'workshop' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+            onClick={() => setMode('workshop')}
+          >
+            {t('Taller')}
+          </button>
+          <button
+            className={`px-3 py-1.5 flex items-center gap-1 ${mode === 'deep' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+            onClick={() => setMode('deep')}
+          >
+            <Icon name="compass" size={14} /> {t('Deep Research')}
+          </button>
+        </div>
+        {mode === 'workshop' && (
+          <>
+            <select
+              className="input"
+              value={brief.kind}
+              onChange={(e) => setBrief((current) => ({ ...current, kind: e.target.value as WritingWorkshopBrief['kind'] }))}
+            >
+              {WORKSHOP_KIND_ENTRIES.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {t(label)}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input"
+              value={brief.tone ?? 'academic'}
+              onChange={(e) => setBrief((current) => ({ ...current, tone: e.target.value as WritingWorkshopBrief['tone'] }))}
+            >
+              {Object.entries(TONE_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {t(label)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+        {mode === 'deep' && (
+          <select
+            className="input"
+            value={deepTarget}
+            onChange={(e) => setDeepTarget(e.target.value as DeepResearchTargetLength)}
+            title={t('Extensión objetivo del informe')}
+          >
+            {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
+              <option key={id} value={id}>
+                {t(label)}
+              </option>
+            ))}
+          </select>
+        )}
         <select
           className="input"
           value={brief.language ?? 'es'}
@@ -386,19 +483,33 @@ export function WritingWorkshopView({
           <Icon name="help" />
           {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
-        <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={prepare} disabled={loadingMaterials}>
-          <Icon name={loadingMaterials ? 'sync' : 'search'} className={loadingMaterials ? 'animate-spin' : ''} />
-          {t('Preparar mesa')}
-        </button>
-        <button
-          className="btn btn-primary gap-1.5"
-          onClick={generate}
-          disabled={!hasModel || generating || selectedCount === 0}
-          title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
-        >
-          <Icon name={generating ? 'sync' : 'wand'} className={generating ? 'animate-spin' : ''} />
-          {t('Generar borrador')}
-        </button>
+        {mode === 'workshop' && (
+          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={prepare} disabled={loadingMaterials}>
+            <Icon name={loadingMaterials ? 'sync' : 'search'} className={loadingMaterials ? 'animate-spin' : ''} />
+            {t('Preparar mesa')}
+          </button>
+        )}
+        {mode === 'workshop' ? (
+          <button
+            className="btn btn-primary gap-1.5"
+            onClick={generate}
+            disabled={!hasModel || generating || selectedCount === 0}
+            title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
+          >
+            <Icon name={generating ? 'sync' : 'wand'} className={generating ? 'animate-spin' : ''} />
+            {t('Generar borrador')}
+          </button>
+        ) : (
+          <button
+            className="btn btn-primary gap-1.5"
+            onClick={runDeepResearch}
+            disabled={!hasModel || deepRunning || !brief.objective.trim()}
+            title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
+          >
+            <Icon name={deepRunning ? 'sync' : 'compass'} className={deepRunning ? 'animate-spin' : ''} />
+            {deepRunning ? t('Generando informe…') : t('Generar informe')}
+          </button>
+        )}
       </header>
 
       <div className="border-b border-neutral-800 p-3">
@@ -406,8 +517,22 @@ export function WritingWorkshopView({
           className="input w-full min-h-20 resize-y"
           value={brief.objective}
           onChange={(e) => setBrief((current) => ({ ...current, objective: e.target.value }))}
-          placeholder={t('Describe el apartado que quieres construir...')}
+          placeholder={
+            mode === 'deep'
+              ? t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
+              : t('Describe el apartado que quieres construir...')
+          }
         />
+        {mode === 'deep' && (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+            <Badge color="green">{t('Cobertura del corpus completo')}</Badge>
+            <Badge>{t(DEEP_TARGET_LABELS[deepTarget])}</Badge>
+            {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
+            <span className="text-neutral-600">{t('Sin selección manual: el informe elige y cita las fuentes por ti.')}</span>
+          </div>
+        )}
+        {mode === 'workshop' && (
+        <>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <select className="input text-xs" value={sourceScope} onChange={(e) => setSourceScope(e.target.value as ProjectSourceScope)}>
             <option value="none">{t('Sin origen de proyecto')}</option>
@@ -478,6 +603,8 @@ export function WritingWorkshopView({
           )}
           {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
         </div>
+        </>
+        )}
       </div>
 
       {showTutorial && <WritingWorkshopTutorial />}
@@ -490,6 +617,11 @@ export function WritingWorkshopView({
 
       <div className="flex-1 min-h-0 grid grid-cols-[22rem_minmax(0,1fr)_24rem] max-xl:grid-cols-1">
         <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
+          {mode === 'deep' && (
+            <DeepResearchPanel running={deepRunning} progress={deepProgress} meta={deepMeta} target={deepTarget} />
+          )}
+          {mode === 'workshop' && (
+          <>
           <div className="p-3 border-b border-neutral-800 grid grid-cols-3 gap-1 text-xs">
             <TabButton id="ideas" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Ideas'), selection.ideaIds.length, snapshot?.ideas.length)} />
             <TabButton id="themes" active={activeTab} setActive={setActiveTab} label={tabLabel(t('Temas'), selection.themeIds.length, snapshot?.themes.length)} />
@@ -565,13 +697,21 @@ export function WritingWorkshopView({
               />
             ))}
           </div>
+          </>
+          )}
         </aside>
 
         <main className="min-h-0 overflow-y-auto p-5">
           {!draft && (
             <div className="h-full flex items-center justify-center">
               <div className="max-w-md text-center text-neutral-500 text-sm">
-                {generating ? t('Generando borrador...') : t('El borrador aparecerá aquí cuando selecciones materiales y lo generes.')}
+                {mode === 'deep'
+                  ? deepRunning
+                    ? deepProgress?.message ?? t('Generando informe…')
+                    : t('El informe aparecerá aquí. Escribe tu idea de investigación y pulsa «Generar informe».')
+                  : generating
+                    ? t('Generando borrador...')
+                    : t('El borrador aparecerá aquí cuando selecciones materiales y lo generes.')}
               </div>
             </div>
           )}
@@ -968,6 +1108,101 @@ function Metric({ label, value }: { label: string; value: string | number }) {
     <div className="rounded-md border border-neutral-800 px-2 py-1.5">
       <div className="text-[11px] text-neutral-500">{label}</div>
       <div className="text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+const DEEP_PHASE_LABELS: Record<DeepResearchProgress['phase'], string> = {
+  snapshot: 'Reuniendo el corpus',
+  planning: 'Planificando secciones',
+  section: 'Redactando secciones',
+  coverage: 'Ampliando cobertura',
+  assembling: 'Ensamblando y referenciando',
+  done: 'Informe listo',
+};
+
+const DEEP_STEP_ORDER: DeepResearchProgress['phase'][] = ['snapshot', 'planning', 'section', 'coverage', 'assembling', 'done'];
+
+function DeepResearchPanel({
+  running,
+  progress,
+  meta,
+  target,
+}: {
+  running: boolean;
+  progress: DeepResearchProgress | null;
+  meta: DeepResearchMeta | null;
+  target: DeepResearchTargetLength;
+}) {
+  const currentPhaseIndex = progress ? DEEP_STEP_ORDER.indexOf(progress.phase) : -1;
+  return (
+    <div className="p-4 space-y-4 overflow-y-auto min-h-0">
+      <div>
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Icon name="compass" className="text-indigo-300" size={16} /> {t('Deep Research')}
+        </h2>
+        <p className="text-xs text-neutral-500 mt-1">
+          {t('Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.')}
+        </p>
+      </div>
+
+      <div className="text-xs text-neutral-500">
+        <span className="text-neutral-400">{t('Extensión:')}</span> {t(DEEP_TARGET_LABELS[target])}
+      </div>
+
+      {(running || progress) && (
+        <ol className="space-y-1.5">
+          {DEEP_STEP_ORDER.filter((p) => p !== 'done').map((phase) => {
+            const index = DEEP_STEP_ORDER.indexOf(phase);
+            const state = currentPhaseIndex > index ? 'done' : currentPhaseIndex === index ? 'active' : 'todo';
+            return (
+              <li key={phase} className="flex items-center gap-2 text-xs">
+                <Icon
+                  name={state === 'done' ? 'check' : state === 'active' ? 'sync' : 'minus'}
+                  size={13}
+                  className={state === 'done' ? 'text-green-400' : state === 'active' ? 'text-indigo-300 animate-spin' : 'text-neutral-600'}
+                />
+                <span className={state === 'todo' ? 'text-neutral-600' : 'text-neutral-300'}>{t(DEEP_PHASE_LABELS[phase])}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      {progress && (
+        <div className="rounded-md border border-neutral-800 p-2 text-xs text-neutral-400 space-y-1">
+          <div className="text-neutral-300">{progress.message}</div>
+          {progress.sectionIndex != null && progress.sectionTitle && (
+            <div className="text-neutral-500">
+              {tx('Sección {n}: {title}', { n: progress.sectionIndex, title: progress.sectionTitle })}
+            </div>
+          )}
+          {progress.wordsSoFar != null && (
+            <div className="text-neutral-600">
+              {tx('~{p} páginas · {w} palabras', { p: progress.pagesSoFar ?? 0, w: progress.wordsSoFar })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {meta && !running && (
+        <div className="grid grid-cols-2 gap-2">
+          <Metric label={t('Secciones')} value={meta.sections} />
+          <Metric label={t('Páginas')} value={`~${meta.pages}`} />
+          <Metric label={t('Ideas citadas')} value={`${meta.ideasCovered}/${meta.ideasConsidered}`} />
+          <Metric label={t('Obras citadas')} value={meta.worksCited} />
+        </div>
+      )}
+
+      {meta?.stoppedReason && !running && (
+        <div className="rounded-md border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-200">{meta.stoppedReason}</div>
+      )}
+
+      {!running && !progress && (
+        <div className="text-xs text-neutral-600">
+          {t('Consejo: cuanto más profundo sea el análisis del corpus, más completo será el informe.')}
+        </div>
+      )}
     </div>
   );
 }

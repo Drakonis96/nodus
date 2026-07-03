@@ -173,6 +173,19 @@ const api: NodusApi = {
   saveWritingWorkshopDraft: (request) => ipcRenderer.invoke('writing:saved:save', request),
   deleteWritingWorkshopDraft: (id) => ipcRenderer.invoke('writing:saved:delete', id).then(() => undefined),
 
+  generateDeepResearchReport: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onProgress = (_e: unknown, id: string, progress: import('@shared/types').DeepResearchProgress) => {
+      if (id === requestId) handlers?.onProgress?.(progress);
+    };
+    ipcRenderer.on('research:deep:progress', onProgress);
+    try {
+      return await ipcRenderer.invoke('research:deep', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('research:deep:progress', onProgress);
+    }
+  },
+
   tutorPlan: (request) => ipcRenderer.invoke('tutor:plan', request),
   listTutorRoutes: () => ipcRenderer.invoke('tutor:routes:list'),
   saveTutorRoute: (plan, route, model, rating) => ipcRenderer.invoke('tutor:routes:save', plan, route, model, rating),

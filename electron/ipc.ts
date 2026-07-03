@@ -26,6 +26,7 @@ import type {
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
   WritingWorkshopSaveDraftRequest,
+  DeepResearchRequest,
   DebateAnalysisRequest,
   RqDecomposeRequest,
   RqMapRequest,
@@ -94,6 +95,7 @@ import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
+import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, getEmbeddingSnapshot, onEmbeddingProgress, getWorkEmbeddingStatuses } from './ai/embeddingPipeline';
 import {
@@ -475,6 +477,11 @@ export function registerIpc(
   h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
   h('writing:saved:save', async (_e, request: WritingWorkshopSaveDraftRequest) => writingDrafts.saveWritingWorkshopDraft(request));
   h('writing:saved:delete', async (_e, id: string) => writingDrafts.deleteWritingWorkshopDraft(id));
+
+  // deep research (orchestrated, coverage-guided multi-page report)
+  h('research:deep', async (e, requestId: string, request: DeepResearchRequest) =>
+    generateDeepResearchReport(request, (p) => e.sender.send('research:deep:progress', requestId, p))
+  );
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

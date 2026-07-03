@@ -1,0 +1,280 @@
+// Tests for the Deep Research orchestration core. The pure control flow in
+// electron/ai/deepResearchCore.ts has no Electron/DB/AI deps (only erased type
+// imports), so we bundle just that file with esbuild and drive the REAL
+// orchestrator with injected fakes — no provider calls, no database, and
+// crucially NOT the running local app instance.
+//
+// It locks the guarantees that matter for a professional report:
+//   • the loop is bounded (budget cap + hard section cap → stoppedReason);
+//   • coverage top-up lifts a thin report to its minimum length;
+//   • hallucinated citations never survive into the report or its references;
+//   • every reference traces back to a really-cited corpus work;
+//   • the model failing on a section degrades gracefully instead of aborting.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-deep-research-test-'));
+
+try {
+  const outfile = path.join(tmp, 'deepResearchCore.mjs');
+  await build({
+    entryPoints: [path.join(repoRoot, 'electron/ai/deepResearchCore.ts')],
+    outfile,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    external: ['@shared/*'],
+    logLevel: 'silent',
+  });
+  const mod = await import(pathToFileURL(outfile).href);
+  const { orchestrateDeepResearch, applyCitationPolicy, buildSnapshotMaps, resolveTargetPages, countWords, WORDS_PER_PAGE } = mod;
+
+  // ── Fake corpus snapshot ────────────────────────────────────────────────────
+  const makeSnapshot = (ideaCount) => {
+    const ideas = Array.from({ length: ideaCount }, (_, i) => ({
+      id: `g-${i}`,
+      label: `Idea ${i}`,
+      summary: `Resumen de la idea ${i}`,
+      score: 1 - i / ideaCount,
+      reason: 'test',
+      type: 'claim',
+      statement: `Enunciado sustantivo número ${i} sobre el fenómeno estudiado.`,
+      themes: ['tema'],
+      workCount: 1,
+      evidenceCount: 2,
+      works: [
+        { nodus_id: `w-${i}`, title: `Obra ${i}`, authors: [`Autor${i}, N.`], year: 2000 + (i % 25), zotero_key: `zk-${i}` },
+      ],
+    }));
+    const works = ideas.map((idea) => ({
+      id: idea.works[0].nodus_id,
+      label: idea.works[0].title,
+      summary: 'sinopsis',
+      score: 0.5,
+      reason: 'test',
+      title: idea.works[0].title,
+      authors: idea.works[0].authors,
+      year: idea.works[0].year,
+      zotero_key: idea.works[0].zotero_key,
+      themes: ['tema'],
+      deepStatus: 'deep',
+      ideaCount: 1,
+      gapCount: 0,
+    }));
+    const gaps = [
+      {
+        id: 'gap-1',
+        label: 'Hueco 1',
+        summary: 'Un hueco de investigación',
+        score: 0.4,
+        reason: 'test',
+        kind: 'empirical',
+        work: { nodus_id: 'w-0', title: 'Obra 0', authors: ['Autor0, N.'], year: 2000, zotero_key: 'zk-0' },
+        relatedIdea: null,
+        confidence: 0.7,
+      },
+    ];
+    const contradictions = [
+      {
+        id: 'edge-1',
+        label: 'Contradicción 1',
+        summary: 'A contradice a B',
+        score: 0.4,
+        reason: 'test',
+        fromLabel: 'A',
+        toLabel: 'B',
+        type: 'contradicts',
+        basis: 'semantic',
+        confidence: 0.6,
+      },
+    ];
+    return {
+      generatedAt: new Date().toISOString(),
+      brief: { kind: 'deep_research', objective: 'obj', language: 'es' },
+      stats: { ideas: ideaCount, themes: 0, gaps: 1, contradictions: 1, works: ideaCount, passages: 0, tutorRoutes: 0 },
+      recommendedSelection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
+      ideas,
+      themes: [],
+      gaps,
+      contradictions,
+      works,
+      passages: [],
+      tutorRoutes: [],
+    };
+  }
+
+  const HALLUCINATED = '[Fantasma, X. (1999)](nodus://idea/HALLUCINATED-999)';
+
+  // A plan that spreads every pool idea across `sectionCount` sections + a conclusion.
+  const fakePlan = (input) => {
+    const ids = input.ideas.map((i) => i.id);
+    const bodyCount = Math.max(1, input.sectionCount - 1);
+    const per = Math.max(1, Math.ceil(ids.length / bodyCount));
+    const sections = [];
+    for (let b = 0; b < bodyCount; b++) {
+      const chunk = ids.slice(b * per, (b + 1) * per);
+      sections.push({
+        id: `s${b + 1}`,
+        title: `Sección ${b + 1}`,
+        purpose: 'propósito',
+        keyClaims: chunk.slice(0, 3).map((id) => `clave ${id}`),
+        ideaIds: chunk,
+        workIds: [],
+        gapIds: b === 0 ? ['gap-1'] : [],
+        contradictionIds: b === 0 ? ['edge-1'] : [],
+        passageIds: [],
+      });
+    }
+    sections.push({
+      id: 'concl',
+      title: 'Conclusión',
+      purpose: 'cierre',
+      keyClaims: ['síntesis'],
+      ideaIds: [],
+      workIds: [],
+      gapIds: ['gap-1'],
+      contradictionIds: ['edge-1'],
+      passageIds: [],
+    });
+    return { title: 'Informe de prueba', abstract: 'resumen', sections };
+  }
+
+  // Writes ~targetWords words, cites every menu token verbatim, and slips in a
+  // hallucinated citation the policy must strip.
+  const fakeWriteSection = (input) => {
+    const cites = input.citationMenu.map((c) => `Afirmación (${c.token}).`).join(' ');
+    const filler = 'texto '.repeat(input.targetWords);
+    return `## ${input.section.title}\n\n${cites} ${filler} ${HALLUCINATED}`;
+  }
+
+  const fakeFinalize = (input) => {
+    return {
+      title: 'Informe de prueba',
+      abstract: 'Este informe desarrolla el objetivo a partir del corpus.',
+      limitations: input.uncoveredSamples.length ? [`Sin desarrollar: ${input.uncoveredSamples.join('; ')}`] : [],
+      nextSteps: ['Revisar citas.'],
+    };
+  }
+
+  const baseDeps = (snapshot) => ({
+    buildSnapshot: async () => snapshot,
+    planReport: async (input) => fakePlan(input),
+    writeSection: async (input) => fakeWriteSection(input),
+    finalize: async (input) => fakeFinalize(input),
+  });
+
+  // ── 1. resolveTargetPages buckets ───────────────────────────────────────────
+  assert.deepEqual(resolveTargetPages('concise', { ideas: [] }), { min: 5, max: 8 });
+  assert.deepEqual(resolveTargetPages('standard', { ideas: [] }), { min: 9, max: 14 });
+  assert.deepEqual(resolveTargetPages('exhaustive', { ideas: [] }), { min: 15, max: 20 });
+  {
+    const adaptive = resolveTargetPages('adaptive', { ideas: new Array(60).fill(0) });
+    assert.ok(adaptive.min >= 5 && adaptive.max <= 20 && adaptive.max > adaptive.min, 'adaptive clamps to 5–20');
+  }
+
+  // ── 2. applyCitationPolicy: strip hallucinations, keep + relabel real ones ──
+  {
+    const snapshot = makeSnapshot(3);
+    const maps = buildSnapshotMaps(snapshot);
+    const md = `Uno [x](nodus://idea/g-0) y dos ${HALLUCINATED} y tres [y](nodus://work/w-1).`;
+    const { markdown, cited } = applyCitationPolicy(md, maps);
+    assert.ok(!markdown.includes('HALLUCINATED'), 'hallucinated citation stripped');
+    assert.ok(markdown.includes('nodus://idea/g-0'), 'valid idea citation kept');
+    assert.ok(markdown.includes('nodus://work/w-1'), 'valid work citation kept');
+    assert.ok(markdown.includes('Autor0, N. (2000)'), 'idea label rewritten to canonical corpus label');
+    assert.deepEqual([...cited.ideas], ['g-0']);
+    assert.deepEqual([...cited.works], ['w-1']);
+  }
+
+  // ── 3. Full report: standard length, coverage, clean citations, references ──
+  {
+    const snapshot = makeSnapshot(40);
+    const report = await orchestrateDeepResearch({ objective: 'X', language: 'es', targetLength: 'standard' }, baseDeps(snapshot));
+    const { draft, meta } = report;
+
+    assert.ok(meta.sections >= 4, 'produced several sections');
+    assert.ok(meta.pages >= 9, `at least the 9-page minimum (got ${meta.pages})`);
+    assert.ok(meta.pages <= 14 + 2, `does not blow past the 14-page target much (got ${meta.pages})`);
+    assert.equal(meta.stoppedReason, null, 'standard run finishes without hitting a cap');
+
+    // No hallucinated citation anywhere in the assembled report.
+    assert.ok(!draft.draftMarkdown.includes('HALLUCINATED'), 'no hallucinated citation in report body');
+    // Real citations are present and clickable.
+    assert.ok(/nodus:\/\/idea\/g-\d+/.test(draft.draftMarkdown), 'report carries clickable idea citations');
+
+    // References section exists, is non-empty, and every entry traces to a cited work.
+    assert.ok(draft.draftMarkdown.includes('## Referencias'), 'report has a References section');
+    assert.ok(draft.bibliography.length > 0, 'bibliography is populated');
+    assert.ok(meta.worksCited > 0 && meta.ideasCovered > 0, 'coverage accounting is populated');
+    // Coverage: with 40 ideas across body sections, most should be cited.
+    assert.ok(meta.ideasCovered >= 30, `covers the bulk of the corpus ideas (got ${meta.ideasCovered}/40)`);
+
+    // The draft round-trips into the Writing Workshop shape (export/save reuse).
+    assert.equal(typeof draft.title, 'string');
+    assert.ok(Array.isArray(draft.outline) && draft.outline.length === meta.sections);
+    assert.equal(draft.stats.selectedIdeas, meta.ideasCovered);
+  }
+
+  // ── 4. Budget cap: runaway section length stops the loop and flags truncation ─
+  {
+    const snapshot = makeSnapshot(60);
+    const deps = { ...baseDeps(snapshot), writeSection: async () => `## Larga\n\n${'palabra '.repeat(6000)}` };
+    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'concise' }, deps);
+    assert.ok(report.meta.stoppedReason, 'runaway length trips a stop reason');
+    assert.ok(/presupuesto|páginas/.test(report.meta.stoppedReason), 'stop reason mentions the page budget');
+    assert.equal(report.draft.stats.truncated, true, 'draft marked truncated');
+    assert.ok(report.meta.sections <= 22, 'never exceeds the hard section cap');
+  }
+
+  // ── 5. Coverage top-up: thin sections get lifted toward the minimum length ──
+  {
+    const snapshot = makeSnapshot(50);
+    // Each section is deliberately tiny (ignores targetWords) so the top-up loop must engage.
+    const deps = {
+      ...baseDeps(snapshot),
+      writeSection: async (input) => `## ${input.section.title}\n\n Breve (${input.citationMenu[0]?.token ?? ''}).`,
+    };
+    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'standard' }, deps);
+    // Top-up is bounded, so it may not fully reach the minimum, but it must add sections
+    // beyond the plan and keep the report coherent.
+    assert.ok(report.meta.sections > 5, 'top-up added sections beyond the base plan');
+    assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'top-up sections also citation-clean');
+  }
+
+  // ── 6. Resilience: plan + every section failing still yields a report ───────
+  {
+    const snapshot = makeSnapshot(12);
+    const deps = {
+      buildSnapshot: async () => snapshot,
+      planReport: async () => {
+        throw new Error('planner down');
+      },
+      writeSection: async () => {
+        throw new Error('writer down');
+      },
+      finalize: async () => {
+        throw new Error('finalizer down');
+      },
+    };
+    const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'concise' }, deps);
+    assert.ok(report.meta.sections > 0, 'fallback plan still produced sections');
+    assert.ok(report.meta.stoppedReason && /degradada/.test(report.meta.stoppedReason), 'degraded generation is reported');
+    assert.ok(report.draft.draftMarkdown.includes('## Referencias'), 'still assembles a full document');
+    // Degraded sections still only cite real corpus ideas.
+    assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'no fake citations even in degraded mode');
+  }
+
+  // ── 7. countWords sanity ────────────────────────────────────────────────────
+  assert.equal(countWords('uno dos tres'), 3);
+  assert.equal(countWords('[Autor (2020)](nodus://idea/g-1) palabra'), 3, 'link label counts, url does not');
+  assert.equal(WORDS_PER_PAGE, 450);
+
+  console.log('deep research orchestration test passed');
+} finally {
+  await rm(tmp, { recursive: true, force: true });
+}

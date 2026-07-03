@@ -49,7 +49,7 @@ science-of-learning sample — no real library required).
 | **Read** | Two-level scanning: light (title + abstract, cheap) and deep (full text, ideas + evidence + relations). Automatic or manual, your choice. |
 | **Understand** | Idea graph (Cytoscape.js), author graph, debate view (contradictions as two-sided face-offs), Tutor mode (AI-guided step-by-step walkthrough). |
 | **Orient** | Research gap mining, reading path planner, research coverage map (decompose a thesis question, map which sub-questions your corpus covers). |
-| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. |
+| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. |
 | **Converse** | Research assistant chat grounded in your corpus (ideas, passages, contradictions, gaps, author graph — you pick the context). |
 
 ### Demo mode
@@ -190,6 +190,17 @@ result: outline, Markdown draft, support matrix, bibliography, next steps and
 limitations. All citations use `nodus://` links that resolve to the real
 source/evidence inside Nodus. Exports to Markdown. Drafts can be saved locally
 and re-opened.
+
+The **Deep Research** toggle turns the same panel into an orchestrated report
+builder: write a research idea and Nodus plans an outline, writes it section by
+section guided by how much of the corpus each pass has covered, and assembles a
+professional 5–20 page academic report with an inline `(Author, year)` citation
+for every substantive claim and a full reference list. The loop is bounded
+(page-budget and section caps), never fabricates a source (hallucinated
+citations are stripped and every reference traces to a really-cited work), and
+degrades gracefully if the model fails on a section. Length is adaptive by
+default or pinned (concise / standard / exhaustive). The report reuses the
+workshop's viewer, export, local-save and clickable-citation stack.
 
 ### Notes workspace
 

@@ -1710,7 +1710,8 @@ export type WritingWorkshopKind =
   | 'debate'
   | 'gap_justification'
   | 'chapter_section'
-  | 'research_question';
+  | 'research_question'
+  | 'deep_research';
 
 export interface WritingWorkshopBrief {
   kind: WritingWorkshopKind;
@@ -1898,6 +1899,65 @@ export interface WritingWorkshopStreamHandlers {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Deep Research — orchestrated, coverage-guided multi-page report
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * How ambitious the report should be. `adaptive` (default) sizes the page target
+ * from the amount of relevant material in the corpus; the fixed buckets let the
+ * user pin a range. Every bucket is clamped to the professional 5–20 page window.
+ */
+export type DeepResearchTargetLength = 'adaptive' | 'concise' | 'standard' | 'exhaustive';
+
+export interface DeepResearchRequest {
+  /** The research idea/question the whole report must develop. */
+  objective: string;
+  language?: 'es' | 'en' | 'fr';
+  audience?: string;
+  targetLength?: DeepResearchTargetLength;
+  model?: ModelRef | null;
+}
+
+/** One live progress event emitted while a report is being orchestrated. */
+export interface DeepResearchProgress {
+  phase: 'snapshot' | 'planning' | 'section' | 'coverage' | 'assembling' | 'done';
+  message: string;
+  /** 1-based index of the section being written (phase === 'section'). */
+  sectionIndex?: number;
+  sectionTotal?: number;
+  sectionTitle?: string;
+  wordsSoFar?: number;
+  pagesSoFar?: number;
+}
+
+/** Coverage + budget accounting attached to a finished report. */
+export interface DeepResearchMeta {
+  sections: number;
+  words: number;
+  pages: number;
+  ideasCovered: number;
+  ideasConsidered: number;
+  worksCited: number;
+  targetPages: { min: number; max: number };
+  /** Non-null when the loop stopped before covering everything (budget cap, cap on sections, etc.). */
+  stoppedReason: string | null;
+}
+
+/**
+ * A finished report. `draft` reuses the Writing Workshop draft shape so the whole
+ * downstream stack (renderer, citation modal, export, local save) works unchanged;
+ * `meta` carries the deep-research-specific accounting.
+ */
+export interface DeepResearchReport {
+  draft: WritingWorkshopDraft;
+  meta: DeepResearchMeta;
+}
+
+export interface DeepResearchStreamHandlers {
+  onProgress?(progress: DeepResearchProgress): void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Updates
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2072,6 +2132,10 @@ export interface NodusApi {
   listWritingWorkshopDrafts(): Promise<WritingWorkshopSavedDraft[]>;
   saveWritingWorkshopDraft(request: WritingWorkshopSaveDraftRequest): Promise<WritingWorkshopSavedDraft>;
   deleteWritingWorkshopDraft(id: string): Promise<void>;
+
+  // deep research (orchestrated, coverage-guided multi-page report over the whole corpus)
+  /** Plan → write section by section (guided by coverage) → assemble a fully cited 5–20 page report. */
+  generateDeepResearchReport(request: DeepResearchRequest, handlers?: DeepResearchStreamHandlers): Promise<DeepResearchReport>;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

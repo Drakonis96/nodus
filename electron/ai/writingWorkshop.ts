@@ -1432,6 +1432,8 @@ function kindLabel(kind: WritingWorkshopBrief['kind']): string {
       return 'apartado de capitulo';
     case 'research_question':
       return 'pregunta o hipotesis de investigacion';
+    case 'deep_research':
+      return 'informe de investigacion en profundidad';
   }
 }
 

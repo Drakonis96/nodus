@@ -1139,6 +1139,45 @@ export const EN: Record<string, string> = {
   'Borrador eliminado.': 'Draft deleted.',
   'Taller de escritura': 'Writing Workshop',
   'Del grafo a un borrador con fuentes verificables.': 'From the graph to a draft with verifiable sources.',
+  // Deep Research
+  'Deep Research': 'Deep Research',
+  'Taller': 'Workshop',
+  'Informe académico de varias páginas, guiado por cobertura y con todas las fuentes citadas.':
+    'A multi-page academic report, coverage-guided and with every source cited.',
+  'Adaptativo (según corpus)': 'Adaptive (from corpus)',
+  'Conciso (5–8 pág.)': 'Concise (5–8 pp.)',
+  'Estándar (9–14 pág.)': 'Standard (9–14 pp.)',
+  'Exhaustivo (15–20 pág.)': 'Exhaustive (15–20 pp.)',
+  'Extensión objetivo del informe': 'Target report length',
+  'Extensión:': 'Length:',
+  'Generar informe': 'Generate report',
+  'Generando informe…': 'Generating report…',
+  'Escribe la idea de investigación antes de generar el informe.': 'Write the research idea before generating the report.',
+  'Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.':
+    'Write the research idea or question. The report will develop it fully, citing every work in the corpus.',
+  'Cobertura del corpus completo': 'Full-corpus coverage',
+  'Sin selección manual: el informe elige y cita las fuentes por ti.':
+    'No manual selection: the report picks and cites the sources for you.',
+  'Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.':
+    'Report generated: {s} sections · ~{p} pages · {i} ideas cited.',
+  'El informe aparecerá aquí. Escribe tu idea de investigación y pulsa «Generar informe».':
+    'The report will appear here. Write your research idea and press “Generate report”.',
+  'Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.':
+    'Plan, write section by section guided by corpus coverage, and assemble a 5–20 page academic report with every source cited.',
+  'Reuniendo el corpus': 'Gathering the corpus',
+  'Planificando secciones': 'Planning sections',
+  'Redactando secciones': 'Writing sections',
+  'Ampliando cobertura': 'Extending coverage',
+  'Ensamblando y referenciando': 'Assembling and referencing',
+  'Informe listo': 'Report ready',
+  'Sección {n}: {title}': 'Section {n}: {title}',
+  '~{p} páginas · {w} palabras': '~{p} pages · {w} words',
+  'Secciones': 'Sections',
+  'Páginas': 'Pages',
+  'Ideas citadas': 'Ideas cited',
+  'Obras citadas': 'Works cited',
+  'Consejo: cuanto más profundo sea el análisis del corpus, más completo será el informe.':
+    'Tip: the deeper the corpus analysis, the more complete the report.',
   'Ocultar tutorial': 'Hide tutorial',
   'Preparar mesa': 'Prepare table',
   'Configura un modelo de síntesis': 'Configure a synthesis model',
