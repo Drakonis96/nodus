@@ -770,20 +770,20 @@ function ProjectGuidePanel({
   const disabled = Boolean(busy);
 
   return (
-    <section className="mx-5 mt-3 rounded-lg border border-neutral-800 bg-neutral-900/70 p-3">
+    <section className="mx-5 mt-3 rounded-lg border border-neutral-200 bg-white/95 p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/70 dark:shadow-none">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <Icon name="graduation" size={16} className="text-indigo-300" />
+            <Icon name="graduation" size={16} className="text-indigo-600 dark:text-indigo-300" />
             <h2 className="text-sm font-semibold">{t(guide.title)}</h2>
-            <span className="rounded-md border border-neutral-700 px-1.5 py-0.5 text-[11px] text-neutral-400">
+            <span className="rounded-md border border-neutral-300 px-1.5 py-0.5 text-[11px] text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
               {guide.doneCount}/{guide.totalCount}
             </span>
           </div>
           <p className="mt-1 text-xs text-neutral-500">{next ? t(next.summary) : t(guide.subtitle)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={onEditBrief} disabled={disabled}>
+          <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={onEditBrief} disabled={disabled}>
             <Icon name="edit" size={13} /> {t('Editar brief')}
           </button>
           {next ? (
@@ -792,14 +792,14 @@ function ProjectGuidePanel({
               {t(next.actionLabel)}
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700/60 bg-emerald-900/20 px-2 py-1 text-xs text-emerald-300">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
               <Icon name="check" size={13} /> {t('Completado')}
             </span>
           )}
         </div>
       </div>
 
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-800">
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
         <div className="h-full rounded-full bg-indigo-500" style={{ width: `${guide.completion}%` }} />
       </div>
 
@@ -816,7 +816,7 @@ function ProjectGuidePanel({
       </div>
 
       {briefEditing && (
-        <div className="mt-3 rounded-md border border-neutral-800 bg-neutral-950 p-3">
+        <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
           <textarea
             className="input min-h-20 w-full resize-y text-sm"
             value={briefDraft}
@@ -824,7 +824,7 @@ function ProjectGuidePanel({
             placeholder={t('Objetivo, alcance, pregunta principal y criterio de selección')}
           />
           <div className="mt-2 flex justify-end gap-2">
-            <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={onCancelBrief} disabled={busy === 'save-brief'}>
+            <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={onCancelBrief} disabled={busy === 'save-brief'}>
               {t('Cancelar')}
             </button>
             <button className="btn btn-primary text-xs gap-1.5" onClick={onSaveBrief} disabled={busy === 'save-brief'}>
@@ -975,9 +975,9 @@ function guideStepIcon(status: ProjectGuideStepStatus): string {
 }
 
 function guideStepClass(status: ProjectGuideStepStatus): string {
-  if (status === 'done') return 'border-emerald-700/60 bg-emerald-900/20 text-emerald-200';
-  if (status === 'current') return 'border-indigo-600/70 bg-indigo-900/30 text-indigo-100';
-  return 'border-neutral-800 bg-neutral-950/70 text-neutral-500';
+  if (status === 'done') return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-200';
+  if (status === 'current') return 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-600/70 dark:bg-indigo-900/30 dark:text-indigo-100';
+  return 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-500';
 }
 
 function tabLabel(tab: ChapterTab): string {
