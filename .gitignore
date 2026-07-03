@@ -5,6 +5,7 @@ release/
 *.log
 .DS_Store
 .vite/
+.kilo/
 *.nodus
 *.sqlite
 
