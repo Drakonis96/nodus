@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import AdmZip from 'adm-zip';
 import type { DeepContextMode, SourceType, PdfAnalysis } from '@shared/types';
 import { itemChildren, itemAsAttachment, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
@@ -257,6 +258,112 @@ export function extractTextFile(filePath: string): string {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+function decodeHtmlEntities(text: string): string {
+  const named: Record<string, string> = {
+    amp: '&',
+    apos: "'",
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
+  };
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body: string) => {
+    const lower = body.toLowerCase();
+    if (lower.startsWith('#x')) {
+      const code = Number.parseInt(lower.slice(2), 16);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    }
+    if (lower.startsWith('#')) {
+      const code = Number.parseInt(lower.slice(1), 10);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    }
+    return named[lower] ?? entity;
+  });
+}
+
+function htmlToText(html: string): string {
+  return decodeHtmlEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|section|article|h[1-6]|li|tr|blockquote)>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/[ \t\f\v]+/g, ' ')
+      .replace(/\s*\n\s*/g, '\n')
+  ).trim();
+}
+
+function xmlAttrs(tag: string): Record<string, string> {
+  const attrs: Record<string, string> = {};
+  const re = /([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(tag)) !== null) attrs[match[1]] = decodeHtmlEntities(match[2] ?? match[3] ?? '');
+  return attrs;
+}
+
+function zipText(zip: AdmZip, entryName: string): string | null {
+  const entry = zip.getEntry(entryName);
+  if (!entry || entry.isDirectory) return null;
+  return entry.getData().toString('utf8');
+}
+
+function normalizeZipPath(filePath: string): string {
+  return filePath.replace(/^\/+/, '').replace(/\\/g, '/');
+}
+
+function joinZipPath(base: string, relative: string): string {
+  return normalizeZipPath(path.posix.normalize(path.posix.join(base, relative)));
+}
+
+function epubReadingOrder(zip: AdmZip): string[] {
+  const container = zipText(zip, 'META-INF/container.xml');
+  const rootfileTag = container?.match(/<rootfile\b[^>]*>/i)?.[0];
+  const rootfile = rootfileTag ? xmlAttrs(rootfileTag)['full-path'] : null;
+  if (!rootfile) return [];
+  const opf = rootfile ? zipText(zip, normalizeZipPath(rootfile)) : null;
+  if (!opf) return [];
+
+  const base = path.posix.dirname(normalizeZipPath(rootfile));
+  const manifest = new Map<string, string>();
+  for (const item of opf.match(/<item\b[^>]*>/gi) ?? []) {
+    const attrs = xmlAttrs(item);
+    if (attrs.id && attrs.href) manifest.set(attrs.id, joinZipPath(base === '.' ? '' : base, attrs.href));
+  }
+
+  const order: string[] = [];
+  for (const itemref of opf.match(/<itemref\b[^>]*>/gi) ?? []) {
+    const idref = xmlAttrs(itemref).idref;
+    const href = idref ? manifest.get(idref) : null;
+    if (href && /\.(xhtml|html?|xml)$/i.test(href)) order.push(href);
+  }
+  return order;
+}
+
+export function extractEpub(filePath: string): string {
+  const zip = new AdmZip(filePath);
+  const ordered = epubReadingOrder(zip);
+  const fallback = zip
+    .getEntries()
+    .map((entry) => normalizeZipPath(entry.entryName))
+    .filter((entry) => /\.(xhtml|html?)$/i.test(entry) && !/(^|\/)(nav|toc)\.(xhtml|html?)$/i.test(entry))
+    .sort((a, b) => a.localeCompare(b));
+
+  const files = ordered.length > 0 ? ordered : fallback;
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const file of files) {
+    if (seen.has(file)) continue;
+    seen.add(file);
+    const html = zipText(zip, file);
+    if (!html) continue;
+    const text = htmlToText(html);
+    if (text) parts.push(text);
+  }
+  return parts.join('\n\n');
+}
+
 export async function extractFromPath(
   filePath: string,
   opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext } = {}
@@ -280,6 +387,10 @@ export async function extractFromPath(
   } else if (ext === '.docx') {
     const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'docx' });
     doc = { text: await extractDocx(filePath), sourceType: 'upload', notes: null };
+    done({ chars: doc.text.length });
+  } else if (ext === '.epub') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'epub' });
+    doc = { text: extractEpub(filePath), sourceType: 'epub', notes: null };
     done({ chars: doc.text.length });
   } else if (ext === '.md' || ext === '.markdown') {
     const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'markdown' });
@@ -314,16 +425,26 @@ export function defaultZoteroStorage(): string {
   return '';
 }
 
-/** Only PDFs and plain text are legitimate full-text sources. HTML snapshots and images are excluded. */
-function isTextAttachment(att: ZoteroAttachment): boolean {
+function attachmentSourceType(att: ZoteroAttachment): SourceType {
+  const ct = (att.contentType ?? '').toLowerCase();
+  const fn = (att.filename ?? '').toLowerCase();
+  if (ct === 'application/pdf' || fn.endsWith('.pdf')) return 'pdf';
+  if (ct === 'application/epub+zip' || fn.endsWith('.epub')) return 'epub';
+  if (fn.endsWith('.md') || fn.endsWith('.markdown') || ct === 'text/markdown') return 'markdown';
+  return 'upload';
+}
+
+/** Only document-like attachments are legitimate full-text sources. HTML snapshots and images are excluded. */
+export function isTextAttachment(att: ZoteroAttachment): boolean {
   const ct = att.contentType ?? '';
   if (ct === 'application/pdf') return true;
+  if (ct === 'application/epub+zip') return true;
   if (ct === 'text/plain' || ct === 'text/markdown') return true;
   if (ct.startsWith('text/html')) return false; // web snapshots
   if (ct.startsWith('image/')) return false;
   if (att.linkMode === 'imported_url') return false;
   const fn = att.filename ?? '';
-  return /\.(pdf|txt|md|markdown|docx)$/i.test(fn);
+  return /\.(pdf|epub|txt|md|markdown|docx)$/i.test(fn);
 }
 
 export interface ResolveOptions {
@@ -332,6 +453,56 @@ export interface ResolveOptions {
   ocr: OcrOptions;
   onProgress?: OnExtractProgress;
   perf?: PerfContext;
+}
+
+export interface TextAvailabilityProbe {
+  available: boolean;
+  sourceType: SourceType | null;
+  reason: 'zotero_fulltext' | 'local_file' | 'none';
+}
+
+async function textAttachmentsFor(userId: string, zoteroKey: string, itemType?: string | null): Promise<ZoteroAttachment[]> {
+  let attachments: ZoteroAttachment[] = [];
+  if ((itemType ?? '').toLowerCase() === 'attachment') {
+    const self = await itemAsAttachment(userId, zoteroKey).catch(() => null);
+    if (self) attachments = [self];
+  } else {
+    attachments = await itemChildren(userId, zoteroKey).catch(() => [] as ZoteroAttachment[]);
+  }
+  return attachments.filter(isTextAttachment);
+}
+
+/**
+ * Cheaply check whether a previously skipped work now has text available. This
+ * avoids re-queueing every historical `skipped_no_text` row on each sync while
+ * still recovering works once Zotero has indexed their attachment.
+ */
+export async function probeWorkTextAvailability(
+  userId: string,
+  zoteroKey: string,
+  storagePath: string,
+  opts: { preferZoteroFulltext: boolean; itemType?: string | null }
+): Promise<TextAvailabilityProbe> {
+  const textAttachments = await textAttachmentsFor(userId, zoteroKey, opts.itemType);
+  if (opts.preferZoteroFulltext) {
+    for (const att of textAttachments) {
+      const ft = await getFulltext(userId, att.key).catch(() => null);
+      if (ft && ft.content.trim().length > 500) {
+        return { available: true, sourceType: attachmentSourceType(att), reason: 'zotero_fulltext' };
+      }
+    }
+  }
+
+  const effectiveStorage = storagePath || defaultZoteroStorage();
+  if (!effectiveStorage) return { available: false, sourceType: null, reason: 'none' };
+  for (const att of textAttachments) {
+    if (!att.filename) continue;
+    const filePath = path.join(effectiveStorage, att.key, att.filename);
+    if (fs.existsSync(filePath) && /\.(epub|txt|md|markdown|docx)$/i.test(att.filename)) {
+      return { available: true, sourceType: attachmentSourceType(att), reason: 'local_file' };
+    }
+  }
+  return { available: false, sourceType: null, reason: 'none' };
 }
 
 /**
@@ -353,20 +524,12 @@ export async function resolveWorkText(
   let attachments: ZoteroAttachment[] = [];
   const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey });
   try {
-    if ((itemType ?? '').toLowerCase() === 'attachment') {
-      // A standalone attachment item IS the file — it has no children, so read it
-      // directly. This is what makes markdown/PDF files dropped straight into a
-      // collection scannable as full text.
-      const self = await itemAsAttachment(userId, zoteroKey);
-      if (self) attachments = [self];
-    } else {
-      attachments = await itemChildren(userId, zoteroKey);
-    }
+    attachments = await textAttachmentsFor(userId, zoteroKey, itemType);
     metadataDone({ attachments: attachments.length });
   } catch (e) {
     metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
   }
-  const textAttachments = attachments.filter(isTextAttachment);
+  const textAttachments = attachments;
   // Fall back to the standard Zotero storage location when the user left it blank,
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
   const effectiveStorage = storagePath || defaultZoteroStorage();
@@ -386,7 +549,7 @@ export async function resolveWorkText(
           fulltextDone({ checked, hit: true, chars: ft.content.length });
           return {
             text: ft.content,
-            sourceType: 'pdf',
+            sourceType: attachmentSourceType(att),
             notes: `Texto indexado por Zotero${ft.totalPages ? ` (${ft.indexedPages}/${ft.totalPages} págs.)` : ''}.`,
           };
         }

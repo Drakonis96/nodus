@@ -327,7 +327,7 @@ function normalizeLinkRole(value: string): ProjectLinkRole {
 }
 
 function normalizeSourceFormat(value: string): ChapterSourceFormat {
-  return ['docx', 'pdf', 'markdown', 'txt', 'unknown'].includes(value) ? (value as ChapterSourceFormat) : 'unknown';
+  return ['docx', 'pdf', 'epub', 'markdown', 'txt', 'unknown'].includes(value) ? (value as ChapterSourceFormat) : 'unknown';
 }
 
 function normalizeSuggestionKind(value: string): ProjectInsertionSuggestion['kind'] {
@@ -369,6 +369,7 @@ export function sourceFormatFromPath(filePath: string): ChapterSourceFormat {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.docx') return 'docx';
   if (ext === '.pdf') return 'pdf';
+  if (ext === '.epub') return 'epub';
   if (ext === '.md' || ext === '.markdown') return 'markdown';
   if (ext === '.txt') return 'txt';
   return 'unknown';

@@ -24,7 +24,7 @@ export type LightStatus = 'none' | 'pending' | 'done' | 'failed';
 export type DeepStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
 export type SummaryStatus = 'none' | 'pending' | 'done' | 'failed' | 'skipped_no_text';
 export type DeepTrigger = 'tag' | 'manual' | 'both' | null;
-export type SourceType = 'pdf' | 'markdown' | 'upload' | 'abstract_only' | 'none';
+export type SourceType = 'pdf' | 'epub' | 'markdown' | 'upload' | 'abstract_only' | 'none';
 
 export type GapKind =
   | 'future_work'
@@ -1442,7 +1442,7 @@ export type ProjectLinkRole =
   | 'source'
   | 'draft'
   | 'context';
-export type ChapterSourceFormat = 'docx' | 'pdf' | 'markdown' | 'txt' | 'unknown';
+export type ChapterSourceFormat = 'docx' | 'pdf' | 'epub' | 'markdown' | 'txt' | 'unknown';
 export type ChapterSuggestionKind = 'idea' | 'gap' | 'debate' | 'work' | 'note';
 export type ChapterSuggestionOperation = 'insert_after' | 'insert_before' | 'replace' | 'comment';
 export type ChapterSuggestionStatus = 'suggested' | 'accepted' | 'rejected' | 'applied' | 'blocked';

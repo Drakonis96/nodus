@@ -18,6 +18,7 @@ import type { ZoteroCollection } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, ZoteroItem } from '@shared/types';
 import { getDb } from '../db/database';
+import { probeWorkTextAvailability } from '../extraction/textExtractor';
 
 function authorsOf(item: ZoteroItem): string[] {
   return item.creators.map((c) => {
@@ -120,6 +121,23 @@ export interface SyncResult {
   deepQueued: number;
 }
 
+export function shouldQueueDeepAfterSync(input: {
+  autoDeepScanOnReadTag: boolean;
+  hasReadTag: boolean;
+  manualDeep: boolean;
+  isNew: boolean;
+  didChange: boolean;
+  deepStatus: string | null;
+  recoverableText: boolean;
+}): boolean {
+  const selectedForDeep = (input.autoDeepScanOnReadTag && input.hasReadTag) || input.manualDeep;
+  if (!selectedForDeep) return false;
+  if (input.isNew || input.didChange) return true;
+  if (input.deepStatus === 'none' || input.deepStatus === 'failed') return true;
+  if (input.deepStatus === 'skipped_no_text') return input.recoverableText;
+  return false;
+}
+
 /** Full sync over all monitored collections. */
 export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntry> {
   const settings = getSettings();
@@ -159,14 +177,26 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
         lightQueued++;
       }
       const after = getWorkByZoteroKey(item.key);
+      let recoverableText = false;
+      if (after?.deep_status === 'skipped_no_text') {
+        const probe = await probeWorkTextAvailability(settings.zoteroUserId, item.key, settings.zoteroStoragePath, {
+          preferZoteroFulltext: settings.preferZoteroFulltext,
+          itemType: after.item_type,
+        });
+        recoverableText = probe.available;
+      }
       const needsDeep =
         !!after &&
-        (isNew ||
-          didChange ||
-          after.deep_status === 'none' ||
-          after.deep_status === 'failed' ||
-          after.deep_status === 'skipped_no_text');
-      if (settings.autoDeepScanOnReadTag && hasReadTag && needsDeep) {
+        shouldQueueDeepAfterSync({
+          autoDeepScanOnReadTag: settings.autoDeepScanOnReadTag,
+          hasReadTag,
+          manualDeep: after.manual_deep === 1,
+          isNew,
+          didChange,
+          deepStatus: after.deep_status,
+          recoverableText,
+        });
+      if (needsDeep) {
         setDeepPending(nodusId);
         scanQueue.enqueue(nodusId, item.title, 'deep');
         deepQueued++;

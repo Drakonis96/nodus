@@ -611,7 +611,7 @@ export function registerIpc(
         title: 'Importar capitulo',
         properties: ['openFile'],
         filters: [
-          { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'md', 'markdown', 'txt'] },
+          { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'epub', 'md', 'markdown', 'txt'] },
           { name: 'Todos los archivos', extensions: ['*'] },
         ],
       });
