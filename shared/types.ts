@@ -363,6 +363,8 @@ export interface CopilotInstallResult {
   ok: boolean;
   message: string;
   manifestPath: string | null;
+  /** Number of stale Nodus add-in cache entries removed from Office's Wef cache. */
+  cacheEntriesRemoved?: number;
 }
 
 /** Navigation request emitted by the local Word add-in server into the renderer. */

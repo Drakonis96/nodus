@@ -173,7 +173,7 @@ export function registerIpc(
     if (result.ok && getSettings().copilotEnabled) await restartCopilotServer();
     return result;
   });
-  h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath()));
+  h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath(), app.getVersion()));
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 

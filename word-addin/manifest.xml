@@ -6,7 +6,7 @@
   xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
   xsi:type="TaskPaneApp">
   <Id>E4352919-FFEC-4F77-8268-975BB4217FAD</Id>
-  <Version>0.1.0</Version>
+  <Version>0.7.20</Version>
   <ProviderName>Nodus</ProviderName>
   <DefaultLocale>es-ES</DefaultLocale>
   <DisplayName DefaultValue="Nodus Copilot" />
@@ -34,7 +34,7 @@
             <LearnMoreUrl resid="GetStarted.LearnMoreUrl" />
           </GetStarted>
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
-            <OfficeTab id="TabHome">
+            <CustomTab id="Nodus.Tab">
               <Group id="Nodus.Group">
                 <Label resid="Nodus.Group.Label" />
                 <Icon>
@@ -59,7 +59,8 @@
                   </Action>
                 </Control>
               </Group>
-            </OfficeTab>
+              <Label resid="Nodus.Tab.Label" />
+            </CustomTab>
           </ExtensionPoint>
         </DesktopFormFactor>
       </Host>
@@ -76,6 +77,7 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Nodus Copilot" />
+        <bt:String id="Nodus.Tab.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Group.Label" DefaultValue="Nodus" />
         <bt:String id="Nodus.Taskpane.Label" DefaultValue="Nodus Copilot" />
       </bt:ShortStrings>

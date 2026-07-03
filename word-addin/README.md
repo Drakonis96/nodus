@@ -29,12 +29,14 @@ complemento y una pequeña API JSON **en el mismo origen HTTPS local**
 2. **Activa** el toggle "Activar copiloto para Word". Verás `Activo:
    https://localhost:4320/addin/taskpane.html`.
 3. Pulsa **Instalar/actualizar en Word**. Nodus copia un manifiesto con el puerto
-   actual al catálogo local de Word. Reinicia Word si el complemento ya estaba
-   cargado. En Word: **Inicio → Complementos → Complementos de desarrollador →
-   Nodus Copilot**.
+   actual al catálogo local de Word, actualiza su versión para que Office no
+   reutilice una cinta antigua y limpia entradas cacheadas de Nodus en Wef.
+   Reinicia Word si el complemento ya estaba cargado. En Word verás una pestaña
+   propia **Nodus** con el botón **Nodus Copilot**.
 
 ## Uso diario
-- Abre Nodus (con el copiloto activado) y Word. Abre el panel del complemento.
+- Abre Nodus (con el copiloto activado) y Word. En la pestaña **Nodus**, abre el
+  panel **Nodus Copilot**.
 - Escribe. Al pausar, el panel muestra las ideas relacionadas del párrafo.
 - Usa el buscador para filtrar por idea, autor u obra indexada.
 - Abre **Detalles** para ver fuentes y conexiones; **Abrir en Nodus** enfoca la
