@@ -891,6 +891,46 @@ function ideaCitation(idea: WritingWorkshopIdeaCandidate): string {
   return `[${label}](nodus://idea/${encodeURIComponent(idea.id)})`;
 }
 
+/**
+ * One citable pool, ready to hand to an *external* writer (an MCP client's model)
+ * so it can articulate and draft the report itself. Every `token` is a verbatim
+ * `nodus://` citation the writer must copy unchanged; anything not in this catalog
+ * is stripped by {@link applyCitationPolicy} at assembly time. Themes carry no
+ * citable token (they are structural context only). Mirrors the trimming the
+ * in-app planner uses so the two writers see the same material.
+ */
+export interface CitationCatalog {
+  ideas: { token: string; note: string; type: string; works: string }[];
+  works: { token: string; note: string }[];
+  gaps: { token: string; note: string }[];
+  contradictions: { token: string; note: string }[];
+  themes: { id: string; label: string; summary: string }[];
+}
+
+export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): CitationCatalog {
+  return {
+    ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
+      token: ideaCitation(i),
+      note: clip(i.statement || i.label, 200),
+      type: i.type,
+      works: i.works.map((w) => `${w.authors[0] ?? 'Autor'}${w.year ? ` (${w.year})` : ''}`).join('; '),
+    })),
+    works: snapshot.works.slice(0, POOL_LIMITS.works).map((w) => ({
+      token: `[${sourceLabelFromWork(w) || w.label}](nodus://work/${encodeURIComponent(w.id)})`,
+      note: clip(w.title || w.label, 160),
+    })),
+    gaps: snapshot.gaps.slice(0, POOL_LIMITS.gaps).map((g) => ({
+      token: `[hueco](nodus://gap/${encodeURIComponent(g.id)})`,
+      note: clip(g.summary || g.label, 160),
+    })),
+    contradictions: snapshot.contradictions.slice(0, POOL_LIMITS.contradictions).map((c) => ({
+      token: `[contradicción](nodus://contradiction/${encodeURIComponent(c.id)})`,
+      note: clip(c.summary || c.label, 160),
+    })),
+    themes: snapshot.themes.slice(0, POOL_LIMITS.themes).map((t) => ({ id: t.id, label: t.label, summary: clip(t.summary, 160) })),
+  };
+}
+
 function sourceLabelFromWork(work: { authors: string[]; year: number | null } | undefined): string {
   if (!work) return '';
   return authorYearLabel(work.authors[0], work.year);

@@ -30,6 +30,8 @@ import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../ai/writingWorkshop';
+import { generateDeepResearchReport } from '../ai/deepResearch';
+import { buildDeepResearchBrief, assembleClientDeepResearchReport } from '../ai/deepResearchClient';
 import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail } from '../ai/liveRelations';
 
 const IDEA_TYPES = ['claim', 'finding', 'construct', 'method', 'framework'] as const;
@@ -88,6 +90,15 @@ const writingSelectionSchema = z.object({
   passageIds: z.array(z.string().min(1)).max(300),
   tutorRouteIds: z.array(z.string().min(1)).max(100),
 });
+
+const deepResearchTargetLengthSchema = z
+  .enum(['adaptive', 'concise', 'standard', 'exhaustive'])
+  .default('adaptive')
+  .describe('Extensión objetivo. adaptive: la decide el corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
+const deepResearchSectionLimitSchema = z
+  .union([z.literal('auto'), z.number().int().min(1).max(20)])
+  .default('auto')
+  .describe("Tope de secciones. 'auto' lo dimensiona por el corpus; un número lo fija (con una sección de gracia).");
 
 const writingDraftSchema = z.object({
   generatedAt: z.string().min(1),
@@ -1033,6 +1044,77 @@ export function registerTools(server: McpServer): void {
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool(() => ({ drafts: writingDrafts.listWritingWorkshopDrafts() }))
+  );
+
+  server.registerTool(
+    'nodus_generate_deep_research',
+    {
+      title: 'Generate a Deep Research report',
+      description:
+        'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus (5–20 pp). Two writers via `writer`: ' +
+        '"nodus" (default) — Nodus\'s own configured model plans and writes the whole report and returns it (save=true also stores it as a draft). ' +
+        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens.',
+      inputSchema: {
+        objective: z.string().trim().min(1).max(8_000),
+        language: z.enum(['es', 'en', 'fr']).optional(),
+        audience: z.string().trim().max(1_000).optional(),
+        targetLength: deepResearchTargetLengthSchema,
+        sectionLimit: deepResearchSectionLimitSchema,
+        writer: z
+          .enum(['nodus', 'client'])
+          .default('nodus')
+          .describe('"nodus": el modelo configurado en Nodus redacta el informe. "client": el modelo que llama al MCP lo redacta a partir del kit devuelto.'),
+        model: modelSchema.optional(),
+        save: z.boolean().default(false),
+        title: z.string().trim().min(1).max(2_000).optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }) =>
+      tool(async () => {
+        if (writer === 'client') {
+          return buildDeepResearchBrief({ objective, language, audience, targetLength, sectionLimit });
+        }
+        const report = await generateDeepResearchReport({ objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null });
+        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: asModel(model), title }) : null;
+        return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_finalize_deep_research',
+    {
+      title: 'Finalize a client-written Deep Research report',
+      description:
+        'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (`## ` body sections only) and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language used for the brief so the same corpus snapshot is used to validate citations.',
+      inputSchema: {
+        objective: z.string().trim().min(1).max(8_000),
+        language: z.enum(['es', 'en', 'fr']).optional(),
+        audience: z.string().trim().max(1_000).optional(),
+        sectionsMarkdown: z.string().trim().min(1).max(200_000),
+        title: z.string().trim().min(1).max(2_000).optional(),
+        abstract: z.string().trim().max(20_000).optional(),
+        limitations: z.array(z.string().trim().min(1).max(2_000)).max(30).optional(),
+        nextSteps: z.array(z.string().trim().min(1).max(2_000)).max(30).optional(),
+        save: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ objective, language, audience, sectionsMarkdown, title, abstract, limitations, nextSteps, save }) =>
+      tool(async () => {
+        const report = await assembleClientDeepResearchReport({
+          objective,
+          language,
+          audience,
+          sectionsMarkdown,
+          title,
+          abstract,
+          limitations,
+          nextSteps,
+        });
+        const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, title }) : null;
+        return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
+      })()
   );
 
   server.registerTool(

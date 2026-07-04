@@ -71,6 +71,8 @@ try {
     'nodus_generate_writing_draft',
     'nodus_save_writing_draft',
     'nodus_list_writing_drafts',
+    'nodus_generate_deep_research',
+    'nodus_finalize_deep_research',
     'nodus_create_folder',
     'nodus_update_folder_summary',
     'nodus_create_note',

@@ -36,6 +36,7 @@ try {
     orchestrateDeepResearch,
     applyCitationPolicy,
     buildSnapshotMaps,
+    buildCitationCatalog,
     resolveTargetPages,
     resolveSectionPlan,
     countWords,
@@ -198,6 +199,23 @@ try {
     assert.ok(markdown.includes('Autor0, N. (2000)'), 'idea label rewritten to canonical corpus label');
     assert.deepEqual([...cited.ideas], ['g-0']);
     assert.deepEqual([...cited.works], ['w-1']);
+  }
+
+  // ── 2b. buildCitationCatalog: trimmed pool, and every token is really citable ──
+  {
+    const snapshot = makeSnapshot(90);
+    const maps = buildSnapshotMaps(snapshot);
+    const catalog = buildCitationCatalog(snapshot);
+    // Pool is trimmed to POOL_LIMITS.ideas (70) even though the snapshot has 90.
+    assert.equal(catalog.ideas.length, 70, 'idea pool trimmed to POOL_LIMITS');
+    assert.equal(catalog.gaps.length, 1, 'gaps surfaced');
+    assert.equal(catalog.contradictions.length, 1, 'contradictions surfaced');
+    // Client-driven guarantee: a report citing ONLY catalog tokens loses nothing.
+    const md = [...catalog.ideas, ...catalog.works, ...catalog.gaps, ...catalog.contradictions]
+      .map((c) => `Claim ${c.token}.`)
+      .join('\n');
+    const { markdown } = applyCitationPolicy(md, maps);
+    assert.equal((markdown.match(/nodus:\/\//g) ?? []).length, md.match(/nodus:\/\//g).length, 'every catalog token survives the citation policy');
   }
 
   // ── 3. Full report: standard length, coverage, clean citations, references ──
