@@ -511,18 +511,29 @@ export function SigmaGraph({
       const hover = hoverRef.current;
       if (focus.active && focus.local) {
         const { primaryNodes, secondaryNodes, contextNodes, center } = focus.local;
-        if (node === center || primaryNodes.has(node)) {
+        if (node === center) {
+          // The selected node is the visual anchor: enlarge it so the eye lands
+          // on it and its outgoing links read as a distinct star.
+          res.zIndex = 4;
+          res.forceLabel = true;
+          res.size = Number(dataAttrs.size ?? 4) * 1.5;
+        } else if (primaryNodes.has(node)) {
           res.zIndex = 3;
           res.forceLabel = true;
+          res.size = Number(dataAttrs.size ?? 4) * 1.12;
         } else if (secondaryNodes.has(node)) {
           res.zIndex = 2;
         } else if (contextNodes.has(node)) {
           res.zIndex = 1;
           res.color = nodeColor(String(dataAttrs.kind));
         } else {
+          // Out-of-focus nodes recede hard — shrunk and dimmed. WebGL always
+          // draws edges beneath nodes, so a dense field of full-size grey blobs
+          // buries the focused connections; shrinking them lets the links surface.
           res.color = fadeNode;
           res.label = '';
           res.zIndex = 0;
+          res.size = Math.max(1.3, Number(dataAttrs.size ?? 2) * 0.42);
         }
       }
       // Hover augment: highlight the hovered node and its neighbours over the
@@ -534,6 +545,9 @@ export function SigmaGraph({
         res.label = dataAttrs.label;
         res.forceLabel = true;
         res.zIndex = 6;
+        // Restore size: a hovered node may have been shrunk by an active focus
+        // above, and a tiny-but-bright dot reads as a glitch.
+        res.size = Number(dataAttrs.size ?? 4) * (node === hover ? 1.3 : 1);
       }
       return res;
     },
@@ -553,10 +567,11 @@ export function SigmaGraph({
       if (focus.active && focus.local) {
         const { primaryEdges, secondaryEdges, contextEdges } = focus.local;
         if (primaryEdges.has(edge) || edge === focus.edgeId) {
-          // Reveal the semantic edge-type colour on the focused path.
+          // Reveal the semantic edge-type colour on the focused path and make it
+          // bold — these are the connections the user selected the node to see.
           res.color = EDGE_TYPE_COLORS[String(dataAttrs.kind)] ?? (lightTheme ? '#475569' : '#cbd5e1');
-          res.zIndex = 3;
-          res.size = Math.max(1.4, Number(dataAttrs.size ?? 1) * 2.2);
+          res.zIndex = 4;
+          res.size = Math.max(2.6, Number(dataAttrs.size ?? 1) * 3.6);
         } else if (secondaryEdges.has(edge)) {
           res.color = lightTheme ? '#b6b6b6' : '#3f3f46';
           res.zIndex = 2;

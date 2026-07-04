@@ -3186,6 +3186,33 @@ export function GraphView({
     setFilters((f) => (f.theme && !themes.includes(f.theme) ? { ...f, theme: '' } : f));
   }, [themes, themesLoaded]);
 
+  // Escape clears the current graph selection: closes the detail panel and drops
+  // the highlight, mirroring the panel's close button. Ignored while typing so it
+  // doesn't fight the search box or the filter selects.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Only defer to real form controls (e.g. the graph search box) so typing
+      // isn't hijacked. The detail panel's rich-text body is contentEditable and
+      // auto-focuses on open, so guarding on that would block the very case this
+      // shortcut exists for — closing the open panel.
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!ideaDetail && !edgeDetail && !detailLoading) {
+        clearFocusRef.current();
+        return;
+      }
+      detailSeqRef.current++;
+      setIdeaDetail(null);
+      setEdgeDetail(null);
+      setDetailLoading(null);
+      clearFocusRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [ideaDetail, edgeDetail, detailLoading]);
+
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Filter bar */}
@@ -3216,6 +3243,24 @@ export function GraphView({
           >
             <Icon name="search" /> {t('Filtros')}
           </button>
+          {/* Layout toggle, surfaced in the main bar so switching between the
+              force graph and the radial view is always one click away. */}
+          <div className="flex rounded-lg overflow-hidden border border-neutral-700">
+            <button
+              className={`px-2.5 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : 'hover:bg-neutral-800'}`}
+              title={t('Layout dirigido por fuerzas: agrupa ideas conectadas')}
+              onClick={() => selectLayoutMode('force')}
+            >
+              {t('Grafo')}
+            </button>
+            <button
+              className={`px-2.5 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : 'hover:bg-neutral-800'}`}
+              title={t('Layout radial: temas en polígono, ideas alrededor')}
+              onClick={() => selectLayoutMode('radial')}
+            >
+              {t('Radial')}
+            </button>
+          </div>
           {contextNotice && (
             <div className="inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/20 px-2 py-1 text-indigo-200">
               <Icon name="fit" size={12} />
@@ -3268,22 +3313,6 @@ export function GraphView({
               </button>
               <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('authors')}>
                 {t('Autores')}
-              </button>
-            </div>
-            <div className="flex rounded-lg overflow-hidden border border-neutral-700">
-              <button
-                className={`px-3 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : ''}`}
-                title={t('Layout dirigido por fuerzas: agrupa ideas conectadas')}
-                onClick={() => selectLayoutMode('force')}
-              >
-                {t('Grafo')}
-              </button>
-              <button
-                className={`px-3 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : ''}`}
-                title={t('Layout radial: temas en polígono, ideas alrededor')}
-                onClick={() => selectLayoutMode('radial')}
-              >
-                {t('Radial')}
               </button>
             </div>
             {lens === 'ideas' && (
