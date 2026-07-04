@@ -272,7 +272,6 @@ export function WorkGraphModal({
                   filters={OPEN_FILTERS}
                   lens="ideas"
                   preset="overview"
-                  layoutMode="force"
                   highlightDepth={1}
                   lightTheme={lightTheme}
                   onOpenNode={openNode}

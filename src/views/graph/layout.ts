@@ -50,11 +50,14 @@ export class WorkerLayout {
       outboundAttractionDistribution: true,
       // Honour our per-edge weight (non-layout edges have weight 0 → no pull).
       edgeWeightInfluence: 1,
-      scalingRatio: options.scalingRatio ?? 14,
-      gravity: options.gravity ?? 0.8,
-      // Critical-feeling damping: the initial layout visibly breathes but sheds
-      // energy quickly instead of leaving nodes quivering after a gesture.
-      slowDown: 12,
+      // A touch more repulsion and a touch less gravity so dense hubs open up
+      // instead of pulling their leaves into a blob. The hard guarantee against
+      // stacked circles is resolveOverlaps(), run once the simulation settles.
+      scalingRatio: options.scalingRatio ?? 20,
+      gravity: options.gravity ?? 0.7,
+      // More damping so the graph settles calmly and then stays put, instead of
+      // visibly drifting/quivering for many seconds after it appears.
+      slowDown: 18,
     };
     this.supervisor = new FA2Layout(this.graph, {
       settings,
@@ -142,4 +145,98 @@ export function scatterPositions(graph: Graph): void {
     graph.mergeNodeAttributes(id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
     i++;
   });
+}
+
+/**
+ * Push apart any nodes whose circles overlap. ForceAtlas2's `adjustSizes`
+ * anti-collision is approximate (and weakened by Barnes-Hut on large graphs), so
+ * the settled layout can still leave circles stacked on top of one another — the
+ * unreadable "blob" the user sees. This runs once after the simulation stops and
+ * deterministically separates overlapping nodes with a few relaxation passes over
+ * a spatial hash, so the result is O(n·iterations) rather than O(n²).
+ *
+ * `padding` is extra breathing room (in layout units) added on top of each pair's
+ * combined radii, so labels have somewhere to sit. Positions are only nudged, so
+ * the overall shape the force layout found is preserved.
+ */
+export function resolveOverlaps(
+  graph: Graph,
+  opts: { padding?: number; iterations?: number } = {}
+): boolean {
+  const padding = opts.padding ?? 10;
+  const iterations = opts.iterations ?? 80;
+
+  const ids: string[] = [];
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const rs: number[] = [];
+  let maxR = 1;
+  graph.forEachNode((id, attrs) => {
+    if (typeof attrs.x !== 'number' || typeof attrs.y !== 'number') return;
+    const r = Math.max(1, Number(attrs.size ?? 4));
+    ids.push(id);
+    xs.push(attrs.x as number);
+    ys.push(attrs.y as number);
+    rs.push(r);
+    if (r > maxR) maxR = r;
+  });
+
+  const n = ids.length;
+  if (n < 2) return false;
+
+  const cell = maxR * 2 + padding;
+  let anyMoved = false;
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const grid = new Map<string, number[]>();
+    for (let i = 0; i < n; i++) {
+      const key = `${Math.floor(xs[i] / cell)},${Math.floor(ys[i] / cell)}`;
+      const bucket = grid.get(key);
+      if (bucket) bucket.push(i);
+      else grid.set(key, [i]);
+    }
+
+    let moved = false;
+    for (let i = 0; i < n; i++) {
+      const cx = Math.floor(xs[i] / cell);
+      const cy = Math.floor(ys[i] / cell);
+      for (let gx = cx - 1; gx <= cx + 1; gx++) {
+        for (let gy = cy - 1; gy <= cy + 1; gy++) {
+          const bucket = grid.get(`${gx},${gy}`);
+          if (!bucket) continue;
+          for (const j of bucket) {
+            if (j <= i) continue;
+            let dx = xs[j] - xs[i];
+            let dy = ys[j] - ys[i];
+            let dist = Math.hypot(dx, dy);
+            const minDist = rs[i] + rs[j] + padding;
+            if (dist >= minDist) continue;
+            if (dist < 1e-6) {
+              // Coincident nodes: nudge along a deterministic direction derived
+              // from the index so the resolution stays stable across runs.
+              const a = (i * 2.399963) % (Math.PI * 2);
+              dx = Math.cos(a);
+              dy = Math.sin(a);
+              dist = 1;
+            }
+            const shift = (minDist - dist) / 2;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            xs[i] -= ux * shift;
+            ys[i] -= uy * shift;
+            xs[j] += ux * shift;
+            ys[j] += uy * shift;
+            moved = true;
+          }
+        }
+      }
+    }
+    if (moved) anyMoved = true;
+    else break;
+  }
+
+  if (anyMoved) {
+    for (let i = 0; i < n; i++) graph.mergeNodeAttributes(ids[i], { x: xs[i], y: ys[i] });
+  }
+  return anyMoved;
 }

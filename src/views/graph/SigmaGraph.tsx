@@ -18,9 +18,9 @@ import type { GraphData, GraphNodeType } from '@shared/types';
 import { NODE_COLORS } from '../../components/ui';
 import type { GraphPresetId } from '../../navigation';
 import { t } from '../../i18n';
-import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens, type GraphModel } from './model';
+import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
-import { WorkerLayout, seedMissingPositions, scatterPositions } from './layout';
+import { WorkerLayout, seedMissingPositions, scatterPositions, resolveOverlaps } from './layout';
 import { computeClusters, type AggregatedGraph } from './lod';
 
 export interface SigmaGraphApi {
@@ -28,8 +28,6 @@ export interface SigmaGraphApi {
   zoomBy: (factor: number) => void;
   /** Replay the graph as an incremental, chronological build-up. */
   playHistory: () => boolean;
-  /** Toggle the manual LOD view. Returns whether communities are now collapsed. */
-  toggleCommunities: () => boolean;
   focusNode: (id: string) => boolean;
   focusEdge: (id: string) => boolean;
   /** Spotlight a Tutor stop and keep it visible while the user moves the camera. */
@@ -44,13 +42,11 @@ interface SigmaGraphProps {
   filters: GraphFilters;
   lens: GraphLens;
   preset: GraphPresetId;
-  layoutMode: 'force' | 'radial';
   highlightDepth: number | null;
   lightTheme: boolean;
   onOpenNode: (id: string, label: string, type: string) => void;
   onOpenEdge: (id: string, type: string) => void;
   onClearFocus: () => void;
-  onCommunitiesChange?: (collapsed: boolean) => void;
   onApiReady?: (api: SigmaGraphApi | null) => void;
 }
 
@@ -125,172 +121,6 @@ function stableUnit(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return ((hash >>> 0) % 10000) / 10000;
-}
-
-/**
- * The model-only version of the legacy radial layout. Keeping it independent of
- * Cytoscape makes the placement deterministic for either renderer.
- */
-function computeIdeaRadialPositions(model: GraphModel): Map<string, GraphPosition> {
-  const themes = model.nodes.filter((node) => node.type === 'theme');
-  const positions = new Map<string, GraphPosition>();
-  if (themes.length === 0) {
-    // A filtered graph can contain no themes. Stay deterministic in radial mode
-    // instead of silently starting ForceAtlas2.
-    const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-    model.nodes.forEach((node, index) => {
-      const radius = 96 * Math.sqrt(index);
-      const angle = index * goldenAngle;
-      positions.set(node.id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
-    });
-    return positions;
-  }
-
-  const themeAngle = new Map<string, number>();
-  const themeRadius = themes.length === 1 ? 0 : Math.min(1040, 320 + themes.length * 44);
-  themes.forEach((theme, index) => {
-    const angle = ((-90 + (index * 360) / themes.length) * Math.PI) / 180;
-    themeAngle.set(theme.id, angle);
-    positions.set(theme.id, { x: themeRadius * Math.cos(angle), y: themeRadius * Math.sin(angle) });
-  });
-
-  const nodeById = new Map(model.nodes.map((node) => [node.id, node]));
-  const themesByIdea = new Map<string, string[]>();
-  for (const edge of model.edges) {
-    if (edge.type !== 'contains') continue;
-    const source = nodeById.get(edge.source);
-    const target = nodeById.get(edge.target);
-    if (source?.type !== 'theme' || !target || target.type === 'theme') continue;
-    const list = themesByIdea.get(target.id) ?? [];
-    list.push(source.id);
-    themesByIdea.set(target.id, list);
-  }
-
-  const groups = new Map<string, string[]>();
-  themes.forEach((theme) => groups.set(theme.id, []));
-  const orphans: string[] = [];
-  for (const node of model.nodes) {
-    if (node.type === 'theme') continue;
-    const themeId = (themesByIdea.get(node.id) ?? []).find((id) => themeAngle.has(id));
-    if (themeId) groups.get(themeId)?.push(node.id);
-    else orphans.push(node.id);
-  }
-
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
-  const clusterStep = 134;
-  let maxRadius = themeRadius + 220;
-  for (const [themeId, members] of groups) {
-    const angle = themeAngle.get(themeId)!;
-    const themePosition = positions.get(themeId)!;
-    const clusterDistance = 360 + Math.min(420, Math.sqrt(members.length) * 76);
-    const center = {
-      x: themePosition.x + clusterDistance * Math.cos(angle),
-      y: themePosition.y + clusterDistance * Math.sin(angle),
-    };
-    members.forEach((id, index) => {
-      const jitter = (stableUnit(id) - 0.5) * 0.7;
-      const radius = members.length === 1 ? 0 : 42 + clusterStep * Math.sqrt(index + 1);
-      const memberAngle = angle + index * goldenAngle + jitter;
-      const position = {
-        x: center.x + radius * Math.cos(memberAngle),
-        y: center.y + radius * Math.sin(memberAngle),
-      };
-      positions.set(id, position);
-      maxRadius = Math.max(maxRadius, Math.hypot(position.x, position.y));
-    });
-  }
-
-  const orphanRadius = maxRadius + 340;
-  orphans.forEach((id, index) => {
-    const radius = orphanRadius + 58 * Math.sqrt(index);
-    const angle = index * goldenAngle;
-    positions.set(id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
-  });
-
-  // Preserve the legacy layout's small deterministic pull between related ideas
-  // without allowing the result to drift like a force simulation.
-  const relationEdges = model.edges.filter((edge) => {
-    if (edge.type === 'contains') return false;
-    const source = nodeById.get(edge.source);
-    const target = nodeById.get(edge.target);
-    return source?.type !== 'theme' && target?.type !== 'theme';
-  });
-  const strengthByType: Record<string, number> = {
-    contradicts: 0.42,
-    refutes: 0.42,
-    supports: 0.38,
-    extends: 0.34,
-    applies_to: 0.3,
-    shares_method: 0.26,
-    measures_same: 0.26,
-    precondition_of: 0.3,
-  };
-  for (let iteration = 0; iteration < 70; iteration++) {
-    for (const edge of relationEdges) {
-      const source = positions.get(edge.source);
-      const target = positions.get(edge.target);
-      if (!source || !target) continue;
-      const dx = target.x - source.x;
-      const dy = target.y - source.y;
-      const distance = Math.max(1, Math.hypot(dx, dy));
-      const confidence = Math.min(1, Math.max(0.1, edge.confidence));
-      const ideal = edge.type === 'contradicts' || edge.type === 'refutes' ? 190 : 145 + (1 - confidence) * 70;
-      const pull = ((distance - ideal) / distance) * (strengthByType[edge.type] ?? 0.24) * confidence * 0.045;
-      const moveX = dx * pull;
-      const moveY = dy * pull;
-      source.x += moveX;
-      source.y += moveY;
-      target.x -= moveX;
-      target.y -= moveY;
-    }
-  }
-
-  return positions;
-}
-
-function computeAuthorRadialPositions(model: GraphModel): Map<string, GraphPosition> {
-  const nodes = model.nodes
-    .filter((node) => node.type === 'author')
-    .map((node) => ({
-      id: node.id,
-      score: Math.max(0, node.degree) * 5 + Math.max(0, node.workCount) * 2 + node.labelRank,
-    }))
-    .sort((a, b) => b.score - a.score || stableUnit(a.id) - stableUnit(b.id));
-  const positions = new Map<string, GraphPosition>();
-  if (nodes.length === 0) return positions;
-  if (nodes.length === 1) {
-    positions.set(nodes[0].id, { x: 0, y: 0 });
-    return positions;
-  }
-
-  let index = 0;
-  if (nodes.length >= 12) {
-    positions.set(nodes[index].id, { x: 0, y: 0 });
-    index++;
-  }
-  const spacing = nodes.length > 140 ? 132 : nodes.length > 80 ? 150 : 172;
-  const ringGap = nodes.length > 140 ? 176 : nodes.length > 80 ? 198 : 224;
-  for (let ring = 1; index < nodes.length; ring++) {
-    const radius = 230 + (ring - 1) * ringGap;
-    const capacity = Math.max(8 + ring * 4, Math.floor((2 * Math.PI * radius) / spacing));
-    const count = Math.min(capacity, nodes.length - index);
-    const offset = stableUnit(`author-ring:${ring}:${nodes.length}`) * Math.PI * 2;
-    for (let slot = 0; slot < count; slot++) {
-      const id = nodes[index + slot].id;
-      const angle = offset + (slot / count) * Math.PI * 2;
-      const jitter = (stableUnit(`author-jitter:${id}`) - 0.5) * Math.min(26, spacing * 0.16);
-      positions.set(id, {
-        x: (radius + jitter) * Math.cos(angle),
-        y: (radius + jitter) * Math.sin(angle),
-      });
-    }
-    index += count;
-  }
-  return positions;
-}
-
-function computeRadialLayoutPositions(model: GraphModel, lens: GraphLens): Map<string, GraphPosition> {
-  return lens === 'authors' ? computeAuthorRadialPositions(model) : computeIdeaRadialPositions(model);
 }
 
 function fitLabelText(context: CanvasRenderingContext2D, text: string, maxWidth: number): string {
@@ -387,13 +217,11 @@ export function SigmaGraph({
   filters,
   lens,
   preset,
-  layoutMode,
   highlightDepth,
   lightTheme,
   onOpenNode,
   onOpenEdge,
   onClearFocus,
-  onCommunitiesChange,
   onApiReady,
 }: SigmaGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -417,12 +245,8 @@ export function SigmaGraph({
   const clusterTimerRef = useRef<number | null>(null);
   const minimapRafRef = useRef<number | null>(null);
   const minimapFrameRef = useRef<MinimapFrame | null>(null);
-  const radialFitRafRef = useRef<number | null>(null);
   const searchRef = useRef(filters.search);
   const [revealedNodeIds, setRevealedNodeIds] = useState<Set<string>>(() => new Set());
-  // null keeps automatic LOD. A boolean explicitly forces the corresponding
-  // mode after every camera event until the graph is rebuilt or reset.
-  const manualOverviewRef = useRef<boolean | null>(null);
   const lightThemeRef = useRef(lightTheme);
   const onCameraUpdatedRef = useRef<() => void>(() => {});
 
@@ -518,8 +342,11 @@ export function SigmaGraph({
           res.forceLabel = true;
           res.size = Number(dataAttrs.size ?? 4) * 1.5;
         } else if (primaryNodes.has(node)) {
+          // Neighbours are emphasised (size + z-order) but their labels go
+          // through the normal collision check rather than being force-drawn:
+          // a tight hub with many neighbours would otherwise stack every caption
+          // into an unreadable pile. Overlapping ones hide; those with room show.
           res.zIndex = 3;
-          res.forceLabel = true;
           res.size = Number(dataAttrs.size ?? 4) * 1.12;
         } else if (secondaryNodes.has(node)) {
           res.zIndex = 2;
@@ -708,10 +535,9 @@ export function SigmaGraph({
         sigma.setGraph(detail);
       }
       sigma.refresh();
-      onCommunitiesChange?.(next === 'overview');
       return true;
     },
-    [ensureClusters, onCommunitiesChange]
+    [ensureClusters]
   );
 
   const focusTutor = useCallback(
@@ -743,11 +569,6 @@ export function SigmaGraph({
         switchMode('detail');
         return;
       }
-      const manualOverview = manualOverviewRef.current;
-      if (manualOverview != null) {
-        switchMode(manualOverview ? 'overview' : 'detail');
-        return;
-      }
       const ratio = sigma.getCamera().ratio;
       // Only collapse to the (still-rough) overview for very large corpora where
       // the full graph genuinely can't be drawn legibly. Below this, always show
@@ -763,26 +584,6 @@ export function SigmaGraph({
   useEffect(() => {
     onCameraUpdatedRef.current = onCameraUpdated;
   }, [onCameraUpdated]);
-
-  const applyRadialLayout = useCallback(
-    (graph: Graph) => {
-      const positions = computeRadialLayoutPositions(model, lens);
-      positions.forEach((position, id) => {
-        if (graph.hasNode(id)) graph.mergeNodeAttributes(id, position);
-      });
-      return positions.size > 0;
-    },
-    [lens, model]
-  );
-
-  const fitRadialGraph = useCallback((graph: Graph) => {
-    if (radialFitRafRef.current != null) window.cancelAnimationFrame(radialFitRafRef.current);
-    radialFitRafRef.current = window.requestAnimationFrame(() => {
-      radialFitRafRef.current = null;
-      if (detailGraphRef.current !== graph) return;
-      void sigmaRef.current?.getCamera().animatedReset({ duration: 320 });
-    });
-  }, []);
 
   // ── Sigma minimap ───────────────────────────────────────────────────────────
   const drawMinimap = useCallback(() => {
@@ -1253,8 +1054,6 @@ export function SigmaGraph({
     focusRef.current = { active: false, local: null, edgeId: null };
     hoverRef.current = null;
     modeRef.current = 'detail';
-    manualOverviewRef.current = null;
-    onCommunitiesChange?.(false);
 
     sigma.setGraph(graph);
 
@@ -1273,17 +1072,6 @@ export function SigmaGraph({
     }
 
     if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
-    if (layoutMode === 'radial') {
-      // Radial is a complete preset layout. Do not instantiate the FA2 worker
-      // here: switching modes must not leave a background force simulation
-      // overwriting the deterministic positions.
-      layoutRef.current = null;
-      applyRadialLayout(graph);
-      ensureClusters();
-      sigma.refresh();
-      fitRadialGraph(graph);
-      return;
-    }
 
     sigma.refresh();
     if (graph.order > 0) {
@@ -1293,21 +1081,26 @@ export function SigmaGraph({
       // but cap the worker budget so very large libraries remain economical.
       const settleMs = obsidianSettleMs(graph.order);
       layout.start({ durationMs: settleMs });
-      // Precompute LOD clusters once settled, so a future zoom-out is instant.
+      // Once the physics have settled, guarantee no two circles are stacked on
+      // top of each other (ForceAtlas2's anti-collision is only approximate) and
+      // precompute LOD clusters so a future zoom-out is instant.
       clusterTimerRef.current = window.setTimeout(() => {
         clusterTimerRef.current = null;
+        if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
+          if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+        }
         ensureClusters();
       }, settleMs + 300);
     } else {
       layoutRef.current = null;
     }
-  }, [applyRadialLayout, buildDetailGraph, ensureClusters, fitRadialGraph, layoutMode, model, onCommunitiesChange]);
+  }, [buildDetailGraph, ensureClusters, model]);
 
   // ── Obsidian-style chronological playback ──────────────────────────────────
   const playHistory = useCallback((): boolean => {
     const sigma = sigmaRef.current;
     const graph = detailGraphRef.current;
-    if (!sigma || !graph || graph.order === 0 || lens === 'authors' || layoutMode === 'radial') return false;
+    if (!sigma || !graph || graph.order === 0 || lens === 'authors') return false;
 
     if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
     if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
@@ -1315,14 +1108,12 @@ export function SigmaGraph({
     clusterTimerRef.current = null;
     layoutRef.current?.kill();
     layoutRef.current = null;
-    manualOverviewRef.current = false;
     switchMode('detail');
     focusRef.current = { active: false, local: null, edgeId: null };
     tutorFocusRef.current = null;
     hoverRef.current = null;
     hoverLocalRef.current = null;
     onClearFocus();
-    onCommunitiesChange?.(false);
 
     // Start from a fresh, neutral cloud so the gradual reveal has the same
     // "network coming into being" quality as Obsidian's history animation.
@@ -1381,10 +1172,13 @@ export function SigmaGraph({
     layout.start({ durationMs: settleMs });
     clusterTimerRef.current = window.setTimeout(() => {
       clusterTimerRef.current = null;
+      if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
+        if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+      }
       ensureClusters();
     }, settleMs + 300);
     return true;
-  }, [ensureClusters, layoutMode, lens, model, onClearFocus, onCommunitiesChange, switchMode]);
+  }, [ensureClusters, lens, model, onClearFocus, switchMode]);
 
   // ── Imperative API for the toolbar / navigation ─────────────────────────────
   useEffect(() => {
@@ -1399,34 +1193,6 @@ export function SigmaGraph({
         camera.animate({ ratio: camera.getBoundedRatio(camera.ratio / factor) }, { duration: 180 });
       },
       playHistory,
-      toggleCommunities: () => {
-        const detail = detailGraphRef.current;
-        if (!detail || detail.order === 0) {
-          manualOverviewRef.current = false;
-          onCommunitiesChange?.(false);
-          return false;
-        }
-        const nextCollapsed = modeRef.current !== 'overview';
-        if (nextCollapsed) {
-          const clusters = ensureClusters();
-          // Match the legacy control: a lone fallback cluster is not a useful
-          // "communities" view, so leave the detailed graph in place.
-          if (!clusters || clusters.clusters.length < 2) {
-            manualOverviewRef.current = false;
-            onCommunitiesChange?.(false);
-            return false;
-          }
-          if (focusRef.current.active) {
-            clearFocus();
-            onClearFocus();
-          }
-        }
-        manualOverviewRef.current = nextCollapsed;
-        const switched = switchMode(nextCollapsed ? 'overview' : 'detail');
-        const collapsed = switched && modeRef.current === 'overview';
-        onCommunitiesChange?.(collapsed);
-        return collapsed;
-      },
       focusNode: (id) => {
         const g = detailGraphRef.current;
         if (!g || !g.hasNode(id)) return false;
@@ -1457,32 +1223,31 @@ export function SigmaGraph({
         hoverRef.current = null;
         hoverLocalRef.current = null;
         modeRef.current = 'detail';
-        manualOverviewRef.current = null;
-        onCommunitiesChange?.(false);
         if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
         const sigma = sigmaRef.current;
         if (g && g.order > 0) {
           if (sigma && sigma.getGraph() !== g) sigma.setGraph(g);
           layoutRef.current?.kill();
-          if (layoutMode === 'radial') {
-            layoutRef.current = null;
-            applyRadialLayout(g);
-            ensureClusters();
-            fitRadialGraph(g);
-          } else {
-            scatterPositions(g);
-            const layout = new WorkerLayout(g);
-            layoutRef.current = layout;
-            layout.start({ durationMs: obsidianSettleMs(g.order) });
-          }
+          scatterPositions(g);
+          const layout = new WorkerLayout(g);
+          layoutRef.current = layout;
+          const settleMs = obsidianSettleMs(g.order);
+          layout.start({ durationMs: settleMs });
+          if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
+          clusterTimerRef.current = window.setTimeout(() => {
+            clusterTimerRef.current = null;
+            if (!draggingRef.current && detailGraphRef.current === g && layoutRef.current === layout) {
+              if (resolveOverlaps(g)) sigmaRef.current?.refresh();
+            }
+          }, settleMs + 300);
         }
         sigma?.refresh();
-        if (layoutMode !== 'radial') void sigma?.getCamera().animatedReset({ duration: 320 });
+        void sigma?.getCamera().animatedReset({ duration: 320 });
       },
     };
     onApiReady(api);
     return () => onApiReady(null);
-  }, [onApiReady, applyFocusForNode, applyFocusForEdge, applyRadialLayout, clearFocus, ensureClusters, fitRadialGraph, focusTutor, layoutMode, onClearFocus, onCommunitiesChange, playHistory, switchMode]);
+  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, ensureClusters, focusTutor, onClearFocus, playHistory, switchMode]);
 
   // Final teardown.
   useEffect(() => {
@@ -1490,7 +1255,6 @@ export function SigmaGraph({
       if (cameraRafRef.current != null) window.cancelAnimationFrame(cameraRafRef.current);
       if (clusterTimerRef.current != null) window.clearTimeout(clusterTimerRef.current);
       if (minimapRafRef.current != null) window.cancelAnimationFrame(minimapRafRef.current);
-      if (radialFitRafRef.current != null) window.cancelAnimationFrame(radialFitRafRef.current);
       if (historyTimerRef.current != null) window.clearInterval(historyTimerRef.current);
       layoutRef.current?.kill();
       layoutRef.current = null;

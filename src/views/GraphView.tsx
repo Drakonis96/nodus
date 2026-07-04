@@ -1058,7 +1058,7 @@ function graphPreset(id: GraphPresetId, target?: GraphNavigationTarget): { lens:
         lens: 'ideas',
         filters: withTarget,
         depth: 1,
-        layoutMode: 'radial',
+        layoutMode: 'force',
       };
     case 'unread':
       return {
@@ -1345,112 +1345,6 @@ function authorPhysicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Se
   return physical;
 }
 
-// ── Louvain community detection (simplified) ────────────────────────────────
-// Returns a map of node id → community id. Works on undirected weighted edges.
-function louvain(cy: Core): Map<string, number> {
-  const nodes = cy.nodes().filter((n) => !n.isParent()); // skip compound parents
-  const adj = new Map<string, Map<string, number>>();
-  let totalWeight = 0;
-
-  // Build adjacency (undirected, weighted by confidence).
-  nodes.forEach((n) => { adj.set(n.id(), new Map()); });
-  cy.edges().forEach((e) => {
-    const s = e.data('source') as string;
-    const t = e.data('target') as string;
-    if (!adj.has(s) || !adj.has(t)) return;
-    const w = Math.max(0.1, Number(e.data('confidence') ?? 0.5));
-    const a = adj.get(s)!;
-    a.set(t, (a.get(t) ?? 0) + w);
-    const b = adj.get(t)!;
-    b.set(s, (b.get(s) ?? 0) + w);
-    totalWeight += w;
-  });
-  if (totalWeight === 0 || nodes.length === 0) return new Map();
-
-  // Each node starts in its own community.
-  const community = new Map<string, number>();
-  const nodeIds: string[] = [];
-  nodes.forEach((n) => {
-    nodeIds.push(n.id());
-    community.set(n.id(), nodeIds.length - 1);
-  });
-
-  // k_i = weighted degree of node i
-  const k = new Map<string, number>();
-  for (const id of nodeIds) {
-    let sum = 0;
-    for (const w of adj.get(id)!.values()) sum += w;
-    k.set(id, sum);
-  }
-
-  // Sum of weights inside each community.
-  const sigmaIn = new Map<number, number>();
-  const sigmaTot = new Map<number, number>();
-  for (const id of nodeIds) {
-    const c = community.get(id)!;
-    sigmaIn.set(c, 0);
-    sigmaTot.set(c, k.get(id)!);
-  }
-
-  // Iterate until no improvement.
-  let improved = true;
-  let iter = 0;
-  while (improved && iter < 20) {
-    improved = false;
-    iter++;
-    for (const id of nodeIds) {
-      const currentC = community.get(id)!;
-      const ki = k.get(id)!;
-      const neighbors = adj.get(id)!;
-
-      // Remove node from its community.
-      let kiIn = 0;
-      for (const [nb, w] of neighbors) {
-        if (community.get(nb) === currentC) kiIn += w;
-      }
-      sigmaTot.set(currentC, (sigmaTot.get(currentC) ?? 0) - ki);
-      sigmaIn.set(currentC, (sigmaIn.get(currentC) ?? 0) - 2 * kiIn);
-
-      // Find best community among neighbors.
-      const neighborComms = new Map<number, number>(); // comm → ki_in
-      for (const [nb, w] of neighbors) {
-        const nc = community.get(nb)!;
-        neighborComms.set(nc, (neighborComms.get(nc) ?? 0) + w);
-      }
-
-      let bestC = currentC;
-      let bestGain = 0;
-      for (const [nc, kiInNew] of neighborComms) {
-        const sigmaTotNc = sigmaTot.get(nc) ?? 0;
-        const gain = kiInNew / totalWeight - (ki * sigmaTotNc) / (totalWeight * totalWeight);
-        if (gain > bestGain) {
-          bestGain = gain;
-          bestC = nc;
-        }
-      }
-
-      // Move node to best community.
-      community.set(id, bestC);
-      const kiInBest = neighborComms.get(bestC) ?? 0;
-      sigmaTot.set(bestC, (sigmaTot.get(bestC) ?? 0) + ki);
-      sigmaIn.set(bestC, (sigmaIn.get(bestC) ?? 0) + 2 * kiInBest);
-
-      if (bestC !== currentC) improved = true;
-    }
-  }
-
-  // Renumber communities to 0..N-1.
-  const renumber = new Map<number, number>();
-  let next = 0;
-  const result = new Map<string, number>();
-  for (const id of nodeIds) {
-    const c = community.get(id)!;
-    if (!renumber.has(c)) renumber.set(c, next++);
-    result.set(id, renumber.get(c)!);
-  }
-  return result;
-}
-
 export function GraphView({
   settings,
   onSettingsChange,
@@ -1544,10 +1438,8 @@ export function GraphView({
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
   const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
   const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(LAYOUT_KEY) as 'force' | 'radial') || 'force');
-  const [communitiesCollapsed, setCommunitiesCollapsed] = useState(false);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const sigmaApiRef = useRef<SigmaGraphApi | null>(null);
-  const communitiesRef = useRef<Map<string, number>>(new Map());
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
   const lensRef = useRef<GraphLens>(lens);
   const appliedGraphModeRef = useRef<{ lens: GraphLens; layoutMode: 'force' | 'radial' } | null>(null);
@@ -1654,19 +1546,6 @@ export function GraphView({
   const stopActiveLayout = useCallback(() => {
     activeLayoutRef.current?.stop?.();
     activeLayoutRef.current = null;
-  }, []);
-
-  const removeCommunityGuides = useCallback((cy: Core) => {
-    const guides = cy.nodes('[type="community-guide"]');
-    if (guides.empty()) return;
-    cy.batch(() => {
-      guides.forEach((guide) => {
-        guide.children().forEach((child) => {
-          child.move({ parent: null });
-        });
-      });
-      guides.remove();
-    });
   }, []);
 
   const applyElasticDragStep = useCallback(() => {
@@ -2606,7 +2485,6 @@ export function GraphView({
     const renderableNodes = cy.nodes().filter((node) => !node.isParent());
     const renderableNodeCount = renderableNodes.length;
     if (renderableNodeCount === 0) {
-      setCommunitiesCollapsed(false);
       finishGraphRender();
       return;
     }
@@ -2652,10 +2530,7 @@ export function GraphView({
     // NOTE: automatic community guides (invisible compound parents) were removed
     // — they force the layout into a far slower compound-graph path on
     // every rebuild, which was a major cause of the freeze with themes enabled.
-    // The explicit "Comunidades" button still groups on demand via toggleCommunities.
     applySemanticZoomRef.current(cy, true);
-    // Reset community state when elements are rebuilt.
-    setCommunitiesCollapsed(false);
     let layout: any;
     if (lensChanged || layoutModeChanged || !hasReusablePositions) forceLayoutPrimedRef.current = false;
     const forceLayoutNeedsInitialFrame = !forceLayoutPrimedRef.current || !hasReusablePositions;
@@ -2969,102 +2844,6 @@ export function GraphView({
     cy.animate({ center: { renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } }, pan: { x: cy.width() / 2 - gx * cy.zoom(), y: cy.height() / 2 - gy * cy.zoom() } } as any, { duration: 300 });
   };
 
-  // ── Community collapse/expand ───────────────────────────────────────────────
-  const toggleCommunities = useCallback(() => {
-    const cy = cyRef.current;
-    if (!cy) return;
-
-    if (communitiesCollapsed) {
-      // Expand: remove compound parents, restore original elements.
-      cy.batch(() => {
-        const parents = cy.nodes(':parent');
-        // Move children out of parents first.
-        parents.forEach((p) => {
-          p.children().forEach((child) => {
-            child.move({ parent: null });
-          });
-        });
-        parents.remove();
-      });
-      // No automatic guides on expand (see note in the elements effect).
-      // Re-layout after expand.
-      stopActiveLayout();
-      const layout = cy.layout({
-        ...createForceLayoutOptions(cy, false, () => {
-          if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
-          applyLabelBoxRepulsion(cy);
-          applySemanticZoomRef.current(cy, true);
-        }),
-        fit: false,
-        animationDuration: 400,
-      } as any);
-      activeLayoutRef.current = layout;
-      layout.run();
-      setCommunitiesCollapsed(false);
-    } else {
-      removeCommunityGuides(cy);
-      // Collapse: detect communities and create compound nodes.
-      const commMap = louvain(cy);
-      communitiesRef.current = commMap;
-
-      // Count community sizes.
-      const commSizes = new Map<number, number>();
-      for (const c of commMap.values()) commSizes.set(c, (commSizes.get(c) ?? 0) + 1);
-      // Only create compound nodes for communities with ≥3 members.
-      const validComms = new Set([...commSizes.entries()].filter(([, s]) => s >= 3).map(([c]) => c));
-      if (validComms.size < 2) {
-        setCommunitiesCollapsed(false);
-        return; // Not enough communities to collapse.
-      }
-
-      cy.batch(() => {
-        for (const commId of validComms) {
-          const parentId = `comm:${commId}`;
-          cy.add({
-            group: 'nodes',
-            data: {
-              id: parentId,
-              label: tx('Comunidad {n}', { n: commId + 1 }),
-              type: 'community',
-              size: 60,
-            },
-          });
-        }
-        // Move nodes into their community parent.
-        for (const [nodeId, commId] of commMap) {
-          if (!validComms.has(commId)) continue;
-          const node = cy.getElementById(nodeId);
-          if (node.nonempty() && !node.isParent()) {
-            node.move({ parent: `comm:${commId}` });
-          }
-        }
-      });
-      // Re-layout after collapse.
-      stopActiveLayout();
-      const layout = cy.layout({
-        ...createForceLayoutOptions(cy, false, () => {
-          if (activeLayoutRef.current === layout) activeLayoutRef.current = null;
-          applyLabelBoxRepulsion(cy);
-          applySemanticZoomRef.current(cy, true);
-        }),
-        fit: false,
-        animationDuration: 400,
-      } as any);
-      activeLayoutRef.current = layout;
-      layout.run();
-      setCommunitiesCollapsed(true);
-    }
-  }, [communitiesCollapsed, removeCommunityGuides, stopActiveLayout]);
-
-  const handleCommunitiesToggle = useCallback(() => {
-    if (USE_SIGMA) {
-      const collapsed = sigmaApiRef.current?.toggleCommunities();
-      if (collapsed !== undefined) setCommunitiesCollapsed(collapsed);
-      return;
-    }
-    toggleCommunities();
-  }, [toggleCommunities]);
-
   // Tutor stop → frame the node on the graph and open its info in the right sidebar so
   // it can be read alongside the narration. A sequence token avoids a stale async detail
   // landing after the user has already advanced to the next stop.
@@ -3114,10 +2893,6 @@ export function GraphView({
       setLens(nextLens);
       setActivePreset(nextLens === 'authors' ? 'authors' : 'overview');
     });
-  };
-  const selectLayoutMode = (nextLayoutMode: 'force' | 'radial') => {
-    if (nextLayoutMode === layoutMode) return;
-    transitionGraph(() => setLayoutMode(nextLayoutMode));
   };
   const applyPreset = useCallback((id: GraphPresetId, navigationTarget?: GraphNavigationTarget) => {
     const next = graphPreset(id, navigationTarget);
@@ -3243,24 +3018,6 @@ export function GraphView({
           >
             <Icon name="search" /> {t('Filtros')}
           </button>
-          {/* Layout toggle, surfaced in the main bar so switching between the
-              force graph and the radial view is always one click away. */}
-          <div className="flex rounded-lg overflow-hidden border border-neutral-700">
-            <button
-              className={`px-2.5 py-1 ${layoutMode === 'force' ? 'bg-indigo-600 text-white' : 'hover:bg-neutral-800'}`}
-              title={t('Layout dirigido por fuerzas: agrupa ideas conectadas')}
-              onClick={() => selectLayoutMode('force')}
-            >
-              {t('Grafo')}
-            </button>
-            <button
-              className={`px-2.5 py-1 ${layoutMode === 'radial' ? 'bg-indigo-600 text-white' : 'hover:bg-neutral-800'}`}
-              title={t('Layout radial: temas en polígono, ideas alrededor')}
-              onClick={() => selectLayoutMode('radial')}
-            >
-              {t('Radial')}
-            </button>
-          </div>
           {contextNotice && (
             <div className="inline-flex items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/20 px-2 py-1 text-indigo-200">
               <Icon name="fit" size={12} />
@@ -3390,15 +3147,6 @@ export function GraphView({
               value={filters.yearMax ?? ''}
               onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })}
             />
-            {lens === 'ideas' && (
-              <button
-                className={`btn border border-neutral-700 gap-1.5 ${communitiesCollapsed ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
-                title={communitiesCollapsed ? t('Expandir comunidades') : t('Colapsar en comunidades (Louvain)')}
-                onClick={handleCommunitiesToggle}
-              >
-                <Icon name="layers" /> {communitiesCollapsed ? t('Expandir') : t('Comunidades')}
-              </button>
-            )}
             <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset(lens === 'authors' ? 'authors' : 'overview')}>
               {t('Limpiar')}
             </button>
@@ -3427,13 +3175,11 @@ export function GraphView({
                 filters={filters}
                 lens={lens}
                 preset={activePreset}
-                layoutMode={layoutMode}
                 highlightDepth={highlightDepth}
                 lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')}
                 onOpenNode={onSigmaOpenNode}
                 onOpenEdge={onSigmaOpenEdge}
                 onClearFocus={onSigmaClear}
-                onCommunitiesChange={setCommunitiesCollapsed}
                 onApiReady={(api) => {
                   sigmaApiRef.current = api;
                   clearFocusRef.current = () => api?.clearFocus();
