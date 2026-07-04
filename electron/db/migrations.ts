@@ -732,6 +732,41 @@ export const migrations: Migration[] = [
       ALTER TABLE notes ADD COLUMN embedding_text_hash TEXT;
     `,
   },
+  {
+    version: 22,
+    up: /* sql */ `
+      -- Cached AI synthesis for one author's dossier ("Ficha de autor"). The raw
+      -- ideas/relations are always assembled live from the graph; only the
+      -- narrated thesis/remember/positioning is expensive, so it is cached here.
+      -- 'fingerprint' hashes the author's idea + relation set so the UI can flag
+      -- the synthesis as stale when the corpus changes.
+      CREATE TABLE author_dossier_synthesis (
+        author_id    TEXT PRIMARY KEY,
+        thesis       TEXT NOT NULL DEFAULT '',
+        remember_json TEXT NOT NULL DEFAULT '[]',
+        positioning  TEXT NOT NULL DEFAULT '',
+        model_json   TEXT,
+        fingerprint  TEXT NOT NULL DEFAULT '',
+        generated_at TEXT NOT NULL,
+        FOREIGN KEY (author_id) REFERENCES authors(author_id) ON DELETE CASCADE
+      );
+
+      -- Cached one-sentence stance for a single author×theme cell of the
+      -- synthesis matrix. Sparse: only generated cells are stored. 'fingerprint'
+      -- hashes the idea set behind the cell so it can be invalidated on change.
+      CREATE TABLE synthesis_matrix_cell (
+        author_id    TEXT NOT NULL,
+        theme_id     TEXT NOT NULL,
+        stance       TEXT NOT NULL DEFAULT '',
+        model_json   TEXT,
+        fingerprint  TEXT NOT NULL DEFAULT '',
+        generated_at TEXT NOT NULL,
+        PRIMARY KEY (author_id, theme_id),
+        FOREIGN KEY (author_id) REFERENCES authors(author_id) ON DELETE CASCADE,
+        FOREIGN KEY (theme_id) REFERENCES themes(theme_id) ON DELETE CASCADE
+      );
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

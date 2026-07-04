@@ -94,6 +94,8 @@ import { summaryContentHash } from './ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
+import { listAuthors, buildAuthorDossier, synthesizeAuthorDossier } from './ai/authorDossier';
+import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -400,6 +402,17 @@ export function registerIpc(
     ideas.getIdeasByWork(nodusId, limit, offset)
   );
   h('graph:themes', async () => themes.listGraphThemes());
+
+  // authors (dossier + synthesis matrix)
+  h('authors:list', async () => listAuthors());
+  h('authors:dossier', async (_e, authorId: string) => buildAuthorDossier(authorId));
+  h('authors:synthesize', async (_e, authorId: string, model?: ModelRef | null) =>
+    synthesizeAuthorDossier(authorId, model)
+  );
+  h('authors:matrix', async () => buildSynthesisMatrix());
+  h('authors:matrixCell', async (_e, authorId: string, themeId: string, model?: ModelRef | null) =>
+    synthesizeMatrixCell(authorId, themeId, model)
+  );
 
   // main-theme management ("temas principales")
   h('themes:listManaged', async () => themes.listManagedThemes());

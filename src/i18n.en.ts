@@ -1508,5 +1508,48 @@ export const EN: Record<string, string> = {
   'faltan fragmentos o están obsoletos': 'missing or outdated passages',
   'deben cumplir todas': 'all must be satisfied',
   'Estado:': 'Status:',
+
+  // Authors view (dossier + synthesis matrix). Keys already defined elsewhere
+  // (Autores, Síntesis, Obras, '{n} obras', idea-type labels, …) are reused.
+  Autor: 'Author',
+  'Fichas de autor': 'Author cards',
+  'Matriz de síntesis': 'Synthesis matrix',
+  'Modelo de síntesis': 'Synthesis model',
+  'Buscar autor…': 'Search author…',
+  'No hay autores todavía.': 'No authors yet.',
+  'Cargando ficha…': 'Loading card…',
+  'Selecciona un autor para ver su ficha.': 'Select an author to see their card.',
+  'Ver en el grafo de autores': 'View in the authors graph',
+  'Las ideas cambiaron desde la última síntesis': 'The ideas changed since the last synthesis',
+  desactualizada: 'outdated',
+  Regenerar: 'Regenerate',
+  'Generando síntesis…': 'Generating synthesis…',
+  'Genera una tesis central, los puntos clave para recordar y cómo se posiciona este autor frente a los demás.':
+    'Generate a central thesis, the key points to remember, and how this author positions against the others.',
+  'Generar síntesis': 'Generate synthesis',
+  'Tesis central': 'Central thesis',
+  'Qué recordar': 'What to remember',
+  'Cómo se relaciona': 'How they relate',
+  'Conexiones con otros autores': 'Connections with other authors',
+  'temas comunes': 'shared themes',
+  'Ideas del autor': "Author's ideas",
+  'Este autor aún no tiene ideas extraídas. Analiza sus obras.':
+    'This author has no extracted ideas yet. Analyze their works.',
+  Leído: 'Read',
+  'Construyendo la matriz…': 'Building the matrix…',
+  'Aún no hay suficientes autores y temas analizados para construir la matriz.':
+    'Not enough analyzed authors and themes yet to build the matrix.',
+  'Filas = autores, columnas = temas. Cada celda muestra cuántas ideas aporta ese autor al tema; haz clic para ver las ideas y generar una postura.':
+    'Rows = authors, columns = themes. Each cell shows how many ideas the author contributes to the theme; click to see the ideas and generate a stance.',
+  'Generando postura…': 'Generating stance…',
+  'Generar postura': 'Generate stance',
+  'Ver autor en el grafo': 'View author in the graph',
+  '{n} ideas': '{n} ideas',
+  'contradice a': 'contradicts',
+  'refuta a': 'refutes',
+  'extiende a': 'extends',
+  'apoya a': 'supports',
+  'refina a': 'refines',
+  'coautor con': 'co-author with',
   // <<END_EN>>
 };

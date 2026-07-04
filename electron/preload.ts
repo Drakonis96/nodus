@@ -87,6 +87,13 @@ const api: NodusApi = {
   getIdeasByWork: (nodusId, limit, offset) => ipcRenderer.invoke('works:ideasByWork', nodusId, limit, offset),
   getThemes: () => ipcRenderer.invoke('graph:themes'),
 
+  listAuthors: () => ipcRenderer.invoke('authors:list'),
+  getAuthorDossier: (authorId) => ipcRenderer.invoke('authors:dossier', authorId),
+  synthesizeAuthor: (authorId, model) => ipcRenderer.invoke('authors:synthesize', authorId, model),
+  getSynthesisMatrix: () => ipcRenderer.invoke('authors:matrix'),
+  synthesizeMatrixCell: (authorId, themeId, model) =>
+    ipcRenderer.invoke('authors:matrixCell', authorId, themeId, model),
+
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
   addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),
   renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),

@@ -2004,6 +2004,117 @@ export interface UpdateProgressEvent extends UpdateCheckResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Author Dossier ("Ficha de autor") — a per-author study surface that assembles
+// what one author claims across the corpus plus how they relate to the others.
+// Assembly is pure DB; the `synthesis` block is an on-demand, cached AI pass.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AuthorSummary {
+  author_id: string;
+  name: string;
+  affiliation: string | null;
+  workCount: number;
+  ideaCount: number;
+  relationCount: number;
+  topThemes: string[];
+  read: boolean;
+  hasSynthesis: boolean;
+}
+
+export interface AuthorDossierWork {
+  nodus_id: string;
+  title: string;
+  year: number | null;
+  zoteroKey: string | null;
+  read: boolean;
+}
+
+export interface AuthorDossierIdea {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  development: string;
+  role: 'principal' | 'secondary';
+  confidence: number;
+  workId: string;
+  workTitle: string;
+  year: number | null;
+  themes: string[];
+  evidence: Evidence[];
+}
+
+export interface AuthorDossierRelation {
+  author_id: string;
+  name: string;
+  /** contradicts | extends | supports | refutes (from the derived author_relations layer). */
+  type: string;
+  weight: number;
+  sharedThemes: string[];
+}
+
+export interface AuthorDossierSynthesis {
+  /** 1–2 sentence central thesis of the author across their works. */
+  thesis: string;
+  /** Short "what to remember" bullets for fast retention under time pressure. */
+  remember: string[];
+  /** One paragraph narrating how this author relates to the connected authors. */
+  positioning: string;
+  model: ModelRef | null;
+  generatedAt: string;
+  /** True when the underlying ideas/relations changed since this was generated. */
+  stale: boolean;
+}
+
+export interface AuthorDossier {
+  author: Author;
+  works: AuthorDossierWork[];
+  ideas: AuthorDossierIdea[];
+  relations: AuthorDossierRelation[];
+  themes: string[];
+  synthesis: AuthorDossierSynthesis | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Synthesis Matrix ("Matriz de síntesis") — the classic literature matrix:
+// rows = authors, columns = themes, cells = that author's ideas on that theme.
+// Counts/labels are pure DB; the per-cell `stance` is an on-demand, cached AI pass.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SynthesisMatrixAuthor {
+  author_id: string;
+  name: string;
+  workCount: number;
+}
+
+export interface SynthesisMatrixTheme {
+  theme_id: string;
+  label: string;
+}
+
+export interface SynthesisMatrixCellIdea {
+  global_id: string;
+  label: string;
+  type: IdeaType;
+}
+
+export interface SynthesisMatrixCell {
+  authorId: string;
+  themeId: string;
+  ideaCount: number;
+  ideas: SynthesisMatrixCellIdea[];
+  /** One-sentence synthesized stance; null until generated. */
+  stance: string | null;
+}
+
+export interface SynthesisMatrix {
+  authors: SynthesisMatrixAuthor[];
+  themes: SynthesisMatrixTheme[];
+  /** Sparse — only cells where the author develops at least one idea in the theme. */
+  cells: SynthesisMatrixCell[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2097,6 +2208,18 @@ export interface NodusApi {
   /** Paginated list of the ideas a work develops. */
   getIdeasByWork(nodusId: string, limit: number, offset: number): Promise<IdeaByWorkPage>;
   getThemes(): Promise<Theme[]>;
+
+  // authors (dossier + synthesis matrix)
+  /** Lightweight list of every author with their corpus footprint. */
+  listAuthors(): Promise<AuthorSummary[]>;
+  /** Full study card for one author (ideas, relations, themes, cached synthesis). */
+  getAuthorDossier(authorId: string): Promise<AuthorDossier | null>;
+  /** Generate (and cache) the AI thesis/remember/positioning for one author. */
+  synthesizeAuthor(authorId: string, model?: ModelRef | null): Promise<AuthorDossierSynthesis>;
+  /** Authors × themes matrix with idea counts/labels and any cached stances. */
+  getSynthesisMatrix(): Promise<SynthesisMatrix>;
+  /** Generate (and cache) the one-sentence stance for one author×theme cell. */
+  synthesizeMatrixCell(authorId: string, themeId: string, model?: ModelRef | null): Promise<SynthesisMatrixCell>;
 
   // main-theme management ("temas principales")
   listManagedThemes(): Promise<ManagedTheme[]>;
