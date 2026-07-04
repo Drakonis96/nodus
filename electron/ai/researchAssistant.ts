@@ -3,6 +3,8 @@ import type {
   ChatMessageRecord,
   Evidence,
   Gap,
+  GraphEdge,
+  GraphNode,
   Idea,
   ModelRef,
   ResearchChatRequest,
@@ -20,6 +22,7 @@ import { completeText, completeTextStream } from './aiClient';
 import { embed } from './aiClient';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
+import { findSimilarIdeas } from '../db/ideasRepo';
 
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_DOCUMENTS = 30;
@@ -33,7 +36,64 @@ const TOP_K_SCOPED_PASSAGES = 8;
 const TOP_K_GLOBAL_PASSAGES = 6;
 const MAX_PASSAGE_CONTEXT_CHARS = 24_000;
 
+// ── Query-relevant retrieval ────────────────────────────────────────────────
+// The graph sections used to dump the whole corpus regardless of the question,
+// which overflowed the model's context window on large libraries. Instead we
+// retrieve a top-K slice ranked by the question's embedding (via findSimilarIdeas
+// / findSimilarWorks) and scope every derived section to that slice. When no
+// embedding provider is configured we fall back to a bounded, most-supported
+// slice so the payload is always capped.
+const IDEA_SIM_THRESHOLD = 0.28;
+const TOP_K_IDEAS = 60;
+const MAX_OCCURRENCES_PER_IDEA = 6;
+const MAX_EVIDENCE_PER_IDEA = 5;
+const TOP_K_THEMES = 20;
+const MAX_THEME_IDEAS = 12;
+const MAX_THEME_WORKS = 12;
+const TOP_K_CONTRADICTIONS = 30;
+const TOP_K_GAPS = 30;
+const TOP_K_AUTHORS = 25;
+const MAX_AUTHOR_WORKS = 12;
+const MAX_AUTHOR_IDEAS = 12;
+const WORK_SIM_THRESHOLD = 0.2;
+const TOP_K_SCOPE_WORKS = 120;
+const MAX_GRAPH_IDEA_NODES = 50;
+const MAX_GRAPH_THEME_NODES = 24;
+const MAX_GRAPH_EDGES = 100;
+// Backstop for the whole assembled context (~4 chars/token). Keeps the request
+// well under the smallest supported model windows even with history + output,
+// trimming the least query-relevant sections first if the caps above still
+// leave the payload too large.
+const MAX_TOTAL_CONTEXT_CHARS = 600_000;
+const CONTEXT_DROP_ORDER = [
+  'grafo',
+  'documentos_relacionados',
+  'rutas_de_lectura',
+  'autores',
+  'documentos_resumidos',
+  'temas_principales',
+  'huecos_de_investigacion',
+  'contradicciones',
+  'ideas_generadas',
+  'pasajes_relevantes',
+];
+
 type SectionPayload = Record<string, unknown>;
+
+/**
+ * Query-relevance scope shared by every graph section. Built once per request
+ * from the last user message so all sections agree on the same top-K slice.
+ * A null id set means "no embedding available" — sections then fall back to a
+ * bounded, most-supported selection instead of dumping the corpus.
+ */
+interface RelevanceScope {
+  queryEmbedding: number[] | null;
+  /** Ordered top-K idea ids relevant to the question, or null when no embedding is available. */
+  ideaIds: string[] | null;
+  ideaIdSet: Set<string> | null;
+  /** Works linked to relevant ideas ∪ works whose summary matches the question. */
+  workIdSet: Set<string> | null;
+}
 
 interface BuildResult {
   context: SectionPayload;
@@ -184,32 +244,133 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   return { system, user, stats };
 }
 
+/**
+ * Resolve the query embedding once and derive the shared relevance scope (top-K
+ * ideas + the works those ideas live in ∪ works whose summary matches). Every
+ * graph section ranks/filters against this so the assembled context is a
+ * bounded, question-relevant slice rather than a full-corpus dump.
+ */
+async function buildRelevanceScope(selection: ResearchContextSelection, question: string): Promise<RelevanceScope> {
+  const needsRelevance =
+    selection.ideas ||
+    selection.themes ||
+    selection.contradictions ||
+    selection.gaps ||
+    selection.authors ||
+    selection.graph ||
+    selection.documents ||
+    selection.passages !== false;
+
+  let queryEmbedding: number[] | null = null;
+  if (needsRelevance && question.trim()) {
+    try {
+      queryEmbedding = await embed(question.trim());
+    } catch (error) {
+      // Semantic retrieval is an evidence layer, not a reason to block an answer
+      // when the user has not configured an embedding provider yet. Sections then
+      // fall back to their bounded, most-supported selection.
+      console.warn('[researchAssistant] semantic retrieval unavailable:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  if (!queryEmbedding) {
+    return { queryEmbedding: null, ideaIds: null, ideaIdSet: null, workIdSet: null };
+  }
+
+  // Zero matches (query far from the corpus, or ideas not yet embedded for the
+  // active provider) must fall back to the bounded default rather than filter
+  // every section down to nothing — so an empty result becomes a null scope,
+  // not an empty one. queryEmbedding is kept for documents/passages retrieval.
+  const similarIdeas = findSimilarIdeas(queryEmbedding, IDEA_SIM_THRESHOLD, TOP_K_IDEAS).map((row) => row.global_id);
+  const ideaIds = similarIdeas.length ? similarIdeas : null;
+  const ideaIdSet = ideaIds ? new Set(ideaIds) : null;
+
+  const workIds = new Set<string>();
+  if (ideaIds) {
+    const placeholders = ideaIds.map(() => '?').join(',');
+    const rows = getDb()
+      .prepare(`SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id IN (${placeholders})`)
+      .all(...ideaIds) as { nodus_id: string }[];
+    for (const row of rows) workIds.add(row.nodus_id);
+  }
+  for (const row of findSimilarWorks(queryEmbedding, WORK_SIM_THRESHOLD, TOP_K_SCOPE_WORKS)) {
+    workIds.add(row.nodus_id);
+  }
+  const workIdSet = workIds.size ? workIds : null;
+
+  return { queryEmbedding, ideaIds, ideaIdSet, workIdSet };
+}
+
+/**
+ * Ordered idea ids for the Ideas section. Uses the query-relevant top-K when an
+ * embedding is available, otherwise falls back to the most-supported ideas so
+ * the section stays bounded even without embeddings.
+ */
+function resolveIdeaIds(scope: RelevanceScope, limit: number): string[] {
+  if (scope.ideaIds) return scope.ideaIds.slice(0, limit);
+  const rows = getDb()
+    .prepare(
+      `SELECT i.global_id
+         FROM ideas i
+         LEFT JOIN idea_occurrences io ON io.global_id = i.global_id
+        GROUP BY i.global_id
+        ORDER BY COUNT(io.nodus_id) DESC, i.created_at DESC
+        LIMIT ?`
+    )
+    .all(limit) as { global_id: string }[];
+  return rows.map((row) => row.global_id);
+}
+
+/**
+ * Final safety net: even after per-section caps, drop the least query-relevant
+ * sections until the serialized context fits the token budget. This should rarely
+ * fire given the top-K caps, but guarantees the request never overflows.
+ */
+function enforceContextBudget(context: SectionPayload): { truncated: boolean } {
+  const dropped: string[] = [];
+  for (const key of CONTEXT_DROP_ORDER) {
+    if (JSON.stringify(context).length <= MAX_TOTAL_CONTEXT_CHARS) break;
+    if (context[key] == null) continue;
+    delete context[key];
+    dropped.push(key);
+  }
+  if (dropped.length) {
+    context.contexto_recortado = {
+      motivo: 'El contexto superaba el presupuesto de tokens; se omitieron las secciones menos relevantes a la consulta.',
+      secciones_omitidas: dropped,
+    };
+  }
+  return { truncated: dropped.length > 0 };
+}
+
 async function buildResearchContext(selection: ResearchContextSelection, question = ''): Promise<BuildResult> {
   const context: SectionPayload = {
     generated_at: new Date().toISOString(),
-    note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario en el modal.',
+    note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario, acotadas a lo relevante para la consulta.',
   };
   const sections: string[] = [];
   const linkedWorkIds = new Set<string>();
   let truncated = false;
 
+  const scope = await buildRelevanceScope(selection, question);
+
   if (selection.ideas) {
-    context.ideas_generadas = listIdeas(linkedWorkIds);
+    context.ideas_generadas = listIdeas(linkedWorkIds, scope);
     sections.push('Ideas generadas');
   }
 
   if (selection.themes) {
-    context.temas_principales = listThemes(linkedWorkIds);
+    context.temas_principales = listThemes(linkedWorkIds, scope);
     sections.push('Temas principales');
   }
 
   if (selection.contradictions) {
-    context.contradicciones = listContradictions(linkedWorkIds);
+    context.contradicciones = listContradictions(linkedWorkIds, scope);
     sections.push('Contradicciones');
   }
 
   if (selection.gaps) {
-    context.huecos_de_investigacion = listGaps(linkedWorkIds);
+    context.huecos_de_investigacion = listGaps(linkedWorkIds, scope);
     sections.push('Huecos de investigacion');
   }
 
@@ -223,30 +384,19 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   }
 
   if (selection.authors) {
-    context.autores = listAuthors(linkedWorkIds);
+    context.autores = listAuthors(linkedWorkIds, scope);
     sections.push('Autores');
   }
 
   if (selection.graph) {
-    context.grafo = listGraph(selection, linkedWorkIds);
+    context.grafo = listGraph(selection, linkedWorkIds, scope);
     sections.push('Grafo');
   }
 
   const passageScopeWorkIds = new Set(linkedWorkIds);
-  const needsSemanticRetrieval = selection.documents || selection.passages !== false;
-  let queryEmbedding: number[] | null = null;
-  if (needsSemanticRetrieval && question.trim()) {
-    try {
-      queryEmbedding = await embed(question.trim());
-    } catch (error) {
-      // Passage retrieval is an evidence layer, not a reason to block a graph
-      // answer when the user has not configured an embedding provider yet.
-      console.warn('[researchAssistant] semantic retrieval unavailable:', error instanceof Error ? error.message : String(error));
-    }
-  }
 
   if (selection.documents) {
-    const documentContext = await listDocuments(linkedWorkIds, queryEmbedding);
+    const documentContext = await listDocuments(linkedWorkIds, scope.queryEmbedding);
     context.documentos_relacionados = documentContext.documents;
     context.documentos_resumidos = documentContext.summaries;
     if (documentContext.omitted > 0) {
@@ -259,10 +409,13 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   // Default to enabled for historic saved selections created before the passage
   // toggle existed. Explicit false still gives the reader full control.
   if (selection.passages !== false) {
-    const passages = listRelevantPassages(queryEmbedding, passageScopeWorkIds);
+    const passages = listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds);
     context.pasajes_relevantes = passages;
     sections.push('Pasajes de texto completo');
   }
+
+  const budget = enforceContextBudget(context);
+  truncated = truncated || budget.truncated;
 
   const contextChars = JSON.stringify(context).length;
   return {
@@ -283,21 +436,27 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   };
 }
 
-function listIdeas(linkedWorkIds: Set<string>) {
+function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
+  const ideaIds = resolveIdeaIds(scope, TOP_K_IDEAS);
+  if (ideaIds.length === 0) return [];
+  const placeholders = ideaIds.map(() => '?').join(',');
+
   const ideas = db
-    .prepare('SELECT global_id, type, label, statement, created_at FROM ideas ORDER BY created_at ASC')
-    .all() as IdeaRow[];
+    .prepare(`SELECT global_id, type, label, statement, created_at FROM ideas WHERE global_id IN (${placeholders})`)
+    .all(...ideaIds) as IdeaRow[];
+  const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
+
   const occurrences = db
     .prepare(
       `SELECT io.global_id, io.nodus_id, io.role, io.development, io.confidence,
               w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
        FROM idea_occurrences io
        JOIN works w ON w.nodus_id = io.nodus_id
-       WHERE w.archived = 0
+       WHERE w.archived = 0 AND io.global_id IN (${placeholders})
        ORDER BY w.year DESC, w.title ASC`
     )
-    .all() as Array<{
+    .all(...ideaIds) as Array<{
       global_id: string;
       nodus_id: string;
       role: string;
@@ -311,33 +470,39 @@ function listIdeas(linkedWorkIds: Set<string>) {
       doi: string | null;
       source_type: string | null;
     }>;
-  const evidence = db.prepare('SELECT * FROM evidence ORDER BY nodus_id ASC').all() as Evidence[];
+  const evidence = db
+    .prepare(`SELECT * FROM evidence WHERE global_id IN (${placeholders}) ORDER BY nodus_id ASC`)
+    .all(...ideaIds) as Evidence[];
 
   const occByIdea = groupBy(occurrences, (o) => o.global_id);
   const evidenceByIdea = groupBy(evidence, (e) => e.global_id);
 
-  return ideas.map((idea) => {
-    const occs = occByIdea.get(idea.global_id) ?? [];
-    for (const occurrence of occs) linkedWorkIds.add(occurrence.nodus_id);
-    return {
-      id: idea.global_id,
-      type: idea.type,
-      label: idea.label,
-      statement: idea.statement,
-      occurrences: occs.map((o) => ({
-        role: o.role,
-        development: o.development,
-        confidence: o.confidence,
-        work: workSummary(o),
-      })),
-      evidence: (evidenceByIdea.get(idea.global_id) ?? []).slice(0, 5).map(evidenceSummary),
-    };
-  });
+  // Preserve the relevance order returned by resolveIdeaIds.
+  return ideaIds
+    .map((id) => ideaById.get(id))
+    .filter((idea): idea is IdeaRow => Boolean(idea))
+    .map((idea) => {
+      const occs = (occByIdea.get(idea.global_id) ?? []).slice(0, MAX_OCCURRENCES_PER_IDEA);
+      for (const occurrence of occs) linkedWorkIds.add(occurrence.nodus_id);
+      return {
+        id: idea.global_id,
+        type: idea.type,
+        label: idea.label,
+        statement: idea.statement,
+        occurrences: occs.map((o) => ({
+          role: o.role,
+          development: o.development,
+          confidence: o.confidence,
+          work: workSummary(o),
+        })),
+        evidence: (evidenceByIdea.get(idea.global_id) ?? []).slice(0, MAX_EVIDENCE_PER_IDEA).map(evidenceSummary),
+      };
+    });
 }
 
-function listThemes(linkedWorkIds: Set<string>) {
+function listThemes(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
-  const themes = db
+  let themes = db
     .prepare(
       `SELECT t.theme_id, t.label, t.created_at,
               COUNT(DISTINCT wt.nodus_id) AS work_count,
@@ -350,17 +515,33 @@ function listThemes(linkedWorkIds: Set<string>) {
     )
     .all() as Array<{ theme_id: string; label: string; created_at: string; work_count: number; idea_count: number }>;
 
+  // Keep only themes that carry at least one query-relevant idea.
+  if (scope.ideaIdSet && scope.ideaIds && scope.ideaIds.length) {
+    const placeholders = scope.ideaIds.map(() => '?').join(',');
+    const linkedThemeIds = new Set(
+      (
+        db
+          .prepare(`SELECT DISTINCT theme_id FROM idea_theme_links WHERE global_id IN (${placeholders})`)
+          .all(...scope.ideaIds) as { theme_id: string }[]
+      ).map((row) => row.theme_id)
+    );
+    themes = themes.filter((theme) => linkedThemeIds.has(theme.theme_id));
+  }
+  themes = themes.slice(0, TOP_K_THEMES);
+
   return themes.map((theme) => {
-    const works = db
-      .prepare(
-        `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
-         FROM work_themes wt
-         JOIN works w ON w.nodus_id = wt.nodus_id
-         WHERE wt.theme_id = ? AND w.archived = 0
-         ORDER BY w.year DESC, w.title ASC`
-      )
-      .all(theme.theme_id) as Array<WorkRow & { authors_json: string }>;
-    const ideas = db
+    const works = (
+      db
+        .prepare(
+          `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
+           FROM work_themes wt
+           JOIN works w ON w.nodus_id = wt.nodus_id
+           WHERE wt.theme_id = ? AND w.archived = 0
+           ORDER BY w.year DESC, w.title ASC`
+        )
+        .all(theme.theme_id) as Array<WorkRow & { authors_json: string }>
+    ).slice(0, MAX_THEME_WORKS);
+    const allIdeas = db
       .prepare(
         `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
          FROM idea_theme_links it
@@ -369,6 +550,13 @@ function listThemes(linkedWorkIds: Set<string>) {
          ORDER BY i.label ASC`
       )
       .all(theme.theme_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+    // Surface the relevant ideas first; fall back to all when none intersect.
+    let ideas = allIdeas;
+    if (scope.ideaIdSet) {
+      const relevant = allIdeas.filter((idea) => scope.ideaIdSet!.has(idea.global_id));
+      ideas = relevant.length ? relevant : allIdeas;
+    }
+    ideas = ideas.slice(0, MAX_THEME_IDEAS);
     for (const work of works) linkedWorkIds.add(work.nodus_id);
     return {
       id: theme.theme_id,
@@ -386,9 +574,19 @@ function listThemes(linkedWorkIds: Set<string>) {
   });
 }
 
-function listContradictions(linkedWorkIds: Set<string>) {
+function listContradictions(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
-  return getContradictions().map((detail) => {
+  let details = getContradictions();
+  // Keep contradictions that touch a query-relevant idea, then cap by confidence.
+  if (scope.ideaIdSet) {
+    const set = scope.ideaIdSet;
+    details = details.filter((detail) => set.has(detail.edge.from_id) || set.has(detail.edge.to_id));
+  }
+  details = details
+    .slice()
+    .sort((a, b) => (b.edge.confidence ?? 0) - (a.edge.confidence ?? 0))
+    .slice(0, TOP_K_CONTRADICTIONS);
+  return details.map((detail) => {
     if (detail.edge.source_work) linkedWorkIds.add(detail.edge.source_work);
     for (const ev of detail.evidence) linkedWorkIds.add(ev.nodus_id);
     const from = db.prepare('SELECT global_id, type, label, statement FROM ideas WHERE global_id = ?').get(detail.edge.from_id) as
@@ -413,7 +611,7 @@ function listContradictions(linkedWorkIds: Set<string>) {
   });
 }
 
-function listGaps(linkedWorkIds: Set<string>) {
+function listGaps(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const rows = getDb()
     .prepare(
       `SELECT g.*, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type,
@@ -441,7 +639,18 @@ function listGaps(linkedWorkIds: Set<string>) {
       evidence_kind: string | null;
     }>;
 
-  return rows.map((row) => {
+  // Prefer gaps tied to a query-relevant idea; backfill with the highest-
+  // confidence remaining gaps. Rows are already confidence-ordered.
+  let selected = rows;
+  if (scope.ideaIdSet) {
+    const set = scope.ideaIdSet;
+    const linked = rows.filter((row) => row.related_idea != null && set.has(row.related_idea));
+    const rest = rows.filter((row) => !(row.related_idea != null && set.has(row.related_idea)));
+    selected = [...linked, ...rest];
+  }
+  selected = selected.slice(0, TOP_K_GAPS);
+
+  return selected.map((row) => {
     linkedWorkIds.add(row.nodus_id);
     return {
       id: row.id,
@@ -467,38 +676,63 @@ function listGaps(linkedWorkIds: Set<string>) {
   });
 }
 
-function listAuthors(linkedWorkIds: Set<string>) {
+function listAuthors(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
-  const authors = db.prepare('SELECT * FROM authors ORDER BY name ASC').all() as Author[];
-  const relations = db
-    .prepare(
-      `SELECT ar.from_author, fa.name AS from_name, ar.to_author, ta.name AS to_name, ar.type, ar.weight
-       FROM author_relations ar
-       JOIN authors fa ON fa.author_id = ar.from_author
-       JOIN authors ta ON ta.author_id = ar.to_author
-       ORDER BY ar.weight DESC`
-    )
-    .all() as Array<{
-      from_author: string;
-      from_name: string;
-      to_author: string;
-      to_name: string;
-      type: string;
-      weight: number;
-    }>;
+  let authors = db.prepare('SELECT * FROM authors ORDER BY name ASC').all() as Author[];
+
+  // Keep authors who wrote a work in the query-relevant scope.
+  if (scope.workIdSet) {
+    const workIds = [...scope.workIdSet];
+    if (workIds.length === 0) {
+      authors = [];
+    } else {
+      const placeholders = workIds.map(() => '?').join(',');
+      const relevantAuthorIds = new Set(
+        (
+          db
+            .prepare(`SELECT DISTINCT author_id FROM work_authors WHERE nodus_id IN (${placeholders})`)
+            .all(...workIds) as { author_id: string }[]
+        ).map((row) => row.author_id)
+      );
+      authors = authors.filter((author) => relevantAuthorIds.has(author.author_id));
+    }
+  }
+  authors = authors.slice(0, TOP_K_AUTHORS);
+  const authorIdSet = new Set(authors.map((author) => author.author_id));
+
+  const relations = (
+    db
+      .prepare(
+        `SELECT ar.from_author, fa.name AS from_name, ar.to_author, ta.name AS to_name, ar.type, ar.weight
+         FROM author_relations ar
+         JOIN authors fa ON fa.author_id = ar.from_author
+         JOIN authors ta ON ta.author_id = ar.to_author
+         ORDER BY ar.weight DESC`
+      )
+      .all() as Array<{
+        from_author: string;
+        from_name: string;
+        to_author: string;
+        to_name: string;
+        type: string;
+        weight: number;
+      }>
+  ).filter((relation) => authorIdSet.has(relation.from_author) && authorIdSet.has(relation.to_author));
 
   return {
     authors: authors.map((author) => {
-      const works = db
-        .prepare(
-          `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
-           FROM work_authors wa
-           JOIN works w ON w.nodus_id = wa.nodus_id
-           WHERE wa.author_id = ? AND w.archived = 0
-           ORDER BY w.year DESC, w.title ASC`
-        )
-        .all(author.author_id) as Array<WorkRow & { authors_json: string }>;
-      const ideas = db
+      const works = (
+        db
+          .prepare(
+            `SELECT w.nodus_id, w.zotero_key, w.title, w.authors_json, w.year, w.item_type, w.doi, w.source_type
+             FROM work_authors wa
+             JOIN works w ON w.nodus_id = wa.nodus_id
+             WHERE wa.author_id = ? AND w.archived = 0
+             ORDER BY w.year DESC, w.title ASC`
+          )
+          .all(author.author_id) as Array<WorkRow & { authors_json: string }>
+      ).slice(0, MAX_AUTHOR_WORKS);
+      const allIdeas = db
         .prepare(
           `SELECT DISTINCT i.global_id, i.type, i.label, i.statement
            FROM work_authors wa
@@ -508,6 +742,12 @@ function listAuthors(linkedWorkIds: Set<string>) {
            ORDER BY i.label ASC`
         )
         .all(author.author_id) as Array<{ global_id: string; type: string; label: string; statement: string }>;
+      let ideas = allIdeas;
+      if (scope.ideaIdSet) {
+        const relevant = allIdeas.filter((idea) => scope.ideaIdSet!.has(idea.global_id));
+        ideas = relevant.length ? relevant : allIdeas;
+      }
+      ideas = ideas.slice(0, MAX_AUTHOR_IDEAS);
       for (const work of works) linkedWorkIds.add(work.nodus_id);
       return {
         id: author.author_id,
@@ -526,34 +766,71 @@ function listAuthors(linkedWorkIds: Set<string>) {
   };
 }
 
-function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>) {
+/**
+ * Emit the graph *structure* the model can reason and cite over — not the
+ * rendering metadata. We keep each node's id/label/type/statement and the
+ * relations; we drop the heavy fields (workIds, years, read, workCount, plus the
+ * authors/themes name arrays that balloon on aggregate nodes) since that detail
+ * already lives in the dedicated autores/temas sections. Cuts the section ~5x.
+ */
+function slimGraphNode(node: GraphNode) {
+  return {
+    id: node.id,
+    label: node.label,
+    type: node.type,
+    statement: node.statement,
+    max_confidence: node.maxConfidence,
+  };
+}
+
+function slimGraphEdge(edge: GraphEdge) {
+  return {
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    type: edge.type,
+    basis: edge.basis,
+    confidence: edge.confidence,
+  };
+}
+
+function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const parts = selection.graphParts;
   const out: SectionPayload = {};
   const ideaGraph = buildIdeaGraph();
+  const ideaSet = scope.ideaIdSet;
 
   if (parts.ideaNodes) {
-    out.nodos_de_ideas = ideaGraph.nodes.filter((node) => node.type !== 'theme');
-    for (const node of ideaGraph.nodes) {
-      if (node.type !== 'theme') addIdeaWorkIds(node.id, linkedWorkIds);
-    }
+    let nodes = ideaGraph.nodes.filter((node) => node.type !== 'theme');
+    if (ideaSet) nodes = nodes.filter((node) => ideaSet.has(node.id));
+    nodes = nodes.slice(0, MAX_GRAPH_IDEA_NODES);
+    out.nodos_de_ideas = nodes.map(slimGraphNode);
+    for (const node of nodes) addIdeaWorkIds(node.id, linkedWorkIds);
   }
   if (parts.themeNodes) {
-    out.nodos_de_temas = ideaGraph.nodes.filter((node) => node.type === 'theme');
-    for (const node of ideaGraph.nodes) {
-      if (node.type === 'theme' && node.id.startsWith('theme:')) addThemeWorkIds(node.id.slice('theme:'.length), linkedWorkIds);
+    const themeNodes = ideaGraph.nodes.filter((node) => node.type === 'theme').slice(0, MAX_GRAPH_THEME_NODES);
+    out.nodos_de_temas = themeNodes.map(slimGraphNode);
+    for (const node of themeNodes) {
+      if (node.id.startsWith('theme:')) addThemeWorkIds(node.id.slice('theme:'.length), linkedWorkIds);
     }
   }
   if (parts.ideaEdges) {
-    out.relaciones_de_ideas = ideaGraph.edges;
-    for (const edge of ideaGraph.edges) {
+    let edges = ideaGraph.edges;
+    if (ideaSet) edges = edges.filter((edge) => ideaSet.has(edge.source) && ideaSet.has(edge.target));
+    edges = edges.slice(0, MAX_GRAPH_EDGES);
+    out.relaciones_de_ideas = edges.map(slimGraphEdge);
+    for (const edge of edges) {
       addIdeaWorkIds(edge.source, linkedWorkIds);
       addIdeaWorkIds(edge.target, linkedWorkIds);
     }
   }
   if (parts.authorGraph) {
     const authorGraph = buildAuthorGraph();
-    out.grafo_de_autores = authorGraph;
-    for (const node of authorGraph.nodes) addAuthorWorkIds(node.id, linkedWorkIds);
+    const nodes = authorGraph.nodes.slice(0, TOP_K_AUTHORS);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const edges = authorGraph.edges.filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target));
+    out.grafo_de_autores = { nodes: nodes.map(slimGraphNode), edges: edges.map(slimGraphEdge) };
+    for (const node of nodes) addAuthorWorkIds(node.id, linkedWorkIds);
   }
   return out;
 }
