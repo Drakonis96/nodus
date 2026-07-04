@@ -651,7 +651,7 @@ export function WritingWorkshopView({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 grid grid-cols-[22rem_minmax(0,1fr)_24rem] max-xl:grid-cols-1">
+      <div className="flex-1 min-h-0 grid grid-cols-[18rem_minmax(0,1fr)_20rem] max-xl:grid-cols-1">
         <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
           {mode === 'deep' && (
             <DeepResearchPanel
