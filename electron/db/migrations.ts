@@ -767,6 +767,23 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 23,
+    up: /* sql */ `
+      -- Make Zotero the single source of author identity. We persist the raw
+      -- structured creators (with role) per work so author nodes can be built
+      -- from canonical (lastName, first-initial) keys instead of free-text names,
+      -- which previously fragmented one person into several nodes.
+      ALTER TABLE works ADD COLUMN creators_json TEXT;
+
+      -- Normalized identity key ("lastname::i") used to dedupe author nodes.
+      ALTER TABLE authors ADD COLUMN canonical_key TEXT;
+      CREATE INDEX idx_authors_canonical ON authors(canonical_key);
+
+      -- Zotero creator role for this work↔author link: 'author' | 'editor'.
+      ALTER TABLE work_authors ADD COLUMN role TEXT NOT NULL DEFAULT 'author';
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

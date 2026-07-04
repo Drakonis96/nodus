@@ -286,18 +286,26 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
   return (
     getDb()
       .prepare(
-        `SELECT w.nodus_id, w.title, w.year, w.zotero_key AS zoteroKey, w.read_tag AS readTag
+        `SELECT w.nodus_id, w.title, w.year, w.zotero_key AS zoteroKey, w.read_tag AS readTag, wa.role AS role
            FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id
           WHERE wa.author_id = ? AND w.archived = 0
           ORDER BY w.year DESC, w.title`
       )
-      .all(authorId) as { nodus_id: string; title: string; year: number | null; zoteroKey: string | null; readTag: number }[]
+      .all(authorId) as {
+      nodus_id: string;
+      title: string;
+      year: number | null;
+      zoteroKey: string | null;
+      readTag: number;
+      role: string | null;
+    }[]
   ).map((w) => ({
     nodus_id: w.nodus_id,
     title: w.title,
     year: w.year,
     zoteroKey: w.zoteroKey,
     read: w.readTag === 1,
+    role: w.role === 'editor' ? ('editor' as const) : ('author' as const),
   }));
 }
 

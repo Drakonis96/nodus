@@ -84,6 +84,7 @@ function mapItem(raw: any): ZoteroItem {
     lastName: c.lastName ?? '',
     firstName: c.firstName ?? '',
     name: c.name,
+    creatorType: c.creatorType ?? 'author',
   }));
   return {
     key: d.key ?? raw.key,

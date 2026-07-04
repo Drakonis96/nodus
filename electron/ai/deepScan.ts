@@ -10,7 +10,7 @@ import {
   embeddingTextForIdea,
 } from '../db/ideasRepo';
 import { addGap, addExternalRef } from '../db/gapsRepo';
-import { getOrCreateAuthor, linkWorkAuthor, recomputeAuthorRelations } from '../db/authorsRepo';
+import { canonicalKeyFromDisplay, linkZoteroAuthors, recomputeAuthorRelations } from '../db/authorsRepo';
 import { setDeepResult } from '../db/worksRepo';
 import {
   getWorkThemeLabels,
@@ -388,16 +388,16 @@ export async function runDeepScan(
       addGap(work.nodus_id, g.kind, g.statement, related, g.confidence, evId);
     }
 
-    // Authors.
+    // Authors. Identity comes from Zotero (canonical), never from the free-text
+    // names the model read off the page — those only fragmented one person into
+    // several nodes. We still salvage the model's affiliations by matching them
+    // to the canonical identity, since Zotero rarely carries affiliation.
+    const affiliationByKey = new Map<string, string | null>();
     for (const a of merged.authors) {
-      const authorId = getOrCreateAuthor(a.name, a.affiliation);
-      linkWorkAuthor(work.nodus_id, authorId);
+      const key = canonicalKeyFromDisplay(a.name);
+      if (key && a.affiliation && !affiliationByKey.get(key)) affiliationByKey.set(key, a.affiliation);
     }
-    // Also link the Zotero-listed authors so the author lens is complete.
-    for (const name of authors) {
-      const authorId = getOrCreateAuthor(name, null);
-      linkWorkAuthor(work.nodus_id, authorId);
-    }
+    linkZoteroAuthors(work.nodus_id, { createIfMissing: true, affiliationByKey });
 
     setDeepResult(work.nodus_id, 'done', hash, doc.sourceType, merged.ideas.size === 0 ? doc.notes ?? null : null);
 

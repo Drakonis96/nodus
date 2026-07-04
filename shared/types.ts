@@ -452,13 +452,31 @@ export interface ZoteroItem {
   key: string;
   version: number;
   title: string;
-  creators: { lastName: string; firstName?: string; name?: string }[];
+  creators: ZoteroCreator[];
   year: number | null;
   itemType: string;
   doi: string | null;
   abstract: string | null;
   tags: string[];
   collections: string[];
+}
+
+/** A raw Zotero creator. `creatorType` distinguishes author/editor/translator/… */
+export interface ZoteroCreator {
+  lastName: string;
+  firstName?: string;
+  name?: string;
+  creatorType?: string;
+}
+
+/** Persisted per work (works.creators_json): structured creators kept for building
+ *  canonical author identity. `role` is the collapsed Zotero creatorType we care
+ *  about for the author layer. */
+export interface WorkCreator {
+  lastName: string;
+  firstName: string;
+  name: string | null;
+  role: 'author' | 'editor';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2027,6 +2045,8 @@ export interface AuthorDossierWork {
   year: number | null;
   zoteroKey: string | null;
   read: boolean;
+  /** How this person is credited on the work (from Zotero). */
+  role: 'author' | 'editor';
 }
 
 export interface AuthorDossierIdea {

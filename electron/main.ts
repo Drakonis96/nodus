@@ -5,6 +5,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
+import { reconcileAuthorLayerOnce } from './db/authorsRepo';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
@@ -343,6 +344,7 @@ function setupAutoUpdates(): void {
 
 app.whenReady().then(() => {
   getDb(); // open + migrate before anything touches data
+  reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   setCopilotWindowProvider(() => mainWindow);
   registerIpc(() => mainWindow, () => checkForUpdates('manual'), installDownloadedUpdate);
   createWindow();

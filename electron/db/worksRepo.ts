@@ -1,7 +1,7 @@
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
-import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus } from '@shared/types';
+import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
 
 function normalizeZoteroTag(tag: string): string {
   return tag.trim().normalize('NFC').toLowerCase();
@@ -312,6 +312,7 @@ export interface UpsertWorkInput {
   zotero_version: number | null;
   title: string;
   authors: string[];
+  creators?: WorkCreator[];
   year: number | null;
   item_type: string;
   doi: string | null;
@@ -325,22 +326,25 @@ export function upsertWork(input: UpsertWorkInput): void {
   const existing = getWorkByZoteroKey(input.zotero_key);
   if (!existing) {
     db.prepare(
-      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, year, item_type, doi, read_tag, light_status)
-       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @year, @item_type, @doi, @read_tag, 'none')`
+      `INSERT INTO works (nodus_id, zotero_key, zotero_version, title, authors_json, creators_json, year, item_type, doi, read_tag, light_status)
+       VALUES (@nodus_id, @zotero_key, @zotero_version, @title, @authors_json, @creators_json, @year, @item_type, @doi, @read_tag, 'none')`
     ).run({
       ...input,
       authors_json: JSON.stringify(input.authors),
+      creators_json: input.creators ? JSON.stringify(input.creators) : null,
       read_tag: input.read_tag ? 1 : 0,
     });
   } else {
     db.prepare(
       `UPDATE works SET zotero_version=@zotero_version, title=@title, authors_json=@authors_json,
+       creators_json=COALESCE(@creators_json, creators_json),
        year=@year, item_type=@item_type, doi=@doi, read_tag=@read_tag, archived=0 WHERE zotero_key=@zotero_key`
     ).run({
       zotero_key: input.zotero_key,
       zotero_version: input.zotero_version,
       title: input.title,
       authors_json: JSON.stringify(input.authors),
+      creators_json: input.creators ? JSON.stringify(input.creators) : null,
       year: input.year,
       item_type: input.item_type,
       doi: input.doi,

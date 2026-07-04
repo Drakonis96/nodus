@@ -402,6 +402,11 @@ function AuthorDossierDetail({
               <div key={w.nodus_id} className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800">
                 <span className="truncate">{w.title || t('(sin título)')}</span>
                 {w.year && <span className="text-xs text-neutral-500 shrink-0">{w.year}</span>}
+                {w.role === 'editor' && (
+                  <Badge color="cyan" title={t('Figura como editor/a de esta obra')}>
+                    {t('ed.')}
+                  </Badge>
+                )}
                 {w.read && (
                   <Badge color="green" title={t('Leído')}>
                     <Icon name="check" size={10} />

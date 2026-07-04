@@ -1551,5 +1551,7 @@ export const EN: Record<string, string> = {
   'apoya a': 'supports',
   'refina a': 'refines',
   'coautor con': 'co-author with',
+  'ed.': 'ed.',
+  'Figura como editor/a de esta obra': 'Credited as editor of this work',
   // <<END_EN>>
 };

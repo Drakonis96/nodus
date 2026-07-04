@@ -16,7 +16,8 @@ import { setWorkCollections, addWorkCollections, upsertCollections } from '../db
 import { collectionItemsRecursive, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
 import type { ZoteroCollection } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
-import type { SyncLogEntry, ZoteroItem } from '@shared/types';
+import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
+import { linkZoteroAuthors } from '../db/authorsRepo';
 import { getDb } from '../db/database';
 import { probeWorkTextAvailability } from '../extraction/textExtractor';
 
@@ -27,6 +28,20 @@ function authorsOf(item: ZoteroItem): string[] {
     const initial = c.firstName ? `, ${c.firstName.charAt(0)}.` : '';
     return `${last}${initial}`;
   });
+}
+
+/** Structured creators kept for building canonical author identity. Only authors
+ *  and editors feed the author layer (translators, series editors, … are ignored). */
+function creatorsOf(item: ZoteroItem): WorkCreator[] {
+  const out: WorkCreator[] = [];
+  for (const c of item.creators) {
+    const type = (c.creatorType ?? 'author').toLowerCase();
+    const role: 'author' | 'editor' | null =
+      type === 'author' ? 'author' : type === 'editor' ? 'editor' : null;
+    if (!role) continue;
+    out.push({ lastName: c.lastName ?? '', firstName: c.firstName ?? '', name: c.name ?? null, role });
+  }
+  return out;
 }
 
 /** Ingest a single Zotero item into Nodus. Analysis is enqueued separately by explicit settings. */
@@ -69,6 +84,7 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
     zotero_version: item.version,
     title: item.title,
     authors: authorsOf(item),
+    creators: creatorsOf(item),
     year: item.year,
     item_type: item.itemType,
     doi: item.doi,
@@ -76,6 +92,10 @@ export function ingestZoteroItem(item: ZoteroItem, readTagName: string): { nodus
     zoteroTags: item.tags,
   });
   setWorkCollections(nodusId, item.collections);
+  // Refresh the canonical author layer from Zotero for works that already have
+  // author nodes (i.e. were analysed): re-key to canonical identity, apply
+  // editor roles, drop stale name variants. Un-analysed works are left untouched.
+  linkZoteroAuthors(nodusId, { createIfMissing: false });
 
   const trigger = recomputeDeepTrigger(nodusId);
   return { nodusId, isNew: !existing, hasReadTag: trigger === 'tag' || trigger === 'both' };
