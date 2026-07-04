@@ -45,11 +45,17 @@ function isAiPlan(v: unknown): v is AiPlan {
 }
 
 async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<DeepResearchPlan> {
+  const countRule =
+    input.sectionMode === 'user'
+      ? `El usuario ha fijado un máximo de ${input.sectionCount} secciones. Planifica EXACTAMENTE ${input.sectionCount} salvo que sea imprescindible una más: nunca superes ${input.sectionHardCap}.`
+      : `Elige tú el número de secciones, pero mantenlo bajo: en torno a ${input.sectionCount} y nunca por encima de ${input.sectionHardCap}.`;
   const system = [
     'Eres el planificador del modo Deep Research de Nodus.',
     'Diseñas el esqueleto de un informe académico riguroso y bien referenciado a partir de un grafo local de ideas, obras, huecos y contradicciones.',
-    `El informe debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas, así que planifica alrededor de ${input.sectionCount} secciones sustantivas (introducción, cuerpo por líneas argumentales, y síntesis/conclusión).`,
-    'Reparte TODAS las ideas relevantes entre las secciones (cada idea en su sección principal). Asigna huecos y contradicciones donde aporten tensión.',
+    'PRINCIPIO CLAVE: prefiere POCAS secciones LARGAS y de gran profundidad antes que muchas secciones cortas. Cada sección debe agrupar varias ideas afines y desarrollarlas relacionándolas entre sí, no una idea por sección.',
+    countRule,
+    `El cuerpo del informe debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas repartidas entre esas pocas secciones (introducción, cuerpo por líneas argumentales amplias y síntesis/conclusión). La bibliografía final NO cuenta para esa extensión.`,
+    'Agrupa las ideas por afinidad temática o argumental: cada sección reúne un CONJUNTO de ideas relacionadas, no una sola. Reparte TODAS las ideas relevantes entre las secciones. Asigna huecos y contradicciones donde aporten tensión.',
     'Usa EXCLUSIVAMENTE los identificadores que se te dan. No inventes ideas, obras ni ids.',
     'Devuelve SOLO JSON válido con la forma:',
     '{"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"ideaIds":["..."],"workIds":["..."],"gapIds":["..."],"contradictionIds":["..."],"passageIds":["..."]}]}',
@@ -60,6 +66,8 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<D
       idioma: input.language,
       audiencia: input.audience ?? null,
       secciones_objetivo: input.sectionCount,
+      secciones_maximo_absoluto: input.sectionHardCap,
+      numero_secciones: input.sectionMode === 'user' ? 'fijado_por_usuario' : 'a_decidir_por_ti',
       paginas_objetivo: input.targetPages,
       ideas: input.ideas,
       temas: input.themes,
@@ -94,7 +102,8 @@ async function aiWriteSection(input: SectionInput, model: ModelRef | null): Prom
     'Escribe en español salvo que el idioma indicado pida otra lengua.',
     'Usa SOLO los materiales y las citas del menú proporcionado. No inventes obras, autores, datos ni páginas.',
     'Cada afirmación sustantiva debe ir respaldada por una cita del menú, colocada ENTRE PARÉNTESIS y en formato enlace Markdown nodus:// exactamente como aparece en el menú.',
-    `Extensión objetivo: ~${input.targetWords} palabras, en 2-4 párrafos desarrollados. Nada de listas salvo que sean imprescindibles.`,
+    `Extensión objetivo: ~${input.targetWords} palabras (es una sección de fondo, extensa y desarrollada), en 4-7 párrafos densos. Nada de listas salvo que sean imprescindibles.`,
+    'Desarrolla la sección con profundidad real: no te limites a enunciar cada idea; contrástalas, encadénalas y construye un argumento continuo que atraviese todas las ideas asignadas.',
     'Relaciona las ideas entre sí: continuidad, diferencias, niveles de abstracción, consecuencias metodológicas, tensiones y huecos.',
     'No repitas lo ya dicho en secciones anteriores (se te da un resumen). Aporta desarrollo nuevo.',
     input.isConclusion
@@ -113,7 +122,7 @@ async function aiWriteSection(input: SectionInput, model: ModelRef | null): Prom
     null,
     2
   );
-  return completeText({ system, user, temperature: 0.3, maxTokens: 3600 }, model);
+  return completeText({ system, user, temperature: 0.3, maxTokens: 5200 }, model);
 }
 
 interface AiFinal {

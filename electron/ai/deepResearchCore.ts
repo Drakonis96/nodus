@@ -26,13 +26,23 @@ import type {
 export const WORDS_PER_PAGE = 450;
 const MIN_TARGET_PAGES = 5;
 const MAX_TARGET_PAGES = 20;
-/** A section aims for roughly this many words; also drives how many sections a plan needs. */
-const SECTION_TARGET_WORDS = 650;
-const MIN_SECTIONS = 4;
-/** Hard ceiling on total sections (planned + coverage top-ups) — stops runaway loops. */
-const MAX_SECTIONS = 22;
+/**
+ * A section aims for roughly this many words. Deliberately high so a report is a few
+ * long, well-developed sections rather than many thin ones — depth over fragmentation.
+ */
+const SECTION_TARGET_WORDS = 1000;
+/** Never fewer than this many sections (intro · body · synthesis at the very least). */
+export const MIN_SECTIONS = 3;
+/** Absolute safety ceiling on total sections (planned + coverage top-ups) — stops runaway loops. */
+export const MAX_SECTIONS = 14;
+/** The heuristic never *targets* more than this many sections before the +1 grace. */
+const MAX_PLAN_SECTIONS = 10;
+/** A numeric user cap is allowed to be exceeded by at most this many sections. */
+const SECTION_GRACE = 1;
 /** Coverage top-up may add at most this many extra sections beyond the plan. */
-const MAX_TOPUP_SECTIONS = 6;
+const MAX_TOPUP_SECTIONS = 2;
+/** Per-section word budget is clamped to this window (min, max). Upper end allows deep sections. */
+const SECTION_WORDS_RANGE = { min: 500, max: 1500 } as const;
 /** Trim the material pool handed to the planner so the prompt stays within limits. */
 export const POOL_LIMITS = { ideas: 70, themes: 20, gaps: 20, contradictions: 16, works: 40, passages: 20 } as const;
 const MAX_MATRIX_ROWS = 80;
@@ -59,7 +69,12 @@ export interface PlanInput {
   objective: string;
   language: 'es' | 'en' | 'fr';
   audience?: string;
+  /** Soft target number of sections the planner should aim for. */
   sectionCount: number;
+  /** Hard ceiling the planner must not exceed (already includes the +1 grace). */
+  sectionHardCap: number;
+  /** Whether the user pinned a section cap ('user') or left it to the model ('auto'). */
+  sectionMode: 'auto' | 'user';
   targetPages: { min: number; max: number };
   ideas: { id: string; label: string; type: string; statement: string; works: string }[];
   themes: { id: string; label: string; summary: string }[];
@@ -161,15 +176,16 @@ export async function orchestrateDeepResearch(
   const maps = buildSnapshotMaps(snapshot);
 
   const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', snapshot);
-  const sectionCount = clamp(
-    Math.round((midpoint(targetPages) * WORDS_PER_PAGE) / SECTION_TARGET_WORDS),
-    MIN_SECTIONS,
-    MAX_SECTIONS
-  );
+  const sectionPlan = resolveSectionPlan(targetPages, request.sectionLimit ?? 'auto');
+  const sectionCount = sectionPlan.target;
+  const sectionHardCap = sectionPlan.hardCap;
 
-  emit({ phase: 'planning', message: `Planificando ${sectionCount} secciones (${targetPages.min}–${targetPages.max} páginas)…` });
-  const plan = await planWithFallback(deps, request, language, snapshot, sectionCount, targetPages);
+  emit({ phase: 'planning', message: `Planificando ~${sectionCount} secciones de fondo (${targetPages.min}–${targetPages.max} páginas)…` });
+  const plan = await planWithFallback(deps, request, language, snapshot, sectionPlan, targetPages);
 
+  // Budget is measured over the BODY sections only. The abstract, limitations and
+  // the final bibliography are assembled separately and never consume this budget,
+  // so references at the end never eat into the page/word target.
   const maxWords = targetPages.max * WORDS_PER_PAGE;
   const minWords = targetPages.min * WORDS_PER_PAGE;
 
@@ -186,7 +202,13 @@ export async function orchestrateDeepResearch(
   let stoppedReason: string | null = null;
 
   const runSection = async (section: DeepResearchPlanSection, isConclusion: boolean): Promise<void> => {
-    const targetWords = clamp(Math.round(maxWords / Math.max(sectionCount, 1)), 420, 950);
+    // Spread the page budget across the planned sections → fewer sections means each
+    // one gets a bigger, deeper word target (clamped so it stays writable in one pass).
+    const targetWords = clamp(
+      Math.round(maxWords / Math.max(sectionCount, 1)),
+      SECTION_WORDS_RANGE.min,
+      SECTION_WORDS_RANGE.max
+    );
     emit({
       phase: 'section',
       message: `Redactando: ${section.title}`,
@@ -232,8 +254,8 @@ export async function orchestrateDeepResearch(
 
   // Planned sections.
   for (let i = 0; i < plan.sections.length; i++) {
-    if (written.length >= MAX_SECTIONS) {
-      stoppedReason = `Se alcanzó el máximo de ${MAX_SECTIONS} secciones.`;
+    if (written.length >= sectionHardCap) {
+      stoppedReason = `Se alcanzó el máximo de ${sectionHardCap} secciones.`;
       break;
     }
     if (totalWords >= maxWords) {
@@ -247,7 +269,7 @@ export async function orchestrateDeepResearch(
   // Coverage top-up: keep deepening while the report is under its minimum length
   // and relevant ideas remain uncovered — but never past the hard caps.
   let topups = 0;
-  while (totalWords < minWords && written.length < MAX_SECTIONS && topups < MAX_TOPUP_SECTIONS && !stoppedReason) {
+  while (totalWords < minWords && written.length < sectionHardCap && topups < MAX_TOPUP_SECTIONS && !stoppedReason) {
     const uncovered = snapshot.ideas.filter((idea) => !coveredIdeaIds.has(idea.id)).slice(0, 6);
     if (uncovered.length === 0) break;
     topups += 1;
@@ -377,18 +399,49 @@ function sectionInput(
 // Planning
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Resolved section budget: a soft target the planner aims for and a hard cap it must not exceed. */
+export interface SectionPlan {
+  target: number;
+  hardCap: number;
+  mode: 'auto' | 'user';
+}
+
+/**
+ * Decide how many sections a report should have. The whole design bias is toward
+ * FEWER, LONGER sections. `'auto'` derives a small count from the page target; a
+ * numeric `sectionLimit` pins the target and allows the model exactly one extra
+ * section (the grace) when it genuinely needs it.
+ */
+export function resolveSectionPlan(
+  targetPages: { min: number; max: number },
+  sectionLimit: 'auto' | number
+): SectionPlan {
+  const natural = clamp(
+    Math.round((midpoint(targetPages) * WORDS_PER_PAGE) / SECTION_TARGET_WORDS),
+    MIN_SECTIONS,
+    MAX_PLAN_SECTIONS
+  );
+  if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
+    const target = clamp(Math.round(sectionLimit), MIN_SECTIONS, MAX_SECTIONS);
+    return { target, hardCap: Math.min(MAX_SECTIONS, target + SECTION_GRACE), mode: 'user' };
+  }
+  return { target: natural, hardCap: Math.min(MAX_SECTIONS, natural + SECTION_GRACE), mode: 'auto' };
+}
+
 export function buildPlanInput(
   request: DeepResearchRequest,
   language: 'es' | 'en' | 'fr',
   snapshot: WritingWorkshopSnapshot,
-  sectionCount: number,
+  sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
 ): PlanInput {
   return {
     objective: request.objective,
     language,
     audience: request.audience,
-    sectionCount,
+    sectionCount: sectionPlan.target,
+    sectionHardCap: sectionPlan.hardCap,
+    sectionMode: sectionPlan.mode,
     targetPages,
     ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
       id: i.id,
@@ -411,28 +464,32 @@ async function planWithFallback(
   request: DeepResearchRequest,
   language: 'es' | 'en' | 'fr',
   snapshot: WritingWorkshopSnapshot,
-  sectionCount: number,
+  sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
 ): Promise<DeepResearchPlan> {
-  const input = buildPlanInput(request, language, snapshot, sectionCount, targetPages);
+  const input = buildPlanInput(request, language, snapshot, sectionPlan, targetPages);
   let plan: DeepResearchPlan | null = null;
   try {
-    plan = normalizePlan(await deps.planReport(input), snapshot);
+    plan = normalizePlan(await deps.planReport(input), snapshot, sectionPlan.hardCap);
   } catch {
     plan = null;
   }
-  if (!plan || plan.sections.length === 0) return fallbackPlan(request, snapshot, sectionCount);
+  if (!plan || plan.sections.length === 0) return fallbackPlan(request, snapshot, sectionPlan.target);
   return plan;
 }
 
-export function normalizePlan(plan: DeepResearchPlan, snapshot: WritingWorkshopSnapshot): DeepResearchPlan {
+export function normalizePlan(
+  plan: DeepResearchPlan,
+  snapshot: WritingWorkshopSnapshot,
+  maxSections: number = MAX_SECTIONS
+): DeepResearchPlan {
   const ideaIds = new Set(snapshot.ideas.map((i) => i.id));
   const workIds = new Set(snapshot.works.map((w) => w.id));
   const gapIds = new Set(snapshot.gaps.map((g) => g.id));
   const contradictionIds = new Set(snapshot.contradictions.map((c) => c.id));
   const passageIds = new Set(snapshot.passages.map((p) => p.id));
 
-  const sections = (plan.sections ?? []).slice(0, MAX_SECTIONS).map((s, index) => ({
+  const sections = (plan.sections ?? []).slice(0, maxSections).map((s, index) => ({
     id: cleanStr(s.id, `s${index + 1}`),
     title: cleanStr(s.title, `Sección ${index + 1}`),
     purpose: cleanStr(s.purpose, ''),

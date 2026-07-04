@@ -1,21 +1,45 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app, dialog } from 'electron';
-import type { WritingWorkshopDraft, WritingWorkshopExportRequest, WritingWorkshopMatrixRow } from '@shared/types';
+import type {
+  WritingWorkshopDraft,
+  WritingWorkshopExportFormat,
+  WritingWorkshopExportRequest,
+  WritingWorkshopMatrixRow,
+} from '@shared/types';
+import { markdownToPdf } from './markdownRender';
 
 export async function exportWritingWorkshopDraft(
   request: WritingWorkshopExportRequest
 ): Promise<{ path: string } | null> {
   const draft = request.draft;
-  const filename = `${slug(draft.title || 'taller-escritura')}.md`;
+  const requested = request.format ?? 'markdown';
+  const base = slug(draft.title || 'taller-escritura');
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar borrador del Taller de escritura',
-    defaultPath: path.join(app.getPath('documents'), filename),
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
+    title: 'Exportar informe',
+    defaultPath: path.join(app.getPath('documents'), `${base}.${requested === 'pdf' ? 'pdf' : 'md'}`),
+    // Offer both filters so the user can switch format in the native dialog; the
+    // final format is decided by the chosen extension (falling back to `requested`).
+    filters:
+      requested === 'pdf'
+        ? [
+            { name: 'PDF', extensions: ['pdf'] },
+            { name: 'Markdown', extensions: ['md'] },
+          ]
+        : [
+            { name: 'Markdown', extensions: ['md'] },
+            { name: 'PDF', extensions: ['pdf'] },
+          ],
   });
   if (canceled || !filePath) return null;
 
-  fs.writeFileSync(filePath, renderDraftMarkdown(draft), 'utf8');
+  const format: WritingWorkshopExportFormat = path.extname(filePath).toLowerCase() === '.pdf' ? 'pdf' : 'markdown';
+  const markdown = renderDraftMarkdown(draft);
+  if (format === 'pdf') {
+    fs.writeFileSync(filePath, await markdownToPdf(markdown, draft.title || 'Informe'));
+  } else {
+    fs.writeFileSync(filePath, markdown, 'utf8');
+  }
   return { path: filePath };
 }
 

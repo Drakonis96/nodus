@@ -4,6 +4,7 @@ import type {
   AppSettings,
   DeepResearchMeta,
   DeepResearchProgress,
+  DeepResearchSectionLimit,
   DeepResearchTargetLength,
   Project,
   ProjectDetail,
@@ -50,6 +51,20 @@ const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   standard: 'Estándar (9–14 pág.)',
   exhaustive: 'Exhaustivo (15–20 pág.)',
 };
+
+/** Options for the "max sections" selector. `'auto'` lets the model decide; numbers cap it. */
+const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[] = [
+  { value: 'auto', label: 'Secciones: Auto (IA decide)' },
+  { value: 4, label: 'Máx. 4 secciones' },
+  { value: 5, label: 'Máx. 5 secciones' },
+  { value: 6, label: 'Máx. 6 secciones' },
+  { value: 8, label: 'Máx. 8 secciones' },
+  { value: 10, label: 'Máx. 10 secciones' },
+];
+
+function sectionLimitLabel(limit: DeepResearchSectionLimit): string {
+  return limit === 'auto' ? t('Secciones: Auto') : tx('Máx. {n} secciones', { n: limit });
+}
 
 const TONE_LABELS: Record<NonNullable<WritingWorkshopBrief['tone']>, string> = {
   academic: 'Académico',
@@ -122,9 +137,11 @@ export function WritingWorkshopView({
   // Deep Research mode (orchestrated, coverage-guided multi-page report).
   const [mode, setMode] = useState<'workshop' | 'deep'>('workshop');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
+  const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [deepRunning, setDeepRunning] = useState(false);
   const [deepProgress, setDeepProgress] = useState<DeepResearchProgress | null>(null);
   const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   const selectedCount = useMemo(() => countSelection(selection), [selection]);
   const tableCount = useMemo(() => (snapshot ? countSnapshot(snapshot) : 0), [snapshot]);
@@ -227,6 +244,7 @@ export function WritingWorkshopView({
           language: brief.language,
           audience: brief.audience,
           targetLength: deepTarget,
+          sectionLimit: deepSectionLimit,
           model: selectedModel,
         },
         { onProgress: (p) => setDeepProgress(p) }
@@ -247,13 +265,14 @@ export function WritingWorkshopView({
     }
   };
 
-  const exportDraft = async () => {
+  const exportDraft = async (format: 'markdown' | 'pdf') => {
     if (!draft) return;
+    setExportMenuOpen(false);
     setExporting(true);
     setError(null);
     setMessage(null);
     try {
-      const result = await window.nodus.exportWritingWorkshopDraft({ draft });
+      const result = await window.nodus.exportWritingWorkshopDraft({ draft, format });
       if (result) setMessage(`${t('Exportado')}: ${result.path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -455,18 +474,34 @@ export function WritingWorkshopView({
           </>
         )}
         {mode === 'deep' && (
-          <select
-            className="input"
-            value={deepTarget}
-            onChange={(e) => setDeepTarget(e.target.value as DeepResearchTargetLength)}
-            title={t('Extensión objetivo del informe')}
-          >
-            {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
-              <option key={id} value={id}>
-                {t(label)}
-              </option>
-            ))}
-          </select>
+          <>
+            <select
+              className="input"
+              value={deepTarget}
+              onChange={(e) => setDeepTarget(e.target.value as DeepResearchTargetLength)}
+              title={t('Extensión objetivo del informe')}
+            >
+              {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>
+                  {t(label)}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input"
+              value={String(deepSectionLimit)}
+              onChange={(e) =>
+                setDeepSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))
+              }
+              title={t('Número máximo de secciones (menos secciones = mayor profundidad)')}
+            >
+              {DEEP_SECTION_OPTIONS.map((option) => (
+                <option key={String(option.value)} value={String(option.value)}>
+                  {t(option.label)}
+                </option>
+              ))}
+            </select>
+          </>
         )}
         <select
           className="input"
@@ -527,6 +562,7 @@ export function WritingWorkshopView({
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
             <Badge color="green">{t('Cobertura del corpus completo')}</Badge>
             <Badge>{t(DEEP_TARGET_LABELS[deepTarget])}</Badge>
+            <Badge>{sectionLimitLabel(deepSectionLimit)}</Badge>
             {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
             <span className="text-neutral-600">{t('Sin selección manual: el informe elige y cita las fuentes por ti.')}</span>
           </div>
@@ -618,7 +654,13 @@ export function WritingWorkshopView({
       <div className="flex-1 min-h-0 grid grid-cols-[22rem_minmax(0,1fr)_24rem] max-xl:grid-cols-1">
         <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
           {mode === 'deep' && (
-            <DeepResearchPanel running={deepRunning} progress={deepProgress} meta={deepMeta} target={deepTarget} />
+            <DeepResearchPanel
+              running={deepRunning}
+              progress={deepProgress}
+              meta={deepMeta}
+              target={deepTarget}
+              sectionLimit={deepSectionLimit}
+            />
           )}
           {mode === 'workshop' && (
           <>
@@ -717,23 +759,51 @@ export function WritingWorkshopView({
           )}
           {draft && (
             <div className="max-w-4xl mx-auto space-y-5">
-              <div className="flex flex-wrap items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-semibold">{draft.title}</h2>
-                  <p className="text-sm text-neutral-400 mt-1">{draft.abstract}</p>
+              <div className="space-y-3">
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold break-words">{draft.title}</h2>
+                  {draft.abstract && <p className="text-sm text-neutral-400 mt-1">{draft.abstract}</p>}
                 </div>
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={copyDraft}>
-                  <Icon name="check" /> {t('Copiar')}
-                </button>
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={saveDraft} disabled={savingDraft}>
-                  <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
-                </button>
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setSavingToNotes(true)}>
-                  <Icon name="notebook" /> {t('Guardar en notas')}
-                </button>
-                <button className="btn btn-primary gap-1.5" onClick={exportDraft} disabled={exporting}>
-                  <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={copyDraft}>
+                    <Icon name="check" /> {t('Copiar')}
+                  </button>
+                  <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={saveDraft} disabled={savingDraft}>
+                    <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
+                  </button>
+                  <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setSavingToNotes(true)}>
+                    <Icon name="notebook" /> {t('Guardar en notas')}
+                  </button>
+                  <div className="relative">
+                    <button
+                      className="btn btn-primary gap-1.5"
+                      onClick={() => setExportMenuOpen((open) => !open)}
+                      disabled={exporting}
+                    >
+                      <Icon name={exporting ? 'sync' : 'download'} className={exporting ? 'animate-spin' : ''} /> {t('Exportar')}
+                      <Icon name="chevronDown" size={14} />
+                    </button>
+                    {exportMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                        <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-700 bg-neutral-900 shadow-xl py-1">
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
+                            onClick={() => void exportDraft('markdown')}
+                          >
+                            <Icon name="code" size={14} /> {t('Markdown (.md)')}
+                          </button>
+                          <button
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
+                            onClick={() => void exportDraft('pdf')}
+                          >
+                            <Icon name="download" size={14} /> {t('PDF (.pdf)')}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               <section className="card p-4">
                 <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
@@ -825,6 +895,7 @@ export function WritingWorkshopView({
           defaultTitle={draft.title}
           kind="writing"
           source={{ origin: 'writing', model: selectedModel, ref: draft.brief.kind }}
+          allowProjectLink
           onClose={() => setSavingToNotes(false)}
         />
       )}
@@ -1128,11 +1199,13 @@ function DeepResearchPanel({
   progress,
   meta,
   target,
+  sectionLimit,
 }: {
   running: boolean;
   progress: DeepResearchProgress | null;
   meta: DeepResearchMeta | null;
   target: DeepResearchTargetLength;
+  sectionLimit: DeepResearchSectionLimit;
 }) {
   const currentPhaseIndex = progress ? DEEP_STEP_ORDER.indexOf(progress.phase) : -1;
   return (
@@ -1146,8 +1219,13 @@ function DeepResearchPanel({
         </p>
       </div>
 
-      <div className="text-xs text-neutral-500">
-        <span className="text-neutral-400">{t('Extensión:')}</span> {t(DEEP_TARGET_LABELS[target])}
+      <div className="text-xs text-neutral-500 space-y-1">
+        <div>
+          <span className="text-neutral-400">{t('Extensión:')}</span> {t(DEEP_TARGET_LABELS[target])}
+        </div>
+        <div>
+          <span className="text-neutral-400">{t('Secciones:')}</span> {sectionLimitLabel(sectionLimit)}
+        </div>
       </div>
 
       {(running || progress) && (

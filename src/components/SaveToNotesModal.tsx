@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Note, NoteFolder, NoteKind, NoteSource } from '@shared/types';
+import type { Note, NoteFolder, NoteKind, NoteSource, Project } from '@shared/types';
 import { Icon } from './ui';
 import { flattenFolders } from '../notesTree';
 import { t } from '../i18n';
@@ -15,6 +15,7 @@ export function SaveToNotesModal({
   defaultTitle,
   kind,
   source,
+  allowProjectLink = false,
   onClose,
   onSaved,
 }: {
@@ -22,6 +23,8 @@ export function SaveToNotesModal({
   defaultTitle: string;
   kind: NoteKind;
   source?: NoteSource | null;
+  /** When true, also offer to link the saved note to a project. */
+  allowProjectLink?: boolean;
   onClose: () => void;
   onSaved?: (note: Note) => void;
 }) {
@@ -30,6 +33,8 @@ export function SaveToNotesModal({
   const [title, setTitle] = useState(defaultTitle.trim() || t('Nota sin título'));
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +44,15 @@ export function SaveToNotesModal({
     void window.nodus.getNotesTree().then((tree) => {
       if (on) setFolders(tree.folders);
     });
+    if (allowProjectLink) {
+      void window.nodus.listProjects().then((list) => {
+        if (on) setProjects(list);
+      });
+    }
     return () => {
       on = false;
     };
-  }, []);
+  }, [allowProjectLink]);
 
   const flat = useMemo(() => flattenFolders(folders), [folders]);
 
@@ -75,6 +85,16 @@ export function SaveToNotesModal({
         folderId,
         source: source ?? { origin: kind },
       });
+      if (allowProjectLink && projectId) {
+        await window.nodus.addProjectLink({
+          projectId,
+          sectionId: null,
+          kind: 'note',
+          refId: note.id,
+          label: title,
+          role: 'source',
+        });
+      }
       setDone(true);
       onSaved?.(note);
       window.setTimeout(onClose, 750);
@@ -154,6 +174,25 @@ export function SaveToNotesModal({
               {t('Crear')}
             </button>
           </div>
+
+          {allowProjectLink && (
+            <div>
+              <label className="text-xs uppercase text-neutral-500">{t('Vincular a proyecto (opcional)')}</label>
+              <select
+                className="input w-full mt-1"
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                disabled={projects.length === 0}
+              >
+                <option value="">{t('Sin proyecto')}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="rounded-md border border-neutral-800 bg-neutral-900/50 p-2 text-xs text-neutral-400">
             <Icon name="info" size={12} className="mr-1 text-neutral-500" />

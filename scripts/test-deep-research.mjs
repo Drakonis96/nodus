@@ -32,7 +32,16 @@ try {
     logLevel: 'silent',
   });
   const mod = await import(pathToFileURL(outfile).href);
-  const { orchestrateDeepResearch, applyCitationPolicy, buildSnapshotMaps, resolveTargetPages, countWords, WORDS_PER_PAGE } = mod;
+  const {
+    orchestrateDeepResearch,
+    applyCitationPolicy,
+    buildSnapshotMaps,
+    resolveTargetPages,
+    resolveSectionPlan,
+    countWords,
+    WORDS_PER_PAGE,
+    MAX_SECTIONS,
+  } = mod;
 
   // ── Fake corpus snapshot ────────────────────────────────────────────────────
   const makeSnapshot = (ideaCount) => {
@@ -231,19 +240,20 @@ try {
     assert.ok(report.meta.sections <= 22, 'never exceeds the hard section cap');
   }
 
-  // ── 5. Coverage top-up: thin sections get lifted toward the minimum length ──
+  // ── 5. Thin sections stay bounded and complete (no runaway section count) ───
   {
     const snapshot = makeSnapshot(50);
-    // Each section is deliberately tiny (ignores targetWords) so the top-up loop must engage.
+    // Each section is deliberately tiny (ignores targetWords). Even so, the report must
+    // stay within its section budget and keep full corpus coverage — never balloon.
     const deps = {
       ...baseDeps(snapshot),
       writeSection: async (input) => `## ${input.section.title}\n\n Breve (${input.citationMenu[0]?.token ?? ''}).`,
     };
     const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'standard' }, deps);
-    // Top-up is bounded, so it may not fully reach the minimum, but it must add sections
-    // beyond the plan and keep the report coherent.
-    assert.ok(report.meta.sections > 5, 'top-up added sections beyond the base plan');
-    assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'top-up sections also citation-clean');
+    // Standard auto plan stays small (few, deep sections) and bounded by the +1 grace.
+    assert.ok(report.meta.sections >= 4 && report.meta.sections <= 6, `bounded section count (got ${report.meta.sections})`);
+    assert.ok(report.meta.ideasCovered >= 40, `keeps full corpus coverage (got ${report.meta.ideasCovered}/50)`);
+    assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'thin sections also citation-clean');
   }
 
   // ── 6. Resilience: plan + every section failing still yields a report ───────
@@ -273,6 +283,49 @@ try {
   assert.equal(countWords('uno dos tres'), 3);
   assert.equal(countWords('[Autor (2020)](nodus://idea/g-1) palabra'), 3, 'link label counts, url does not');
   assert.equal(WORDS_PER_PAGE, 450);
+
+  // ── 8. resolveSectionPlan: auto vs. user-capped, with the +1 grace ──────────
+  {
+    const auto = resolveSectionPlan({ min: 15, max: 20 }, 'auto');
+    assert.equal(auto.mode, 'auto', 'auto mode reported');
+    assert.ok(auto.target >= 3 && auto.target <= 10, `auto target stays small (got ${auto.target})`);
+    assert.ok(auto.hardCap <= MAX_SECTIONS, 'auto hard cap respects the absolute ceiling');
+    assert.ok(auto.hardCap === Math.min(MAX_SECTIONS, auto.target + 1), 'auto hard cap = target + 1 grace');
+
+    const capped = resolveSectionPlan({ min: 15, max: 20 }, 5);
+    assert.equal(capped.mode, 'user', 'user mode reported');
+    assert.equal(capped.target, 5, 'user cap becomes the target');
+    assert.equal(capped.hardCap, 6, 'user cap allows exactly one extra section');
+
+    // An absurd cap is clamped to the absolute ceiling.
+    const huge = resolveSectionPlan({ min: 15, max: 20 }, 999);
+    assert.ok(huge.target <= MAX_SECTIONS && huge.hardCap <= MAX_SECTIONS, 'huge cap clamped to the ceiling');
+  }
+
+  // ── 9. A user section cap is honoured end-to-end (never exceeds cap + 1) ─────
+  {
+    const snapshot = makeSnapshot(60);
+    const report = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', targetLength: 'exhaustive', sectionLimit: 4 },
+      baseDeps(snapshot)
+    );
+    assert.ok(report.meta.sections <= 5, `respects the 4-section cap + 1 grace (got ${report.meta.sections})`);
+    assert.ok(report.meta.sections >= 3, 'still produces a real report under a tight cap');
+    // Even capped, references still trace to really-cited works.
+    assert.ok(report.draft.bibliography.length > 0, 'capped report still has references');
+    assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'capped report stays citation-clean');
+  }
+
+  // ── 10. Fewer/deeper by default: auto exhaustive stays well under the old cap ─
+  {
+    const snapshot = makeSnapshot(60);
+    const report = await orchestrateDeepResearch(
+      { objective: 'X', language: 'es', targetLength: 'exhaustive' },
+      baseDeps(snapshot)
+    );
+    assert.ok(report.meta.sections <= MAX_SECTIONS, 'never exceeds the absolute section ceiling');
+    assert.ok(report.meta.sections <= 12, `auto mode favours few, deep sections (got ${report.meta.sections})`);
+  }
 
   console.log('deep research orchestration test passed');
 } finally {

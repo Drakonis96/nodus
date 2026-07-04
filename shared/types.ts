@@ -1871,8 +1871,12 @@ export interface WritingWorkshopDraftRequest {
   model?: ModelRef | null;
 }
 
+export type WritingWorkshopExportFormat = 'markdown' | 'pdf';
+
 export interface WritingWorkshopExportRequest {
   draft: WritingWorkshopDraft;
+  /** Output format. Defaults to `'markdown'` when omitted. */
+  format?: WritingWorkshopExportFormat;
 }
 
 /** A locally saved workshop draft, including the exact prompt and selected evidence. */
@@ -1909,12 +1913,26 @@ export interface WritingWorkshopStreamHandlers {
  */
 export type DeepResearchTargetLength = 'adaptive' | 'concise' | 'standard' | 'exhaustive';
 
+/**
+ * How the number of report sections is decided. `'auto'` lets the model/heuristic
+ * pick from the corpus size; a positive number is a soft ceiling — the planner aims
+ * for at most that many sections and may exceed it by one only when strictly needed.
+ * The bibliography, abstract and limitations never count as sections.
+ */
+export type DeepResearchSectionLimit = 'auto' | number;
+
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
   language?: 'es' | 'en' | 'fr';
   audience?: string;
   targetLength?: DeepResearchTargetLength;
+  /**
+   * Upper bound on the number of sections. `'auto'` (default) sizes it from the
+   * corpus; a number caps it (with a one-section grace). Fewer, longer sections are
+   * preferred over many short ones.
+   */
+  sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
 }
 
