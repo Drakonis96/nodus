@@ -51,6 +51,8 @@ try {
     'nodus_list_gaps',
     'nodus_get_gap',
     'nodus_get_author_relations',
+    'nodus_search_authors',
+    'nodus_get_author_synthesis',
     'nodus_list_works',
     'nodus_get_work',
     'nodus_list_work_passages',
@@ -136,6 +138,33 @@ try {
   });
   assert.equal(theme.works.total, 2);
   assert.equal(theme.ideas.total, 1);
+
+  const authors = await callTool(server, 'nodus_search_authors', {
+    query: 'ana',
+    synthesis: 'all',
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(authors.total, 1);
+  assert.equal(authors.authors[0].author_id, 'author-1');
+  assert.equal(authors.authors[0].hasSynthesis, true);
+
+  const authorSynthesis = await callTool(server, 'nodus_get_author_synthesis', {
+    author: 'author-1',
+    generateIfMissing: false,
+    refresh: false,
+  });
+  assert.equal(authorSynthesis.source, 'cached');
+  assert.match(authorSynthesis.synthesis.thesis, /memoria visual/);
+  assert.equal(authorSynthesis.counts.works, 1);
+
+  const missingAuthorSynthesis = await callTool(server, 'nodus_get_author_synthesis', {
+    author: 'author-2',
+    generateIfMissing: false,
+    refresh: false,
+  });
+  assert.equal(missingAuthorSynthesis.source, 'missing');
+  assert.equal(missingAuthorSynthesis.synthesis, null);
 
   const routes = await callTool(server, 'nodus_list_tutor_routes', { mode: 'overview', limit: 10, offset: 0 });
   assert.equal(routes.total, 1);
@@ -332,6 +361,34 @@ function seedMcpDatabase(db) {
     'none',
     1,
     null
+  );
+
+  db.prepare('INSERT INTO authors (author_id, name, affiliation, canonical_key) VALUES (?, ?, ?, ?)').run(
+    'author-1',
+    'Garcia, Ana',
+    'Universidad de Prueba',
+    'garcia::a'
+  );
+  db.prepare('INSERT INTO authors (author_id, name, affiliation, canonical_key) VALUES (?, ?, ?, ?)').run(
+    'author-2',
+    'Lopez, Marta',
+    null,
+    'lopez::m'
+  );
+  db.prepare('INSERT INTO work_authors (nodus_id, author_id, role) VALUES (?, ?, ?)').run('work-1', 'author-1', 'author');
+  db.prepare('INSERT INTO work_authors (nodus_id, author_id, role) VALUES (?, ?, ?)').run('work-2', 'author-2', 'author');
+  db.prepare(
+    `INSERT INTO author_dossier_synthesis (
+      author_id, thesis, remember_json, positioning, model_json, fingerprint, generated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'author-1',
+    'Garcia sintetiza el papel de la memoria visual en el turismo.',
+    JSON.stringify(['La memoria visual ordena el corpus.', 'El turismo actua como mediador.']),
+    'Se conecta con otros autores a traves del tema turismo.',
+    null,
+    'test-fingerprint',
+    now
   );
 
   db.prepare('INSERT INTO themes (theme_id, label, created_at, pinned) VALUES (?, ?, ?, ?)').run('theme-1', 'turismo', now, 1);

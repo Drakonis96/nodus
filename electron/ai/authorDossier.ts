@@ -49,6 +49,16 @@ function clip(value: string, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1).trim()}…`;
 }
 
+function parseAuthorsJson(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Split a stored author name (usually "Surname, Given") into display + sort parts. */
 export function splitName(name: string): { firstName: string; lastName: string; fullName: string } {
   const clean = (name || '').replace(/\s+/g, ' ').trim();
@@ -304,7 +314,10 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
   return (
     getDb()
       .prepare(
-        `SELECT w.nodus_id, w.title, w.year, w.zotero_key AS zoteroKey, w.read_tag AS readTag, wa.role AS role
+        `SELECT w.nodus_id, w.title, w.authors_json AS authorsJson, w.year, w.item_type AS itemType,
+                w.doi, w.zotero_key AS zoteroKey, w.source_type AS sourceType,
+                w.light_status AS lightStatus, w.deep_status AS deepStatus, w.summary_status AS summaryStatus,
+                w.notes, w.read_tag AS readTag, wa.role AS role
            FROM work_authors wa JOIN works w ON w.nodus_id = wa.nodus_id
           WHERE wa.author_id = ? AND w.archived = 0
           ORDER BY w.year DESC, w.title`
@@ -312,16 +325,32 @@ function loadWorks(authorId: string): AuthorDossierWork[] {
       .all(authorId) as {
       nodus_id: string;
       title: string;
+      authorsJson: string | null;
       year: number | null;
+      itemType: string | null;
+      doi: string | null;
       zoteroKey: string | null;
+      sourceType: AuthorDossierWork['sourceType'];
+      lightStatus: AuthorDossierWork['lightStatus'];
+      deepStatus: AuthorDossierWork['deepStatus'];
+      summaryStatus: AuthorDossierWork['summaryStatus'];
+      notes: string | null;
       readTag: number;
       role: string | null;
     }[]
   ).map((w) => ({
     nodus_id: w.nodus_id,
     title: w.title,
+    authors: parseAuthorsJson(w.authorsJson),
     year: w.year,
+    itemType: w.itemType,
+    doi: w.doi,
     zoteroKey: w.zoteroKey,
+    sourceType: w.sourceType,
+    lightStatus: w.lightStatus,
+    deepStatus: w.deepStatus,
+    summaryStatus: w.summaryStatus,
+    notes: w.notes,
     read: w.readTag === 1,
     role: w.role === 'editor' ? ('editor' as const) : ('author' as const),
   }));

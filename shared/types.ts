@@ -2049,8 +2049,16 @@ export interface AuthorSummary {
 export interface AuthorDossierWork {
   nodus_id: string;
   title: string;
+  authors: string[];
   year: number | null;
+  itemType: string | null;
+  doi: string | null;
   zoteroKey: string | null;
+  sourceType: SourceType | null;
+  lightStatus: LightStatus;
+  deepStatus: DeepStatus;
+  summaryStatus: SummaryStatus;
+  notes: string | null;
   read: boolean;
   /** How this person is credited on the work (from Zotero). */
   role: 'author' | 'editor';

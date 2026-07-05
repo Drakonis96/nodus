@@ -13,6 +13,7 @@ import type {
   WritingWorkshopDraft,
   WritingWorkshopSelection,
   WorkFilter,
+  AuthorSummary,
 } from '@shared/types';
 import { getDb } from '../db/database';
 import * as ideas from '../db/ideasRepo';
@@ -33,6 +34,11 @@ import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from '../a
 import { generateDeepResearchReport } from '../ai/deepResearch';
 import { buildDeepResearchBrief, assembleClientDeepResearchReport } from '../ai/deepResearchClient';
 import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail } from '../ai/liveRelations';
+import {
+  buildAuthorDossier,
+  listAuthors as listAuthorSummaries,
+  synthesizeAuthorDossier,
+} from '../ai/authorDossier';
 
 const IDEA_TYPES = ['claim', 'finding', 'construct', 'method', 'framework'] as const;
 const EDGE_TYPES = [
@@ -285,6 +291,46 @@ function compactTutorRoute(route: NonNullable<ReturnType<typeof tutorRoutes.getT
 function resolveTheme(value: string) {
   const needle = value.trim().toLowerCase();
   return themes.listManagedThemes().find((theme) => theme.theme_id === value || theme.label.toLowerCase() === needle) ?? null;
+}
+
+function authorMatchesQuery(author: AuthorSummary, query?: string): boolean {
+  if (!query?.trim()) return true;
+  const q = query.trim().toLowerCase();
+  return [
+    author.author_id,
+    author.name,
+    author.fullName,
+    author.firstName,
+    author.lastName,
+    author.affiliation ?? '',
+    ...author.topThemes,
+  ]
+    .join(' ')
+    .toLowerCase()
+    .includes(q);
+}
+
+function resolveAuthor(value: string): AuthorSummary {
+  const authors = listAuthorSummaries();
+  const needle = value.trim().toLowerCase();
+  const exact = authors.find(
+    (author) =>
+      author.author_id === value ||
+      author.name.toLowerCase() === needle ||
+      author.fullName.toLowerCase() === needle
+  );
+  if (exact) return exact;
+
+  const matches = authors.filter((author) => authorMatchesQuery(author, value));
+  if (matches.length === 1) return matches[0];
+  if (matches.length === 0) throw notFound('un autor', value);
+  throw new McpToolError(
+    'invalid_input',
+    `La búsqueda "${value}" coincide con varios autores: ${matches
+      .slice(0, 6)
+      .map((author) => `${author.fullName || author.name} (${author.author_id})`)
+      .join('; ')}. Usa el author_id.`
+  );
 }
 
 function asModel(model?: z.infer<typeof modelSchema>): ModelRef | undefined {
@@ -551,6 +597,91 @@ export function registerTools(server: McpServer): void {
         const edges = graph.edges.filter((edge) => edge.source === root.id || edge.target === root.id);
         const nodeIds = new Set([root.id, ...edges.flatMap((edge) => [edge.source, edge.target])]);
         return { nodes: graph.nodes.filter((node) => nodeIds.has(node.id)), edges };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_authors',
+    {
+      title: 'Search authors',
+      description:
+        'Busca autores del corpus local por id, nombre, afiliación o temas principales. Devuelve el footprint de cada autor y si ya tiene síntesis de ficha generada.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        synthesis: z.enum(['all', 'with', 'without']).default('all'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, synthesis = 'all' }) =>
+      tool(() => {
+        const all = listAuthorSummaries()
+          .filter((author) => authorMatchesQuery(author, query))
+          .filter((author) => synthesis === 'all' || (synthesis === 'with' ? author.hasSynthesis : !author.hasSynthesis));
+        return page('authors', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_author_synthesis',
+    {
+      title: 'Get or generate author synthesis',
+      description:
+        'Resuelve un autor por author_id o nombre. Si ya existe una síntesis de ficha, la devuelve; si no existe y generateIfMissing=true, la genera y la guarda usando el modelo de síntesis configurado o el modelo indicado. Use refresh=true para regenerar aunque exista.',
+      inputSchema: {
+        author: z.string().trim().min(1).max(500),
+        generateIfMissing: z.boolean().default(true),
+        refresh: z.boolean().default(false),
+        model: modelSchema.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+    },
+    ({ author, generateIfMissing = true, refresh = false, model }) =>
+      tool(async () => {
+        const resolved = resolveAuthor(author);
+        const dossier = buildAuthorDossier(resolved.author_id);
+        if (!dossier) throw notFound('un autor', author);
+
+        if (!refresh && dossier.synthesis) {
+          return {
+            source: 'cached',
+            author: resolved,
+            synthesis: dossier.synthesis,
+            counts: {
+              works: dossier.works.length,
+              ideas: dossier.ideas.length,
+              relations: dossier.relations.length,
+              themes: dossier.themes.length,
+            },
+          };
+        }
+
+        if (!generateIfMissing && !refresh) {
+          return {
+            source: 'missing',
+            author: resolved,
+            synthesis: null,
+            counts: {
+              works: dossier.works.length,
+              ideas: dossier.ideas.length,
+              relations: dossier.relations.length,
+              themes: dossier.themes.length,
+            },
+          };
+        }
+
+        const synthesis = await synthesizeAuthorDossier(resolved.author_id, asModel(model));
+        return {
+          source: refresh ? 'refreshed' : 'generated',
+          author: { ...resolved, hasSynthesis: true },
+          synthesis,
+          counts: {
+            works: dossier.works.length,
+            ideas: dossier.ideas.length,
+            relations: dossier.relations.length,
+            themes: dossier.themes.length,
+          },
+        };
       })()
   );
 
