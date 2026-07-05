@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 24;
 
 export const migrations: Migration[] = [
   {
@@ -782,6 +782,22 @@ export const migrations: Migration[] = [
 
       -- Zotero creator role for this work↔author link: 'author' | 'editor'.
       ALTER TABLE work_authors ADD COLUMN role TEXT NOT NULL DEFAULT 'author';
+    `,
+  },
+  {
+    version: 24,
+    up: /* sql */ `
+      -- Progress for Modo Estudio. The guide itself is recalculated from the
+      -- live graph, but the user's learning state must survive restarts.
+      CREATE TABLE study_progress (
+        target_kind TEXT NOT NULL,
+        target_id   TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        note        TEXT,
+        updated_at  TEXT NOT NULL,
+        PRIMARY KEY (target_kind, target_id)
+      );
+      CREATE INDEX idx_study_progress_status ON study_progress(status, updated_at);
     `,
   },
 ];

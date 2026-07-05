@@ -2160,6 +2160,189 @@ export interface SynthesisMatrix {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Study Guide ("Modo Estudio") — a guided layer for mastering a whole corpus:
+// author-by-author learning goals, ranked Zotero works, progress tracking and
+// optional AI tutor sessions grounded in the existing graph + indexed passages.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type StudyProgressKind = 'author' | 'work' | 'idea' | 'theme';
+export type StudyProgressStatus = 'pending' | 'in_progress' | 'understood' | 'needs_full_read' | 'review';
+
+export interface StudyProgressRecord {
+  targetKind: StudyProgressKind;
+  targetId: string;
+  status: StudyProgressStatus;
+  note: string | null;
+  updatedAt: string;
+}
+
+export interface StudyPlanRequest {
+  objective?: string;
+  sessionMinutes?: number;
+  authorLimit?: number;
+  worksPerAuthor?: number;
+  includeCompleted?: boolean;
+  /** User-triggered semantic focus. Uses embeddings when configured; never required. */
+  semanticFocus?: boolean;
+}
+
+export interface StudyGuideStats {
+  totalAuthors: number;
+  shownAuthors: number;
+  totalWorks: number;
+  totalIdeas: number;
+  completedAuthors: number;
+  reviewAuthors: number;
+  fullReadWorks: number;
+  zoteroLinkedWorks: number;
+}
+
+export interface StudyKeyIdea {
+  globalId: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  workId: string;
+  workTitle: string;
+}
+
+export interface StudyRecommendedWork {
+  nodusId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  zoteroKey: string | null;
+  read: boolean;
+  sourceType: SourceType | null;
+  deepStatus: DeepStatus;
+  summaryStatus: SummaryStatus;
+  ideaCount: number;
+  principalIdeaCount: number;
+  passageCount: number;
+  score: number;
+  reasons: string[];
+  progressStatus: StudyProgressStatus | null;
+  summary: string | null;
+}
+
+export interface StudyAuthorPlan {
+  authorId: string;
+  name: string;
+  fullName: string;
+  rank: number;
+  score: number;
+  progressStatus: StudyProgressStatus | null;
+  progressNote: string | null;
+  workCount: number;
+  ideaCount: number;
+  relationCount: number;
+  topThemes: string[];
+  coverage: {
+    analyzedWorks: number;
+    totalWorks: number;
+    fullTextWorks: number;
+    zoteroLinkedWorks: number;
+    readWorks: number;
+  };
+  recommendedWorks: StudyRecommendedWork[];
+  keyIdeas: StudyKeyIdea[];
+  learningGoals: string[];
+  reviewQuestions: string[];
+  reasons: string[];
+  nextAction: string;
+}
+
+export interface StudyGuidePhase {
+  id: 'orientacion' | 'autores' | 'contrastes' | 'lectura_profunda' | 'repaso';
+  title: string;
+  objective: string;
+  authorIds: string[];
+}
+
+export interface StudyGuidePlan {
+  generatedAt: string;
+  objective: string;
+  sessionMinutes: number;
+  stats: StudyGuideStats;
+  summary: string;
+  nextAuthorId: string | null;
+  authors: StudyAuthorPlan[];
+  phases: StudyGuidePhase[];
+  coverageWarnings: string[];
+  semanticFocusAvailable: boolean;
+  semanticFocusUsed: boolean;
+  semanticFocusSummary: string | null;
+}
+
+export interface StudySessionRequest {
+  authorId: string;
+  objective?: string;
+  sessionMinutes?: number;
+  useFullText?: boolean;
+  model?: ModelRef | null;
+}
+
+export interface StudySessionPassage {
+  passageId: string;
+  workId: string;
+  workTitle: string;
+  zoteroKey: string | null;
+  pageLabel: string | null;
+  snippet: string;
+  similarity: number | null;
+}
+
+export interface StudySessionStep {
+  title: string;
+  body: string;
+  workIds: string[];
+  ideaIds: string[];
+  minutes: number;
+}
+
+export interface StudyQuizQuestion {
+  id: string;
+  question: string;
+  expected: string;
+  ideaIds: string[];
+  workIds: string[];
+}
+
+export interface StudySession {
+  authorId: string;
+  authorName: string;
+  generatedAt: string;
+  model: ModelRef | null;
+  usedFullText: boolean;
+  guide: string;
+  sequence: StudySessionStep[];
+  recommendedWorks: StudyRecommendedWork[];
+  keyIdeas: StudyKeyIdea[];
+  passages: StudySessionPassage[];
+  quiz: StudyQuizQuestion[];
+  fullReadCandidates: StudyRecommendedWork[];
+  nextActions: string[];
+}
+
+export interface StudyAnswerRequest {
+  authorId: string;
+  question: string;
+  answer: string;
+  objective?: string;
+  model?: ModelRef | null;
+}
+
+export interface StudyAnswerAssessment {
+  verdict: 'solid' | 'partial' | 'weak';
+  score: number;
+  feedback: string;
+  missing: string[];
+  nextReview: string[];
+  model: ModelRef | null;
+  generatedAt: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2267,6 +2450,21 @@ export interface NodusApi {
   synthesizeMatrixCell(authorId: string, themeId: string, model?: ModelRef | null): Promise<SynthesisMatrixCell>;
   /** Export cached author syntheses (selected or all) to Markdown or PDF. */
   exportAuthorSyntheses(request: AuthorSynthesisExportRequest): Promise<{ path: string } | null>;
+
+  // study guide
+  /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
+  getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;
+  /** Persist study progress for an author/work/idea/theme. */
+  setStudyProgress(record: {
+    targetKind: StudyProgressKind;
+    targetId: string;
+    status: StudyProgressStatus;
+    note?: string | null;
+  }): Promise<StudyProgressRecord>;
+  /** Optional AI tutor session for one author, grounded in graph data and indexed passages. */
+  generateStudySession(request: StudySessionRequest): Promise<StudySession>;
+  /** Evaluate a learner's answer against the selected author's extracted ideas. */
+  evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment>;
 
   // main-theme management ("temas principales")
   listManagedThemes(): Promise<ManagedTheme[]>;

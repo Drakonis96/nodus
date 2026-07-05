@@ -95,6 +95,11 @@ const api: NodusApi = {
     ipcRenderer.invoke('authors:matrixCell', authorId, themeId, model),
   exportAuthorSyntheses: (request) => ipcRenderer.invoke('authors:exportSyntheses', request),
 
+  getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
+  setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),
+  generateStudySession: (request) => ipcRenderer.invoke('study:session', request),
+  evaluateStudyAnswer: (request) => ipcRenderer.invoke('study:answer', request),
+
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
   addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),
   renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),

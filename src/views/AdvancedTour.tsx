@@ -49,6 +49,12 @@ const STEPS: AdvancedTourStep[] = [
   },
   {
     stage: 'Paso 2 · Comprender el corpus',
+    view: 'study',
+    title: 'Modo Estudio: domina autores e ideas',
+    body: 'Cuando el objetivo sea aprender el corpus, entra en Estudio: Nodus prioriza autores, recomienda obras concretas para abrir en Zotero, propone sesiones tutor con pasajes y te permite marcar qué está entendido, qué queda en repaso y qué exige lectura completa.',
+  },
+  {
+    stage: 'Paso 2 · Comprender el corpus',
     view: 'argument',
     title: 'Reconstruye la arquitectura de un argumento',
     body: 'Elige una idea central y traza su mapa de argumentos: por conectividad (sin IA, siguiendo las aristas) o dejando que la IA dibuje el esquema de premisas y conclusiones. Es la forma de pasar de «qué dicen las fuentes» a «cómo razonan», y de detectar saltos lógicos antes de apoyarte en ellos.',

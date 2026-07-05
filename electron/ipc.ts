@@ -49,6 +49,9 @@ import type {
   ImportProjectChapterInput,
   UpdateProjectInput,
   UpdateProjectSectionInput,
+  StudyPlanRequest,
+  StudySessionRequest,
+  StudyAnswerRequest,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -98,6 +101,8 @@ import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { listAuthors, buildAuthorDossier, synthesizeAuthorDossier } from './ai/authorDossier';
 import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix';
 import { exportAuthorSyntheses } from './export/authorSynthesisExport';
+import { buildStudyPlan, evaluateStudyAnswer, generateStudySession } from './ai/studyGuide';
+import * as studyProgress from './db/studyProgressRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -416,6 +421,17 @@ export function registerIpc(
     synthesizeMatrixCell(authorId, themeId, model)
   );
   h('authors:exportSyntheses', async (_e, request: AuthorSynthesisExportRequest) => exportAuthorSyntheses(request));
+
+  // study guide
+  h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
+  h('study:progress:set', async (_e, record: {
+    targetKind: 'author' | 'work' | 'idea' | 'theme';
+    targetId: string;
+    status: 'pending' | 'in_progress' | 'understood' | 'needs_full_read' | 'review';
+    note?: string | null;
+  }) => studyProgress.setStudyProgress(record));
+  h('study:session', async (_e, request: StudySessionRequest) => generateStudySession(request));
+  h('study:answer', async (_e, request: StudyAnswerRequest) => evaluateStudyAnswer(request));
 
   // main-theme management ("temas principales")
   h('themes:listManaged', async () => themes.listManagedThemes());
