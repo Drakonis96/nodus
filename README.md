@@ -112,7 +112,7 @@ preload script.
   policy.
 - Node.js 20+.
 
-Or skip all of the above: launch the app, click **Cargar demo**, and explore.
+Or skip all of the above: launch the app, click **Load demo**, and explore.
 
 ## Setup
 
@@ -140,7 +140,7 @@ coarse-grained parent themes. Cheap, incremental, and what keeps unread works
 visible on the map so gaps stay visible.
 
 **Deep scan** — full clean text. Triggered per-work by a configurable read tag
-(default: `leído`) or by manual selection. Extracts typed ideas (claim, finding,
+or by manual selection. Extracts typed ideas (claim, finding,
 construct, method, framework), verbatim evidence anchored to exact passages,
 then fuses each idea against the global graph. The author layer is derived
 post-process — the model is never asked to infer global author relations.
@@ -157,8 +157,8 @@ evidence and relations.
 AI-guided, step-by-step walkthrough of your idea graph. A long-context model
 analyses all ideas, themes and connections and proposes weighted routes:
 
-- **Recorrido completo** — full coverage, ordered by weight.
-- **Desde un objetivo** — routes traced from a specific research interest.
+- **Full tour** — full coverage, ordered by weight.
+- **From a goal** — routes traced from a specific research interest.
 
 No artificial stop cap. Narration streams as one continuous discourse grounded
 in the node's evidence. The graph spotlights and frames each stop live.
