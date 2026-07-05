@@ -85,6 +85,8 @@ const api: NodusApi = {
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
   getIdeaEdges: (globalId) => ipcRenderer.invoke('graph:ideaEdges', globalId),
   getIdeasByWork: (nodusId, limit, offset) => ipcRenderer.invoke('works:ideasByWork', nodusId, limit, offset),
+  getWorkIdeaSynthesis: (nodusId) => ipcRenderer.invoke('works:getIdeaSynthesis', nodusId),
+  synthesizeWorkIdeas: (nodusId, model) => ipcRenderer.invoke('works:synthesizeIdeas', nodusId, model),
   getThemes: () => ipcRenderer.invoke('graph:themes'),
 
   listAuthors: () => ipcRenderer.invoke('authors:list'),

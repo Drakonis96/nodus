@@ -100,6 +100,7 @@ import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { listAuthors, buildAuthorDossier, synthesizeAuthorDossier } from './ai/authorDossier';
 import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix';
+import { getCachedWorkIdeaSynthesis, synthesizeWorkIdeas } from './ai/workIdeaSynthesis';
 import { exportAuthorSyntheses } from './export/authorSynthesisExport';
 import { buildStudyPlan, evaluateStudyAnswer, generateStudySession } from './ai/studyGuide';
 import * as studyProgress from './db/studyProgressRepo';
@@ -407,6 +408,10 @@ export function registerIpc(
   h('graph:ideaEdges', async (_e, globalId: string) => ideas.getIdeaEdges(globalId));
   h('works:ideasByWork', async (_e, nodusId: string, limit: number, offset: number) =>
     ideas.getIdeasByWork(nodusId, limit, offset)
+  );
+  h('works:getIdeaSynthesis', async (_e, nodusId: string) => getCachedWorkIdeaSynthesis(nodusId));
+  h('works:synthesizeIdeas', async (_e, nodusId: string, model?: ModelRef | null) =>
+    synthesizeWorkIdeas(nodusId, model)
   );
   h('graph:themes', async () => themes.listGraphThemes());
 

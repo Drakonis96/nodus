@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
 import type {
   AppSettings,
   ModelRef,
@@ -13,6 +14,7 @@ import type {
 import { Badge, Icon, Spinner, TypeDot } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
+import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import type { PendingAssistantNavigationTarget, PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
@@ -60,6 +62,7 @@ export function StudyGuideView({
   const [answer, setAnswer] = useState('');
   const [assessment, setAssessment] = useState<StudyAnswerAssessment | null>(null);
   const [assessing, setAssessing] = useState(false);
+  const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
 
   const loadPlan = useCallback(
     async (semanticFocus = false) => {
@@ -300,12 +303,26 @@ export function StudyGuideView({
               onSetProgress={setProgress}
               onOpenGraph={onOpenGraph}
               onAskAssistant={askAssistant}
+              onOpenWorkIdeas={setIdeasWork}
             />
           ) : (
             <div className="h-full flex items-center justify-center text-neutral-500 text-sm">{t('Selecciona un autor.')}</div>
           )}
         </section>
       </div>
+      {ideasWork && (
+        <WorkIdeasModal
+          work={ideasWork}
+          model={model}
+          enableSynthesis
+          onClose={() => setIdeasWork(null)}
+          onOpenGraph={onOpenGraph}
+          onOpenWorkGraph={(work) => {
+            setIdeasWork(null);
+            onOpenGraph({ preset: 'reading', workId: work.nodus_id, workTitle: work.title, label: `${t('Ideas y conexiones:')} ${work.title}` });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -389,6 +406,7 @@ function AuthorStudyPanel({
   onSetProgress,
   onOpenGraph,
   onAskAssistant,
+  onOpenWorkIdeas,
 }: {
   author: StudyAuthorPlan;
   session: StudySession | null;
@@ -405,6 +423,7 @@ function AuthorStudyPanel({
   onSetProgress: (kind: 'author' | 'work' | 'idea' | 'theme', id: string, status: StudyProgressStatus, note?: string | null) => Promise<void>;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onAskAssistant: () => void;
+  onOpenWorkIdeas: (work: { nodus_id: string; title: string }) => void;
 }) {
   return (
     <div className="space-y-4 pb-8">
@@ -476,6 +495,7 @@ function AuthorStudyPanel({
                   work={work}
                   onSetProgress={onSetProgress}
                   onOpenGraph={onOpenGraph}
+                  onOpenIdeas={onOpenWorkIdeas}
                 />
               ))}
             </div>
@@ -539,16 +559,31 @@ function WorkRecommendation({
   work,
   onSetProgress,
   onOpenGraph,
+  onOpenIdeas,
 }: {
   work: StudyRecommendedWork;
   onSetProgress: (kind: 'author' | 'work' | 'idea' | 'theme', id: string, status: StudyProgressStatus, note?: string | null) => Promise<void>;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenIdeas: (work: { nodus_id: string; title: string }) => void;
 }) {
-  const openZotero = async () => {
+  const openZotero = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
     if (work.zoteroKey) await window.nodus.openInZotero(work.zoteroKey);
   };
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3">
+    <div
+      className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-3 transition-colors hover:border-neutral-700 hover:bg-neutral-900/70 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      title={t('Ver todas las ideas de esta obra')}
+      onClick={() => onOpenIdeas({ nodus_id: work.nodusId, title: work.title || t('(sin título)') })}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpenIdeas({ nodus_id: work.nodusId, title: work.title || t('(sin título)') });
+        }
+      }}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -573,7 +608,7 @@ function WorkRecommendation({
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5" onClick={(event) => event.stopPropagation()}>
           <button
             className="btn btn-ghost py-1 px-2 gap-1"
             title={work.zoteroKey ? t('Abrir en Zotero') : t('Sin enlace Zotero')}
@@ -584,7 +619,10 @@ function WorkRecommendation({
           </button>
           <button
             className="btn btn-ghost py-1 px-2 gap-1"
-            onClick={() => onOpenGraph({ preset: 'reading', workId: work.nodusId, workTitle: work.title, zoteroKey: work.zoteroKey ?? undefined, label: work.title })}
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenGraph({ preset: 'reading', workId: work.nodusId, workTitle: work.title, zoteroKey: work.zoteroKey ?? undefined, label: work.title });
+            }}
           >
             <Icon name="network" /> {t('Grafo')}
           </button>

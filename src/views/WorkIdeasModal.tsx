@@ -5,7 +5,7 @@
 // connections to other ideas. From the detail you can jump into the graph
 // — either the focused node in the global graph, or the work's idea graph.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { EdgeDetail, IdeaByWork, IdeaDetail, IdeaType } from '@shared/types';
+import type { EdgeDetail, IdeaByWork, IdeaDetail, IdeaType, ModelRef, WorkIdeaSynthesis } from '@shared/types';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, TypeDot } from '../components/ui';
 import { OccurrenceCard } from '../components/NodeDetailPanel';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -25,11 +25,15 @@ function edgeTypeLabel(type: EdgeDetail['edge']['type']): string {
 
 export function WorkIdeasModal({
   work,
+  model,
+  enableSynthesis = false,
   onClose,
   onOpenGraph,
   onOpenWorkGraph,
 }: {
   work: { nodus_id: string; title: string };
+  model?: ModelRef | null;
+  enableSynthesis?: boolean;
   onClose: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenWorkGraph: (work: { nodus_id: string; title: string }) => void;
@@ -48,6 +52,9 @@ export function WorkIdeasModal({
   const [edges, setEdges] = useState<EdgeDetail[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingNote, setSavingNote] = useState<IdeaDetail | null>(null);
+  const [synthesis, setSynthesis] = useState<WorkIdeaSynthesis | null>(null);
+  const [synthesizing, setSynthesizing] = useState(false);
+  const [synthesisError, setSynthesisError] = useState<string | null>(null);
 
   // Start a fresh navigation trail rooted at `id` (origin = this idea).
   const selectFromList = useCallback((id: string) => {
@@ -67,6 +74,19 @@ export function WorkIdeasModal({
   const canGoBack = pos > 0;
   const canGoForward = pos < history.length - 1;
 
+  const synthesize = useCallback(async () => {
+    if (synthesizing) return;
+    setSynthesizing(true);
+    setSynthesisError(null);
+    try {
+      setSynthesis(await window.nodus.synthesizeWorkIdeas(work.nodus_id, model ?? null));
+    } catch (e) {
+      setSynthesisError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSynthesizing(false);
+    }
+  }, [model, synthesizing, work.nodus_id]);
+
   // Open the save-to-notes dialog for any idea, reusing the loaded detail when it
   // is the one already shown, otherwise fetching it on demand.
   const saveIdeaToNotes = useCallback(
@@ -81,21 +101,35 @@ export function WorkIdeasModal({
   useEffect(() => {
     let on = true;
     setLoading(true);
+    setSynthesis(null);
+    setSynthesisError(null);
+    setHistory([]);
+    setPos(0);
     void window.nodus.getIdeasByWork(work.nodus_id, PAGE_SIZE, 0).then((page) => {
       if (!on) return;
       setIdeas(page.ideas);
       setTotal(page.total);
-      setHistory((current) => {
-        if (current.length > 0) return current;
-        const first = page.ideas[0]?.global_id;
-        return first ? [first] : current;
-      });
+      const first = page.ideas[0]?.global_id;
+      setHistory(first ? [first] : []);
       setLoading(false);
     });
     return () => {
       on = false;
     };
   }, [work.nodus_id]);
+
+  useEffect(() => {
+    if (!enableSynthesis) return;
+    let on = true;
+    setSynthesis(null);
+    setSynthesisError(null);
+    void window.nodus.getWorkIdeaSynthesis(work.nodus_id).then((cached) => {
+      if (on) setSynthesis(cached);
+    });
+    return () => {
+      on = false;
+    };
+  }, [enableSynthesis, work.nodus_id]);
 
   const loadMore = useCallback(async () => {
     const page = await window.nodus.getIdeasByWork(work.nodus_id, PAGE_SIZE, ideas.length);
@@ -258,6 +292,67 @@ export function WorkIdeasModal({
 
           {/* Idea detail */}
           <div className="min-w-0 flex-1 overflow-y-auto p-4">
+            {enableSynthesis && (
+              <section className="mb-4 rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
+                <div className="mb-2 flex items-center gap-2">
+                  <Icon name="wand" size={14} className="text-indigo-400" />
+                  <h3 className="text-sm font-medium">{t('Síntesis de la obra')}</h3>
+                  {synthesis?.stale && (
+                    <Badge color="amber" title={t('Las ideas cambiaron desde la última síntesis')}>
+                      {t('desactualizada')}
+                    </Badge>
+                  )}
+                  <div className="flex-1" />
+                  {synthesis && !synthesizing && (
+                    <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" onClick={() => void synthesize()}>
+                      <Icon name="refresh" size={12} /> {t('Regenerar')}
+                    </button>
+                  )}
+                </div>
+                {synthesizing ? (
+                  <div className="flex items-center gap-2 text-sm text-neutral-400">
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-neutral-600 border-t-indigo-400" />
+                    {t('Generando síntesis…')}
+                  </div>
+                ) : synthesis ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">{t('Tesis central')}</p>
+                      <p className="text-sm text-neutral-100">{synthesis.thesis}</p>
+                    </div>
+                    {synthesis.remember.length > 0 && (
+                      <div>
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">{t('Qué recordar')}</p>
+                        <ul className="space-y-1">
+                          {synthesis.remember.map((item, index) => (
+                            <li key={`${item}-${index}`} className="flex gap-2 text-sm text-neutral-300">
+                              <span className="mt-0.5 text-indigo-400">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {synthesis.positioning && (
+                      <div>
+                        <p className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">{t('Cómo se organiza')}</p>
+                        <p className="text-sm text-neutral-300">{synthesis.positioning}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="min-w-[16rem] flex-1 text-sm text-neutral-400">
+                      {t('Genera una tesis central y puntos clave a partir de todas las ideas extraídas de esta obra.')}
+                    </p>
+                    <button className="btn btn-primary gap-1.5 text-xs" onClick={() => void synthesize()} disabled={ideas.length === 0}>
+                      <Icon name="wand" size={13} /> {t('Generar síntesis')}
+                    </button>
+                  </div>
+                )}
+                {synthesisError && <p className="mt-2 text-sm text-red-400">{synthesisError}</p>}
+              </section>
+            )}
             {selectedId && (
               <div className="mb-3 flex items-center gap-1.5">
                 <button

@@ -15,6 +15,12 @@ const requiredLightOverrides = [
   '.light .bg-cyan-950\\/30',
   '.light .border-cyan-900',
   '.light .text-cyan-200',
+  '.light .bg-neutral-800\\/80',
+  '.light .bg-neutral-800\\/50',
+  '.light .bg-indigo-900\\/40',
+  '.light .hover\\:bg-neutral-900\\/70:hover',
+  '.light .hover\\:bg-neutral-700:hover',
+  '.light .bg-violet-950\\/15',
 ];
 
 for (const selector of requiredLightOverrides) {

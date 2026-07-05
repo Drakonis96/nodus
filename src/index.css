@@ -68,6 +68,10 @@ body {
 .light .text-cyan-400 {
   color: #0e7490;
 }
+.light .text-violet-200,
+.light .text-violet-300 {
+  color: #6d28d9;
+}
 .light .hover\:text-white:hover,
 .light .hover\:text-neutral-200:hover {
   color: #111827;
@@ -91,6 +95,10 @@ body {
 .light .border-cyan-900,
 .light .border-cyan-900\/70 {
   border-color: #67e8f9;
+}
+.light .border-violet-900\/60,
+.light .border-violet-900\/70 {
+  border-color: #c4b5fd;
 }
 .light .border-red-800,
 .light .border-red-900\/60 {
@@ -121,11 +129,19 @@ body {
   background-color: rgba(250, 250, 250, 0.92);
 }
 .light .bg-neutral-800,
-.light .bg-neutral-800\/60 {
+.light .bg-neutral-800\/50,
+.light .bg-neutral-800\/60,
+.light .bg-neutral-800\/80 {
   background-color: #e5e7eb;
+}
+.light .bg-indigo-900\/40 {
+  background-color: #e0e7ff;
 }
 .light .bg-indigo-900\/50 {
   background-color: #e0e7ff;
+}
+.light .hover\:bg-indigo-900\/60:hover {
+  background-color: #c7d2fe;
 }
 .light .bg-emerald-900\/50 {
   background-color: #d1fae5;
@@ -145,6 +161,9 @@ body {
 }
 .light .bg-cyan-950\/60 {
   background-color: #cffafe;
+}
+.light .bg-violet-950\/15 {
+  background-color: #f5f3ff;
 }
 .light .bg-indigo-600\/15 {
   background-color: rgba(129, 140, 248, 0.12);
@@ -173,6 +192,7 @@ body {
 .light .hover\:bg-neutral-900:hover,
 .light .hover\:bg-neutral-900\/50:hover,
 .light .hover\:bg-neutral-900\/60:hover,
+.light .hover\:bg-neutral-900\/70:hover,
 .light .hover\:bg-neutral-900\/80:hover {
   background-color: #f5f5f5;
 }
@@ -180,6 +200,9 @@ body {
 .light .hover\:bg-neutral-800\/50:hover,
 .light .hover\:bg-neutral-800\/80:hover {
   background-color: #e5e7eb;
+}
+.light .hover\:bg-neutral-700:hover {
+  background-color: #d4d4d4;
 }
 .light .hover\:bg-red-950\/50:hover {
   background-color: #fee2e2;

@@ -2101,6 +2101,18 @@ export interface AuthorDossierSynthesis {
   stale: boolean;
 }
 
+export interface WorkIdeaSynthesis {
+  /** 1–2 sentence central thesis of one work across its extracted ideas. */
+  thesis: string;
+  /** Short "what to remember" bullets for fast retention under time pressure. */
+  remember: string[];
+  /** One paragraph placing the work within its internal themes and tensions. */
+  positioning: string;
+  model: ModelRef | null;
+  generatedAt: string;
+  stale: boolean;
+}
+
 export interface AuthorDossier {
   author: Author;
   /** Natural reading order ("Given Surname") for the card heading. */
@@ -2435,6 +2447,10 @@ export interface NodusApi {
   getIdeaEdges(globalId: string): Promise<EdgeDetail[]>;
   /** Paginated list of the ideas a work develops. */
   getIdeasByWork(nodusId: string, limit: number, offset: number): Promise<IdeaByWorkPage>;
+  /** Cached narrated synthesis for the ideas extracted from one work, if present. */
+  getWorkIdeaSynthesis(nodusId: string): Promise<WorkIdeaSynthesis | null>;
+  /** Generate a narrated synthesis for the ideas extracted from one work. */
+  synthesizeWorkIdeas(nodusId: string, model?: ModelRef | null): Promise<WorkIdeaSynthesis>;
   getThemes(): Promise<Theme[]>;
 
   // authors (dossier + synthesis matrix)

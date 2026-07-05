@@ -553,6 +553,7 @@ export function resetGraphData(): void {
       DELETE FROM work_themes;
       DELETE FROM themes;
       DELETE FROM work_summaries;
+      DELETE FROM work_idea_synthesis;
       UPDATE works SET
         light_status = 'none', light_at = NULL, light_hash = NULL,
         deep_status = 'none', deep_at = NULL, deep_hash = NULL,
@@ -575,6 +576,7 @@ export function purgeDeepData(nodusId: string): void {
     db.prepare('DELETE FROM gaps WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM external_refs WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM work_authors WHERE nodus_id = ?').run(nodusId);
+    db.prepare('DELETE FROM work_idea_synthesis WHERE nodus_id = ?').run(nodusId);
     // Drop ideas that no longer have any occurrence — but never user-authored
     // manual ideas, which are owned by a note and may legitimately have no works
     // linked yet. Without this guard a deep re-scan of any work would silently

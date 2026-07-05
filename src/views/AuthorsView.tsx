@@ -5,13 +5,14 @@ import type {
   AuthorDossierIdea,
   AuthorDossierWork,
   AuthorSummary,
-  IdeaType,
   ModelRef,
   SynthesisMatrix,
   SynthesisMatrixCell,
 } from '@shared/types';
-import { Badge, Icon, NODE_COLORS, NODE_LABELS, Spinner, TypeDot } from '../components/ui';
+import { Badge, Icon, Spinner, TypeDot } from '../components/ui';
+import { IdeaDetailModal } from '../components/IdeaDetailModal';
 import { ModelPicker } from '../components/ModelPicker';
+import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
@@ -35,8 +36,6 @@ const RELATION_COLORS: Record<string, 'red' | 'amber' | 'green' | 'cyan' | 'neut
   refines: 'amber',
   coauthor: 'neutral',
 };
-
-const IDEA_TYPE_ORDER: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 
 type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
 type SynthFilter = 'all' | 'with' | 'without';
@@ -352,6 +351,7 @@ function DossierTab({
         ) : (
           <AuthorDossierDetail
             dossier={dossier}
+            model={model}
             synthesizing={synthesizing}
             error={error}
             onSynthesize={synthesize}
@@ -366,6 +366,7 @@ function DossierTab({
 
 function AuthorDossierDetail({
   dossier,
+  model,
   synthesizing,
   error,
   onSynthesize,
@@ -373,6 +374,7 @@ function AuthorDossierDetail({
   onSelectAuthor,
 }: {
   dossier: AuthorDossier;
+  model: ModelRef | null;
   synthesizing: boolean;
   error: string | null;
   onSynthesize: () => void;
@@ -380,17 +382,16 @@ function AuthorDossierDetail({
   onSelectAuthor: (id: string) => void;
 }) {
   const [worksOpen, setWorksOpen] = useState(false);
-  const ideasByType = useMemo(() => {
-    const map = new Map<IdeaType, AuthorDossierIdea[]>();
-    for (const idea of dossier.ideas) {
-      const list = map.get(idea.type) ?? [];
-      list.push(idea);
-      map.set(idea.type, list);
-    }
-    return map;
-  }, [dossier.ideas]);
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null);
+  const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
 
   const { author, synthesis } = dossier;
+
+  useEffect(() => {
+    setWorksOpen(false);
+    setSelectedIdeaId(null);
+    setIdeasWork(null);
+  }, [author.author_id]);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_18rem] max-w-6xl items-start">
@@ -519,35 +520,6 @@ function AuthorDossierDetail({
         </div>
       )}
 
-      {/* Ideas grouped by type */}
-      <div>
-        <h4 className="font-medium mb-2 flex items-center gap-2">
-          <Icon name="bulb" size={15} className="text-neutral-400" /> {t('Ideas del autor')}
-        </h4>
-        {dossier.ideas.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t('Este autor aún no tiene ideas extraídas. Analiza sus obras.')}</p>
-        ) : (
-          <div className="space-y-4">
-            {IDEA_TYPE_ORDER.filter((type) => ideasByType.has(type)).map((type) => (
-              <div key={type}>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <TypeDot type={type} />
-                  <span className="text-sm font-medium" style={{ color: NODE_COLORS[type] }}>
-                    {t(NODE_LABELS[type])}
-                  </span>
-                  <span className="text-xs text-neutral-500">({ideasByType.get(type)!.length})</span>
-                </div>
-                <div className="space-y-2">
-                  {ideasByType.get(type)!.map((idea) => (
-                    <IdeaCard key={idea.global_id} idea={idea} />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Works */}
       {dossier.works.length > 0 && (
         <div>
@@ -556,47 +528,49 @@ function AuthorDossierDetail({
           </h4>
           <div className="space-y-1">
             {dossier.works.map((w) => (
-              <div key={w.nodus_id} className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800">
-                <span className="truncate">{w.title || t('(sin título)')}</span>
-                {w.year && <span className="text-xs text-neutral-500 shrink-0">{w.year}</span>}
-                {w.role === 'editor' && (
-                  <Badge color="cyan" title={t('Figura como editor/a de esta obra')}>
-                    {t('ed.')}
-                  </Badge>
-                )}
-                {w.read && (
-                  <Badge color="green" title={t('Leído')}>
-                    <Icon name="check" size={10} />
-                  </Badge>
-                )}
-                {w.zoteroKey && (
-                  <button
-                    className="ml-auto shrink-0 text-neutral-500 hover:text-indigo-400"
-                    title={t('Abrir en Zotero')}
-                    onClick={() => window.nodus.openInZotero(w.zoteroKey!)}
-                  >
-                    <Icon name="external" size={13} />
-                  </button>
-                )}
-              </div>
+              <AuthorWorkRow key={w.nodus_id} work={w} onOpenIdeas={(work) => setIdeasWork(work)} />
             ))}
           </div>
         </div>
       )}
       </div>
-      <AuthorIdeasSidebar ideas={dossier.ideas} />
+      <AuthorIdeasSidebar ideas={dossier.ideas} onOpenIdea={setSelectedIdeaId} />
       {worksOpen && (
         <AuthorWorksModal
           authorName={dossier.fullName || author.name}
           works={dossier.works}
           onClose={() => setWorksOpen(false)}
+          onOpenWorkIdeas={(work) => {
+            setWorksOpen(false);
+            setIdeasWork(work);
+          }}
+        />
+      )}
+      {selectedIdeaId && (
+        <IdeaDetailModal
+          initialIdeaId={selectedIdeaId}
+          onClose={() => setSelectedIdeaId(null)}
+          onOpenGraph={onOpenGraph}
+        />
+      )}
+      {ideasWork && (
+        <WorkIdeasModal
+          work={ideasWork}
+          model={model}
+          enableSynthesis
+          onClose={() => setIdeasWork(null)}
+          onOpenGraph={onOpenGraph}
+          onOpenWorkGraph={(work) => {
+            setIdeasWork(null);
+            onOpenGraph({ preset: 'reading', workId: work.nodus_id, workTitle: work.title, label: `${t('Ideas y conexiones:')} ${work.title}` });
+          }}
         />
       )}
     </div>
   );
 }
 
-function AuthorIdeasSidebar({ ideas }: { ideas: AuthorDossierIdea[] }) {
+function AuthorIdeasSidebar({ ideas, onOpenIdea }: { ideas: AuthorDossierIdea[]; onOpenIdea: (id: string) => void }) {
   const [query, setQuery] = useState('');
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -608,10 +582,6 @@ function AuthorIdeasSidebar({ ideas }: { ideas: AuthorDossierIdea[] }) {
         .includes(q)
     );
   }, [ideas, query]);
-
-  const jumpToIdea = useCallback((id: string) => {
-    document.getElementById(`author-idea-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
 
   return (
     <aside className="xl:sticky xl:top-0 rounded-lg border border-neutral-800 bg-neutral-950/70 p-3 min-w-0">
@@ -637,7 +607,7 @@ function AuthorIdeasSidebar({ ideas }: { ideas: AuthorDossierIdea[] }) {
             <button
               key={idea.global_id}
               type="button"
-              onClick={() => jumpToIdea(idea.global_id)}
+              onClick={() => onOpenIdea(idea.global_id)}
               className="w-full text-left px-2 py-2 rounded-md border border-neutral-800 bg-neutral-900/80 hover:border-neutral-700"
             >
               <div className="flex items-start gap-2">
@@ -686,10 +656,12 @@ function AuthorWorksModal({
   authorName,
   works,
   onClose,
+  onOpenWorkIdeas,
 }: {
   authorName: string;
   works: AuthorDossierWork[];
   onClose: () => void;
+  onOpenWorkIdeas: (work: { nodus_id: string; title: string }) => void;
 }) {
   const ordered = useMemo(
     () =>
@@ -728,7 +700,12 @@ function AuthorWorksModal({
           {ordered.map((work) => (
             <div key={work.nodus_id} className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
               <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => onOpenWorkIdeas({ nodus_id: work.nodus_id, title: work.title || t('(sin título)') })}
+                  title={t('Ver todas las ideas de esta obra')}
+                >
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="text-sm font-medium text-neutral-100">{work.title || t('(sin título)')}</h4>
                     {work.year && <Badge>{work.year}</Badge>}
@@ -744,18 +721,29 @@ function AuthorWorksModal({
                   {work.authors.length > 0 && (
                     <p className="mt-1 text-xs text-neutral-500">{work.authors.join(', ')}</p>
                   )}
-                </div>
-                {work.zoteroKey && (
+                </button>
+                <div className="flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
-                    className="shrink-0 rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700 flex items-center gap-1"
-                    onClick={() => window.nodus.openInZotero(work.zoteroKey!)}
-                    title={t('Abrir en Zotero')}
+                    className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700 flex items-center gap-1"
+                    onClick={() => onOpenWorkIdeas({ nodus_id: work.nodus_id, title: work.title || t('(sin título)') })}
+                    title={t('Ver todas las ideas de esta obra')}
                   >
-                    <Icon name="external" size={12} />
-                    Zotero
+                    <Icon name="bulb" size={12} />
+                    {t('Ideas')}
                   </button>
-                )}
+                  {work.zoteroKey && (
+                    <button
+                      type="button"
+                      className="rounded-md bg-neutral-800 px-2 py-1 text-xs text-neutral-200 hover:bg-neutral-700 flex items-center gap-1"
+                      onClick={() => window.nodus.openInZotero(work.zoteroKey!)}
+                      title={t('Abrir en Zotero')}
+                    >
+                      <Icon name="external" size={12} />
+                      Zotero
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 grid gap-2 text-xs text-neutral-400 sm:grid-cols-2 lg:grid-cols-3">
@@ -782,6 +770,55 @@ function AuthorWorksModal({
   );
 }
 
+function AuthorWorkRow({
+  work,
+  onOpenIdeas,
+}: {
+  work: AuthorDossierWork;
+  onOpenIdeas: (work: { nodus_id: string; title: string }) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-sm">
+      <button
+        type="button"
+        className="min-w-0 flex-1 text-left"
+        onClick={() => onOpenIdeas({ nodus_id: work.nodus_id, title: work.title || t('(sin título)') })}
+        title={t('Ver todas las ideas de esta obra')}
+      >
+        <span className="block truncate">{work.title || t('(sin título)')}</span>
+      </button>
+      {work.year && <span className="shrink-0 text-xs text-neutral-500">{work.year}</span>}
+      {work.role === 'editor' && (
+        <Badge color="cyan" title={t('Figura como editor/a de esta obra')}>
+          {t('ed.')}
+        </Badge>
+      )}
+      {work.read && (
+        <Badge color="green" title={t('Leído')}>
+          <Icon name="check" size={10} />
+        </Badge>
+      )}
+      <button
+        type="button"
+        className="shrink-0 text-neutral-500 hover:text-indigo-400"
+        title={t('Ver todas las ideas de esta obra')}
+        onClick={() => onOpenIdeas({ nodus_id: work.nodus_id, title: work.title || t('(sin título)') })}
+      >
+        <Icon name="bulb" size={13} />
+      </button>
+      {work.zoteroKey && (
+        <button
+          className="shrink-0 text-neutral-500 hover:text-indigo-400"
+          title={t('Abrir en Zotero')}
+          onClick={() => window.nodus.openInZotero(work.zoteroKey!)}
+        >
+          <Icon name="external" size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md bg-neutral-950/70 px-2 py-1.5">
@@ -789,42 +826,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <div className="truncate text-neutral-300" title={value}>
         {value}
       </div>
-    </div>
-  );
-}
-
-function IdeaCard({ idea }: { idea: AuthorDossierIdea }) {
-  const [open, setOpen] = useState(false);
-  const hasMore = Boolean(idea.development) || idea.evidence.length > 0;
-  return (
-    <div id={`author-idea-${idea.global_id}`} className="scroll-mt-4 rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2">
-      <button className="w-full text-left" onClick={() => hasMore && setOpen((v) => !v)}>
-        <div className="flex items-start gap-2">
-          <span className="text-sm font-medium">{idea.label}</span>
-          {idea.themes.slice(0, 2).map((th) => (
-            <Badge key={th} color="indigo">
-              {th}
-            </Badge>
-          ))}
-          {hasMore && <Icon name={open ? 'chevronDown' : 'chevronRight'} size={13} className="ml-auto text-neutral-500 shrink-0" />}
-        </div>
-        <p className="text-sm text-neutral-400 mt-0.5">{idea.statement}</p>
-      </button>
-      {open && (
-        <div className="mt-2 space-y-2 border-t border-neutral-800 pt-2">
-          {idea.development && <p className="text-sm text-neutral-300">{idea.development}</p>}
-          {idea.evidence.slice(0, 3).map((ev) => (
-            <blockquote key={ev.id} className="text-xs text-neutral-400 border-l-2 border-neutral-700 pl-2 italic">
-              «{ev.quote}»
-              {ev.location && <span className="not-italic text-neutral-600"> — {ev.location}</span>}
-            </blockquote>
-          ))}
-          <p className="text-[11px] text-neutral-600">
-            {idea.workTitle}
-            {idea.year ? ` (${idea.year})` : ''}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

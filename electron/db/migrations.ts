@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 export const migrations: Migration[] = [
   {
@@ -798,6 +798,24 @@ export const migrations: Migration[] = [
         PRIMARY KEY (target_kind, target_id)
       );
       CREATE INDEX idx_study_progress_status ON study_progress(status, updated_at);
+    `,
+  },
+  {
+    version: 25,
+    up: /* sql */ `
+      -- Cached narrated synthesis for one work's extracted ideas. Mirrors the
+      -- author dossier synthesis shape, with a fingerprint over the work's idea
+      -- set so the UI can flag stale results after re-analysis.
+      CREATE TABLE work_idea_synthesis (
+        nodus_id      TEXT PRIMARY KEY,
+        thesis        TEXT NOT NULL DEFAULT '',
+        remember_json TEXT NOT NULL DEFAULT '[]',
+        positioning   TEXT NOT NULL DEFAULT '',
+        model_json    TEXT,
+        fingerprint   TEXT NOT NULL DEFAULT '',
+        generated_at  TEXT NOT NULL,
+        FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
+      );
     `,
   },
 ];

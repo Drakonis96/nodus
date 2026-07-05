@@ -171,6 +171,7 @@ const COMPOSITE_PK_TABLES = [
   'work_zotero_tags',
   'work_summaries',
   'work_aliases',
+  'work_idea_synthesis',
 ];
 
 // Child tables keyed by their own id (nodus_id is a plain column): re-point all.
