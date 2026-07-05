@@ -4,6 +4,7 @@ import type {
   AppSettings,
   AddProjectLinkInput,
   ApplyProjectSuggestionsRequest,
+  AuthorSynthesisExportRequest,
   ChapterSuggestionStatus,
   QueueKind,
   WorkFilter,
@@ -96,6 +97,7 @@ import { answerTutorStep, buildTutorPlan, streamTutorStep } from './ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from './ai/argumentMap';
 import { listAuthors, buildAuthorDossier, synthesizeAuthorDossier } from './ai/authorDossier';
 import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix';
+import { exportAuthorSyntheses } from './export/authorSynthesisExport';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -413,6 +415,7 @@ export function registerIpc(
   h('authors:matrixCell', async (_e, authorId: string, themeId: string, model?: ModelRef | null) =>
     synthesizeMatrixCell(authorId, themeId, model)
   );
+  h('authors:exportSyntheses', async (_e, request: AuthorSynthesisExportRequest) => exportAuthorSyntheses(request));
 
   // main-theme management ("temas principales")
   h('themes:listManaged', async () => themes.listManagedThemes());

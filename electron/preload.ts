@@ -93,6 +93,7 @@ const api: NodusApi = {
   getSynthesisMatrix: () => ipcRenderer.invoke('authors:matrix'),
   synthesizeMatrixCell: (authorId, themeId, model) =>
     ipcRenderer.invoke('authors:matrixCell', authorId, themeId, model),
+  exportAuthorSyntheses: (request) => ipcRenderer.invoke('authors:exportSyntheses', request),
 
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
   addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),

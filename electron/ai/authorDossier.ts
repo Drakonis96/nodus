@@ -49,6 +49,20 @@ function clip(value: string, max: number): string {
   return clean.length <= max ? clean : `${clean.slice(0, max - 1).trim()}…`;
 }
 
+/** Split a stored author name (usually "Surname, Given") into display + sort parts. */
+export function splitName(name: string): { firstName: string; lastName: string; fullName: string } {
+  const clean = (name || '').replace(/\s+/g, ' ').trim();
+  const comma = clean.indexOf(',');
+  if (comma >= 0) {
+    const lastName = clean.slice(0, comma).trim();
+    const firstName = clean.slice(comma + 1).trim();
+    return { firstName, lastName, fullName: `${firstName} ${lastName}`.trim() };
+  }
+  const tokens = clean.split(' ');
+  if (tokens.length <= 1) return { firstName: '', lastName: clean, fullName: clean };
+  return { firstName: tokens[0], lastName: tokens.slice(1).join(' '), fullName: clean };
+}
+
 // ─── Author list (footprint summary) ──────────────────────────────────────────
 
 /** Lightweight list of every author that has at least one live (non-archived) work. */
@@ -122,9 +136,13 @@ export function listAuthors(): AuthorSummary[] {
   return authors
     .map((a): AuthorSummary => {
       const w = works.get(a.author_id) ?? { total: 0, read: 0 };
+      const parts = splitName(a.name);
       return {
         author_id: a.author_id,
         name: a.name,
+        firstName: parts.firstName,
+        lastName: parts.lastName,
+        fullName: parts.fullName,
         affiliation: a.affiliation,
         workCount: w.total,
         ideaCount: ideaCount.get(a.author_id) ?? 0,
@@ -373,8 +391,19 @@ export function buildAuthorDossier(authorId: string): AuthorDossier | null {
 
   const fingerprint = dossierFingerprint(ideas, relations);
   const synthesis = readCachedSynthesis(authorId, fingerprint);
+  const parts = splitName(author.name);
 
-  return { author, works, ideas, relations, themes, synthesis };
+  return {
+    author,
+    fullName: parts.fullName,
+    firstName: parts.firstName,
+    lastName: parts.lastName,
+    works,
+    ideas,
+    relations,
+    themes,
+    synthesis,
+  };
 }
 
 // ─── AI synthesis (cached) ────────────────────────────────────────────────────

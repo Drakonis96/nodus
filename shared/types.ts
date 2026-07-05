@@ -2029,7 +2029,14 @@ export interface UpdateProgressEvent extends UpdateCheckResponse {
 
 export interface AuthorSummary {
   author_id: string;
+  /** Sort form as stored ("Surname, Given"). */
   name: string;
+  /** Given name(s), for name-order sorting. */
+  firstName: string;
+  /** Surname(s), for surname sorting. */
+  lastName: string;
+  /** Natural reading order ("Given Surname") for display. */
+  fullName: string;
   affiliation: string | null;
   workCount: number;
   ideaCount: number;
@@ -2088,11 +2095,21 @@ export interface AuthorDossierSynthesis {
 
 export interface AuthorDossier {
   author: Author;
+  /** Natural reading order ("Given Surname") for the card heading. */
+  fullName: string;
+  firstName: string;
+  lastName: string;
   works: AuthorDossierWork[];
   ideas: AuthorDossierIdea[];
   relations: AuthorDossierRelation[];
   themes: string[];
   synthesis: AuthorDossierSynthesis | null;
+}
+
+export interface AuthorSynthesisExportRequest {
+  /** Authors to export. Empty = every author that has a generated synthesis. */
+  authorIds: string[];
+  format: 'markdown' | 'pdf';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2240,6 +2257,8 @@ export interface NodusApi {
   getSynthesisMatrix(): Promise<SynthesisMatrix>;
   /** Generate (and cache) the one-sentence stance for one author×theme cell. */
   synthesizeMatrixCell(authorId: string, themeId: string, model?: ModelRef | null): Promise<SynthesisMatrixCell>;
+  /** Export cached author syntheses (selected or all) to Markdown or PDF. */
+  exportAuthorSyntheses(request: AuthorSynthesisExportRequest): Promise<{ path: string } | null>;
 
   // main-theme management ("temas principales")
   listManagedThemes(): Promise<ManagedTheme[]>;

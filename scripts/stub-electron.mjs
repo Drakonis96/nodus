@@ -8,4 +8,10 @@ export const safeStorage = {
   encryptString: (s) => Buffer.from(String(s)),
   decryptString: (b) => Buffer.from(b).toString(),
 };
-export default { app, safeStorage };
+// Present so modules that import them at load time bundle cleanly; the pure-DB
+// smoke paths never invoke these.
+export const dialog = { showSaveDialog: async () => ({ canceled: true, filePath: undefined }) };
+export const ipcMain = { handle: () => undefined, on: () => undefined };
+export class BrowserWindow {}
+export const shell = { openExternal: async () => undefined };
+export default { app, safeStorage, dialog, ipcMain, BrowserWindow, shell };

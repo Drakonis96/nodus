@@ -37,6 +37,23 @@ const RELATION_COLORS: Record<string, 'red' | 'amber' | 'green' | 'cyan' | 'neut
 
 const IDEA_TYPE_ORDER: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 
+type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
+type SynthFilter = 'all' | 'with' | 'without';
+
+const SORT_LABELS: Record<SortKey, string> = {
+  name: 'Nombre',
+  surname: 'Apellidos',
+  works: 'Nº de obras',
+  ideas: 'Nº de ideas',
+  connections: 'Nº de conexiones',
+};
+
+const SYNTH_FILTER_LABELS: Record<SynthFilter, string> = {
+  all: 'Todas',
+  with: 'Con síntesis',
+  without: 'Sin síntesis',
+};
+
 export function AuthorsView({
   settings,
   onOpenGraph,
@@ -100,6 +117,12 @@ function DossierTab({
   const [synthesizing, setSynthesizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('surname');
+  const [synthFilter, setSynthFilter] = useState<SynthFilter>('all');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exportFormat, setExportFormat] = useState<'markdown' | 'pdf'>('markdown');
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
 
   const reloadAuthors = useCallback(async () => {
     const list = await window.nodus.listAuthors();
@@ -150,48 +173,171 @@ function DossierTab({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return authors;
-    return authors.filter((a) => a.name.toLowerCase().includes(q));
-  }, [authors, query]);
+    let list = authors;
+    if (q) list = list.filter((a) => a.fullName.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
+    if (synthFilter === 'with') list = list.filter((a) => a.hasSynthesis);
+    else if (synthFilter === 'without') list = list.filter((a) => !a.hasSynthesis);
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
+        case 'surname':
+          return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+        case 'works':
+          return b.workCount - a.workCount || a.lastName.localeCompare(b.lastName);
+        case 'ideas':
+          return b.ideaCount - a.ideaCount || a.lastName.localeCompare(b.lastName);
+        case 'connections':
+          return b.relationCount - a.relationCount || a.lastName.localeCompare(b.lastName);
+      }
+    });
+    return sorted;
+  }, [authors, query, synthFilter, sortBy]);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const allFilteredSelected = filtered.length > 0 && filtered.every((a) => selected.has(a.author_id));
+  const toggleSelectAll = useCallback(() => {
+    setSelected((cur) => {
+      const next = new Set(cur);
+      const every = filtered.length > 0 && filtered.every((a) => next.has(a.author_id));
+      if (every) filtered.forEach((a) => next.delete(a.author_id));
+      else filtered.forEach((a) => next.add(a.author_id));
+      return next;
+    });
+  }, [filtered]);
+
+  const doExport = useCallback(async () => {
+    setExporting(true);
+    setExportMsg(null);
+    try {
+      const res = await window.nodus.exportAuthorSyntheses({ authorIds: [...selected], format: exportFormat });
+      setExportMsg(res ? tx('Exportado a {path}', { path: res.path }) : null);
+    } catch (e) {
+      setExportMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }, [selected, exportFormat]);
 
   return (
     <div className="flex-1 min-h-0 flex gap-4">
       {/* Author list */}
-      <div className="w-72 shrink-0 flex flex-col min-h-0">
+      <div className="w-80 shrink-0 flex flex-col min-h-0">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('Buscar autor…')}
           className="mb-2 w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm outline-none focus:border-indigo-600"
         />
+        <div className="flex gap-2 mb-2">
+          <label className="flex-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
+            {t('Ordenar')}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortKey)}
+              className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
+            >
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+                <option key={k} value={k}>
+                  {t(SORT_LABELS[k])}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+            {t('Síntesis')}
+            <select
+              value={synthFilter}
+              onChange={(e) => setSynthFilter(e.target.value as SynthFilter)}
+              className="bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
+            >
+              {(Object.keys(SYNTH_FILTER_LABELS) as SynthFilter[]).map((k) => (
+                <option key={k} value={k}>
+                  {t(SYNTH_FILTER_LABELS[k])}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {/* Selection + export */}
+        <div className="flex items-center justify-between mb-2 text-[11px]">
+          <label className="flex items-center gap-1.5 text-neutral-400 cursor-pointer">
+            <input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} className="accent-indigo-600" />
+            {selected.size > 0 ? tx('{n} seleccionados', { n: selected.size }) : t('Seleccionar todos')}
+          </label>
+          {selected.size > 0 && (
+            <button className="text-neutral-500 hover:text-neutral-300" onClick={() => setSelected(new Set())}>
+              {t('Limpiar')}
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2 mb-2">
+          <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value as 'markdown' | 'pdf')}
+            className="bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
+          >
+            <option value="markdown">Markdown</option>
+            <option value="pdf">PDF</option>
+          </select>
+          <button
+            onClick={doExport}
+            disabled={exporting}
+            className="flex-1 text-xs px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 flex items-center justify-center gap-1"
+            title={t('Exporta la síntesis de los autores seleccionados (o de todos los que tengan síntesis)')}
+          >
+            <Icon name="download" size={12} />
+            {selected.size > 0 ? tx('Exportar ({n})', { n: selected.size }) : t('Exportar todas')}
+          </button>
+        </div>
+        {exportMsg && <p className="text-[11px] text-neutral-500 mb-2 break-words">{exportMsg}</p>}
+
         <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-1">
           {filtered.length === 0 && <p className="text-sm text-neutral-500 px-1">{t('No hay autores todavía.')}</p>}
           {filtered.map((a) => (
-            <button
+            <div
               key={a.author_id}
-              onClick={() => setSelectedId(a.author_id)}
-              className={`w-full text-left px-3 py-2 rounded-lg border transition ${
+              className={`flex items-start gap-2 px-2 py-2 rounded-lg border transition ${
                 selectedId === a.author_id
                   ? 'bg-neutral-800 border-indigo-600'
                   : 'bg-neutral-900 border-neutral-800 hover:border-neutral-700'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">{a.name}</span>
-                {a.hasSynthesis && <Icon name="wand" size={12} className="text-indigo-400 shrink-0" />}
-              </div>
-              <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
-                <span>{tx('{n} obras', { n: a.workCount })}</span>
-                <span>·</span>
-                <span>{tx('{n} ideas', { n: a.ideaCount })}</span>
-                {a.relationCount > 0 && (
-                  <>
-                    <span>·</span>
-                    <span>{tx('{n} conexiones', { n: a.relationCount })}</span>
-                  </>
-                )}
-              </div>
-            </button>
+              <input
+                type="checkbox"
+                checked={selected.has(a.author_id)}
+                onChange={() => toggleSelect(a.author_id)}
+                className="mt-1 accent-indigo-600 shrink-0"
+                title={t('Seleccionar para exportar')}
+              />
+              <button onClick={() => setSelectedId(a.author_id)} className="flex-1 min-w-0 text-left">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium truncate">{a.fullName || a.name}</span>
+                  {a.hasSynthesis && <Icon name="wand" size={12} className="text-indigo-400 shrink-0" />}
+                </div>
+                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-neutral-500">
+                  <span>{tx('{n} obras', { n: a.workCount })}</span>
+                  <span>·</span>
+                  <span>{tx('{n} ideas', { n: a.ideaCount })}</span>
+                  {a.relationCount > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>{tx('{n} conexiones', { n: a.relationCount })}</span>
+                    </>
+                  )}
+                </div>
+              </button>
+            </div>
           ))}
         </div>
       </div>
@@ -249,7 +395,7 @@ function AuthorDossierDetail({
       {/* Header */}
       <div>
         <div className="flex items-start gap-3">
-          <h3 className="text-xl font-semibold">{author.name}</h3>
+          <h3 className="text-xl font-semibold">{dossier.fullName || author.name}</h3>
           <button
             className="ml-auto shrink-0 text-xs px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center gap-1"
             onClick={() => onOpenGraph({ preset: 'authors', nodeId: author.author_id, label: author.name })}

@@ -1553,5 +1553,21 @@ export const EN: Record<string, string> = {
   'coautor con': 'co-author with',
   'ed.': 'ed.',
   'Figura como editor/a de esta obra': 'Credited as editor of this work',
+  Ordenar: 'Sort',
+  Nombre: 'First name',
+  Apellidos: 'Surname',
+  'Nº de obras': 'No. of works',
+  'Nº de ideas': 'No. of ideas',
+  'Nº de conexiones': 'No. of connections',
+  'Con síntesis': 'With synthesis',
+  'Sin síntesis': 'Without synthesis',
+  'Seleccionar todos': 'Select all',
+  '{n} seleccionados': '{n} selected',
+  'Exportar todas': 'Export all',
+  'Exportar ({n})': 'Export ({n})',
+  'Seleccionar para exportar': 'Select for export',
+  'Exporta la síntesis de los autores seleccionados (o de todos los que tengan síntesis)':
+    'Export the synthesis of the selected authors (or of all that have one)',
+  'Exportado a {path}': 'Exported to {path}',
   // <<END_EN>>
 };
