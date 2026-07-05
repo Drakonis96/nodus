@@ -64,6 +64,10 @@ body {
 .light .text-cyan-300 {
   color: #0891b2;
 }
+.light .text-cyan-200,
+.light .text-cyan-400 {
+  color: #0e7490;
+}
 .light .hover\:text-white:hover,
 .light .hover\:text-neutral-200:hover {
   color: #111827;
@@ -80,8 +84,13 @@ body {
 
 .light .border-neutral-700,
 .light .border-neutral-800,
-.light .border-neutral-800\/60 {
+.light .border-neutral-800\/60,
+.light .border-neutral-900 {
   border-color: #d4d4d4;
+}
+.light .border-cyan-900,
+.light .border-cyan-900\/70 {
+  border-color: #67e8f9;
 }
 .light .border-red-800,
 .light .border-red-900\/60 {
@@ -95,7 +104,8 @@ body {
 .light .bg-neutral-950\/35,
 .light .bg-neutral-950\/40,
 .light .bg-neutral-950\/50,
-.light .bg-neutral-950\/60 {
+.light .bg-neutral-950\/60,
+.light .bg-neutral-950\/70 {
   background-color: rgba(248, 250, 252, 0.86);
 }
 .light .bg-neutral-900,
@@ -130,10 +140,17 @@ body {
 .light .bg-cyan-900\/50 {
   background-color: #cffafe;
 }
+.light .bg-cyan-950\/30 {
+  background-color: #ecfeff;
+}
+.light .bg-cyan-950\/60 {
+  background-color: #cffafe;
+}
 .light .bg-indigo-600\/15 {
   background-color: rgba(129, 140, 248, 0.12);
 }
 .light .bg-indigo-950\/35,
+.light .bg-indigo-950\/40,
 .light .bg-indigo-950\/25,
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
@@ -147,12 +164,16 @@ body {
 .light .border-indigo-700 {
   border-color: #a5b4fc;
 }
+.light .ring-indigo-700\/60 {
+  --tw-ring-color: rgba(129, 140, 248, 0.48);
+}
 .light .text-indigo-200 {
   color: #4338ca;
 }
 .light .hover\:bg-neutral-900:hover,
 .light .hover\:bg-neutral-900\/50:hover,
-.light .hover\:bg-neutral-900\/60:hover {
+.light .hover\:bg-neutral-900\/60:hover,
+.light .hover\:bg-neutral-900\/80:hover {
   background-color: #f5f5f5;
 }
 .light .hover\:bg-neutral-800:hover,
@@ -162,6 +183,9 @@ body {
 }
 .light .hover\:bg-red-950\/50:hover {
   background-color: #fee2e2;
+}
+.light .hover\:bg-cyan-950\/60:hover {
+  background-color: #cffafe;
 }
 
 /* Library filters use an explicit light palette so selected controls never inherit
