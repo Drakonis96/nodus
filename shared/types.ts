@@ -1711,6 +1711,71 @@ export interface AnalyzeChapterRelationsRequest {
   force?: boolean;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Manuscript verifier: sentence-level claim checks against indexed/listed corpus
+// ideas and full-text passages. It is deliberately not a "send whole manuscript
+// to the model" feature: the main process extracts candidate claims first and
+// only sends compact claim+evidence batches for optional classification.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ManuscriptClaimStatus = 'missing_citation' | 'covered' | 'own_argument' | 'weak_match';
+export type ManuscriptClaimSeverity = 'high' | 'medium' | 'low' | 'info';
+export type ManuscriptEvidenceKind = 'idea' | 'passage';
+
+export interface ManuscriptEvidenceCandidate {
+  kind: ManuscriptEvidenceKind;
+  refId: string;
+  label: string;
+  citation: string;
+  snippet: string;
+  score: number;
+  workTitle?: string | null;
+  pageLabel?: string | null;
+}
+
+export interface ManuscriptClaimCheck {
+  id: string;
+  excerpt: string;
+  paragraphIndex: number;
+  sentenceIndex: number;
+  hasCitation: boolean;
+  existingCitations: string[];
+  status: ManuscriptClaimStatus;
+  severity: ManuscriptClaimSeverity;
+  rationale: string;
+  suggestedCitations: ManuscriptEvidenceCandidate[];
+  replacementHint?: string | null;
+}
+
+export interface ManuscriptVerificationSummary {
+  totalClaims: number;
+  checkedClaims: number;
+  missingCitations: number;
+  covered: number;
+  ownArguments: number;
+  weakMatches: number;
+  citedClaims: number;
+}
+
+export interface ManuscriptVerificationResult {
+  chapterId: string;
+  generatedAt: string;
+  /** False only when there is no chapter text or no corpus signal to compare against. */
+  available: boolean;
+  /** True when an AI pass refined the deterministic retrieval result. */
+  aiReviewed: boolean;
+  summary: ManuscriptVerificationSummary;
+  claims: ManuscriptClaimCheck[];
+  warnings: string[];
+}
+
+export interface ManuscriptVerificationRequest {
+  chapterId: string;
+  model?: ModelRef | null;
+  language?: AppLanguage;
+  maxClaims?: number;
+}
+
 export interface ProjectDetail {
   project: Project;
   sections: ProjectSection[];
@@ -2731,6 +2796,8 @@ export interface NodusApi {
   /** Extract chapter ideas, embed them and discover typed relations with the library. */
   analyzeChapterRelations(request: AnalyzeChapterRelationsRequest): Promise<ChapterRelationsResult>;
   onChapterRelationsProgress(cb: (p: ChapterRelationsProgress) => void): () => void;
+  /** Check uncited manuscript claims against indexed/listed corpus ideas and passages. */
+  verifyManuscriptCitations(request: ManuscriptVerificationRequest): Promise<ManuscriptVerificationResult>;
   exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 

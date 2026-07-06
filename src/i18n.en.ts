@@ -1479,6 +1479,34 @@ export const EN: Record<string, string> = {
     'Analyzed {n} chapter idea(s) and their relations with the library.',
   matiza: 'refines',
   'amplía': 'extends',
+  // Manuscript verifier
+  Verificación: 'Verification',
+  'Verificar citas': 'Verify citations',
+  'Revisado con IA': 'AI-reviewed',
+  'Revisión determinista': 'Deterministic review',
+  'Detecta afirmaciones del capítulo, comprueba si ya tienen cita y solo marca las que coinciden con ideas o pasajes del corpus.':
+    'Detect chapter claims, check whether they already have a citation, and only flag those matching corpus ideas or passages.',
+  Afirmaciones: 'Claims',
+  'Faltan citas': 'Missing citations',
+  Cubiertas: 'Covered',
+  'Aportación propia': 'Own contribution',
+  'No hay suficientes señales del corpus para verificar este capítulo.':
+    'There are not enough corpus signals to verify this chapter.',
+  'Verificadas {n} afirmaciones; {m} necesitan cita.':
+    'Verified {n} claims; {m} need citations.',
+  'Verifica el capítulo contra tu corpus antes de cerrar el manuscrito o exportarlo.':
+    'Verify the chapter against your corpus before closing the manuscript or exporting it.',
+  'No se encontraron afirmaciones que requieran revisión de citas.':
+    'No claims requiring citation review were found.',
+  'Falta cita': 'Missing citation',
+  'Cita cubierta': 'Citation covered',
+  'Posible aportación propia': 'Possible own contribution',
+  'Coincidencia débil': 'Weak match',
+  'Con cita': 'Cited',
+  'Párrafo {p} · frase {s}': 'Paragraph {p} · sentence {s}',
+  Sugerencia: 'Suggestion',
+  'Candidatos de cita': 'Citation candidates',
+  'Sin citas sugeridas.': 'No suggested citations.',
   'Eliminar proyecto': 'Delete project',
   'Proyecto eliminado.': 'Project deleted.',
   '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':

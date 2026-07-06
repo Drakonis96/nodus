@@ -297,6 +297,7 @@ const api: NodusApi = {
     ipcRenderer.on('projects:chapterRelations:progress', listener);
     return () => ipcRenderer.removeListener('projects:chapterRelations:progress', listener);
   },
+  verifyManuscriptCitations: (request) => ipcRenderer.invoke('projects:manuscript:verify', request),
   exportProject: (request) => ipcRenderer.invoke('projects:export', request),
   exportProjectChapter: (request) => ipcRenderer.invoke('projects:chapters:export', request),
 

@@ -34,6 +34,7 @@ import type {
   RqUpdateSubQuestionsRequest,
   RqExportRequest,
   HypothesisLabRequest,
+  ManuscriptVerificationRequest,
   CreateNoteFolderInput,
   CreateNoteInput,
   UpdateNoteInput,
@@ -92,6 +93,7 @@ import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
 import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
+import { verifyManuscriptCitations } from './ai/manuscriptVerifier';
 import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -700,6 +702,9 @@ export function registerIpc(
   h('projects:chapterRelations:get', async (_e, chapterId: string) => getChapterRelations(chapterId));
   h('projects:chapterRelations:analyze', async (_e, request: AnalyzeChapterRelationsRequest) =>
     analyzeChapterRelations(request)
+  );
+  h('projects:manuscript:verify', async (_e, request: ManuscriptVerificationRequest) =>
+    verifyManuscriptCitations(request)
   );
   h('projects:export', async (_e, request: ExportProjectRequest) => exportProject(request));
   h('projects:chapters:export', async (_e, request: ExportProjectChapterRequest) =>
