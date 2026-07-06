@@ -13,6 +13,9 @@
   var searchTimer = null;
   var autoAnalyze = true;
   var detailCache = {};
+  var isWord = false;
+  var currentParagraphText = '';
+  var currentSelectionText = '';
 
   var RELATION_LABEL = {
     supports: 'apoya',
@@ -97,6 +100,7 @@
   }
 
   function getCurrentParagraph() {
+    if (!isWord) return Promise.resolve(currentParagraphText);
     return Word.run(function (context) {
       var range = context.document.getSelection();
       var para = range.paragraphs.getFirst();
@@ -110,6 +114,7 @@
   }
 
   function getSelectionText() {
+    if (!isWord) return Promise.resolve(currentSelectionText);
     return Word.run(function (context) {
       var range = context.document.getSelection();
       range.load('text');
@@ -122,6 +127,13 @@
   }
 
   function insertAtCursor(text) {
+    if (!isWord) {
+      return api('/api/editor/insert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      });
+    }
     return Word.run(function (context) {
       var range = context.document.getSelection();
       var prefix = text.charAt(0) === ' ' ? '' : ' ';
@@ -430,11 +442,28 @@
       .catch(function () { setStatus('Nodus no responde', 'err'); });
   }
 
-  Office.onReady(function (info) {
-    if (info.host !== Office.HostType.Word) {
-      document.body.innerHTML = '<p style="padding:16px">Este complemento solo funciona en Word.</p>';
-      return;
+  function startStandalonePolling() {
+    function poll() {
+      api('/api/editor/state')
+        .then(function (state) {
+          var changed = (state.paragraphText !== currentParagraphText || state.selectionText !== currentSelectionText);
+          currentParagraphText = state.paragraphText || '';
+          currentSelectionText = state.selectionText || '';
+          if (changed) {
+            onSelectionChanged();
+          }
+        })
+        .catch(function (e) {
+          console.warn('Error polling editor state', e);
+        })
+        .finally(function () {
+          setTimeout(poll, 1500);
+        });
     }
+    poll();
+  }
+
+  function initApp() {
     els.status = document.getElementById('status');
     els.paragraph = document.getElementById('paragraph');
     els.results = document.getElementById('results');
@@ -444,13 +473,23 @@
     els.searchBox = document.getElementById('searchBox');
     els.searchBtn = document.getElementById('searchBtn');
 
-    applyOfficeTheme();
-    try {
-      if (Office.context.officeTheme && Office.context.officeTheme.addHandlerAsync && Office.EventType.OfficeThemeChanged) {
-        Office.context.officeTheme.addHandlerAsync(Office.EventType.OfficeThemeChanged, applyOfficeTheme);
+    if (!isWord) {
+      var captionEl = document.querySelector('.head .caption');
+      if (captionEl) captionEl.textContent = 'LibreOffice / Editor';
+    }
+
+    if (isWord) {
+      applyOfficeTheme();
+      try {
+        if (Office.context.officeTheme && Office.context.officeTheme.addHandlerAsync && Office.EventType.OfficeThemeChanged) {
+          Office.context.officeTheme.addHandlerAsync(Office.EventType.OfficeThemeChanged, applyOfficeTheme);
+        }
+      } catch (e) {
+        // Older Word webviews do not expose live theme events.
       }
-    } catch (e) {
-      // Older Word webviews do not expose live theme events.
+      Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
+    } else {
+      startStandalonePolling();
     }
 
     els.analyzeBtn.onclick = function () {
@@ -468,8 +507,24 @@
     };
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
 
-    Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
     checkHealth();
     analyze(true);
+  }
+
+  var initialized = false;
+  Office.onReady(function (info) {
+    if (initialized) return;
+    if (info && info.host === Office.HostType.Word) {
+      isWord = true;
+    }
+    initialized = true;
+    initApp();
   });
+
+  setTimeout(function () {
+    if (!initialized) {
+      initialized = true;
+      initApp();
+    }
+  }, 1000);
 })();

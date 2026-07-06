@@ -23,6 +23,15 @@ let status: CopilotServerStatus = { running: false, port: null, addinUrl: null, 
 let lifecycle = Promise.resolve();
 let getMainWindow: (() => BrowserWindow | null) | null = null;
 
+interface EditorState {
+  paragraphText: string;
+  selectionText: string;
+}
+
+let editorState: EditorState = { paragraphText: '', selectionText: '' };
+let pendingInsertionResolvers: ((text: string) => void)[] = [];
+
+
 function addinUrl(port: number): string {
   return `https://localhost:${port}/addin/taskpane.html`;
 }
@@ -123,7 +132,7 @@ async function serveAddin(req: IncomingMessage, res: ServerResponse, urlPath: st
   }
 }
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse, port: number): Promise<void> {
+export async function handleRequest(req: IncomingMessage, res: ServerResponse, port: number): Promise<void> {
   setCors(req, res);
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -231,6 +240,50 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse, port: nu
       }
       await shell.openExternal(`zotero://select/library/items/${encodeURIComponent(body.zoteroKey)}`);
       sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (urlPath === '/api/editor/update-text' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { paragraphText?: string; selectionText?: string };
+      editorState.paragraphText = String(body.paragraphText ?? '');
+      editorState.selectionText = String(body.selectionText ?? '');
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (urlPath === '/api/editor/state' && req.method === 'GET') {
+      sendJson(res, 200, editorState);
+      return;
+    }
+    if (urlPath === '/api/editor/insert' && req.method === 'POST') {
+      const body = (await readJsonBody(req)) as { text?: string };
+      const text = String(body.text ?? '');
+      const resolver = pendingInsertionResolvers.shift();
+      if (resolver) {
+        resolver(text);
+      }
+      sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (urlPath === '/api/editor/poll-insertion' && req.method === 'GET') {
+      await new Promise<void>((resolve) => {
+        let resolved = false;
+        const timeout = setTimeout(() => {
+          if (resolved) return;
+          resolved = true;
+          pendingInsertionResolvers = pendingInsertionResolvers.filter((r) => r !== resolver);
+          sendJson(res, 200, { text: null });
+          resolve();
+        }, 30000); // 30s timeout
+
+        const resolver = (text: string) => {
+          if (resolved) return;
+          resolved = true;
+          clearTimeout(timeout);
+          sendJson(res, 200, { text });
+          resolve();
+        };
+
+        pendingInsertionResolvers.push(resolver);
+      });
       return;
     }
     sendJson(res, 404, { error: 'Ruta no encontrada.' });
