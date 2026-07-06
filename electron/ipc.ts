@@ -70,6 +70,7 @@ import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import * as dedupe from './db/dedupeRepo';
+import * as ideaDedupe from './db/ideaDedupeRepo';
 import { listCollectionFacets } from './db/collectionsRepo';
 import * as ideas from './db/ideasRepo';
 import * as themes from './db/themesRepo';
@@ -364,6 +365,11 @@ export function registerIpc(
   h('works:merge', async (_e, canonicalId: string, duplicateIds: string[]) =>
     dedupe.mergeWorks(canonicalId, duplicateIds)
   );
+  h('ideas:listDuplicates', async () => ideaDedupe.listDuplicateIdeas());
+  h('ideas:merge', async (_e, canonicalId: string, duplicateIds: string[]) =>
+    ideaDedupe.mergeIdeas(canonicalId, duplicateIds)
+  );
+  h('ideas:backup', async () => ideaDedupe.backupDatabase());
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();
     await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);

@@ -90,6 +90,31 @@ export interface DuplicateWorkGroup {
   members: DuplicateWorkMember[];
 }
 
+/** One idea inside a duplicate group, with richness signals for review. */
+export interface DuplicateIdeaMember {
+  global_id: string;
+  label: string;
+  statement: string;
+  type: string;
+  /** How many works this idea occurs in. */
+  workCount: number;
+  /** How many evidence rows support it. */
+  evidenceCount: number;
+  /** How many graph edges touch it. */
+  edgeCount: number;
+  /** True for the richest member; pre-selected as the one to keep on merge. */
+  suggestedCanonical: boolean;
+}
+
+/** A set of ideas that look like the same idea, grouped for review-and-merge. */
+export interface DuplicateIdeaGroup {
+  /** Why they were grouped. Phase 1 uses 'label' (identical normalized label + type). */
+  reason: 'label';
+  /** Stable group key, used as a React key in the review modal. */
+  key: string;
+  members: DuplicateIdeaMember[];
+}
+
 /** A non-citable orientation summary derived from already extracted material. */
 export interface WorkSummary {
   nodus_id: string;
@@ -2555,6 +2580,12 @@ export interface NodusApi {
   listDuplicateWorks(): Promise<DuplicateWorkGroup[]>;
   /** Merge duplicate works into the chosen canonical, re-pointing all derived data. */
   mergeWorks(canonicalId: string, duplicateIds: string[]): Promise<{ merged: number }>;
+  /** Groups of ideas that look like the same idea (identical normalized label + type). */
+  listDuplicateIdeas(): Promise<DuplicateIdeaGroup[]>;
+  /** Merge duplicate ideas into the chosen canonical, re-pointing all derived data and the graph. */
+  mergeIdeas(canonicalId: string, duplicateIds: string[]): Promise<{ merged: number }>;
+  /** Snapshot the DB into userData/backups before a destructive maintenance action; returns the path. */
+  backupDatabase(): Promise<string>;
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;

@@ -5,6 +5,7 @@ import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
 import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT } from '../components/NodeDetailPanel';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
+import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
 import { TutorPanel } from './TutorPanel';
 import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
@@ -1414,6 +1415,7 @@ export function GraphView({
   }, []);
   const [lens, setLens] = useState<GraphLens>(loadLens);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [ideaDupesOpen, setIdeaDupesOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
   const [themes, setThemes] = useState<string[]>([]);
@@ -3058,6 +3060,15 @@ export function GraphView({
               <Icon name="tag" /> {t('Temas')}
             </button>
           )}
+          {lens === 'ideas' && (
+            <button
+              className="btn btn-ghost border border-neutral-700 gap-1.5"
+              title={t('Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado')}
+              onClick={() => setIdeaDupesOpen(true)}
+            >
+              <Icon name="copy" /> {t('Duplicados')}
+            </button>
+          )}
           <div className="flex-1" />
           <span className="text-neutral-500">{tx('{n} nodos', { n: elements.filter((e) => !(e.data as any).source).length })}</span>
         </div>
@@ -3308,6 +3319,14 @@ export function GraphView({
           onReprocessed={reload}
           onClose={() => {
             setThemesModalOpen(false);
+            reload();
+          }}
+        />
+      )}
+      {ideaDupesOpen && (
+        <IdeaDuplicatesModal
+          onClose={() => {
+            setIdeaDupesOpen(false);
             reload();
           }}
         />

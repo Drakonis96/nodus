@@ -748,6 +748,21 @@ export const EN: Record<string, string> = {
   'Fusionar todos los duplicados': 'Merge all duplicates',
   'Se fusionarán {g} grupo(s), conservando en cada uno la copia marcada y reasignando sus ideas, evidencia y etiquetas. Las {n} copias sobrantes se eliminarán de la biblioteca de Nodus (Zotero no se modifica). ¿Continuar?':
     'This will merge {g} group(s), keeping the marked copy in each and re-pointing its ideas, evidence and tags. The {n} surplus copies will be removed from the Nodus library (Zotero is not modified). Continue?',
+  Duplicados: 'Duplicates',
+  'Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado':
+    'Find and merge duplicate ideas to clean up the graph and the list',
+  'Ideas duplicadas': 'Duplicate ideas',
+  'Buscando ideas duplicadas…': 'Looking for duplicate ideas…',
+  'No se han encontrado ideas duplicadas.': 'No duplicate ideas found.',
+  '{g} grupo(s) · {n} idea(s) duplicadas a fusionar': '{g} group(s) · {n} duplicate idea(s) to merge',
+  'Solo se agrupan ideas con la misma etiqueta y el mismo tipo. La evidencia se conserva íntegra al fusionar.':
+    'Only ideas with the same label and type are grouped. Evidence is fully preserved on merge.',
+  'Misma etiqueta': 'Same label',
+  'Copia de seguridad creada antes de fusionar:': 'Backup created before merging:',
+  '{n} evidencia(s)': '{n} evidence',
+  'Fusionar todas las ideas duplicadas': 'Merge all duplicate ideas',
+  'Se hará primero una copia de seguridad completa de la base de datos. Después se fusionarán {g} grupo(s), conservando en cada uno la idea marcada y reasignándole toda la evidencia, ocurrencias, temas y conexiones del grafo de las {n} copias sobrantes, que se eliminarán. La evidencia no se pierde. ¿Continuar?':
+    'A full database backup is taken first. Then {g} group(s) will be merged, keeping the marked idea in each and re-pointing all evidence, occurrences, themes and graph connections from the {n} surplus copies, which are then removed. No evidence is lost. Continue?',
   'Seleccionar los {n} resultados filtrados': 'Select the {n} filtered results',
   Título: 'Title',
   Autores: 'Authors',
