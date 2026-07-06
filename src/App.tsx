@@ -7,6 +7,7 @@ import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
 import { DebateView } from './views/DebateView';
 import { ResearchMapView } from './views/ResearchMapView';
+import { HypothesisLabView } from './views/HypothesisLabView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
 import { ProjectsView } from './views/ProjectsView';
@@ -338,6 +339,13 @@ export function App() {
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
               onOpenDebates={() => setView('debate')}
+            />
+          )}
+          {view === 'hypothesis' && (
+            <HypothesisLabView
+              settings={settings}
+              onOpenGraph={(target) => navigate('graph', target)}
+              onOpenAssistant={openAssistant}
             />
           )}
           {view === 'reading' && (

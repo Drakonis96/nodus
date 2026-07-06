@@ -160,6 +160,7 @@ const api: NodusApi = {
   },
   deleteResearchQuestion: (id) => ipcRenderer.invoke('research:rq:delete', id).then(() => undefined),
   exportResearchCoverage: (request) => ipcRenderer.invoke('research:rq:export', request),
+  generateHypothesisLab: (request) => ipcRenderer.invoke('hypothesis:generate', request),
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;

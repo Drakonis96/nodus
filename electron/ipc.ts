@@ -33,6 +33,7 @@ import type {
   RqMapRequest,
   RqUpdateSubQuestionsRequest,
   RqExportRequest,
+  HypothesisLabRequest,
   CreateNoteFolderInput,
   CreateNoteInput,
   UpdateNoteInput,
@@ -103,6 +104,7 @@ import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix
 import { getCachedWorkIdeaSynthesis, synthesizeWorkIdeas } from './ai/workIdeaSynthesis';
 import { exportAuthorSyntheses } from './export/authorSynthesisExport';
 import { buildStudyPlan, evaluateStudyAnswer, generateStudySession } from './ai/studyGuide';
+import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
@@ -497,6 +499,9 @@ export function registerIpc(
     rqRepo.deleteResearchQuestion(id);
   });
   h('research:rq:export', async (_e, request: RqExportRequest) => exportResearchCoverage(request));
+
+  // hypothesis lab
+  h('hypothesis:generate', async (_e, request: HypothesisLabRequest) => generateHypothesisLab(request));
 
   // research assistant
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));

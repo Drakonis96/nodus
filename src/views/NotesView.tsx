@@ -56,6 +56,7 @@ const KIND_LABELS: Record<NoteKind, string> = {
   writing: 'Escritura',
   debate: 'Debate',
   idea: 'Idea',
+  hypothesis: 'Hipótesis',
 };
 
 const KIND_COLORS: Record<NoteKind, 'neutral' | 'indigo' | 'cyan' | 'red' | 'green'> = {
@@ -64,6 +65,7 @@ const KIND_COLORS: Record<NoteKind, 'neutral' | 'indigo' | 'cyan' | 'red' | 'gre
   writing: 'cyan',
   debate: 'red',
   idea: 'green',
+  hypothesis: 'cyan',
 };
 
 export function NotesView({

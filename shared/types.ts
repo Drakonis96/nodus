@@ -773,6 +773,82 @@ export interface RqMapHandlers {
   onProgress?(progress: RqMapProgress): void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hypothesis lab — turns gaps, debates and supporting ideas into testable,
+// evidence-backed research hypotheses. Not persisted as its own table: users can
+// save a generated dossier into Notes, where nodus:// citations remain clickable.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type HypothesisLabMode = 'exploratory' | 'causal' | 'comparative' | 'methodological' | 'intervention';
+export type HypothesisMaturity = 'seed' | 'promising' | 'testable' | 'ready';
+export type HypothesisEvidenceKind = 'gap' | 'idea' | 'debate' | 'work' | 'passage' | 'project';
+export type HypothesisEvidenceRole = 'gap' | 'support' | 'contrast' | 'method' | 'scope' | 'source';
+
+export interface HypothesisLabRequest {
+  objective: string;
+  mode: HypothesisLabMode;
+  projectId?: string | null;
+  language?: AppLanguage;
+  maxCandidates?: number;
+  model?: ModelRef | null;
+}
+
+export interface HypothesisEvidenceLink {
+  kind: HypothesisEvidenceKind;
+  role: HypothesisEvidenceRole;
+  refId: string;
+  label: string;
+  citation: string;
+  quote?: string | null;
+  score?: number | null;
+}
+
+export interface HypothesisVariable {
+  name: string;
+  role: 'phenomenon' | 'context' | 'condition' | 'mechanism' | 'outcome' | 'case' | 'method';
+  description: string;
+}
+
+export interface HypothesisCandidate {
+  id: string;
+  title: string;
+  hypothesis: string;
+  rationale: string;
+  maturity: HypothesisMaturity;
+  score: number;
+  novelty: number;
+  support: number;
+  testability: number;
+  risk: number;
+  variables: HypothesisVariable[];
+  evidence: HypothesisEvidenceLink[];
+  methods: string[];
+  predictions: string[];
+  counterArguments: string[];
+  nextSteps: string[];
+  searchQueries: string[];
+  draftAbstract: string;
+}
+
+export interface HypothesisLabStats {
+  works: number;
+  ideas: number;
+  gaps: number;
+  debates: number;
+  passages: number;
+  projectLinked: boolean;
+  aiRefined: boolean;
+  contextChars: number;
+}
+
+export interface HypothesisLabResult {
+  generatedAt: string;
+  request: HypothesisLabRequest;
+  stats: HypothesisLabStats;
+  candidates: HypothesisCandidate[];
+  warnings: string[];
+}
+
 export interface GapAggregate {
   kind: GapKind;
   statement: string;
@@ -1129,7 +1205,7 @@ export interface ChatConversation extends ChatConversationSummary {
  * draft, debate synthesis, or a single idea) whose Markdown keeps `nodus://`
  * citations so they stay clickable inside the notes editor.
  */
-export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea';
+export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea' | 'hypothesis';
 
 /** Optional provenance metadata kept alongside a captured note (model, source ids…). */
 export interface NoteSource {
@@ -2522,6 +2598,10 @@ export interface NodusApi {
   mapResearchCoverage(request: RqMapRequest, handlers?: RqMapHandlers): Promise<ResearchQuestionDetail>;
   deleteResearchQuestion(id: string): Promise<void>;
   exportResearchCoverage(request: RqExportRequest): Promise<{ path: string } | null>;
+
+  // hypothesis lab
+  /** Generate evidence-backed, testable hypotheses from gaps, ideas, debates, works and an optional project. */
+  generateHypothesisLab(request: HypothesisLabRequest): Promise<HypothesisLabResult>;
 
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;

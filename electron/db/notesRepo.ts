@@ -34,7 +34,7 @@ interface NoteRow {
   updated_at: string;
 }
 
-const NOTE_KINDS: NoteKind[] = ['markdown', 'assistant', 'writing', 'debate', 'idea'];
+const NOTE_KINDS: NoteKind[] = ['markdown', 'assistant', 'writing', 'debate', 'idea', 'hypothesis'];
 
 function normalizeKind(value: string | null | undefined): NoteKind {
   return NOTE_KINDS.includes(value as NoteKind) ? (value as NoteKind) : 'markdown';
