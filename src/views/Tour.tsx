@@ -79,6 +79,10 @@ const STEPS: TourStep[] = [
     body: 'Crea carpetas y notas en Markdown. Captura respuestas del asistente, borradores del taller de escritura, síntesis de debates e ideas individuales. Las citas internas (nodus://) permanecen clicables.',
   },
   {
+    title: 'Y hay mucho más',
+    body: 'Esto es solo la mecánica básica. Nodus incluye también Autores (fichas y matriz de síntesis), un Laboratorio de hipótesis, Mapa de argumentos, Debates, Cobertura de tu pregunta, Ruta de lectura, un Taller de escritura con Deep Research y Proyectos de manuscrito con verificador de citas. ¿Quieres el recorrido completo de este flujo? Lánzalo desde Ajustes → Ayuda → Tutorial avanzado.',
+  },
+  {
     title: '¡Listo para empezar!',
     body: 'Explora el grafo, descubre huecos de investigación y sigue la ruta de lectura sugerida. Podrás volver a ver este recorrido desde Ajustes cuando quieras.',
   },

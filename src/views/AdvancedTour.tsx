@@ -49,9 +49,21 @@ const STEPS: AdvancedTourStep[] = [
   },
   {
     stage: 'Paso 2 · Comprender el corpus',
+    view: 'graph',
+    title: 'Mantén el grafo limpio: fusiona duplicados',
+    body: 'Tras escanear muchas obras, una misma idea puede aparecer repetida con etiquetas casi iguales e inflar el grafo. Desde Grafo → Ideas → «Duplicados», Nodus agrupa las ideas idénticas, te deja elegir cuál conservar y las fusiona sin pérdida —consolidando su evidencia y sus conexiones— tras crear una copia de seguridad automática. Un grafo más limpio se lee y se razona mejor.',
+  },
+  {
+    stage: 'Paso 2 · Comprender el corpus',
     view: 'study',
     title: 'Modo Estudio: domina autores e ideas',
     body: 'Cuando el objetivo sea aprender el corpus, entra en Estudio: Nodus prioriza autores, recomienda obras concretas para abrir en Zotero, propone sesiones tutor con pasajes y te permite marcar qué está entendido, qué queda en repaso y qué exige lectura completa.',
+  },
+  {
+    stage: 'Paso 2 · Comprender el corpus',
+    view: 'authors',
+    title: 'Autores: quién sostiene cada idea',
+    body: 'Cambia el foco de las ideas a las voces. En Autores tienes una ficha por autor —su tesis, qué aporta y cómo se posiciona— y una matriz de síntesis que cruza autores con temas para ver de un vistazo quién defiende qué. Es la forma de mapear escuelas, alianzas y disidencias antes de situar tu propia voz.',
   },
   {
     stage: 'Paso 2 · Comprender el corpus',
@@ -78,6 +90,12 @@ const STEPS: AdvancedTourStep[] = [
     body: 'Escribe tu pregunta de investigación y Nodus la desglosa en subpreguntas. Después mapea cuáles cubre tu corpus, cuáles parcialmente y cuáles quedan sin literatura. Es la herramienta para convertir una intuición vaga en un plan de búsqueda estructurado.',
   },
   {
+    stage: 'Paso 3 · Encontrar tu aportación',
+    view: 'hypothesis',
+    title: 'Laboratorio de hipótesis: del hueco a una proposición contrastable',
+    body: 'Aquí Nodus toma tus huecos, ideas y debates y propone hipótesis de investigación comprobables: cada candidata trae sus variables, métodos posibles, predicciones, objeciones y próximos pasos, siempre anclada a la evidencia de tu corpus. Es el puente entre «he detectado un hueco» y «esta es la afirmación que voy a defender».',
+  },
+  {
     stage: 'Paso 4 · Planificar',
     view: 'reading',
     title: 'Una ruta de lectura a la medida de tu pregunta',
@@ -93,6 +111,18 @@ const STEPS: AdvancedTourStep[] = [
     view: 'writing',
     title: 'Del grafo a un borrador con fuentes verificables',
     body: 'El Taller de escritura convierte tus ideas y conexiones en un esquema y un borrador apartado por apartado, con citas que puedes comprobar contra el texto original. No escribe por ti: te da una estructura defendible y las referencias para sostenerla, de modo que mantienes el control intelectual del manuscrito.',
+  },
+  {
+    stage: 'Paso 6 · Escribir',
+    view: 'writing',
+    title: 'Deep Research: un informe citado de principio a fin',
+    body: 'Dentro de Escritura, el modo Deep Research orquesta un informe extenso y multi-apartado sobre una pregunta: planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.',
+  },
+  {
+    stage: 'Paso 6 · Escribir',
+    view: 'projects',
+    title: 'Proyectos: ensambla el manuscrito con verificador de citas',
+    body: 'Un Proyecto convierte tu trabajo en un manuscrito estructurado —carpetas y secciones en Notas—, importa capítulos con versiones recuperables y, sobre cada capítulo, sugiere solo citas verificables contra el texto original, bloqueando las que no puede sostener. Es tu red de seguridad contra la cita fantasma cuando ya estás redactando.',
   },
   {
     stage: 'Paso 7 · Organizar',
