@@ -188,9 +188,21 @@ function lightBadge(s: LightStatus) {
   return <Badge color="neutral">{t('ligero')}…</Badge>;
 }
 
-function deepBadge(s: DeepStatus) {
+function deepBadge(s: DeepStatus, sourceType?: WorkView['source_type']) {
   switch (s) {
     case 'done':
+      // The scan finished, but only the abstract was available — no full text was
+      // read. Flag it so the reader knows to re-scan once the PDF/EPUB is in Zotero.
+      if (sourceType === 'abstract_only' || sourceType === 'none') {
+        return (
+          <Badge
+            color="amber"
+            title={t('El análisis profundo solo usó el abstract, no el texto completo (el PDF/EPUB no estaba disponible al analizar). Reanaliza cuando esté en Zotero.')}
+          >
+            {t('solo abstract')}
+          </Badge>
+        );
+      }
       return <Badge color="indigo">{t('profundo')} ✓</Badge>;
     case 'pending':
       return <Badge color="amber">{t('profundo')}…</Badge>;
@@ -474,6 +486,17 @@ export function Library({
     const n = await window.nodus.reassignThemes(scanModel);
     await load();
     window.alert(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
+  };
+
+  const rescanAbstractOnly = async () => {
+    const ok = window.confirm(
+      t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?')
+    );
+    if (!ok) return;
+    const n = await window.nodus.rescanDegraded(scanModel);
+    await load();
+    if (n === 0) window.alert(t('No hay obras «solo abstract» para reanalizar.'));
+    else window.alert(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
   };
 
   const embedWork = async (nodusId: string) => {
@@ -1071,6 +1094,13 @@ export function Library({
             onClick={reassignThemes}
           />
           <OperationCard
+            icon="bulb"
+            title={t('Reanalizar «solo abstract»')}
+            description={t('Vuelve a analizar las obras cuyo análisis profundo solo usó el abstract porque el PDF/EPUB no estaba disponible. Las que ya tengan el texto recuperan el análisis completo; el resto se omiten sin coste.')}
+            buttonLabel={t('Reanalizar')}
+            onClick={rescanAbstractOnly}
+          />
+          <OperationCard
             icon="search"
             title={t('Indexar pendientes')}
             description={t('Genera embeddings para las ideas que aún no los tienen. No regenera los existentes.')}
@@ -1189,7 +1219,7 @@ export function Library({
                 <div className="p-1 text-neutral-400 truncate">{w.themes.join(', ')}</div>
                 <div className="p-1">{lightBadge(w.light_status)}</div>
                 <div className="p-1 whitespace-nowrap">
-                  {deepBadge(w.deep_status)} {triggerBadge(w)}
+                  {deepBadge(w.deep_status, w.source_type)} {triggerBadge(w)}
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   {passageBadge(passageStatuses.get(w.nodus_id))}

@@ -2649,6 +2649,10 @@ export interface NodusApi {
   /** Re-run the cheap theme scan over the whole library to backfill broad parent themes. */
   reassignThemes(model?: ModelRef | null): Promise<number>;
   rescan(nodusId: string, kind: QueueKind, model?: ModelRef | null): Promise<void>;
+  /** Re-scan every work that degraded to abstract-only, to pick up full text that
+   *  became available since. Idempotent: works whose text is unchanged are no-ops.
+   *  Returns the number of works re-enqueued. */
+  rescanDegraded(model?: ModelRef | null): Promise<number>;
   summarizeWork(nodusId: string, model?: ModelRef | null): Promise<void>;
   summarizeBulk(nodusIds: string[], model?: ModelRef | null): Promise<void>;
   summarizeAll(model?: ModelRef | null): Promise<void>;

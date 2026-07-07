@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef } from '@shared/types';
+import type { QueueItem, QueueKind, QueueProgress, Work, ModelRef, SourceType } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { runLightScan } from '../ai/lightScan';
@@ -21,6 +21,10 @@ import { startPerf } from '../perf';
 type ProgressListener = (p: QueueProgress) => void;
 
 const MAX_RETRIES = 4;
+// A deep scan that degraded to abstract-only may simply have raced a just-attached
+// file. Re-scan once after this delay so the full text is picked up automatically
+// once Zotero has finished landing the attachment.
+const DEGRADED_RETRY_DELAY_MS = 90_000;
 
 class ScanQueue {
   private items: QueueItem[] = [];
@@ -38,6 +42,9 @@ class ScanQueue {
   private reprocessing = false;
   /** Works whose deep scan completed this cycle, awaiting (re-)indexing on drain. */
   private pendingIndexWorks = new Set<string>();
+  /** Works already given a delayed re-scan after degrading to abstract-only, so a
+   *  work is retried at most once per session (the re-scan itself is idempotent). */
+  private degradedRetryScheduled = new Set<string>();
   /** True when a completed deep scan requested semantic bridge discovery on drain. */
   private bridgeAfterDrain = false;
 
@@ -207,6 +214,7 @@ class ScanQueue {
     this.retries.clear();
     this.lastKind = null;
     this.pendingIndexWorks.clear();
+    this.degradedRetryScheduled.clear();
     this.bridgeAfterDrain = false;
     this.deepSinceReprocess = false;
     this.paused = false;
@@ -383,8 +391,9 @@ class ScanQueue {
       if (item.kind === 'light') {
         await this.doLight(work, item.model ?? null);
       } else if (item.kind === 'deep') {
-        await this.doDeep(work, item);
+        const deepInfo = await this.doDeep(work, item);
         this.deepSinceReprocess = true;
+        this.maybeScheduleDegradedRetry(work, deepInfo);
       } else {
         await this.doSummary(work, item);
       }
@@ -447,7 +456,10 @@ class ScanQueue {
     await runLightScan(work, abstract, model, { lockedLabels });
   }
 
-  private async doDeep(work: Work, queueItem: QueueItem): Promise<void> {
+  private async doDeep(
+    work: Work,
+    queueItem: QueueItem
+  ): Promise<{ sourceType: SourceType | null; hadTextAttachment: boolean }> {
     const settings = getSettings();
     const perf = { nodusId: work.nodus_id, title: work.title };
     let abstract: string | null = null;
@@ -487,6 +499,32 @@ class ScanQueue {
       queueItem.subPct = p.pct;
       this.emit();
     });
+    return { sourceType: doc.sourceType, hadTextAttachment: Boolean(doc.hadTextAttachment) };
+  }
+
+  /**
+   * A deep scan that fell back to the abstract (source_type abstract_only/none)
+   * while the Zotero item *does* expose a document attachment usually just raced a
+   * file that landed in storage moments after the text was resolved. Schedule one
+   * delayed re-scan so the full text is picked up automatically. Re-running is
+   * idempotent — if the resolved text is unchanged, runDeepScan is a no-op — and
+   * each work is retried at most once per session to prevent loops.
+   */
+  private maybeScheduleDegradedRetry(
+    work: Work,
+    info: { sourceType: SourceType | null; hadTextAttachment: boolean }
+  ): void {
+    const degraded = info.sourceType === 'abstract_only' || info.sourceType === 'none';
+    if (!degraded || !info.hadTextAttachment || this.degradedRetryScheduled.has(work.nodus_id)) return;
+    this.degradedRetryScheduled.add(work.nodus_id);
+    setTimeout(() => {
+      const current = getWorkById(work.nodus_id);
+      // Skip if the work is gone, failed meanwhile, or already recovered full text
+      // (source_type is no longer abstract-only) — a re-scan would only be a no-op.
+      if (!current || current.deep_status === 'failed') return;
+      if (current.source_type !== 'abstract_only' && current.source_type !== 'none') return;
+      this.enqueue(current.nodus_id, current.title, 'deep');
+    }, DEGRADED_RETRY_DELAY_MS);
   }
 
   private async doSummary(work: Work, item: QueueItem): Promise<void> {

@@ -60,6 +60,7 @@ const api: NodusApi = {
   processFullBulk: (nodusIds, model) => ipcRenderer.invoke('works:processFullBulk', nodusIds, model).then(() => undefined),
   reassignThemes: (model) => ipcRenderer.invoke('works:reassignThemes', model),
   rescan: (nodusId, kind, model) => ipcRenderer.invoke('works:rescan', nodusId, kind, model),
+  rescanDegraded: (model) => ipcRenderer.invoke('works:rescanDegraded', model),
   summarizeWork: (nodusId, model) => ipcRenderer.invoke('works:summarize', nodusId, model).then(() => undefined),
   summarizeBulk: (nodusIds, model) => ipcRenderer.invoke('works:summarizeBulk', nodusIds, model).then(() => undefined),
   summarizeAll: (model) => ipcRenderer.invoke('works:summarizeAll', model).then(() => undefined),
