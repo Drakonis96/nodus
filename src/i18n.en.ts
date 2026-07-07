@@ -156,6 +156,11 @@ export const EN: Record<string, string> = {
   'Escribe una sub-pregunta…': 'Write a sub-question…',
   Subir: 'Move up',
   Bajar: 'Move down',
+  Mostrar: 'Show',
+  Ocultar: 'Hide',
+  'Barra lateral': 'Sidebar',
+  'Reordena u oculta las secciones del menú lateral. «Inicio» queda siempre la primera y «Ajustes» la última; ninguna de las dos puede moverse ni ocultarse.':
+    'Reorder or hide the sidebar sections. “Home” always stays first and “Settings” last; neither can be moved or hidden.',
   'Ver en Debates': 'View in Debates',
   'Esta sub-pregunta no está cubierta por mi biblioteca. Sugiere cómo abordarla y qué tipo de fuentes buscar.':
     'This sub-question is not covered by my library. Suggest how to address it and what kind of sources to look for.',

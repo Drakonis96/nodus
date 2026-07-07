@@ -11,7 +11,8 @@ export interface NavItem {
 }
 
 // Canonical sidebar sections in their default order. Home is always rendered
-// first and cannot be moved; the rest can be reordered from Settings.
+// first and Settings always last; neither can be moved or hidden. The rest can
+// be reordered and shown/hidden from Settings.
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Inicio', icon: 'home' },
   { id: 'search', label: 'Buscar', icon: 'search' },
@@ -34,13 +35,14 @@ export const NAV_ITEMS: NavItem[] = [
 
 /**
  * Resolve the sidebar items for a user-defined order. Home is pinned first and
- * is never part of the saved order. Any sections missing from `sidebarOrder`
- * (e.g. a view added in a newer version) are appended in their default order so
- * the list always stays complete.
+ * Settings is pinned last; neither is ever part of the saved order. Any sections
+ * missing from `sidebarOrder` (e.g. a view added in a newer version) are appended
+ * in their default order so the list always stays complete.
  */
 export function orderedNav(sidebarOrder: string[]): NavItem[] {
   const home = NAV_ITEMS.find((n) => n.id === 'home');
-  const rest = NAV_ITEMS.filter((n) => n.id !== 'home');
+  const settings = NAV_ITEMS.find((n) => n.id === 'settings');
+  const rest = NAV_ITEMS.filter((n) => n.id !== 'home' && n.id !== 'settings');
   const remaining = new Map(rest.map((n) => [n.id, n] as const));
   const ordered: NavItem[] = [];
   for (const id of sidebarOrder) {
@@ -51,7 +53,7 @@ export function orderedNav(sidebarOrder: string[]): NavItem[] {
     }
   }
   for (const n of rest) if (remaining.has(n.id)) ordered.push(n);
-  return home ? [home, ...ordered] : ordered;
+  return [...(home ? [home] : []), ...ordered, ...(settings ? [settings] : [])];
 }
 
 export interface GraphNavigationTarget {

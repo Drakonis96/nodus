@@ -54,8 +54,15 @@ export function App() {
   const [hasData, setHasData] = useState<boolean | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
-  // Sidebar sections in the user's chosen order (Home always pinned first).
-  const nav = useMemo(() => orderedNav(settings?.sidebarOrder ?? []), [settings?.sidebarOrder]);
+  // Sidebar sections in the user's chosen order (Home always pinned first,
+  // Settings always last), minus any the user has hidden. Home and Settings can
+  // never be hidden, so they always stay reachable.
+  const nav = useMemo(() => {
+    const hidden = new Set(settings?.sidebarHidden ?? []);
+    return orderedNav(settings?.sidebarOrder ?? []).filter(
+      (n) => n.id === 'home' || n.id === 'settings' || !hidden.has(n.id),
+    );
+  }, [settings?.sidebarOrder, settings?.sidebarHidden]);
 
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {

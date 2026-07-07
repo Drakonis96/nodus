@@ -48,6 +48,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   copilotPort: 4320,
   copilotToken: '',
   sidebarOrder: [],
+  sidebarHidden: [],
 };
 
 function readRaw(key: string): string | undefined {
