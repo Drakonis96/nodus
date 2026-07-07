@@ -19,6 +19,7 @@ if (!process.argv.includes('--electron-vaults-test')) {
       entry,
       [
         `export * as registry from ${JSON.stringify(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'))};`,
+        `export * as analysisReuse from ${JSON.stringify(path.join(repoRoot, 'electron/vaults/vaultAnalysisImport.ts'))};`,
         `export * as database from ${JSON.stringify(path.join(repoRoot, 'electron/db/database.ts'))};`,
         `export * as secrets from ${JSON.stringify(path.join(repoRoot, 'electron/secrets/secretStore.ts'))};`,
       ].join('\n'),
@@ -59,7 +60,7 @@ const [, , , bundle, userData] = process.argv;
 process.env.NODE_PATH = [path.join(repoRoot, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module._initPaths();
 const require = createRequire(import.meta.url);
-const { registry, database, secrets } = require(bundle);
+const { registry, analysisReuse, database, secrets } = require(bundle);
 
 assert.equal(registry.getActiveVault().id, 'default');
 assert.equal(database.dbPath(), path.join(userData, 'nodus.sqlite'));
@@ -82,19 +83,54 @@ assert.equal(secrets.getApiKey('openai'), 'sk-default');
 db = database.getDb();
 assert.equal(countWorks(db), 0, 'new vault starts with an empty library');
 db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run('work-research', 'ZOT-RESEARCH', 'Research work');
+db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run(
+  'work-reused',
+  'ZOT-DEFAULT',
+  'Default work reused'
+);
 database.closeDb();
 
-const imported = registry.importVaultDataBetweenVaults('default', researchVault.id);
-assert.ok(imported.importedRows > 0, 'analyzed vault import reports copied rows');
-assert.equal(imported.tableRows.works, 1);
-assert.equal(imported.tableRows.ideas, 1);
-assert.equal(imported.tableRows.work_summaries, 1);
+const reused = analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
+assert.equal(reused.requested, 1);
+assert.equal(reused.matched, 1);
+assert.equal(reused.imported, 1);
+const reusedWorkResult = reused.works[0];
+assert.equal(reusedWorkResult.matchedVaultId, 'default');
+assert.equal(reusedWorkResult.matchedSourceNodusId, 'work-default');
+assert.ok(reusedWorkResult.importedRows > 0, 'analysis reuse reports copied rows');
+assert.ok(reusedWorkResult.imported.includes('themes'), 'themes are reused');
+assert.ok(reusedWorkResult.imported.includes('ideas'), 'ideas are reused');
+assert.ok(reusedWorkResult.imported.includes('ideaEmbeddings'), 'idea embeddings are reused');
+assert.ok(reusedWorkResult.imported.includes('summary'), 'summaries are reused');
+assert.ok(reusedWorkResult.imported.includes('passages'), 'passage embeddings are reused');
+assert.equal(reusedWorkResult.tableRows.works, undefined, 'analysis reuse does not copy source works');
 registry.setActiveVault(researchVault.id);
 db = database.getDb();
-assert.deepEqual(workTitles(db), ['Default work', 'Research work']);
-assert.equal(countRows(db, 'ideas'), 1, 'imported ideas are available in the target vault');
-assert.equal(countRows(db, 'work_summaries'), 1, 'imported summaries are available in the target vault');
-assert.equal(countRows(db, 'passages'), 1, 'imported passage embeddings are available in the target vault');
+assert.deepEqual(workTitles(db), ['Default work reused', 'Research work']);
+assert.equal(countWorks(db), 2, 'analysis reuse keeps the target library independent');
+assert.equal(countRows(db, 'ideas'), 1, 'reused ideas are available in the target vault');
+assert.equal(countRows(db, 'work_summaries'), 1, 'reused summaries are available in the target vault');
+assert.equal(countRows(db, 'passages'), 1, 'reused passage embeddings are available in the target vault');
+assert.deepEqual(
+  db.prepare('SELECT light_status, deep_status, summary_status FROM works WHERE nodus_id = ?').get('work-reused'),
+  { light_status: 'done', deep_status: 'done', summary_status: 'done' },
+  'reused analysis updates the target work statuses'
+);
+assert.equal(
+  db.prepare('SELECT COUNT(*) AS count FROM idea_occurrences WHERE nodus_id = ?').get('work-reused').count,
+  1,
+  'reused ideas are attached to the selected target work'
+);
+assert.equal(
+  db.prepare('SELECT nodus_id FROM work_summaries WHERE nodus_id = ?').get('work-reused').nodus_id,
+  'work-reused',
+  'reused summary is attached to the selected target work'
+);
+assert.deepEqual(
+  db.prepare('SELECT passage_id, nodus_id FROM passages WHERE nodus_id = ?').get('work-reused'),
+  { passage_id: 'work-reused#0', nodus_id: 'work-reused' },
+  'reused passages are rewritten for the selected target work'
+);
 assert.equal(
   Buffer.from(db.prepare('SELECT embedding FROM ideas WHERE global_id = ?').get('idea-default').embedding).toString('hex'),
   Buffer.from([1, 2, 3, 4]).toString('hex'),
@@ -131,8 +167,8 @@ database.closeDb();
 
 registry.setActiveVault(researchVault.id);
 db = database.getDb();
-assert.equal(countWorks(db), 2, 'research vault kept its independent and imported works');
-assert.deepEqual(workTitles(db), ['Default work', 'Research work']);
+assert.equal(countWorks(db), 2, 'research vault kept its independent and reused works');
+assert.deepEqual(workTitles(db), ['Default work reused', 'Research work']);
 database.closeDb();
 
 registry.resetVaultDatabase(researchVault.id);

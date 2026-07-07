@@ -148,12 +148,12 @@ import {
   deleteVault,
   getActiveVault,
   getVault,
-  importVaultDataBetweenVaults,
   listVaults,
   renameVault,
   resetVaultDatabase,
   setActiveVault,
 } from './vaults/vaultRegistry';
+import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -193,20 +193,9 @@ function vaultBusyMessage(): string | null {
   return null;
 }
 
-function vaultSwitchMessage(
-  base: string,
-  copiedProviders: VaultSwitchResult['copiedProviders'],
-  importedData: VaultSwitchResult['importedData']
-): string {
+function vaultSwitchMessage(base: string, copiedProviders: VaultSwitchResult['copiedProviders']): string {
   const parts = [base];
   if (copiedProviders.length > 0) parts.push(`Claves API copiadas: ${copiedProviders.length}.`);
-  if (importedData) {
-    parts.push(
-      importedData.importedRows > 0
-        ? `Datos analizados importados: ${importedData.importedRows} filas.`
-        : 'No había datos analizados nuevos que importar.'
-    );
-  }
   return parts.join(' ');
 }
 
@@ -229,22 +218,12 @@ export function registerIpc(
     }
 
     const sourceVaultId = options?.copyApiKeysFromVaultId?.trim() || null;
-    const importSourceVaultId = options?.importDataFromVaultId?.trim() || null;
     if (sourceVaultId && sourceVaultId !== id && !getVault(sourceVaultId)) {
       return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
     }
-    if (importSourceVaultId && importSourceVaultId !== id && !getVault(importSourceVaultId)) {
-      return { ok: false, message: 'No se encontró la bóveda de origen de los datos analizados.', copiedProviders: [] };
-    }
 
     let copiedProviders: VaultSwitchResult['copiedProviders'] = [];
-    let importedData: VaultSwitchResult['importedData'] = null;
     if (getActiveVault().id === id) {
-      if (importSourceVaultId && importSourceVaultId !== id) {
-        const busy = vaultBusyMessage();
-        if (busy) return { ok: false, message: busy, copiedProviders: [], importedData: null };
-        importedData = importVaultDataBetweenVaults(importSourceVaultId, id);
-      }
       if (sourceVaultId && sourceVaultId !== id) {
         copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
       }
@@ -252,10 +231,9 @@ export function registerIpc(
       emitVaultChanged();
       return {
         ok: true,
-        message: vaultSwitchMessage('Esta bóveda ya está cargada.', copiedProviders, importedData),
+        message: vaultSwitchMessage('Esta bóveda ya está cargada.', copiedProviders),
         activeVault,
         copiedProviders,
-        importedData,
       };
     }
 
@@ -267,9 +245,6 @@ export function registerIpc(
         return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
       }
       copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
-    }
-    if (importSourceVaultId && importSourceVaultId !== id) {
-      importedData = importVaultDataBetweenVaults(importSourceVaultId, id);
     }
 
     stopRealtimeSync();
@@ -289,10 +264,9 @@ export function registerIpc(
     emitVaultChanged();
     return {
       ok: true,
-      message: vaultSwitchMessage('Bóveda cargada.', copiedProviders, importedData),
+      message: vaultSwitchMessage('Bóveda cargada.', copiedProviders),
       activeVault,
       copiedProviders,
-      importedData,
     };
   };
 
@@ -366,15 +340,10 @@ export function registerIpc(
     }
     return withVaultKeyProviders(resetVaultDatabase(id));
   });
-  h('vaults:importData', async (_e, sourceVaultId: string, targetVaultId: string) => {
-    const activeId = getActiveVault().id;
-    if (sourceVaultId === activeId || targetVaultId === activeId) {
-      const busy = vaultBusyMessage();
-      if (busy) throw new Error(busy);
-    }
-    const result = importVaultDataBetweenVaults(sourceVaultId, targetVaultId);
-    if (targetVaultId === activeId) emitVaultChanged();
-    return result;
+  h('vaults:reuseAnalysis', async (_e, nodusIds: string[]) => {
+    const busy = vaultBusyMessage();
+    if (busy) throw new Error(busy);
+    return reuseVaultAnalysisForWorks(nodusIds);
   });
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),

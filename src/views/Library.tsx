@@ -9,6 +9,8 @@ import type {
   ModelRef,
   WorkEmbeddingStatus,
   WorkPassageStatus,
+  VaultAnalysisReuseKind,
+  VaultAnalysisReuseResult,
   ZoteroTag,
   CollectionFacet,
 } from '@shared/types';
@@ -267,6 +269,8 @@ export function Library({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
+  const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
+  const [reuseNotice, setReuseNotice] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [confirmReindex, setConfirmReindex] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -313,6 +317,23 @@ export function Library({
     if (!progress.running) void load();
   }), [load]);
 
+  const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
+    if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
+    const result: VaultAnalysisReuseResult = await window.nodus.reuseVaultAnalysis(ids);
+    const importedWorks = result.works.filter((work) => work.imported.length > 0);
+    if (importedWorks.length > 0) {
+      setReuseNotice(tx('Análisis reutilizado desde otras bóvedas para {n} obra(s).', { n: importedWorks.length }));
+    } else {
+      setReuseNotice(t('No se encontró análisis reutilizable en otras bóvedas para la selección.'));
+    }
+    const skipped = new Set(
+      result.works
+        .filter((work) => skipKinds.some((kind) => work.imported.includes(kind)))
+        .map((work) => work.nodusId)
+    );
+    return ids.filter((id) => !skipped.has(id));
+  };
+
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light', scanModel);
     await load();
@@ -346,7 +367,8 @@ export function Library({
   const analyzeSelectedThemes = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    for (const id of ids) {
+    const pending = await reuseSelectedAnalysis(ids, ['themes']);
+    for (const id of pending) {
       await window.nodus.rescan(id, 'light', scanModel);
     }
     setSelected(new Set());
@@ -356,7 +378,8 @@ export function Library({
   const analyzeSelectedIdeas = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    await window.nodus.setManualDeepBulk(ids, true, scanModel);
+    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
+    if (pending.length > 0) await window.nodus.setManualDeepBulk(pending, true, scanModel);
     setSelected(new Set());
     await load();
   };
@@ -364,7 +387,8 @@ export function Library({
   const analyzeSelectedBoth = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    await window.nodus.analyzeBothBulk(ids, scanModel);
+    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
+    if (pending.length > 0) await window.nodus.analyzeBothBulk(pending, scanModel);
     setSelected(new Set());
     await load();
   };
@@ -373,7 +397,8 @@ export function Library({
   const processFullSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    await window.nodus.processFullBulk(ids, scanModel);
+    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
+    if (pending.length > 0) await window.nodus.processFullBulk(pending, scanModel);
     setSelected(new Set());
     await load();
   };
@@ -397,7 +422,8 @@ export function Library({
   const summarizeSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    await window.nodus.summarizeBulk(ids, scanModel);
+    const pending = await reuseSelectedAnalysis(ids, ['summary']);
+    if (pending.length > 0) await window.nodus.summarizeBulk(pending, scanModel);
     setSelected(new Set());
     await load();
   };
@@ -424,7 +450,8 @@ export function Library({
   const embedSelected = async () => {
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
-    await window.nodus.startEmbedding(ids);
+    const pending = await reuseSelectedAnalysis(ids, ['ideaEmbeddings']);
+    if (pending.length > 0) await window.nodus.startEmbedding(pending);
     setSelected(new Set());
   };
 
@@ -434,6 +461,15 @@ export function Library({
 
   const indexPassageWork = async (nodusId: string) => {
     await window.nodus.startPassageEmbedding([nodusId]);
+  };
+
+  const indexSelectedPassages = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    const pending = await reuseSelectedAnalysis(ids, ['passages']);
+    if (pending.length > 0) await window.nodus.startPassageEmbedding(pending);
+    setSelected(new Set());
+    await load();
   };
 
   const indexMissingPassages = async () => {
@@ -465,6 +501,7 @@ export function Library({
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
+    setReuseNotice(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -574,7 +611,10 @@ export function Library({
   }, [selectedVisibleIds, works]);
 
   const allVisibleSelected = works.length > 0 && selectedVisibleIds.length === works.length;
-  const selectAllVisible = () => setSelected(new Set(works.map((work) => work.nodus_id)));
+  const selectAllVisible = () => {
+    setReuseNotice(null);
+    setSelected(new Set(works.map((work) => work.nodus_id)));
+  };
   const summary = useMemo(() => {
     const pendingEmbeddings = works.filter((w) => {
       const s = embeddingStatuses.get(w.nodus_id);
@@ -894,7 +934,11 @@ export function Library({
           <span>{tx('{n} resultados con los filtros actuales', { n: works.length })}</span>
           <button
             className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
-            onClick={() => (allVisibleSelected ? setSelected(new Set()) : selectAllVisible())}
+            onClick={() => {
+              setReuseNotice(null);
+              if (allVisibleSelected) setSelected(new Set());
+              else selectAllVisible();
+            }}
           >
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
             {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} filtrados', { n: works.length })}
@@ -913,6 +957,22 @@ export function Library({
       {selectedVisibleIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
+          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          <label
+            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2.5 py-1.5 text-xs text-indigo-100"
+            title={t('Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.')}
+          >
+            <input
+              type="checkbox"
+              checked={reuseAnalysisFromVaults}
+              onChange={(e) => {
+                setReuseNotice(null);
+                setReuseAnalysisFromVaults(e.target.checked);
+              }}
+            />
+            <span className="min-w-0 leading-4">{t('Reutilizar análisis de otras bóvedas')}</span>
+          </label>
+          {reuseNotice && <span className="min-w-0 max-w-full text-xs text-indigo-200/80">{reuseNotice}</span>}
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
           <button
             className="btn btn-primary"
@@ -937,13 +997,25 @@ export function Library({
           <button className="btn btn-ghost border border-cyan-800 text-cyan-300" onClick={embedSelected}>
             <Icon name="search" /> {t('Indexar')}
           </button>
-          <button className="btn btn-ghost border border-green-800 text-green-300" onClick={() => void window.nodus.startPassageEmbedding(selectedVisibleIds)}>
+          <button className="btn btn-ghost border border-green-800 text-green-300" onClick={indexSelectedPassages}>
             <Icon name="book" /> {t('Indexar pasajes')}
           </button>
           <div className="flex-1" />
-          <button className="btn btn-ghost" onClick={() => setSelected(new Set())}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => {
+              setReuseNotice(null);
+              setSelected(new Set());
+            }}
+          >
             {t('Limpiar selección')}
           </button>
+        </div>
+      )}
+
+      {reuseNotice && selectedVisibleIds.length === 0 && (
+        <div className="mb-3 rounded-md border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-200">
+          {reuseNotice}
         </div>
       )}
 
@@ -1027,6 +1099,7 @@ export function Library({
                 title={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 aria-label={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 onChange={(e) => {
+                  setReuseNotice(null);
                   if (e.target.checked) selectAllVisible();
                   else setSelected(new Set());
                 }}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { VaultDataImportResult, VaultSummary, VaultSwitchOptions } from '@shared/types';
+import type { VaultSummary } from '@shared/types';
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon, PROVIDER_LABELS } from './ui';
@@ -35,13 +35,10 @@ export function VaultSwitcher({
   const [message, setMessage] = useState<string | null>(null);
   const [copyOnLoad, setCopyOnLoad] = useState(false);
   const [copySourceId, setCopySourceId] = useState('');
-  const [importOnLoad, setImportOnLoad] = useState(false);
-  const [importSourceId, setImportSourceId] = useState('');
   const [newVaultName, setNewVaultName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
   const [copyIntoActiveSourceId, setCopyIntoActiveSourceId] = useState('');
-  const [importIntoActiveSourceId, setImportIntoActiveSourceId] = useState('');
   const [dangerVaultId, setDangerVaultId] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingDestructiveAction | null>(null);
   const [destructiveStep, setDestructiveStep] = useState<DestructiveStep>('intro');
@@ -59,17 +56,11 @@ export function VaultSwitcher({
     [activeVault, dangerVaultId, vaults]
   );
 
-  const switchOptions = useMemo(() => {
-    const options: VaultSwitchOptions = {};
-    if (copyOnLoad && copySourceId) options.copyApiKeysFromVaultId = copySourceId;
-    if (importOnLoad && importSourceId) options.importDataFromVaultId = importSourceId;
-    return Object.keys(options).length ? options : undefined;
-  }, [copyOnLoad, copySourceId, importOnLoad, importSourceId]);
+  const switchOptions = copyOnLoad && copySourceId ? { copyApiKeysFromVaultId: copySourceId } : undefined;
 
   useEffect(() => {
     if (!activeVault) return;
     setCopySourceId((current) => current || activeVault.id);
-    setImportSourceId((current) => current || activeVault.id);
     setRenameValue(activeVault.name);
     setDuplicateName(`${activeVault.name} copia`);
   }, [activeVault?.id, activeVault?.name]);
@@ -83,8 +74,7 @@ export function VaultSwitcher({
 
   useEffect(() => {
     if (!copyIntoActiveSourceId && otherVaults[0]) setCopyIntoActiveSourceId(otherVaults[0].id);
-    if (!importIntoActiveSourceId && otherVaults[0]) setImportIntoActiveSourceId(otherVaults[0].id);
-  }, [copyIntoActiveSourceId, importIntoActiveSourceId, otherVaults]);
+  }, [copyIntoActiveSourceId, otherVaults]);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -165,14 +155,6 @@ export function VaultSwitcher({
           ? t('Claves API cargadas en la bóveda activa.')
           : t('La bóveda seleccionada no tiene claves API guardadas.')
       );
-    });
-
-  const importDataIntoActive = () =>
-    run(async () => {
-      if (!activeVault || !importIntoActiveSourceId) return;
-      const result = await window.nodus.importVaultData(importIntoActiveSourceId, activeVault.id);
-      await onActiveVaultChanged();
-      setMessage(importMessage(result));
     });
 
   const startDestructiveAction = (kind: DestructiveKind) => {
@@ -264,55 +246,27 @@ export function VaultSwitcher({
               </button>
             </div>
 
-            <div className="space-y-3 rounded-md border border-neutral-800 p-2">
-              <div className="space-y-2">
-                <label className="flex min-w-0 items-center gap-2 text-xs text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={copyOnLoad}
-                    onChange={(event) => setCopyOnLoad(event.target.checked)}
-                  />
-                  <span className="min-w-0">{t('Al cargar, copiar claves API desde')}</span>
-                </label>
-                <select
-                  className="input w-full min-w-0 text-xs"
-                  value={copySourceId}
-                  onChange={(event) => setCopySourceId(event.target.value)}
-                  disabled={!copyOnLoad}
-                >
-                  {vaults.map((vault) => (
-                    <option key={vault.id} value={vault.id}>
-                      {vault.name} · {providerList(vault)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="flex min-w-0 items-center gap-2 text-xs text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={importOnLoad}
-                    onChange={(event) => setImportOnLoad(event.target.checked)}
-                  />
-                  <span className="min-w-0">{t('Al cargar, importar contenido analizado desde')}</span>
-                </label>
-                <select
-                  className="input w-full min-w-0 text-xs"
-                  value={importSourceId}
-                  onChange={(event) => setImportSourceId(event.target.value)}
-                  disabled={!importOnLoad}
-                >
-                  {vaults.map((vault) => (
-                    <option key={vault.id} value={vault.id}>
-                      {vault.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs leading-5 text-neutral-500">
-                  {t('Importa obras, ideas, embeddings, resúmenes, notas y proyectos ya existentes en otro vault.')}
-                </p>
-              </div>
+            <div className="space-y-2 rounded-md border border-neutral-800 p-2">
+              <label className="flex min-w-0 items-center gap-2 text-xs text-neutral-300">
+                <input
+                  type="checkbox"
+                  checked={copyOnLoad}
+                  onChange={(event) => setCopyOnLoad(event.target.checked)}
+                />
+                <span className="min-w-0">{t('Al cargar, copiar claves API desde')}</span>
+              </label>
+              <select
+                className="input w-full min-w-0 text-xs"
+                value={copySourceId}
+                onChange={(event) => setCopySourceId(event.target.value)}
+                disabled={!copyOnLoad}
+              >
+                {vaults.map((vault) => (
+                  <option key={vault.id} value={vault.id}>
+                    {vault.name} · {providerList(vault)}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-1">
@@ -380,7 +334,7 @@ export function VaultSwitcher({
 
             {activeVault && otherVaults.length > 0 && (
               <div className="space-y-2 rounded-md border border-neutral-800 p-2">
-                <div className="text-xs font-medium text-neutral-300">{t('Traer a la bóveda activa')}</div>
+                <div className="text-xs font-medium text-neutral-300">{t('Traer claves a la bóveda activa')}</div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <select
                     className="input min-w-0 text-sm"
@@ -395,22 +349,6 @@ export function VaultSwitcher({
                   </select>
                   <button className="btn btn-ghost w-full gap-1.5 border border-neutral-700 sm:w-auto" onClick={() => void copyKeysIntoActive()} disabled={busy}>
                     <Icon name="key" /> {t('Cargar claves')}
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <select
-                    className="input min-w-0 text-sm"
-                    value={importIntoActiveSourceId}
-                    onChange={(event) => setImportIntoActiveSourceId(event.target.value)}
-                  >
-                    {otherVaults.map((vault) => (
-                      <option key={vault.id} value={vault.id}>
-                        {vault.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn btn-ghost w-full gap-1.5 border border-neutral-700 sm:w-auto" onClick={() => void importDataIntoActive()} disabled={busy}>
-                    <Icon name="download" /> {t('Importar análisis')}
                   </button>
                 </div>
               </div>
@@ -474,12 +412,6 @@ export function VaultSwitcher({
       })}
     </div>
   );
-}
-
-function importMessage(result: VaultDataImportResult): string {
-  return result.importedRows > 0
-    ? tx('Datos analizados importados: {count} filas.', { count: String(result.importedRows) })
-    : t('No había datos analizados nuevos que importar.');
 }
 
 function renderDestructiveModal({

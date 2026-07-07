@@ -388,12 +388,33 @@ export interface CreateVaultInput {
 
 export interface VaultSwitchOptions {
   copyApiKeysFromVaultId?: string | null;
-  importDataFromVaultId?: string | null;
 }
 
-export interface VaultDataImportResult {
+export type VaultAnalysisReuseKind =
+  | 'themes'
+  | 'ideas'
+  | 'ideaEmbeddings'
+  | 'summary'
+  | 'passages'
+  | 'relations'
+  | 'authors'
+  | 'synthesis';
+
+export interface VaultAnalysisReuseWorkResult {
+  nodusId: string;
+  matchedVaultId: string | null;
+  matchedVaultName: string | null;
+  matchedSourceNodusId: string | null;
+  imported: VaultAnalysisReuseKind[];
   importedRows: number;
   tableRows: Record<string, number>;
+}
+
+export interface VaultAnalysisReuseResult {
+  requested: number;
+  matched: number;
+  imported: number;
+  works: VaultAnalysisReuseWorkResult[];
 }
 
 export interface VaultSwitchResult {
@@ -401,7 +422,6 @@ export interface VaultSwitchResult {
   message: string;
   activeVault?: VaultSummary;
   copiedProviders: AiProvider[];
-  importedData?: VaultDataImportResult | null;
 }
 
 export interface VaultCreateResult {
@@ -2585,7 +2605,7 @@ export interface NodusApi {
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
   resetVault(id: string): Promise<VaultSummary>;
-  importVaultData(sourceVaultId: string, targetVaultId: string): Promise<VaultDataImportResult>;
+  reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;

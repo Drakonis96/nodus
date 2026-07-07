@@ -22,8 +22,7 @@ const api: NodusApi = {
   duplicateVault: (id, name, options) => ipcRenderer.invoke('vaults:duplicate', id, name, options),
   deleteVault: (id, deleteFiles) => ipcRenderer.invoke('vaults:delete', id, deleteFiles).then(() => undefined),
   resetVault: (id) => ipcRenderer.invoke('vaults:reset', id),
-  importVaultData: (sourceVaultId, targetVaultId) =>
-    ipcRenderer.invoke('vaults:importData', sourceVaultId, targetVaultId),
+  reuseVaultAnalysis: (nodusIds) => ipcRenderer.invoke('vaults:reuseAnalysis', nodusIds),
   copyVaultApiKeys: (sourceVaultId, targetVaultId) =>
     ipcRenderer.invoke('vaults:copyApiKeys', sourceVaultId, targetVaultId),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
