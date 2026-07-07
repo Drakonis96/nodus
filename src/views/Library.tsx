@@ -258,6 +258,9 @@ export function Library({
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({});
+  // Local, instantly-responsive text for the search box. It is debounced into
+  // `filter.search` so keystrokes stay smooth even on large libraries.
+  const [searchDraft, setSearchDraft] = useState('');
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -279,25 +282,18 @@ export function Library({
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
 
+  // Only the works list depends on the active filter, so typing in the search
+  // box must reload nothing else. Keeping this isolated is what stops each
+  // keystroke from firing five IPC round-trips against SQLite.
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
     if (initialLoadRef.current) setLoading(true);
     try {
-      const [w, tags, statuses, passageIndexStatuses, collections] = await Promise.all([
-        window.nodus.listWorks(filter),
-        window.nodus.listZoteroTags(),
-        window.nodus.getWorkEmbeddingStatuses(),
-        window.nodus.getWorkPassageStatuses(),
-        window.nodus.listCollectionFacets(),
-      ]);
+      const w = await window.nodus.listWorks(filter);
       // A newer filter or refresh may have completed while this request was in
       // flight.  Never replace its results with stale rows.
       if (requestId !== loadRequestRef.current) return;
       setWorks(w);
-      setAvailableZoteroTags(tags);
-      setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
-      setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
-      setAvailableCollections(collections);
     } finally {
       if (requestId === loadRequestRef.current) {
         initialLoadRef.current = false;
@@ -306,16 +302,53 @@ export function Library({
     }
   }, [filter]);
 
+  // Facets (tags, collections) and per-work index statuses are global — they do
+  // not depend on the active filter. Load them once on mount and refresh only
+  // when the underlying data actually changes, not on every filter change.
+  const loadFacets = useCallback(async () => {
+    const [tags, statuses, passageIndexStatuses, collections] = await Promise.all([
+      window.nodus.listZoteroTags(),
+      window.nodus.getWorkEmbeddingStatuses(),
+      window.nodus.getWorkPassageStatuses(),
+      window.nodus.listCollectionFacets(),
+    ]);
+    setAvailableZoteroTags(tags);
+    setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
+    setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
+    setAvailableCollections(collections);
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
-  useDataRefresh(load);
+  useEffect(() => {
+    void loadFacets();
+  }, [loadFacets]);
+
+  // Stable reference so the event subscriptions below don't re-register on every
+  // filter change (which happens on each debounced keystroke).
+  const refreshAllRef = useRef<() => void>(() => {});
+  refreshAllRef.current = () => {
+    void load();
+    void loadFacets();
+  };
+  useDataRefresh(() => refreshAllRef.current());
   // Once a queued analysis finishes, reapply the active tag/status predicate
   // without remounting the virtual list or losing the reader's scroll position.
-  useScanComplete(() => void load());
+  useScanComplete(() => refreshAllRef.current());
   useEffect(() => window.nodus.onPassageProgress((progress) => {
-    if (!progress.running) void load();
-  }), [load]);
+    if (!progress.running) refreshAllRef.current();
+  }), []);
+
+  // Debounce the free-text search: push the draft into the filter only after the
+  // user pauses, so a burst of keystrokes triggers one DB query instead of one
+  // per character.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setFilter((f) => ((f.search ?? '') === searchDraft ? f : { ...f, search: searchDraft || undefined }));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [searchDraft]);
 
   const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
     if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
@@ -557,7 +590,7 @@ export function Library({
   };
 
   const selectedStatusFlags = filter.statusFlags ?? [];
-  const searchValue = filter.search ?? '';
+  const searchValue = searchDraft;
   const hasActiveFilters =
     searchValue.trim().length > 0 ||
     selectedStatusFlags.length > 0 ||
@@ -583,6 +616,7 @@ export function Library({
   const clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
   const clearAllFilters = () => {
     setFilter({});
+    setSearchDraft('');
     setTagSearch('');
     setCollectionSearch('');
   };
@@ -654,9 +688,9 @@ export function Library({
         <div className="flex flex-wrap gap-2 items-center">
           <input
             className="input"
-            value={searchValue}
+            value={searchDraft}
             placeholder={t('Buscar título o autor…')}
-            onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
+            onChange={(e) => setSearchDraft(e.target.value)}
           />
           <StatusFlagsPicker
             value={selectedStatusFlags}
