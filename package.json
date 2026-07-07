@@ -79,7 +79,8 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
-      "word-addin/**/*"
+      "word-addin/**/*",
+      "scripts/nodus_copilot.py"
     ],
     "publish": [
       {

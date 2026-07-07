@@ -178,6 +178,10 @@ export const EN: Record<string, string> = {
     'Serves the Word add-in over https://localhost and finds how the paragraph relates to your library. Sideload word-addin/manifest.xml in Word to use it.',
   'Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.':
     'Serves Nodus Copilot over https://localhost, searches corpus ideas, shows connections and inserts an idea with the AI configured in Nodus.',
+  'Copiloto de escritura (LibreOffice)': 'Writing copilot (LibreOffice)',
+  'Instalar macro en LibreOffice': 'Install LibreOffice macro',
+  'Copia el macro nodus_copilot.py en la carpeta de macros de LibreOffice. Para usarlo en LibreOffice Writer, ve a Herramientas -> Macros -> Ejecutar macro -> Mis macros -> nodus_copilot -> start_nodus_copilot.':
+    'Copies the nodus_copilot.py macro into the LibreOffice macro folder. To use it in LibreOffice Writer, go to Tools -> Macros -> Run Macro -> My Macros -> nodus_copilot -> start_nodus_copilot.',
   'Ayuda para conectar un cliente MCP': 'Help connecting an MCP client',
   'Puerto local': 'Local port',
   Activo: 'Running',

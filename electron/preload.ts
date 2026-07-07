@@ -20,6 +20,7 @@ const api: NodusApi = {
   regenerateCopilotToken: () => ipcRenderer.invoke('copilot:regenerateToken'),
   ensureCopilotCert: () => ipcRenderer.invoke('copilot:ensureCert'),
   installCopilotAddin: () => ipcRenderer.invoke('copilot:installAddin'),
+  installLibreOfficeCopilot: () => ipcRenderer.invoke('copilot:installLibreOffice'),
   onCopilotOpenIdea: (cb) => {
     const listener = (_e: unknown, target: import('@shared/types').CopilotOpenIdeaTarget) => cb(target);
     ipcRenderer.on('copilot:openIdea', listener);

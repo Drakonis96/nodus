@@ -145,3 +145,33 @@ export async function installCopilotAddin(appRoot: string, appVersion = '0.1.0')
     };
   }
 }
+
+export async function installLibreOfficeCopilot(appRoot: string): Promise<CopilotInstallResult> {
+  if (process.platform !== 'linux') {
+    return {
+      ok: false,
+      manifestPath: null,
+      message: 'La instalación automática del macro de LibreOffice solo está soportada en sistemas Linux.',
+    };
+  }
+
+  const targetDir = path.join(homedir(), '.config', 'libreoffice', '4', 'user', 'Scripts', 'python');
+  const targetPath = path.join(targetDir, 'nodus_copilot.py');
+  const sourcePath = path.join(appRoot, 'scripts', 'nodus_copilot.py');
+
+  try {
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.copyFile(sourcePath, targetPath);
+    return {
+      ok: true,
+      manifestPath: targetPath,
+      message: `Macro de LibreOffice copiado con éxito en: ${targetPath}. Reinicia LibreOffice Writer si lo tenías abierto.`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      manifestPath: null,
+      message: `No se pudo copiar el macro: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}

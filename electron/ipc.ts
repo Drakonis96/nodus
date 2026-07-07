@@ -62,7 +62,7 @@ import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, stopCopilotServer } from './copilot/server';
 import { ensureCopilotCert } from './copilot/certs';
-import { installCopilotAddin } from './copilot/install';
+import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
@@ -186,6 +186,7 @@ export function registerIpc(
     return result;
   });
   h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath(), app.getVersion()));
+  h('copilot:installLibreOffice', async () => installLibreOfficeCopilot(app.getAppPath()));
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 
