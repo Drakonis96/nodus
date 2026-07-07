@@ -133,6 +133,7 @@ export function VaultSwitcher({
   return (
     <div className="relative">
       <button
+        data-tour="vaults"
         className="btn btn-ghost gap-1.5 max-w-[260px]"
         title={t('Bóveda activa')}
         onClick={() => setOpen((value) => !value)}
@@ -265,4 +266,3 @@ export function VaultSwitcher({
     </div>
   );
 }
-

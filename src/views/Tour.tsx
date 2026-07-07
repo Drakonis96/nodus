@@ -23,6 +23,11 @@ const STEPS: TourStep[] = [
     body: '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.',
   },
   {
+    target: 'vaults',
+    title: 'Bóvedas independientes',
+    body: 'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.',
+  },
+  {
     target: 'nav-graph',
     view: 'graph',
     title: 'El grafo de ideas',

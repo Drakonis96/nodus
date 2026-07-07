@@ -377,6 +377,9 @@ export const EN: Record<string, string> = {
   '¡Bienvenido a Nodus!': 'Welcome to Nodus!',
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'First time here? In under a minute I’ll show you how to turn your Zotero library into a graph of ideas. You can skip it anytime.',
+  'Bóvedas independientes': 'Independent vaults',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Each vault is a separate space: library, graph, notes, projects, chats, settings, embeddings and API keys can stay isolated. Use this selector to create another vault, switch vaults or load keys from a previous one.',
   'El grafo de ideas': 'The idea graph',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'It’s the heart of Nodus. Each node is an idea drawn from your reading and each edge a relationship between them. It starts empty and fills up as you deep-scan works.',
