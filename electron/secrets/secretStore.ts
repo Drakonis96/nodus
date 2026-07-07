@@ -6,7 +6,7 @@ import type { AiProvider } from '@shared/types';
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
 
-const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 function keyFile(provider: AiProvider): string {
   return path.join(app.getPath('userData'), `ai_key_${provider}.bin`);

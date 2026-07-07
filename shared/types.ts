@@ -250,7 +250,7 @@ export interface ExternalRef {
 // Settings
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini';
+export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini' | 'xiaomi';
 export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini'>;
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';

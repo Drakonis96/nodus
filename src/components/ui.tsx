@@ -1,7 +1,7 @@
 import React from 'react';
 import type { EdgeType, AiProvider, ModelRef, GraphNodeType } from '@shared/types';
 
-export const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+export const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
@@ -9,6 +9,7 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   openrouter: 'OpenRouter',
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
+  xiaomi: 'Xiaomi MiMo',
 };
 
 export function modelLabel(m: ModelRef): string {
