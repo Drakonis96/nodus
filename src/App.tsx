@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, SyncLogEntry } from '@shared/types';
+import type { AppSettings, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView } from './views/HomeView';
 import { Library } from './views/Library';
@@ -23,6 +23,7 @@ import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
+import { VaultSwitcher } from './components/VaultSwitcher';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
@@ -38,6 +39,8 @@ import nodusLogo from './assets/nodus-logo.svg';
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [vaults, setVaults] = useState<VaultSummary[]>([]);
+  const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
   const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   const [collectionsOpen, setCollectionsOpen] = useState(false);
@@ -86,6 +89,18 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  const reloadVaults = useCallback(async () => {
+    if (!window.nodus) return [];
+    const next = await window.nodus.listVaults();
+    setVaults(next);
+    setActiveVault(next.find((vault) => vault.active) ?? null);
+    return next;
+  }, []);
+
+  useEffect(() => {
+    void reloadVaults();
+  }, [reloadVaults]);
 
   const refreshHasData = useCallback(async () => {
     if (!window.nodus) return;
@@ -185,6 +200,20 @@ export function App() {
     [navigate]
   );
 
+  const handleActiveVaultChanged = useCallback(async () => {
+    setCollectionsOpen(false);
+    setResearchOpen(false);
+    setGraphTarget(null);
+    setAssistantTarget(null);
+    setNoteTarget(null);
+    setLastSync(null);
+    setView('home');
+    await reloadVaults();
+    await reloadSettings();
+    await refreshHasData();
+    notifyDataChanged();
+  }, [refreshHasData, reloadSettings, reloadVaults]);
+
   if (loadError) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
@@ -222,6 +251,12 @@ export function App() {
           <span>Nodus</span>
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
+        <VaultSwitcher
+          vaults={vaults}
+          activeVault={activeVault}
+          onVaultsChanged={reloadVaults}
+          onActiveVaultChanged={handleActiveVaultChanged}
+        />
         <div className="flex-1" />
         {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
         {settings.favorites.length > 0 && (

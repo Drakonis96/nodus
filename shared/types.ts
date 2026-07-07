@@ -371,6 +371,41 @@ export interface AppSettings {
   sidebarHidden: string[];
 }
 
+export interface VaultSummary {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
+  lastOpenedAt: string;
+  active: boolean;
+  legacy: boolean;
+  apiKeyProviders: AiProvider[];
+}
+
+export interface CreateVaultInput {
+  name: string;
+}
+
+export interface VaultSwitchOptions {
+  copyApiKeysFromVaultId?: string | null;
+}
+
+export interface VaultSwitchResult {
+  ok: boolean;
+  message: string;
+  activeVault?: VaultSummary;
+  copiedProviders: AiProvider[];
+}
+
+export interface VaultCreateResult {
+  vault: VaultSummary;
+}
+
+export interface VaultDuplicateResult {
+  vault: VaultSummary;
+  copiedProviders: AiProvider[];
+}
+
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
 export interface McpServerStatus {
   running: boolean;
@@ -2535,6 +2570,14 @@ export interface NodusApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  listVaults(): Promise<VaultSummary[]>;
+  getActiveVault(): Promise<VaultSummary>;
+  createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
+  renameVault(id: string, name: string): Promise<VaultSummary>;
+  switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
+  duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
+  deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
+  copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;

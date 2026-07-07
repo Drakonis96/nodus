@@ -185,6 +185,22 @@ export const EN: Record<string, string> = {
   'El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.':
     'The Nodus bridge (preload) is unavailable. The app cannot talk to its backend.',
   'No se pudieron cargar los ajustes: {msg}': 'Could not load settings: {msg}',
+  'Bóveda activa': 'Active vault',
+  Bóveda: 'Vault',
+  Bóvedas: 'Vaults',
+  Activa: 'Active',
+  'Sin bóveda activa': 'No active vault',
+  'Al cargar, copiar claves API desde': 'When loading, copy API keys from',
+  Cargar: 'Load',
+  'Nueva bóveda': 'New vault',
+  Duplicar: 'Duplicate',
+  'Cargar claves': 'Load keys',
+  'Escribe un nombre para la bóveda.': 'Enter a vault name.',
+  'Bóveda renombrada.': 'Vault renamed.',
+  'Bóveda duplicada con sus datos y claves API.': 'Vault duplicated with its data and API keys.',
+  'La bóveda seleccionada no tiene claves API guardadas.': 'The selected vault has no saved API keys.',
+  'sin claves': 'no keys',
+  'Claves API cargadas en la bóveda activa.': 'API keys loaded into the active vault.',
   // ── Settings ───────────────────────────────────────────────────────────────
   'Lo básico queda separado de los parámetros técnicos de análisis y extracción.':
     'The essentials are kept separate from the technical analysis and extraction parameters.',

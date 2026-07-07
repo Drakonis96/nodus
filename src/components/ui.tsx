@@ -94,6 +94,7 @@ const ICON_PATHS: Record<string, string> = {
   check: '<polyline points="20 6 9 17 4 12"/>',
   chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
+  key: '<path d="M21 2l-2 2"/><path d="M17 6l-2 2"/><circle cx="7.5" cy="14.5" r="5.5"/><path d="M12 10l7-7 2 2-7 7"/><path d="M7.5 14.5h.01"/>',
   compass: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
   chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
   chevronRight: '<polyline points="9 18 15 12 9 6"/>',

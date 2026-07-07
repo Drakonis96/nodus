@@ -14,6 +14,15 @@ import type {
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
+  listVaults: () => ipcRenderer.invoke('vaults:list'),
+  getActiveVault: () => ipcRenderer.invoke('vaults:getActive'),
+  createVault: (input) => ipcRenderer.invoke('vaults:create', input),
+  renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),
+  switchVault: (id, options) => ipcRenderer.invoke('vaults:switch', id, options),
+  duplicateVault: (id, name, options) => ipcRenderer.invoke('vaults:duplicate', id, name, options),
+  deleteVault: (id, deleteFiles) => ipcRenderer.invoke('vaults:delete', id, deleteFiles).then(() => undefined),
+  copyVaultApiKeys: (sourceVaultId, targetVaultId) =>
+    ipcRenderer.invoke('vaults:copyApiKeys', sourceVaultId, targetVaultId),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),

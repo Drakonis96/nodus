@@ -1,4 +1,5 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
@@ -54,6 +55,10 @@ import type {
   StudyPlanRequest,
   StudySessionRequest,
   StudyAnswerRequest,
+  CreateVaultInput,
+  VaultSummary,
+  VaultSwitchOptions,
+  VaultSwitchResult,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -61,14 +66,15 @@ import type {
 // alias for a runtime value import.
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
-import { getMcpStatus, regenerateMcpToken, restartMcpServer, stopMcpServer } from './mcp';
-import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, stopCopilotServer } from './copilot/server';
+import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
+import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin } from './copilot/install';
-import { setApiKey, clearApiKey, getApiKey } from './secrets/secretStore';
+import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault } from './secrets/secretStore';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
+import { reconcileAuthorLayerOnce } from './db/authorsRepo';
 import * as dedupe from './db/dedupeRepo';
 import * as ideaDedupe from './db/ideaDedupeRepo';
 import { listCollectionFacets } from './db/collectionsRepo';
@@ -132,10 +138,20 @@ import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
 import * as workSummaries from './db/workSummariesRepo';
 import * as projects from './db/projectsRepo';
-import { getDb } from './db/database';
+import { closeDb, getDb } from './db/database';
 import { exportWritingWorkshopDraft } from './export/writingWorkshopExport';
 import { generateProjectSuggestions } from './ai/projectInsertion';
 import { exportProject, exportProjectChapter } from './export/projectExport';
+import {
+  createVault,
+  createVaultFromDatabaseFile,
+  deleteVault,
+  getActiveVault,
+  getVault,
+  listVaults,
+  renameVault,
+  setActiveVault,
+} from './vaults/vaultRegistry';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -155,6 +171,26 @@ function processFullChain(nodusId: string, model?: ModelRef | null): void {
   scanQueue.enqueue(nodusId, w.title, 'deep', model, { chain: true });
 }
 
+function withVaultKeyProviders(vault: VaultSummary): VaultSummary {
+  return { ...vault, apiKeyProviders: listApiKeyProvidersForVault(vault.id) };
+}
+
+function vaultBusyMessage(): string | null {
+  if (scanQueue.isBusy()) {
+    return 'No se puede cambiar de bóveda con la cola de análisis activa. Pausa o termina los trabajos pendientes antes de cargar otra bóveda.';
+  }
+  if (getEmbeddingSnapshot().running) {
+    return 'No se puede cambiar de bóveda mientras se están indexando embeddings de ideas.';
+  }
+  if (getPassageSnapshot().running) {
+    return 'No se puede cambiar de bóveda mientras se están indexando pasajes.';
+  }
+  if (isSemanticBridgeRunning()) {
+    return 'No se puede cambiar de bóveda mientras se descubren relaciones semánticas.';
+  }
+  return null;
+}
+
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -162,6 +198,73 @@ export function registerIpc(
   installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
   const h = ipcMain.handle.bind(ipcMain);
+
+  const emitVaultChanged = () => {
+    getWindow()?.webContents.send('vaults:changed', withVaultKeyProviders(getActiveVault()));
+  };
+
+  const switchVaultSafely = async (id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult> => {
+    const target = getVault(id);
+    if (!target) {
+      return { ok: false, message: 'Bóveda no encontrada.', copiedProviders: [] };
+    }
+
+    const sourceVaultId = options?.copyApiKeysFromVaultId?.trim() || null;
+    if (sourceVaultId && sourceVaultId !== id && !getVault(sourceVaultId)) {
+      return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
+    }
+
+    let copiedProviders: VaultSwitchResult['copiedProviders'] = [];
+    if (getActiveVault().id === id) {
+      if (sourceVaultId && sourceVaultId !== id) {
+        copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
+      }
+      const activeVault = withVaultKeyProviders(getActiveVault());
+      emitVaultChanged();
+      return {
+        ok: true,
+        message: copiedProviders.length
+          ? 'Claves API cargadas en la bóveda activa.'
+          : 'Esta bóveda ya está cargada.',
+        activeVault,
+        copiedProviders,
+      };
+    }
+
+    const busy = vaultBusyMessage();
+    if (busy) return { ok: false, message: busy, copiedProviders: [] };
+
+    if (sourceVaultId && sourceVaultId !== id) {
+      if (!getVault(sourceVaultId)) {
+        return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
+      }
+      copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
+    }
+
+    stopRealtimeSync();
+    await stopMcpServer();
+    await stopCopilotServer();
+    closeDb();
+    setActiveVault(id);
+    getDb();
+    reconcileAuthorLayerOnce();
+
+    const settings = getSettings();
+    if (settings.syncMode === 'realtime') startRealtimeSync();
+    if (settings.mcpEnabled) void startMcpServer();
+    if (settings.copilotEnabled) void startCopilotServer();
+
+    const activeVault = withVaultKeyProviders(getActiveVault());
+    emitVaultChanged();
+    return {
+      ok: true,
+      message: copiedProviders.length
+        ? `Bóveda cargada. Claves API copiadas: ${copiedProviders.length}.`
+        : 'Bóveda cargada.',
+      activeVault,
+      copiedProviders,
+    };
+  };
 
   // settings + secrets
   h('settings:get', async () => getSettings());
@@ -181,6 +284,39 @@ export function registerIpc(
     }
     return next;
   });
+  h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
+  h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));
+  h('vaults:create', async (_e, input: CreateVaultInput) => {
+    const vault = createVault(input.name);
+    return { vault: withVaultKeyProviders(vault) };
+  });
+  h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));
+  h('vaults:switch', async (_e, id: string, options?: VaultSwitchOptions) => switchVaultSafely(id, options));
+  h('vaults:duplicate', async (_e, id: string, name: string, options?: VaultSwitchOptions) => {
+    const source = getVault(id);
+    if (!source) throw new Error('Bóveda no encontrada.');
+    const tmp = path.join(app.getPath('temp'), `nodus-vault-copy-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
+    try {
+      if (source.active) {
+        await getDb().backup(tmp);
+      } else {
+        fs.copyFileSync(source.path, tmp);
+      }
+      const vault = createVaultFromDatabaseFile(tmp, name);
+      const hasExplicitSource = options && Object.prototype.hasOwnProperty.call(options, 'copyApiKeysFromVaultId');
+      const keySource = hasExplicitSource ? options.copyApiKeysFromVaultId ?? null : id;
+      const copiedProviders = keySource && keySource !== vault.id ? copyApiKeysBetweenVaults(keySource, vault.id) : [];
+      return { vault: withVaultKeyProviders(vault), copiedProviders };
+    } finally {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    }
+  });
+  h('vaults:delete', async (_e, id: string, deleteFiles?: boolean) => {
+    deleteVault(id, Boolean(deleteFiles));
+  });
+  h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
+    copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),
+  }));
   h('mcp:status', async () => getMcpStatus());
   h('mcp:regenerateToken', async () => regenerateMcpToken());
   h('copilot:status', async () => getCopilotStatus());
