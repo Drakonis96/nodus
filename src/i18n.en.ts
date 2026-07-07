@@ -191,10 +191,43 @@ export const EN: Record<string, string> = {
   Activa: 'Active',
   'Sin bóveda activa': 'No active vault',
   'Al cargar, copiar claves API desde': 'When loading, copy API keys from',
+  'Al cargar, importar contenido analizado desde': 'When loading, import analyzed content from',
+  'Importa obras, ideas, embeddings, resúmenes, notas y proyectos ya existentes en otro vault.':
+    'Imports works, ideas, embeddings, summaries, notes and projects that already exist in another vault.',
   Cargar: 'Load',
   'Nueva bóveda': 'New vault',
   Duplicar: 'Duplicate',
   'Cargar claves': 'Load keys',
+  'Traer a la bóveda activa': 'Bring into the active vault',
+  'Importar análisis': 'Import analysis',
+  'Datos analizados importados: {count} filas.': 'Analyzed data imported: {count} rows.',
+  'No había datos analizados nuevos que importar.': 'There was no new analyzed data to import.',
+  'Zona peligrosa': 'Danger zone',
+  'Vault objetivo': 'Target vault',
+  Reinicializar: 'Reset',
+  'La bóveda activa no se puede eliminar. Carga otra bóveda antes.':
+    'The active vault cannot be deleted. Load another vault first.',
+  'La bóveda principal no se puede eliminar; puedes reinicializarla.':
+    'The primary vault cannot be deleted; you can reset it instead.',
+  'Eliminar bóveda': 'Delete vault',
+  'Reinicializar bóveda': 'Reset vault',
+  'Esta acción eliminará la bóveda "{name}" y sus archivos locales. No afecta a otras bóvedas.':
+    'This will delete the vault "{name}" and its local files. It does not affect other vaults.',
+  'Esta acción borrará el contenido de "{name}" y recreará su base de datos vacía. No afecta a otras bóvedas.':
+    'This will erase the contents of "{name}" and recreate its empty database. It does not affect other vaults.',
+  Continuar: 'Continue',
+  'Introduce este código manualmente': 'Enter this code manually',
+  'Código de seguridad': 'Security code',
+  'No se puede pegar aquí. Escribe las cuatro cifras manualmente.':
+    'You cannot paste here. Type the four digits manually.',
+  'Código incorrecto.': 'Incorrect code.',
+  'Escribe las cuatro cifras para continuar.': 'Type the four digits to continue.',
+  'Código correcto. Confirma una última vez para ejecutar la acción.':
+    'Code accepted. Confirm one last time to run the action.',
+  'Eliminar definitivamente': 'Delete permanently',
+  'Reinicializar definitivamente': 'Reset permanently',
+  'Bóveda eliminada.': 'Vault deleted.',
+  'Bóveda reinicializada.': 'Vault reset.',
   'Escribe un nombre para la bóveda.': 'Enter a vault name.',
   'Bóveda renombrada.': 'Vault renamed.',
   'Bóveda duplicada con sus datos y claves API.': 'Vault duplicated with its data and API keys.',

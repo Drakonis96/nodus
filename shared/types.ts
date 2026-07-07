@@ -388,6 +388,12 @@ export interface CreateVaultInput {
 
 export interface VaultSwitchOptions {
   copyApiKeysFromVaultId?: string | null;
+  importDataFromVaultId?: string | null;
+}
+
+export interface VaultDataImportResult {
+  importedRows: number;
+  tableRows: Record<string, number>;
 }
 
 export interface VaultSwitchResult {
@@ -395,6 +401,7 @@ export interface VaultSwitchResult {
   message: string;
   activeVault?: VaultSummary;
   copiedProviders: AiProvider[];
+  importedData?: VaultDataImportResult | null;
 }
 
 export interface VaultCreateResult {
@@ -2577,6 +2584,8 @@ export interface NodusApi {
   switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
+  resetVault(id: string): Promise<VaultSummary>;
+  importVaultData(sourceVaultId: string, targetVaultId: string): Promise<VaultDataImportResult>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;

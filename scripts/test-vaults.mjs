@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import Module, { createRequire } from 'node:module';
 import os from 'node:os';
@@ -64,7 +65,8 @@ assert.equal(registry.getActiveVault().id, 'default');
 assert.equal(database.dbPath(), path.join(userData, 'nodus.sqlite'));
 
 let db = database.getDb();
-db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run('work-default', 'ZOT-DEFAULT', 'Default work');
+seedAnalyzedWork(db);
+db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('vault-import-test', 'source-only-setting');
 secrets.setApiKey('openai', 'sk-default');
 assert.equal(secrets.getApiKey('openai'), 'sk-default');
 database.closeDb();
@@ -80,6 +82,29 @@ assert.equal(secrets.getApiKey('openai'), 'sk-default');
 db = database.getDb();
 assert.equal(countWorks(db), 0, 'new vault starts with an empty library');
 db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run('work-research', 'ZOT-RESEARCH', 'Research work');
+database.closeDb();
+
+const imported = registry.importVaultDataBetweenVaults('default', researchVault.id);
+assert.ok(imported.importedRows > 0, 'analyzed vault import reports copied rows');
+assert.equal(imported.tableRows.works, 1);
+assert.equal(imported.tableRows.ideas, 1);
+assert.equal(imported.tableRows.work_summaries, 1);
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+assert.deepEqual(workTitles(db), ['Default work', 'Research work']);
+assert.equal(countRows(db, 'ideas'), 1, 'imported ideas are available in the target vault');
+assert.equal(countRows(db, 'work_summaries'), 1, 'imported summaries are available in the target vault');
+assert.equal(countRows(db, 'passages'), 1, 'imported passage embeddings are available in the target vault');
+assert.equal(
+  Buffer.from(db.prepare('SELECT embedding FROM ideas WHERE global_id = ?').get('idea-default').embedding).toString('hex'),
+  Buffer.from([1, 2, 3, 4]).toString('hex'),
+  'idea embedding blob is preserved'
+);
+assert.equal(
+  db.prepare('SELECT value FROM settings WHERE key = ?').get('vault-import-test'),
+  undefined,
+  'vault import does not overwrite target settings'
+);
 database.closeDb();
 
 registry.setActiveVault('default');
@@ -106,14 +131,133 @@ database.closeDb();
 
 registry.setActiveVault(researchVault.id);
 db = database.getDb();
-assert.equal(countWorks(db), 1, 'research vault kept its independent work');
-assert.equal(workTitle(db), 'Research work');
+assert.equal(countWorks(db), 2, 'research vault kept its independent and imported works');
+assert.deepEqual(workTitles(db), ['Default work', 'Research work']);
 database.closeDb();
+
+registry.resetVaultDatabase(researchVault.id);
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+assert.equal(countWorks(db), 0, 'reset vault recreates an empty database');
+assert.equal(secrets.getApiKey('openai'), 'sk-default', 'reset keeps vault API keys available');
+database.closeDb();
+
+const removable = registry.createVault('Temporal para borrar');
+const removableDir = path.dirname(removable.path);
+assert.ok(existsSync(removableDir), 'created vault directory exists before delete');
+registry.deleteVault(removable.id, true);
+assert.equal(registry.getVault(removable.id), null, 'deleted vault is removed from registry');
+assert.equal(existsSync(removableDir), false, 'deleted vault files are removed from disk');
 
 function countWorks(db) {
   return db.prepare('SELECT COUNT(*) AS count FROM works').get().count;
 }
 
+function countRows(db, table) {
+  return db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get().count;
+}
+
 function workTitle(db) {
   return db.prepare('SELECT title FROM works ORDER BY nodus_id LIMIT 1').get().title;
+}
+
+function workTitles(db) {
+  return db.prepare('SELECT title FROM works ORDER BY title').all().map((row) => row.title);
+}
+
+function seedAnalyzedWork(db) {
+  const now = '2026-07-07T00:00:00.000Z';
+  db.prepare(
+    `INSERT INTO works (
+      nodus_id, zotero_key, title, authors_json, light_status, light_at, light_hash,
+      deep_status, deep_at, deep_hash, summary_status, summary_at, summary_hash
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'work-default',
+    'ZOT-DEFAULT',
+    'Default work',
+    '[]',
+    'done',
+    now,
+    'light-hash',
+    'done',
+    now,
+    'deep-hash',
+    'done',
+    now,
+    'summary-hash'
+  );
+  db.prepare('INSERT INTO themes (theme_id, label, created_at) VALUES (?, ?, ?)').run('theme-default', 'Theme', now);
+  db.prepare('INSERT INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run('work-default', 'theme-default');
+  db.prepare(
+    `INSERT INTO ideas (
+      global_id, type, label, statement, embedding, created_at,
+      embedding_provider, embedding_model, embedding_dim, embedding_text_hash
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'idea-default',
+    'claim',
+    'Imported idea',
+    'Imported statement',
+    Buffer.from([1, 2, 3, 4]),
+    now,
+    'openai',
+    'text-embedding-3-small',
+    4,
+    'idea-hash'
+  );
+  db.prepare('INSERT INTO idea_occurrences (global_id, nodus_id, role, development, confidence) VALUES (?, ?, ?, ?, ?)').run(
+    'idea-default',
+    'work-default',
+    'central',
+    'development',
+    0.9
+  );
+  db.prepare('INSERT INTO evidence (id, global_id, nodus_id, quote, location, kind) VALUES (?, ?, ?, ?, ?, ?)').run(
+    'evidence-default',
+    'idea-default',
+    'work-default',
+    'quote',
+    'p. 1',
+    'quote'
+  );
+  db.prepare(
+    `INSERT INTO work_summaries (
+      nodus_id, summary, source_level, model_json, content_hash, embedding,
+      embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'work-default',
+    'Summary',
+    'deep',
+    '{}',
+    'summary-content-hash',
+    Buffer.from([5, 6, 7, 8]),
+    'openai',
+    'text-embedding-3-small',
+    4,
+    'summary-embedding-hash',
+    now,
+    now
+  );
+  db.prepare(
+    `INSERT INTO passages (
+      passage_id, nodus_id, chunk_index, text, page_label, char_len, content_hash,
+      embedding, embedding_provider, embedding_model, embedding_dim, embedding_text_hash, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    'passage-default',
+    'work-default',
+    0,
+    'Passage',
+    '1',
+    7,
+    'passage-hash',
+    Buffer.from([9, 10, 11, 12]),
+    'openai',
+    'text-embedding-3-small',
+    4,
+    'passage-embedding-hash',
+    now
+  );
 }

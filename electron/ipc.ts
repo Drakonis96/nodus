@@ -148,8 +148,10 @@ import {
   deleteVault,
   getActiveVault,
   getVault,
+  importVaultDataBetweenVaults,
   listVaults,
   renameVault,
+  resetVaultDatabase,
   setActiveVault,
 } from './vaults/vaultRegistry';
 
@@ -191,6 +193,23 @@ function vaultBusyMessage(): string | null {
   return null;
 }
 
+function vaultSwitchMessage(
+  base: string,
+  copiedProviders: VaultSwitchResult['copiedProviders'],
+  importedData: VaultSwitchResult['importedData']
+): string {
+  const parts = [base];
+  if (copiedProviders.length > 0) parts.push(`Claves API copiadas: ${copiedProviders.length}.`);
+  if (importedData) {
+    parts.push(
+      importedData.importedRows > 0
+        ? `Datos analizados importados: ${importedData.importedRows} filas.`
+        : 'No había datos analizados nuevos que importar.'
+    );
+  }
+  return parts.join(' ');
+}
+
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -210,12 +229,22 @@ export function registerIpc(
     }
 
     const sourceVaultId = options?.copyApiKeysFromVaultId?.trim() || null;
+    const importSourceVaultId = options?.importDataFromVaultId?.trim() || null;
     if (sourceVaultId && sourceVaultId !== id && !getVault(sourceVaultId)) {
       return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
     }
+    if (importSourceVaultId && importSourceVaultId !== id && !getVault(importSourceVaultId)) {
+      return { ok: false, message: 'No se encontró la bóveda de origen de los datos analizados.', copiedProviders: [] };
+    }
 
     let copiedProviders: VaultSwitchResult['copiedProviders'] = [];
+    let importedData: VaultSwitchResult['importedData'] = null;
     if (getActiveVault().id === id) {
+      if (importSourceVaultId && importSourceVaultId !== id) {
+        const busy = vaultBusyMessage();
+        if (busy) return { ok: false, message: busy, copiedProviders: [], importedData: null };
+        importedData = importVaultDataBetweenVaults(importSourceVaultId, id);
+      }
       if (sourceVaultId && sourceVaultId !== id) {
         copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
       }
@@ -223,11 +252,10 @@ export function registerIpc(
       emitVaultChanged();
       return {
         ok: true,
-        message: copiedProviders.length
-          ? 'Claves API cargadas en la bóveda activa.'
-          : 'Esta bóveda ya está cargada.',
+        message: vaultSwitchMessage('Esta bóveda ya está cargada.', copiedProviders, importedData),
         activeVault,
         copiedProviders,
+        importedData,
       };
     }
 
@@ -239,6 +267,9 @@ export function registerIpc(
         return { ok: false, message: 'No se encontró la bóveda de origen de las claves API.', copiedProviders: [] };
       }
       copiedProviders = copyApiKeysBetweenVaults(sourceVaultId, id);
+    }
+    if (importSourceVaultId && importSourceVaultId !== id) {
+      importedData = importVaultDataBetweenVaults(importSourceVaultId, id);
     }
 
     stopRealtimeSync();
@@ -258,11 +289,10 @@ export function registerIpc(
     emitVaultChanged();
     return {
       ok: true,
-      message: copiedProviders.length
-        ? `Bóveda cargada. Claves API copiadas: ${copiedProviders.length}.`
-        : 'Bóveda cargada.',
+      message: vaultSwitchMessage('Bóveda cargada.', copiedProviders, importedData),
       activeVault,
       copiedProviders,
+      importedData,
     };
   };
 
@@ -313,6 +343,38 @@ export function registerIpc(
   });
   h('vaults:delete', async (_e, id: string, deleteFiles?: boolean) => {
     deleteVault(id, Boolean(deleteFiles));
+  });
+  h('vaults:reset', async (_e, id: string) => {
+    const target = getVault(id);
+    if (!target) throw new Error('Bóveda no encontrada.');
+    if (target.active) {
+      const busy = vaultBusyMessage();
+      if (busy) throw new Error(busy);
+      stopRealtimeSync();
+      await stopMcpServer();
+      await stopCopilotServer();
+      closeDb();
+      const reset = resetVaultDatabase(id);
+      getDb();
+      reconcileAuthorLayerOnce();
+      const settings = getSettings();
+      if (settings.syncMode === 'realtime') startRealtimeSync();
+      if (settings.mcpEnabled) void startMcpServer();
+      if (settings.copilotEnabled) void startCopilotServer();
+      emitVaultChanged();
+      return withVaultKeyProviders(reset);
+    }
+    return withVaultKeyProviders(resetVaultDatabase(id));
+  });
+  h('vaults:importData', async (_e, sourceVaultId: string, targetVaultId: string) => {
+    const activeId = getActiveVault().id;
+    if (sourceVaultId === activeId || targetVaultId === activeId) {
+      const busy = vaultBusyMessage();
+      if (busy) throw new Error(busy);
+    }
+    const result = importVaultDataBetweenVaults(sourceVaultId, targetVaultId);
+    if (targetVaultId === activeId) emitVaultChanged();
+    return result;
   });
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),
