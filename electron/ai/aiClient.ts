@@ -48,21 +48,49 @@ type TextDeltaHandler = (delta: string, kind?: 'content' | 'reasoning') => void;
 const LANGUAGE_DIRECTIVE: Record<string, string> = {
   en: `
 
-═══ OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
-Write ALL natural-language / free-text output fields in English, regardless of the
-source document's language. This includes label, statement, development, summary,
-rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT
-write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must
-be copied EXACTLY in the source language — never translate quotes. JSON keys and
-enum values stay exactly as specified.`,
+═══ IDIOMA DE SALIDA — PRIORIDAD MÁXIMA / OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
+[ES] Escribe TODOS los campos de salida de texto libre / lenguaje natural en INGLÉS, independientemente del idioma del documento de origen. Esto incluye: label, statement, development, summary, rationale, explanation, notes, title, body, reason y cualquier prosa que produzcas. NO escribas en español. La ÚNICA excepción: cualquier campo de "quote" / evidencia literal debe ser copiado EXACTAMENTE en el idioma original de la fuente (nunca traduzcas citas). Las claves JSON y los valores enum se mantienen exactamente como se especifican.
+[EN] Write ALL natural-language / free-text output fields in English, regardless of the source document's language. This includes label, statement, development, summary, rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must be copied EXACTLY in the source language — never translate quotes. JSON keys and enum values stay exactly as specified.`,
+  fr: `
+
+═══ IDIOMA DE SALIDA — PRIORIDAD MÁXIMA / OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
+[ES] Escribe TODOS los campos de salida de texto libre / lenguaje natural en FRANCÉS, independientemente del idioma del documento de origen. Esto incluye: label, statement, development, summary, rationale, explanation, notes, title, body, reason y cualquier prosa que produzcas. NO escribas en español. La ÚNICA excepción: cualquier campo de "quote" / evidencia literal debe ser copiado EXACTAMENTE en el idioma original de la fuente (nunca traduzcas citas). Las claves JSON y los valores enum se mantienen exactamente como se especifican.
+[EN] Write ALL natural-language / free-text output fields in French, regardless of the source document's language. This includes label, statement, development, summary, rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must be copied EXACTLY in the source language — never translate quotes. JSON keys and enum values stay exactly as specified.`,
+  tr: `
+
+═══ IDIOMA DE SALIDA — PRIORIDAD MÁXIMA / OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
+[ES] Escribe TODOS los campos de salida de texto libre / lenguaje natural en TURCO, independientemente del idioma del documento de origen. Esto incluye: label, statement, development, summary, rationale, explanation, notes, title, body, reason y cualquier prosa que produzcas. NO escribas en español. La ÚNICA excepción: cualquier campo de "quote" / evidencia literal debe ser copiado EXACTAMENTE en el idioma original de la fuente (nunca traduzcas citas). Las claves JSON y los valores enum se mantienen exactamente como se especifican.
+[EN] Write ALL natural-language / free-text output fields in Turkish, regardless of the source document's language. This includes label, statement, development, summary, rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must be copied EXACTLY in the source language — never translate quotes. JSON keys and enum values stay exactly as specified.`,
   es: '',
 };
 
 function withPromptLanguage<T extends { system: string }>(opts: T): T {
-  const lang = getSettings().promptLanguage === 'en' ? 'en' : 'es';
+  const lang = getSettings().promptLanguage ?? 'es';
   const directive = LANGUAGE_DIRECTIVE[lang];
-  if (!directive) return opts;
-  return { ...opts, system: `${opts.system}${directive}` };
+  let system = opts.system;
+  if (lang !== 'es') {
+    let target = 'español';
+    if (lang === 'en') target = 'inglés';
+    else if (lang === 'fr') target = 'francés';
+    else if (lang === 'tr') target = 'turco';
+
+    system = system
+      .replace(/en español/gi, `en ${target}`)
+      .replace(/espanol/gi, target)
+      .replace(/español/gi, target);
+  }
+  if (!directive) return { ...opts, system };
+
+  let prefix = '';
+  if (lang === 'en') {
+    prefix = '═══ IMPORTANT: WRITE ENTIRELY IN ENGLISH ═══\n';
+  } else if (lang === 'fr') {
+    prefix = '═══ IMPORTANT: ÉCRIRE ENTIÈREMENT EN FRANÇAIS ═══\n';
+  } else if (lang === 'tr') {
+    prefix = '═══ ÖNEMLİ: TAMAMEN TÜRKÇE YAZIN (WRITE ENTIRELY IN TURKISH) ═══\n';
+  }
+
+  return { ...opts, system: `${prefix}${system}${directive}` };
 }
 
 /** Resolve which model to use: explicit override, else the configured default. */
@@ -453,9 +481,9 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
     defaultHeaders:
       provider === 'openrouter'
         ? {
-            'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
-            'X-Title': 'Nodus',
-          }
+          'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
+          'X-Title': 'Nodus',
+        }
         : undefined,
   });
   const res = await client.embeddings.create({ model: modelId, input });

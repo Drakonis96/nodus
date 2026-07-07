@@ -181,7 +181,7 @@ export async function generateWritingWorkshopDraft(request: WritingWorkshopDraft
 
   const system = [
     'Eres el Taller de escritura de Nodus. Ayudas a convertir un grafo academico local en un borrador verificable.',
-    'Debes escribir en espanol salvo que el campo language pida otra lengua.',
+    'Debes escribir en el idioma especificado en el campo brief.lengua (es: espanol, en: ingles, fr: frances, tr: turco).',
     'Usa SOLO los materiales recibidos. No inventes obras, autores, citas, paginas ni relaciones.',
     'Los campos resumen_orientacion son solo para ubicar una obra: NUNCA son evidencia ni una fuente citable. Para afirmaciones sustantivas usa ideas, evidencias, huecos o contradicciones anclados.',
     'Cada afirmacion sustantiva del borrador debe ir ligada a una fuente mediante enlaces Markdown nodus://.',
