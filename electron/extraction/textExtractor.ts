@@ -498,7 +498,7 @@ export async function probeWorkTextAvailability(
   for (const att of textAttachments) {
     if (!att.filename) continue;
     const filePath = path.join(effectiveStorage, att.key, att.filename);
-    if (fs.existsSync(filePath) && /\.(epub|txt|md|markdown|docx)$/i.test(att.filename)) {
+    if (fs.existsSync(filePath) && /\.(pdf|epub|txt|md|markdown|docx)$/i.test(att.filename)) {
       return { available: true, sourceType: attachmentSourceType(att), reason: 'local_file' };
     }
   }
@@ -566,7 +566,8 @@ export async function resolveWorkText(
     if (!fs.existsSync(filePath)) continue;
     try {
       docs.push(await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf }));
-    } catch {
+    } catch (e) {
+      console.error(`[resolveWorkText] Error extracting from ${filePath}:`, e);
       /* skip unreadable attachment */
     }
   }

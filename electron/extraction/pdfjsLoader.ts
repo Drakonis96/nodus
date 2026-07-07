@@ -3,7 +3,8 @@ import fs from 'node:fs';
 // Single place to load the pdfjs legacy build (no DOM) and open a document.
 // pdfjs is an ESM-only package; dynamic import keeps it external to the main bundle.
 export async function loadPdfjs(): Promise<any> {
-  return import('pdfjs-dist/legacy/build/pdf.mjs');
+  const dynamicImport = new Function('specifier', 'return import(specifier)');
+  return dynamicImport('pdfjs-dist/legacy/build/pdf.mjs');
 }
 
 export async function openPdf(filePath: string): Promise<any> {

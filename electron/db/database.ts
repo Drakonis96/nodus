@@ -1,13 +1,21 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
-import { app } from 'electron';
+import os from 'node:os';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
+
+let app: any = null;
+try {
+  app = require('electron').app;
+} catch {
+  // fallback for node scripts
+}
 
 let db: Database.Database | null = null;
 
 export function dbPath(): string {
-  return path.join(app.getPath('userData'), 'nodus.sqlite');
+  const userData = app ? app.getPath('userData') : path.join(os.homedir(), '.config', 'nodus');
+  return path.join(userData, 'nodus.sqlite');
 }
 
 /** Cosine similarity between two Float32 BLOBs, computed inside SQLite. */
@@ -37,9 +45,10 @@ function openDatabase(file: string): Database.Database {
 
 export function getDb(): Database.Database {
   if (!db) {
-    const dir = app.getPath('userData');
+    const target = dbPath();
+    const dir = path.dirname(target);
     fs.mkdirSync(dir, { recursive: true });
-    db = openDatabase(dbPath());
+    db = openDatabase(target);
   }
   return db;
 }
