@@ -23,6 +23,11 @@ const STEPS: TourStep[] = [
     body: '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.',
   },
   {
+    target: 'vaults',
+    title: 'Bóvedas independientes',
+    body: 'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.',
+  },
+  {
     target: 'nav-graph',
     view: 'graph',
     title: 'El grafo de ideas',
@@ -77,6 +82,10 @@ const STEPS: TourStep[] = [
     view: 'notes',
     title: 'Tu espacio de notas',
     body: 'Crea carpetas y notas en Markdown. Captura respuestas del asistente, borradores del taller de escritura, síntesis de debates e ideas individuales. Las citas internas (nodus://) permanecen clicables.',
+  },
+  {
+    title: 'Y hay mucho más',
+    body: 'Esto es solo la mecánica básica. Nodus incluye también Autores (fichas y matriz de síntesis), un Laboratorio de hipótesis, Mapa de argumentos, Debates, Cobertura de tu pregunta, Ruta de lectura, un Taller de escritura con Deep Research y Proyectos de manuscrito con verificador de citas. ¿Quieres el recorrido completo de este flujo? Lánzalo desde Ajustes → Ayuda → Tutorial avanzado.',
   },
   {
     title: '¡Listo para empezar!',

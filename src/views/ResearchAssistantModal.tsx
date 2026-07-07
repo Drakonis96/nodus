@@ -206,6 +206,11 @@ export function ResearchAssistantModal({
   // racing React state updates.
   const messagesRef = useRef<UiMessage[]>([]);
   messagesRef.current = messages;
+  // Mirrors `activeId` so in-flight stream callbacks only touch the UI while their
+  // own conversation is on screen — this lets the user switch chats mid-response
+  // without the stream overwriting the conversation they switched to.
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
 
   const availableModels = useMemo(() => {
     const models: ModelRef[] = [];
@@ -329,7 +334,6 @@ export function ResearchAssistantModal({
   }, [initialTarget]);
 
   const loadConversation = async (id: string) => {
-    if (sending) return;
     const conversation = await window.nodus.getConversation(id);
     if (!conversation) {
       await refreshConversations();
@@ -408,6 +412,7 @@ export function ResearchAssistantModal({
         { messages: requestMessages, selection, model: selectedModel },
         {
           onDelta: (delta) => {
+            if (activeIdRef.current !== conversationId) return; // user switched away
             setMessages((current) =>
               current.map((message) =>
                 message.id === assistantId ? { ...message, content: message.content + delta } : message
@@ -416,6 +421,7 @@ export function ResearchAssistantModal({
             window.setTimeout(updateJumpIndicator, 0);
           },
           onReasoning: (delta) => {
+            if (activeIdRef.current !== conversationId) return;
             setMessages((current) =>
               current.map((message) =>
                 message.id === assistantId ? { ...message, reasoning: (message.reasoning ?? '') + delta } : message
@@ -429,8 +435,10 @@ export function ResearchAssistantModal({
         userMessage,
         { id: assistantId, role: 'assistant', content: response.answer, selectionKey, stats: response.stats },
       ];
-      setMessages(finalMessages);
-      window.setTimeout(updateJumpIndicator, 0);
+      if (activeIdRef.current === conversationId) {
+        setMessages(finalMessages);
+        window.setTimeout(updateJumpIndicator, 0);
+      }
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
       const errorMessage: UiMessage = {
@@ -441,8 +449,10 @@ export function ResearchAssistantModal({
         error: true,
       };
       const finalMessages = [...priorMessages, userMessage, errorMessage];
-      setMessages(finalMessages);
-      window.setTimeout(updateJumpIndicator, 0);
+      if (activeIdRef.current === conversationId) {
+        setMessages(finalMessages);
+        window.setTimeout(updateJumpIndicator, 0);
+      }
       await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);

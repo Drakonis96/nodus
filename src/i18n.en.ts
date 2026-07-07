@@ -17,6 +17,63 @@ export const EN: Record<string, string> = {
   Ajustes: 'Settings',
   Buscar: 'Search',
   Proyectos: 'Projects',
+  Hipótesis: 'Hypotheses',
+
+  // ── Hypothesis lab ───────────────────────────────────────────────────────
+  'Laboratorio de hipótesis': 'Hypothesis lab',
+  'Generar hipótesis': 'Generate hypotheses',
+  'Generando…': 'Generating…',
+  'Objetivo, tema, pregunta o intuición de investigación...': 'Objective, topic, question or research intuition...',
+  Exploratoria: 'Exploratory',
+  Causal: 'Causal',
+  Comparativa: 'Comparative',
+  Metodológica: 'Methodological',
+  Intervención: 'Intervention',
+  '{n} candidatas': '{n} candidates',
+  '{n} candidatas · {g} huecos · {i} ideas · {d} debates': '{n} candidates · {g} gaps · {i} ideas · {d} debates',
+  refinada: 'refined',
+  estructural: 'structural',
+  'sin modelo': 'no model',
+  Candidatas: 'Candidates',
+  'Leyendo señales del corpus…': 'Reading corpus signals...',
+  'Genera una primera mesa de hipótesis desde tus huecos, ideas y debates.':
+    'Generate an initial hypothesis board from your gaps, ideas and debates.',
+  'Aún no hay hipótesis generadas.': 'No hypotheses generated yet.',
+  Semilla: 'Seed',
+  Prometedora: 'Promising',
+  Contrastable: 'Testable',
+  'Lista para contrastar': 'Ready',
+  Novedad: 'Novelty',
+  Soporte: 'Support',
+  Test: 'Test',
+  Riesgo: 'Risk',
+  Testeabilidad: 'Testability',
+  'score {n}': 'score {n}',
+  'Ver evidencia': 'View evidence',
+  Evaluar: 'Evaluate',
+  'Hipótesis propuesta': 'Proposed hypothesis',
+  Racionalidad: 'Rationale',
+  Dossier: 'Dossier',
+  Variables: 'Variables',
+  'Variables y mecanismo': 'Variables and mechanism',
+  'Métodos posibles': 'Possible methods',
+  Predicciones: 'Predictions',
+  Objeciones: 'Objections',
+  'Próximos pasos': 'Next steps',
+  Búsquedas: 'Searches',
+  Hueco: 'Gap',
+  Idea: 'Idea',
+  Pasaje: 'Passage',
+  Proyecto: 'Project',
+  'Sin elementos.': 'No items.',
+  fenómeno: 'phenomenon',
+  contexto: 'context',
+  condición: 'condition',
+  mecanismo: 'mechanism',
+  resultado: 'outcome',
+  caso: 'case',
+  'Evalúa esta hipótesis de investigación con mi corpus. Busca objeciones, fuentes clave, operacionalización y próximos pasos:':
+    'Evaluate this research hypothesis against my corpus. Look for objections, key sources, operationalization and next steps:',
 
   // ── Demo mode ──────────────────────────────────────────────────────────────────
   'Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.':
@@ -99,6 +156,11 @@ export const EN: Record<string, string> = {
   'Escribe una sub-pregunta…': 'Write a sub-question…',
   Subir: 'Move up',
   Bajar: 'Move down',
+  Mostrar: 'Show',
+  Ocultar: 'Hide',
+  'Barra lateral': 'Sidebar',
+  'Reordena u oculta las secciones del menú lateral. «Inicio» queda siempre la primera y «Ajustes» la última; ninguna de las dos puede moverse ni ocultarse.':
+    'Reorder or hide the sidebar sections. “Home” always stays first and “Settings” last; neither can be moved or hidden.',
   'Ver en Debates': 'View in Debates',
   'Esta sub-pregunta no está cubierta por mi biblioteca. Sugiere cómo abordarla y qué tipo de fuentes buscar.':
     'This sub-question is not covered by my library. Suggest how to address it and what kind of sources to look for.',
@@ -123,6 +185,55 @@ export const EN: Record<string, string> = {
   'El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.':
     'The Nodus bridge (preload) is unavailable. The app cannot talk to its backend.',
   'No se pudieron cargar los ajustes: {msg}': 'Could not load settings: {msg}',
+  'Bóveda activa': 'Active vault',
+  Bóveda: 'Vault',
+  Bóvedas: 'Vaults',
+  Activa: 'Active',
+  'Sin bóveda activa': 'No active vault',
+  'Al cargar, copiar claves API desde': 'When loading, copy API keys from',
+  Cargar: 'Load',
+  'Nueva bóveda': 'New vault',
+  Duplicar: 'Duplicate',
+  'Cargar claves': 'Load keys',
+  'Traer claves a la bóveda activa': 'Bring keys into the active vault',
+  'Reutilizar análisis de otras bóvedas': 'Reuse analysis from other vaults',
+  'Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.':
+    'Looks for matches in other vaults and, if it finds ideas, embeddings, summaries or passages that were already generated, imports them before using AI.',
+  'Análisis reutilizado desde otras bóvedas para {n} obra(s).': 'Analysis reused from other vaults for {n} work(s).',
+  'No se encontró análisis reutilizable en otras bóvedas para la selección.':
+    'No reusable analysis was found in other vaults for the selection.',
+  'Zona peligrosa': 'Danger zone',
+  'Vault objetivo': 'Target vault',
+  Reinicializar: 'Reset',
+  'La bóveda activa no se puede eliminar. Carga otra bóveda antes.':
+    'The active vault cannot be deleted. Load another vault first.',
+  'La bóveda principal no se puede eliminar; puedes reinicializarla.':
+    'The primary vault cannot be deleted; you can reset it instead.',
+  'Eliminar bóveda': 'Delete vault',
+  'Reinicializar bóveda': 'Reset vault',
+  'Esta acción eliminará la bóveda "{name}" y sus archivos locales. No afecta a otras bóvedas.':
+    'This will delete the vault "{name}" and its local files. It does not affect other vaults.',
+  'Esta acción borrará el contenido de "{name}" y recreará su base de datos vacía. No afecta a otras bóvedas.':
+    'This will erase the contents of "{name}" and recreate its empty database. It does not affect other vaults.',
+  Continuar: 'Continue',
+  'Introduce este código manualmente': 'Enter this code manually',
+  'Código de seguridad': 'Security code',
+  'No se puede pegar aquí. Escribe las cuatro cifras manualmente.':
+    'You cannot paste here. Type the four digits manually.',
+  'Código incorrecto.': 'Incorrect code.',
+  'Escribe las cuatro cifras para continuar.': 'Type the four digits to continue.',
+  'Código correcto. Confirma una última vez para ejecutar la acción.':
+    'Code accepted. Confirm one last time to run the action.',
+  'Eliminar definitivamente': 'Delete permanently',
+  'Reinicializar definitivamente': 'Reset permanently',
+  'Bóveda eliminada.': 'Vault deleted.',
+  'Bóveda reinicializada.': 'Vault reset.',
+  'Escribe un nombre para la bóveda.': 'Enter a vault name.',
+  'Bóveda renombrada.': 'Vault renamed.',
+  'Bóveda duplicada con sus datos y claves API.': 'Vault duplicated with its data and API keys.',
+  'La bóveda seleccionada no tiene claves API guardadas.': 'The selected vault has no saved API keys.',
+  'sin claves': 'no keys',
+  'Claves API cargadas en la bóveda activa.': 'API keys loaded into the active vault.',
   // ── Settings ───────────────────────────────────────────────────────────────
   'Lo básico queda separado de los parámetros técnicos de análisis y extracción.':
     'The essentials are kept separate from the technical analysis and extraction parameters.',
@@ -303,6 +414,9 @@ export const EN: Record<string, string> = {
   '¡Bienvenido a Nodus!': 'Welcome to Nodus!',
   '¿Es tu primera vez? En menos de un minuto te enseño cómo convertir tu biblioteca de Zotero en un grafo de ideas. Puedes saltártelo cuando quieras.':
     'First time here? In under a minute I’ll show you how to turn your Zotero library into a graph of ideas. You can skip it anytime.',
+  'Bóvedas independientes': 'Independent vaults',
+  'Cada bóveda es un espacio separado: biblioteca, grafo, notas, proyectos, chats, ajustes, embeddings y claves API pueden vivir aislados. Usa este selector para crear otra, cambiar de bóveda o cargar claves desde una bóveda anterior.':
+    'Each vault is a separate space: library, graph, notes, projects, chats, settings, embeddings and API keys can stay isolated. Use this selector to create another vault, switch vaults or load keys from a previous one.',
   'El grafo de ideas': 'The idea graph',
   'Es el corazón de Nodus. Cada nodo es una idea extraída de tus lecturas y cada arista una relación entre ellas. Empieza vacío: se llena a medida que escaneas obras a fondo.':
     'It’s the heart of Nodus. Each node is an idea drawn from your reading and each edge a relationship between them. It starts empty and fills up as you deep-scan works.',
@@ -369,6 +483,26 @@ export const EN: Record<string, string> = {
   'Inicio: tu panel de mando': 'Home: your control panel',
   'Inicio resume el estado de tu corpus, los análisis pendientes y el siguiente paso recomendado. La investigación es iterativa: escaneas más obras, vuelven a aparecer ideas y huecos, refinas la ruta y el borrador. Vuelve aquí entre vueltas. Puedes relanzar este recorrido cuando quieras desde Ajustes → Ayuda.':
     'Home summarizes the state of your corpus, pending analyses and the recommended next step. Research is iterative: you scan more works, new ideas and gaps appear, you refine the path and the draft. Come back here between rounds. You can replay this tour anytime from Settings → Help.',
+  'Mantén el grafo limpio: fusiona duplicados': 'Keep the graph clean: merge duplicates',
+  'Tras escanear muchas obras, una misma idea puede aparecer repetida con etiquetas casi iguales e inflar el grafo. Desde Grafo → Ideas → «Duplicados», Nodus agrupa las ideas idénticas, te deja elegir cuál conservar y las fusiona sin pérdida —consolidando su evidencia y sus conexiones— tras crear una copia de seguridad automática. Un grafo más limpio se lee y se razona mejor.':
+    'After scanning many works, the same idea can appear repeated with almost identical labels and bloat the graph. From Graph → Ideas → “Duplicates”, Nodus groups identical ideas, lets you choose which one to keep and merges them losslessly —consolidating their evidence and connections— after taking an automatic backup. A cleaner graph is easier to read and reason over.',
+  'Autores: quién sostiene cada idea': 'Authors: who backs each idea',
+  'Cambia el foco de las ideas a las voces. En Autores tienes una ficha por autor —su tesis, qué aporta y cómo se posiciona— y una matriz de síntesis que cruza autores con temas para ver de un vistazo quién defiende qué. Es la forma de mapear escuelas, alianzas y disidencias antes de situar tu propia voz.':
+    'Shift the focus from ideas to voices. In Authors you get a dossier per author —their thesis, what they contribute and how they position themselves— and a synthesis matrix crossing authors with themes to see at a glance who argues what. It’s how you map schools, alliances and dissent before situating your own voice.',
+  'Laboratorio de hipótesis: del hueco a una proposición contrastable':
+    'Hypothesis Lab: from a gap to a testable proposition',
+  'Aquí Nodus toma tus huecos, ideas y debates y propone hipótesis de investigación comprobables: cada candidata trae sus variables, métodos posibles, predicciones, objeciones y próximos pasos, siempre anclada a la evidencia de tu corpus. Es el puente entre «he detectado un hueco» y «esta es la afirmación que voy a defender».':
+    'Here Nodus takes your gaps, ideas and debates and proposes testable research hypotheses: each candidate comes with its variables, possible methods, predictions, objections and next steps, always grounded in your corpus’s evidence. It’s the bridge between “I’ve spotted a gap” and “this is the claim I’m going to defend”.',
+  'Deep Research: un informe citado de principio a fin': 'Deep Research: a cited report from end to end',
+  'Dentro de Escritura, el modo Deep Research orquesta un informe extenso y multi-apartado sobre una pregunta: planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.':
+    'Inside Writing, Deep Research mode orchestrates a long, multi-section report on a question: it plans the sections, gathers your corpus’s evidence and writes with checkable citations. Ideal when you need a solid, traceable state of the art, not just a stray paragraph.',
+  'Proyectos: ensambla el manuscrito con verificador de citas':
+    'Projects: assemble the manuscript with a citation verifier',
+  'Un Proyecto convierte tu trabajo en un manuscrito estructurado —carpetas y secciones en Notas—, importa capítulos con versiones recuperables y, sobre cada capítulo, sugiere solo citas verificables contra el texto original, bloqueando las que no puede sostener. Es tu red de seguridad contra la cita fantasma cuando ya estás redactando.':
+    'A Project turns your work into a structured manuscript —folders and sections in Notes—, imports chapters with recoverable versions and, on each chapter, suggests only citations verifiable against the original text, blocking those it can’t support. It’s your safety net against the phantom citation once you’re actually drafting.',
+  'Y hay mucho más': 'And there’s much more',
+  'Esto es solo la mecánica básica. Nodus incluye también Autores (fichas y matriz de síntesis), un Laboratorio de hipótesis, Mapa de argumentos, Debates, Cobertura de tu pregunta, Ruta de lectura, un Taller de escritura con Deep Research y Proyectos de manuscrito con verificador de citas. ¿Quieres el recorrido completo de este flujo? Lánzalo desde Ajustes → Ayuda → Tutorial avanzado.':
+    'This is just the basic mechanics. Nodus also includes Authors (dossiers and synthesis matrix), a Hypothesis Lab, Argument Map, Debates, coverage of your question, Reading Path, a Writing Workshop with Deep Research and manuscript Projects with a citation verifier. Want the full walkthrough of this flow? Launch it from Settings → Help → Advanced tutorial.',
   // ── Onboarding ─────────────────────────────────────────────────────────────
   'Conectar Zotero': 'Connect Zotero',
   Lecturas: 'Reading',
@@ -695,6 +829,21 @@ export const EN: Record<string, string> = {
   'Fusionar todos los duplicados': 'Merge all duplicates',
   'Se fusionarán {g} grupo(s), conservando en cada uno la copia marcada y reasignando sus ideas, evidencia y etiquetas. Las {n} copias sobrantes se eliminarán de la biblioteca de Nodus (Zotero no se modifica). ¿Continuar?':
     'This will merge {g} group(s), keeping the marked copy in each and re-pointing its ideas, evidence and tags. The {n} surplus copies will be removed from the Nodus library (Zotero is not modified). Continue?',
+  Duplicados: 'Duplicates',
+  'Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado':
+    'Find and merge duplicate ideas to clean up the graph and the list',
+  'Ideas duplicadas': 'Duplicate ideas',
+  'Buscando ideas duplicadas…': 'Looking for duplicate ideas…',
+  'No se han encontrado ideas duplicadas.': 'No duplicate ideas found.',
+  '{g} grupo(s) · {n} idea(s) duplicadas a fusionar': '{g} group(s) · {n} duplicate idea(s) to merge',
+  'Solo se agrupan ideas con la misma etiqueta y el mismo tipo. La evidencia se conserva íntegra al fusionar.':
+    'Only ideas with the same label and type are grouped. Evidence is fully preserved on merge.',
+  'Misma etiqueta': 'Same label',
+  'Copia de seguridad creada antes de fusionar:': 'Backup created before merging:',
+  '{n} evidencia(s)': '{n} evidence',
+  'Fusionar todas las ideas duplicadas': 'Merge all duplicate ideas',
+  'Se hará primero una copia de seguridad completa de la base de datos. Después se fusionarán {g} grupo(s), conservando en cada uno la idea marcada y reasignándole toda la evidencia, ocurrencias, temas y conexiones del grafo de las {n} copias sobrantes, que se eliminarán. La evidencia no se pierde. ¿Continuar?':
+    'A full database backup is taken first. Then {g} group(s) will be merged, keeping the marked idea in each and re-pointing all evidence, occurrences, themes and graph connections from the {n} surplus copies, which are then removed. No evidence is lost. Continue?',
   'Seleccionar los {n} resultados filtrados': 'Select the {n} filtered results',
   Título: 'Title',
   Autores: 'Authors',
@@ -1426,6 +1575,34 @@ export const EN: Record<string, string> = {
     'Analyzed {n} chapter idea(s) and their relations with the library.',
   matiza: 'refines',
   'amplía': 'extends',
+  // Manuscript verifier
+  Verificación: 'Verification',
+  'Verificar citas': 'Verify citations',
+  'Revisado con IA': 'AI-reviewed',
+  'Revisión determinista': 'Deterministic review',
+  'Detecta afirmaciones del capítulo, comprueba si ya tienen cita y solo marca las que coinciden con ideas o pasajes del corpus.':
+    'Detect chapter claims, check whether they already have a citation, and only flag those matching corpus ideas or passages.',
+  Afirmaciones: 'Claims',
+  'Faltan citas': 'Missing citations',
+  Cubiertas: 'Covered',
+  'Aportación propia': 'Own contribution',
+  'No hay suficientes señales del corpus para verificar este capítulo.':
+    'There are not enough corpus signals to verify this chapter.',
+  'Verificadas {n} afirmaciones; {m} necesitan cita.':
+    'Verified {n} claims; {m} need citations.',
+  'Verifica el capítulo contra tu corpus antes de cerrar el manuscrito o exportarlo.':
+    'Verify the chapter against your corpus before closing the manuscript or exporting it.',
+  'No se encontraron afirmaciones que requieran revisión de citas.':
+    'No claims requiring citation review were found.',
+  'Falta cita': 'Missing citation',
+  'Cita cubierta': 'Citation covered',
+  'Posible aportación propia': 'Possible own contribution',
+  'Coincidencia débil': 'Weak match',
+  'Con cita': 'Cited',
+  'Párrafo {p} · frase {s}': 'Paragraph {p} · sentence {s}',
+  Sugerencia: 'Suggestion',
+  'Candidatos de cita': 'Citation candidates',
+  'Sin citas sugeridas.': 'No suggested citations.',
   'Eliminar proyecto': 'Delete project',
   'Proyecto eliminado.': 'Project deleted.',
   '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':

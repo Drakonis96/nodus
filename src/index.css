@@ -57,6 +57,7 @@ body {
 .light .text-amber-400 {
   color: #b45309;
 }
+.light .text-red-200,
 .light .text-red-300,
 .light .text-red-400 {
   color: #dc2626;

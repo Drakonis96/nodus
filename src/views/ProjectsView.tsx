@@ -8,6 +8,10 @@ import type {
   ChapterRelationType,
   ChapterSuggestionMode,
   ChapterSuggestionStatus,
+  ManuscriptClaimCheck,
+  ManuscriptClaimStatus,
+  ManuscriptEvidenceCandidate,
+  ManuscriptVerificationResult,
   Project,
   ProjectChapter,
   ProjectChapterVersion,
@@ -25,7 +29,7 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { notifyDataChanged, useDataRefresh } from '../hooks';
 import { t, tx } from '../i18n';
 
-type ChapterTab = 'texto' | 'relaciones' | 'sugerencias' | 'versiones' | 'exportar';
+type ChapterTab = 'texto' | 'relaciones' | 'verificacion' | 'sugerencias' | 'versiones' | 'exportar';
 
 const PROJECT_KIND_OPTIONS: { value: ProjectKind; label: string }[] = [
   { value: 'thesis', label: 'Tesis' },
@@ -46,6 +50,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [versions, setVersions] = useState<ProjectChapterVersion[]>([]);
   const [relations, setRelations] = useState<ChapterRelationsResult | null>(null);
   const [relationsProgress, setRelationsProgress] = useState<ChapterRelationsProgress | null>(null);
+  const [verification, setVerification] = useState<ManuscriptVerificationResult | null>(null);
   const [tab, setTab] = useState<ChapterTab>('texto');
   const [mode, setMode] = useState<ChapterSuggestionMode>('suggest');
   const [chapterExportFormat, setChapterExportFormat] = useState<ChapterExportFormat>('markdown');
@@ -98,9 +103,11 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       setSuggestions([]);
       setVersions([]);
       setRelations(null);
+      setVerification(null);
       return;
     }
     setChapterMarkdown(chapter.currentMarkdown);
+    setVerification(null);
     const [nextSuggestions, nextVersions, nextRelations] = await Promise.all([
       window.nodus.listProjectChapterSuggestions(chapter.id),
       window.nodus.listProjectChapterVersions(chapter.id),
@@ -322,6 +329,31 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     } finally {
       setBusy(null);
       setRelationsProgress(null);
+    }
+  };
+
+  const verifyManuscript = async () => {
+    if (!detail || !selectedChapter) return;
+    setBusy('verify-manuscript');
+    try {
+      const result = await window.nodus.verifyManuscriptCitations({
+        chapterId: selectedChapter.id,
+        model: detail.project.model ?? settings.defaultModel,
+        language: settings.uiLanguage,
+        maxClaims: 80,
+      });
+      setVerification(result);
+      setTab('verificacion');
+      setMessage(
+        !result.available
+          ? t('No hay suficientes señales del corpus para verificar este capítulo.')
+          : tx('Verificadas {n} afirmaciones; {m} necesitan cita.', {
+              n: result.summary.checkedClaims,
+              m: result.summary.missingCitations,
+            })
+      );
+    } finally {
+      setBusy(null);
     }
   };
 
@@ -577,12 +609,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                   <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capitulo seleccionado.')}</div>
                 ) : (
                   <>
-                    <div className="border-b border-neutral-800 p-3 flex items-center gap-2">
+                    <div className="border-b border-neutral-800 p-3 flex flex-wrap items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold truncate">{selectedChapter.title}</div>
                         <div className="text-xs text-neutral-500">{selectedChapter.wordCount} {t('palabras')} · {selectedChapter.originalFileName ?? selectedChapter.sourceFormat}</div>
                       </div>
-                      {(['texto', 'relaciones', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
+                      {(['texto', 'relaciones', 'verificacion', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
                         <button
                           key={item}
                           className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
@@ -642,6 +674,61 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                           {(!relations || !relations.analyzed) && busy !== 'relations' && (
                             <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
                               {t('Analiza las relaciones para ver cómo conecta este capítulo con toda tu biblioteca.')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {tab === 'verificacion' && (
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
+                          <button className="btn btn-primary gap-1.5" onClick={() => void verifyManuscript()} disabled={busy === 'verify-manuscript'}>
+                            <Icon name={busy === 'verify-manuscript' ? 'sync' : 'search'} className={busy === 'verify-manuscript' ? 'animate-spin' : ''} /> {t('Verificar citas')}
+                          </button>
+                          {verification && (
+                            <span className="text-xs text-neutral-500">
+                              {verification.aiReviewed ? t('Revisado con IA') : t('Revisión determinista')}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mb-4 max-w-3xl text-xs text-neutral-500">
+                          {t('Detecta afirmaciones del capítulo, comprueba si ya tienen cita y solo marca las que coinciden con ideas o pasajes del corpus.')}
+                        </p>
+
+                        {verification && (
+                          <div className="mb-4 grid grid-cols-2 gap-2 xl:grid-cols-5">
+                            <VerificationStat label={t('Afirmaciones')} value={verification.summary.checkedClaims} />
+                            <VerificationStat label={t('Faltan citas')} value={verification.summary.missingCitations} tone="red" />
+                            <VerificationStat label={t('Cubiertas')} value={verification.summary.covered} tone="green" />
+                            <VerificationStat label={t('Aportación propia')} value={verification.summary.ownArguments} />
+                            <VerificationStat label={t('Coincidencia débil')} value={verification.summary.weakMatches} tone="amber" />
+                          </div>
+                        )}
+
+                        {verification?.warnings.length ? (
+                          <div className="mb-4 space-y-2">
+                            {verification.warnings.map((warning) => (
+                              <div key={warning} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                                <Icon name="alert" size={14} className="mt-0.5" />
+                                <span>{warning}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="space-y-3">
+                          {verification?.claims.map((claim) => (
+                            <ManuscriptClaimCard key={claim.id} claim={claim} onOpen={(target) => setCitation(target)} />
+                          ))}
+                          {!verification && busy !== 'verify-manuscript' && (
+                            <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+                              {t('Verifica el capítulo contra tu corpus antes de cerrar el manuscrito o exportarlo.')}
+                            </div>
+                          )}
+                          {verification && verification.claims.length === 0 && (
+                            <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+                              {t('No se encontraron afirmaciones que requieran revisión de citas.')}
                             </div>
                           )}
                         </div>
@@ -742,6 +829,147 @@ function Stat({ label, value }: { label: string; value: number }) {
       <div className="text-lg font-semibold">{value}</div>
       <div className="text-[11px] text-neutral-500">{label}</div>
     </div>
+  );
+}
+
+function VerificationStat({
+  label,
+  value,
+  tone = 'neutral',
+}: {
+  label: string;
+  value: number;
+  tone?: 'neutral' | 'red' | 'green' | 'amber';
+}) {
+  const toneClass =
+    tone === 'red'
+      ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-200'
+      : tone === 'green'
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+        : tone === 'amber'
+          ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200'
+          : 'border-neutral-200 bg-white text-neutral-900 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100';
+  return (
+    <div className={`rounded-lg border p-3 ${toneClass}`}>
+      <div className="text-xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[11px] text-neutral-500 dark:text-neutral-400">{label}</div>
+    </div>
+  );
+}
+
+const CLAIM_STATUS_ICON: Record<ManuscriptClaimStatus, string> = {
+  missing_citation: 'alert',
+  covered: 'check',
+  own_argument: 'bulb',
+  weak_match: 'search',
+};
+
+function claimStatusMeta(status: ManuscriptClaimStatus): { label: string; className: string } {
+  switch (status) {
+    case 'missing_citation':
+      return {
+        label: t('Falta cita'),
+        className: 'border-red-200 bg-red-50 text-red-700 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-200',
+      };
+    case 'covered':
+      return {
+        label: t('Cita cubierta'),
+        className:
+          'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200',
+      };
+    case 'own_argument':
+      return {
+        label: t('Posible aportación propia'),
+        className:
+          'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/30 dark:text-indigo-200',
+      };
+    case 'weak_match':
+      return {
+        label: t('Coincidencia débil'),
+        className:
+          'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200',
+      };
+  }
+}
+
+function ManuscriptClaimCard({
+  claim,
+  onOpen,
+}: {
+  claim: ManuscriptClaimCheck;
+  onOpen: (citation: CitationTarget) => void;
+}) {
+  const meta = claimStatusMeta(claim.status);
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:shadow-none">
+      <div className="flex flex-wrap items-start gap-2">
+        <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${meta.className}`}>
+          <Icon name={CLAIM_STATUS_ICON[claim.status]} size={13} />
+          {meta.label}
+        </span>
+        {claim.hasCitation && <span className="rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-500 dark:border-neutral-800">{t('Con cita')}</span>}
+        <span className="ml-auto text-[11px] text-neutral-500">
+          {tx('Párrafo {p} · frase {s}', { p: claim.paragraphIndex + 1, s: claim.sentenceIndex + 1 })}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">{claim.excerpt}</p>
+      <p className="mt-2 text-xs text-neutral-500">{claim.rationale}</p>
+
+      {claim.existingCitations.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {claim.existingCitations.map((citation) => (
+            <span key={citation} className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+              {citation}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {claim.replacementHint && claim.status === 'missing_citation' && (
+        <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:border-indigo-800/60 dark:bg-indigo-950/30 dark:text-indigo-200">
+          <span className="font-medium">{t('Sugerencia')}:</span> <code>{claim.replacementHint}</code>
+        </div>
+      )}
+
+      <div className="mt-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Candidatos de cita')}</div>
+        {claim.suggestedCitations.length === 0 ? (
+          <div className="text-xs text-neutral-500">{t('Sin citas sugeridas.')}</div>
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {claim.suggestedCitations.map((candidate) => (
+              <EvidenceCandidateButton key={`${candidate.kind}:${candidate.refId}`} candidate={candidate} onOpen={onOpen} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceCandidateButton({
+  candidate,
+  onOpen,
+}: {
+  candidate: ManuscriptEvidenceCandidate;
+  onOpen: (citation: CitationTarget) => void;
+}) {
+  const title = candidate.workTitle && candidate.workTitle !== candidate.label ? `${candidate.label} · ${candidate.workTitle}` : candidate.label;
+  return (
+    <button
+      type="button"
+      className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:bg-neutral-900"
+      onClick={() => onOpen({ kind: candidate.kind, id: candidate.refId })}
+    >
+      <div className="flex items-center gap-2">
+        <Icon name={candidate.kind === 'idea' ? 'bulb' : 'quote'} size={13} className="text-indigo-500 dark:text-indigo-300" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{title}</span>
+        <span className="shrink-0 text-[10px] tabular-nums text-neutral-500">{Math.round(candidate.score * 100)}%</span>
+      </div>
+      <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{candidate.snippet}</p>
+      {candidate.pageLabel && <div className="mt-1 text-[11px] text-neutral-500">{candidate.pageLabel}</div>}
+    </button>
   );
 }
 
@@ -986,6 +1214,8 @@ function tabLabel(tab: ChapterTab): string {
       return t('Texto');
     case 'relaciones':
       return t('Relaciones');
+    case 'verificacion':
+      return t('Verificación');
     case 'sugerencias':
       return t('Sugerencias');
     case 'versiones':

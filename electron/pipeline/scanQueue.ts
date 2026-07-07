@@ -66,6 +66,10 @@ class ScanQueue {
     };
   }
 
+  isBusy(): boolean {
+    return this.running || this.items.some((item) => item.state === 'queued' || item.state === 'running');
+  }
+
   /** Keep active/pending work at the top and completed history at the bottom. */
   private insertPending(item: QueueItem): void {
     const firstTerminal = this.items.findIndex((candidate) =>

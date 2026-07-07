@@ -15,7 +15,7 @@ import {
   type BackupCipherMetadata,
 } from './backupCrypto';
 
-const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 interface ExportManifestBase {
   schemaVersion: number;

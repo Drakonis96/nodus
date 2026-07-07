@@ -1,6 +1,6 @@
 import type { AiProvider, EmbeddingProvider, ModelInfo } from '@shared/types';
 
-export const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+export const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
@@ -8,6 +8,7 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   openrouter: 'OpenRouter',
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
+  xiaomi: 'Xiaomi MiMo',
 };
 
 /**
@@ -25,6 +26,9 @@ export function openAiCompatBase(provider: AiProvider): string | null {
     case 'gemini':
       // Google exposes an OpenAI-compatible surface for chat + embeddings.
       return 'https://generativelanguage.googleapis.com/v1beta/openai';
+    case 'xiaomi':
+      // Xiaomi MiMo's official API is OpenAI-compatible and accepts Bearer auth.
+      return 'https://api.xiaomimimo.com/v1';
     case 'anthropic':
       return null;
   }
@@ -38,7 +42,13 @@ export function openAiCompatBase(provider: AiProvider): string | null {
  * enabling it broadly trades a rare extra round-trip for far fewer JSON-repair calls.
  */
 export function supportsJsonMode(provider: AiProvider): boolean {
-  return provider === 'openai' || provider === 'deepseek' || provider === 'openrouter' || provider === 'gemini';
+  return (
+    provider === 'openai' ||
+    provider === 'deepseek' ||
+    provider === 'openrouter' ||
+    provider === 'gemini' ||
+    provider === 'xiaomi'
+  );
 }
 
 /** How hard a model should "think" before answering. `off` asks reasoning models to
@@ -63,9 +73,16 @@ export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Re
       // it elsewhere 400s and the caller strips it. Omit for "off" (the default).
       return effort === 'off' ? {} : { reasoning_effort: effort };
     case 'deepseek':
+      // DeepSeek V4 is a hybrid model: thinking is ON by default and would slow
+      // scans to a crawl (and waste tokens). Turn it off explicitly for "off";
+      // otherwise pass the requested effort, which V4 honors via reasoning_effort.
+      return effort === 'off' ? { thinking: { type: 'disabled' } } : { reasoning_effort: effort };
+    case 'xiaomi':
+      // Xiaomi MiMo is likewise a reasoning model with a thinking toggle (default ON).
+      // Disable it for scans; leave the model's default for explicit efforts.
+      return effort === 'off' ? { thinking: { type: 'disabled' } } : {};
     case 'anthropic':
-      // DeepSeek selects thinking via the model id (chat vs reasoner); Anthropic uses
-      // its own SDK path. Neither has a usable OpenAI-compat reasoning knob here.
+      // Anthropic uses its own SDK path, not this OpenAI-compat reasoning knob.
       return {};
   }
 }
@@ -101,6 +118,8 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listOpenRouter();
     case 'gemini':
       return listGemini(key);
+    case 'xiaomi':
+      return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false);
   }
 }
 

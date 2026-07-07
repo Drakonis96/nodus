@@ -1,32 +1,23 @@
-import { app, safeStorage } from 'electron';
+import { safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
+import { activeVaultDir, vaultDir } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
 
-const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'];
+const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
+
+function keyFileInDir(dir: string, provider: AiProvider): string {
+  return path.join(dir, `ai_key_${provider}.bin`);
+}
 
 function keyFile(provider: AiProvider): string {
-  return path.join(app.getPath('userData'), `ai_key_${provider}.bin`);
+  return keyFileInDir(activeVaultDir(), provider);
 }
 
-export function setApiKey(provider: AiProvider, key: string): void {
-  if (!key) {
-    clearApiKey(provider);
-    return;
-  }
-  const file = keyFile(provider);
-  if (!safeStorage.isEncryptionAvailable()) {
-    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
-    return;
-  }
-  fs.writeFileSync(file, safeStorage.encryptString(key));
-}
-
-export function getApiKey(provider: AiProvider): string | null {
-  const file = keyFile(provider);
+function readKeyFile(file: string): string | null {
   if (!fs.existsSync(file)) return null;
   const buf = fs.readFileSync(file);
   const asStr = buf.toString('utf8');
@@ -37,6 +28,24 @@ export function getApiKey(provider: AiProvider): string | null {
   } catch {
     return null;
   }
+}
+
+export function setApiKey(provider: AiProvider, key: string): void {
+  if (!key) {
+    clearApiKey(provider);
+    return;
+  }
+  const file = keyFile(provider);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
+    return;
+  }
+  fs.writeFileSync(file, safeStorage.encryptString(key));
+}
+
+export function getApiKey(provider: AiProvider): string | null {
+  return readKeyFile(keyFile(provider));
 }
 
 export function hasApiKey(provider: AiProvider): boolean {
@@ -51,4 +60,25 @@ export function clearApiKey(provider: AiProvider): void {
 /** Map of provider -> whether a key is stored, for the renderer (no keys exposed). */
 export function providerKeyMap(): Record<AiProvider, boolean> {
   return Object.fromEntries(PROVIDERS.map((p) => [p, hasApiKey(p)])) as Record<AiProvider, boolean>;
+}
+
+export function listApiKeyProvidersForVault(vaultId: string): AiProvider[] {
+  const dir = vaultDir(vaultId);
+  if (!dir) return [];
+  return PROVIDERS.filter((provider) => readKeyFile(keyFileInDir(dir, provider)) !== null);
+}
+
+export function copyApiKeysBetweenVaults(sourceVaultId: string, targetVaultId: string): AiProvider[] {
+  const sourceDir = vaultDir(sourceVaultId);
+  const targetDir = vaultDir(targetVaultId);
+  if (!sourceDir || !targetDir) throw new Error('Bóveda no encontrada.');
+  fs.mkdirSync(targetDir, { recursive: true });
+  const copied: AiProvider[] = [];
+  for (const provider of PROVIDERS) {
+    const source = keyFileInDir(sourceDir, provider);
+    if (!fs.existsSync(source) || readKeyFile(source) === null) continue;
+    fs.copyFileSync(source, keyFileInDir(targetDir, provider));
+    copied.push(provider);
+  }
+  return copied;
 }

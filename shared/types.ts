@@ -90,6 +90,31 @@ export interface DuplicateWorkGroup {
   members: DuplicateWorkMember[];
 }
 
+/** One idea inside a duplicate group, with richness signals for review. */
+export interface DuplicateIdeaMember {
+  global_id: string;
+  label: string;
+  statement: string;
+  type: string;
+  /** How many works this idea occurs in. */
+  workCount: number;
+  /** How many evidence rows support it. */
+  evidenceCount: number;
+  /** How many graph edges touch it. */
+  edgeCount: number;
+  /** True for the richest member; pre-selected as the one to keep on merge. */
+  suggestedCanonical: boolean;
+}
+
+/** A set of ideas that look like the same idea, grouped for review-and-merge. */
+export interface DuplicateIdeaGroup {
+  /** Why they were grouped. Phase 1 uses 'label' (identical normalized label + type). */
+  reason: 'label';
+  /** Stable group key, used as a React key in the review modal. */
+  key: string;
+  members: DuplicateIdeaMember[];
+}
+
 /** A non-citable orientation summary derived from already extracted material. */
 export interface WorkSummary {
   nodus_id: string;
@@ -225,7 +250,7 @@ export interface ExternalRef {
 // Settings
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini';
+export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini' | 'xiaomi';
 export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini'>;
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
@@ -334,10 +359,79 @@ export interface AppSettings {
   copilotToken: string;
   /**
    * User-defined order of the sidebar sections, as view ids. Excludes 'home'
-   * (always pinned first). Empty means the default order. Unknown/missing ids
-   * are reconciled against the canonical nav list at render time.
+   * (always pinned first) and 'settings' (always pinned last). Empty means the
+   * default order. Unknown/missing ids are reconciled against the canonical nav
+   * list at render time.
    */
   sidebarOrder: string[];
+  /**
+   * View ids the user has hidden from the sidebar. 'home' and 'settings' can
+   * never be hidden. Hidden sections are simply not rendered in the sidebar nav;
+   * they can be shown again from Settings.
+   */
+  sidebarHidden: string[];
+}
+
+export interface VaultSummary {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
+  lastOpenedAt: string;
+  active: boolean;
+  legacy: boolean;
+  apiKeyProviders: AiProvider[];
+}
+
+export interface CreateVaultInput {
+  name: string;
+}
+
+export interface VaultSwitchOptions {
+  copyApiKeysFromVaultId?: string | null;
+}
+
+export type VaultAnalysisReuseKind =
+  | 'themes'
+  | 'ideas'
+  | 'ideaEmbeddings'
+  | 'summary'
+  | 'passages'
+  | 'relations'
+  | 'authors'
+  | 'synthesis';
+
+export interface VaultAnalysisReuseWorkResult {
+  nodusId: string;
+  matchedVaultId: string | null;
+  matchedVaultName: string | null;
+  matchedSourceNodusId: string | null;
+  imported: VaultAnalysisReuseKind[];
+  importedRows: number;
+  tableRows: Record<string, number>;
+}
+
+export interface VaultAnalysisReuseResult {
+  requested: number;
+  matched: number;
+  imported: number;
+  works: VaultAnalysisReuseWorkResult[];
+}
+
+export interface VaultSwitchResult {
+  ok: boolean;
+  message: string;
+  activeVault?: VaultSummary;
+  copiedProviders: AiProvider[];
+}
+
+export interface VaultCreateResult {
+  vault: VaultSummary;
+}
+
+export interface VaultDuplicateResult {
+  vault: VaultSummary;
+  copiedProviders: AiProvider[];
 }
 
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
@@ -774,6 +868,82 @@ export interface RqMapHandlers {
   onProgress?(progress: RqMapProgress): void;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Hypothesis lab — turns gaps, debates and supporting ideas into testable,
+// evidence-backed research hypotheses. Not persisted as its own table: users can
+// save a generated dossier into Notes, where nodus:// citations remain clickable.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type HypothesisLabMode = 'exploratory' | 'causal' | 'comparative' | 'methodological' | 'intervention';
+export type HypothesisMaturity = 'seed' | 'promising' | 'testable' | 'ready';
+export type HypothesisEvidenceKind = 'gap' | 'idea' | 'debate' | 'work' | 'passage' | 'project';
+export type HypothesisEvidenceRole = 'gap' | 'support' | 'contrast' | 'method' | 'scope' | 'source';
+
+export interface HypothesisLabRequest {
+  objective: string;
+  mode: HypothesisLabMode;
+  projectId?: string | null;
+  language?: AppLanguage;
+  maxCandidates?: number;
+  model?: ModelRef | null;
+}
+
+export interface HypothesisEvidenceLink {
+  kind: HypothesisEvidenceKind;
+  role: HypothesisEvidenceRole;
+  refId: string;
+  label: string;
+  citation: string;
+  quote?: string | null;
+  score?: number | null;
+}
+
+export interface HypothesisVariable {
+  name: string;
+  role: 'phenomenon' | 'context' | 'condition' | 'mechanism' | 'outcome' | 'case' | 'method';
+  description: string;
+}
+
+export interface HypothesisCandidate {
+  id: string;
+  title: string;
+  hypothesis: string;
+  rationale: string;
+  maturity: HypothesisMaturity;
+  score: number;
+  novelty: number;
+  support: number;
+  testability: number;
+  risk: number;
+  variables: HypothesisVariable[];
+  evidence: HypothesisEvidenceLink[];
+  methods: string[];
+  predictions: string[];
+  counterArguments: string[];
+  nextSteps: string[];
+  searchQueries: string[];
+  draftAbstract: string;
+}
+
+export interface HypothesisLabStats {
+  works: number;
+  ideas: number;
+  gaps: number;
+  debates: number;
+  passages: number;
+  projectLinked: boolean;
+  aiRefined: boolean;
+  contextChars: number;
+}
+
+export interface HypothesisLabResult {
+  generatedAt: string;
+  request: HypothesisLabRequest;
+  stats: HypothesisLabStats;
+  candidates: HypothesisCandidate[];
+  warnings: string[];
+}
+
 export interface GapAggregate {
   kind: GapKind;
   statement: string;
@@ -1130,7 +1300,7 @@ export interface ChatConversation extends ChatConversationSummary {
  * draft, debate synthesis, or a single idea) whose Markdown keeps `nodus://`
  * citations so they stay clickable inside the notes editor.
  */
-export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea';
+export type NoteKind = 'markdown' | 'assistant' | 'writing' | 'debate' | 'idea' | 'hypothesis';
 
 /** Optional provenance metadata kept alongside a captured note (model, source ids…). */
 export interface NoteSource {
@@ -1634,6 +1804,71 @@ export interface AnalyzeChapterRelationsRequest {
   model?: ModelRef | null;
   /** Re-extract and recompute even if cached for the current text hash. */
   force?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Manuscript verifier: sentence-level claim checks against indexed/listed corpus
+// ideas and full-text passages. It is deliberately not a "send whole manuscript
+// to the model" feature: the main process extracts candidate claims first and
+// only sends compact claim+evidence batches for optional classification.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ManuscriptClaimStatus = 'missing_citation' | 'covered' | 'own_argument' | 'weak_match';
+export type ManuscriptClaimSeverity = 'high' | 'medium' | 'low' | 'info';
+export type ManuscriptEvidenceKind = 'idea' | 'passage';
+
+export interface ManuscriptEvidenceCandidate {
+  kind: ManuscriptEvidenceKind;
+  refId: string;
+  label: string;
+  citation: string;
+  snippet: string;
+  score: number;
+  workTitle?: string | null;
+  pageLabel?: string | null;
+}
+
+export interface ManuscriptClaimCheck {
+  id: string;
+  excerpt: string;
+  paragraphIndex: number;
+  sentenceIndex: number;
+  hasCitation: boolean;
+  existingCitations: string[];
+  status: ManuscriptClaimStatus;
+  severity: ManuscriptClaimSeverity;
+  rationale: string;
+  suggestedCitations: ManuscriptEvidenceCandidate[];
+  replacementHint?: string | null;
+}
+
+export interface ManuscriptVerificationSummary {
+  totalClaims: number;
+  checkedClaims: number;
+  missingCitations: number;
+  covered: number;
+  ownArguments: number;
+  weakMatches: number;
+  citedClaims: number;
+}
+
+export interface ManuscriptVerificationResult {
+  chapterId: string;
+  generatedAt: string;
+  /** False only when there is no chapter text or no corpus signal to compare against. */
+  available: boolean;
+  /** True when an AI pass refined the deterministic retrieval result. */
+  aiReviewed: boolean;
+  summary: ManuscriptVerificationSummary;
+  claims: ManuscriptClaimCheck[];
+  warnings: string[];
+}
+
+export interface ManuscriptVerificationRequest {
+  chapterId: string;
+  model?: ModelRef | null;
+  language?: AppLanguage;
+  maxClaims?: number;
 }
 
 export interface ProjectDetail {
@@ -2363,6 +2598,16 @@ export interface NodusApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  listVaults(): Promise<VaultSummary[]>;
+  getActiveVault(): Promise<VaultSummary>;
+  createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
+  renameVault(id: string, name: string): Promise<VaultSummary>;
+  switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
+  duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
+  deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
+  resetVault(id: string): Promise<VaultSummary>;
+  reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
+  copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
@@ -2417,6 +2662,12 @@ export interface NodusApi {
   listDuplicateWorks(): Promise<DuplicateWorkGroup[]>;
   /** Merge duplicate works into the chosen canonical, re-pointing all derived data. */
   mergeWorks(canonicalId: string, duplicateIds: string[]): Promise<{ merged: number }>;
+  /** Groups of ideas that look like the same idea (identical normalized label + type). */
+  listDuplicateIdeas(): Promise<DuplicateIdeaGroup[]>;
+  /** Merge duplicate ideas into the chosen canonical, re-pointing all derived data and the graph. */
+  mergeIdeas(canonicalId: string, duplicateIds: string[]): Promise<{ merged: number }>;
+  /** Snapshot the DB into userData/backups before a destructive maintenance action; returns the path. */
+  backupDatabase(): Promise<string>;
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
@@ -2525,6 +2776,10 @@ export interface NodusApi {
   mapResearchCoverage(request: RqMapRequest, handlers?: RqMapHandlers): Promise<ResearchQuestionDetail>;
   deleteResearchQuestion(id: string): Promise<void>;
   exportResearchCoverage(request: RqExportRequest): Promise<{ path: string } | null>;
+
+  // hypothesis lab
+  /** Generate evidence-backed, testable hypotheses from gaps, ideas, debates, works and an optional project. */
+  generateHypothesisLab(request: HypothesisLabRequest): Promise<HypothesisLabResult>;
 
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
@@ -2654,6 +2909,8 @@ export interface NodusApi {
   /** Extract chapter ideas, embed them and discover typed relations with the library. */
   analyzeChapterRelations(request: AnalyzeChapterRelationsRequest): Promise<ChapterRelationsResult>;
   onChapterRelationsProgress(cb: (p: ChapterRelationsProgress) => void): () => void;
+  /** Check uncited manuscript claims against indexed/listed corpus ideas and passages. */
+  verifyManuscriptCitations(request: ManuscriptVerificationRequest): Promise<ManuscriptVerificationResult>;
   exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 

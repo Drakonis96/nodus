@@ -14,6 +14,17 @@ import type {
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
+  listVaults: () => ipcRenderer.invoke('vaults:list'),
+  getActiveVault: () => ipcRenderer.invoke('vaults:getActive'),
+  createVault: (input) => ipcRenderer.invoke('vaults:create', input),
+  renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),
+  switchVault: (id, options) => ipcRenderer.invoke('vaults:switch', id, options),
+  duplicateVault: (id, name, options) => ipcRenderer.invoke('vaults:duplicate', id, name, options),
+  deleteVault: (id, deleteFiles) => ipcRenderer.invoke('vaults:delete', id, deleteFiles).then(() => undefined),
+  resetVault: (id) => ipcRenderer.invoke('vaults:reset', id),
+  reuseVaultAnalysis: (nodusIds) => ipcRenderer.invoke('vaults:reuseAnalysis', nodusIds),
+  copyVaultApiKeys: (sourceVaultId, targetVaultId) =>
+    ipcRenderer.invoke('vaults:copyApiKeys', sourceVaultId, targetVaultId),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),
@@ -57,6 +68,9 @@ const api: NodusApi = {
   listCollectionFacets: () => ipcRenderer.invoke('works:collectionFacets'),
   listDuplicateWorks: () => ipcRenderer.invoke('works:listDuplicates'),
   mergeWorks: (canonicalId, duplicateIds) => ipcRenderer.invoke('works:merge', canonicalId, duplicateIds),
+  listDuplicateIdeas: () => ipcRenderer.invoke('ideas:listDuplicates'),
+  mergeIdeas: (canonicalId, duplicateIds) => ipcRenderer.invoke('ideas:merge', canonicalId, duplicateIds),
+  backupDatabase: () => ipcRenderer.invoke('ideas:backup'),
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
@@ -161,6 +175,7 @@ const api: NodusApi = {
   },
   deleteResearchQuestion: (id) => ipcRenderer.invoke('research:rq:delete', id).then(() => undefined),
   exportResearchCoverage: (request) => ipcRenderer.invoke('research:rq:export', request),
+  generateHypothesisLab: (request) => ipcRenderer.invoke('hypothesis:generate', request),
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -297,6 +312,7 @@ const api: NodusApi = {
     ipcRenderer.on('projects:chapterRelations:progress', listener);
     return () => ipcRenderer.removeListener('projects:chapterRelations:progress', listener);
   },
+  verifyManuscriptCitations: (request) => ipcRenderer.invoke('projects:manuscript:verify', request),
   exportProject: (request) => ipcRenderer.invoke('projects:export', request),
   exportProjectChapter: (request) => ipcRenderer.invoke('projects:chapters:export', request),
 

@@ -1,21 +1,13 @@
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
-
-let app: any = null;
-try {
-  app = require('electron').app;
-} catch {
-  // fallback for node scripts
-}
+import { activeVaultDbPath } from '../vaults/vaultRegistry';
 
 let db: Database.Database | null = null;
 
 export function dbPath(): string {
-  const userData = app ? app.getPath('userData') : path.join(os.homedir(), '.config', 'nodus');
-  return path.join(userData, 'nodus.sqlite');
+  return activeVaultDbPath();
 }
 
 /** Cosine similarity between two Float32 BLOBs, computed inside SQLite. */

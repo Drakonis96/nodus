@@ -337,11 +337,13 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
 
           <Section title={t('Barra lateral')}>
             <p className="text-xs text-neutral-500 -mt-1">
-              {t('Reordena las secciones del menú lateral. «Inicio» queda siempre la primera.')}
+              {t('Reordena u oculta las secciones del menú lateral. «Inicio» queda siempre la primera y «Ajustes» la última; ninguna de las dos puede moverse ni ocultarse.')}
             </p>
             <SidebarOrderEditor
               sidebarOrder={settings.sidebarOrder}
+              sidebarHidden={settings.sidebarHidden}
               onReorder={(ids) => void patch({ sidebarOrder: ids })}
+              onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden })}
             />
           </Section>
 
@@ -934,17 +936,23 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
 }
 
 /**
- * Reorder the sidebar sections with up/down controls. Home is pinned first and
- * not shown here; the saved order is the list of the remaining view ids.
+ * Reorder and show/hide the sidebar sections. Home (pinned first) and Settings
+ * (pinned last) can neither be moved nor hidden, so they are not shown here; the
+ * saved order is the list of the remaining view ids.
  */
 function SidebarOrderEditor({
   sidebarOrder,
+  sidebarHidden,
   onReorder,
+  onToggleHidden,
 }: {
   sidebarOrder: string[];
+  sidebarHidden: string[];
   onReorder: (ids: string[]) => void;
+  onToggleHidden: (hidden: string[]) => void;
 }) {
-  const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home');
+  const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -954,6 +962,13 @@ function SidebarOrderEditor({
     const ids = items.map((n) => n.id);
     [ids[index], ids[target]] = [ids[target], ids[index]];
     onReorder(ids);
+  };
+
+  const toggleHidden = (id: string) => {
+    const next = new Set(hidden);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onToggleHidden([...next]);
   };
 
   const drop = (targetId: string) => {
@@ -999,8 +1014,29 @@ function SidebarOrderEditor({
           }`}
         >
           <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
-          <Icon name={item.icon} size={15} className="text-neutral-500 shrink-0" />
-          <span className="flex-1 min-w-0 truncate text-sm text-neutral-200">{t(item.label)}</span>
+          <Icon
+            name={item.icon}
+            size={15}
+            className={`shrink-0 ${hidden.has(item.id) ? 'text-neutral-700' : 'text-neutral-500'}`}
+          />
+          <span
+            className={`flex-1 min-w-0 truncate text-sm ${
+              hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
+            }`}
+          >
+            {t(item.label)}
+          </span>
+          <button
+            className={`p-1 rounded hover:bg-neutral-800 ${
+              hidden.has(item.id)
+                ? 'text-neutral-600 hover:text-neutral-300'
+                : 'text-neutral-500 hover:text-neutral-100'
+            }`}
+            title={hidden.has(item.id) ? t('Mostrar') : t('Ocultar')}
+            onClick={() => toggleHidden(item.id)}
+          >
+            <Icon name={hidden.has(item.id) ? 'eyeOff' : 'eye'} size={14} />
+          </button>
           <button
             className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
             title={t('Subir')}
