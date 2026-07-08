@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "0.9.3",
+  "version": "0.9.6",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",

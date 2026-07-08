@@ -28,6 +28,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
 
 const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -142,6 +143,10 @@ export function WritingWorkshopView({
   const [deepProgress, setDeepProgress] = useState<DeepResearchProgress | null>(null);
   const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useDismissableLayer<HTMLDivElement>({
+    open: exportMenuOpen,
+    onDismiss: () => setExportMenuOpen(false),
+  });
 
   const selectedCount = useMemo(() => countSelection(selection), [selection]);
   const tableCount = useMemo(() => (snapshot ? countSnapshot(snapshot) : 0), [snapshot]);
@@ -775,7 +780,7 @@ export function WritingWorkshopView({
                   <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setSavingToNotes(true)}>
                     <Icon name="notebook" /> {t('Guardar en notas')}
                   </button>
-                  <div className="relative">
+                  <div className="relative" ref={exportMenuRef}>
                     <button
                       className="btn btn-primary gap-1.5"
                       onClick={() => setExportMenuOpen((open) => !open)}
@@ -785,23 +790,20 @@ export function WritingWorkshopView({
                       <Icon name="chevronDown" size={14} />
                     </button>
                     {exportMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
-                        <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-700 bg-neutral-900 shadow-xl py-1">
-                          <button
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
-                            onClick={() => void exportDraft('markdown')}
-                          >
-                            <Icon name="code" size={14} /> {t('Markdown (.md)')}
-                          </button>
-                          <button
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
-                            onClick={() => void exportDraft('pdf')}
-                          >
-                            <Icon name="download" size={14} /> {t('PDF (.pdf)')}
-                          </button>
-                        </div>
-                      </>
+                      <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-700 bg-neutral-900 shadow-xl py-1">
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
+                          onClick={() => void exportDraft('markdown')}
+                        >
+                          <Icon name="code" size={14} /> {t('Markdown (.md)')}
+                        </button>
+                        <button
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-800 flex items-center gap-2"
+                          onClick={() => void exportDraft('pdf')}
+                        >
+                          <Icon name="download" size={14} /> {t('PDF (.pdf)')}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

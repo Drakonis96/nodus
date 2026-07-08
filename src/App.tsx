@@ -235,7 +235,14 @@ export function App() {
   setActiveLang(settings.uiLanguage);
 
   if (!settings.onboardingComplete) {
-    return <Onboarding onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))} />;
+    return (
+      <Onboarding
+        vaults={vaults}
+        activeVault={activeVault}
+        onVaultsChanged={reloadVaults}
+        onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
+      />
+    );
   }
 
   return (
@@ -405,7 +412,15 @@ export function App() {
           {view === 'notes' && (
             <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
           )}
-          {view === 'settings' && <Settings settings={settings} onChange={reloadSettings} />}
+          {view === 'settings' && (
+            <Settings
+              settings={settings}
+              vaults={vaults}
+              activeVault={activeVault}
+              onChange={reloadSettings}
+              onVaultsChanged={reloadVaults}
+            />
+          )}
         </main>
       </div>
 

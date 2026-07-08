@@ -16,6 +16,7 @@ import {
   DETAIL_DEFAULT_FONT,
   type DetailLoading,
 } from '../components/NodeDetailPanel';
+import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
 
 const RELATION_LABELS: Record<string, string> = {
@@ -69,6 +70,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [seedId, setSeedId] = useState('');
   const [search, setSearch] = useState('');
+  const [seedSearchOpen, setSeedSearchOpen] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState('');
   const [minConnections, setMinConnections] = useState(0);
   const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
@@ -88,6 +90,10 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
   const detailSeqRef = useRef(0);
   const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
+  const seedSearchRef = useDismissableLayer<HTMLDivElement>({
+    open: seedSearchOpen,
+    onDismiss: () => setSeedSearchOpen(false),
+  });
 
   useEffect(() => {
     void window.nodus.getGraph('ideas').then((g) => {
@@ -278,18 +284,22 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
           <>
             <div className="flex flex-col gap-1 min-w-[260px] flex-1">
               <label className="text-neutral-500 uppercase tracking-wide">{t('Idea a investigar')}</label>
-              <div className="relative">
+              <div className="relative" ref={seedSearchRef}>
                 <input
                   className="input w-full"
                   placeholder={graphLoaded ? t('Busca una idea…') : t('Cargando ideas…')}
                   value={search}
+                  onFocus={() => {
+                    if (search.trim()) setSeedSearchOpen(true);
+                  }}
                   onChange={(e) => {
                     setSearch(e.target.value);
                     setSeedId('');
+                    setSeedSearchOpen(Boolean(e.target.value.trim()));
                   }}
                   disabled={!graphLoaded}
                 />
-                {search && (
+                {search && seedSearchOpen && (
                   <div className="absolute z-20 mt-1 w-full max-h-72 overflow-y-auto card bg-neutral-900 border border-neutral-700 shadow-xl">
                     {filteredIdeas.length === 0 && (
                       <div className="px-3 py-2 text-neutral-500">{t('Sin coincidencias')}</div>
@@ -301,6 +311,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                         onClick={() => {
                           setSeedId(n.id);
                           setSearch(n.label);
+                          setSeedSearchOpen(false);
                         }}
                       >
                         <div className="flex items-center gap-2">

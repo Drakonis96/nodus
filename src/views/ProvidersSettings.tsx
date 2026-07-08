@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import type { AiProvider, AppSettings, ModelInfo, ModelRef } from '@shared/types';
+import type { AiProvider, AppSettings, ModelInfo, ModelRef, VaultSummary } from '@shared/types';
+import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
 import { AI_PROVIDERS, PROVIDER_LABELS, modelLabel, sameModel } from '../components/ui';
 import { t, tx } from '../i18n';
 
 export function ProvidersSettings({
   settings,
+  vaults,
+  activeVault,
   onChange,
+  onVaultsChanged,
 }: {
   settings: AppSettings;
+  vaults: VaultSummary[];
+  activeVault: VaultSummary | null;
   onChange: () => Promise<unknown>;
+  onVaultsChanged: () => Promise<unknown>;
 }) {
   const [open, setOpen] = useState<AiProvider | null>(null);
 
@@ -37,6 +44,15 @@ export function ProvidersSettings({
   return (
     <section className="card p-4 mb-4">
       <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-3">{t('Proveedores de IA y modelos')}</h2>
+      <VaultApiKeyImporter
+        vaults={vaults}
+        activeVault={activeVault}
+        onImported={async () => {
+          await onVaultsChanged();
+          await onChange();
+        }}
+        className="mb-4"
+      />
 
       {/* Current default + favorites */}
       <div className="mb-4 text-sm">

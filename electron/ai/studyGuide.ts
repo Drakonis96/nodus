@@ -120,19 +120,30 @@ async function semanticBoosts(objective: string | undefined, enabled: boolean): 
 function loadWorkInputs(workBoosts: Map<string, number>): Map<string, StudyGuideWorkInput[]> {
   const rows = getDb()
     .prepare(
-      `SELECT wa.author_id,
+      `WITH idea_counts AS (
+         SELECT nodus_id,
+                COUNT(DISTINCT global_id) AS ideaCount,
+                COUNT(DISTINCT CASE WHEN role = 'principal' THEN global_id END) AS principalIdeaCount
+           FROM idea_occurrences
+          GROUP BY nodus_id
+       ),
+       passage_counts AS (
+         SELECT nodus_id, COUNT(*) AS passageCount
+           FROM passages
+          GROUP BY nodus_id
+       )
+       SELECT wa.author_id,
               w.nodus_id, w.title, w.authors_json AS authorsJson, w.year, w.zotero_key AS zoteroKey,
               w.read_tag AS readTag, w.source_type AS sourceType, w.deep_status AS deepStatus,
               w.summary_status AS summaryStatus, ws.summary AS summary,
-              COUNT(DISTINCT io.global_id) AS ideaCount,
-              COUNT(DISTINCT CASE WHEN io.role = 'principal' THEN io.global_id END) AS principalIdeaCount,
-              COUNT(DISTINCT p.passage_id) AS passageCount
+              COALESCE(ic.ideaCount, 0) AS ideaCount,
+              COALESCE(ic.principalIdeaCount, 0) AS principalIdeaCount,
+              COALESCE(pc.passageCount, 0) AS passageCount
          FROM work_authors wa
          JOIN works w ON w.nodus_id = wa.nodus_id AND w.archived = 0
-         LEFT JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
-         LEFT JOIN passages p ON p.nodus_id = w.nodus_id
+         LEFT JOIN idea_counts ic ON ic.nodus_id = w.nodus_id
+         LEFT JOIN passage_counts pc ON pc.nodus_id = w.nodus_id
          LEFT JOIN work_summaries ws ON ws.nodus_id = w.nodus_id
-        GROUP BY wa.author_id, w.nodus_id
         ORDER BY wa.author_id, ideaCount DESC, w.year DESC`
     )
     .all() as {

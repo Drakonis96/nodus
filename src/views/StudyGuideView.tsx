@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type {
   AppSettings,
@@ -21,6 +21,8 @@ import { t, tx } from '../i18n';
 
 const AUTHOR_ROW_HEIGHT = 132;
 
+type StudyPlanLoadPhase = 'idle' | 'preparing' | 'reading' | 'rendering' | 'semantic';
+
 const STATUS_LABELS: Record<StudyProgressStatus, string> = {
   pending: 'Pendiente',
   in_progress: 'En curso',
@@ -36,6 +38,12 @@ const STATUS_COLORS: Record<StudyProgressStatus, 'neutral' | 'indigo' | 'green' 
   needs_full_read: 'amber',
   review: 'indigo',
 };
+
+function waitForPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+  });
+}
 
 export function StudyGuideView({
   settings,
@@ -53,6 +61,7 @@ export function StudyGuideView({
   const [worksPerAuthor, setWorksPerAuthor] = useState(4);
   const [includeCompleted, setIncludeCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadPhase, setLoadPhase] = useState<StudyPlanLoadPhase>('idle');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
   const [session, setSession] = useState<StudySession | null>(null);
@@ -63,11 +72,18 @@ export function StudyGuideView({
   const [assessment, setAssessment] = useState<StudyAnswerAssessment | null>(null);
   const [assessing, setAssessing] = useState(false);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
+  const loadSeqRef = useRef(0);
 
   const loadPlan = useCallback(
     async (semanticFocus = false) => {
+      const seq = loadSeqRef.current + 1;
+      loadSeqRef.current = seq;
       setLoading(true);
+      setLoadPhase(semanticFocus ? 'semantic' : 'preparing');
       try {
+        await waitForPaint();
+        if (seq !== loadSeqRef.current) return;
+        setLoadPhase(semanticFocus ? 'semantic' : 'reading');
         const next = await window.nodus.getStudyPlan({
           objective,
           sessionMinutes,
@@ -76,13 +92,18 @@ export function StudyGuideView({
           includeCompleted,
           semanticFocus,
         });
+        if (seq !== loadSeqRef.current) return;
+        setLoadPhase('rendering');
         setPlan(next);
         setSelectedId((current) => {
           if (current && next.authors.some((author) => author.authorId === current)) return current;
           return next.nextAuthorId ?? next.authors[0]?.authorId ?? null;
         });
       } finally {
-        setLoading(false);
+        if (seq === loadSeqRef.current) {
+          setLoading(false);
+          setLoadPhase('idle');
+        }
       }
     },
     [authorLimit, includeCompleted, objective, sessionMinutes, worksPerAuthor]
@@ -206,6 +227,8 @@ export function StudyGuideView({
         </button>
       </div>
 
+      {loading && <StudyPlanLoadingBar phase={loadPhase} />}
+
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_21rem] gap-4 mb-4">
         <div className="space-y-3">
           <textarea
@@ -323,6 +346,29 @@ export function StudyGuideView({
           }}
         />
       )}
+    </div>
+  );
+}
+
+function StudyPlanLoadingBar({ phase }: { phase: StudyPlanLoadPhase }) {
+  const label =
+    phase === 'semantic'
+      ? t('Afinando ruta con embeddings…')
+      : phase === 'rendering'
+        ? t('Actualizando ruta de autores…')
+        : phase === 'reading'
+          ? t('Leyendo autores, obras e ideas…')
+          : t('Preparando ruta de estudio…');
+
+  return (
+    <div className="mb-4 rounded-lg border border-indigo-900/50 bg-indigo-950/25 px-3 py-2 dark:border-indigo-900/60">
+      <div className="flex items-center gap-2 text-xs text-indigo-200">
+        <Spinner />
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-900/80 dark:bg-neutral-900">
+        <div className="study-plan-progress h-full w-1/3 rounded-full bg-indigo-500" />
+      </div>
     </div>
   );
 }

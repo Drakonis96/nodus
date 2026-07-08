@@ -498,6 +498,18 @@ export function registerIpc(
     }
     scanQueue.enqueue(nodusId, w.title, kind, model);
   });
+  h('works:rescanDegraded', async (_e, model?: ModelRef | null) => {
+    // Re-scan works that only ever saw the abstract (e.g. the PDF wasn't attached/
+    // indexed when they were first analysed). A bare enqueue is idempotent: if the
+    // resolved text is unchanged, runDeepScan is a no-op and no tokens are spent.
+    const rows = getDb()
+      .prepare(
+        "SELECT nodus_id, title FROM works WHERE archived = 0 AND deep_status = 'done' AND source_type IN ('abstract_only','none')"
+      )
+      .all() as { nodus_id: string; title: string }[];
+    for (const w of rows) scanQueue.enqueue(w.nodus_id, w.title, 'deep', model);
+    return rows.length;
+  });
   h('works:summarize', async (_e, nodusId: string, model?: ModelRef | null) => {
     const work = works.getWork(nodusId);
     if (!work) return;

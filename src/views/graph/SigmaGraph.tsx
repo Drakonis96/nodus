@@ -53,6 +53,7 @@ interface SigmaGraphProps {
 // Camera ratio above which we show the aggregated overview instead of every node.
 const OVERVIEW_RATIO = 0.6;
 const HISTORY_DURATION_MS = 7_200;
+const CAMERA_SELECTION_GUARD_MS = 260;
 
 // Obsidian lets a graph breathe while its forces settle. Keep that perceptible
 // without spending an unbounded amount of CPU on large research libraries.
@@ -249,6 +250,7 @@ export function SigmaGraph({
   const [revealedNodeIds, setRevealedNodeIds] = useState<Set<string>>(() => new Set());
   const lightThemeRef = useRef(lightTheme);
   const onCameraUpdatedRef = useRef<() => void>(() => {});
+  const suppressSelectionUntilRef = useRef(0);
 
   const model = useMemo(() => buildGraphModel(data, filters, lens, preset, revealedNodeIds), [data, filters, lens, preset, revealedNodeIds]);
 
@@ -569,15 +571,13 @@ export function SigmaGraph({
         switchMode('detail');
         return;
       }
-      const ratio = sigma.getCamera().ratio;
-      // Only collapse to the (still-rough) overview for very large corpora where
-      // the full graph genuinely can't be drawn legibly. Below this, always show
-      // the complete graph — WebGL handles a few thousand nodes fine.
-      const enoughToCluster = (clustersRef.current?.clusters.length ?? 0) >= 2 && model.nodes.length > 3000;
-      if (enoughToCluster && ratio >= OVERVIEW_RATIO) switchMode('overview');
-      else switchMode('detail');
+      // Keep camera gestures visually stable. The aggregated LOD is useful as a
+      // future explicit overview, but swapping into it automatically while the
+      // user pinches/wheels makes the graph look like it selected a tiny local
+      // subnetwork without any click.
+      switchMode('detail');
     });
-  }, [model.nodes.length, switchMode]);
+  }, [switchMode]);
 
   // The Sigma instance is intentionally created once. Keep its camera listener
   // pointed at the current LOD policy when filters, theme, or callbacks change.
@@ -747,9 +747,11 @@ export function SigmaGraph({
     const resetLabelCollision = () => {
       labelCollision.boxes.length = 0;
     };
+    const isSelectionSuppressed = () => Date.now() < suppressSelectionUntilRef.current;
     sigma.on('beforeRender', resetLabelCollision);
 
     sigma.on('clickNode', ({ node }) => {
+      if (isSelectionSuppressed()) return;
       const g = sigmaRef.current?.getGraph();
       if (!g) return;
       if (modeRef.current === 'overview') {
@@ -766,6 +768,7 @@ export function SigmaGraph({
       onOpenNode(node, String(attrs.label ?? ''), String(attrs.kind ?? ''));
     });
     sigma.on('clickEdge', ({ edge }) => {
+      if (isSelectionSuppressed()) return;
       if (modeRef.current === 'overview') return;
       tutorFocusRef.current = null;
       const g = sigmaRef.current?.getGraph();
@@ -932,6 +935,10 @@ export function SigmaGraph({
     });
 
     const mouse = sigma.getMouseCaptor();
+    const suppressSelectionAfterCameraGesture = () => {
+      suppressSelectionUntilRef.current = Date.now() + CAMERA_SELECTION_GUARD_MS;
+    };
+    mouse.on('wheel', suppressSelectionAfterCameraGesture);
     const onMouseMove = (event: any) => {
       const state = dragStateRef.current;
       if (!state) return;
@@ -974,7 +981,10 @@ export function SigmaGraph({
     };
     mouse.on('mouseup', endDrag);
 
-    const handleCameraUpdated = () => onCameraUpdatedRef.current();
+    const handleCameraUpdated = () => {
+      suppressSelectionAfterCameraGesture();
+      onCameraUpdatedRef.current();
+    };
     sigma.getCamera().on('updated', handleCameraUpdated);
 
     return () => {
@@ -982,6 +992,7 @@ export function SigmaGraph({
       if (drag?.frameId != null) window.cancelAnimationFrame(drag.frameId);
       dragStateRef.current = null;
       draggingRef.current = null;
+      mouse.removeListener('wheel', suppressSelectionAfterCameraGesture);
       mouse.removeListener('mousemovebody', onMouseMove);
       mouse.removeListener('mouseup', endDrag);
       sigma.getCamera().removeListener('updated', handleCameraUpdated);

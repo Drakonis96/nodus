@@ -21,7 +21,7 @@ import { WorkIdeasModal } from './WorkIdeasModal';
 import { DuplicatesModal } from './DuplicatesModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
-import { useDataRefresh, useScanComplete } from '../hooks';
+import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -67,22 +67,11 @@ function StatusFlagsPicker({
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const ref = useDismissableLayer<HTMLDivElement>({
+    open,
+    onDismiss: () => setOpen(false),
+    group: 'library-filters',
+  });
 
   const active = value.length > 0;
 
@@ -188,9 +177,21 @@ function lightBadge(s: LightStatus) {
   return <Badge color="neutral">{t('ligero')}…</Badge>;
 }
 
-function deepBadge(s: DeepStatus) {
+function deepBadge(s: DeepStatus, sourceType?: WorkView['source_type']) {
   switch (s) {
     case 'done':
+      // The scan finished, but only the abstract was available — no full text was
+      // read. Flag it so the reader knows to re-scan once the PDF/EPUB is in Zotero.
+      if (sourceType === 'abstract_only' || sourceType === 'none') {
+        return (
+          <Badge
+            color="amber"
+            title={t('El análisis profundo solo usó el abstract, no el texto completo (el PDF/EPUB no estaba disponible al analizar). Reanaliza cuando esté en Zotero.')}
+          >
+            {t('solo abstract')}
+          </Badge>
+        );
+      }
       return <Badge color="indigo">{t('profundo')} ✓</Badge>;
     case 'pending':
       return <Badge color="amber">{t('profundo')}…</Badge>;
@@ -258,6 +259,9 @@ export function Library({
 }) {
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({});
+  // Local, instantly-responsive text for the search box. It is debounced into
+  // `filter.search` so keystrokes stay smooth even on large libraries.
+  const [searchDraft, setSearchDraft] = useState('');
   const [availableZoteroTags, setAvailableZoteroTags] = useState<ZoteroTag[]>([]);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
@@ -278,26 +282,29 @@ export function Library({
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
+  const tagFilterRef = useDismissableLayer<HTMLDivElement>({
+    open: tagFilterOpen,
+    onDismiss: () => setTagFilterOpen(false),
+    group: 'library-filters',
+  });
+  const collectionFilterRef = useDismissableLayer<HTMLDivElement>({
+    open: collectionFilterOpen,
+    onDismiss: () => setCollectionFilterOpen(false),
+    group: 'library-filters',
+  });
 
+  // Only the works list depends on the active filter, so typing in the search
+  // box must reload nothing else. Keeping this isolated is what stops each
+  // keystroke from firing five IPC round-trips against SQLite.
   const load = useCallback(async () => {
     const requestId = ++loadRequestRef.current;
     if (initialLoadRef.current) setLoading(true);
     try {
-      const [w, tags, statuses, passageIndexStatuses, collections] = await Promise.all([
-        window.nodus.listWorks(filter),
-        window.nodus.listZoteroTags(),
-        window.nodus.getWorkEmbeddingStatuses(),
-        window.nodus.getWorkPassageStatuses(),
-        window.nodus.listCollectionFacets(),
-      ]);
+      const w = await window.nodus.listWorks(filter);
       // A newer filter or refresh may have completed while this request was in
       // flight.  Never replace its results with stale rows.
       if (requestId !== loadRequestRef.current) return;
       setWorks(w);
-      setAvailableZoteroTags(tags);
-      setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
-      setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
-      setAvailableCollections(collections);
     } finally {
       if (requestId === loadRequestRef.current) {
         initialLoadRef.current = false;
@@ -306,16 +313,53 @@ export function Library({
     }
   }, [filter]);
 
+  // Facets (tags, collections) and per-work index statuses are global — they do
+  // not depend on the active filter. Load them once on mount and refresh only
+  // when the underlying data actually changes, not on every filter change.
+  const loadFacets = useCallback(async () => {
+    const [tags, statuses, passageIndexStatuses, collections] = await Promise.all([
+      window.nodus.listZoteroTags(),
+      window.nodus.getWorkEmbeddingStatuses(),
+      window.nodus.getWorkPassageStatuses(),
+      window.nodus.listCollectionFacets(),
+    ]);
+    setAvailableZoteroTags(tags);
+    setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
+    setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
+    setAvailableCollections(collections);
+  }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
-  useDataRefresh(load);
+  useEffect(() => {
+    void loadFacets();
+  }, [loadFacets]);
+
+  // Stable reference so the event subscriptions below don't re-register on every
+  // filter change (which happens on each debounced keystroke).
+  const refreshAllRef = useRef<() => void>(() => {});
+  refreshAllRef.current = () => {
+    void load();
+    void loadFacets();
+  };
+  useDataRefresh(() => refreshAllRef.current());
   // Once a queued analysis finishes, reapply the active tag/status predicate
   // without remounting the virtual list or losing the reader's scroll position.
-  useScanComplete(() => void load());
+  useScanComplete(() => refreshAllRef.current());
   useEffect(() => window.nodus.onPassageProgress((progress) => {
-    if (!progress.running) void load();
-  }), [load]);
+    if (!progress.running) refreshAllRef.current();
+  }), []);
+
+  // Debounce the free-text search: push the draft into the filter only after the
+  // user pauses, so a burst of keystrokes triggers one DB query instead of one
+  // per character.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setFilter((f) => ((f.search ?? '') === searchDraft ? f : { ...f, search: searchDraft || undefined }));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [searchDraft]);
 
   const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
     if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
@@ -443,6 +487,17 @@ export function Library({
     window.alert(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
   };
 
+  const rescanAbstractOnly = async () => {
+    const ok = window.confirm(
+      t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?')
+    );
+    if (!ok) return;
+    const n = await window.nodus.rescanDegraded(scanModel);
+    await load();
+    if (n === 0) window.alert(t('No hay obras «solo abstract» para reanalizar.'));
+    else window.alert(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
+  };
+
   const embedWork = async (nodusId: string) => {
     await window.nodus.startEmbedding([nodusId]);
   };
@@ -557,7 +612,7 @@ export function Library({
   };
 
   const selectedStatusFlags = filter.statusFlags ?? [];
-  const searchValue = filter.search ?? '';
+  const searchValue = searchDraft;
   const hasActiveFilters =
     searchValue.trim().length > 0 ||
     selectedStatusFlags.length > 0 ||
@@ -583,6 +638,7 @@ export function Library({
   const clearStatusFlags = () => setFilter((c) => ({ ...c, statusFlags: [] }));
   const clearAllFilters = () => {
     setFilter({});
+    setSearchDraft('');
     setTagSearch('');
     setCollectionSearch('');
   };
@@ -654,16 +710,16 @@ export function Library({
         <div className="flex flex-wrap gap-2 items-center">
           <input
             className="input"
-            value={searchValue}
+            value={searchDraft}
             placeholder={t('Buscar título o autor…')}
-            onChange={(e) => setFilter((f) => ({ ...f, search: e.target.value }))}
+            onChange={(e) => setSearchDraft(e.target.value)}
           />
           <StatusFlagsPicker
             value={selectedStatusFlags}
             setDimension={setStatusDimension}
             onClear={clearStatusFlags}
           />
-          <div className="relative">
+          <div className="relative" ref={tagFilterRef}>
             <button
               type="button"
               className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
@@ -750,7 +806,7 @@ export function Library({
               </div>
             )}
           </div>
-          <div className="relative">
+          <div className="relative" ref={collectionFilterRef}>
             <button
               type="button"
               className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
@@ -1037,6 +1093,13 @@ export function Library({
             onClick={reassignThemes}
           />
           <OperationCard
+            icon="bulb"
+            title={t('Reanalizar «solo abstract»')}
+            description={t('Vuelve a analizar las obras cuyo análisis profundo solo usó el abstract porque el PDF/EPUB no estaba disponible. Las que ya tengan el texto recuperan el análisis completo; el resto se omiten sin coste.')}
+            buttonLabel={t('Reanalizar')}
+            onClick={rescanAbstractOnly}
+          />
+          <OperationCard
             icon="search"
             title={t('Indexar pendientes')}
             description={t('Genera embeddings para las ideas que aún no los tienen. No regenera los existentes.')}
@@ -1155,7 +1218,7 @@ export function Library({
                 <div className="p-1 text-neutral-400 truncate">{w.themes.join(', ')}</div>
                 <div className="p-1">{lightBadge(w.light_status)}</div>
                 <div className="p-1 whitespace-nowrap">
-                  {deepBadge(w.deep_status)} {triggerBadge(w)}
+                  {deepBadge(w.deep_status, w.source_type)} {triggerBadge(w)}
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   {passageBadge(passageStatuses.get(w.nodus_id))}

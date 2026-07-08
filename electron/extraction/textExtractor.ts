@@ -15,6 +15,12 @@ export interface ExtractedDoc {
   sourceType: SourceType;
   notes: string | null;
   analysis?: PdfAnalysis;
+  /**
+   * True when the Zotero item exposes a document attachment (PDF/EPUB/…), even if
+   * it could not be read on this pass. Lets the pipeline distinguish "no full text
+   * exists" from "full text should exist but wasn't ready yet" and retry the latter.
+   */
+  hadTextAttachment?: boolean;
 }
 
 export interface ExtractProgress {
@@ -31,6 +37,11 @@ export interface OcrOptions {
 }
 
 const MIN_CHARS_TEXT_PAGE = 50;
+// A freshly-attached file can take a moment to surface through the local Zotero API
+// (its attachment child, filename, or on-disk copy), so we retry a couple of times
+// before concluding a work has no readable full text.
+const ATTACHMENT_READ_ATTEMPTS = 3;
+const ATTACHMENT_RETRY_DELAYS_MS = [0, 900, 2200];
 const STANDARD_CHUNK_WORDS = 1800;
 const STANDARD_OVERLAP_WORDS = 100;
 const LONG_CHUNK_WORDS = 30000;
@@ -52,6 +63,10 @@ export interface ChunkPlan {
   maxIdeasPerChunk: number;
   maxRelationsPerChunk: number;
   maxGapsPerChunk: number;
+}
+
+function sleep(ms: number): Promise<void> {
+  return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
 }
 
 function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {
@@ -512,28 +527,17 @@ export async function probeWorkTextAvailability(
  *   3) Unpaywall open-access PDF (by DOI)
  *   4) Abstract only / none
  */
-export async function resolveWorkText(
+/**
+ * Phases 1 & 2 of resolution: reuse Zotero's indexed full text when it's complete,
+ * else parse the local attachment file(s) directly. Returns the extracted document,
+ * or null (with any scan note, e.g. "OCR disabled") when no attachment yields text.
+ */
+async function readTextAttachments(
+  textAttachments: ZoteroAttachment[],
   userId: string,
-  zoteroKey: string,
-  storagePath: string,
-  abstract: string | null,
-  doi: string | null,
-  opts: ResolveOptions,
-  itemType?: string | null
-): Promise<ExtractedDoc> {
-  let attachments: ZoteroAttachment[] = [];
-  const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey });
-  try {
-    attachments = await textAttachmentsFor(userId, zoteroKey, itemType);
-    metadataDone({ attachments: attachments.length });
-  } catch (e) {
-    metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-  }
-  const textAttachments = attachments;
-  // Fall back to the standard Zotero storage location when the user left it blank,
-  // so deep scans can still find local PDFs instead of degrading to abstract-only.
-  const effectiveStorage = storagePath || defaultZoteroStorage();
-
+  effectiveStorage: string,
+  opts: ResolveOptions
+): Promise<{ doc: ExtractedDoc | null; scanNote: string | null }> {
   // (1) Reuse Zotero's indexed full text when it's substantial and reasonably complete.
   if (opts.preferZoteroFulltext) {
     const fulltextDone = startPerf('Zotero fulltext', opts.perf, { attachments: textAttachments.length });
@@ -548,9 +552,12 @@ export async function resolveWorkText(
         if (complete) {
           fulltextDone({ checked, hit: true, chars: ft.content.length });
           return {
-            text: ft.content,
-            sourceType: attachmentSourceType(att),
-            notes: `Texto indexado por Zotero${ft.totalPages ? ` (${ft.indexedPages}/${ft.totalPages} págs.)` : ''}.`,
+            doc: {
+              text: ft.content,
+              sourceType: attachmentSourceType(att),
+              notes: `Texto indexado por Zotero${ft.totalPages ? ` (${ft.indexedPages}/${ft.totalPages} págs.)` : ''}.`,
+            },
+            scanNote: null,
           };
         }
       }
@@ -578,7 +585,61 @@ export async function resolveWorkText(
       .map((d, i) => (withText.length > 1 ? `--- documento ${i + 1} ---\n${d.text}` : d.text))
       .join('\n\n');
     const notes = withText.map((d) => d.notes).filter(Boolean).join(' ') || null;
-    return { text: combined, sourceType: withText[0].sourceType, notes, analysis: withText[0].analysis };
+    return { doc: { text: combined, sourceType: withText[0].sourceType, notes, analysis: withText[0].analysis }, scanNote: null };
+  }
+
+  return { doc: null, scanNote: docs.find((d) => d.notes)?.notes ?? null };
+}
+
+/**
+ * Resolve full text for a work via a detector chain that escalates only as needed:
+ *   1) Zotero's own indexed full text (no parsing)
+ *   2) Parse the PDF in storage (digital/hybrid → text; scanned → OCR if enabled)
+ *   3) Unpaywall open-access PDF (by DOI)
+ *   4) Abstract only / none
+ */
+export async function resolveWorkText(
+  userId: string,
+  zoteroKey: string,
+  storagePath: string,
+  abstract: string | null,
+  doi: string | null,
+  opts: ResolveOptions,
+  itemType?: string | null
+): Promise<ExtractedDoc> {
+  // Fall back to the standard Zotero storage location when the user left it blank,
+  // so deep scans can still find local PDFs instead of degrading to abstract-only.
+  const effectiveStorage = storagePath || defaultZoteroStorage();
+  const isAttachmentItem = (itemType ?? '').toLowerCase() === 'attachment';
+
+  // (1+2) Resolve text from the Zotero attachments. A scan can race a just-attached
+  // file — the attachment child, its filename, or the on-disk copy may surface a
+  // moment later — so retry briefly before degrading instead of silently accepting
+  // the abstract for a work that actually has full text.
+  let hadTextAttachment = false;
+  let scanNote: string | null = null;
+  for (let attempt = 0; attempt < ATTACHMENT_READ_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(ATTACHMENT_RETRY_DELAYS_MS[attempt] ?? 1500);
+    let textAttachments: ZoteroAttachment[] = [];
+    const metadataDone = startPerf('Zotero attachment metadata', opts.perf, { zoteroKey, attempt });
+    try {
+      textAttachments = await textAttachmentsFor(userId, zoteroKey, itemType);
+      metadataDone({ attachments: textAttachments.length });
+    } catch (e) {
+      metadataDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+    }
+    if (textAttachments.length > 0) hadTextAttachment = true;
+
+    const result = await readTextAttachments(textAttachments, userId, effectiveStorage, opts);
+    if (result.doc) return { ...result.doc, hadTextAttachment: true };
+    if (result.scanNote) scanNote = result.scanNote;
+
+    // Keep retrying only while a brief wait might change the outcome: attachments
+    // were found but not yet readable (file/index settling), or none surfaced yet on
+    // the first try for a normal (non-attachment) item. This costs at most one short
+    // extra wait for works that genuinely have no full text.
+    const worthRetrying = !isAttachmentItem && (textAttachments.length > 0 || attempt === 0);
+    if (!worthRetrying) break;
   }
 
   // (3) Unpaywall fallback by DOI.
@@ -590,15 +651,16 @@ export async function resolveWorkText(
       return null;
     });
     unpaywallDone({ hit: Boolean(oa), chars: oa?.text.length ?? 0 });
-    if (oa && oa.text.trim()) return oa;
+    if (oa && oa.text.trim()) return { ...oa, hadTextAttachment };
   }
 
-  // (4) Degrade to abstract-only / none. Carry forward any scan note (e.g. OCR disabled).
-  const scanNote = docs.find((d) => d.notes)?.notes ?? null;
+  // (4) Degrade to abstract-only / none. Carry forward any scan note (e.g. OCR
+  // disabled) and whether a document attachment existed, so the pipeline can retry
+  // works that *should* have full text instead of silently accepting the abstract.
   if (abstract) {
-    return { text: abstract, sourceType: 'abstract_only', notes: scanNote ?? 'Solo abstract disponible.' };
+    return { text: abstract, sourceType: 'abstract_only', notes: scanNote ?? 'Solo abstract disponible.', hadTextAttachment };
   }
-  return { text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.' };
+  return { text: '', sourceType: 'none', notes: scanNote ?? 'Sin texto ni abstract disponible.', hadTextAttachment };
 }
 
 async function tryUnpaywall(

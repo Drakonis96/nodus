@@ -24,6 +24,19 @@ body {
   @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
 }
 
+@keyframes study-plan-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.study-plan-progress {
+  animation: study-plan-progress 1.15s ease-in-out infinite;
+}
+
 .light body {
   @apply bg-neutral-50 text-neutral-900;
 }
@@ -210,6 +223,29 @@ body {
 }
 .light .hover\:bg-cyan-950\/60:hover {
   background-color: #cffafe;
+}
+
+.light .vault-danger-panel {
+  background-color: #fff7f7;
+  border-color: #fecaca;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+.light .vault-danger-title {
+  color: #b91c1c;
+}
+.light .vault-danger-button {
+  background-color: #ffffff;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+.light .vault-danger-button:hover:not(:disabled) {
+  background-color: #fff1f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+.light .vault-danger-button:disabled {
+  background-color: #fffafa;
+  color: #ef4444;
 }
 
 /* Library filters use an explicit light palette so selected controls never inherit
