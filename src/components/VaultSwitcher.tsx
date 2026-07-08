@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { VaultSummary } from '@shared/types';
 import { t, tx } from '../i18n';
+import { useDismissableLayer } from '../hooks';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon, PROVIDER_LABELS } from './ui';
 
@@ -33,12 +34,9 @@ export function VaultSwitcher({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [copyOnLoad, setCopyOnLoad] = useState(false);
-  const [copySourceId, setCopySourceId] = useState('');
   const [newVaultName, setNewVaultName] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
-  const [copyIntoActiveSourceId, setCopyIntoActiveSourceId] = useState('');
   const [dangerVaultId, setDangerVaultId] = useState('');
   const [pendingAction, setPendingAction] = useState<PendingDestructiveAction | null>(null);
   const [destructiveStep, setDestructiveStep] = useState<DestructiveStep>('intro');
@@ -46,21 +44,13 @@ export function VaultSwitcher({
   const [destructiveEntry, setDestructiveEntry] = useState('');
   const [destructiveError, setDestructiveError] = useState<string | null>(null);
 
-  const otherVaults = useMemo(
-    () => vaults.filter((vault) => vault.id !== activeVault?.id),
-    [activeVault?.id, vaults]
-  );
-
   const dangerVault = useMemo(
     () => vaults.find((vault) => vault.id === dangerVaultId) ?? activeVault ?? vaults[0] ?? null,
     [activeVault, dangerVaultId, vaults]
   );
 
-  const switchOptions = copyOnLoad && copySourceId ? { copyApiKeysFromVaultId: copySourceId } : undefined;
-
   useEffect(() => {
     if (!activeVault) return;
-    setCopySourceId((current) => current || activeVault.id);
     setRenameValue(activeVault.name);
     setDuplicateName(`${activeVault.name} copia`);
   }, [activeVault?.id, activeVault?.name]);
@@ -71,10 +61,6 @@ export function VaultSwitcher({
       setDangerVaultId(activeVault.id);
     }
   }, [activeVault, dangerVaultId, vaults]);
-
-  useEffect(() => {
-    if (!copyIntoActiveSourceId && otherVaults[0]) setCopyIntoActiveSourceId(otherVaults[0].id);
-  }, [copyIntoActiveSourceId, otherVaults]);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -90,7 +76,7 @@ export function VaultSwitcher({
 
   const loadVault = (vaultId: string) =>
     run(async () => {
-      const result = await window.nodus.switchVault(vaultId, switchOptions);
+      const result = await window.nodus.switchVault(vaultId);
       setMessage(result.message);
       if (result.ok) {
         await onActiveVaultChanged();
@@ -108,7 +94,7 @@ export function VaultSwitcher({
         return;
       }
       const created = await window.nodus.createVault({ name });
-      const result = await window.nodus.switchVault(created.vault.id, switchOptions);
+      const result = await window.nodus.switchVault(created.vault.id);
       setMessage(result.message);
       setNewVaultName('');
       if (result.ok) {
@@ -143,18 +129,6 @@ export function VaultSwitcher({
       await window.nodus.duplicateVault(activeVault.id, name);
       await onVaultsChanged();
       setMessage(t('Bóveda duplicada con sus datos y claves API.'));
-    });
-
-  const copyKeysIntoActive = () =>
-    run(async () => {
-      if (!activeVault || !copyIntoActiveSourceId) return;
-      const result = await window.nodus.copyVaultApiKeys(copyIntoActiveSourceId, activeVault.id);
-      await onVaultsChanged();
-      setMessage(
-        result.copiedProviders.length
-          ? t('Claves API cargadas en la bóveda activa.')
-          : t('La bóveda seleccionada no tiene claves API guardadas.')
-      );
     });
 
   const startDestructiveAction = (kind: DestructiveKind) => {
@@ -217,9 +191,13 @@ export function VaultSwitcher({
       : dangerVault?.legacy
         ? t('La bóveda principal no se puede eliminar; puedes reinicializarla.')
         : null;
+  const switcherRef = useDismissableLayer<HTMLDivElement>({
+    open,
+    onDismiss: () => setOpen(false),
+  });
 
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0" ref={switcherRef}>
       <button
         data-tour="vaults"
         className="btn btn-ghost min-w-0 max-w-[260px] gap-1.5"
@@ -246,44 +224,21 @@ export function VaultSwitcher({
               </button>
             </div>
 
-            <div className="space-y-2 rounded-md border border-neutral-800 p-2">
-              <label className="flex min-w-0 items-center gap-2 text-xs text-neutral-300">
-                <input
-                  type="checkbox"
-                  checked={copyOnLoad}
-                  onChange={(event) => setCopyOnLoad(event.target.checked)}
-                />
-                <span className="min-w-0">{t('Al cargar, copiar claves API desde')}</span>
-              </label>
-              <select
-                className="input w-full min-w-0 text-xs"
-                value={copySourceId}
-                onChange={(event) => setCopySourceId(event.target.value)}
-                disabled={!copyOnLoad}
-              >
-                {vaults.map((vault) => (
-                  <option key={vault.id} value={vault.id}>
-                    {vault.name} · {providerList(vault)}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1">
+            <div className="space-y-2">
               {vaults.map((vault) => (
                 <div
                   key={vault.id}
-                  className="flex min-w-0 items-center gap-2 rounded-md border border-neutral-800 px-2 py-2"
+                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_5.75rem] items-center gap-2 rounded-md border border-neutral-800 px-2 py-2"
                 >
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0">
                     <div className="truncate text-sm text-neutral-200">{vault.name}</div>
                     <div className="truncate text-xs text-neutral-500">{providerList(vault)}</div>
                   </div>
                   {vault.active ? (
-                    <span className="shrink-0 rounded-md bg-indigo-600 px-2 py-1 text-xs text-white">{t('Activa')}</span>
+                    <span className="inline-flex h-8 w-full items-center justify-center rounded-md bg-indigo-600 px-2 text-xs text-white">{t('Activa')}</span>
                   ) : (
                     <button
-                      className="btn btn-primary shrink-0 py-1 text-xs"
+                      className="btn btn-primary h-8 w-full py-1 text-xs"
                       onClick={() => void loadVault(vault.id)}
                       disabled={busy}
                     >
@@ -294,69 +249,47 @@ export function VaultSwitcher({
               ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
               <input
-                className="input min-w-0 text-sm"
+                className="input h-9 min-w-0 text-sm"
                 value={newVaultName}
                 onChange={(event) => setNewVaultName(event.target.value)}
                 placeholder={t('Nueva bóveda')}
               />
-              <button className="btn btn-primary w-full gap-1.5 sm:w-auto" onClick={() => void createAndLoad()} disabled={busy}>
+              <button className="btn btn-primary h-9 w-full gap-1.5" onClick={() => void createAndLoad()} disabled={busy}>
                 <Icon name="plus" /> {t('Crear')}
               </button>
             </div>
 
             {activeVault && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
                 <input
-                  className="input min-w-0 text-sm"
+                  className="input h-9 min-w-0 text-sm"
                   value={renameValue}
                   onChange={(event) => setRenameValue(event.target.value)}
                 />
-                <button className="btn btn-ghost w-full gap-1.5 border border-neutral-700 sm:w-auto" onClick={() => void renameActive()} disabled={busy}>
+                <button className="btn btn-ghost h-9 w-full gap-1.5 border border-neutral-700" onClick={() => void renameActive()} disabled={busy}>
                   <Icon name="edit" /> {t('Renombrar')}
                 </button>
               </div>
             )}
 
             {activeVault && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
                 <input
-                  className="input min-w-0 text-sm"
+                  className="input h-9 min-w-0 text-sm"
                   value={duplicateName}
                   onChange={(event) => setDuplicateName(event.target.value)}
                 />
-                <button className="btn btn-ghost w-full gap-1.5 border border-neutral-700 sm:w-auto" onClick={() => void duplicateActive()} disabled={busy}>
+                <button className="btn btn-ghost h-9 w-full gap-1.5 border border-neutral-700" onClick={() => void duplicateActive()} disabled={busy}>
                   <Icon name="copy" /> {t('Duplicar')}
                 </button>
               </div>
             )}
 
-            {activeVault && otherVaults.length > 0 && (
-              <div className="space-y-2 rounded-md border border-neutral-800 p-2">
-                <div className="text-xs font-medium text-neutral-300">{t('Traer claves a la bóveda activa')}</div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <select
-                    className="input min-w-0 text-sm"
-                    value={copyIntoActiveSourceId}
-                    onChange={(event) => setCopyIntoActiveSourceId(event.target.value)}
-                  >
-                    {otherVaults.map((vault) => (
-                      <option key={vault.id} value={vault.id}>
-                        {vault.name} · {providerList(vault)}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="btn btn-ghost w-full gap-1.5 border border-neutral-700 sm:w-auto" onClick={() => void copyKeysIntoActive()} disabled={busy}>
-                    <Icon name="key" /> {t('Cargar claves')}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {dangerVault && (
-              <div className="space-y-2 rounded-md border border-red-900/60 bg-red-950/20 p-2">
-                <div className="text-xs font-medium text-red-300">{t('Zona peligrosa')}</div>
+              <div className="vault-danger-panel space-y-2 rounded-md border border-red-900/60 bg-red-950/20 p-2">
+                <div className="vault-danger-title text-xs font-medium text-red-300">{t('Zona peligrosa')}</div>
                 <label className="block space-y-1">
                   <span className="text-xs text-neutral-500">{t('Vault objetivo')}</span>
                   <select
@@ -373,14 +306,14 @@ export function VaultSwitcher({
                 </label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button
-                    className="btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50"
+                    className="vault-danger-button btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50"
                     onClick={() => startDestructiveAction('reset')}
                     disabled={busy}
                   >
                     <Icon name="refresh" /> {t('Reinicializar')}
                   </button>
                   <button
-                    className="btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="vault-danger-button btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-45"
                     onClick={() => startDestructiveAction('delete')}
                     disabled={busy || Boolean(deleteDisabledReason)}
                     title={deleteDisabledReason ?? undefined}

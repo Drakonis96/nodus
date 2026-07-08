@@ -21,7 +21,7 @@ import { WorkIdeasModal } from './WorkIdeasModal';
 import { DuplicatesModal } from './DuplicatesModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
-import { useDataRefresh, useScanComplete } from '../hooks';
+import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
   type PendingAssistantNavigationTarget,
@@ -67,22 +67,11 @@ function StatusFlagsPicker({
   onClear: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('mousedown', onDown);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const ref = useDismissableLayer<HTMLDivElement>({
+    open,
+    onDismiss: () => setOpen(false),
+    group: 'library-filters',
+  });
 
   const active = value.length > 0;
 
@@ -293,6 +282,16 @@ export function Library({
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
+  const tagFilterRef = useDismissableLayer<HTMLDivElement>({
+    open: tagFilterOpen,
+    onDismiss: () => setTagFilterOpen(false),
+    group: 'library-filters',
+  });
+  const collectionFilterRef = useDismissableLayer<HTMLDivElement>({
+    open: collectionFilterOpen,
+    onDismiss: () => setCollectionFilterOpen(false),
+    group: 'library-filters',
+  });
 
   // Only the works list depends on the active filter, so typing in the search
   // box must reload nothing else. Keeping this isolated is what stops each
@@ -720,7 +719,7 @@ export function Library({
             setDimension={setStatusDimension}
             onClear={clearStatusFlags}
           />
-          <div className="relative">
+          <div className="relative" ref={tagFilterRef}>
             <button
               type="button"
               className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
@@ -807,7 +806,7 @@ export function Library({
               </div>
             )}
           </div>
-          <div className="relative">
+          <div className="relative" ref={collectionFilterRef}>
             <button
               type="button"
               className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}

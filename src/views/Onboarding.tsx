@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, ZoteroCollection, ModelInfo } from '@shared/types';
+import type { AiProvider, ZoteroCollection, ModelInfo, VaultSummary } from '@shared/types';
+import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
 import { AI_PROVIDERS, PROVIDER_LABELS, Spinner } from '../components/ui';
 import { t, tx } from '../i18n';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
 
-export function Onboarding({ onDone }: { onDone: (view?: OnboardingExit) => void }) {
+export function Onboarding({
+  vaults,
+  activeVault,
+  onVaultsChanged,
+  onDone,
+}: {
+  vaults: VaultSummary[];
+  activeVault: VaultSummary | null;
+  onVaultsChanged: () => Promise<unknown>;
+  onDone: (view?: OnboardingExit) => void;
+}) {
   const [step, setStep] = useState(0);
   const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
@@ -175,6 +186,7 @@ export function Onboarding({ onDone }: { onDone: (view?: OnboardingExit) => void
 
         {step === 3 && (
           <div className="space-y-4">
+            <VaultApiKeyImporter vaults={vaults} activeVault={activeVault} onImported={onVaultsChanged} />
             <label className="block text-sm">
               {t('Proveedor')}
               <select

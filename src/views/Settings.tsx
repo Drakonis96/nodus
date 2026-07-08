@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings, CopilotServerStatus, EmbeddingProvider, McpServerStatus, ModelInfo, UpdateProgressEvent } from '@shared/types';
+import type {
+  AppSettings,
+  CopilotServerStatus,
+  EmbeddingProvider,
+  McpServerStatus,
+  ModelInfo,
+  UpdateProgressEvent,
+  VaultSummary,
+} from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
@@ -15,9 +23,43 @@ const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
   openrouter: 'baai/bge-m3',
 };
 
-export function Settings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
+type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
+
+const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
+  { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
+  { id: 'models', label: 'Modelos IA', icon: 'wand', keywords: 'model model id embedding embeddings extraccion sintesis tutor resumen fusion razonamiento openrouter unpaywall contexto concurrencia' },
+  { id: 'library', label: 'Biblioteca', icon: 'book', keywords: 'zotero sincronizacion tag lectura automatizacion cola analisis resumen relaciones' },
+  { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
+  { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion' },
+  { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
+  { id: 'system', label: 'Sistema', icon: 'settings', keywords: 'ayuda tutorial actualizaciones update version' },
+  { id: 'data', label: 'Datos', icon: 'download', keywords: 'backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
+];
+
+function normalizeSettingsText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+export function Settings({
+  settings,
+  vaults,
+  activeVault,
+  onChange,
+  onVaultsChanged,
+}: {
+  settings: AppSettings;
+  vaults: VaultSummary[];
+  activeVault: VaultSummary | null;
+  onChange: () => Promise<unknown>;
+  onVaultsChanged: () => Promise<unknown>;
+}) {
   const [saved, setSaved] = useState<string | null>(null);
-  const [settingsTab, setSettingsTab] = useState<'basic' | 'advanced'>('basic');
+  const [settingsTab, setSettingsTab] = useState<SettingsTabId>('providers');
+  const [settingsQuery, setSettingsQuery] = useState('');
   // Reset-graph flow: a confirm() dialog, then a modal that requires typing a
   // freshly generated 4-digit code so it can't be triggered by accident.
   const [resetCode, setResetCode] = useState<string | null>(null);
@@ -208,32 +250,88 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
     updateProgress?.progress != null ? Math.max(0, Math.min(100, updateProgress.progress)) : null;
   const updateBusy = updateProgress?.status === 'downloading' || updateProgress?.status === 'installing';
   const updateDownloaded = updateProgress?.status === 'downloaded';
+  const normalizedSettingsQuery = normalizeSettingsText(settingsQuery);
+  const settingsSearchActive = normalizedSettingsQuery.length > 0;
+  const visibleSettingsSection = (tab: SettingsTabId, title: string, keywords: string): boolean => {
+    if (!settingsSearchActive) return settingsTab === tab;
+    const tabMeta = SETTINGS_TABS.find((item) => item.id === tab);
+    return normalizeSettingsText(`${title} ${t(title)} ${tabMeta?.label ?? ''} ${t(tabMeta?.label ?? '')} ${tabMeta?.keywords ?? ''} ${keywords}`).includes(normalizedSettingsQuery);
+  };
+  const visibleSettingsCount = [
+    visibleSettingsSection('providers', 'Proveedores de IA y modelos', 'api claves proveedor favoritos predeterminado vault boveda cargar claves'),
+    visibleSettingsSection('library', 'Zotero y sincronización', 'zotero sincronizacion manual tiempo real storage tag lectura'),
+    visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar'),
+    visibleSettingsSection('interface', 'Idioma', 'interfaz prompts idioma español english citas'),
+    visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad'),
+    visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
+    visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
+    visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion'),
+    visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
+    visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña'),
+    visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia'),
+    visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
+    visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
+  ].filter(Boolean).length;
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="flex flex-wrap items-start gap-4 mb-5">
+      <div className="flex flex-wrap items-start gap-4 mb-4">
         <div>
           <h1 className="text-xl font-semibold">{t('Ajustes')}</h1>
           <p className="text-sm text-neutral-500 mt-1">
-            {t('Lo básico queda separado de los parámetros técnicos de análisis y extracción.')}
+            {t('Busca un ajuste o entra por una sección temática.')}
           </p>
           <p className="text-xs text-neutral-600 mt-1">Nodus v{__APP_VERSION__}</p>
         </div>
         <div className="flex-1" />
-        <div className="inline-grid grid-cols-2 rounded-lg border border-neutral-800 bg-neutral-900/50 p-1">
-          <SettingsTabButton active={settingsTab === 'basic'} onClick={() => setSettingsTab('basic')}>
-            {t('Básico')}
-          </SettingsTabButton>
-          <SettingsTabButton active={settingsTab === 'advanced'} onClick={() => setSettingsTab('advanced')}>
-            {t('Avanzado')}
-          </SettingsTabButton>
-        </div>
+        <label className="relative w-full sm:w-80">
+          <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input
+            className="input w-full pl-9"
+            value={settingsQuery}
+            onChange={(e) => setSettingsQuery(e.target.value)}
+            placeholder={t('Buscar en ajustes…')}
+          />
+        </label>
       </div>
 
-      {settingsTab === 'basic' ? (
-        <>
-          <ProvidersSettings settings={settings} onChange={onChange} />
+      <div className="mb-5 flex flex-wrap gap-2">
+        {SETTINGS_TABS.map((tab) => (
+          <SettingsTabButton
+            key={tab.id}
+            active={!settingsSearchActive && settingsTab === tab.id}
+            icon={tab.icon}
+            onClick={() => {
+              setSettingsTab(tab.id);
+              setSettingsQuery('');
+            }}
+          >
+            {t(tab.label)}
+          </SettingsTabButton>
+        ))}
+        {settingsSearchActive && (
+          <div className="ml-auto self-center text-xs text-neutral-500">
+            {visibleSettingsCount === 1 ? t('1 sección encontrada') : `${visibleSettingsCount} ${t('secciones encontradas')}`}
+          </div>
+        )}
+      </div>
 
+      {visibleSettingsCount === 0 && (
+        <div className="card p-5 text-sm text-neutral-500">
+          {t('No hay ajustes que coincidan con la búsqueda.')}
+        </div>
+      )}
+      {visibleSettingsSection('providers', 'Proveedores de IA y modelos', 'api claves proveedor favoritos predeterminado vault boveda cargar claves') && (
+        <ProvidersSettings
+            settings={settings}
+            vaults={vaults}
+            activeVault={activeVault}
+            onChange={onChange}
+            onVaultsChanged={onVaultsChanged}
+          />
+      )}
+
+      {visibleSettingsSection('library', 'Zotero y sincronización', 'zotero sincronizacion manual tiempo real storage tag lectura') && (
           <Section title={t('Zotero y sincronización')}>
             <Row label={t('Modo de sincronización')}>
               <select className="input" value={settings.syncMode} onChange={(e) => patch({ syncMode: e.target.value as any })}>
@@ -252,7 +350,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               />
             </Row>
           </Section>
+      )}
 
+      {visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar') && (
           <Section title={t('Automatización de análisis')}>
             <Row label={t('Analizar temas al sincronizar')}>
               <input type="checkbox" checked={settings.autoLightScan} onChange={(e) => patch({ autoLightScan: e.target.checked })} />
@@ -285,7 +385,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('Apagado por defecto: sincronizar solo incorpora metadatos. Los análisis manuales desde Biblioteca o Colecciones se ejecutan siempre.')}
             </p>
           </Section>
+      )}
 
+      {visibleSettingsSection('interface', 'Idioma', 'interfaz prompts idioma español english citas') && (
           <Section title={t('Idioma')}>
             <Row label={t('Idioma de la interfaz')}>
               <select
@@ -311,7 +413,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('El idioma de los prompts determina en qué idioma la IA genera ideas, temas, narrativa del tutor y borradores. Las citas textuales siempre conservan el idioma original de la fuente.')}
             </p>
           </Section>
+      )}
 
+      {visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad') && (
           <Section title={t('Apariencia')}>
             <Row label={t('Tema')}>
               <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
@@ -330,7 +434,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               />
             </Row>
           </Section>
+      )}
 
+      {visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion') && (
           <Section title={t('Barra lateral')}>
             <p className="text-xs text-neutral-500 -mt-1">
               {t('Reordena u oculta las secciones del menú lateral. «Inicio» queda siempre la primera y «Ajustes» la última; ninguna de las dos puede moverse ni ocultarse.')}
@@ -342,7 +448,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden })}
             />
           </Section>
+      )}
 
+      {visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar') && (
           <Section title={t('Ayuda')}>
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -401,7 +509,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               </div>
             </div>
           </Section>
+      )}
 
+      {visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion') && (
           <Section title={t('Servidor MCP')}>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
@@ -453,7 +563,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('Solo escucha en este ordenador. Las herramientas de escritura están activas mientras el servidor esté encendido.')}
             </p>
           </Section>
+      )}
 
+      {visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost') && (
           <Section title={t('Copiloto de escritura (Word)')}>
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-neutral-300">{t('Activar Nodus Copilot para Word')}</label>
@@ -511,7 +623,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.')}
             </p>
           </Section>
+      )}
 
+      {visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña') && (
           <Section title={t('Datos')}>
             {settings.demoMode && (
               <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2">
@@ -551,9 +665,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('La copia incluye todos los datos de Nodus: textos extraídos, embeddings de ideas, resúmenes y pasajes, modelos seleccionados, grafo, ajustes y claves API, dentro de un archivo cifrado.')}
             </p>
           </Section>
-        </>
-      ) : (
-        <>
+      )}
+
+      {visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia') && (
           <Section title={t('IA avanzada')}>
             <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
@@ -650,7 +764,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               />
             </Row>
           </Section>
+      )}
 
+      {visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas') && (
           <Section title={t('Extracción de texto (PDFs grandes)')}>
             <Row label={t('Reusar texto indexado por Zotero')}>
               <input
@@ -684,7 +800,9 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               {t('El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.')}
             </p>
           </Section>
+      )}
 
+      {visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos') && (
           <section className="card p-4 mb-4 border border-red-900/60">
             <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">{t('Zona de peligro')}</h2>
             <div className="flex items-center justify-between gap-4">
@@ -699,7 +817,6 @@ export function Settings({ settings, onChange }: { settings: AppSettings; onChan
               </button>
             </div>
           </section>
-        </>
       )}
 
       {resetCode && (
@@ -1036,32 +1153,37 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <label className="text-sm text-neutral-300">
+    <div className="grid gap-3 md:grid-cols-[minmax(13rem,0.85fr)_minmax(0,1.55fr)] md:items-start">
+      <label className="pt-2 text-sm text-neutral-300">
         {label}
         {hint && <span className="mt-0.5 block text-xs text-neutral-500">{hint}</span>}
       </label>
-      <div>{children}</div>
+      <div className="min-w-0 md:flex md:justify-end">{children}</div>
     </div>
   );
 }
 
 function SettingsTabButton({
   active,
+  icon,
   onClick,
   children,
 }: {
   active: boolean;
+  icon: string;
   onClick: () => void;
   children: string;
 }) {
   return (
     <button
-      className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
-        active ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:text-neutral-200'
+      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+        active
+          ? 'border-indigo-500 bg-indigo-600 text-white shadow-sm shadow-indigo-950/20'
+          : 'border-neutral-800 bg-neutral-900/40 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200'
       }`}
       onClick={onClick}
     >
+      <Icon name={icon} size={14} />
       {children}
     </button>
   );
@@ -1100,9 +1222,9 @@ function EmbeddingModelControl({
   const shown = (models ?? []).slice(0, 300);
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex flex-wrap justify-end gap-2">
-        <select className="input" value={provider} onChange={(e) => setProvider(e.target.value as EmbeddingProvider)}>
+    <div className="w-full max-w-3xl space-y-2">
+      <div className="grid gap-2 lg:grid-cols-[11rem_minmax(13rem,1fr)_auto]">
+        <select className="input w-full" value={provider} onChange={(e) => setProvider(e.target.value as EmbeddingProvider)}>
           {EMBEDDING_PROVIDERS.map((p) => (
             <option key={p} value={p}>
               {PROVIDER_LABELS[p]}
@@ -1110,18 +1232,18 @@ function EmbeddingModelControl({
           ))}
         </select>
         <input
-          className="input w-64"
+          className="input w-full min-w-0"
           value={settings.embeddingModel}
           onChange={(e) => onPatch({ embeddingModel: e.target.value })}
           placeholder={DEFAULT_EMBEDDING_MODEL[provider]}
         />
-        <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loading}>
+        <button className="btn btn-ghost justify-center border border-neutral-700" onClick={loadModels} disabled={loading}>
           {loading ? t('Cargando…') : t('Cargar modelos')}
         </button>
       </div>
       {models && (
         <select
-          className="input w-full max-w-md"
+          className="input w-full"
           value={settings.embeddingModel}
           onChange={(e) => onPatch({ embeddingModel: e.target.value })}
         >
@@ -1135,8 +1257,8 @@ function EmbeddingModelControl({
           ))}
         </select>
       )}
-      {error && <div className="text-xs text-red-400 max-w-md text-right">{error}</div>}
-      <p className="text-xs text-neutral-500 max-w-md text-right">
+      {error && <div className="text-xs text-red-400">{error}</div>}
+      <p className="text-xs text-neutral-500">
         {t('OpenRouter acepta IDs como baai/bge-m3; si escribes BAAI:bge-m3 se normaliza automáticamente.')}
       </p>
     </div>
