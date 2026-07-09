@@ -1430,6 +1430,8 @@ export function GraphView({
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
   const [graphLevel, setGraphLevel] = useState<GraphLevelState>({ level: 'corpus' });
+  // How many of a theme's most-connected ideas the backbone (level 2) shows.
+  const [backboneCap, setBackboneCap] = useState(90);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1');
   const [contextNotice, setContextNotice] = useState<string | null>(null);
@@ -1729,9 +1731,16 @@ export function GraphView({
         : null;
   const constellationModel = useMemo(() => (levelsActive ? buildThemeConstellation(data) : null), [levelsActive, data]);
   const backboneModel = useMemo(
-    () => (levelsActive && activeThemeLabel ? buildThemeBackbone(data, activeThemeLabel, 90) : null),
-    [levelsActive, activeThemeLabel, data]
+    () => (levelsActive && activeThemeLabel ? buildThemeBackbone(data, activeThemeLabel, backboneCap) : null),
+    [levelsActive, activeThemeLabel, data, backboneCap]
   );
+  // Total ideas in the active theme (for the "showing N of M" control at level 2).
+  const activeThemeTotal = useMemo(() => {
+    if (!activeThemeLabel || !constellationModel) return 0;
+    const key = activeThemeLabel.trim().toLowerCase();
+    return constellationModel.nodes.find((n) => n.label.trim().toLowerCase() === key)?.workCount ?? 0;
+  }, [activeThemeLabel, constellationModel]);
+  const backboneShown = backboneModel?.nodes.length ?? 0;
   const graphOverrideModel =
     !levelsActive || graphLevel.level === 'full' ? null : activeThemeLabel ? backboneModel : constellationModel;
   const graphViewLevel: GraphViewLevel =
@@ -1741,6 +1750,7 @@ export function GraphView({
     setIdeaDetail(null);
     setEdgeDetail(null);
     setDetailLoading(null);
+    setBackboneCap(90);
     setGraphLevel({ level: 'theme', theme: label });
   }, []);
   const backToCorpus = useCallback(() => {
@@ -3267,7 +3277,7 @@ export function GraphView({
 
           {/* Semantic-zoom breadcrumb (Sigma overview) */}
           {USE_SIGMA && levelsActive && (
-            <div className="absolute top-3 left-3 z-10 max-w-[70%]">
+            <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-col gap-1.5">
               {graphViewLevel === 'corpus' ? (
                 <div className="card flex items-center gap-1.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-400">
                   <Icon name="layers" size={13} />
@@ -3294,6 +3304,35 @@ export function GraphView({
                   {graphViewLevel === 'full' && (
                     <span className="px-1 text-neutral-400">{t('Idea enfocada')}</span>
                   )}
+                </div>
+              )}
+
+              {/* Level-2 density control: how many of the theme's ideas to show. */}
+              {graphViewLevel === 'theme' && activeThemeTotal > 0 && (
+                <div className="card flex items-center gap-2.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-300">
+                  <span className="whitespace-nowrap tabular-nums text-neutral-400">
+                    {backboneCap >= activeThemeTotal
+                      ? tx('Todas · {n} ideas', { n: activeThemeTotal })
+                      : tx('{n} de {m} más conectadas', { n: backboneShown, m: activeThemeTotal })}
+                  </span>
+                  <input
+                    type="range"
+                    min={20}
+                    max={Math.min(400, Math.max(90, activeThemeTotal))}
+                    step={10}
+                    value={Math.min(backboneCap, Math.min(400, Math.max(90, activeThemeTotal)))}
+                    onChange={(e) => setBackboneCap(parseInt(e.target.value, 10))}
+                    className="h-1 w-28 cursor-pointer accent-indigo-400"
+                    title={t('Cuántas ideas mostrar (por conectividad)')}
+                    aria-label={t('Número de ideas a mostrar')}
+                  />
+                  <button
+                    className={`rounded px-1.5 py-0.5 font-medium ${backboneCap >= activeThemeTotal ? 'bg-indigo-500/25 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setBackboneCap((c) => (c >= activeThemeTotal ? 90 : activeThemeTotal))}
+                    title={t('Mostrar todas las ideas del tema (puede ir más lento)')}
+                  >
+                    {t('Todas')}
+                  </button>
                 </div>
               )}
             </div>

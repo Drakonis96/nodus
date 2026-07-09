@@ -20,7 +20,7 @@ import type { GraphPresetId } from '../../navigation';
 import { t } from '../../i18n';
 import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens, type GraphModel } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
-import { WorkerLayout, seedMissingPositions, scatterPositions, resolveOverlaps } from './layout';
+import { WorkerLayout, seedMissingPositions, scatterPositions, resolveOverlaps, settleSync } from './layout';
 import { computeClusters, type AggregatedGraph } from './lod';
 
 export interface SigmaGraphApi {
@@ -239,6 +239,11 @@ function drawWrappedNodeLabel(
     return;
   }
 
+  // Themes optionally show their idea count on a second, smaller line.
+  const countText = kind === 'theme' && typeof data.count === 'number' ? String(data.count) : '';
+  const countFont = Math.round(fontSize * 0.82);
+  if (countText) box.bottom += countFont * 1.25;
+
   // Theme captions carry the structure of the overview, so seat them on a soft
   // translucent plate. The plate is drawn on Sigma's top label canvas, so the
   // title always reads clearly — never obscured by a node or edge behind it.
@@ -253,6 +258,11 @@ function drawWrappedNodeLabel(
 
   const firstBaseline = data.y - ((lines.length - 1) * lineHeight) / 2 + fontSize * 0.34;
   lines.forEach((line, index) => context.fillText(line, left, firstBaseline + index * lineHeight));
+  if (countText) {
+    context.font = `600 ${countFont}px ${settings.labelFont}`;
+    context.fillStyle = hexLightness(color) > 0.5 ? 'rgba(255,255,255,0.62)' : 'rgba(20,22,28,0.6)';
+    context.fillText(countText, left, firstBaseline + lines.length * lineHeight);
+  }
   collision.boxes.push(box);
   context.restore();
 }
@@ -348,11 +358,14 @@ export function SigmaGraph({
       graph.addNode(n.id, {
         label: n.label,
         kind: n.type,
-        size: Math.max(4, n.size / 2.4),
+        // Theme hubs read as bubbles, so give them a larger on-screen radius than ideas.
+        size: Math.max(4, n.size / (n.type === 'theme' ? 1.7 : 2.4)),
         color: n.color ?? nodeColor(n.type),
         degree: n.degree,
         labelRank: n.labelRank,
         read: n.read,
+        // Idea count, surfaced under theme captions in the constellation.
+        count: n.type === 'theme' ? n.workCount : undefined,
         historyVisible: true,
         // No x/y here on purpose: seedMissingPositions() scatters new nodes on a
         // spiral (and restores prior positions) so ForceAtlas2 has a valid,
@@ -1160,28 +1173,37 @@ export function SigmaGraph({
 
     sigma.refresh();
     if (graph.order > 0) {
-      const overrideScene = overrideActiveRef.current;
-      // A constellation / backbone is a compact scene, so settle it quickly and
-      // frame it — no need for the long Obsidian-style breathe of the full graph.
-      if (overrideScene) void sigma.getCamera().animatedReset({ duration: 1 });
-      const layout = new WorkerLayout(graph);
-      layoutRef.current = layout;
-      // Let the network visibly breathe while it settles, like Obsidian's graph,
-      // but cap the worker budget so very large libraries remain economical.
-      const settleMs = overrideScene ? Math.min(2600, obsidianSettleMs(graph.order)) : obsidianSettleMs(graph.order);
-      layout.start({ durationMs: settleMs });
-      // Once the physics have settled, guarantee no two circles are stacked on
-      // top of each other (ForceAtlas2's anti-collision is only approximate) and
-      // precompute LOD clusters so a future zoom-out is instant.
-      clusterTimerRef.current = window.setTimeout(() => {
-        clusterTimerRef.current = null;
-        if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
-          if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
-          // Frame the settled scene so the whole theme overview / backbone is in view.
-          if (overrideScene) void sigmaRef.current?.getCamera().animatedReset({ duration: 320 });
-        }
+      if (overrideActiveRef.current) {
+        // A constellation / backbone is a compact, self-contained scene. Settle it
+        // synchronously in one shot, guarantee circle spacing, and frame it once.
+        // No worker "breathe" — that kept the camera drifting and made the zoom
+        // controls feel unresponsive on these small scenes.
+        // Fewer iterations for a large "show all" scene so the synchronous settle
+        // never blocks the main thread for long.
+        settleSync(graph, graph.order > 600 ? 180 : 500);
+        resolveOverlaps(graph, { padding: graph.order > 600 ? 8 : 16 });
+        layoutRef.current = null;
+        sigma.refresh();
+        void sigma.getCamera().animatedReset({ duration: 320 });
         ensureClusters();
-      }, settleMs + 300);
+      } else {
+        const layout = new WorkerLayout(graph);
+        layoutRef.current = layout;
+        // Let the network visibly breathe while it settles, like Obsidian's graph,
+        // but cap the worker budget so very large libraries remain economical.
+        const settleMs = obsidianSettleMs(graph.order);
+        layout.start({ durationMs: settleMs });
+        // Once the physics have settled, guarantee no two circles are stacked on
+        // top of each other (ForceAtlas2's anti-collision is only approximate) and
+        // precompute LOD clusters so a future zoom-out is instant.
+        clusterTimerRef.current = window.setTimeout(() => {
+          clusterTimerRef.current = null;
+          if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
+            if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+          }
+          ensureClusters();
+        }, settleMs + 300);
+      }
     } else {
       layoutRef.current = null;
     }

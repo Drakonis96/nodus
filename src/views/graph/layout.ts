@@ -10,7 +10,7 @@
 // has visually settled. A manual `start()` (e.g. after a re-layout) can re-run it.
 import Graph from 'graphology';
 import FA2Layout from 'graphology-layout-forceatlas2/worker';
-import { inferSettings } from 'graphology-layout-forceatlas2';
+import forceAtlas2, { inferSettings } from 'graphology-layout-forceatlas2';
 
 export interface FA2Options {
   /** Auto-stop after this many ms of simulation. */
@@ -110,6 +110,33 @@ export class WorkerLayout {
     this.supervisor?.kill();
     this.supervisor = null;
   }
+}
+
+/**
+ * Settle a small graph synchronously and return. Used for the compact semantic-zoom
+ * scenes (theme constellation / backbone) where the long Obsidian-style worker
+ * "breathe" is unnecessary and actively harmful — it kept the camera drifting and
+ * made zoom feel unresponsive. Runs a bounded ForceAtlas2 in one shot so the scene
+ * appears already laid out, then the caller frames it once.
+ */
+export function settleSync(graph: Graph, iterations = 400): void {
+  if (graph.order === 0) return;
+  const inferred = inferSettings(graph);
+  forceAtlas2.assign(graph, {
+    iterations,
+    getEdgeWeight: 'weight',
+    settings: {
+      ...inferred,
+      barnesHutOptimize: graph.order > 500,
+      barnesHutTheta: 0.7,
+      adjustSizes: true,
+      outboundAttractionDistribution: true,
+      edgeWeightInfluence: 1,
+      scalingRatio: 22,
+      gravity: 0.9,
+      slowDown: 8,
+    },
+  });
 }
 
 /**

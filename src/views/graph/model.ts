@@ -364,6 +364,14 @@ export function themeConstellationSize(memberCount: number): number {
   return 20 + Math.min(70, Math.sqrt(Math.max(0, memberCount)) * 1.4);
 }
 
+// Theme *nodes* carry an uppercased display label (graphService), while an idea's
+// `themes` keeps the original case. Match membership on a normalized key so the
+// two always line up — otherwise a drilled theme finds no ideas and the graph
+// comes up empty. Also collapses stray whitespace for robustness.
+function normalizeThemeKey(label: string): string {
+  return label.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 /**
  * Level 1 — the corpus as a constellation of themes. Each theme becomes one node
  * sized by how many ideas it holds and coloured from a categorical palette; a
@@ -372,38 +380,42 @@ export function themeConstellationSize(memberCount: number): number {
  */
 export function buildThemeConstellation(data: GraphData): GraphModel {
   const themeNodes = data.nodes.filter((n) => n.type === 'theme');
-  const labelToId = new Map<string, string>();
-  for (const theme of themeNodes) labelToId.set(theme.label, theme.id);
+  const labelToId = new Map<string, string>(); // normalized theme label → theme node id
+  for (const theme of themeNodes) labelToId.set(normalizeThemeKey(theme.label), theme.id);
 
   // Membership + a single primary theme per idea (first listed) for edge crossing.
-  const memberCount = new Map<string, number>(); // theme label → idea count
-  const primaryTheme = new Map<string, string>(); // idea id → theme label
+  // All keyed on the normalized label so uppercased theme nodes still match.
+  const memberCount = new Map<string, number>(); // normalized label → idea count
+  const primaryTheme = new Map<string, string>(); // idea id → theme node id
   const ideaIds = new Set<string>();
   for (const node of data.nodes) {
     if (node.type === 'theme') continue;
     ideaIds.add(node.id);
     const themes = node.themes ?? [];
-    if (themes.length) primaryTheme.set(node.id, themes[0]);
-    for (const label of themes) memberCount.set(label, (memberCount.get(label) ?? 0) + 1);
+    if (themes.length) {
+      const primaryId = labelToId.get(normalizeThemeKey(themes[0]));
+      if (primaryId) primaryTheme.set(node.id, primaryId);
+    }
+    for (const label of themes) {
+      const key = normalizeThemeKey(label);
+      memberCount.set(key, (memberCount.get(key) ?? 0) + 1);
+    }
   }
 
   const pairWeight = new Map<string, number>();
   for (const edge of data.edges) {
     if (edge.type === 'contains') continue;
     if (!ideaIds.has(edge.source) || !ideaIds.has(edge.target)) continue;
-    const a = primaryTheme.get(edge.source);
+    const a = primaryTheme.get(edge.source); // already a theme node id
     const b = primaryTheme.get(edge.target);
     if (!a || !b || a === b) continue;
-    const ida = labelToId.get(a);
-    const idb = labelToId.get(b);
-    if (!ida || !idb) continue;
-    const key = ida < idb ? `${ida} ${idb}` : `${idb} ${ida}`;
+    const key = a < b ? `${a} ${b}` : `${b} ${a}`;
     pairWeight.set(key, (pairWeight.get(key) ?? 0) + 1);
   }
   const maxWeight = Math.max(1, ...pairWeight.values());
 
   const nodes: NodeModel[] = themeNodes.map((theme, index) => {
-    const count = memberCount.get(theme.label) ?? theme.workCount ?? 0;
+    const count = memberCount.get(normalizeThemeKey(theme.label)) ?? theme.workCount ?? 0;
     return {
       id: theme.id,
       label: theme.label,
@@ -420,9 +432,9 @@ export function buildThemeConstellation(data: GraphData): GraphModel {
 
   const edges: EdgeModel[] = [];
   for (const [key, weight] of pairWeight) {
-    const [source, target] = key.split(' ');
+    const [source, target] = key.split(' ');
     edges.push({
-      id: `themelink ${key}`,
+      id: `themelink ${key}`,
       source,
       target,
       type: 'related',
@@ -463,10 +475,11 @@ function largestComponent(ids: Set<string>, adjacency: Map<string, Set<string>>)
  * relations are actually visible instead of buried under thousands of nodes.
  */
 export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90): GraphModel {
+  const wanted = normalizeThemeKey(themeLabel);
   const memberById = new Map<string, GraphData['nodes'][number]>();
   for (const node of data.nodes) {
     if (node.type === 'theme') continue;
-    if ((node.themes ?? []).includes(themeLabel)) memberById.set(node.id, node);
+    if ((node.themes ?? []).some((l) => normalizeThemeKey(l) === wanted)) memberById.set(node.id, node);
   }
   const memberIds = new Set(memberById.keys());
 
@@ -480,7 +493,7 @@ export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90
     if (!memberIds.has(edge.source) || !memberIds.has(edge.target)) continue;
     adjacency.get(edge.source)!.add(edge.target);
     adjacency.get(edge.target)!.add(edge.source);
-    const key = edge.source < edge.target ? `${edge.source} ${edge.target}` : `${edge.target} ${edge.source}`;
+    const key = edge.source < edge.target ? `${edge.source} ${edge.target}` : `${edge.target} ${edge.source}`;
     const existing = edgeByPair.get(key);
     if (!existing || edge.confidence > existing.confidence) edgeByPair.set(key, edge);
   }
@@ -530,7 +543,7 @@ export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90
 
   const edges: EdgeModel[] = [];
   for (const [key, edge] of edgeByPair) {
-    const [source, target] = key.split(' ');
+    const [source, target] = key.split(' ');
     if (!kept.has(source) || !kept.has(target)) continue;
     edges.push({
       id: edge.id,
