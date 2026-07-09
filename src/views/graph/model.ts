@@ -62,6 +62,12 @@ export interface NodeModel {
   /** Explicit render colour. When set (e.g. per-theme in the constellation) it
    *  overrides the type-based palette the renderer would otherwise apply. */
   color?: string;
+  /** A cross-theme neighbour of the current theme's core: an idea that lives in
+   *  another theme but connects into this one. Rendered as a small context
+   *  satellite and clickable to jump to its theme. */
+  bridge?: boolean;
+  /** For a bridge node, the label of the theme to jump to when it is clicked. */
+  bridgeTheme?: string;
 }
 
 export interface EdgeModel {
@@ -555,6 +561,84 @@ export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90
       layoutEdge: true,
     });
   }
+
+  // ── Cross-theme bridges ─────────────────────────────────────────────────────
+  // Ideas from OTHER themes that connect into this theme's core. Without them a
+  // theme view silos its ideas and hides interdisciplinary links. We keep a
+  // bounded set (the most-connected) as small satellites coloured by their own
+  // theme; the renderer reveals a focused idea's bridges and lets a click jump to
+  // that theme. Skipped for very large "show all" cores to stay economical.
+  const BRIDGE_CAP = 60;
+  if (kept.size > 0 && kept.size <= 250) {
+    const themeColorByKey = new Map<string, string>();
+    let ti = 0;
+    for (const node of data.nodes) {
+      if (node.type !== 'theme') continue;
+      themeColorByKey.set(normalizeThemeKey(node.label), THEME_CONSTELLATION_PALETTE[ti % THEME_CONSTELLATION_PALETTE.length]);
+      ti++;
+    }
+    const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
+    const bridgeStat = new Map<string, { count: number; conf: number }>();
+    for (const edge of data.edges) {
+      if (edge.type === 'contains' || edge.source === edge.target) continue;
+      for (const [inCore, other] of [[edge.source, edge.target], [edge.target, edge.source]] as const) {
+        if (!kept.has(inCore) || kept.has(other)) continue;
+        const on = nodeById.get(other);
+        if (!on || on.type === 'theme') continue;
+        if ((on.themes ?? []).some((l) => normalizeThemeKey(l) === wanted)) continue; // shares this theme → not a bridge
+        const s = bridgeStat.get(other) ?? { count: 0, conf: 0 };
+        s.count += 1;
+        s.conf = Math.max(s.conf, edge.confidence);
+        bridgeStat.set(other, s);
+      }
+    }
+    const bridgeIds = [...bridgeStat.entries()]
+      .sort((a, b) => b[1].count - a[1].count || b[1].conf - a[1].conf)
+      .slice(0, BRIDGE_CAP)
+      .map(([id]) => id);
+    const bridgeSet = new Set(bridgeIds);
+
+    for (const id of bridgeIds) {
+      const node = nodeById.get(id)!;
+      const firstTheme = (node.themes ?? [])[0];
+      nodes.push({
+        id,
+        label: node.label,
+        type: node.type,
+        createdAt: node.createdAt,
+        workCount: node.workCount,
+        degree: bridgeStat.get(id)!.count,
+        labelRank: 0,
+        size: ideaNodeSize(2) * 0.85,
+        read: node.read,
+        color: firstTheme ? themeColorByKey.get(normalizeThemeKey(firstTheme)) : undefined,
+        bridge: true,
+        bridgeTheme: firstTheme,
+      });
+    }
+    // Edges tying the core to its bridges (deduped, and only one endpoint may be a bridge).
+    const seenEdge = new Set(edges.map((e) => e.id));
+    for (const edge of data.edges) {
+      if (edge.type === 'contains' || seenEdge.has(edge.id)) continue;
+      const coreA = kept.has(edge.source);
+      const coreB = kept.has(edge.target);
+      const brA = bridgeSet.has(edge.source);
+      const brB = bridgeSet.has(edge.target);
+      if ((coreA && brB) || (brA && coreB)) {
+        seenEdge.add(edge.id);
+        edges.push({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          type: edge.type,
+          basis: edge.basis,
+          confidence: edge.confidence,
+          layoutEdge: true,
+        });
+      }
+    }
+  }
+
   return { nodes, edges };
 }
 

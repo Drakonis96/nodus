@@ -366,6 +366,9 @@ export function SigmaGraph({
         read: n.read,
         // Idea count, surfaced under theme captions in the constellation.
         count: n.type === 'theme' ? n.workCount : undefined,
+        // Cross-theme satellites: dimmed at rest, revealed on focus, click to jump.
+        bridge: n.bridge === true,
+        bridgeTheme: n.bridgeTheme,
         historyVisible: true,
         // No x/y here on purpose: seedMissingPositions() scatters new nodes on a
         // spiral (and restores prior positions) so ForceAtlas2 has a valid,
@@ -411,6 +414,12 @@ export function SigmaGraph({
       if (viewLevelRef.current === 'corpus') res.forceLabel = true;
       const focus = focusRef.current;
       const hover = hoverRef.current;
+      // Cross-theme satellites stay quiet (no caption) until a connected idea is
+      // focused or they are hovered — otherwise 60 extra labels would drown the core.
+      const isBridge = dataAttrs.bridge === true;
+      if (isBridge && !focus.active && node !== hover && !hoverLocalRef.current?.neighbors.has(node)) {
+        res.label = '';
+      }
       if (focus.active && focus.local) {
         const { primaryNodes, secondaryNodes, contextNodes, center } = focus.local;
         if (node === center) {
@@ -841,6 +850,11 @@ export function SigmaGraph({
       // Corpus level: a click drills into the theme instead of opening a detail.
       if (viewLevelRef.current === 'corpus' && onDrillDownRef.current) {
         onDrillDownRef.current(node, String(attrs.label ?? ''));
+        return;
+      }
+      // A cross-theme satellite: follow the bridge into its own theme.
+      if (attrs.bridge === true && attrs.bridgeTheme && onDrillDownRef.current) {
+        onDrillDownRef.current(node, String(attrs.bridgeTheme));
         return;
       }
       tutorFocusRef.current = null;

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
-import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT } from '../components/NodeDetailPanel';
+import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT, type RelationRow } from '../components/NodeDetailPanel';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
@@ -2782,6 +2782,63 @@ export function GraphView({
     setDetailLoading(null);
   }, []);
 
+  // ── Idea relations (for the navigable "Conectada con" list) ─────────────────
+  const nodeById = useMemo(() => {
+    const map = new Map<string, GraphData['nodes'][number]>();
+    for (const node of data.nodes) map.set(node.id, node);
+    return map;
+  }, [data]);
+
+  // Every typed relation of the open idea — from the FULL edge set, so cross-theme
+  // links surface here even while the graph view is scoped to one theme.
+  const ideaRelations = useMemo<RelationRow[]>(() => {
+    const idea = ideaDetail?.idea;
+    if (!idea) return [];
+    const id = idea.global_id;
+    const norm = (s: string) => s.trim().toLowerCase();
+    const themeKey = activeThemeLabel ? norm(activeThemeLabel) : null;
+    const rows: (RelationRow & { conf: number })[] = [];
+    const seen = new Set<string>();
+    for (const edge of data.edges) {
+      if (edge.type === 'contains') continue;
+      const other = edge.source === id ? edge.target : edge.target === id ? edge.source : null;
+      if (!other) continue;
+      const pairKey = `${other}|${edge.type}`;
+      if (seen.has(pairKey)) continue;
+      const neighbor = nodeById.get(other);
+      if (!neighbor || neighbor.type === 'theme') continue;
+      seen.add(pairKey);
+      const neighborThemes = neighbor.themes ?? [];
+      const isBridge = themeKey != null && !neighborThemes.some((l) => norm(l) === themeKey);
+      // Only label the theme when it adds information: for a bridge, the theme it
+      // reaches into; at the full graph, the neighbour's theme as context. A
+      // same-theme neighbour needs no label.
+      const themeLabel = isBridge
+        ? neighborThemes.find((l) => themeKey == null || norm(l) !== themeKey) ?? neighborThemes[0]
+        : themeKey == null
+          ? neighborThemes[0]
+          : undefined;
+      rows.push({
+        id: other,
+        label: neighbor.label,
+        relLabel: t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type,
+        relColor: EDGE_TYPE_COLORS[edge.type] ?? '#888',
+        themeLabel,
+        isBridge,
+        conf: edge.confidence,
+      });
+    }
+    // Surface cross-theme bridges first, then by confidence.
+    rows.sort((a, b) => Number(b.isBridge) - Number(a.isBridge) || b.conf - a.conf);
+    return rows.slice(0, 40).map(({ conf: _conf, ...row }) => row);
+  }, [ideaDetail, data, nodeById, activeThemeLabel]);
+
+  const openRelatedIdea = useCallback((ideaId: string) => {
+    const neighbor = nodeById.get(ideaId);
+    onSigmaOpenNode(ideaId, neighbor?.label ?? '', neighbor?.type ?? '');
+    if (USE_SIGMA) sigmaApiRef.current?.focusNode(ideaId);
+  }, [nodeById, onSigmaOpenNode]);
+
   // ── Minimap ────────────────────────────────────────────────────────────────
   const drawMinimap = useCallback(() => {
     const cy = cyRef.current;
@@ -3425,6 +3482,8 @@ export function GraphView({
             fontSize={detailFontSize}
             onWidthChange={setDetailWidth}
             onFontChange={changeDetailFont}
+            relations={USE_SIGMA ? ideaRelations : undefined}
+            onOpenIdea={openRelatedIdea}
             onClose={() => {
               detailSeqRef.current++;
               setIdeaDetail(null);

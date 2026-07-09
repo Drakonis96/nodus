@@ -34,6 +34,17 @@ export interface DetailLoading {
  * `loading` is set (so taps/selections never feel frozen), then fills with the
  * idea or edge detail. Reused by the graph view and the argument map.
  */
+/** One typed relation of the open idea, ready to render + navigate. */
+export interface RelationRow {
+  id: string;
+  label: string;
+  relLabel: string;
+  relColor: string;
+  themeLabel?: string;
+  /** True when the neighbour lives in a different theme (a cross-theme bridge). */
+  isBridge: boolean;
+}
+
 export function NodeDetailPanel({
   ideaDetail,
   edgeDetail,
@@ -43,6 +54,8 @@ export function NodeDetailPanel({
   onWidthChange,
   onFontChange,
   onClose,
+  relations,
+  onOpenIdea,
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
@@ -52,6 +65,10 @@ export function NodeDetailPanel({
   onWidthChange: (width: number) => void;
   onFontChange: (delta: number) => void;
   onClose: () => void;
+  /** Typed relations of the open idea (cross-theme included); enables the
+   *  navigable "Conectada con" list. */
+  relations?: RelationRow[];
+  onOpenIdea?: (ideaId: string) => void;
 }) {
   // A note pending capture: built lazily from whichever detail is open.
   const [saving, setSaving] = useState<{ content: string; title: string; ref: string } | null>(null);
@@ -153,6 +170,38 @@ export function NodeDetailPanel({
             <h3 className="font-semibold mt-2">{ideaDetail.idea.label}</h3>
             <p className="text-neutral-400 mt-1">{ideaDetail.idea.statement}</p>
           </div>
+          {relations && relations.length > 0 && (
+            <div>
+              <div className="text-xs uppercase text-neutral-500 mb-1">{t('Conectada con')}</div>
+              <div className="-mx-1">
+                {relations.map((r) => (
+                  <button
+                    key={r.id}
+                    className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-800"
+                    onClick={() => onOpenIdea?.(r.id)}
+                    title={t('Abrir esta idea')}
+                  >
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.relColor }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block leading-snug text-neutral-200">{r.label}</span>
+                      <span className="text-[11px] text-neutral-500">
+                        {r.relLabel}
+                        {r.themeLabel && (
+                          <>
+                            {' · '}
+                            <span className={r.isBridge ? 'font-medium text-amber-400' : 'text-neutral-500'}>
+                              {r.isBridge ? '→ ' : ''}
+                              {r.themeLabel}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
             {ideaDetail.occurrences.map((o) => (
