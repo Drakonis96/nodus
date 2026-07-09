@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AppSettings, CorpusHealthBucketId, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView } from './views/HomeView';
 import { Library } from './views/Library';
@@ -10,6 +10,7 @@ import { ResearchMapView } from './views/ResearchMapView';
 import { HypothesisLabView } from './views/HypothesisLabView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
+import { DeepResearchView } from './views/DeepResearchView';
 import { ProjectsView } from './views/ProjectsView';
 import { NotesView } from './views/NotesView';
 import { SearchView } from './views/SearchView';
@@ -32,6 +33,7 @@ import { notifyDataChanged, useDataRefresh } from './hooks';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
+  PendingLibraryNavigationTarget,
   View,
 } from './navigation';
 import { orderedNav } from './navigation';
@@ -46,6 +48,7 @@ export function App() {
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
   // same note is chosen twice.
@@ -162,6 +165,11 @@ export function App() {
   const navigate = useCallback((nextView: View, graph?: PendingGraphNavigationTarget) => {
     if (graph) setGraphTarget({ ...graph, nonce: Date.now() });
     setView(nextView);
+  }, []);
+
+  const openLibraryBucket = useCallback((healthBucket: CorpusHealthBucketId) => {
+    setLibraryTarget({ healthBucket, nonce: Date.now() });
+    setView('library');
   }, []);
 
   useEffect(() => {
@@ -348,6 +356,7 @@ export function App() {
               syncing={syncing}
               onSync={onSync}
               onNavigate={(target) => navigate(target)}
+              onOpenLibraryBucket={openLibraryBucket}
               onOpenAssistant={() => openAssistant()}
               showDemoOffer={hasData === false && !settings.demoMode}
               demoBusy={demoBusy}
@@ -357,6 +366,7 @@ export function App() {
           {view === 'library' && (
             <Library
               settings={settings}
+              target={libraryTarget}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
@@ -401,6 +411,7 @@ export function App() {
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'deepResearch' && <DeepResearchView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'projects' && <ProjectsView settings={settings} />}
           {view === 'search' && (
             <SearchView

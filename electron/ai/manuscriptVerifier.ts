@@ -1,5 +1,7 @@
 import type {
   AppLanguage,
+  ApplyManuscriptCitationRequest,
+  ApplyManuscriptCitationResult,
   ManuscriptClaimCheck,
   ManuscriptClaimSeverity,
   ManuscriptClaimStatus,
@@ -10,6 +12,8 @@ import type {
 import {
   classifyClaimLocally,
   extractManuscriptClaims,
+  insertCitationIntoDraft,
+  pruneDistantCandidates,
   summarizeChecks,
   tokenizeForMatch,
   type ExtractedManuscriptClaim,
@@ -18,7 +22,7 @@ import { completeJson, embed } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { allIdeaCandidates, findSimilarIdeas } from '../db/ideasRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
-import { getChapter } from '../db/projectsRepo';
+import { getChapter, updateChapterMarkdown } from '../db/projectsRepo';
 
 const DEFAULT_MAX_CLAIMS = 80;
 const SEMANTIC_IDEA_THRESHOLD = 0.3;
@@ -113,6 +117,17 @@ export async function verifyManuscriptCitations(
     claims: finalChecks,
     warnings,
   };
+}
+
+export function applyManuscriptCitation(request: ApplyManuscriptCitationRequest): ApplyManuscriptCitationResult {
+  const chapter = getChapter(request.chapterId);
+  if (!chapter) return { applied: false, chapter: null };
+  const result = insertCitationIntoDraft(chapter.currentMarkdown, request.excerpt, request.citationMarkdown);
+  if (!result.applied || result.markdown === chapter.currentMarkdown) {
+    return { applied: false, chapter };
+  }
+  const updated = updateChapterMarkdown(request.chapterId, result.markdown, { versionLabel: 'Antes de aplicar cita' });
+  return { applied: Boolean(updated), chapter: updated };
 }
 
 async function gatherEvidence(
@@ -219,6 +234,7 @@ async function refineWithAi(
             'Marca missing_citation solo si NO hay cita existente y algun candidato respalda directamente la frase.',
             'Marca own_argument si la frase expresa una contribucion del autor o si no hay respaldo directo en los candidatos.',
             'No inventes fuentes, ids ni citas. Usa solo evidenceIds de los candidatos recibidos.',
+            'En evidenceIds incluye SOLO los candidatos que respaldan directamente la frase, del mas al menos pertinente. Omite los candidatos fuera de tema aunque aparezcan en la lista.',
             language === 'en'
               ? 'Write rationale and replacementHint in English.'
               : 'Escribe rationale y replacementHint en espanol.',
@@ -270,16 +286,22 @@ async function refineWithAi(
 function applyAiReview(check: ManuscriptClaimCheck, review: AiClaimReview): ManuscriptClaimCheck {
   let status = normalizeStatus(review.status) ?? check.status;
   if (check.hasCitation && status === 'missing_citation') status = 'covered';
-  const severity = normalizeSeverity(review.severity) ?? severityForStatus(status, check);
   const allowedEvidence = new Set(check.suggestedCitations.map((candidate) => `${candidate.kind}:${candidate.refId}`));
-  const evidenceIds = (review.evidenceIds ?? []).filter((id) => allowedEvidence.has(id));
-  const suggestedCitations =
-    evidenceIds.length > 0
-      ? [
-          ...evidenceIds.flatMap((id) => check.suggestedCitations.filter((candidate) => `${candidate.kind}:${candidate.refId}` === id)),
-          ...check.suggestedCitations.filter((candidate) => !evidenceIds.includes(`${candidate.kind}:${candidate.refId}`)),
-        ]
-      : check.suggestedCitations;
+  const endorsedIds = new Set((review.evidenceIds ?? []).filter((id) => allowedEvidence.has(id)));
+  const endorsed = check.suggestedCitations
+    .filter((candidate) => endorsedIds.has(`${candidate.kind}:${candidate.refId}`))
+    .map((candidate) => ({ ...candidate, aiEndorsed: true }));
+  const others = check.suggestedCitations
+    .filter((candidate) => !endorsedIds.has(`${candidate.kind}:${candidate.refId}`))
+    .map((candidate) => ({ ...candidate, aiEndorsed: false }));
+  // When the AI explicitly names the supporting sources for a claim that needs (or
+  // weakly has) a citation, drop the rest: those are the off-topic matches the user
+  // sees as "super distant". Otherwise keep the ranked list but float endorsed first.
+  const prunes = status === 'missing_citation' || status === 'weak_match';
+  const suggestedCitations = (
+    prunes && endorsed.length > 0 ? endorsed : [...endorsed, ...others]
+  ).sort((a, b) => b.score - a.score);
+  const severity = normalizeSeverity(review.severity) ?? severityForStatus(status, { ...check, suggestedCitations });
 
   return {
     ...check,

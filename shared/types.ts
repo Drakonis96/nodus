@@ -1567,6 +1567,9 @@ export interface CorpusHealthBucket {
   sample: CorpusHealthWork[];
 }
 
+/** The work-level corpus-health buckets that can be replayed as a Library filter. */
+export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' | 'pdfsToRecover';
+
 export interface CorpusHealth {
   totalWorks: number;
   /** Works with no usable full text (abstract-only, no source, or extraction skipped). */
@@ -1825,6 +1828,8 @@ export interface ManuscriptEvidenceCandidate {
   score: number;
   workTitle?: string | null;
   pageLabel?: string | null;
+  /** True when the AI review confirmed this candidate as direct support for the claim. */
+  aiEndorsed?: boolean;
 }
 
 export interface ManuscriptClaimCheck {
@@ -1868,6 +1873,20 @@ export interface ManuscriptVerificationRequest {
   model?: ModelRef | null;
   language?: AppLanguage;
   maxClaims?: number;
+}
+
+export interface ApplyManuscriptCitationRequest {
+  chapterId: string;
+  /** Claim sentence as returned by the verifier; located in the draft with whitespace tolerance. */
+  excerpt: string;
+  /** Citation markdown to append to the sentence, e.g. `[label](nodus://idea/...)`. */
+  citationMarkdown: string;
+}
+
+export interface ApplyManuscriptCitationResult {
+  /** False when the sentence could not be located in the current draft. */
+  applied: boolean;
+  chapter: ProjectChapter | null;
 }
 
 export interface ProjectDetail {
@@ -2912,6 +2931,8 @@ export interface NodusApi {
   onChapterRelationsProgress(cb: (p: ChapterRelationsProgress) => void): () => void;
   /** Check uncited manuscript claims against indexed/listed corpus ideas and passages. */
   verifyManuscriptCitations(request: ManuscriptVerificationRequest): Promise<ManuscriptVerificationResult>;
+  /** Insert a chosen citation into the draft at the claim sentence, saving a recoverable version. */
+  applyManuscriptCitation(request: ApplyManuscriptCitationRequest): Promise<ApplyManuscriptCitationResult>;
   exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 
@@ -2975,6 +2996,8 @@ export interface WorkFilter {
   summaryStatus?: SummaryStatus | 'all';
   /** Presence conditions that must all be satisfied (AND). `!` prefix = NOT. */
   statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages'>;
+  /** Restrict to a corpus-health bucket (works without text, light-only, etc.). */
+  healthBucket?: CorpusHealthBucketId;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

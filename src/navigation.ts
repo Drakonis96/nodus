@@ -1,6 +1,6 @@
-import type { ResearchContextSelection } from '@shared/types';
+import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'study' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'study' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -28,6 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
   { id: 'writing', label: 'Escritura', icon: 'edit' },
+  { id: 'deepResearch', label: 'Deep Research', icon: 'compass' },
   { id: 'projects', label: 'Proyectos', icon: 'folder' },
   { id: 'notes', label: 'Notas', icon: 'notebook' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
@@ -77,8 +78,15 @@ export interface AssistantNavigationTarget {
   selection?: ResearchContextSelection;
 }
 
+/** Navigation into the Library that pre-applies a filter (e.g. a corpus-health bucket). */
+export interface LibraryNavigationTarget {
+  nonce: number;
+  healthBucket?: CorpusHealthBucketId;
+}
+
 export type PendingGraphNavigationTarget = Omit<GraphNavigationTarget, 'nonce'>;
 export type PendingAssistantNavigationTarget = Omit<AssistantNavigationTarget, 'nonce'>;
+export type PendingLibraryNavigationTarget = Omit<LibraryNavigationTarget, 'nonce'>;
 
 export const ASSISTANT_CONTEXTS: Record<'idea' | 'gap' | 'contradiction' | 'reading', ResearchContextSelection> = {
   idea: {

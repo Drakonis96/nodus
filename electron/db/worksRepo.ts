@@ -2,6 +2,7 @@ import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
 import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
+import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
 
 function normalizeZoteroTag(tag: string): string {
   return tag.trim().normalize('NFC').toLowerCase();
@@ -215,6 +216,11 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
         }
       }
     }
+  }
+  if (filter.healthBucket) {
+    // Replay the exact predicate the corpus-health notice counted, so the list
+    // matches the number the user clicked.
+    clauses.push(`(${HEALTH_BUCKET_WHERE[filter.healthBucket]})`);
   }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');

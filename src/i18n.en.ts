@@ -502,8 +502,8 @@ export const EN: Record<string, string> = {
   'Aquí Nodus toma tus huecos, ideas y debates y propone hipótesis de investigación comprobables: cada candidata trae sus variables, métodos posibles, predicciones, objeciones y próximos pasos, siempre anclada a la evidencia de tu corpus. Es el puente entre «he detectado un hueco» y «esta es la afirmación que voy a defender».':
     'Here Nodus takes your gaps, ideas and debates and proposes testable research hypotheses: each candidate comes with its variables, possible methods, predictions, objections and next steps, always grounded in your corpus’s evidence. It’s the bridge between “I’ve spotted a gap” and “this is the claim I’m going to defend”.',
   'Deep Research: un informe citado de principio a fin': 'Deep Research: a cited report from end to end',
-  'Dentro de Escritura, el modo Deep Research orquesta un informe extenso y multi-apartado sobre una pregunta: planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.':
-    'Inside Writing, Deep Research mode orchestrates a long, multi-section report on a question: it plans the sections, gathers your corpus’s evidence and writes with checkable citations. Ideal when you need a solid, traceable state of the art, not just a stray paragraph.',
+  'Deep Research es su propia sección: orquesta un informe extenso y multi-apartado sobre una pregunta —planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables—. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.':
+    'Deep Research is its own section: it orchestrates a long, multi-section report on a question —it plans the sections, gathers your corpus’s evidence and writes with checkable citations—. Ideal when you need a solid, traceable state of the art, not just a stray paragraph.',
   'Proyectos: ensambla el manuscrito con verificador de citas':
     'Projects: assemble the manuscript with a citation verifier',
   'Un Proyecto convierte tu trabajo en un manuscrito estructurado —carpetas y secciones en Notas—, importa capítulos con versiones recuperables y, sobre cada capítulo, sugiere solo citas verificables contra el texto original, bloqueando las que no puede sostener. Es tu red de seguridad contra la cita fantasma cuando ya estás redactando.':
@@ -1303,6 +1303,25 @@ export const EN: Record<string, string> = {
   // Deep Research
   'Deep Research': 'Deep Research',
   'Taller': 'Workshop',
+  'Informe guardado localmente.': 'Report saved locally.',
+  'Informe guardado abierto. Puedes exportarlo o reutilizar su idea para regenerarlo.':
+    'Saved report opened. You can export it or reuse its idea to regenerate it.',
+  'Idea reutilizada: ajusta los parámetros y genera un informe actualizado.':
+    'Idea reused: adjust the parameters and generate an updated report.',
+  '¿Eliminar este informe guardado? Esta acción no se puede deshacer.': 'Delete this saved report? This action cannot be undone.',
+  'Informe eliminado.': 'Report deleted.',
+  '1. Plantea la idea': '1. Frame the idea',
+  'Escribe la pregunta o idea de investigación que quieres desarrollar. El informe la convierte en un texto de varias páginas, no en una respuesta corta.':
+    'Write the research question or idea you want to develop. The report turns it into a multi-page text, not a short answer.',
+  '2. Ajusta el alcance': '2. Set the scope',
+  'Elige la extensión objetivo y el número máximo de secciones. Menos secciones producen un texto más profundo; más secciones, uno más panorámico.':
+    'Choose the target length and the maximum number of sections. Fewer sections produce a deeper text; more sections, a more panoramic one.',
+  '3. Cobertura del corpus': '3. Corpus coverage',
+  'Nodus recorre todo el corpus indexado, planifica las secciones y redacta guiado por la cobertura, citando cada obra sin que tengas que seleccionarla.':
+    'Nodus sweeps the whole indexed corpus, plans the sections and writes guided by coverage, citing every work without you having to select it.',
+  '4. Revisa y exporta': '4. Review and export',
+  'Abre las citas para comprobar cada fuente, guarda el informe para retomarlo y expórtalo a Markdown o PDF cuando esté listo.':
+    'Open the citations to check each source, save the report to resume it later and export it to Markdown or PDF when it is ready.',
   'Informe académico de varias páginas, guiado por cobertura y con todas las fuentes citadas.':
     'A multi-page academic report, coverage-guided and with every source cited.',
   'Adaptativo (según corpus)': 'Adaptive (from corpus)',
@@ -1639,7 +1658,14 @@ export const EN: Record<string, string> = {
   'Párrafo {p} · frase {s}': 'Paragraph {p} · sentence {s}',
   Sugerencia: 'Suggestion',
   'Candidatos de cita': 'Citation candidates',
+  'ordenados por afinidad': 'ranked by affinity',
   'Sin citas sugeridas.': 'No suggested citations.',
+  Recomendada: 'Recommended',
+  'Aplicar cita': 'Apply citation',
+  'Ver fuente': 'View source',
+  'Cita aplicada al borrador sobre una versión nueva recuperable.': 'Citation applied to the draft on a new recoverable version.',
+  'No se pudo localizar la frase exacta en el borrador; insértala manualmente desde el texto.':
+    'The exact sentence could not be located in the draft; insert it manually from the text.',
   'Eliminar proyecto': 'Delete project',
   'Proyecto eliminado.': 'Project deleted.',
   '¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.':
@@ -1726,6 +1752,7 @@ export const EN: Record<string, string> = {
   'faltan fragmentos o están obsoletos': 'missing or outdated passages',
   'deben cumplir todas': 'all must be satisfied',
   'Estado:': 'Status:',
+  'Salud del corpus:': 'Corpus health:',
 
   // Authors view (dossier + synthesis matrix). Keys already defined elsewhere
   // (Autores, Síntesis, Obras, '{n} obras', idea-type labels, …) are reused.

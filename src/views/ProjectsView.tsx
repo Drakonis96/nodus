@@ -9,6 +9,7 @@ import type {
   ChapterSuggestionMode,
   ChapterSuggestionStatus,
   ManuscriptClaimCheck,
+  ManuscriptClaimSeverity,
   ManuscriptClaimStatus,
   ManuscriptEvidenceCandidate,
   ManuscriptVerificationResult,
@@ -23,6 +24,7 @@ import type {
   ProjectSectionStatus,
 } from '@shared/types';
 import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type ProjectGuideStepStatus } from '@shared/projectGuide';
+import { summarizeChecks } from '@shared/manuscriptVerifier';
 import { Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
@@ -375,6 +377,32 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
               m: result.summary.missingCitations,
             })
       );
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const applyCitation = async (claim: ManuscriptClaimCheck, candidate: ManuscriptEvidenceCandidate) => {
+    if (!selectedChapter) return;
+    const citationMarkdown = `[${candidate.label}](${candidate.citation})`;
+    setBusy(candidateApplyKey(claim.id, candidate));
+    try {
+      const result = await window.nodus.applyManuscriptCitation({
+        chapterId: selectedChapter.id,
+        excerpt: claim.excerpt,
+        citationMarkdown,
+      });
+      if (result?.applied && result.chapter) {
+        setChapterMarkdown(result.chapter.currentMarkdown);
+        // Keep the verification panel: update this claim in place instead of reloading
+        // chapter artifacts (which would clear the results). Refresh only version history.
+        setVerification((prev) => (prev ? markClaimCited(prev, claim.id, citationMarkdown) : prev));
+        setVersions(await window.nodus.listProjectChapterVersions(selectedChapter.id));
+        setMessage(t('Cita aplicada al borrador sobre una versión nueva recuperable.'));
+        notifyDataChanged();
+      } else {
+        setMessage(t('No se pudo localizar la frase exacta en el borrador; insértala manualmente desde el texto.'));
+      }
     } finally {
       setBusy(null);
     }
@@ -747,7 +775,13 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
                         <div className="space-y-3">
                           {verification?.claims.map((claim) => (
-                            <ManuscriptClaimCard key={claim.id} claim={claim} onOpen={(target) => setCitation(target)} />
+                            <ManuscriptClaimCard
+                              key={claim.id}
+                              claim={claim}
+                              busy={busy}
+                              onOpen={(target) => setCitation(target)}
+                              onApplyCitation={(candidate) => void applyCitation(claim, candidate)}
+                            />
                           ))}
                           {!verification && busy !== 'verify-manuscript' && (
                             <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
@@ -920,12 +954,39 @@ function claimStatusMeta(status: ManuscriptClaimStatus): { label: string; classN
   }
 }
 
+function candidateApplyKey(claimId: string, candidate: ManuscriptEvidenceCandidate): string {
+  return `apply-citation:${claimId}:${candidate.kind}:${candidate.refId}`;
+}
+
+function markClaimCited(
+  result: ManuscriptVerificationResult,
+  claimId: string,
+  citationMarkdown: string
+): ManuscriptVerificationResult {
+  const claims = result.claims.map((claim) =>
+    claim.id === claimId
+      ? {
+          ...claim,
+          status: 'covered' as ManuscriptClaimStatus,
+          severity: 'info' as ManuscriptClaimSeverity,
+          hasCitation: true,
+          existingCitations: [...claim.existingCitations, citationMarkdown],
+        }
+      : claim
+  );
+  return { ...result, claims, summary: summarizeChecks(claims, result.summary.totalClaims) };
+}
+
 function ManuscriptClaimCard({
   claim,
+  busy,
   onOpen,
+  onApplyCitation,
 }: {
   claim: ManuscriptClaimCheck;
+  busy: string | null;
   onOpen: (citation: CitationTarget) => void;
+  onApplyCitation: (candidate: ManuscriptEvidenceCandidate) => void;
 }) {
   const meta = claimStatusMeta(claim.status);
   return (
@@ -961,13 +1022,22 @@ function ManuscriptClaimCard({
       )}
 
       <div className="mt-3">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Candidatos de cita')}</div>
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+          {t('Candidatos de cita')} <span className="font-normal normal-case text-neutral-400">· {t('ordenados por afinidad')}</span>
+        </div>
         {claim.suggestedCitations.length === 0 ? (
           <div className="text-xs text-neutral-500">{t('Sin citas sugeridas.')}</div>
         ) : (
           <div className="grid gap-2 md:grid-cols-2">
             {claim.suggestedCitations.map((candidate) => (
-              <EvidenceCandidateButton key={`${candidate.kind}:${candidate.refId}`} candidate={candidate} onOpen={onOpen} />
+              <EvidenceCandidateButton
+                key={`${candidate.kind}:${candidate.refId}`}
+                claimId={claim.id}
+                candidate={candidate}
+                busy={busy}
+                onOpen={onOpen}
+                onApply={onApplyCitation}
+              />
             ))}
           </div>
         )}
@@ -977,27 +1047,58 @@ function ManuscriptClaimCard({
 }
 
 function EvidenceCandidateButton({
+  claimId,
   candidate,
+  busy,
   onOpen,
+  onApply,
 }: {
+  claimId: string;
   candidate: ManuscriptEvidenceCandidate;
+  busy: string | null;
   onOpen: (citation: CitationTarget) => void;
+  onApply: (candidate: ManuscriptEvidenceCandidate) => void;
 }) {
   const title = candidate.workTitle && candidate.workTitle !== candidate.label ? `${candidate.label} · ${candidate.workTitle}` : candidate.label;
+  const applying = busy === candidateApplyKey(claimId, candidate);
   return (
-    <button
-      type="button"
-      className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:bg-neutral-900"
-      onClick={() => onOpen({ kind: candidate.kind, id: candidate.refId })}
+    <div
+      className={`flex min-w-0 flex-col rounded-md border px-3 py-2 ${
+        candidate.aiEndorsed
+          ? 'border-indigo-300 bg-indigo-50/70 dark:border-indigo-700/60 dark:bg-indigo-950/25'
+          : 'border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50'
+      }`}
     >
       <div className="flex items-center gap-2">
         <Icon name={candidate.kind === 'idea' ? 'bulb' : 'quote'} size={13} className="text-indigo-500 dark:text-indigo-300" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{title}</span>
+        {candidate.aiEndorsed && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded border border-indigo-300 bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-900/40 dark:text-indigo-200">
+            <Icon name="check" size={10} /> {t('Recomendada')}
+          </span>
+        )}
         <span className="shrink-0 text-[10px] tabular-nums text-neutral-500">{Math.round(candidate.score * 100)}%</span>
       </div>
       <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{candidate.snippet}</p>
       {candidate.pageLabel && <div className="mt-1 text-[11px] text-neutral-500">{candidate.pageLabel}</div>}
-    </button>
+      <div className="mt-2 flex items-center gap-1.5">
+        <button
+          type="button"
+          className="btn btn-primary gap-1 px-2 py-1 text-[11px]"
+          onClick={() => onApply(candidate)}
+          disabled={busy !== null}
+        >
+          <Icon name={applying ? 'sync' : 'check'} size={12} className={applying ? 'animate-spin' : ''} /> {t('Aplicar cita')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost gap-1 px-2 py-1 text-[11px]"
+          onClick={() => onOpen({ kind: candidate.kind, id: candidate.refId })}
+        >
+          <Icon name="quote" size={12} /> {t('Ver fuente')}
+        </button>
+      </div>
+    </div>
   );
 }
 

@@ -4,6 +4,7 @@ import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
   AddProjectLinkInput,
+  ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
   AuthorSynthesisExportRequest,
   ChapterSuggestionStatus,
@@ -100,7 +101,7 @@ import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
 import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
-import { verifyManuscriptCitations } from './ai/manuscriptVerifier';
+import { applyManuscriptCitation, verifyManuscriptCitations } from './ai/manuscriptVerifier';
 import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -890,6 +891,9 @@ export function registerIpc(
   );
   h('projects:manuscript:verify', async (_e, request: ManuscriptVerificationRequest) =>
     verifyManuscriptCitations(request)
+  );
+  h('projects:manuscript:applyCitation', async (_e, request: ApplyManuscriptCitationRequest) =>
+    applyManuscriptCitation(request)
   );
   h('projects:export', async (_e, request: ExportProjectRequest) => exportProject(request));
   h('projects:chapters:export', async (_e, request: ExportProjectChapterRequest) =>

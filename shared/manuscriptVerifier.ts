@@ -186,7 +186,7 @@ export function classifyClaimLocally(input: {
   language?: AppLanguage;
 }): ManuscriptClaimCheck {
   const language = input.language === 'en' ? 'en' : 'es';
-  const evidence = input.evidence.slice().sort((a, b) => b.score - a.score);
+  const evidence = pruneDistantCandidates(input.evidence);
   const top = evidence[0] ?? null;
   const strong = Boolean(top && (top.score >= 0.32 || (top.score >= 0.24 && evidence.length >= 2)));
   const direct = Boolean(top && top.score >= 0.2);
@@ -241,9 +241,65 @@ export function classifyClaimLocally(input: {
     status,
     severity,
     rationale,
-    suggestedCitations: evidence.slice(0, 5),
+    suggestedCitations: evidence,
     replacementHint: top ? citationHint(top) : null,
   };
+}
+
+/**
+ * Keeps only citation candidates that are pertinent to the claim, dropping the
+ * long tail of weak/off-topic matches that clutter the verifier. Candidates far
+ * below the best match (relative gap) or below an absolute affinity floor are
+ * removed, so the sentence is offered a short, ranked list instead of everything
+ * the retrieval step happened to surface.
+ */
+export function pruneDistantCandidates(candidates: ManuscriptEvidenceCandidate[], limit = 4): ManuscriptEvidenceCandidate[] {
+  const sorted = candidates.slice().sort((a, b) => b.score - a.score);
+  if (sorted.length === 0) return sorted;
+  const top = sorted[0].score;
+  const floor = Math.max(0.24, top * 0.62);
+  return sorted.filter((candidate, index) => index === 0 || candidate.score >= floor).slice(0, limit);
+}
+
+/**
+ * Inserts `citationMarkdown` into `markdown` right before the terminal
+ * punctuation of the sentence that matches `excerpt`. Matching tolerates
+ * whitespace/newline differences between the verifier excerpt and the stored
+ * draft. Returns `applied: false` when the sentence cannot be located or the
+ * citation is already present there.
+ */
+export function insertCitationIntoDraft(
+  markdown: string,
+  excerpt: string,
+  citationMarkdown: string
+): { markdown: string; applied: boolean } {
+  const citation = citationMarkdown.trim();
+  if (!markdown || !excerpt.trim() || !citation) return { markdown, applied: false };
+  const pattern = buildExcerptRegex(excerpt);
+  if (!pattern) return { markdown, applied: false };
+  const match = pattern.exec(markdown);
+  if (!match) return { markdown, applied: false };
+  const matched = match[0];
+  if (matched.includes(citation)) return { markdown, applied: false };
+  const end = match.index + matched.length;
+  const tail = matched.match(/[.!?]+["'”’)\]]*\s*$/);
+  const insertAt = tail ? end - tail[0].length : end;
+  const needsSpace = insertAt > 0 && !/\s$/.test(markdown.slice(0, insertAt));
+  const next = markdown.slice(0, insertAt) + (needsSpace ? ' ' : '') + citation + markdown.slice(insertAt);
+  return { markdown: next, applied: true };
+}
+
+function buildExcerptRegex(excerpt: string): RegExp | null {
+  const escaped = excerpt
+    .trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\s+/g, '\\s+');
+  if (!escaped) return null;
+  try {
+    return new RegExp(escaped);
+  } catch {
+    return null;
+  }
 }
 
 export function summarizeChecks(checks: ManuscriptClaimCheck[], totalClaims = checks.length) {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   WorkView,
   WorkFilter,
+  CorpusHealthBucketId,
   DeepStatus,
   LightStatus,
   SummaryStatus,
@@ -24,6 +25,7 @@ import { VirtualList } from '../components/VirtualList';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import {
   ASSISTANT_CONTEXTS,
+  type LibraryNavigationTarget,
   type PendingAssistantNavigationTarget,
   type PendingGraphNavigationTarget,
 } from '../navigation';
@@ -34,6 +36,20 @@ const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
+
+/** Human label for a corpus-health bucket, matching the notice text on Home. */
+function healthBucketLabel(id: CorpusHealthBucketId): string {
+  switch (id) {
+    case 'withoutText':
+      return t('Sin texto');
+    case 'lightOnly':
+      return t('Solo análisis ligero');
+    case 'deepPriority':
+      return t('Prioritarias por analizar');
+    case 'pdfsToRecover':
+      return t('Recuperar texto');
+  }
+}
 
 type StatusDimension = 'deep' | 'summary' | 'ideas' | 'passages';
 
@@ -248,11 +264,14 @@ function passageBadge(status: WorkPassageStatus | undefined) {
 
 export function Library({
   settings,
+  target,
   onOpenCollections,
   onOpenGraph,
   onOpenAssistant,
 }: {
   settings: AppSettings;
+  /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
+  target?: LibraryNavigationTarget | null;
   onOpenCollections: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
@@ -350,6 +369,16 @@ export function Library({
   useEffect(() => window.nodus.onPassageProgress((progress) => {
     if (!progress.running) refreshAllRef.current();
   }), []);
+
+  // Focus the list on a corpus-health bucket when the user clicks a health notice
+  // on Home. The nonce re-triggers even if the same bucket is chosen twice. We
+  // replace the whole filter so the list shows exactly the works that notice
+  // counted, and clear any leftover search text.
+  useEffect(() => {
+    if (!target) return;
+    setSearchDraft('');
+    setFilter(target.healthBucket ? { healthBucket: target.healthBucket } : {});
+  }, [target]);
 
   // Debounce the free-text search: push the draft into the filter only after the
   // user pauses, so a burst of keystrokes triggers one DB query instead of one
@@ -612,12 +641,15 @@ export function Library({
   };
 
   const selectedStatusFlags = filter.statusFlags ?? [];
+  const selectedHealthBucket = filter.healthBucket ?? null;
   const searchValue = searchDraft;
   const hasActiveFilters =
     searchValue.trim().length > 0 ||
     selectedStatusFlags.length > 0 ||
     selectedZoteroTags.length > 0 ||
-    selectedCollections.length > 0;
+    selectedCollections.length > 0 ||
+    selectedHealthBucket !== null;
+  const clearHealthBucket = () => setFilter((c) => ({ ...c, healthBucket: undefined }));
   const toggleStatusFlag = (f: StatusFlag) =>
     setFilter((cur) => {
       const set = new Set(cur.statusFlags ?? []);
@@ -957,6 +989,19 @@ export function Library({
                 {filter.collectionMode === 'all' ? t('deben estar todas') : t('basta cualquiera')}
               </span>
             )}
+          </div>
+        )}
+        {selectedHealthBucket && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
+            <span>{t('Salud del corpus:')}</span>
+            <button
+              type="button"
+              className="library-active-chip tone-amber inline-flex items-center gap-1 rounded-md border border-amber-800/70 bg-amber-950/30 px-2 py-1 text-amber-200 hover:bg-amber-950/60"
+              onClick={clearHealthBucket}
+              title={`${t('Quitar')} ${healthBucketLabel(selectedHealthBucket)}`}
+            >
+              {healthBucketLabel(selectedHealthBucket)} <Icon name="x" size={12} />
+            </button>
           </div>
         )}
         {selectedStatusFlags.length > 0 && (

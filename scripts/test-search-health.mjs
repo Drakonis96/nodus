@@ -136,6 +136,16 @@ try {
   assert.equal(countWhere(PDFS_TO_RECOVER), 2, 'pdfsToRecover: w3 + w5');
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM works WHERE archived = 0').get().n, 5, 'archived work excluded');
 
+  // ── The centralized clauses (single source of truth for the health panel AND
+  // the Library `healthBucket` filter) must produce the same counts as the
+  // oracle above. This guards worksRepo.listWorks({ healthBucket }) — which
+  // injects these exact strings — against drift from corpusHealthRepo.
+  const central = await loadHealthBucketClauses();
+  assert.equal(countWhere(`(${central.withoutText})`), 2, 'central withoutText clause matches oracle');
+  assert.equal(countWhere(`(${central.lightOnly})`), 2, 'central lightOnly clause matches oracle');
+  assert.equal(countWhere(`(${central.deepPriority})`), 1, 'central deepPriority clause matches oracle');
+  assert.equal(countWhere(`(${central.pdfsToRecover})`), 2, 'central pdfsToRecover clause matches oracle');
+
   // ── Embedding backlog aggregate (provider/model aware) ──────────────────────
   const idea = db.prepare(
     'INSERT INTO ideas (global_id, type, label, statement, embedding, embedding_provider, embedding_model, embedding_dim) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -227,6 +237,23 @@ async function migration20Sql() {
   const match = source.match(/version:\s*20,\s*up:\s*\/\*\s*sql\s*\*\/\s*`([\s\S]*?)`\s*,\s*}\s*(?:,|];)/);
   assert.ok(match?.[1], 'Could not find migration 20 SQL');
   return match[1];
+}
+
+// Extract the four bucket WHERE clauses straight from the source of truth so the
+// test breaks if that file and corpusHealthRepo/worksRepo ever diverge.
+async function loadHealthBucketClauses() {
+  const source = await readFile(path.join(repoRoot, 'electron/db/corpusHealthBuckets.ts'), 'utf8');
+  const clause = (name) => {
+    const match = source.match(new RegExp('const ' + name + ' = `([\\s\\S]*?)`;'));
+    assert.ok(match?.[1], `Could not find ${name} in corpusHealthBuckets.ts`);
+    return match[1];
+  };
+  return {
+    withoutText: clause('WITHOUT_TEXT_WHERE'),
+    lightOnly: clause('LIGHT_ONLY_WHERE'),
+    deepPriority: clause('DEEP_PRIORITY_WHERE'),
+    pdfsToRecover: clause('PDFS_TO_RECOVER_WHERE'),
+  };
 }
 
 function tableExists(db, name) {
