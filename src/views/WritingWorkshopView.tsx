@@ -21,6 +21,7 @@ import type {
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, EDGE_LABELS, Icon, NODE_LABELS, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { confirm } from '../components/feedback';
 import type { MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -265,7 +266,13 @@ export function WritingWorkshopView({
   };
 
   const deleteSavedDraft = async (saved: WritingWorkshopSavedDraft) => {
-    if (!window.confirm(t('¿Eliminar este borrador guardado? Esta acción no se puede deshacer.'))) return;
+    const ok = await confirm({
+      title: t('Eliminar borrador'),
+      message: t('¿Eliminar este borrador guardado? Esta acción no se puede deshacer.'),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
     setError(null);
     setMessage(null);
     try {

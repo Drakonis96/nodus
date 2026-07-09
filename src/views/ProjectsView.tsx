@@ -26,6 +26,7 @@ import type {
 import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type ProjectGuideStepStatus } from '@shared/projectGuide';
 import { summarizeChecks } from '@shared/manuscriptVerifier';
 import { Icon } from '../components/ui';
+import { confirm } from '../components/feedback';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { ProjectGuideStepModal } from '../components/ProjectGuideStepModal';
@@ -177,11 +178,14 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
   const deleteActiveProject = async () => {
     if (!detail) return;
-    const ok = window.confirm(
-      tx('¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.', {
+    const ok = await confirm({
+      title: t('Eliminar proyecto'),
+      message: tx('¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.', {
         title: detail.project.title,
-      })
-    );
+      }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
     if (!ok) return;
     setBusy('delete-project');
     try {

@@ -17,6 +17,7 @@ import type {
 } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { DuplicatesModal } from './DuplicatesModal';
@@ -555,17 +556,19 @@ export function Library({
   const processFullLibrary = async () => {
     const ids = works.map((w) => w.nodus_id);
     if (ids.length === 0) return;
-    const ok = window.confirm(
-      tx(
+    const ok = await confirm({
+      title: t('Procesar toda la biblioteca'),
+      message: tx(
         'Procesar todo encadena para las {n} obra(s) filtrada(s): temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones. Es una operación larga que consume tokens del modelo seleccionado. ¿Continuar?',
         { n: ids.length }
-      )
-    );
+      ),
+      confirmLabel: t('Continuar'),
+    });
     if (!ok) return;
     await window.nodus.processFullBulk(ids, scanModel);
     setSelected(new Set());
     await load();
-    window.alert(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
+    toast(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
   };
 
   const summarizeSelected = async () => {
@@ -583,24 +586,28 @@ export function Library({
   };
 
   const reassignThemes = async () => {
-    const ok = window.confirm(
-      t('Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?')
-    );
+    const ok = await confirm({
+      title: t('Reasignar temas'),
+      message: t('Reasignar temas vuelve a ejecutar el análisis ligero (título + abstract) sobre TODA la biblioteca para reconstruir los temas padre y agrupar las ideas existentes bajo ellos. Consume tokens del modelo seleccionado. ¿Continuar?'),
+      confirmLabel: t('Continuar'),
+    });
     if (!ok) return;
     const n = await window.nodus.reassignThemes(scanModel);
     await load();
-    window.alert(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
+    toast(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
   };
 
   const rescanAbstractOnly = async () => {
-    const ok = window.confirm(
-      t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?')
-    );
+    const ok = await confirm({
+      title: t('Reanalizar «solo abstract»'),
+      message: t('Reanaliza las obras que solo se analizaron con el abstract (el PDF/EPUB no estaba disponible al analizarlas). Las que ya tengan el texto disponible en Zotero recuperarán el análisis completo; el resto se omiten sin coste. ¿Continuar?'),
+      confirmLabel: t('Continuar'),
+    });
     if (!ok) return;
     const n = await window.nodus.rescanDegraded(scanModel);
     await load();
-    if (n === 0) window.alert(t('No hay obras «solo abstract» para reanalizar.'));
-    else window.alert(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
+    if (n === 0) toast(t('No hay obras «solo abstract» para reanalizar.'), { tone: 'info' });
+    else toast(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
   };
 
   const embedWork = async (nodusId: string) => {

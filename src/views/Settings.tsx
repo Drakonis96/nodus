@@ -10,9 +10,10 @@ import type {
 } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
-import { orderedNav } from '../navigation';
+import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 
 const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
@@ -153,10 +154,13 @@ export function Settings({
     );
   };
 
-  const startReset = () => {
-    const ok = window.confirm(
-      t('Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?')
-    );
+  const startReset = async () => {
+    const ok = await confirm({
+      title: t('Reinicializar el grafo'),
+      message: t('Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.'),
+      confirmLabel: t('Continuar'),
+      danger: true,
+    });
     if (!ok) return;
     setResetInput('');
     setResetCode(String(Math.floor(1000 + Math.random() * 9000)));
@@ -1019,9 +1023,11 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
 }
 
 /**
- * Reorder and show/hide the sidebar sections. Home (pinned first) and Settings
- * (pinned last) can neither be moved nor hidden, so they are not shown here; the
- * saved order is the list of the remaining view ids.
+ * Reorder and show/hide the sidebar sections, grouped like the sidebar itself
+ * (Explorar · Analizar · Escribir). Home (pinned first) and Settings (pinned
+ * last) can neither be moved nor hidden, so they are not shown here. Reordering
+ * is constrained to within a group; the saved order is the flat list of the
+ * remaining view ids, from which {@link groupedNav} derives each group's order.
  */
 function SidebarOrderEditor({
   sidebarOrder,
@@ -1034,16 +1040,22 @@ function SidebarOrderEditor({
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
 }) {
-  const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const orderedAll = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: orderedAll.filter((n) => n.group === g.id) }));
   const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const move = (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (target < 0 || target >= items.length) return;
-    const ids = items.map((n) => n.id);
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+  const move = (id: string, dir: -1 | 1) => {
+    const group = groups.find((g) => g.items.some((n) => n.id === id));
+    if (!group) return;
+    const gi = group.items.findIndex((n) => n.id === id);
+    const target = gi + dir;
+    if (target < 0 || target >= group.items.length) return;
+    const ids: string[] = orderedAll.map((n) => n.id);
+    const ia = ids.indexOf(id);
+    const ib = ids.indexOf(group.items[target].id);
+    [ids[ia], ids[ib]] = [ids[ib], ids[ia]];
     onReorder(ids);
   };
 
@@ -1054,91 +1066,104 @@ function SidebarOrderEditor({
     onToggleHidden([...next]);
   };
 
+  // Drag-and-drop only rearranges within the same group; cross-group drops are ignored.
   const drop = (targetId: string) => {
     if (!draggingId || draggingId === targetId) return;
-    const ids: string[] = items.map((n) => n.id);
+    const src = orderedAll.find((n) => n.id === draggingId);
+    const tgt = orderedAll.find((n) => n.id === targetId);
+    if (!src || !tgt || src.group !== tgt.group) return;
+    const ids: string[] = orderedAll.map((n) => n.id);
     const from = ids.indexOf(draggingId);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
+    if (from < 0) return;
     ids.splice(from, 1);
+    const to = ids.indexOf(targetId);
     ids.splice(to, 0, draggingId);
     onReorder(ids);
   };
 
   return (
-    <ul className="space-y-1">
-      {items.map((item, index) => (
-        <li
-          key={item.id}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', item.id);
-            setDraggingId(item.id);
-          }}
-          onDragEnter={() => setDragOverId(item.id)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            drop(item.id);
-            setDraggingId(null);
-            setDragOverId(null);
-          }}
-          onDragEnd={() => {
-            setDraggingId(null);
-            setDragOverId(null);
-          }}
-          className={`flex items-center gap-2 rounded-md border bg-neutral-900/40 px-3 py-1.5 transition-colors ${
-            draggingId === item.id ? 'opacity-40' : ''
-          } ${
-            dragOverId === item.id && draggingId !== item.id
-              ? 'border-indigo-500 border-dashed'
-              : 'border-neutral-800'
-          }`}
-        >
-          <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
-          <Icon
-            name={item.icon}
-            size={15}
-            className={`shrink-0 ${hidden.has(item.id) ? 'text-neutral-700' : 'text-neutral-500'}`}
-          />
-          <span
-            className={`flex-1 min-w-0 truncate text-sm ${
-              hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
-            }`}
-          >
-            {t(item.label)}
-          </span>
-          <button
-            className={`p-1 rounded hover:bg-neutral-800 ${
-              hidden.has(item.id)
-                ? 'text-neutral-600 hover:text-neutral-300'
-                : 'text-neutral-500 hover:text-neutral-100'
-            }`}
-            title={hidden.has(item.id) ? t('Mostrar') : t('Ocultar')}
-            onClick={() => toggleHidden(item.id)}
-          >
-            <Icon name={hidden.has(item.id) ? 'eyeOff' : 'eye'} size={14} />
-          </button>
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
-            title={t('Subir')}
-            disabled={index === 0}
-            onClick={() => move(index, -1)}
-          >
-            <Icon name="arrowUp" size={14} />
-          </button>
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
-            title={t('Bajar')}
-            disabled={index === items.length - 1}
-            onClick={() => move(index, 1)}
-          >
-            <Icon name="arrowDown" size={14} />
-          </button>
-        </li>
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <div key={group.id}>
+          <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+            {t(group.label)}
+          </div>
+          <ul className="space-y-1">
+            {group.items.map((item, gi) => (
+              <li
+                key={item.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', item.id);
+                  setDraggingId(item.id);
+                }}
+                onDragEnter={() => setDragOverId(item.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  drop(item.id);
+                  setDraggingId(null);
+                  setDragOverId(null);
+                }}
+                onDragEnd={() => {
+                  setDraggingId(null);
+                  setDragOverId(null);
+                }}
+                className={`flex items-center gap-2 rounded-md border bg-neutral-900/40 px-3 py-1.5 transition-colors ${
+                  draggingId === item.id ? 'opacity-40' : ''
+                } ${
+                  dragOverId === item.id && draggingId !== item.id
+                    ? 'border-indigo-500 border-dashed'
+                    : 'border-neutral-800'
+                }`}
+              >
+                <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
+                <Icon
+                  name={item.icon}
+                  size={15}
+                  className={`shrink-0 ${hidden.has(item.id) ? 'text-neutral-700' : 'text-neutral-500'}`}
+                />
+                <span
+                  className={`flex-1 min-w-0 truncate text-sm ${
+                    hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
+                  }`}
+                >
+                  {t(item.label)}
+                </span>
+                <button
+                  className={`p-1 rounded hover:bg-neutral-800 ${
+                    hidden.has(item.id)
+                      ? 'text-neutral-600 hover:text-neutral-300'
+                      : 'text-neutral-500 hover:text-neutral-100'
+                  }`}
+                  title={hidden.has(item.id) ? t('Mostrar') : t('Ocultar')}
+                  onClick={() => toggleHidden(item.id)}
+                >
+                  <Icon name={hidden.has(item.id) ? 'eyeOff' : 'eye'} size={14} />
+                </button>
+                <button
+                  className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+                  title={t('Subir')}
+                  disabled={gi === 0}
+                  onClick={() => move(item.id, -1)}
+                >
+                  <Icon name="arrowUp" size={14} />
+                </button>
+                <button
+                  className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+                  title={t('Bajar')}
+                  disabled={gi === group.items.length - 1}
+                  onClick={() => move(item.id, 1)}
+                >
+                  <Icon name="arrowDown" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

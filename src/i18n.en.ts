@@ -2074,5 +2074,19 @@ export const EN: Record<string, string> = {
   'Proyecto completo': 'Full project',
   'Seccion del proyecto': 'Project section',
   'texto completo': 'full text',
+  // ── v1 launch: confirm-dialog titles (native window.confirm → styled ConfirmModal) ──
+  'Reinicializar el grafo': 'Reset the graph',
+  'Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.':
+    'Resetting the graph will delete ALL ideas, themes, connections, authors and gaps, and leave every work unanalyzed. Your Zotero library and your settings are kept. This action cannot be undone.',
+  'Eliminar borrador': 'Delete draft',
+  'Eliminar informe': 'Delete report',
+  'Procesar toda la biblioteca': 'Process the entire library',
+  // ── v1 launch: sidebar groups + command palette ──
+  Explorar: 'Explore',
+  Escribir: 'Write',
+  General: 'General',
+  'Paleta de comandos': 'Command palette',
+  'Ir a una sección o ejecutar una acción…': 'Go to a section or run an action…',
+  'Actualizar (sincronizar Zotero)': 'Update (sync Zotero)',
   // <<END_EN>>
 };

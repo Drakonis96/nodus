@@ -25,6 +25,7 @@ import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher } from './components/VaultSwitcher';
+import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
@@ -36,7 +37,8 @@ import type {
   PendingLibraryNavigationTarget,
   View,
 } from './navigation';
-import { orderedNav } from './navigation';
+import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 
 export function App() {
@@ -60,15 +62,16 @@ export function App() {
   const [hasData, setHasData] = useState<boolean | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
-  // Sidebar sections in the user's chosen order (Home always pinned first,
-  // Settings always last), minus any the user has hidden. Home and Settings can
-  // never be hidden, so they always stay reachable.
-  const nav = useMemo(() => {
-    const hidden = new Set(settings?.sidebarHidden ?? []);
-    return orderedNav(settings?.sidebarOrder ?? []).filter(
-      (n) => n.id === 'home' || n.id === 'settings' || !hidden.has(n.id),
-    );
-  }, [settings?.sidebarOrder, settings?.sidebarHidden]);
+  // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
+  // each group in the user's chosen order, minus any hidden sections. Home is
+  // pinned first and Settings last, both outside every group and never hidden.
+  const navGroups = useMemo(
+    () => groupedNav(settings?.sidebarOrder ?? [], settings?.sidebarHidden ?? []),
+    [settings?.sidebarOrder, settings?.sidebarHidden]
+  );
+  const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
+  const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
@@ -151,6 +154,18 @@ export function App() {
     });
   };
 
+  // Global command palette: ⌘K / Ctrl+K toggles it from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const onSync = async () => {
     setSyncing(true);
     try {
@@ -221,6 +236,30 @@ export function App() {
     await refreshHasData();
     notifyDataChanged();
   }, [refreshHasData, reloadSettings, reloadVaults]);
+
+  // Command palette entries: every navigation destination (grouped like the
+  // sidebar) plus the header's global actions. Rebuilt when the language changes
+  // so labels stay translated.
+  const paletteCommands = useMemo<Command[]>(() => {
+    const groupLabel = new Map(NAV_GROUPS.map((g) => [g.id, t(g.label)] as const));
+    const bySection = [
+      ...NAV_ITEMS.filter((n) => !n.group),
+      ...NAV_GROUPS.flatMap((g) => NAV_ITEMS.filter((n) => n.group === g.id)),
+    ];
+    const navCommands: Command[] = bySection.map((n) => ({
+      id: `nav:${n.id}`,
+      label: t(n.label),
+      section: n.group ? groupLabel.get(n.group)! : t('General'),
+      icon: n.icon,
+      run: () => setView(n.id),
+    }));
+    const actions: Command[] = [
+      { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
+      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'wand', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+    ];
+    return [...navCommands, ...actions];
+  }, [settings?.uiLanguage, onSync, openAssistant]);
 
   if (loadError) {
     return (
@@ -328,22 +367,39 @@ export function App() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar (collapsible via the Nodus logo) */}
+        {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
+            Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
         {!navCollapsed && (
-          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
-            {nav.map((n) => (
-              <button
-                key={n.id}
-                data-tour={`nav-${n.id}`}
-                onClick={() => setView(n.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                  view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
-                }`}
-              >
-                <Icon name={n.icon} className="opacity-70" />
-                {t(n.label)}
-              </button>
-            ))}
+          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1 overflow-y-auto">
+            {(() => {
+              const navButton = (n: { id: View; icon: string; label: string }) => (
+                <button
+                  key={n.id}
+                  data-tour={`nav-${n.id}`}
+                  onClick={() => setView(n.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                    view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                  }`}
+                >
+                  <Icon name={n.icon} className="opacity-70" />
+                  {t(n.label)}
+                </button>
+              );
+              return (
+                <>
+                  {navButton(homeItem)}
+                  {navGroups.map((group) => (
+                    <div key={group.id} className="mt-2 flex flex-col gap-1">
+                      <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
+                        {t(group.label)}
+                      </div>
+                      {group.items.map((n) => navButton(n))}
+                    </div>
+                  ))}
+                  <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                </>
+              );
+            })()}
           </nav>
         )}
 
@@ -440,6 +496,10 @@ export function App() {
         <EmbeddingProgressBar />
         <PassageProgressBar />
       </div>
+
+      <FeedbackHost />
+
+      {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
 
       {collectionsOpen && (
         <CollectionsModal

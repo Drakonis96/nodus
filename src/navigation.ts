@@ -4,33 +4,56 @@ export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
+/** Sidebar section groups, in render order. Home and Settings are pinned outside
+ * any group (first/last); every other section belongs to exactly one group.
+ * Reordering (in Settings) happens within a group. */
+export type NavGroupId = 'explore' | 'analyze' | 'create';
+
 export interface NavItem {
   id: View;
   label: string;
   icon: string;
+  /** Pinned sections (home, settings) have no group. */
+  group?: NavGroupId;
 }
 
-// Canonical sidebar sections in their default order. Home is always rendered
-// first and Settings always last; neither can be moved or hidden. The rest can
-// be reordered and shown/hidden from Settings.
+export interface NavGroupDef {
+  id: NavGroupId;
+  label: string;
+}
+
+export const NAV_GROUPS: NavGroupDef[] = [
+  { id: 'explore', label: 'Explorar' },
+  { id: 'analyze', label: 'Analizar' },
+  { id: 'create', label: 'Escribir' },
+];
+
+// Canonical sidebar sections in their default order, grouped. Home is always
+// rendered first and Settings always last; neither can be moved or hidden. The
+// rest can be reordered (within their group) and shown/hidden from Settings.
+// Every icon is unique so sections stay distinguishable when the sidebar is
+// collapsed to icons.
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Inicio', icon: 'home' },
-  { id: 'search', label: 'Buscar', icon: 'search' },
-  { id: 'graph', label: 'Grafo', icon: 'layers' },
-  { id: 'argument', label: 'Mapa de argumentos', icon: 'map' },
-  { id: 'ideas', label: 'Ideas', icon: 'bulb' },
-  { id: 'authors', label: 'Autores', icon: 'graduation' },
-  { id: 'study', label: 'Estudio', icon: 'compass' },
-  { id: 'library', label: 'Biblioteca', icon: 'book' },
-  { id: 'gaps', label: 'Huecos', icon: 'gap' },
-  { id: 'debate', label: 'Debates', icon: 'scale' },
-  { id: 'research', label: 'Cobertura', icon: 'compass' },
-  { id: 'hypothesis', label: 'Hipótesis', icon: 'flask' },
-  { id: 'reading', label: 'Ruta de lectura', icon: 'route' },
-  { id: 'writing', label: 'Escritura', icon: 'edit' },
-  { id: 'deepResearch', label: 'Deep Research', icon: 'compass' },
-  { id: 'projects', label: 'Proyectos', icon: 'folder' },
-  { id: 'notes', label: 'Notas', icon: 'notebook' },
+  // Explorar — recorrer el corpus y el grafo.
+  { id: 'search', label: 'Buscar', icon: 'search', group: 'explore' },
+  { id: 'library', label: 'Biblioteca', icon: 'book', group: 'explore' },
+  { id: 'graph', label: 'Grafo', icon: 'layers', group: 'explore' },
+  { id: 'argument', label: 'Mapa de argumentos', icon: 'map', group: 'explore' },
+  // Analizar — superficies derivadas del grafo.
+  { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'analyze' },
+  { id: 'authors', label: 'Autores', icon: 'graduation', group: 'analyze' },
+  { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
+  { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
+  { id: 'debate', label: 'Debates', icon: 'scale', group: 'analyze' },
+  { id: 'research', label: 'Cobertura', icon: 'help', group: 'analyze' },
+  { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
+  { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
+  // Escribir — producir salidas con citas.
+  { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
+  { id: 'deepResearch', label: 'Deep Research', icon: 'network', group: 'create' },
+  { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
+  { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 
@@ -55,6 +78,27 @@ export function orderedNav(sidebarOrder: string[]): NavItem[] {
   }
   for (const n of rest) if (remaining.has(n.id)) ordered.push(n);
   return [...(home ? [home] : []), ...ordered, ...(settings ? [settings] : [])];
+}
+
+export interface NavGroup extends NavGroupDef {
+  items: NavItem[];
+}
+
+/**
+ * Group the (visible, ordered) sidebar sections for rendering. Groups appear in
+ * {@link NAV_GROUPS} order; within each group the items keep the user's saved
+ * order. Home and Settings are pinned outside groups and are not returned here.
+ * Empty groups (all sections hidden) are dropped.
+ */
+export function groupedNav(sidebarOrder: string[], sidebarHidden: string[]): NavGroup[] {
+  const hidden = new Set(sidebarHidden);
+  const ordered = orderedNav(sidebarOrder).filter(
+    (n) => n.id !== 'home' && n.id !== 'settings' && !hidden.has(n.id),
+  );
+  return NAV_GROUPS.map((g) => ({
+    ...g,
+    items: ordered.filter((n) => n.group === g.id),
+  })).filter((g) => g.items.length > 0);
 }
 
 export interface GraphNavigationTarget {
