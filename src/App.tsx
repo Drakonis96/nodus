@@ -299,7 +299,7 @@ export function App() {
         <button
           className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
           onClick={toggleNav}
-          title={navCollapsed ? 'Mostrar el menú lateral' : 'Ocultar el menú lateral (más espacio para el grafo)'}
+          title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
           <img src={nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
@@ -317,7 +317,7 @@ export function App() {
           <select
             data-tour="model"
             className="input text-xs py-1"
-            title="Modelo predeterminado para escaneos"
+            title={t('Modelo predeterminado para escaneos')}
             value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
             onChange={async (e) => {
               if (!e.target.value) return;
