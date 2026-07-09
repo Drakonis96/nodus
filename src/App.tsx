@@ -42,6 +42,10 @@ import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 
+// Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
+const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
+
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
@@ -312,8 +316,23 @@ export function App() {
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
         />
+        {/* Command-palette launcher: advertises the ⌘K/Ctrl+K shortcut and gives
+            mouse users a way in. Opens the same palette as the keyboard shortcut. */}
+        <button
+          className="btn btn-ghost gap-2 text-neutral-400"
+          onClick={() => setPaletteOpen(true)}
+          title={t('Paleta de comandos')}
+        >
+          <Icon name="search" />
+          <span className="hidden lg:inline">{t('Comandos')}</span>
+          <kbd className="composer-kbd">{PALETTE_HINT}</kbd>
+        </button>
         <div className="flex-1" />
-        {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
+        {lastSync && (
+          <span className="text-xs text-neutral-500 truncate max-w-[14rem]" title={lastSync.summary}>
+            {lastSync.summary}
+          </span>
+        )}
         {settings.favorites.length > 0 && (
           <select
             data-tour="model"

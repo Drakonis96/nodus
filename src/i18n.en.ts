@@ -2084,6 +2084,7 @@ export const EN: Record<string, string> = {
   Escribir: 'Write',
   General: 'General',
   'Paleta de comandos': 'Command palette',
+  Comandos: 'Commands',
   'Ir a una sección o ejecutar una acción…': 'Go to a section or run an action…',
   'Actualizar (sincronizar Zotero)': 'Update (sync Zotero)',
   // ── v1.0.1: global error boundary ──
