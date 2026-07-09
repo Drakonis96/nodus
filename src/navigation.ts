@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'study' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -44,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'analyze' },
   { id: 'authors', label: 'Autores', icon: 'graduation', group: 'analyze' },
   { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
+  { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
   { id: 'debate', label: 'Debates', icon: 'scale', group: 'analyze' },
   { id: 'research', label: 'Cobertura', icon: 'help', group: 'analyze' },

@@ -18,6 +18,7 @@ import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { AuthorsView } from './views/AuthorsView';
 import { StudyGuideView } from './views/StudyGuideView';
+import { ImmersionView } from './views/ImmersionView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
@@ -493,6 +494,9 @@ export function App() {
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
             />
+          )}
+          {view === 'immersion' && (
+            <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />
           )}
           {view === 'gaps' && (
             <GapsView

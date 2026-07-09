@@ -994,3 +994,22 @@ body {
 .light .citation-card-snippet {
   color: #475569;
 }
+
+/* ── v1.2.0 Inmersión ─────────────────────────────────────────────────────── */
+/* Hero banner of the Inmersión launcher: a quiet radial glow that works as a
+   deliberate design in BOTH themes (no dark-only gradient utilities). */
+.immersion-hero {
+  background:
+    radial-gradient(52rem 26rem at 88% -20%, rgba(129, 140, 248, 0.16), transparent 60%),
+    radial-gradient(40rem 22rem at -10% 120%, rgba(217, 70, 239, 0.1), transparent 60%),
+    linear-gradient(135deg, rgba(30, 27, 75, 0.5), rgba(10, 10, 10, 0) 55%);
+}
+.light .immersion-hero {
+  background:
+    radial-gradient(52rem 26rem at 88% -20%, rgba(99, 102, 241, 0.14), transparent 60%),
+    radial-gradient(40rem 22rem at -10% 120%, rgba(192, 38, 211, 0.08), transparent 60%),
+    linear-gradient(135deg, #eef2ff, #fafafa 60%, #fdf4ff);
+}
+.light .stroke-neutral-800 {
+  stroke: #e5e7eb;
+}

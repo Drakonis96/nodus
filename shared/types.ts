@@ -2624,6 +2624,293 @@ export interface StudyAnswerAssessment {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Inmersión — a fully guided topic-mastery session. Phase 0 (the scope) is pure
+// embeddings + graph, no AI; the generated plan stores every AI answer verbatim
+// so a session can be resumed and replayed forever without new AI calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ImmersionScopeRequest {
+  topic: string;
+}
+
+/** One idea inside the topic territory, ranked by relevance (no AI involved). */
+export interface ImmersionScopeIdea {
+  id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  score: number;
+  themes: string[];
+  authors: string[];
+  workIds: string[];
+}
+
+export interface ImmersionScopeWork {
+  nodusId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  zoteroKey: string | null;
+  score: number;
+  ideaCount: number;
+}
+
+export interface ImmersionScopeAuthor {
+  authorId: string | null;
+  name: string;
+  ideaCount: number;
+  workCount: number;
+}
+
+/** Phase 0 — the map of what the corpus knows about a topic (embeddings + graph only). */
+export interface ImmersionScope {
+  topic: string;
+  generatedAt: string;
+  embeddingAvailable: boolean;
+  /** Whether the configured synthesis/default model has a usable API key; without it generation would degrade to structural content. */
+  aiKeyAvailable: boolean;
+  ideas: ImmersionScopeIdea[];
+  works: ImmersionScopeWork[];
+  authors: ImmersionScopeAuthor[];
+  themes: string[];
+  debateCount: number;
+  gapCount: number;
+  passageCount: number;
+  /** The topic subgraph (idea nodes + edges among them), ready for the renderer. */
+  graph: GraphData;
+  estimatedStations: number;
+  warnings: string[];
+}
+
+export interface ImmersionRequest {
+  topic: string;
+  language?: 'es' | 'en';
+  /** Total time budget for the whole immersion, in minutes. */
+  minutes: number;
+  /** Whether stations and the final exam carry retrieval questions (always skippable). */
+  includeQuiz: boolean;
+  model?: ModelRef | null;
+}
+
+/**
+ * A literal quote re-read from the stored full text. `text` always comes from the
+ * database, never from the model — the model only picks the passage and explains
+ * why it matters.
+ */
+export interface ImmersionCitation {
+  passageId: string;
+  workId: string;
+  workTitle: string;
+  authors: string[];
+  year: number | null;
+  zoteroKey: string | null;
+  pageLabel: string | null;
+  text: string;
+  whyItMatters: string;
+  /** Guided close reading: what to notice in this quote and how it bears on the sub-question. */
+  commentary: string;
+}
+
+export interface ImmersionAuthorPosition {
+  authorId: string | null;
+  name: string;
+  position: string;
+  ideaIds: string[];
+}
+
+export interface ImmersionQuizQuestion {
+  id: string;
+  kind: 'choice' | 'open';
+  question: string;
+  /** Choice questions: the options shown; empty for open questions. */
+  options: string[];
+  /** Choice questions: index into `options`; null for open questions. */
+  correctIndex: number | null;
+  /** Choice questions: shown after answering. */
+  explanation: string;
+  /** Open questions: what a solid answer must recover. */
+  expected: string;
+  ideaIds: string[];
+}
+
+/**
+ * One guided stop of the immersion — a complete mini-lesson: framing context,
+ * a long threaded lesson, guided close reading of literal quotes, author
+ * positions, takeaways to retain and optional retrieval questions.
+ */
+export interface ImmersionStation {
+  id: string;
+  title: string;
+  question: string;
+  minutes: number;
+  /** Why this sub-question matters inside the topic (framing before the lesson). */
+  context: string;
+  /** The main lesson: markdown with nodus:// citations, validated against the corpus. */
+  synthesis: string;
+  citations: ImmersionCitation[];
+  positions: ImmersionAuthorPosition[];
+  /** The sentences the reader must retain from this station. */
+  takeaways: string[];
+  /** The ideas this station covers; drives the embedded graph excerpt. */
+  ideaIds: string[];
+  quiz: ImmersionQuizQuestion[];
+}
+
+export interface ImmersionKeyTerm {
+  term: string;
+  definition: string;
+}
+
+export interface ImmersionContrastCell {
+  author: string;
+  authorId: string | null;
+  /** One-sentence stance; empty when this author has no known position. */
+  stance: string;
+  ideaIds: string[];
+}
+
+export interface ImmersionContrastRow {
+  stationId: string;
+  question: string;
+  cells: ImmersionContrastCell[];
+}
+
+export interface ImmersionContrasts {
+  authors: string[];
+  rows: ImmersionContrastRow[];
+}
+
+export interface ImmersionFrontier {
+  kind: 'gap' | 'thin_coverage';
+  statement: string;
+  detail: string;
+  workTitle: string | null;
+}
+
+export interface ImmersionExam {
+  questions: ImmersionQuizQuestion[];
+  /** The "explain it in your own words" closing prompt. */
+  feynman: string;
+}
+
+/** Compact idea reference stored in the plan so answers can be assessed later without the live graph. */
+export interface ImmersionIdeaRef {
+  id: string;
+  label: string;
+  statement: string;
+  authors: string[];
+  workTitles: string[];
+}
+
+export interface ImmersionPlanStats {
+  stations: number;
+  ideas: number;
+  works: number;
+  authors: number;
+  citations: number;
+  quizQuestions: number;
+}
+
+export interface ImmersionPlan {
+  topic: string;
+  title: string;
+  language: 'es' | 'en';
+  minutes: number;
+  generatedAt: string;
+  model: ModelRef | null;
+  /** Phase 1 panorama: markdown with nodus:// citations. */
+  overview: string;
+  keyTerms: ImmersionKeyTerm[];
+  stations: ImmersionStation[];
+  contrasts: ImmersionContrasts;
+  frontiers: ImmersionFrontier[];
+  exam: ImmersionExam;
+  /** The topic subgraph; stations select node subsets from it via ideaIds. */
+  graph: GraphData;
+  ideaIndex: ImmersionIdeaRef[];
+  stats: ImmersionPlanStats;
+  /** Non-null when generation degraded somewhere (a model failure fell back to structural content). */
+  stoppedReason: string | null;
+}
+
+export interface ImmersionAssessment {
+  verdict: 'solid' | 'partial' | 'weak';
+  score: number;
+  feedback: string;
+  missing: string[];
+}
+
+export interface ImmersionAnswerRecord {
+  questionId: string;
+  kind: 'choice' | 'open';
+  answer: string;
+  /** Choice questions: whether the chosen option was right. */
+  correct: boolean | null;
+  /** Open questions: the AI (or heuristic) assessment. */
+  assessment: ImmersionAssessment | null;
+  answeredAt: string;
+}
+
+export interface ImmersionProgress {
+  currentStep: number;
+  furthestStep: number;
+  completedSteps: number[];
+  answers: ImmersionAnswerRecord[];
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface ImmersionSession {
+  id: string;
+  topic: string;
+  language: 'es' | 'en';
+  minutes: number;
+  model: ModelRef | null;
+  plan: ImmersionPlan;
+  progress: ImmersionProgress;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImmersionSessionSummary {
+  id: string;
+  topic: string;
+  title: string;
+  language: 'es' | 'en';
+  minutes: number;
+  stats: ImmersionPlanStats;
+  progressPct: number;
+  finished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImmersionBuildProgress {
+  phase: 'material' | 'curriculum' | 'panorama' | 'station' | 'contrasts' | 'frontiers' | 'exam' | 'assembling' | 'done';
+  message: string;
+  stationIndex?: number;
+  stationTotal?: number;
+  stationTitle?: string;
+}
+
+export interface ImmersionStreamHandlers {
+  onProgress?(progress: ImmersionBuildProgress): void;
+}
+
+export interface ImmersionAnswerRequest {
+  sessionId: string;
+  questionId: string;
+  answer: string;
+  model?: ModelRef | null;
+}
+
+/** The recorded answer (with assessment when open) plus the persisted progress. */
+export interface ImmersionAnswerResult {
+  record: ImmersionAnswerRecord;
+  progress: ImmersionProgress;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2768,6 +3055,15 @@ export interface NodusApi {
   }): Promise<StudyProgressRecord>;
   /** Optional AI tutor session for one author, grounded in graph data and indexed passages. */
   generateStudySession(request: StudySessionRequest): Promise<StudySession>;
+
+  // inmersión (guided topic mastery)
+  buildImmersionScope(request: ImmersionScopeRequest): Promise<ImmersionScope>;
+  generateImmersionSession(request: ImmersionRequest, handlers?: ImmersionStreamHandlers): Promise<ImmersionSession>;
+  listImmersionSessions(): Promise<ImmersionSessionSummary[]>;
+  getImmersionSession(id: string): Promise<ImmersionSession | null>;
+  setImmersionProgress(id: string, progress: ImmersionProgress): Promise<void>;
+  answerImmersionQuestion(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult>;
+  deleteImmersionSession(id: string): Promise<void>;
   /** Evaluate a learner's answer against the selected author's extracted ideas. */
   evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment>;
 

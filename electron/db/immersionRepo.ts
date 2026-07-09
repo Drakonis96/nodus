@@ -1,0 +1,178 @@
+import { v4 as uuid } from 'uuid';
+import type {
+  ImmersionAnswerRecord,
+  ImmersionPlan,
+  ImmersionPlanStats,
+  ImmersionProgress,
+  ImmersionSession,
+  ImmersionSessionSummary,
+  ModelRef,
+} from '@shared/types';
+import { getDb } from './database';
+
+interface SessionRow {
+  id: string;
+  topic: string;
+  title: string;
+  language: string;
+  minutes: number;
+  model_json: string | null;
+  plan_json: string;
+  progress_json: string;
+  stats_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+const EMPTY_STATS: ImmersionPlanStats = { stations: 0, ideas: 0, works: 0, authors: 0, citations: 0, quizQuestions: 0 };
+
+export function emptyImmersionProgress(): ImmersionProgress {
+  return {
+    currentStep: 0,
+    furthestStep: 0,
+    completedSteps: [],
+    answers: [],
+    startedAt: null,
+    finishedAt: null,
+  };
+}
+
+function parseJson<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeProgress(value: unknown): ImmersionProgress {
+  const empty = emptyImmersionProgress();
+  if (!value || typeof value !== 'object') return empty;
+  const o = value as Partial<ImmersionProgress>;
+  return {
+    currentStep: Math.max(0, Number(o.currentStep ?? 0)),
+    furthestStep: Math.max(0, Number(o.furthestStep ?? 0)),
+    completedSteps: Array.isArray(o.completedSteps) ? o.completedSteps.map(Number).filter((n) => Number.isFinite(n)) : [],
+    answers: Array.isArray(o.answers) ? (o.answers as ImmersionAnswerRecord[]) : [],
+    startedAt: typeof o.startedAt === 'string' ? o.startedAt : null,
+    finishedAt: typeof o.finishedAt === 'string' ? o.finishedAt : null,
+  };
+}
+
+/** Fill fields added after a plan was stored, so old sessions replay unchanged. */
+function normalizePlan(plan: ImmersionPlan): ImmersionPlan {
+  for (const station of plan.stations ?? []) {
+    station.context = typeof station.context === 'string' ? station.context : '';
+    station.takeaways = Array.isArray(station.takeaways) ? station.takeaways : [];
+    for (const citation of station.citations ?? []) {
+      citation.commentary = typeof citation.commentary === 'string' ? citation.commentary : '';
+    }
+  }
+  return plan;
+}
+
+function toSession(row: SessionRow): ImmersionSession | null {
+  const plan = parseJson<ImmersionPlan | null>(row.plan_json, null);
+  if (!plan) return null;
+  normalizePlan(plan);
+  return {
+    id: row.id,
+    topic: row.topic,
+    language: row.language === 'en' ? 'en' : 'es',
+    minutes: row.minutes,
+    model: parseJson<ModelRef | null>(row.model_json, null),
+    plan,
+    progress: normalizeProgress(parseJson<unknown>(row.progress_json, null)),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Total number of player steps a plan produces: panorama + stations + contrasts + frontiers + exam. */
+export function immersionStepCount(stats: ImmersionPlanStats): number {
+  return 1 + stats.stations + 3;
+}
+
+function toSummary(row: SessionRow): ImmersionSessionSummary {
+  const stats = { ...EMPTY_STATS, ...parseJson<Partial<ImmersionPlanStats>>(row.stats_json, {}) };
+  const progress = normalizeProgress(parseJson<unknown>(row.progress_json, null));
+  const steps = immersionStepCount(stats);
+  const pct = progress.finishedAt
+    ? 100
+    : Math.max(0, Math.min(99, Math.round((progress.completedSteps.length / Math.max(1, steps)) * 100)));
+  return {
+    id: row.id,
+    topic: row.topic,
+    title: row.title || row.topic,
+    language: row.language === 'en' ? 'en' : 'es',
+    minutes: row.minutes,
+    stats,
+    progressPct: pct,
+    finished: progress.finishedAt != null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function saveImmersionSession(plan: ImmersionPlan, model: ModelRef | null): ImmersionSession {
+  const db = getDb();
+  const now = new Date().toISOString();
+  const id = uuid();
+  const progress = emptyImmersionProgress();
+  db.prepare(
+    `INSERT INTO immersion_sessions (
+       id, topic, title, language, minutes, model_json, plan_json, progress_json, stats_json, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id,
+    plan.topic,
+    plan.title,
+    plan.language,
+    plan.minutes,
+    model ? JSON.stringify(model) : null,
+    JSON.stringify(plan),
+    JSON.stringify(progress),
+    JSON.stringify(plan.stats),
+    now,
+    now
+  );
+  return { id, topic: plan.topic, language: plan.language, minutes: plan.minutes, model, plan, progress, createdAt: now, updatedAt: now };
+}
+
+export function listImmersionSessions(): ImmersionSessionSummary[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id, topic, title, language, minutes, model_json, '' AS plan_json, progress_json, stats_json, created_at, updated_at
+         FROM immersion_sessions
+        ORDER BY updated_at DESC`
+    )
+    .all() as SessionRow[];
+  return rows.map(toSummary);
+}
+
+export function getImmersionSession(id: string): ImmersionSession | null {
+  const row = getDb().prepare('SELECT * FROM immersion_sessions WHERE id = ?').get(id) as SessionRow | undefined;
+  return row ? toSession(row) : null;
+}
+
+export function setImmersionProgress(id: string, progress: ImmersionProgress): void {
+  getDb()
+    .prepare('UPDATE immersion_sessions SET progress_json = ?, updated_at = ? WHERE id = ?')
+    .run(JSON.stringify(normalizeProgress(progress)), new Date().toISOString(), id);
+}
+
+/** Append (or replace) one answer inside the stored progress and persist atomically. */
+export function recordImmersionAnswer(id: string, record: ImmersionAnswerRecord): ImmersionProgress {
+  const session = getImmersionSession(id);
+  if (!session) throw new Error('Sesión de inmersión no encontrada');
+  const answers = session.progress.answers.filter((a) => a.questionId !== record.questionId);
+  answers.push(record);
+  const next: ImmersionProgress = { ...session.progress, answers };
+  setImmersionProgress(id, next);
+  return next;
+}
+
+export function deleteImmersionSession(id: string): void {
+  getDb().prepare('DELETE FROM immersion_sessions WHERE id = ?').run(id);
+}

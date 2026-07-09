@@ -19,3 +19,6 @@ release/
 *.p12
 *.pfx
 *.mobileprovision
+
+# esbuild smoke-test bundles (generated at repo root)
+.smoke-*.mjs

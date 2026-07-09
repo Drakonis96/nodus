@@ -59,6 +59,8 @@ interface SigmaGraphProps {
   onOpenEdge: (id: string, type: string) => void;
   onClearFocus: () => void;
   onApiReady?: (api: SigmaGraphApi | null) => void;
+  /** Hide the minimap overlay — for small embedded excerpts where it would cover the graph. */
+  showMinimap?: boolean;
 }
 
 // Camera ratio above which we show the aggregated overview instead of every node.
@@ -281,6 +283,7 @@ export function SigmaGraph({
   onOpenEdge,
   onClearFocus,
   onApiReady,
+  showMinimap = true,
 }: SigmaGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
@@ -1395,7 +1398,7 @@ export function SigmaGraph({
         ref={minimapRef}
         width={156}
         height={104}
-        className="absolute bottom-3 right-3 z-10 cursor-pointer rounded-lg border border-neutral-300/70 opacity-70 hover:opacity-95 dark:border-neutral-700"
+        className={`absolute bottom-3 right-3 z-10 cursor-pointer rounded-lg border border-neutral-300/70 opacity-70 hover:opacity-95 dark:border-neutral-700${showMinimap ? '' : ' hidden'}`}
         title={t('Mini-mapa · click para navegar')}
         onClick={onMinimapClick}
       />

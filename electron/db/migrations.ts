@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 25;
+export const SCHEMA_VERSION = 26;
 
 export const migrations: Migration[] = [
   {
@@ -816,6 +816,30 @@ export const migrations: Migration[] = [
         generated_at  TEXT NOT NULL,
         FOREIGN KEY (nodus_id) REFERENCES works(nodus_id) ON DELETE CASCADE
       );
+    `,
+  },
+  {
+    version: 26,
+    up: /* sql */ `
+      -- Inmersión sessions. plan_json stores the COMPLETE generated experience
+      -- (every AI answer, literal quotes, contrasts matrix, exam, topic subgraph)
+      -- so a session replays forever without new AI calls; progress_json stores
+      -- the user's position, completed steps and answers (with assessments).
+      -- stats_json is a small denormalized summary so listing never parses plans.
+      CREATE TABLE immersion_sessions (
+        id            TEXT PRIMARY KEY,
+        topic         TEXT NOT NULL,
+        title         TEXT NOT NULL DEFAULT '',
+        language      TEXT NOT NULL DEFAULT 'es',
+        minutes       INTEGER NOT NULL DEFAULT 150,
+        model_json    TEXT,
+        plan_json     TEXT NOT NULL,
+        progress_json TEXT NOT NULL,
+        stats_json    TEXT NOT NULL DEFAULT '{}',
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_immersion_updated ON immersion_sessions(updated_at DESC);
     `,
   },
 ];

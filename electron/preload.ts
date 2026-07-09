@@ -122,6 +122,25 @@ const api: NodusApi = {
   generateStudySession: (request) => ipcRenderer.invoke('study:session', request),
   evaluateStudyAnswer: (request) => ipcRenderer.invoke('study:answer', request),
 
+  buildImmersionScope: (request) => ipcRenderer.invoke('immersion:scope', request),
+  generateImmersionSession: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onProgress = (_e: unknown, id: string, progress: import('@shared/types').ImmersionBuildProgress) => {
+      if (id === requestId) handlers?.onProgress?.(progress);
+    };
+    ipcRenderer.on('immersion:generate:progress', onProgress);
+    try {
+      return await ipcRenderer.invoke('immersion:generate', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('immersion:generate:progress', onProgress);
+    }
+  },
+  listImmersionSessions: () => ipcRenderer.invoke('immersion:list'),
+  getImmersionSession: (id) => ipcRenderer.invoke('immersion:get', id),
+  setImmersionProgress: (id, progress) => ipcRenderer.invoke('immersion:progress:set', id, progress).then(() => undefined),
+  answerImmersionQuestion: (request) => ipcRenderer.invoke('immersion:answer', request),
+  deleteImmersionSession: (id) => ipcRenderer.invoke('immersion:delete', id).then(() => undefined),
+
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
   addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),
   renameTheme: (themeId, label) => ipcRenderer.invoke('themes:rename', themeId, label),

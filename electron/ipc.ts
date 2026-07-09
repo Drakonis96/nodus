@@ -56,6 +56,10 @@ import type {
   StudyPlanRequest,
   StudySessionRequest,
   StudyAnswerRequest,
+  ImmersionScopeRequest,
+  ImmersionRequest,
+  ImmersionProgress,
+  ImmersionAnswerRequest,
   CreateVaultInput,
   VaultSummary,
   VaultSwitchOptions,
@@ -114,6 +118,8 @@ import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix
 import { getCachedWorkIdeaSynthesis, synthesizeWorkIdeas } from './ai/workIdeaSynthesis';
 import { exportAuthorSyntheses } from './export/authorSynthesisExport';
 import { buildStudyPlan, evaluateStudyAnswer, generateStudySession } from './ai/studyGuide';
+import { buildImmersionScope, evaluateImmersionAnswer, generateImmersionSession } from './ai/immersion';
+import * as immersionRepo from './db/immersionRepo';
 import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
@@ -631,6 +637,21 @@ export function registerIpc(
   }) => studyProgress.setStudyProgress(record));
   h('study:session', async (_e, request: StudySessionRequest) => generateStudySession(request));
   h('study:answer', async (_e, request: StudyAnswerRequest) => evaluateStudyAnswer(request));
+
+  // inmersión (guided topic mastery: scope → generate → resume/replay forever)
+  h('immersion:scope', async (_e, request: ImmersionScopeRequest) => buildImmersionScope(request));
+  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) =>
+    generateImmersionSession(request, (p) => e.sender.send('immersion:generate:progress', requestId, p))
+  );
+  h('immersion:list', async () => immersionRepo.listImmersionSessions());
+  h('immersion:get', async (_e, id: string) => immersionRepo.getImmersionSession(id));
+  h('immersion:progress:set', async (_e, id: string, progress: ImmersionProgress) =>
+    immersionRepo.setImmersionProgress(id, progress)
+  );
+  h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
+  h('immersion:delete', async (_e, id: string) => {
+    immersionRepo.deleteImmersionSession(id);
+  });
 
   // main-theme management ("temas principales")
   h('themes:listManaged', async () => themes.listManagedThemes());
