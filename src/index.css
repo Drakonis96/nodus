@@ -386,6 +386,65 @@ body {
   color: #312e81;
 }
 
+/* ── v1 launch: light-mode fills/borders/dividers that had no light equivalent and
+   stayed dark on pale surfaces. Same manual-override style as the rules above; the
+   companion text-* colours are already remapped to dark earlier in this file. Kept
+   after the semantic (.library-active-chip, etc.) rules so those keep winning by
+   specificity where present. ── */
+.light .bg-indigo-950\/30,
+.light .bg-indigo-950\/50 {
+  background-color: #e0e7ff;
+}
+.light .bg-indigo-800\/70 {
+  background-color: #c7d2fe;
+}
+.light .bg-emerald-900\/40 {
+  background-color: #d1fae5;
+}
+.light .bg-cyan-950\/40 {
+  background-color: #ecfeff;
+}
+.light .bg-cyan-950\/50 {
+  background-color: #cffafe;
+}
+.light .bg-red-950\/30,
+.light .bg-red-900\/40 {
+  background-color: #fee2e2;
+}
+.light .bg-amber-950\/50 {
+  background-color: #fef3c7;
+}
+.light .bg-neutral-950\/45 {
+  background-color: rgba(248, 250, 252, 0.86);
+}
+.light .border-indigo-800\/70,
+.light .border-indigo-800\/60 {
+  border-color: #a5b4fc;
+}
+.light .border-cyan-800 {
+  border-color: #67e8f9;
+}
+.light .border-violet-800,
+.light .border-violet-800\/70 {
+  border-color: #c4b5fd;
+}
+.light .border-red-800\/70,
+.light .border-red-800\/60,
+.light .border-red-900\/70 {
+  border-color: #fecaca;
+}
+.light .border-neutral-800\/70 {
+  border-color: #d4d4d4;
+}
+.light .border-green-700,
+.light .border-green-800 {
+  border-color: #86efac;
+}
+.light .divide-neutral-800 > :not([hidden]) ~ :not([hidden]),
+.light .divide-neutral-800\/70 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb;
+}
+
 /* Subtle, minimalist scrollbars. */
 ::-webkit-scrollbar {
   width: 8px;
