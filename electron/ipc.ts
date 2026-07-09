@@ -95,7 +95,7 @@ import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
-import { verifyCitations } from './citations/verifyCitations';
+import { verifyCitations, previewCitation } from './citations/verifyCitations';
 import { globalSearch } from './db/searchRepo';
 import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
@@ -207,6 +207,10 @@ export function registerIpc(
   installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
   const h = ipcMain.handle.bind(ipcMain);
+
+  // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
+  // button (`research:chatStream:cancel`) can abort the provider mid-answer.
+  const chatAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
     getWindow()?.webContents.send('vaults:changed', withVaultKeyProviders(getActiveVault()));
@@ -693,12 +697,28 @@ export function registerIpc(
 
   // research assistant
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
-  h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) =>
-    streamResearchChat(request, (delta, kind) => {
-      const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
-      e.sender.send(channel, requestId, delta);
-    })
-  );
+  h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
+    // Track the in-flight stream so `research:chatStream:cancel` can abort it. On
+    // abort the provider stops mid-answer and streamResearchChat returns whatever
+    // partial text had streamed, which the renderer keeps.
+    const controller = new AbortController();
+    chatAborters.set(requestId, controller);
+    try {
+      return await streamResearchChat(
+        request,
+        (delta, kind) => {
+          const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
+          e.sender.send(channel, requestId, delta);
+        },
+        controller.signal
+      );
+    } finally {
+      chatAborters.delete(requestId);
+    }
+  });
+  h('research:chatStream:cancel', async (_e, requestId: string) => {
+    chatAborters.get(requestId)?.abort();
+  });
 
   // writing workshop
   h('writing:snapshot', async (_e, brief: WritingWorkshopBrief) => buildWritingWorkshopSnapshot(brief));
@@ -809,6 +829,7 @@ export function registerIpc(
   );
   h('notes:folders:suggestIdeas', async (_e, folderId: string) => suggestFolderIdeas(folderId));
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
+  h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)
   );

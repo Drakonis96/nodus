@@ -318,18 +318,20 @@ export async function completeText(opts: CallOpts, model?: ModelRef | null): Pro
 export async function completeTextStream(
   opts: CallOpts,
   onDelta: TextDeltaHandler,
-  model?: ModelRef | null
+  model?: ModelRef | null,
+  signal?: AbortSignal
 ): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta, reasoning);
+  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta, reasoning, signal);
 }
 
 async function rawCompleteStream(
   model: ModelRef,
   opts: CallOpts,
   onDelta: TextDeltaHandler,
-  reasoning: ReasoningEffort = 'off'
+  reasoning: ReasoningEffort = 'off',
+  signal?: AbortSignal
 ): Promise<string> {
   const key = getApiKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
@@ -351,20 +353,26 @@ async function rawCompleteStream(
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
     try {
-      const stream = await (client.messages.create as any)({
-        model: model.model,
-        max_tokens: opts.maxTokens ?? 8000,
-        temperature: opts.temperature ?? 0.15,
-        system: opts.system,
-        stream: true,
-        messages: [{ role: 'user', content: opts.user }],
-      });
+      const stream = await (client.messages.create as any)(
+        {
+          model: model.model,
+          max_tokens: opts.maxTokens ?? 8000,
+          temperature: opts.temperature ?? 0.15,
+          system: opts.system,
+          stream: true,
+          messages: [{ role: 'user', content: opts.user }],
+        },
+        { signal }
+      );
       for await (const event of stream as AsyncIterable<any>) {
         if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
         else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
         else if (event?.type === 'text') emitContent(event.text);
       }
     } catch (e: any) {
+      // A user-triggered stop surfaces as an abort here — keep the partial answer
+      // that already streamed instead of failing the whole turn.
+      if (signal?.aborted) return full;
       throw wrapProviderError(e);
     }
     if (!full.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
@@ -395,10 +403,10 @@ async function rawCompleteStream(
   try {
     let stream;
     try {
-      stream = await client.chat.completions.create({ ...baseBody, ...extras } as any);
+      stream = await client.chat.completions.create({ ...baseBody, ...extras } as any, { signal });
     } catch (e: any) {
       if (isBadRequest(e) && Object.keys(extras).length > 0) {
-        stream = await client.chat.completions.create(baseBody as any);
+        stream = await client.chat.completions.create(baseBody as any, { signal });
       } else {
         throw e;
       }
@@ -413,6 +421,8 @@ async function rawCompleteStream(
       emitContent(delta?.content);
     }
   } catch (e: any) {
+    // A user-triggered stop surfaces as an abort here — keep the partial answer.
+    if (signal?.aborted) return full;
     if (e instanceof AiError) throw e;
     throw wrapProviderError(e);
   }

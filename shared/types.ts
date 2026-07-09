@@ -1479,6 +1479,19 @@ export interface CitationRef {
   id: string;
 }
 
+/**
+ * Lightweight preview of a cited source, shown in the hover-card that appears
+ * over an inline citation before the user commits to opening the full source
+ * modal. All strings come straight from the corpus (already Spanish); the
+ * caller adds the localized kind label.
+ */
+export interface CitationPreview {
+  kind: CitationKind;
+  title: string;
+  subtitle?: string;
+  snippet?: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Global search
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2804,6 +2817,12 @@ export interface NodusApi {
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
+  /**
+   * Abort the research-chat stream currently in flight. The pending
+   * {@link researchChatStream} promise then resolves with whatever partial
+   * answer had streamed so far (never rejects), so the UI can keep the text.
+   */
+  cancelResearchChat(): Promise<void>;
 
   // writing workshop
   getWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
@@ -2892,6 +2911,8 @@ export interface NodusApi {
   suggestFolderIdeas(folderId: string): Promise<FolderIdeaSuggestionsResult>;
   /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
+  /** Lightweight preview (title + snippet) of a cited source for its hover-card. Null if it no longer resolves. */
+  getCitationPreview(ref: CitationRef): Promise<CitationPreview | null>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
   globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
   /** Search by meaning over embedded ideas, passages and works. */

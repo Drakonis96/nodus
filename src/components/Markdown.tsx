@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { CitationRef } from '@shared/types';
+import type { CitationPreview, CitationRef } from '@shared/types';
 import { t } from '../i18n';
 
 const nodusUrlTransform = (value: string) => {
@@ -65,24 +65,9 @@ export function Markdown({
               const key = `${citation.kind}:${citation.id}`;
               const unverified = verify && validity[key] === false;
               return (
-                <button
-                  type="button"
-                  className="citation-link"
-                  data-citation-kind={citation.kind}
-                  data-verified={unverified ? 'false' : undefined}
-                  title={
-                    unverified
-                      ? t('Fuente no encontrada: esta cita no se pudo verificar en el corpus.')
-                      : `${t('Abrir fuente:')} ${citationLabel(citation.kind)}`
-                  }
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onCitation(citation);
-                  }}
-                >
+                <CitationLink citation={citation} unverified={unverified} onCitation={onCitation}>
                   {children}
-                  {unverified && <span aria-hidden className="citation-warn">⚠</span>}
-                </button>
+                </CitationLink>
               );
             }
             return (
@@ -102,6 +87,115 @@ export function Markdown({
         {content}
       </ReactMarkdown>
     </div>
+  );
+}
+
+/**
+ * Inline citation pill with a hover-card. Hovering (after a short delay, so a
+ * cursor merely passing over the text does not flash cards) lazily fetches a
+ * lightweight preview — title, source and a snippet — positioned above or below
+ * the pill. The card is `position: fixed` so it escapes the chat's scroll
+ * clipping, and `pointer-events: none` so it never steals the hover. Clicking
+ * still opens the full source modal via `onCitation`.
+ */
+function CitationLink({
+  citation,
+  unverified,
+  onCitation,
+  children,
+}: {
+  citation: MarkdownCitation;
+  unverified: boolean;
+  onCitation: (citation: MarkdownCitation) => void;
+  children: ReactNode;
+}) {
+  const [preview, setPreview] = useState<CitationPreview | 'loading' | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; placement: 'top' | 'bottom' } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const timerRef = useRef<number | null>(null);
+  const fetchedRef = useRef(false);
+
+  useEffect(
+    () => () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    },
+    []
+  );
+
+  const reveal = () => {
+    const el = btnRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const placement: 'top' | 'bottom' = rect.top > 240 ? 'top' : 'bottom';
+    setPos({
+      top: placement === 'top' ? rect.top - 8 : rect.bottom + 8,
+      left: Math.min(Math.max(rect.left, 12), Math.max(12, window.innerWidth - 340)),
+      placement,
+    });
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      setPreview('loading');
+      void window.nodus
+        .getCitationPreview({ kind: citation.kind, id: citation.id })
+        .then((value) => setPreview(value))
+        .catch(() => setPreview(null));
+    }
+  };
+
+  const onEnter = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(reveal, 320);
+  };
+  const onLeave = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setPos(null);
+  };
+
+  return (
+    <span className="citation-wrap" onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      <button
+        ref={btnRef}
+        type="button"
+        className="citation-link"
+        data-citation-kind={citation.kind}
+        data-verified={unverified ? 'false' : undefined}
+        title={
+          unverified
+            ? t('Fuente no encontrada: esta cita no se pudo verificar en el corpus.')
+            : `${t('Abrir fuente:')} ${citationLabel(citation.kind)}`
+        }
+        onClick={(e) => {
+          e.preventDefault();
+          onCitation(citation);
+        }}
+      >
+        {children}
+        {unverified && (
+          <span aria-hidden className="citation-warn">
+            ⚠
+          </span>
+        )}
+      </button>
+      {pos && preview !== null && (
+        <span
+          className="citation-card"
+          data-placement={pos.placement}
+          style={{ top: pos.top, left: pos.left }}
+        >
+          {preview === 'loading' ? (
+            <span className="citation-card-loading">{t('Cargando…')}</span>
+          ) : (
+            <>
+              <span className="citation-card-kind">{citationLabel(preview.kind)}</span>
+              <span className="citation-card-title">{preview.title}</span>
+              {preview.subtitle && <span className="citation-card-sub">{preview.subtitle}</span>}
+              {preview.snippet && <span className="citation-card-snippet">{preview.snippet}</span>}
+            </>
+          )}
+        </span>
+      )}
+    </span>
   );
 }
 

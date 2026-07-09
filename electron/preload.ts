@@ -10,6 +10,11 @@ import type {
   ChapterRelationsProgress,
 } from '@shared/types';
 
+// Tracks the research-chat stream currently in flight so `cancelResearchChat`
+// can abort it without the renderer having to juggle request ids. Only one chat
+// stream runs at a time (the composer is disabled while sending).
+let activeChatRequestId: string | null = null;
+
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -187,14 +192,19 @@ const api: NodusApi = {
     };
     ipcRenderer.on('research:chatStream:delta', onDelta);
     ipcRenderer.on('research:chatStream:reasoning', onReasoning);
+    activeChatRequestId = requestId;
     try {
       const response = await ipcRenderer.invoke('research:chatStream', requestId, request);
       handlers.onStats?.(response.stats);
       return response;
     } finally {
+      if (activeChatRequestId === requestId) activeChatRequestId = null;
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
     }
+  },
+  cancelResearchChat: async () => {
+    if (activeChatRequestId) await ipcRenderer.invoke('research:chatStream:cancel', activeChatRequestId);
   },
 
   getWritingWorkshopSnapshot: (brief) => ipcRenderer.invoke('writing:snapshot', brief),
@@ -278,6 +288,7 @@ const api: NodusApi = {
   updateNoteFolderSummary: (id, summary) => ipcRenderer.invoke('notes:folders:updateSummary', id, summary),
   suggestFolderIdeas: (folderId) => ipcRenderer.invoke('notes:folders:suggestIdeas', folderId),
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
+  getCitationPreview: (ref) => ipcRenderer.invoke('citations:preview', ref),
   globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
   semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
   findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),

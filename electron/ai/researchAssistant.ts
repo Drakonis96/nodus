@@ -138,7 +138,8 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
 
 export async function streamResearchChat(
   request: ResearchChatRequest,
-  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
+  signal?: AbortSignal
 ): Promise<ResearchChatResponse> {
   const { system, user, stats } = await buildResearchChatPrompt(request);
   const answer = await completeTextStream(
@@ -149,7 +150,8 @@ export async function streamResearchChat(
       maxTokens: 6000,
     },
     onDelta,
-    request.model
+    request.model,
+    signal
   );
 
   return { answer: answer.trim(), stats };
