@@ -351,7 +351,8 @@ function buildThemeMemberships(): ThemeMembership {
   return { edges: Array.from(edges.values()), labelsByIdea };
 }
 
-function normalizeText(text: string): string {
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return '';
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -1280,8 +1281,8 @@ function collectCoreThemes(rows: ReadingWorkRow[], gapSignals: GapSignals, resea
 }
 
 function collectCitedWorks(): string[] {
-  const rows = getDb().prepare('SELECT cited_work FROM external_refs').all() as { cited_work: string }[];
-  return rows.map((r) => normalizeText(r.cited_work));
+  const rows = getDb().prepare('SELECT cited_work FROM external_refs').all() as { cited_work: string | null }[];
+  return rows.map((r) => normalizeText(r.cited_work)).filter(Boolean);
 }
 
 function approximateCitationCount(row: ReadingWorkRow, citedWorks: string[]): number {
