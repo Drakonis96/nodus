@@ -52,6 +52,15 @@ export function App() {
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
   const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
+  // Per-group collapse state for the sidebar (Explorar · Analizar · Escribir),
+  // persisted so a user's folded groups survive restarts.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('nodus.collapsedGroups') || '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
@@ -156,6 +165,16 @@ export function App() {
     setNavCollapsed((v) => {
       localStorage.setItem('nodus.navCollapsed', v ? '0' : '1');
       return !v;
+    });
+  };
+
+  const toggleGroup = (id: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem('nodus.collapsedGroups', JSON.stringify([...next]));
+      return next;
     });
   };
 
@@ -408,14 +427,26 @@ export function App() {
               return (
                 <>
                   {navButton(homeItem)}
-                  {navGroups.map((group) => (
-                    <div key={group.id} className="mt-2 flex flex-col gap-1">
-                      <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
-                        {t(group.label)}
+                  {navGroups.map((group) => {
+                    const collapsed = collapsedGroups.has(group.id);
+                    const hasActive = group.items.some((n) => n.id === view);
+                    return (
+                      <div key={group.id} className="mt-2 flex flex-col gap-1">
+                        <button
+                          onClick={() => toggleGroup(group.id)}
+                          aria-expanded={!collapsed}
+                          title={collapsed ? t('Mostrar grupo') : t('Plegar grupo')}
+                          className={`flex items-center gap-1 px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-left transition-colors ${
+                            collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
+                          }`}
+                        >
+                          <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={11} />
+                          {t(group.label)}
+                        </button>
+                        {!collapsed && group.items.map((n) => navButton(n))}
                       </div>
-                      {group.items.map((n) => navButton(n))}
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                 </>
               );
