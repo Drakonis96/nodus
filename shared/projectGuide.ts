@@ -20,6 +20,7 @@ export interface ProjectGuideStep {
   id: ProjectGuideStepId;
   title: string;
   summary: string;
+  description: string;
   evidence: string;
   status: ProjectGuideStepStatus;
   action: ProjectGuideAction;
@@ -67,6 +68,8 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
       id: 'brief',
       title: 'Brief y pregunta',
       summary: 'Objetivo, alcance y criterio de lectura definidos.',
+      description:
+        'Define el objetivo, el alcance, la pregunta principal y el criterio de selección de fuentes. Este texto aparece en la cabecera del proyecto, se envía como contexto a la IA al generar sugerencias y se incluye en la exportación.',
       evidence: briefReady ? compactEvidence(briefText || detail.project.researchQuestionId || 'Pregunta vinculada') : 'Pendiente',
       action: 'edit_brief',
       actionLabel: 'Editar brief',
@@ -75,8 +78,10 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
     },
     {
       id: 'coverage',
-      title: 'Pregunta y cobertura',
+      title: 'Cobertura',
       summary: 'Pregunta principal conectada con la cobertura del corpus.',
+      description:
+        'Vincula tu pregunta de investigación con el corpus: indica qué áreas ya están cubiertas y qué falta por explorar. Marcar este paso como en curso activa la sección de cobertura en el proyecto.',
       evidence: coverageReady ? sectionEvidence(detail, 'coverage', 'Cobertura en curso') : 'Sin cobertura marcada',
       action: 'mark_coverage',
       actionLabel: 'Marcar cobertura',
@@ -87,6 +92,8 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
       id: 'materials',
       title: 'Corpus y materiales',
       summary: 'Obras, ideas, notas, huecos o borradores listos para integrarse.',
+      description:
+        'Añade obras, ideas, notas, huecos, debates y borradores al proyecto. Estos materiales son los que la IA usará para proponer inserciones con citas verificables en el manuscrito.',
       evidence: materialsReady
         ? sourceLinks.length > 0
           ? `${sourceLinks.length} material(es) vinculados`
@@ -101,6 +108,8 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
       id: 'outline',
       title: 'Estructura argumental',
       summary: 'Debates, huecos y borradores organizados antes de intervenir el texto.',
+      description:
+        'Organiza los debates, huecos y borradores que estructurarán el argumento antes de redactar los capítulos. Puedes activar cada bloque por separado para marcar que está listo para usarse.',
       evidence: outlineReady ? `${outlineSignals.length} bloque(s) de estructura activos` : 'Estructura pendiente',
       action: 'mark_outline',
       actionLabel: 'Preparar estructura',
@@ -111,6 +120,8 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
       id: 'manuscript',
       title: 'Manuscrito',
       summary: 'Capítulo o artículo importado como texto editable y versionado.',
+      description:
+        'Importa un capítulo o artículo como texto editable. Nodus lo versiona automáticamente y permite aplicar sugerencias sobre el borrador.',
       evidence: manuscriptReady ? `${detail.chapters.length} capítulo(s), ${manuscriptWords} palabra(s)` : 'Sin capítulo importado',
       action: 'import_chapter',
       actionLabel: 'Subir capítulo',
@@ -121,6 +132,8 @@ export function buildProjectGuide(detail: ProjectDetail): ProjectGuide {
       id: 'review',
       title: 'Revisión y salida',
       summary: 'Relaciones, sugerencias verificables y exportación final.',
+      description:
+        'Genera sugerencias verificables contra el corpus y revisa las citas del manuscrito antes de exportar o cerrar el proyecto.',
       evidence: reviewReady
         ? detail.stats.suggestions > 0 || detail.stats.appliedSuggestions > 0
           ? `${detail.stats.suggestions} sugerencia(s), ${detail.stats.appliedSuggestions} aplicada(s)`

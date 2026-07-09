@@ -1567,6 +1567,35 @@ export const EN: Record<string, string> = {
   'Estructura argumental preparada.': 'Argument structure prepared.',
   'No se encontraron nuevas sugerencias verificables para este capítulo.':
     'No new verifiable suggestions were found for this chapter.',
+  'Define el objetivo, el alcance, la pregunta principal y el criterio de selección de fuentes. Este texto aparece en la cabecera del proyecto, se envía como contexto a la IA al generar sugerencias y se incluye en la exportación.':
+    'Define the objective, scope, main question, and source selection criteria. This text appears in the project header, is sent as context to the AI when generating suggestions, and is included in exports.',
+  'Vincula tu pregunta de investigación con el corpus: indica qué áreas ya están cubiertas y qué falta por explorar. Marcar este paso como en curso activa la sección de cobertura en el proyecto.':
+    'Connect your research question to the corpus: indicate which areas are already covered and what remains to be explored. Marking this step as in progress activates the coverage section in the project.',
+  'Añade obras, ideas, notas, huecos, debates y borradores al proyecto. Estos materiales son los que la IA usará para proponer inserciones con citas verificables en el manuscrito.':
+    'Add works, ideas, notes, gaps, debates, and drafts to the project. These materials are what the AI will use to propose insertions with verifiable citations in the manuscript.',
+  'Organiza los debates, huecos y borradores que estructurarán el argumento antes de redactar los capítulos. Puedes activar cada bloque por separado para marcar que está listo para usarse.':
+    'Organize the debates, gaps, and drafts that will structure the argument before drafting the chapters. You can activate each block separately to mark it as ready to use.',
+  'Importa un capítulo o artículo como texto editable. Nodus lo versiona automáticamente y permite aplicar sugerencias sobre el borrador.':
+    'Import a chapter or article as editable text. Nodus versions it automatically and lets you apply suggestions to the draft.',
+  'Genera sugerencias verificables contra el corpus y revisa las citas del manuscrito antes de exportar o cerrar el proyecto.':
+    'Generate verifiable suggestions against the corpus and review the manuscript citations before exporting or closing the project.',
+  'Guardando brief...': 'Saving brief...',
+  'Actualizando sección...': 'Updating section...',
+  'Importando capítulo...': 'Importing chapter...',
+  'Generando sugerencias...': 'Generating suggestions...',
+  'Procesando...': 'Processing...',
+  'Brief del proyecto': 'Project brief',
+  'Estado de la cobertura': 'Coverage status',
+  'Estado de los materiales': 'Materials status',
+  'En revisión': 'In review',
+  Listo: 'Ready',
+  Descartada: 'Discarded',
+  'Sube un capítulo o artículo para convertirlo en texto editable. Se guardará como nota vinculada y versionada.':
+    'Upload a chapter or article to make it editable text. It will be saved as a linked, versioned note.',
+  'Genera sugerencias de inserción con citas verificables y revisa las citas del capítulo antes de exportar.':
+    'Generate insertion suggestions with verifiable citations and review the chapter citations before exporting.',
+  'Sección actualizada. El flujo guiado refleja el cambio.':
+    'Section updated. The guided flow reflects the change.',
   // Chapter relations (chapter ideas ↔ library)
   Relaciones: 'Relations',
   'Analizar relaciones': 'Analyze relations',

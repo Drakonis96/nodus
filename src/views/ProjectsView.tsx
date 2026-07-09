@@ -26,6 +26,7 @@ import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type Pro
 import { Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { ProjectGuideStepModal } from '../components/ProjectGuideStepModal';
 import { notifyDataChanged, useDataRefresh } from '../hooks';
 import { t, tx } from '../i18n';
 
@@ -58,8 +59,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [newTitle, setNewTitle] = useState('');
   const [newBrief, setNewBrief] = useState('');
   const [newKind, setNewKind] = useState<ProjectKind>('thesis');
-  const [briefEditing, setBriefEditing] = useState(false);
-  const [briefDraft, setBriefDraft] = useState('');
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
@@ -138,8 +138,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   }, [selectedChapter, loadChapterArtifacts]);
 
   useEffect(() => {
-    setBriefDraft(detail?.project.brief ?? '');
-    setBriefEditing(false);
+    setEditingStepId(null);
   }, [detail?.project.id]);
 
   const refreshActiveProject = useCallback(async () => {
@@ -196,12 +195,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     }
   };
 
-  const saveProjectBrief = async () => {
+  const saveProjectBrief = async (brief: string) => {
     if (!detail) return;
     setBusy('save-brief');
     try {
-      await window.nodus.updateProject({ id: detail.project.id, brief: briefDraft.trim() });
-      setBriefEditing(false);
+      await window.nodus.updateProject({ id: detail.project.id, brief: brief.trim() });
+      setEditingStepId(null);
       setMessage(t('Brief actualizado. El flujo guiado ya usa este objetivo.'));
       notifyDataChanged();
       await refreshActiveProject();
@@ -220,6 +219,30 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     setBusy(`section-${role}`);
     try {
       await window.nodus.updateProjectSection({ id: section.id, status });
+      setEditingStepId(null);
+      setMessage(successMessage);
+      notifyDataChanged();
+      await refreshActiveProject();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const updateSectionStatuses = async (
+    updates: { role: ProjectSectionRole; status: ProjectSectionStatus }[],
+    successMessage: string
+  ) => {
+    const resolved = updates
+      .map(({ role, status }) => {
+        const section = sectionByRole(role);
+        return section ? { id: section.id, status } : null;
+      })
+      .filter((item): item is { id: string; status: ProjectSectionStatus } => item !== null);
+    if (resolved.length === 0) return;
+    setBusy('section-batch');
+    try {
+      await Promise.all(resolved.map((item) => window.nodus.updateProjectSection(item)));
+      setEditingStepId(null);
       setMessage(successMessage);
       notifyDataChanged();
       await refreshActiveProject();
@@ -416,10 +439,6 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   };
 
   const runGuideAction = (action: ProjectGuideAction) => {
-    if (action === 'edit_brief') {
-      setBriefEditing(true);
-      return;
-    }
     if (action === 'mark_coverage') {
       void updateSectionStatus('coverage', 'in_progress', t('Cobertura marcada como en curso.'));
       return;
@@ -433,10 +452,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       return;
     }
     if (action === 'import_chapter') {
+      setEditingStepId(null);
       void importChapter();
       return;
     }
     if (action === 'review_chapter') {
+      setEditingStepId(null);
       if (!selectedChapter) {
         void importChapter();
         return;
@@ -545,16 +566,23 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
               <ProjectGuidePanel
                 guide={guide}
                 busy={busy}
-                briefDraft={briefDraft}
-                briefEditing={briefEditing}
-                onBriefDraftChange={setBriefDraft}
-                onEditBrief={() => setBriefEditing(true)}
-                onCancelBrief={() => {
-                  setBriefDraft(detail.project.brief);
-                  setBriefEditing(false);
-                }}
-                onSaveBrief={() => void saveProjectBrief()}
-                onAction={(action) => runGuideAction(action)}
+                onStepClick={(stepId) => setEditingStepId(stepId)}
+              />
+            )}
+            {guide && editingStepId && (
+              <ProjectGuideStepModal
+                step={guide.steps.find((s) => s.id === editingStepId)!}
+                detail={detail}
+                busy={busy}
+                onClose={() => setEditingStepId(null)}
+                onSaveBrief={(brief) => void saveProjectBrief(brief)}
+                onUpdateSections={(updates) =>
+                  void updateSectionStatuses(
+                    updates,
+                    t('Sección actualizada. El flujo guiado refleja el cambio.')
+                  )
+                }
+                onRunAction={(action) => runGuideAction(action)}
               />
             )}
 
@@ -976,25 +1004,12 @@ function EvidenceCandidateButton({
 function ProjectGuidePanel({
   guide,
   busy,
-  briefDraft,
-  briefEditing,
-  onBriefDraftChange,
-  onEditBrief,
-  onCancelBrief,
-  onSaveBrief,
-  onAction,
+  onStepClick,
 }: {
   guide: ProjectGuide;
   busy: string | null;
-  briefDraft: string;
-  briefEditing: boolean;
-  onBriefDraftChange: (value: string) => void;
-  onEditBrief: () => void;
-  onCancelBrief: () => void;
-  onSaveBrief: () => void;
-  onAction: (action: ProjectGuideAction) => void;
+  onStepClick: (stepId: string) => void;
 }) {
-  const next = guide.nextStep;
   const disabled = Boolean(busy);
 
   return (
@@ -1008,23 +1023,15 @@ function ProjectGuidePanel({
               {guide.doneCount}/{guide.totalCount}
             </span>
           </div>
-          <p className="mt-1 text-xs text-neutral-500">{next ? t(next.summary) : t(guide.subtitle)}</p>
+          <p className="mt-1 text-xs text-neutral-500">{t(guide.subtitle)}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={onEditBrief} disabled={disabled}>
-            <Icon name="edit" size={13} /> {t('Editar brief')}
-          </button>
-          {next ? (
-            <button className="btn btn-primary text-xs gap-1.5" onClick={() => onAction(next.action)} disabled={disabled}>
-              <Icon name={busy ? 'sync' : actionIcon(next.action)} size={13} className={busy ? 'animate-spin' : ''} />
-              {t(next.actionLabel)}
-            </button>
-          ) : (
+        {guide.doneCount === guide.totalCount && (
+          <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
               <Icon name="check" size={13} /> {t('Completado')}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
@@ -1033,35 +1040,22 @@ function ProjectGuidePanel({
 
       <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-6">
         {guide.steps.map((step) => (
-          <div key={step.id} className={`min-w-0 rounded-md border px-2.5 py-2 ${guideStepClass(step.status)}`}>
+          <button
+            key={step.id}
+            type="button"
+            className={`min-w-0 rounded-md border px-2.5 py-2 text-left transition-opacity hover:opacity-90 ${guideStepClass(step.status)}`}
+            onClick={() => onStepClick(step.id)}
+            disabled={disabled}
+            title={t(step.title)}
+          >
             <div className="flex items-center gap-1.5">
               <Icon name={guideStepIcon(step.status)} size={13} />
               <span className="truncate text-xs font-medium">{t(step.title)}</span>
             </div>
             <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">{step.evidence}</p>
-          </div>
+          </button>
         ))}
       </div>
-
-      {briefEditing && (
-        <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
-          <textarea
-            className="input min-h-20 w-full resize-y text-sm"
-            value={briefDraft}
-            onChange={(e) => onBriefDraftChange(e.target.value)}
-            placeholder={t('Objetivo, alcance, pregunta principal y criterio de selección')}
-          />
-          <div className="mt-2 flex justify-end gap-2">
-            <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={onCancelBrief} disabled={busy === 'save-brief'}>
-              {t('Cancelar')}
-            </button>
-            <button className="btn btn-primary text-xs gap-1.5" onClick={onSaveBrief} disabled={busy === 'save-brief'}>
-              <Icon name={busy === 'save-brief' ? 'sync' : 'check'} size={13} className={busy === 'save-brief' ? 'animate-spin' : ''} />
-              {t('Guardar brief')}
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -1177,23 +1171,6 @@ function ChapterIdeaCard({
 
 function kindLabel(kind: ProjectKind): string {
   return PROJECT_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
-}
-
-function actionIcon(action: ProjectGuideAction): string {
-  switch (action) {
-    case 'edit_brief':
-      return 'edit';
-    case 'mark_coverage':
-      return 'map';
-    case 'mark_materials':
-      return 'book';
-    case 'mark_outline':
-      return 'layers';
-    case 'import_chapter':
-      return 'upload';
-    case 'review_chapter':
-      return 'wand';
-  }
 }
 
 function guideStepIcon(status: ProjectGuideStepStatus): string {
