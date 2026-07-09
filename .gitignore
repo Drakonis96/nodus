@@ -6,6 +6,7 @@ release/
 .DS_Store
 .vite/
 .kilo/
+.github/
 *.nodus
 *.sqlite
 
