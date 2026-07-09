@@ -121,10 +121,11 @@
       "target": [
         "deb",
         "AppImage",
-        "snap"
+        "snap",
+        "flatpak"
       ],
       "category": "Office",
-      "maintainer": "Nodus <info@z-eksen.org>"
+      "maintainer": "Oğuz Karayemiş <oguzkarayemis@gmail.com>"
     },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
   }
