@@ -9,6 +9,7 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { getDb } from './database';
+import { normalizeBareCitations } from '../ai/immersionCore';
 
 interface SessionRow {
   id: string;
@@ -60,10 +61,26 @@ function normalizeProgress(value: unknown): ImmersionProgress {
   };
 }
 
-/** Fill fields added after a plan was stored, so old sessions replay unchanged. */
+/**
+ * Fill fields added after a plan was stored and repair citation markup in plans
+ * generated before the bare-url normalizer existed, so old sessions replay
+ * cleanly (chips instead of raw nodus:// text).
+ */
 function normalizePlan(plan: ImmersionPlan): ImmersionPlan {
+  const labels = new Map<string, string>();
+  for (const ref of plan.ideaIndex ?? []) labels.set(`nodus://idea/${ref.id}`, ref.label);
   for (const station of plan.stations ?? []) {
-    station.context = typeof station.context === 'string' ? station.context : '';
+    for (const citation of station.citations ?? []) {
+      const surname = (citation.authors?.[0] ?? '').split(',')[0].trim() || citation.workTitle;
+      const label = [surname, citation.year ?? '', citation.pageLabel ? `p. ${citation.pageLabel}` : ''].filter(Boolean).join(', ');
+      labels.set(`nodus://passage/${citation.passageId}`, label);
+      labels.set(`nodus://passage/${encodeURIComponent(citation.passageId)}`, label);
+    }
+  }
+  plan.overview = normalizeBareCitations(typeof plan.overview === 'string' ? plan.overview : '', labels);
+  for (const station of plan.stations ?? []) {
+    station.context = normalizeBareCitations(typeof station.context === 'string' ? station.context : '', labels);
+    station.synthesis = normalizeBareCitations(typeof station.synthesis === 'string' ? station.synthesis : '', labels);
     station.takeaways = Array.isArray(station.takeaways) ? station.takeaways : [];
     for (const citation of station.citations ?? []) {
       citation.commentary = typeof citation.commentary === 'string' ? citation.commentary : '';
