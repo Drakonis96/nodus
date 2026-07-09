@@ -1,16 +1,10 @@
 import Database from 'better-sqlite3';
+import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { VaultSummary } from '@shared/types';
 import { runMigrations } from '../db/migrations';
-
-let app: any = null;
-try {
-  app = require('electron').app;
-} catch {
-  // fallback for node scripts
-}
 
 interface VaultRecord {
   id: string;
@@ -31,11 +25,7 @@ const REGISTRY_FILE = 'vaults.json';
 const LEGACY_VAULT_ID = 'default';
 
 function userDataDir(): string {
-  if (app) {
-    return app.getPath('userData');
-  }
-  const os = require('node:os');
-  return path.join(os.homedir(), '.config', 'nodus');
+  return app.getPath('userData');
 }
 
 function registryPath(): string {

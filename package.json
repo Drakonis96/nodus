@@ -119,7 +119,9 @@
     },
     "linux": {
       "target": [
-        "deb"
+        "deb",
+        "AppImage",
+        "snap"
       ],
       "category": "Office",
       "maintainer": "Nodus <info@z-eksen.org>"
