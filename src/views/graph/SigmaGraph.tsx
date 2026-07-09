@@ -18,7 +18,7 @@ import type { GraphData, GraphNodeType } from '@shared/types';
 import { NODE_COLORS } from '../../components/ui';
 import type { GraphPresetId } from '../../navigation';
 import { t } from '../../i18n';
-import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens } from './model';
+import { buildGraphModel, EDGE_TYPE_COLORS, type GraphFilters, type GraphLens, type GraphModel } from './model';
 import { buildGraphIndex, collectLocalGraph, type GraphIndex, type LocalGraph } from './focus';
 import { WorkerLayout, seedMissingPositions, scatterPositions, resolveOverlaps } from './layout';
 import { computeClusters, type AggregatedGraph } from './lod';
@@ -37,6 +37,9 @@ export interface SigmaGraphApi {
   reset: () => void;
 }
 
+/** Semantic-zoom level currently on screen. 'full' is the classic idea graph. */
+export type GraphViewLevel = 'corpus' | 'theme' | 'full';
+
 interface SigmaGraphProps {
   data: GraphData;
   filters: GraphFilters;
@@ -44,6 +47,14 @@ interface SigmaGraphProps {
   preset: GraphPresetId;
   highlightDepth: number | null;
   lightTheme: boolean;
+  /** When set, the renderer uses this model verbatim instead of deriving one from
+   *  data/filters — this is how the constellation (level 1) and theme backbone
+   *  (level 2) are shown. */
+  overrideModel?: GraphModel | null;
+  viewLevel?: GraphViewLevel;
+  /** Called instead of opening a detail panel when a theme node is clicked at the
+   *  corpus level, so the parent can drill into that theme. */
+  onDrillDown?: (nodeId: string, label: string) => void;
   onOpenNode: (id: string, label: string, type: string) => void;
   onOpenEdge: (id: string, type: string) => void;
   onClearFocus: () => void;
@@ -163,6 +174,27 @@ function labelsOverlap(a: RenderedLabelBox, b: RenderedLabelBox): boolean {
   return a.left - gap < b.right && a.right + gap > b.left && a.top - gap < b.bottom && a.bottom + gap > b.top;
 }
 
+function roundRectPath(context: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + w, y, x + w, y + h, radius);
+  context.arcTo(x + w, y + h, x, y + h, radius);
+  context.arcTo(x, y + h, x, y, radius);
+  context.arcTo(x, y, x + w, y, radius);
+  context.closePath();
+}
+
+/** Rough perceived lightness of a #rrggbb colour (0 dark … 1 light). */
+function hexLightness(hex: string): number {
+  const value = hex.replace('#', '');
+  if (value.length < 6) return 0.5;
+  const r = parseInt(value.slice(0, 2), 16);
+  const g = parseInt(value.slice(2, 4), 16);
+  const b = parseInt(value.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
 function drawWrappedNodeLabel(
   context: CanvasRenderingContext2D,
   data: SigmaNodeLabelData,
@@ -207,6 +239,18 @@ function drawWrappedNodeLabel(
     return;
   }
 
+  // Theme captions carry the structure of the overview, so seat them on a soft
+  // translucent plate. The plate is drawn on Sigma's top label canvas, so the
+  // title always reads clearly — never obscured by a node or edge behind it.
+  if (kind === 'theme') {
+    const padX = 5;
+    const padY = 3;
+    context.fillStyle = hexLightness(color) > 0.5 ? 'rgba(10,10,10,0.62)' : 'rgba(255,255,255,0.82)';
+    roundRectPath(context, box.left - padX, box.top - padY, box.right - box.left + padX * 2, box.bottom - box.top + padY * 2, 5);
+    context.fill();
+    context.fillStyle = color;
+  }
+
   const firstBaseline = data.y - ((lines.length - 1) * lineHeight) / 2 + fontSize * 0.34;
   lines.forEach((line, index) => context.fillText(line, left, firstBaseline + index * lineHeight));
   collision.boxes.push(box);
@@ -220,6 +264,9 @@ export function SigmaGraph({
   preset,
   highlightDepth,
   lightTheme,
+  overrideModel,
+  viewLevel = 'full',
+  onDrillDown,
   onOpenNode,
   onOpenEdge,
   onClearFocus,
@@ -251,8 +298,20 @@ export function SigmaGraph({
   const lightThemeRef = useRef(lightTheme);
   const onCameraUpdatedRef = useRef<() => void>(() => {});
   const suppressSelectionUntilRef = useRef(0);
+  // Level + drill callback are read from live refs inside the once-created Sigma
+  // event handlers, so a level change never re-installs listeners.
+  const viewLevelRef = useRef(viewLevel);
+  const onDrillDownRef = useRef(onDrillDown);
+  const overrideActiveRef = useRef(!!overrideModel);
 
-  const model = useMemo(() => buildGraphModel(data, filters, lens, preset, revealedNodeIds), [data, filters, lens, preset, revealedNodeIds]);
+  const derivedModel = useMemo(() => buildGraphModel(data, filters, lens, preset, revealedNodeIds), [data, filters, lens, preset, revealedNodeIds]);
+  const model = overrideModel ?? derivedModel;
+
+  useEffect(() => {
+    viewLevelRef.current = viewLevel;
+    onDrillDownRef.current = onDrillDown;
+    overrideActiveRef.current = !!overrideModel;
+  }, [viewLevel, onDrillDown, overrideModel]);
 
   const fadeNode = lightTheme ? '#d8d8d8' : '#2b2b2b';
 
@@ -290,7 +349,7 @@ export function SigmaGraph({
         label: n.label,
         kind: n.type,
         size: Math.max(4, n.size / 2.4),
-        color: nodeColor(n.type),
+        color: n.color ?? nodeColor(n.type),
         degree: n.degree,
         labelRank: n.labelRank,
         read: n.read,
@@ -333,6 +392,10 @@ export function SigmaGraph({
         res.label = '';
         return res;
       }
+      // Corpus level: only a handful of theme nodes — always keep their captions
+      // so the overview reads at a glance (labels sit on Sigma's top canvas, so a
+      // neighbouring node can never paint over them).
+      if (viewLevelRef.current === 'corpus') res.forceLabel = true;
       const focus = focusRef.current;
       const hover = hoverRef.current;
       if (focus.active && focus.local) {
@@ -354,7 +417,7 @@ export function SigmaGraph({
           res.zIndex = 2;
         } else if (contextNodes.has(node)) {
           res.zIndex = 1;
-          res.color = nodeColor(String(dataAttrs.kind));
+          res.color = (dataAttrs.color as string) ?? nodeColor(String(dataAttrs.kind));
         } else {
           // Out-of-focus nodes recede hard — shrunk and dimmed. WebGL always
           // draws edges beneath nodes, so a dense field of full-size grey blobs
@@ -370,7 +433,7 @@ export function SigmaGraph({
       // without losing the clicked selection). forceLabel — not `highlighted` —
       // because Sigma's highlight draws a light box that hides white-on-dark text.
       if (hover && (node === hover || hoverLocalRef.current?.neighbors.has(node))) {
-        res.color = nodeColor(String(dataAttrs.kind));
+        res.color = (dataAttrs.color as string) ?? nodeColor(String(dataAttrs.kind));
         res.label = dataAttrs.label;
         res.forceLabel = true;
         res.zIndex = 6;
@@ -761,8 +824,13 @@ export function SigmaGraph({
         void attrs;
         return;
       }
-      tutorFocusRef.current = null;
       const attrs = g.getNodeAttributes(node);
+      // Corpus level: a click drills into the theme instead of opening a detail.
+      if (viewLevelRef.current === 'corpus' && onDrillDownRef.current) {
+        onDrillDownRef.current(node, String(attrs.label ?? ''));
+        return;
+      }
+      tutorFocusRef.current = null;
       revealNodeConnections(node);
       applyFocusForNode(node);
       onOpenNode(node, String(attrs.label ?? ''), String(attrs.kind ?? ''));
@@ -971,11 +1039,15 @@ export function SigmaGraph({
       if (state.moved) {
         const g = sigmaRef.current?.getGraph();
         if (g?.hasNode(state.nodeId)) {
-          tutorFocusRef.current = null;
           const attrs = g.getNodeAttributes(state.nodeId);
-          revealNodeConnections(state.nodeId);
-          applyFocusForNode(state.nodeId);
-          onOpenNode(state.nodeId, String(attrs.label ?? ''), String(attrs.kind ?? ''));
+          // At the corpus level a moved theme node still shouldn't open a detail
+          // panel; leave the drilling to an explicit click, not a drag-release.
+          if (viewLevelRef.current !== 'corpus') {
+            tutorFocusRef.current = null;
+            revealNodeConnections(state.nodeId);
+            applyFocusForNode(state.nodeId);
+            onOpenNode(state.nodeId, String(attrs.label ?? ''), String(attrs.kind ?? ''));
+          }
         }
       }
     };
@@ -1057,7 +1129,9 @@ export function SigmaGraph({
 
     layoutRef.current?.kill();
     const graph = buildDetailGraph();
-    seedMissingPositions(graph, prevPositionsRef.current);
+    // Constellation / backbone models are self-contained scenes: lay them out
+    // fresh rather than reusing positions carried over from the full idea graph.
+    seedMissingPositions(graph, overrideActiveRef.current ? undefined : prevPositionsRef.current);
     detailGraphRef.current = graph;
     indexRef.current = buildGraphIndex(model.nodes, model.edges);
     clustersRef.current = null;
@@ -1086,11 +1160,15 @@ export function SigmaGraph({
 
     sigma.refresh();
     if (graph.order > 0) {
+      const overrideScene = overrideActiveRef.current;
+      // A constellation / backbone is a compact scene, so settle it quickly and
+      // frame it — no need for the long Obsidian-style breathe of the full graph.
+      if (overrideScene) void sigma.getCamera().animatedReset({ duration: 1 });
       const layout = new WorkerLayout(graph);
       layoutRef.current = layout;
       // Let the network visibly breathe while it settles, like Obsidian's graph,
       // but cap the worker budget so very large libraries remain economical.
-      const settleMs = obsidianSettleMs(graph.order);
+      const settleMs = overrideScene ? Math.min(2600, obsidianSettleMs(graph.order)) : obsidianSettleMs(graph.order);
       layout.start({ durationMs: settleMs });
       // Once the physics have settled, guarantee no two circles are stacked on
       // top of each other (ForceAtlas2's anti-collision is only approximate) and
@@ -1099,6 +1177,8 @@ export function SigmaGraph({
         clusterTimerRef.current = null;
         if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
           if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+          // Frame the settled scene so the whole theme overview / backbone is in view.
+          if (overrideScene) void sigmaRef.current?.getCamera().animatedReset({ duration: 320 });
         }
         ensureClusters();
       }, settleMs + 300);

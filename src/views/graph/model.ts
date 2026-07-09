@@ -59,6 +59,9 @@ export interface NodeModel {
   labelRank: number;
   size: number;
   read: boolean;
+  /** Explicit render colour. When set (e.g. per-theme in the constellation) it
+   *  overrides the type-based palette the renderer would otherwise apply. */
+  color?: string;
 }
 
 export interface EdgeModel {
@@ -339,6 +342,206 @@ export function buildGraphModel(
     layoutEdge: physicalEdges.has(e.id),
   }));
 
+  return { nodes, edges };
+}
+
+// ── Semantic-zoom levels ─────────────────────────────────────────────────────
+// The graph opens on a legible overview (one node per theme) instead of dumping
+// every idea into a single hairball. Drilling into a theme reveals the backbone
+// of its most-connected ideas, and clicking an idea opens its local neighbourhood
+// (handled by the existing focus machinery). These two pure builders produce the
+// GraphModel for the first two levels; both are deterministic and side-effect free.
+
+/** 14 distinguishable hues for theme nodes; legible on light and dark grounds. */
+export const THEME_CONSTELLATION_PALETTE = [
+  '#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6',
+  '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7', '#eab308', '#64748b',
+];
+
+export function themeConstellationSize(memberCount: number): number {
+  // Gentle sqrt curve: the cap only guards against absurd outliers, so even the
+  // busiest themes still differ in size instead of all saturating at the maximum.
+  return 20 + Math.min(70, Math.sqrt(Math.max(0, memberCount)) * 1.4);
+}
+
+/**
+ * Level 1 — the corpus as a constellation of themes. Each theme becomes one node
+ * sized by how many ideas it holds and coloured from a categorical palette; a
+ * light edge joins two themes weighted by how many idea↔idea relations cross
+ * between them (using each idea's primary theme). No idea nodes are emitted.
+ */
+export function buildThemeConstellation(data: GraphData): GraphModel {
+  const themeNodes = data.nodes.filter((n) => n.type === 'theme');
+  const labelToId = new Map<string, string>();
+  for (const theme of themeNodes) labelToId.set(theme.label, theme.id);
+
+  // Membership + a single primary theme per idea (first listed) for edge crossing.
+  const memberCount = new Map<string, number>(); // theme label → idea count
+  const primaryTheme = new Map<string, string>(); // idea id → theme label
+  const ideaIds = new Set<string>();
+  for (const node of data.nodes) {
+    if (node.type === 'theme') continue;
+    ideaIds.add(node.id);
+    const themes = node.themes ?? [];
+    if (themes.length) primaryTheme.set(node.id, themes[0]);
+    for (const label of themes) memberCount.set(label, (memberCount.get(label) ?? 0) + 1);
+  }
+
+  const pairWeight = new Map<string, number>();
+  for (const edge of data.edges) {
+    if (edge.type === 'contains') continue;
+    if (!ideaIds.has(edge.source) || !ideaIds.has(edge.target)) continue;
+    const a = primaryTheme.get(edge.source);
+    const b = primaryTheme.get(edge.target);
+    if (!a || !b || a === b) continue;
+    const ida = labelToId.get(a);
+    const idb = labelToId.get(b);
+    if (!ida || !idb) continue;
+    const key = ida < idb ? `${ida} ${idb}` : `${idb} ${ida}`;
+    pairWeight.set(key, (pairWeight.get(key) ?? 0) + 1);
+  }
+  const maxWeight = Math.max(1, ...pairWeight.values());
+
+  const nodes: NodeModel[] = themeNodes.map((theme, index) => {
+    const count = memberCount.get(theme.label) ?? theme.workCount ?? 0;
+    return {
+      id: theme.id,
+      label: theme.label,
+      type: 'theme',
+      createdAt: theme.createdAt,
+      workCount: count,
+      degree: count,
+      labelRank: 1.2,
+      size: themeConstellationSize(count),
+      read: true,
+      color: THEME_CONSTELLATION_PALETTE[index % THEME_CONSTELLATION_PALETTE.length],
+    };
+  });
+
+  const edges: EdgeModel[] = [];
+  for (const [key, weight] of pairWeight) {
+    const [source, target] = key.split(' ');
+    edges.push({
+      id: `themelink ${key}`,
+      source,
+      target,
+      type: 'related',
+      basis: 'inferred',
+      confidence: clampUnit(weight / maxWeight),
+      layoutEdge: true,
+    });
+  }
+  return { nodes, edges };
+}
+
+function largestComponent(ids: Set<string>, adjacency: Map<string, Set<string>>): Set<string> {
+  const seen = new Set<string>();
+  let best = new Set<string>();
+  for (const start of ids) {
+    if (seen.has(start)) continue;
+    const component = new Set<string>();
+    const queue = [start];
+    seen.add(start);
+    while (queue.length) {
+      const current = queue.pop()!;
+      component.add(current);
+      for (const other of adjacency.get(current) ?? []) {
+        if (ids.has(other) && !seen.has(other)) {
+          seen.add(other);
+          queue.push(other);
+        }
+      }
+    }
+    if (component.size > best.size) best = component;
+  }
+  return best;
+}
+
+/**
+ * Level 2 — the backbone of one theme. Keeps that theme's most-connected ideas
+ * (capped, largest connected component) with the semantic edges between them, so
+ * relations are actually visible instead of buried under thousands of nodes.
+ */
+export function buildThemeBackbone(data: GraphData, themeLabel: string, cap = 90): GraphModel {
+  const memberById = new Map<string, GraphData['nodes'][number]>();
+  for (const node of data.nodes) {
+    if (node.type === 'theme') continue;
+    if ((node.themes ?? []).includes(themeLabel)) memberById.set(node.id, node);
+  }
+  const memberIds = new Set(memberById.keys());
+
+  // Undirected adjacency + one representative semantic edge per member pair.
+  const adjacency = new Map<string, Set<string>>();
+  const edgeByPair = new Map<string, GraphData['edges'][number]>();
+  for (const id of memberIds) adjacency.set(id, new Set());
+  for (const edge of data.edges) {
+    if (edge.type === 'contains') continue;
+    if (edge.source === edge.target) continue;
+    if (!memberIds.has(edge.source) || !memberIds.has(edge.target)) continue;
+    adjacency.get(edge.source)!.add(edge.target);
+    adjacency.get(edge.target)!.add(edge.source);
+    const key = edge.source < edge.target ? `${edge.source} ${edge.target}` : `${edge.target} ${edge.source}`;
+    const existing = edgeByPair.get(key);
+    if (!existing || edge.confidence > existing.confidence) edgeByPair.set(key, edge);
+  }
+
+  // Largest connected component, then the top-`cap` by degree within it, then the
+  // largest component again so the retained core stays cohesive.
+  const connectedIds = new Set([...memberIds].filter((id) => (adjacency.get(id)?.size ?? 0) > 0));
+  let core = largestComponent(connectedIds.size ? connectedIds : memberIds, adjacency);
+  if (core.size === 0) core = new Set([...memberIds].slice(0, cap));
+
+  const degreeIn = (id: string, within: Set<string>) => {
+    let d = 0;
+    for (const other of adjacency.get(id) ?? []) if (within.has(other)) d++;
+    return d;
+  };
+  let kept = core;
+  if (core.size > cap) {
+    kept = new Set([...core].sort((a, b) => degreeIn(b, core) - degreeIn(a, core)).slice(0, cap));
+    const trimmed = largestComponent(kept, adjacency);
+    if (trimmed.size > 1) kept = trimmed;
+  }
+
+  const degreeById = new Map<string, number>();
+  for (const id of kept) degreeById.set(id, degreeIn(id, kept));
+
+  const ranked = [...kept].sort((a, b) => (degreeById.get(b) ?? 0) - (degreeById.get(a) ?? 0));
+  const labelRankById = new Map<string, number>();
+  ranked.forEach((id, index) => {
+    labelRankById.set(id, ranked.length <= 1 ? 1 : 1 - index / (ranked.length - 1));
+  });
+
+  const nodes: NodeModel[] = [...kept].map((id) => {
+    const node = memberById.get(id)!;
+    const degree = degreeById.get(id) ?? 0;
+    return {
+      id,
+      label: node.label,
+      type: node.type,
+      createdAt: node.createdAt,
+      workCount: node.workCount,
+      degree,
+      labelRank: labelRankById.get(id) ?? 0,
+      size: ideaNodeSize(degree),
+      read: node.read,
+    };
+  });
+
+  const edges: EdgeModel[] = [];
+  for (const [key, edge] of edgeByPair) {
+    const [source, target] = key.split(' ');
+    if (!kept.has(source) || !kept.has(target)) continue;
+    edges.push({
+      id: edge.id,
+      source,
+      target,
+      type: edge.type,
+      basis: edge.basis,
+      confidence: edge.confidence,
+      layoutEdge: true,
+    });
+  }
   return { nodes, edges };
 }
 

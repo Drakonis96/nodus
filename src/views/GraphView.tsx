@@ -7,7 +7,8 @@ import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
 import { TutorPanel } from './TutorPanel';
-import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
+import { SigmaGraph, type SigmaGraphApi, type GraphViewLevel } from './graph/SigmaGraph';
+import { buildThemeConstellation, buildThemeBackbone } from './graph/model';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 import { t, tx } from '../i18n';
@@ -1346,6 +1347,11 @@ function authorPhysicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Se
   return physical;
 }
 
+// Semantic-zoom navigation state for the Sigma engine's overview preset:
+//   corpus → constellation of themes · theme → that theme's backbone ·
+//   full → the classic idea graph (used when a deep-link focuses a node/edge).
+type GraphLevelState = { level: 'corpus' } | { level: 'theme'; theme: string } | { level: 'full' };
+
 export function GraphView({
   settings,
   onSettingsChange,
@@ -1423,6 +1429,7 @@ export function GraphView({
   const [graphLoading, setGraphLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
+  const [graphLevel, setGraphLevel] = useState<GraphLevelState>({ level: 'corpus' });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1');
   const [contextNotice, setContextNotice] = useState<string | null>(null);
@@ -1707,6 +1714,39 @@ export function GraphView({
       return el;
     });
   }, [activePreset, data, filters, lens]);
+
+  // ── Semantic-zoom levels (Sigma engine, overview preset) ────────────────────
+  // Levels only apply to the plain idea overview. Search and work-scoped views
+  // keep the classic full graph so those flows behave exactly as before.
+  const levelsActive =
+    USE_SIGMA && lens === 'ideas' && activePreset === 'overview' && !filters.search.trim() && filters.workIds.length === 0;
+  const activeThemeLabel = !levelsActive
+    ? null
+    : graphLevel.level === 'theme'
+      ? graphLevel.theme
+      : graphLevel.level === 'corpus' && filters.theme
+        ? filters.theme
+        : null;
+  const constellationModel = useMemo(() => (levelsActive ? buildThemeConstellation(data) : null), [levelsActive, data]);
+  const backboneModel = useMemo(
+    () => (levelsActive && activeThemeLabel ? buildThemeBackbone(data, activeThemeLabel, 90) : null),
+    [levelsActive, activeThemeLabel, data]
+  );
+  const graphOverrideModel =
+    !levelsActive || graphLevel.level === 'full' ? null : activeThemeLabel ? backboneModel : constellationModel;
+  const graphViewLevel: GraphViewLevel =
+    !levelsActive || graphLevel.level === 'full' ? 'full' : activeThemeLabel ? 'theme' : 'corpus';
+
+  const drillIntoTheme = useCallback((_nodeId: string, label: string) => {
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading(null);
+    setGraphLevel({ level: 'theme', theme: label });
+  }, []);
+  const backToCorpus = useCallback(() => {
+    setGraphLevel({ level: 'corpus' });
+    setFilters((f) => (f.theme ? { ...f, theme: '' } : f));
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -2905,6 +2945,9 @@ export function GraphView({
       setLayoutMode(next.layoutMode);
       setHighlightDepth(next.depth);
       setFiltersOpen(false);
+      // A plain preset switch (no deep-link) re-enters the graph at the theme
+      // overview; deep-link targets set their own level in the navigation effect.
+      if (!navigationTarget) setGraphLevel(next.filters.theme ? { level: 'theme', theme: next.filters.theme } : { level: 'corpus' });
       if (id !== 'reading' || !navigationTarget?.workId) {
         setContextNotice(null);
         setContextZoteroKey(null);
@@ -2933,6 +2976,11 @@ export function GraphView({
     lastNavigationNonceRef.current = target.nonce;
     const preset = target.preset ?? (target.edgeId ? 'contradictions' : target.workId ? 'reading' : 'overview');
     applyPreset(preset, target);
+    // Keep the semantic-zoom level consistent with the deep-link: a focused node,
+    // edge or work needs the full graph; a theme link opens that theme's backbone.
+    if (target.nodeId || target.edgeId || target.workId) setGraphLevel({ level: 'full' });
+    else if (target.theme) setGraphLevel({ level: 'theme', theme: target.theme });
+    else setGraphLevel({ level: 'corpus' });
     if (target.openTutor) setTutorOpen(true);
     setContextNotice(navigationNotice(target, preset));
     setContextZoteroKey(target.zoteroKey ?? null);
@@ -3188,6 +3236,9 @@ export function GraphView({
                 preset={activePreset}
                 highlightDepth={highlightDepth}
                 lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')}
+                overrideModel={graphOverrideModel}
+                viewLevel={graphViewLevel}
+                onDrillDown={drillIntoTheme}
                 onOpenNode={onSigmaOpenNode}
                 onOpenEdge={onSigmaOpenEdge}
                 onClearFocus={onSigmaClear}
@@ -3211,6 +3262,40 @@ export function GraphView({
                 <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
                 {t('Reorganizando grafo…')}
               </div>
+            </div>
+          )}
+
+          {/* Semantic-zoom breadcrumb (Sigma overview) */}
+          {USE_SIGMA && levelsActive && (
+            <div className="absolute top-3 left-3 z-10 max-w-[70%]">
+              {graphViewLevel === 'corpus' ? (
+                <div className="card flex items-center gap-1.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-400">
+                  <Icon name="layers" size={13} />
+                  {tx('{n} temas · haz clic para explorar', { n: themes.length })}
+                </div>
+              ) : (
+                <div className="card flex items-center gap-0.5 bg-neutral-900/90 px-1 py-1 text-xs">
+                  <button
+                    className="flex items-center gap-1 rounded px-1.5 py-1 text-neutral-300 hover:bg-neutral-800"
+                    onClick={backToCorpus}
+                    title={t('Volver a los temas del corpus')}
+                  >
+                    <Icon name="chevronLeft" size={13} />
+                    {t('Corpus')}
+                  </button>
+                  {graphViewLevel === 'theme' && activeThemeLabel && (
+                    <>
+                      <span className="text-neutral-600">/</span>
+                      <span className="max-w-[280px] truncate px-1 font-medium text-neutral-100" title={activeThemeLabel}>
+                        {activeThemeLabel}
+                      </span>
+                    </>
+                  )}
+                  {graphViewLevel === 'full' && (
+                    <span className="px-1 text-neutral-400">{t('Idea enfocada')}</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
