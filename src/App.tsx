@@ -308,12 +308,12 @@ export function App() {
       </header>
 
       {settings.demoMode && (
-        <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs">
+        <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-100 border-b border-amber-300 text-amber-800 text-xs dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
           <Icon name="alert" size={14} />
           <span className="flex-1">
             {t('Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
           </span>
-          <button className="btn btn-ghost border border-amber-500/40 text-amber-200 py-0.5" onClick={() => void exitDemo()} disabled={demoBusy}>
+          <button className="btn btn-ghost border border-amber-400/60 text-amber-800 py-0.5 dark:border-amber-500/40 dark:text-amber-200" onClick={() => void exitDemo()} disabled={demoBusy}>
             {demoBusy ? t('Saliendo…') : t('Salir del modo demo')}
           </button>
         </div>

@@ -628,15 +628,15 @@ export function Settings({
       {visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña') && (
           <Section title={t('Datos')}>
             {settings.demoMode && (
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
                 <div>
-                  <label className="text-sm text-amber-300">{t('Modo demo activo')}</label>
+                  <label className="text-sm text-amber-700 dark:text-amber-300">{t('Modo demo activo')}</label>
                   <p className="text-xs text-neutral-500 mt-0.5">
                     {t('Estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
                   </p>
                 </div>
                 <button
-                  className="btn border border-amber-700 text-amber-300 hover:bg-amber-950/50 shrink-0"
+                  className="btn border border-amber-300 text-amber-700 hover:bg-amber-100 shrink-0 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/50"
                   onClick={async () => {
                     await window.nodus.clearDemoData();
                     await onChange();
@@ -803,16 +803,16 @@ export function Settings({
       )}
 
       {visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos') && (
-          <section className="card p-4 mb-4 border border-red-900/60">
-            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">{t('Zona de peligro')}</h2>
+          <section className="card p-4 mb-4 border border-red-200 dark:border-red-900/60">
+            <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wide mb-3 dark:text-red-400">{t('Zona de peligro')}</h2>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">{t('Reinicializar grafo')}</label>
+                <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Reinicializar grafo')}</label>
                 <p className="text-xs text-neutral-500 mt-0.5">
                   {t('Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La biblioteca y los ajustes se conservan.')}
                 </p>
               </div>
-              <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
+              <button className="btn border border-red-300 text-red-700 hover:bg-red-50 shrink-0 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50" onClick={startReset}>
                 <Icon name="trash" /> {t('Reinicializar…')}
               </button>
             </div>
@@ -822,11 +822,11 @@ export function Settings({
       {resetCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => !resetting && setResetCode(null)}>
           <div className="card p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-red-400">{t('Confirmación final')}</h3>
-            <p className="text-sm text-neutral-300">
+            <h3 className="font-semibold text-red-600 dark:text-red-400">{t('Confirmación final')}</h3>
+            <p className="text-sm text-neutral-700 dark:text-neutral-300">
               {t('Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:')}
             </p>
-            <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-100 bg-neutral-950 rounded-lg py-3 select-none">
+            <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-900 bg-neutral-100 rounded-lg py-3 select-none dark:text-neutral-100 dark:bg-neutral-950">
               {resetCode}
             </div>
             <input
@@ -846,7 +846,7 @@ export function Settings({
                 {t('Cancelar')}
               </button>
               <button
-                className="btn border border-red-800 text-red-300 hover:bg-red-950/50 disabled:opacity-40"
+                className="btn border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50"
                 disabled={resetInput !== resetCode || resetting}
                 onClick={() => void confirmReset()}
               >

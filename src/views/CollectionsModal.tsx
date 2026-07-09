@@ -51,10 +51,10 @@ function CollectionNode({
       <div
         className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-sm transition-colors ${
           isSelected
-            ? 'border-indigo-600 bg-indigo-600/15 text-neutral-100'
+            ? 'border-indigo-500 bg-indigo-100 text-indigo-900 dark:border-indigo-600 dark:bg-indigo-600/15 dark:text-neutral-100'
             : isMonitored
-              ? 'border-emerald-600/70 bg-emerald-900/50 text-emerald-300'
-              : 'border-transparent text-neutral-300 hover:bg-neutral-800'
+              ? 'border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-600/70 dark:bg-emerald-900/50 dark:text-emerald-300'
+              : 'border-transparent text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
         }`}
         style={{ paddingLeft: depth * 14 + 6 }}
       >
@@ -65,15 +65,15 @@ function CollectionNode({
           {col.name}
         </span>
         {isMonitored && (
-          <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
+          <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
             {t('Monitorizada')}
           </span>
         )}
         <button
           className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${
             isMonitored
-              ? 'bg-red-950/40 text-red-300 hover:bg-red-900/50'
-              : 'bg-indigo-600/15 text-indigo-300 hover:bg-indigo-600 hover:text-white'
+              ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50'
+              : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-600/15 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white'
           }`}
           title={isMonitored ? t('Quitar esta colección del monitoreo') : t('Monitorizar esta colección')}
           onClick={(e) => {
@@ -315,7 +315,7 @@ export function CollectionsModal({
               monitoredEntries.map((entry) => (
                 <button
                   key={entry.key}
-                  className="inline-flex items-center gap-1 rounded-md bg-emerald-900/50 px-2 py-0.5 text-xs text-emerald-300 hover:bg-red-950/50 hover:text-red-300"
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700 hover:bg-red-100 hover:text-red-700 dark:bg-emerald-900/50 dark:text-emerald-300 dark:hover:bg-red-950/50 dark:hover:text-red-300"
                   title={t('Quitar del monitoreo')}
                   onClick={() => toggleMonitoredCollection(entry.key)}
                 >
@@ -334,8 +334,8 @@ export function CollectionsModal({
                 <button
                   className={`rounded-md border px-2 py-0.5 ${
                     selectedIsMonitored
-                      ? 'border-red-900/60 text-red-300 hover:bg-red-950/50'
-                      : 'border-indigo-800 text-indigo-300 hover:bg-indigo-600 hover:text-white'
+                      ? 'border-red-200 text-red-700 hover:bg-red-100 dark:border-red-900/60 dark:text-red-300 dark:hover:bg-red-950/50'
+                      : 'border-indigo-300 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-600 dark:hover:text-white'
                   }`}
                   onClick={() => toggleMonitoredCollection(selected.key)}
                 >

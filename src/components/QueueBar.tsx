@@ -29,9 +29,9 @@ export function QueueBar() {
   const running = items.find((i) => i.state === 'running');
 
   return (
-    <div className="border-t border-neutral-800 bg-neutral-900/80 backdrop-blur px-4 py-2 text-sm">
+    <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80">
       {pausedReason && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-950/60 border border-amber-800/60 px-3 py-1.5 text-amber-300 text-xs">
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-amber-700 text-xs dark:bg-amber-950/60 dark:border-amber-800/60 dark:text-amber-300">
           <span>⚠</span>
           <span className="flex-1">
             {t('Escaneo en pausa:')} {pausedReason} {t('Corrígelo en Ajustes y pulsa')} <b>{t('Reanudar')}</b>.

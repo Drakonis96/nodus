@@ -651,7 +651,7 @@ export function WritingWorkshopView({
       {showTutorial && <WritingWorkshopTutorial />}
 
       {(message || error) && (
-        <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-900 bg-red-950/30 text-red-200' : 'border-neutral-800 text-neutral-400'}`}>
+        <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
           {error ?? message}
         </div>
       )}
@@ -1275,7 +1275,7 @@ function DeepResearchPanel({
       )}
 
       {meta?.stoppedReason && !running && (
-        <div className="rounded-md border border-amber-900 bg-amber-950/30 p-2 text-xs text-amber-200">{meta.stoppedReason}</div>
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{meta.stoppedReason}</div>
       )}
 
       {!running && !progress && (

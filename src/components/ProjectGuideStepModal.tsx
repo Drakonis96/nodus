@@ -126,7 +126,7 @@ export function ProjectGuideStepModal({
         </header>
 
         <div className="space-y-4 px-5 py-4">
-          <div className="rounded-md border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-xs leading-relaxed text-indigo-900 dark:border-indigo-800/40 dark:bg-indigo-900/20 dark:text-indigo-100">
+          <div className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs leading-relaxed text-indigo-800 dark:border-indigo-800/40 dark:bg-indigo-900/20 dark:text-indigo-100">
             {t(step.description)}
           </div>
 

@@ -187,15 +187,44 @@ body {
 .light .bg-indigo-950\/25,
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
+}.light .bg-indigo-900/20 {
+  background-color: #eef2ff;
 }
-.light .bg-neutral-700 {
+.light .bg-emerald-900/20 {
+  background-color: #ecfdf5;
+}
+.light .bg-red-900/20 {
+  background-color: #fef2f2;
+}
+.light .bg-amber-900/20 {
+  background-color: #fffbeb;
+}
+.light .bg-cyan-900/20 {
+  background-color: #ecfeff;
+}
+.light .bg-neutral-800/40 {
+  background-color: #f3f4f6;
+}.light .bg-neutral-700 {
   background-color: #d4d4d4;
 }
 .light .border-indigo-900\/70 {
   border-color: rgba(129, 140, 248, 0.45);
 }
-.light .border-indigo-700 {
+.light .border-indigo-700,
+.light .border-indigo-700/60 {
   border-color: #a5b4fc;
+}
+.light .border-emerald-700/60 {
+  border-color: #6ee7b7;
+}
+.light .border-red-700/60 {
+  border-color: #fca5a5;
+}
+.light .border-amber-700/60 {
+  border-color: #fcd34d;
+}
+.light .border-cyan-700/60 {
+  border-color: #67e8f9;
 }
 .light .ring-indigo-700\/60 {
   --tw-ring-color: rgba(129, 140, 248, 0.48);

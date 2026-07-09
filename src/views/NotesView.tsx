@@ -676,17 +676,17 @@ export function NotesView({
             </>
           )}
           {reorderUndo && (
-            <div className="flex items-center gap-2 rounded-md border border-indigo-700/60 bg-indigo-600/10 px-2.5 py-1.5 text-xs">
-              <Icon name="wand" size={13} className="text-indigo-300 shrink-0" />
-              <span className="flex-1 text-indigo-200">{t('Notas reordenadas por IA.')}</span>
+            <div className="flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-xs dark:border-indigo-700/60 dark:bg-indigo-600/10">
+              <Icon name="wand" size={13} className="text-indigo-600 shrink-0 dark:text-indigo-300" />
+              <span className="flex-1 text-indigo-700 dark:text-indigo-200">{t('Notas reordenadas por IA.')}</span>
               <button
-                className="text-neutral-400 hover:text-neutral-100"
+                className="text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                 onClick={() => void undoReorder()}
               >
                 {t('Deshacer')}
               </button>
               <button
-                className="font-medium text-indigo-300 hover:text-indigo-200"
+                className="font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
                 onClick={() => setReorderUndo(null)}
               >
                 {t('Mantener')}
@@ -941,24 +941,24 @@ function ProjectFolderBanner({
   onSuggest: () => void;
 }) {
   return (
-    <div className="rounded-md border border-indigo-700/50 bg-indigo-600/10 px-2.5 py-2">
+    <div className="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-2 dark:border-indigo-700/50 dark:bg-indigo-600/10">
       <div className="flex items-start gap-2">
-        <Icon name="folder" size={14} className="mt-0.5 shrink-0 text-indigo-300" />
+        <Icon name="folder" size={14} className="mt-0.5 shrink-0 text-indigo-600 dark:text-indigo-300" />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold text-indigo-100">{context.project.title}</div>
-          <div className="truncate text-[11px] text-indigo-200/75">
+          <div className="truncate text-xs font-semibold text-indigo-900 dark:text-indigo-100">{context.project.title}</div>
+          <div className="truncate text-[11px] text-indigo-700/75 dark:text-indigo-200/75">
             {context.section ? `${t('Seccion')}: ${context.section.title}` : t('Carpeta raiz del proyecto')}
           </div>
         </div>
       </div>
       <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1" onClick={onCreateNote}>
+        <button className="btn btn-ghost border border-indigo-300/60 text-[11px] py-1 dark:border-indigo-600/40" onClick={onCreateNote}>
           {t('Nota')}
         </button>
-        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1" onClick={onCreateIdea}>
+        <button className="btn btn-ghost border border-indigo-300/60 text-[11px] py-1 dark:border-indigo-600/40" onClick={onCreateIdea}>
           {t('Idea')}
         </button>
-        <button className="btn btn-ghost border border-indigo-600/40 text-[11px] py-1 gap-1" onClick={onSuggest}>
+        <button className="btn btn-ghost border border-indigo-300/60 text-[11px] py-1 gap-1 dark:border-indigo-600/40" onClick={onSuggest}>
           <Icon name="wand" size={12} /> {t('Sugerir')}
         </button>
       </div>

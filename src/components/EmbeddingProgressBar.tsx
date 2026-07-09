@@ -19,9 +19,9 @@ export function EmbeddingProgressBar() {
   const active = running || paused;
 
   return (
-    <div className="border-t border-neutral-800 bg-neutral-900/80 backdrop-blur px-4 py-2 text-sm">
+    <div className="border-t border-neutral-200 bg-neutral-100/80 backdrop-blur px-4 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900/80">
       {error && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-950/60 border border-red-800/60 px-3 py-1.5 text-red-300 text-xs">
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-1.5 text-red-700 text-xs dark:bg-red-950/60 dark:border-red-800/60 dark:text-red-300">
           <span>{t('Error')}: {error}</span>
         </div>
       )}

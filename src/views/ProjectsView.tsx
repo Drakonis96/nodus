@@ -472,10 +472,10 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     .map((suggestion) => suggestion.id);
 
   return (
-    <div className="h-full flex min-h-0 bg-neutral-950">
-      <aside className="w-72 shrink-0 border-r border-neutral-800 p-3 flex flex-col gap-3 overflow-y-auto">
+    <div className="h-full flex min-h-0 bg-white dark:bg-neutral-950">
+      <aside className="w-72 shrink-0 border-r border-neutral-200 p-3 flex flex-col gap-3 overflow-y-auto dark:border-neutral-800">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t('Proyectos')}</h2>
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{t('Proyectos')}</h2>
           <button className="btn btn-ghost text-xs gap-1.5" onClick={() => void loadProjects()}>
             <Icon name="sync" size={14} /> {t('Actualizar')}
           </button>
@@ -485,22 +485,22 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             <button
               key={project.id}
               className={`w-full text-left border rounded-lg p-3 transition-colors ${
-                activeId === project.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:bg-neutral-900'
+                activeId === project.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
               }`}
               onClick={() => setActiveId(project.id)}
             >
-              <div className="font-medium text-sm truncate">{project.title}</div>
+              <div className="font-medium text-sm truncate text-neutral-900 dark:text-neutral-100">{project.title}</div>
               <div className="text-xs text-neutral-500 mt-1">{kindLabel(project.kind)} · {project.status}</div>
             </button>
           ))}
           {projects.length === 0 && (
-            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-4">
+            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
               {t('Aun no hay proyectos. Crea uno para vincular notas, materiales y capitulos.')}
             </div>
           )}
         </div>
-        <div className="border border-neutral-800 rounded-lg p-3 space-y-2">
-          <div className="text-xs font-semibold text-neutral-300">{t('Nuevo proyecto')}</div>
+        <div className="border border-neutral-200 rounded-lg p-3 space-y-2 dark:border-neutral-800">
+          <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{t('Nuevo proyecto')}</div>
           <input
             className="input w-full text-sm"
             placeholder={t('Titulo')}
@@ -529,22 +529,22 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
           <div className="h-full flex items-center justify-center text-neutral-500">{t('Selecciona o crea un proyecto.')}</div>
         ) : (
           <>
-            <header className="border-b border-neutral-800 px-5 py-4 flex items-start gap-4">
+            <header className="border-b border-neutral-200 px-5 py-4 flex items-start gap-4 dark:border-neutral-800">
               <div className="min-w-0 flex-1">
                 <div className="text-xs uppercase tracking-wide text-neutral-500">{kindLabel(detail.project.kind)}</div>
-                <h1 className="text-xl font-semibold truncate">{detail.project.title}</h1>
-                <p className="text-sm text-neutral-400 line-clamp-2 mt-1">{detail.project.brief || t('Sin brief definido.')}</p>
+                <h1 className="text-xl font-semibold truncate text-neutral-900 dark:text-neutral-100">{detail.project.title}</h1>
+                <p className="text-sm text-neutral-500 line-clamp-2 mt-1 dark:text-neutral-400">{detail.project.brief || t('Sin brief definido.')}</p>
               </div>
               <div className="flex items-center gap-2">
                 <select className="input text-xs" value={projectExportFormat} onChange={(e) => setProjectExportFormat(e.target.value as ProjectExportFormat)}>
                   <option value="markdown">Markdown</option>
                   <option value="json">JSON</option>
                 </select>
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={exportProjectFile} disabled={busy === 'export-project'}>
+                <button className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700" onClick={exportProjectFile} disabled={busy === 'export-project'}>
                   <Icon name={busy === 'export-project' ? 'sync' : 'download'} className={busy === 'export-project' ? 'animate-spin' : ''} /> {t('Exportar proyecto')}
                 </button>
                 <button
-                  className="btn btn-ghost border border-neutral-700 gap-1.5 text-red-300 hover:bg-red-950/40"
+                  className="btn btn-ghost border border-red-300 gap-1.5 text-red-700 hover:bg-red-100 dark:border-neutral-700 dark:text-red-300 dark:hover:bg-red-950/40"
                   onClick={deleteActiveProject}
                   disabled={busy === 'delete-project'}
                   title={t('Eliminar proyecto')}
@@ -555,10 +555,10 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             </header>
 
             {message && (
-              <div className="mx-5 mt-3 px-3 py-2 rounded-lg border border-neutral-800 bg-neutral-900 text-sm text-neutral-300 flex items-center gap-2">
-                <Icon name="check" size={14} className="text-emerald-400" />
+              <div className="mx-5 mt-3 px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-100 text-sm text-neutral-700 flex items-center gap-2 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+                <Icon name="check" size={14} className="text-emerald-600 dark:text-emerald-400" />
                 <span className="flex-1">{message}</span>
-                <button className="text-neutral-500 hover:text-neutral-200" onClick={() => setMessage(null)}>x</button>
+                <button className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200" onClick={() => setMessage(null)}>x</button>
               </div>
             )}
 
@@ -587,7 +587,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             )}
 
             <div className="grid grid-cols-[minmax(220px,300px)_1fr] gap-0 flex-1 min-h-0">
-              <section className="border-r border-neutral-800 p-4 overflow-y-auto">
+              <section className="border-r border-neutral-200 p-4 overflow-y-auto dark:border-neutral-800">
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <Stat label={t('Secciones')} value={detail.stats.sections} />
                   <Stat label={t('Materiales')} value={detail.stats.links} />
@@ -601,8 +601,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                 </div>
                 <div className="space-y-2">
                   {detail.sections.map((section) => (
-                    <div key={section.id} className="border border-neutral-800 rounded-lg p-3">
-                      <div className="text-sm font-medium">{section.title}</div>
+                    <div key={section.id} className="border border-neutral-200 rounded-lg p-3 dark:border-neutral-800">
+                      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{section.title}</div>
                       <div className="text-xs text-neutral-500">{section.role} · {section.status}</div>
                     </div>
                   ))}
@@ -613,19 +613,19 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     <button
                       key={chapter.id}
                       className={`w-full text-left border rounded-lg p-3 ${
-                        selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:bg-neutral-900'
+                        selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
                       }`}
                       onClick={() => {
                         setSelectedChapterId(chapter.id);
                         setTab('texto');
                       }}
                     >
-                      <div className="text-sm font-medium truncate">{chapter.title}</div>
+                      <div className="text-sm font-medium truncate text-neutral-900 dark:text-neutral-100">{chapter.title}</div>
                       <div className="text-xs text-neutral-500">{chapter.wordCount} {t('palabras')} · {chapter.sourceFormat}</div>
                     </button>
                   ))}
                   {detail.chapters.length === 0 && (
-                    <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-4">
+                    <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
                       {t('Sube un capitulo para empezar a trabajar sobre el manuscrito.')}
                     </div>
                   )}
@@ -637,15 +637,15 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                   <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capitulo seleccionado.')}</div>
                 ) : (
                   <>
-                    <div className="border-b border-neutral-800 p-3 flex flex-wrap items-center gap-2">
+                    <div className="border-b border-neutral-200 p-3 flex flex-wrap items-center gap-2 dark:border-neutral-800">
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold truncate">{selectedChapter.title}</div>
+                        <div className="font-semibold truncate text-neutral-900 dark:text-neutral-100">{selectedChapter.title}</div>
                         <div className="text-xs text-neutral-500">{selectedChapter.wordCount} {t('palabras')} · {selectedChapter.originalFileName ?? selectedChapter.sourceFormat}</div>
                       </div>
                       {(['texto', 'relaciones', 'verificacion', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
                         <button
                           key={item}
-                          className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+                          className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`}
                           onClick={() => setTab(item)}
                         >
                           {tabLabel(item)}
@@ -655,15 +655,15 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
                     {tab === 'texto' && (
                       <div className="flex-1 min-h-0 grid grid-cols-2">
-                        <div className="border-r border-neutral-800 min-h-0 flex flex-col">
-                          <div className="p-3 border-b border-neutral-800 flex items-center gap-2">
+                        <div className="border-r border-neutral-200 min-h-0 flex flex-col dark:border-neutral-800">
+                          <div className="p-3 border-b border-neutral-200 flex items-center gap-2 dark:border-neutral-800">
                             <button className="btn btn-primary gap-1.5" onClick={saveChapter} disabled={busy === 'save-chapter'}>
                               <Icon name={busy === 'save-chapter' ? 'sync' : 'check'} className={busy === 'save-chapter' ? 'animate-spin' : ''} /> {t('Guardar')}
                             </button>
                             <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea version previa.')}</div>
                           </div>
                           <textarea
-                            className="flex-1 min-h-0 bg-neutral-950 text-neutral-100 p-4 outline-none resize-none font-mono text-sm leading-relaxed"
+                            className="flex-1 min-h-0 bg-white text-neutral-900 p-4 outline-none resize-none font-mono text-sm leading-relaxed dark:bg-neutral-950 dark:text-neutral-100"
                             value={chapterMarkdown}
                             onChange={(e) => setChapterMarkdown(e.target.value)}
                           />
@@ -675,7 +675,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'relaciones' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="flex items-center gap-2 mb-4">
                           <button className="btn btn-primary gap-1.5" onClick={() => void analyzeRelations(true)} disabled={busy === 'relations'}>
                             <Icon name={busy === 'relations' ? 'sync' : 'network'} className={busy === 'relations' ? 'animate-spin' : ''} /> {t('Analizar relaciones')}
@@ -700,7 +700,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             <ChapterIdeaCard key={idea.id} idea={idea} relations={rels} onOpen={(c) => setCitation(c)} />
                           ))}
                           {(!relations || !relations.analyzed) && busy !== 'relations' && (
-                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
+                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-5 dark:border-neutral-800">
                               {t('Analiza las relaciones para ver cómo conecta este capítulo con toda tu biblioteca.')}
                             </div>
                           )}
@@ -709,7 +709,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'verificacion' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="mb-4 flex flex-wrap items-center gap-2">
                           <button className="btn btn-primary gap-1.5" onClick={() => void verifyManuscript()} disabled={busy === 'verify-manuscript'}>
                             <Icon name={busy === 'verify-manuscript' ? 'sync' : 'search'} className={busy === 'verify-manuscript' ? 'animate-spin' : ''} /> {t('Verificar citas')}
@@ -737,7 +737,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                         {verification?.warnings.length ? (
                           <div className="mb-4 space-y-2">
                             {verification.warnings.map((warning) => (
-                              <div key={warning} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                              <div key={warning} className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
                                 <Icon name="alert" size={14} className="mt-0.5" />
                                 <span>{warning}</span>
                               </div>
@@ -764,7 +764,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'sugerencias' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="flex items-center gap-2 mb-4">
                           <select className="input text-sm" value={mode} onChange={(e) => setMode(e.target.value as ChapterSuggestionMode)}>
                             <option value="suggest">{t('Sugerir ubicacion')}</option>
@@ -774,7 +774,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             <Icon name={busy === 'suggest' ? 'sync' : 'wand'} className={busy === 'suggest' ? 'animate-spin' : ''} /> {t('Generar sugerencias')}
                           </button>
                           <button
-                            className="btn btn-ghost border border-neutral-700 gap-1.5"
+                            className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700"
                             onClick={() => applySuggestions(verifiedSuggestionIds)}
                             disabled={busy === 'apply' || verifiedSuggestionIds.length === 0 || mode !== 'insert'}
                             title={mode !== 'insert' ? t('Cambia a Insertar en borrador para aplicar automaticamente.') : undefined}
@@ -794,7 +794,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             />
                           ))}
                           {suggestions.length === 0 && (
-                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
+                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-5 dark:border-neutral-800">
                               {t('Genera sugerencias para que Nodus proponga inserciones con citas verificables.')}
                             </div>
                           )}
@@ -803,15 +803,15 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'versiones' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-white dark:bg-transparent">
                         {versions.map((version) => (
-                          <div key={version.id} className="border border-neutral-800 rounded-lg p-3">
+                          <div key={version.id} className="border border-neutral-200 rounded-lg p-3 dark:border-neutral-800">
                             <div className="flex items-center gap-3">
                               <div className="flex-1">
-                                <div className="font-medium text-sm">{version.label}</div>
+                                <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">{version.label}</div>
                                 <div className="text-xs text-neutral-500">{new Date(version.createdAt).toLocaleString()}</div>
                               </div>
-                              <button className="btn btn-ghost border border-neutral-700" onClick={() => void restoreVersion(version.id)} disabled={busy === `restore-${version.id}`}>
+                              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void restoreVersion(version.id)} disabled={busy === `restore-${version.id}`}>
                                 {t('Restaurar')}
                               </button>
                             </div>
@@ -823,9 +823,9 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'exportar' && (
-                      <div className="flex-1 p-5">
-                        <div className="max-w-md border border-neutral-800 rounded-lg p-4 space-y-3">
-                          <div className="font-semibold">{t('Exportar capitulo actual')}</div>
+                      <div className="flex-1 p-5 bg-white dark:bg-transparent">
+                        <div className="max-w-md border border-neutral-200 rounded-lg p-4 space-y-3 dark:border-neutral-800">
+                          <div className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Exportar capitulo actual')}</div>
                           <select className="input w-full" value={chapterExportFormat} onChange={(e) => setChapterExportFormat(e.target.value as ChapterExportFormat)}>
                             <option value="markdown">Markdown</option>
                             <option value="txt">TXT</option>
@@ -853,8 +853,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="border border-neutral-800 rounded-lg p-2">
-      <div className="text-lg font-semibold">{value}</div>
+    <div className="border border-neutral-200 rounded-lg p-2 dark:border-neutral-800">
+      <div className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{value}</div>
       <div className="text-[11px] text-neutral-500">{label}</div>
     </div>
   );
@@ -1052,7 +1052,7 @@ function ProjectGuidePanel({
               <Icon name={guideStepIcon(step.status)} size={13} />
               <span className="truncate text-xs font-medium">{t(step.title)}</span>
             </div>
-            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">{step.evidence}</p>
+            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500 dark:text-neutral-500">{step.evidence}</p>
           </button>
         ))}
       </div>
@@ -1074,26 +1074,26 @@ function SuggestionCard({
   canApply: boolean;
 }) {
   return (
-    <div className={`border rounded-lg p-4 ${suggestion.blockedReason ? 'border-amber-600/50 bg-amber-500/5' : 'border-neutral-800'}`}>
+    <div className={`border rounded-lg p-4 ${suggestion.blockedReason ? 'border-amber-300 bg-amber-50 dark:border-amber-600/50 dark:bg-amber-500/5' : 'border-neutral-200 dark:border-neutral-800'}`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{suggestion.refLabel}</div>
+          <div className="text-sm font-semibold truncate text-neutral-900 dark:text-neutral-100">{suggestion.refLabel}</div>
           <div className="text-xs text-neutral-500">
             {suggestion.kind} · {suggestion.operation} · {suggestion.status} · {Math.round(suggestion.confidence * 100)}%
           </div>
         </div>
-        <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => onStatus('accepted')} disabled={suggestion.status === 'accepted'}>
+        <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={() => onStatus('accepted')} disabled={suggestion.status === 'accepted'}>
           {t('Aceptar')}
         </button>
-        <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => onStatus('rejected')} disabled={suggestion.status === 'rejected'}>
+        <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={() => onStatus('rejected')} disabled={suggestion.status === 'rejected'}>
           {t('Rechazar')}
         </button>
         <button className="btn btn-primary text-xs" onClick={onApply} disabled={!canApply}>
           {t('Aplicar')}
         </button>
       </div>
-      {suggestion.blockedReason && <div className="mt-2 text-xs text-amber-300">{suggestion.blockedReason}</div>}
-      <div className="mt-3 border border-neutral-800 rounded-lg p-3 bg-neutral-950">
+      {suggestion.blockedReason && <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">{suggestion.blockedReason}</div>}
+      <div className="mt-3 border border-neutral-200 rounded-lg p-3 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950">
         <Markdown content={suggestion.proposedText} onCitation={onCitation} />
       </div>
       <div className="mt-2 text-xs text-neutral-500">{suggestion.rationale}</div>
@@ -1102,11 +1102,11 @@ function SuggestionCard({
 }
 
 const RELATION_META: Record<ChapterRelationType, { label: string; color: string }> = {
-  supports: { label: 'apoya', color: 'text-emerald-300 border-emerald-700/60 bg-emerald-900/20' },
-  contradicts: { label: 'contradice', color: 'text-red-300 border-red-700/60 bg-red-900/20' },
-  refines: { label: 'matiza', color: 'text-amber-300 border-amber-700/60 bg-amber-900/20' },
-  extends: { label: 'amplía', color: 'text-cyan-300 border-cyan-700/60 bg-cyan-900/20' },
-  related: { label: 'relacionada', color: 'text-neutral-300 border-neutral-700 bg-neutral-800/40' },
+  supports: { label: 'apoya', color: 'text-emerald-700 border-emerald-200 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-700/60 dark:bg-emerald-900/20' },
+  contradicts: { label: 'contradice', color: 'text-red-700 border-red-200 bg-red-50 dark:text-red-300 dark:border-red-700/60 dark:bg-red-900/20' },
+  refines: { label: 'matiza', color: 'text-amber-700 border-amber-200 bg-amber-50 dark:text-amber-300 dark:border-amber-700/60 dark:bg-amber-900/20' },
+  extends: { label: 'amplía', color: 'text-cyan-700 border-cyan-200 bg-cyan-50 dark:text-cyan-300 dark:border-cyan-700/60 dark:bg-cyan-900/20' },
+  related: { label: 'relacionada', color: 'text-neutral-600 border-neutral-300 bg-neutral-100 dark:text-neutral-300 dark:border-neutral-700 dark:bg-neutral-800/40' },
 };
 
 const RELATION_TARGET_ICON: Record<ChapterIdeaRelation['targetKind'], string> = {
@@ -1130,14 +1130,14 @@ function ChapterIdeaCard({
     onOpen({ kind: relation.targetKind, id: relation.targetId });
   };
   return (
-    <div className="border border-neutral-800 rounded-lg p-4">
+    <div className="border border-neutral-200 rounded-lg p-4 dark:border-neutral-800">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide rounded border border-indigo-700/60 bg-indigo-900/20 text-indigo-300 px-1.5 py-0.5">
+        <span className="text-[10px] uppercase tracking-wide rounded border border-indigo-200 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 dark:border-indigo-700/60 dark:bg-indigo-900/20 dark:text-indigo-300">
           {idea.type}
         </span>
-        <div className="font-semibold text-sm">{idea.label}</div>
+        <div className="font-semibold text-sm text-neutral-900 dark:text-neutral-100">{idea.label}</div>
       </div>
-      <p className="text-sm text-neutral-400 mt-1">{idea.statement}</p>
+      <p className="text-sm text-neutral-500 mt-1 dark:text-neutral-400">{idea.statement}</p>
       <div className="mt-3 space-y-1.5">
         {relations.length === 0 && (
           <div className="text-xs text-neutral-600">{t('Sin relaciones encontradas en la biblioteca.')}</div>
@@ -1148,16 +1148,16 @@ function ChapterIdeaCard({
           return (
             <div
               key={relation.id}
-              className={`flex items-start gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5 ${clickable ? 'cursor-pointer hover:border-neutral-700' : ''}`}
+              className={`flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-100/70 px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-900/40 ${clickable ? 'cursor-pointer hover:border-neutral-300 dark:hover:border-neutral-700' : ''}`}
               onClick={() => clickable && openTarget(relation)}
             >
               <span className={`shrink-0 mt-0.5 text-[10px] rounded border px-1.5 py-0.5 ${meta.color}`}>{t(meta.label)}</span>
               <Icon name={RELATION_TARGET_ICON[relation.targetKind]} size={13} className="mt-1 shrink-0 text-neutral-500" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-neutral-100">{relation.targetLabel}</span>
+                  <span className="truncate text-sm text-neutral-900 dark:text-neutral-100">{relation.targetLabel}</span>
                   {relation.targetSubtitle && <span className="shrink-0 truncate text-xs text-neutral-500">{relation.targetSubtitle}</span>}
-                  <span className="ml-auto shrink-0 text-[10px] tabular-nums text-neutral-600">{Math.round((relation.confidence || relation.similarity) * 100)}%</span>
+                  <span className="ml-auto shrink-0 text-[10px] tabular-nums text-neutral-500 dark:text-neutral-600">{Math.round((relation.confidence || relation.similarity) * 100)}%</span>
                 </div>
                 {relation.rationale && <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{relation.rationale}</p>}
               </div>
@@ -1181,7 +1181,7 @@ function guideStepIcon(status: ProjectGuideStepStatus): string {
 
 function guideStepClass(status: ProjectGuideStepStatus): string {
   if (status === 'done') return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-200';
-  if (status === 'current') return 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-600/70 dark:bg-indigo-900/30 dark:text-indigo-100';
+  if (status === 'current') return 'border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-600/70 dark:bg-indigo-900/30 dark:text-indigo-100';
   return 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-500';
 }
 
