@@ -418,7 +418,7 @@ export function WritingWorkshopView({
             <option value="none">{t('Sin origen de proyecto')}</option>
             <option value="project">{t('Proyecto completo')}</option>
             <option value="section">{t('Seccion del proyecto')}</option>
-            <option value="chapter">{t('Capitulo del proyecto')}</option>
+            <option value="chapter">{t('Capítulo del proyecto')}</option>
           </select>
           {sourceScope !== 'none' && (
             <>

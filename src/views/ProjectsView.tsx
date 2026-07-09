@@ -286,7 +286,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       if (chapter) {
         setSelectedChapterId(chapter.id);
         setTab('texto');
-        setMessage(t('Capitulo importado y guardado como nota vinculada.'));
+        setMessage(t('Capítulo importado y guardado como nota vinculada.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -301,7 +301,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     try {
       const updated = await window.nodus.updateProjectChapter(selectedChapter.id, chapterMarkdown);
       if (updated) {
-        setMessage(t('Capitulo guardado con version previa recuperable.'));
+        setMessage(t('Capítulo guardado con versión previa recuperable.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -424,7 +424,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       const updated = await window.nodus.applyProjectSuggestions({ chapterId: selectedChapter.id, suggestionIds: ids });
       if (updated) {
         setChapterMarkdown(updated.currentMarkdown);
-        setMessage(t('Sugerencias aplicadas sobre una version nueva del borrador.'));
+        setMessage(t('Sugerencias aplicadas sobre una versión nueva del borrador.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -439,7 +439,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       const chapter = await window.nodus.restoreProjectChapterVersion(versionId);
       if (chapter) {
         setChapterMarkdown(chapter.currentMarkdown);
-        setMessage(t('Version restaurada. Se guardo una copia previa antes de restaurar.'));
+        setMessage(t('Versión restaurada. Se guardó una copia previa antes de restaurar.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -453,7 +453,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     setBusy('export-chapter');
     try {
       const result = await window.nodus.exportProjectChapter({ chapterId: selectedChapter.id, format: chapterExportFormat });
-      if (result) setMessage(`${t('Capitulo exportado:')} ${result.path}`);
+      if (result) setMessage(`${t('Capítulo exportado:')} ${result.path}`);
     } finally {
       setBusy(null);
     }
@@ -527,7 +527,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
           ))}
           {projects.length === 0 && (
             <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
-              {t('Aun no hay proyectos. Crea uno para vincular notas, materiales y capitulos.')}
+              {t('Aún no hay proyectos. Crea uno para vincular notas, materiales y capítulos.')}
             </div>
           )}
         </div>
@@ -535,7 +535,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
           <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{t('Nuevo proyecto')}</div>
           <input
             className="input w-full text-sm"
-            placeholder={t('Titulo')}
+            placeholder={t('Título')}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
           />
@@ -628,7 +628,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold">{t('Secciones')}</h3>
                   <button className="btn btn-primary text-xs gap-1.5" onClick={importChapter} disabled={busy === 'import'}>
-                    <Icon name={busy === 'import' ? 'sync' : 'upload'} className={busy === 'import' ? 'animate-spin' : ''} /> {t('Subir capitulo')}
+                    <Icon name={busy === 'import' ? 'sync' : 'upload'} className={busy === 'import' ? 'animate-spin' : ''} /> {t('Subir capítulo')}
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -639,7 +639,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     </div>
                   ))}
                 </div>
-                <h3 className="text-sm font-semibold mt-5 mb-2">{t('Capitulos')}</h3>
+                <h3 className="text-sm font-semibold mt-5 mb-2">{t('Capítulos')}</h3>
                 <div className="space-y-2">
                   {detail.chapters.map((chapter) => (
                     <button
@@ -658,7 +658,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                   ))}
                   {detail.chapters.length === 0 && (
                     <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
-                      {t('Sube un capitulo para empezar a trabajar sobre el manuscrito.')}
+                      {t('Sube un capítulo para empezar a trabajar sobre el manuscrito.')}
                     </div>
                   )}
                 </div>
@@ -666,7 +666,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
               <section className="min-w-0 min-h-0 flex flex-col">
                 {!selectedChapter ? (
-                  <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capitulo seleccionado.')}</div>
+                  <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capítulo seleccionado.')}</div>
                 ) : (
                   <>
                     <div className="border-b border-neutral-200 p-3 flex flex-wrap items-center gap-2 dark:border-neutral-800">
@@ -692,7 +692,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             <button className="btn btn-primary gap-1.5" onClick={saveChapter} disabled={busy === 'save-chapter'}>
                               <Icon name={busy === 'save-chapter' ? 'sync' : 'check'} className={busy === 'save-chapter' ? 'animate-spin' : ''} /> {t('Guardar')}
                             </button>
-                            <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea version previa.')}</div>
+                            <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea versión previa.')}</div>
                           </div>
                           <textarea
                             className="flex-1 min-h-0 bg-white text-neutral-900 p-4 outline-none resize-none font-mono text-sm leading-relaxed dark:bg-neutral-950 dark:text-neutral-100"
@@ -805,7 +805,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                       <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="flex items-center gap-2 mb-4">
                           <select className="input text-sm" value={mode} onChange={(e) => setMode(e.target.value as ChapterSuggestionMode)}>
-                            <option value="suggest">{t('Sugerir ubicacion')}</option>
+                            <option value="suggest">{t('Sugerir ubicación')}</option>
                             <option value="insert">{t('Insertar en borrador')}</option>
                           </select>
                           <button className="btn btn-primary gap-1.5" onClick={generateSuggestions} disabled={busy === 'suggest'}>
@@ -815,7 +815,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700"
                             onClick={() => applySuggestions(verifiedSuggestionIds)}
                             disabled={busy === 'apply' || verifiedSuggestionIds.length === 0 || mode !== 'insert'}
-                            title={mode !== 'insert' ? t('Cambia a Insertar en borrador para aplicar automaticamente.') : undefined}
+                            title={mode !== 'insert' ? t('Cambia a Insertar en borrador para aplicar automáticamente.') : undefined}
                           >
                             <Icon name={busy === 'apply' ? 'sync' : 'check'} className={busy === 'apply' ? 'animate-spin' : ''} /> {t('Aplicar todas verificadas')}
                           </button>
@@ -856,14 +856,14 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             <pre className="mt-3 max-h-36 overflow-hidden text-xs text-neutral-500 whitespace-pre-wrap">{version.markdown.slice(0, 900)}</pre>
                           </div>
                         ))}
-                        {versions.length === 0 && <div className="text-sm text-neutral-500">{t('Aun no hay versiones guardadas.')}</div>}
+                        {versions.length === 0 && <div className="text-sm text-neutral-500">{t('Aún no hay versiones guardadas.')}</div>}
                       </div>
                     )}
 
                     {tab === 'exportar' && (
                       <div className="flex-1 p-5 bg-white dark:bg-transparent">
                         <div className="max-w-md border border-neutral-200 rounded-lg p-4 space-y-3 dark:border-neutral-800">
-                          <div className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Exportar capitulo actual')}</div>
+                          <div className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Exportar capítulo actual')}</div>
                           <select className="input w-full" value={chapterExportFormat} onChange={(e) => setChapterExportFormat(e.target.value as ChapterExportFormat)}>
                             <option value="markdown">Markdown</option>
                             <option value="txt">TXT</option>

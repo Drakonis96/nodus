@@ -29,6 +29,7 @@ import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { notifyDataChanged, useDataRefresh } from './hooks';
 import type {
@@ -405,6 +406,10 @@ export function App() {
 
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">
+          {/* Per-view crash isolation: a render error in one section shows a
+              recovery card here instead of blanking the whole window. key={view}
+              clears the error automatically when the user switches sections. */}
+          <AppErrorBoundary key={view}>
           {view === 'home' && (
             <HomeView
               settings={settings}
@@ -488,6 +493,7 @@ export function App() {
               onVaultsChanged={reloadVaults}
             />
           )}
+          </AppErrorBoundary>
         </main>
       </div>
 

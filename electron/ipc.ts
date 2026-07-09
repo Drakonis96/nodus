@@ -866,7 +866,7 @@ export function registerIpc(
     let filePath = input.filePath?.trim() || null;
     if (!filePath) {
       const result = await dialog.showOpenDialog({
-        title: 'Importar capitulo',
+        title: 'Importar capítulo',
         properties: ['openFile'],
         filters: [
           { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'epub', 'md', 'markdown', 'txt'] },
@@ -881,7 +881,7 @@ export function registerIpc(
       ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
       perf: { title: path.basename(filePath), nodusId: input.projectId },
     });
-    if (!doc.text.trim()) throw new Error('No se pudo extraer texto util del capitulo.');
+    if (!doc.text.trim()) throw new Error('No se pudo extraer texto útil del capítulo.');
     return projects.createChapter({
       projectId: input.projectId,
       sectionId: input.sectionId ?? null,
