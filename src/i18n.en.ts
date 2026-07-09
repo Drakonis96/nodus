@@ -857,6 +857,7 @@ export const EN: Record<string, string> = {
   Autores: 'Authors',
   Año: 'Year',
   'Tema(s)': 'Theme(s)',
+  'Ordenar por esta columna': 'Sort by this column',
   Ligero: 'Light',
   Profundo: 'Deep',
   Embeddings: 'Embeddings',

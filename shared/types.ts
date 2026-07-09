@@ -63,6 +63,8 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   authors: string[];
   themes: string[];
   zoteroTags: string[];
+  /** How many ideas have been extracted from this work (idea_occurrences count). */
+  ideaCount: number;
 }
 
 /** One work inside a duplicate group, with enough metadata to choose a canonical. */

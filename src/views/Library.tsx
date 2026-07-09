@@ -33,9 +33,51 @@ import { t, tx } from '../i18n';
 
 const LIBRARY_ROW_HEIGHT = 64;
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
+  '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 4.5rem 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
+
+/** Columns the library table can be ordered by (client-side sort). */
+type SortKey = 'title' | 'authors' | 'year' | 'themes' | 'ideas' | 'light' | 'deep' | 'summary' | 'embeddings' | 'passages';
+type SortState = { key: SortKey; dir: 'asc' | 'desc' };
+
+// Counts and pipeline-status columns default to descending (most/furthest-along
+// first); text columns default to ascending. A third click clears back to the
+// default backend order (year desc, title asc).
+const NUMERIC_SORT_KEYS = new Set<SortKey>(['year', 'ideas', 'light', 'deep', 'summary', 'embeddings', 'passages']);
+const initialSortDir = (key: SortKey): 'asc' | 'desc' => (NUMERIC_SORT_KEYS.has(key) ? 'desc' : 'asc');
+
+function lightRank(s: LightStatus): number {
+  return s === 'done' ? 3 : s === 'pending' ? 2 : s === 'failed' ? 1 : 0;
+}
+
+/** Shared "how far along" rank for the deep and summary status columns. */
+function analysisRank(s: DeepStatus | SummaryStatus): number {
+  switch (s) {
+    case 'done':
+      return 4;
+    case 'pending':
+      return 3;
+    case 'failed':
+      return 2;
+    case 'skipped_no_text':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function embeddingRank(status: WorkEmbeddingStatus | undefined): number {
+  if (!status || status.totalIdeas === 0) return -1;
+  // Fully-indexed works rank above partially-indexed ones; ties broken by count.
+  return (status.complete ? 1_000_000 : 0) + status.embeddedIdeas;
+}
+
+function passageRank(status: WorkPassageStatus | undefined): number {
+  if (!status || status.status === 'missing') return -1;
+  if (status.status === 'complete') return 1_000_000 + status.totalPassages;
+  return 0; // outdated
+}
 
 /** Human label for a corpus-health bucket, matching the notice text on Home. */
 function healthBucketLabel(id: CorpusHealthBucketId): string {
@@ -262,6 +304,37 @@ function passageBadge(status: WorkPassageStatus | undefined) {
   return <Badge color="amber" title={t('El texto o el modelo de embeddings cambió.')}>{t('obsoleto')}</Badge>;
 }
 
+/** A clickable column header that cycles asc → desc → default on the shared sort. */
+function SortHeader({
+  label,
+  sortKey,
+  sort,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  sort: SortState | null;
+  onSort: (key: SortKey) => void;
+}) {
+  const active = sort?.key === sortKey;
+  return (
+    <button
+      type="button"
+      className={`group flex items-center gap-1 text-left font-medium hover:text-neutral-200 ${active ? 'text-neutral-100' : ''}`}
+      onClick={() => onSort(sortKey)}
+      title={t('Ordenar por esta columna')}
+      aria-label={`${label} — ${t('Ordenar por esta columna')}`}
+    >
+      <span className="truncate">{label}</span>
+      <Icon
+        name={active && sort!.dir === 'asc' ? 'arrowUp' : 'arrowDown'}
+        size={12}
+        className={`shrink-0 ${active ? 'opacity-80' : 'opacity-0 group-hover:opacity-30'}`}
+      />
+    </button>
+  );
+}
+
 export function Library({
   settings,
   target,
@@ -299,6 +372,9 @@ export function Library({
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [ideasWork, setIdeasWork] = useState<{ nodus_id: string; title: string } | null>(null);
   const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  // Client-side ordering over the already-in-memory filtered set. `null` keeps
+  // the backend order (year desc, title asc).
+  const [sort, setSort] = useState<SortState | null>(null);
   const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
   const tagFilterRef = useDismissableLayer<HTMLDivElement>({
@@ -717,6 +793,56 @@ export function Library({
       pendingEmbeddings,
     };
   }, [embeddingStatuses, works]);
+
+  // Click a header: sort by it (default direction), flip direction on the second
+  // click, and clear back to the backend order on the third.
+  const cycleSort = (key: SortKey) =>
+    setSort((cur) => {
+      const first = initialSortDir(key);
+      if (!cur || cur.key !== key) return { key, dir: first };
+      if (cur.dir === first) return { key, dir: first === 'asc' ? 'desc' : 'asc' };
+      return null;
+    });
+
+  // Only the rendered list is reordered; selection, counts and batch actions keep
+  // using `works` since they are order-independent.
+  const sortedWorks = useMemo(() => {
+    if (!sort) return works;
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    const value = (w: WorkView): number | string => {
+      switch (sort.key) {
+        case 'title':
+          return w.title.toLocaleLowerCase();
+        case 'authors':
+          return (w.authors[0] ?? '').toLocaleLowerCase();
+        case 'year':
+          return w.year ?? Number.NEGATIVE_INFINITY;
+        case 'themes':
+          return (w.themes[0] ?? '').toLocaleLowerCase();
+        case 'ideas':
+          return w.ideaCount;
+        case 'light':
+          return lightRank(w.light_status);
+        case 'deep':
+          return analysisRank(w.deep_status);
+        case 'summary':
+          return analysisRank(w.summary_status);
+        case 'embeddings':
+          return embeddingRank(embeddingStatuses.get(w.nodus_id));
+        case 'passages':
+          return passageRank(passageStatuses.get(w.nodus_id));
+      }
+    };
+    return [...works].sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      let cmp: number;
+      if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb;
+      else cmp = String(va).localeCompare(String(vb));
+      // Stable, predictable tiebreak so equal keys don't jitter between renders.
+      return cmp !== 0 ? cmp * dir : a.title.localeCompare(b.title);
+    });
+  }, [works, sort, embeddingStatuses, passageStatuses]);
 
   return (
     <div className="h-full flex flex-col p-6 min-h-0">
@@ -1213,22 +1339,23 @@ export function Library({
                 }}
               />
           </div>
-          <div className="font-medium">{t('Título')}</div>
-          <div className="font-medium">{t('Autores')}</div>
-          <div className="font-medium">{t('Año')}</div>
-          <div className="font-medium">{t('Tema(s)')}</div>
-          <div className="font-medium">{t('Ligero')}</div>
-          <div className="font-medium">{t('Profundo')}</div>
-          <div className="font-medium">{t('Resumen')}</div>
-          <div className="font-medium">{t('Embeddings')}</div>
-          <div className="font-medium">{t('Pasajes')}</div>
+          <SortHeader label={t('Título')} sortKey="title" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Autores')} sortKey="authors" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Año')} sortKey="year" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Tema(s)')} sortKey="themes" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Ideas')} sortKey="ideas" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Ligero')} sortKey="light" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Profundo')} sortKey="deep" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Resumen')} sortKey="summary" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Embeddings')} sortKey="embeddings" sort={sort} onSort={cycleSort} />
+          <SortHeader label={t('Pasajes')} sortKey="passages" sort={sort} onSort={cycleSort} />
           <div className="font-medium" data-tour="library-actions">{t('Acciones')}</div>
         </div>
         {loading ? (
           <div className="p-4 text-neutral-500">{t('Cargando...')}</div>
         ) : (
           <VirtualList
-            items={works}
+            items={sortedWorks}
             itemHeight={LIBRARY_ROW_HEIGHT}
             getKey={(w) => w.nodus_id}
             className="flex-1 min-h-0"
@@ -1261,21 +1388,12 @@ export function Library({
                 </div>
                 <div className="p-1 text-neutral-400">{w.year ?? '—'}</div>
                 <div className="p-1 text-neutral-400 truncate">{w.themes.join(', ')}</div>
+                <div className="p-1 tabular-nums text-neutral-400" title={tx('{n} ideas extraídas', { n: w.ideaCount })}>
+                  {w.ideaCount > 0 ? w.ideaCount : '—'}
+                </div>
                 <div className="p-1">{lightBadge(w.light_status)}</div>
                 <div className="p-1 whitespace-nowrap">
                   {deepBadge(w.deep_status, w.source_type)} {triggerBadge(w)}
-                </div>
-                <div className="p-1 whitespace-nowrap">
-                  {passageBadge(passageStatuses.get(w.nodus_id))}
-                  {needsPassageIndex(w) && (
-                    <button
-                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-green-400 hover:text-green-300"
-                      title={t('Indexar pasajes de esta obra')}
-                      onClick={() => indexPassageWork(w.nodus_id)}
-                    >
-                      <Icon name="book" size={11} />
-                    </button>
-                  )}
                 </div>
                 <div className="p-1 whitespace-nowrap">{summaryBadge(w.summary_status)}</div>
                 <div className="p-1 whitespace-nowrap">
@@ -1287,6 +1405,18 @@ export function Library({
                       onClick={() => embedWork(w.nodus_id)}
                     >
                       <Icon name="search" size={11} />
+                    </button>
+                  )}
+                </div>
+                <div className="p-1 whitespace-nowrap">
+                  {passageBadge(passageStatuses.get(w.nodus_id))}
+                  {needsPassageIndex(w) && (
+                    <button
+                      className="ml-1 inline-flex items-center gap-0.5 text-[10px] text-green-400 hover:text-green-300"
+                      title={t('Indexar pasajes de esta obra')}
+                      onClick={() => indexPassageWork(w.nodus_id)}
+                    >
+                      <Icon name="book" size={11} />
                     </button>
                   )}
                 </div>
