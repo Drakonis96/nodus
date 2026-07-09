@@ -239,12 +239,12 @@ function DossierTab({
           className="mb-2 w-full bg-neutral-900 border border-neutral-800 rounded-md px-3 py-1.5 text-sm outline-none focus:border-indigo-600"
         />
         <div className="flex gap-2 mb-2">
-          <label className="flex-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
+          <label className="flex-1 min-w-0 flex items-center gap-1.5 text-[11px] text-neutral-500">
             {t('Ordenar')}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="flex-1 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
+              className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
             >
               {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
                 <option key={k} value={k}>
@@ -253,12 +253,12 @@ function DossierTab({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+          <label className="flex-1 min-w-0 flex items-center gap-1.5 text-[11px] text-neutral-500">
             {t('Síntesis')}
             <select
               value={synthFilter}
               onChange={(e) => setSynthFilter(e.target.value as SynthFilter)}
-              className="bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
+              className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-md px-1.5 py-1 text-xs text-neutral-200 outline-none focus:border-indigo-600"
             >
               {(Object.keys(SYNTH_FILTER_LABELS) as SynthFilter[]).map((k) => (
                 <option key={k} value={k}>
