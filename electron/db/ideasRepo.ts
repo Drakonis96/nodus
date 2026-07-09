@@ -18,6 +18,7 @@ import type {
 } from '@shared/types';
 import { getWorksByIds } from './worksRepo';
 import { getSettings } from './settingsRepo';
+import { getEdgeFeedback } from './edgeFeedbackRepo';
 
 const EDGE_TYPES = new Set<EdgeType>([
   'extends',
@@ -266,7 +267,8 @@ export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; labe
         WHERE embedding IS NOT NULL
           AND embedding_provider = ?
           AND embedding_model = ?
-          AND embedding_dim IS NOT NULL`
+          AND embedding_dim IS NOT NULL
+          AND orphaned_at IS NULL`
     )
     .all(config.provider, config.model) as {
     global_id: string;
@@ -278,8 +280,9 @@ export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; labe
   return rows.map((r) => ({ ...r, embedding: decodeEmbedding(r.embedding) }));
 }
 
-export function allIdeaCandidates(): { global_id: string; type: IdeaType; label: string; statement: string }[] {
-  return getDb().prepare('SELECT global_id, type, label, statement FROM ideas').all() as {
+export function allIdeaCandidates(options: { includeDormant?: boolean } = {}): { global_id: string; type: IdeaType; label: string; statement: string }[] {
+  const dormantSql = options.includeDormant ? '' : 'WHERE orphaned_at IS NULL';
+  return getDb().prepare(`SELECT global_id, type, label, statement FROM ideas ${dormantSql}`).all() as {
     global_id: string;
     type: IdeaType;
     label: string;
@@ -296,12 +299,15 @@ export function findSimilarIdeas(
   queryEmbedding: number[],
   threshold: number,
   limit: number,
-  options: { excludeIds?: string[] } = {}
+  options: { excludeIds?: string[]; includeDormant?: boolean } = {}
 ): { global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[] {
   const buf = encodeEmbedding(queryEmbedding);
   const config = currentEmbeddingConfig();
   const excluded = options.excludeIds ?? [];
   const excludeSql = excluded.length ? `AND global_id NOT IN (${excluded.map(() => '?').join(',')})` : '';
+  // Dormant ideas (no occurrences after a rescan) are hidden from every
+  // retrieval consumer; only fusion opts in, so it can revive them.
+  const dormantSql = options.includeDormant ? '' : 'AND orphaned_at IS NULL';
   return getDb()
     .prepare(
       `SELECT * FROM (
@@ -311,6 +317,7 @@ export function findSimilarIdeas(
            AND embedding_provider = ?
            AND embedding_model = ?
            AND embedding_dim = ?
+           ${dormantSql}
            ${excludeSql}
        ) WHERE similarity >= ?
        ORDER BY similarity DESC
@@ -380,13 +387,15 @@ export function upsertOccurrence(
   development: string,
   confidence: number
 ): void {
-  getDb()
-    .prepare(
-      `INSERT INTO idea_occurrences (global_id, nodus_id, role, development, confidence)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(global_id, nodus_id) DO UPDATE SET role=excluded.role, development=excluded.development, confidence=excluded.confidence`
-    )
-    .run(globalId, nodusId, role, development, confidence);
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO idea_occurrences (global_id, nodus_id, role, development, confidence)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(global_id, nodus_id) DO UPDATE SET role=excluded.role, development=excluded.development, confidence=excluded.confidence`
+  ).run(globalId, nodusId, role, development, confidence);
+  // Revival: re-attaching a work to a dormant idea restores it everywhere
+  // (graph, search) with its original global_id intact.
+  db.prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
 }
 
 export function addEvidence(
@@ -577,18 +586,25 @@ export function purgeDeepData(nodusId: string): void {
     db.prepare('DELETE FROM external_refs WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM work_authors WHERE nodus_id = ?').run(nodusId);
     db.prepare('DELETE FROM work_idea_synthesis WHERE nodus_id = ?').run(nodusId);
-    // Drop ideas that no longer have any occurrence — but never user-authored
-    // manual ideas, which are owned by a note and may legitimately have no works
-    // linked yet. Without this guard a deep re-scan of any work would silently
-    // delete a manual idea that has no occurrences.
+    // Ideas that no longer have any occurrence go DORMANT instead of being
+    // deleted. Deleting them here was the identity bug: the following rescan
+    // re-extracted the same idea but fusion had nothing to match against, so it
+    // minted a new global_id and orphaned every reference to the old one
+    // (notes, tutor routes, drafts, edge feedback). A dormant idea keeps its
+    // global_id and embedding, stays out of the graph and search (no
+    // occurrences / orphaned_at filters), remains a fusion candidate, and is
+    // revived by upsertOccurrence the moment any scan re-attaches it. Manual
+    // ideas are never flagged: they are owned by a note and may legitimately
+    // have no works linked yet.
     db.prepare(
-      `DELETE FROM ideas
-         WHERE global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
-           AND global_id NOT IN (
-             SELECT json_extract(source_json, '$.ref') FROM notes
-              WHERE json_extract(source_json, '$.note') = 'manual-idea'
-           )`
-    ).run();
+      `UPDATE ideas SET orphaned_at = ?
+        WHERE orphaned_at IS NULL
+          AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
+          AND global_id NOT IN (
+            SELECT json_extract(source_json, '$.ref') FROM notes
+             WHERE json_extract(source_json, '$.note') = 'manual-idea'
+          )`
+    ).run(new Date().toISOString());
     db.prepare(
       `DELETE FROM edges
        WHERE from_id NOT IN (SELECT global_id FROM ideas)
@@ -597,6 +613,44 @@ export function purgeDeepData(nodusId: string): void {
     db.prepare('DELETE FROM edge_traces WHERE edge_id NOT IN (SELECT id FROM edges)').run();
   });
   tx();
+}
+
+/**
+ * Delete ideas that have been dormant (no occurrences) longer than maxAgeDays.
+ * Runs at startup as maintenance: recent dormancy is a revival opportunity —
+ * fusion re-matches the idea on the next rescan and keeps its global_id —
+ * while long-dormant ideas are genuinely gone from the corpus. Returns the
+ * number of pruned ideas.
+ */
+export function pruneDormantIdeas(maxAgeDays = 30): number {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000).toISOString();
+  let pruned = 0;
+  const tx = db.transaction(() => {
+    const result = db
+      .prepare(
+        `DELETE FROM ideas
+          WHERE orphaned_at IS NOT NULL
+            AND orphaned_at < ?
+            AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
+            AND global_id NOT IN (
+              SELECT json_extract(source_json, '$.ref') FROM notes
+               WHERE json_extract(source_json, '$.note') = 'manual-idea'
+            )`
+      )
+      .run(cutoff);
+    pruned = result.changes;
+    if (pruned > 0) {
+      db.prepare(
+        `DELETE FROM edges
+         WHERE from_id NOT IN (SELECT global_id FROM ideas)
+            OR to_id NOT IN (SELECT global_id FROM ideas)`
+      ).run();
+      db.prepare('DELETE FROM edge_traces WHERE edge_id NOT IN (SELECT id FROM edges)').run();
+    }
+  });
+  tx();
+  return pruned;
 }
 
 // ── Detail panels ───────────────────────────────────────────────────────────
@@ -651,7 +705,7 @@ export function getIdeasByWork(nodusId: string, limit: number, offset: number): 
 /** Every direct idea↔idea edge touching an idea, with its evidence and trace. */
 export function getIdeaEdges(globalId: string): EdgeDetail[] {
   const rows = getDb()
-    .prepare('SELECT id FROM edges WHERE from_id = ? OR to_id = ? ORDER BY confidence DESC, id')
+    .prepare('SELECT id FROM visible_edges WHERE from_id = ? OR to_id = ? ORDER BY confidence DESC, id')
     .all(globalId, globalId) as { id: string }[];
   return rows.map((row) => getEdgeDetail(row.id)).filter((detail): detail is EdgeDetail => detail !== null);
 }
@@ -675,6 +729,7 @@ export function getEdgeDetail(edgeId: string): EdgeDetail | null {
     explanation: contradictionExplanation(edge, from, to),
     evidence,
     trace: getEdgeTrace(edgeId),
+    feedback: getEdgeFeedback(edge.from_id, edge.to_id, edge.type),
   };
 }
 

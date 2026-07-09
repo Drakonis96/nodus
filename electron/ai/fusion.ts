@@ -124,10 +124,12 @@ export async function fuseIdea(
     mode: embedding ? 'embedding' : 'lexical',
   });
   if (embedding) {
-    candidates = findSimilarIdeas(embedding, SIM_THRESHOLD, MAX_CANDIDATES);
+    // includeDormant: matching a dormant idea revives it with its original
+    // global_id — this is what keeps idea identity stable across rescans.
+    candidates = findSimilarIdeas(embedding, SIM_THRESHOLD, MAX_CANDIDATES, { includeDormant: true });
     retrievalDone({ candidates: candidates.length });
   } else {
-    const pool = allIdeaCandidates();
+    const pool = allIdeaCandidates({ includeDormant: true });
     candidates = pool
       .map((i) => ({
         global_id: i.global_id,

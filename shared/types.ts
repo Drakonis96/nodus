@@ -648,6 +648,46 @@ export interface GraphEdge {
   type: EdgeType | string;
   basis: EdgeBasis;
   confidence: number;
+  /** User audit verdict. Rejected edges never reach the graph, so only 'confirmed' appears here. */
+  verdict?: EdgeFeedbackVerdict;
+}
+
+// ── Edge audit feedback ──────────────────────────────────────────────────────
+// A user verdict over a derived relation. Keyed by idea pair + relation type
+// (not by edges.id) so it survives rescans that recreate edge rows.
+
+export type EdgeFeedbackVerdict = 'rejected' | 'confirmed';
+
+export interface EdgeFeedback {
+  from_id: string;
+  to_id: string;
+  type: string;
+  verdict: EdgeFeedbackVerdict;
+  note: string;
+  created_at: string;
+}
+
+/** Feedback row enriched with idea labels for listing in the UI. */
+export interface EdgeFeedbackView extends EdgeFeedback {
+  from_label: string;
+  to_label: string;
+}
+
+// ── User-layer sync package (multi-machine) ─────────────────────────────────
+
+export interface SyncTableCounts {
+  inserted: number;
+  updated: number;
+  skipped: number;
+}
+
+/** Per-table outcome of merging a sync package. Merges are additive: nothing local is deleted. */
+export interface SyncMergeSummary {
+  noteFolders: SyncTableCounts;
+  notes: SyncTableCounts;
+  writingDrafts: SyncTableCounts;
+  savedSearches: SyncTableCounts;
+  edgeFeedback: SyncTableCounts;
 }
 
 export interface GraphData {
@@ -685,6 +725,8 @@ export interface EdgeDetail {
   explanation?: string | null;
   evidence: Evidence[];
   trace?: EdgeTrace | null;
+  /** Current audit verdict for this relation, if the user has set one. */
+  feedback?: EdgeFeedback | null;
 }
 
 export interface EdgeTrace {
@@ -3021,6 +3063,10 @@ export interface NodusApi {
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
   /** Every direct idea↔idea edge touching an idea (its connections). */
   getIdeaEdges(globalId: string): Promise<EdgeDetail[]>;
+  /** Set (or clear with null) the audit verdict for a relation. */
+  setEdgeFeedback(fromId: string, toId: string, type: string, verdict: EdgeFeedbackVerdict | null, note?: string): Promise<void>;
+  /** Every audit verdict, newest first, with idea labels. */
+  listEdgeFeedback(): Promise<EdgeFeedbackView[]>;
   /** Paginated list of the ideas a work develops. */
   getIdeasByWork(nodusId: string, limit: number, offset: number): Promise<IdeaByWorkPage>;
   /** Cached narrated synthesis for the ideas extracted from one work, if present. */
@@ -3258,6 +3304,10 @@ export interface NodusApi {
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;
   importData(password: string): Promise<{ ok: boolean; message: string }>;
+  /** Export the user layer (notes, drafts, saved searches, edge verdicts) as a portable sync package. */
+  exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
+  /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
+  importSyncPackage(): Promise<SyncMergeSummary | null>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;

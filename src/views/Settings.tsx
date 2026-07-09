@@ -668,6 +668,40 @@ export function Settings({
             <p className="text-xs text-neutral-500">
               {t('La copia incluye todos los datos de Nodus: textos extraídos, embeddings de ideas, resúmenes y pasajes, modelos seleccionados, grafo, ajustes y claves API, dentro de un archivo cifrado.')}
             </p>
+            <div className="mt-2 border-t border-neutral-800 pt-3">
+              <label className="text-sm">{t('Sincronización entre equipos')}</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={async () => {
+                    const result = await window.nodus.exportSyncPackage();
+                    if (result) flash(`${t('Exportado')}: ${result.path}`);
+                  }}
+                >
+                  <Icon name="download" /> {t('Exportar paquete de sync (.nodussync)')}
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={async () => {
+                    try {
+                      const summary = await window.nodus.importSyncPackage();
+                      if (!summary) return;
+                      const total = (c: { inserted: number; updated: number }) => c.inserted + c.updated;
+                      const applied =
+                        total(summary.notes) + total(summary.noteFolders) + total(summary.writingDrafts) + total(summary.savedSearches) + total(summary.edgeFeedback);
+                      flash(`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`);
+                    } catch (e) {
+                      flash(e instanceof Error ? e.message : String(e));
+                    }
+                  }}
+                >
+                  <Icon name="upload" /> {t('Importar paquete de sync (.nodussync)')}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-neutral-500">
+                {t('Lleva tus notas, borradores, búsquedas guardadas y auditorías de relaciones a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
+              </p>
+            </div>
           </Section>
       )}
 

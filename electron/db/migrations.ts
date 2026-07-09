@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 28;
 
 export const migrations: Migration[] = [
   {
@@ -840,6 +840,54 @@ export const migrations: Migration[] = [
         updated_at    TEXT NOT NULL
       );
       CREATE INDEX idx_immersion_updated ON immersion_sessions(updated_at DESC);
+    `,
+  },
+  {
+    version: 27,
+    up: /* sql */ `
+      -- User audit verdicts over derived relations. Keyed by the idea pair +
+      -- relation type (NOT by edges.id): scan pipelines delete and recreate
+      -- edge rows, so a verdict must outlive any individual row. No foreign
+      -- keys for the same reason — feedback for a temporarily-removed idea
+      -- becomes active again the moment a rescan brings the pair back.
+      CREATE TABLE edge_feedback (
+        from_id    TEXT NOT NULL,
+        to_id      TEXT NOT NULL,
+        type       TEXT NOT NULL,
+        verdict    TEXT NOT NULL CHECK (verdict IN ('rejected', 'confirmed')),
+        note       TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (from_id, to_id, type)
+      );
+      CREATE INDEX idx_edge_feedback_reverse ON edge_feedback(to_id, from_id, type);
+
+      -- Single source of truth for "edges the user hasn't vetoed". Every
+      -- UI/AI-facing reader selects from this view; physical maintenance
+      -- (dedupe, deletes, imports) keeps operating on the edges table.
+      -- A rejection hides the pair in BOTH directions.
+      CREATE VIEW visible_edges AS
+        SELECT e.* FROM edges e
+        WHERE NOT EXISTS (
+          SELECT 1 FROM edge_feedback f
+          WHERE f.verdict = 'rejected'
+            AND f.type = e.type
+            AND ((f.from_id = e.from_id AND f.to_id = e.to_id)
+              OR (f.from_id = e.to_id AND f.to_id = e.from_id))
+        );
+    `,
+  },
+  {
+    version: 28,
+    up: /* sql */ `
+      -- Stable idea identity across rescans. A deep rescan used to DELETE any
+      -- idea whose only occurrence was the rescanned work; re-extraction then
+      -- minted a NEW global_id, orphaning every reference (notes, routes,
+      -- drafts, edge feedback). Now such ideas merely go dormant: orphaned_at
+      -- is set, fusion keeps them as match candidates and revives them (same
+      -- global_id) when the idea is extracted again; only long-dormant ideas
+      -- are pruned.
+      ALTER TABLE ideas ADD COLUMN orphaned_at TEXT;
+      CREATE INDEX idx_ideas_orphaned ON ideas(orphaned_at) WHERE orphaned_at IS NOT NULL;
     `,
   },
 ];

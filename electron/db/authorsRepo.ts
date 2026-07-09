@@ -308,7 +308,7 @@ export function recomputeAuthorRelations(): void {
     db.prepare('DELETE FROM author_relations').run();
 
     const edges = db
-      .prepare("SELECT from_id, to_id, type, confidence FROM edges WHERE type IN ('contradicts','extends','supports','refutes')")
+      .prepare("SELECT from_id, to_id, type, confidence FROM visible_edges WHERE type IN ('contradicts','extends','supports','refutes')")
       .all() as { from_id: string; to_id: string; type: string; confidence: number }[];
 
     const weights = new Map<string, { from: string; to: string; type: string; weight: number }>();

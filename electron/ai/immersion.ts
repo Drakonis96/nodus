@@ -286,7 +286,7 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
   const edgeRows = idList.length
     ? (getDb()
         .prepare(
-          `SELECT id, from_id, to_id, type FROM edges
+          `SELECT id, from_id, to_id, type FROM visible_edges
             WHERE from_id IN (${idList.map(() => '?').join(',')})
               AND to_id IN (${idList.map(() => '?').join(',')})`
         )
@@ -316,7 +316,7 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
   await yieldLoop();
 
   // ── Topic subgraph: the user-visible graph filtered to the scoped ideas.
-  const fullGraph = buildIdeaGraph();
+  const fullGraph = await buildIdeaGraph();
   await yieldLoop();
   const nodes = fullGraph.nodes.filter((n) => ideaIds.has(n.id));
   const nodeIds = new Set(nodes.map((n) => n.id));

@@ -69,7 +69,7 @@ function connectionNeighbours(seedIds: string[]): Set<string> {
   const placeholders = seedIds.map(() => '?').join(',');
   const rows = getDb()
     .prepare(
-      `SELECT from_id, to_id FROM edges
+      `SELECT from_id, to_id FROM visible_edges
         WHERE from_id IN (${placeholders}) OR to_id IN (${placeholders})`
     )
     .all(...seedIds, ...seedIds) as { from_id: string; to_id: string }[];

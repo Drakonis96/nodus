@@ -84,6 +84,7 @@ import * as dedupe from './db/dedupeRepo';
 import * as ideaDedupe from './db/ideaDedupeRepo';
 import { listCollectionFacets } from './db/collectionsRepo';
 import * as ideas from './db/ideasRepo';
+import { setEdgeFeedback, listEdgeFeedback } from './db/edgeFeedbackRepo';
 import * as themes from './db/themesRepo';
 import { aggregateGaps, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
@@ -95,6 +96,7 @@ import * as rqRepo from './db/researchMapRepo';
 import { decomposeQuestion, mapCoverage } from './ai/researchMap';
 import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
+import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -606,6 +608,10 @@ export function registerIpc(
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
   h('graph:ideaEdges', async (_e, globalId: string) => ideas.getIdeaEdges(globalId));
+  h('graph:edgeFeedback:set', async (_e, fromId: string, toId: string, type: string, verdict: 'rejected' | 'confirmed' | null, note?: string) =>
+    setEdgeFeedback(fromId, toId, type, verdict, note ?? '')
+  );
+  h('graph:edgeFeedback:list', async () => listEdgeFeedback());
   h('works:ideasByWork', async (_e, nodusId: string, limit: number, offset: number) =>
     ideas.getIdeasByWork(nodusId, limit, offset)
   );
@@ -968,6 +974,26 @@ export function registerIpc(
 
   // export / import
   h('data:export', async () => exportData());
+  h('data:exportSync', async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Exportar paquete de sincronización',
+      defaultPath: path.join(app.getPath('documents'), `nodus-sync-${new Date().toISOString().slice(0, 10)}.nodussync`),
+      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
+    });
+    if (canceled || !filePath) return null;
+    const { buffer, counts } = buildSyncPackage(app.getVersion());
+    fs.writeFileSync(filePath, buffer);
+    return { path: filePath, counts };
+  });
+  h('data:importSync', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Importar paquete de sincronización',
+      properties: ['openFile'],
+      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
+    });
+    if (canceled || filePaths.length === 0) return null;
+    return mergeSyncPackage(fs.readFileSync(filePaths[0]));
+  });
   h('data:import', async (_e, password: string) => {
     const result = await importData(password);
     // Imports intentionally restore MCP as disabled and tokenless. Stop any

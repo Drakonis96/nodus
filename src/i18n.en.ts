@@ -1697,6 +1697,22 @@ export const EN: Record<string, string> = {
   'Sin carpeta (raíz)': 'No folder (root)',
   'Buscar en notas…': 'Search notes…',
   'Guardar en notas': 'Save to notes',
+  'Auditoría de la relación': 'Relation audit',
+  'Has confirmado esta relación.': 'You have confirmed this relation.',
+  'Has marcado esta relación como incorrecta: desaparecerá del grafo y de los análisis.':
+    'You marked this relation as incorrect: it will disappear from the graph and analyses.',
+  'Marcar esta relación como verificada por ti': 'Mark this relation as verified by you',
+  'Ocultar esta relación del grafo y de los análisis (persiste tras re-análisis)':
+    'Hide this relation from the graph and analyses (persists across re-analysis)',
+  'Marcar como incorrecta': 'Mark as incorrect',
+  'Quitar el veredicto y volver al estado derivado': 'Remove the verdict and return to the derived state',
+  'Sincronización entre equipos': 'Multi-device sync',
+  'Exportar paquete de sync (.nodussync)': 'Export sync package (.nodussync)',
+  'Importar paquete de sync (.nodussync)': 'Import sync package (.nodussync)',
+  'Sincronización fusionada': 'Sync merged',
+  'cambios aplicados (nada local se ha borrado).': 'changes applied (nothing local was deleted).',
+  'Lleva tus notas, borradores, búsquedas guardadas y auditorías de relaciones a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.':
+    'Carry your notes, drafts, saved searches and relation audits to another machine. Importing merges: the newest version wins and nothing local is ever deleted.',
   'Guardar nota': 'Save note',
   'Eliminar nota': 'Delete note',
   'Eliminar carpeta': 'Delete folder',

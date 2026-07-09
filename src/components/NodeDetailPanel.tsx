@@ -56,6 +56,7 @@ export function NodeDetailPanel({
   onClose,
   relations,
   onOpenIdea,
+  onEdgeFeedback,
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
@@ -69,6 +70,8 @@ export function NodeDetailPanel({
    *  navigable "Conectada con" list. */
   relations?: RelationRow[];
   onOpenIdea?: (ideaId: string) => void;
+  /** Called after the user sets/clears an audit verdict, so the host view can refresh its graph. */
+  onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
 }) {
   // A note pending capture: built lazily from whichever detail is open.
   const [saving, setSaving] = useState<{ content: string; title: string; ref: string } | null>(null);
@@ -251,6 +254,7 @@ export function NodeDetailPanel({
               “{ev.quote}” <span className="text-neutral-500">{ev.location ?? ''}</span>
             </blockquote>
           ))}
+          <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />
         </div>
       )}
       {saving && (
@@ -262,6 +266,79 @@ export function NodeDetailPanel({
           onClose={() => setSaving(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Audit controls for one relation. The verdict is keyed by the idea pair +
+ * type in the DB, so it survives rescans: a rejected relation stays hidden
+ * even if a pipeline pass recreates the edge row.
+ */
+function EdgeAuditControls({
+  edgeDetail,
+  onEdgeFeedback,
+}: {
+  edgeDetail: EdgeDetail;
+  onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
+}) {
+  const [verdict, setVerdict] = useState<'rejected' | 'confirmed' | null>(edgeDetail.feedback?.verdict ?? null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setVerdict(edgeDetail.feedback?.verdict ?? null);
+  }, [edgeDetail.edge.id, edgeDetail.feedback?.verdict]);
+
+  const apply = async (next: 'rejected' | 'confirmed' | null) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await window.nodus.setEdgeFeedback(edgeDetail.edge.from_id, edgeDetail.edge.to_id, edgeDetail.edge.type, next);
+      setVerdict(next);
+      onEdgeFeedback?.(next);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-950/35 p-3 space-y-2">
+      <div className="text-xs uppercase text-neutral-500">{t('Auditoría de la relación')}</div>
+      {verdict === 'confirmed' && <p className="text-xs text-emerald-400">{t('Has confirmado esta relación.')}</p>}
+      {verdict === 'rejected' && (
+        <p className="text-xs text-red-400">{t('Has marcado esta relación como incorrecta: desaparecerá del grafo y de los análisis.')}</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {verdict !== 'confirmed' && (
+          <button
+            className="card px-2 py-1 text-xs text-emerald-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Marcar esta relación como verificada por ti')}
+            onClick={() => void apply('confirmed')}
+          >
+            ✓ {t('Confirmar')}
+          </button>
+        )}
+        {verdict !== 'rejected' && (
+          <button
+            className="card px-2 py-1 text-xs text-red-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Ocultar esta relación del grafo y de los análisis (persiste tras re-análisis)')}
+            onClick={() => void apply('rejected')}
+          >
+            ✕ {t('Marcar como incorrecta')}
+          </button>
+        )}
+        {verdict !== null && (
+          <button
+            className="card px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Quitar el veredicto y volver al estado derivado')}
+            onClick={() => void apply(null)}
+          >
+            {t('Deshacer')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

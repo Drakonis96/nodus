@@ -58,7 +58,10 @@ export default defineConfig({
     react(),
     electron({
       main: {
-        entry: 'electron/main.ts',
+        // computeWorker.ts is a worker_threads entry: it must land in
+        // dist-electron as its own file (computeWorker.js) so the main process
+        // can spawn it with `new Worker(...)`.
+        entry: ['electron/main.ts', 'electron/workers/computeWorker.ts'],
         vite: {
           build: {
             outDir: 'dist-electron',

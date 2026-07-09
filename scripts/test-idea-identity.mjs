@@ -1,0 +1,174 @@
+// Stable idea identity across rescans. Drives the REAL ideasRepo functions
+// (createIdea, upsertOccurrence, purgeDeepData, findSimilarIdeas,
+// allIdeaCandidates, pruneDormantIdeas) against a scratch DB and proves the
+// dormancy lifecycle: a rescan no longer deletes work-only ideas — it puts
+// them to sleep, fusion can re-match them (same global_id), re-attachment
+// revives them, and only long-dormant ideas get pruned. Runs under
+// Electron-as-Node so better-sqlite3 matches the app ABI.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+
+if (!process.argv.includes('--electron-idea-identity-test')) {
+  execFileSync(
+    path.join(repoRoot, 'node_modules/.bin/electron'),
+    [path.join(repoRoot, 'scripts/test-idea-identity.mjs'), '--electron-idea-identity-test'],
+    { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' }
+  );
+  process.exit(0);
+}
+
+const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-idea-identity-'));
+try {
+  const Database = require('better-sqlite3');
+  const db = new Database(path.join(root, 'identity.sqlite'));
+  db.function('vec_cosine', (a, b) => {
+    if (!a || !b) return 0;
+    const fa = new Float32Array(a.buffer, a.byteOffset, a.byteLength / 4);
+    const fb = new Float32Array(b.buffer, b.byteOffset, b.byteLength / 4);
+    let dot = 0, na = 0, nb = 0;
+    for (let i = 0; i < Math.min(fa.length, fb.length); i++) {
+      dot += fa[i] * fb[i]; na += fa[i] * fa[i]; nb += fb[i] * fb[i];
+    }
+    return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+  });
+
+  // Base schema (the columns ideasRepo touches) + REAL migration 28 on top.
+  db.exec(`
+    CREATE TABLE ideas (
+      global_id TEXT PRIMARY KEY, type TEXT, label TEXT, statement TEXT,
+      embedding BLOB, created_at TEXT, embedding_provider TEXT,
+      embedding_model TEXT, embedding_dim INTEGER, embedding_text_hash TEXT
+    );
+    CREATE TABLE idea_occurrences (
+      global_id TEXT, nodus_id TEXT, role TEXT, development TEXT, confidence REAL,
+      PRIMARY KEY (global_id, nodus_id)
+    );
+    CREATE TABLE notes (id TEXT PRIMARY KEY, source_json TEXT);
+    CREATE TABLE edges (id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT, type TEXT, basis TEXT, confidence REAL, source_work TEXT);
+    CREATE TABLE edge_traces (edge_id TEXT PRIMARY KEY);
+    CREATE TABLE evidence (id TEXT PRIMARY KEY, nodus_id TEXT, global_id TEXT);
+    CREATE TABLE idea_theme_links (theme_id TEXT, nodus_id TEXT, global_id TEXT, confidence REAL);
+    CREATE TABLE gaps (id TEXT PRIMARY KEY, nodus_id TEXT);
+    CREATE TABLE external_refs (id TEXT PRIMARY KEY, nodus_id TEXT);
+    CREATE TABLE work_authors (author_id TEXT, nodus_id TEXT);
+    CREATE TABLE work_idea_synthesis (nodus_id TEXT PRIMARY KEY);
+    CREATE TABLE edge_feedback (
+      from_id TEXT NOT NULL, to_id TEXT NOT NULL, type TEXT NOT NULL,
+      verdict TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+      PRIMARY KEY (from_id, to_id, type)
+    );
+  `);
+  db.exec(await migration28Sql());
+  assert.ok(
+    db.prepare("SELECT 1 FROM pragma_table_info('ideas') WHERE name = 'orphaned_at'").get(),
+    'migration 28 adds orphaned_at'
+  );
+
+  const repoModule = await bundleIdeasRepo();
+  globalThis.__ideaIdentityTestDb = db;
+  const repo = await import(pathToFileURL(repoModule).href);
+
+  // ── 1. An idea living only in w1 ───────────────────────────────────────────
+  const idea = repo.createIdea({ type: 'claim', label: 'Idea frágil', statement: 'Solo aparece en w1', embedding: [1, 0, 0] });
+  repo.upsertOccurrence(idea.global_id, 'w1', 'principal', 'desarrollo', 0.9);
+  const originalId = idea.global_id;
+
+  // ── 2. Rescan purge: the idea goes dormant, it is NOT deleted ──────────────
+  repo.purgeDeepData('w1');
+  const row = db.prepare('SELECT global_id, orphaned_at FROM ideas WHERE global_id = ?').get(originalId);
+  assert.ok(row, 'idea survives the purge');
+  assert.ok(row.orphaned_at, 'idea is flagged dormant');
+
+  // ── 3. Retrieval hides dormant ideas; fusion sees them ─────────────────────
+  const probe = [1, 0, 0];
+  assert.equal(repo.findSimilarIdeas(probe, 0.9, 5).length, 0, 'dormant idea hidden from retrieval');
+  const fusionHits = repo.findSimilarIdeas(probe, 0.9, 5, { includeDormant: true });
+  assert.equal(fusionHits.length, 1, 'fusion still sees the dormant idea');
+  assert.equal(fusionHits[0].global_id, originalId, 'fusion candidate keeps the ORIGINAL global_id');
+  assert.equal(repo.allIdeaCandidates().length, 0, 'lexical pool hides dormant by default');
+  assert.equal(repo.allIdeaCandidates({ includeDormant: true }).length, 1, 'lexical fusion pool includes dormant');
+
+  // ── 4. Re-attachment (what deep scan does after fusion matches) revives ────
+  repo.upsertOccurrence(originalId, 'w1', 'principal', 'desarrollo v2', 0.95);
+  const revived = db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(originalId);
+  assert.equal(revived.orphaned_at, null, 'occurrence re-attachment clears dormancy');
+  assert.equal(repo.findSimilarIdeas(probe, 0.9, 5).length, 1, 'revived idea visible to retrieval again');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM ideas').get().n,
+    1,
+    'the whole cycle minted no duplicate idea — identity is stable'
+  );
+
+  // ── 5. Pruning: only long-dormant, never manual, cleans dangling edges ─────
+  const doomed = repo.createIdea({ type: 'claim', label: 'Efímera', statement: 'x', embedding: [0, 1, 0] });
+  repo.upsertOccurrence(doomed.global_id, 'w2', 'secondary', '', 0.5);
+  db.prepare("INSERT INTO edges VALUES ('e-doom', ?, ?, 'supports', 'inferred', 0.7, NULL)").run(doomed.global_id, originalId);
+  db.prepare("INSERT INTO edge_traces VALUES ('e-doom')").run();
+  repo.purgeDeepData('w2');
+
+  assert.equal(repo.pruneDormantIdeas(30), 0, 'recently dormant ideas are protected');
+  db.prepare('UPDATE ideas SET orphaned_at = ? WHERE global_id = ?').run(daysAgo(40), doomed.global_id);
+  assert.equal(repo.pruneDormantIdeas(30), 1, 'long-dormant idea pruned');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM edges').get().n, 0, 'dangling edge cleaned with it');
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM edge_traces').get().n, 0, 'dangling trace cleaned with it');
+
+  const manual = repo.createIdea({ type: 'claim', label: 'Manual', statement: 'del usuario', embedding: null });
+  db.prepare('INSERT INTO notes VALUES (?, ?)').run('n1', JSON.stringify({ note: 'manual-idea', ref: manual.global_id }));
+  db.prepare('UPDATE ideas SET orphaned_at = ? WHERE global_id = ?').run(daysAgo(400), manual.global_id);
+  assert.equal(repo.pruneDormantIdeas(30), 0, 'manual ideas are never pruned');
+
+  db.close();
+  console.log('idea identity (dormancy + revival) test passed');
+} finally {
+  await rm(root, { recursive: true, force: true });
+}
+
+function daysAgo(days) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+async function migration28Sql() {
+  const source = await readFile(path.join(repoRoot, 'electron/db/migrations.ts'), 'utf8');
+  const match = source.match(/version:\s*28,\s*up:\s*\/\*\s*sql\s*\*\/\s*`([\s\S]*?)`\s*,\s*}\s*(?:,|];)/);
+  assert.ok(match?.[1], 'Could not find migration 28 SQL');
+  return match[1];
+}
+
+/** Bundle the real ideasRepo with database/settings/works stubbed out. */
+async function bundleIdeasRepo() {
+  const dbStub = path.join(root, 'stub-database.js');
+  await writeFile(dbStub, 'export function getDb() { return globalThis.__ideaIdentityTestDb; }\n');
+  const settingsStub = path.join(root, 'stub-settings.js');
+  await writeFile(settingsStub, "export function getSettings() { return { embeddingProvider: 'openai', embeddingModel: 'test-model' }; }\n");
+  const worksStub = path.join(root, 'stub-works.js');
+  await writeFile(worksStub, 'export function getWorksByIds() { return new Map(); }\n');
+  const out = path.join(root, 'ideasRepo.mjs');
+  await build({
+    entryPoints: [path.join(repoRoot, 'electron/db/ideasRepo.ts')],
+    outfile: out,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    alias: { '@shared': path.join(repoRoot, 'shared') },
+    plugins: [
+      {
+        name: 'stub-db-deps',
+        setup(api) {
+          api.onResolve({ filter: /^\.\/database$/ }, () => ({ path: dbStub }));
+          api.onResolve({ filter: /^\.\/settingsRepo$/ }, () => ({ path: settingsStub }));
+          api.onResolve({ filter: /^\.\/worksRepo$/ }, () => ({ path: worksStub }));
+        },
+      },
+    ],
+  });
+  return out;
+}

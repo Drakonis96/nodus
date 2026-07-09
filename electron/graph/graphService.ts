@@ -19,14 +19,20 @@ import type {
   ReadingPathStrategy,
   ReadingPathEntry,
 } from '@shared/types';
-import { getEdgeDetail, getEdgeTrace, getIdeaDetail, findSimilarIdeas, currentEmbeddingConfig } from '../db/ideasRepo';
+import { getEdgeDetail, getEdgeTrace, getIdeaDetail, currentEmbeddingConfig } from '../db/ideasRepo';
 import { listGraphThemes, normalizeThemeLabel } from '../db/themesRepo';
+import { computeThemeMatches } from './computeHost';
+import { centroidF32, type LabeledVector } from './similarityCore';
+import { edgeFeedbackMap } from '../db/edgeFeedbackRepo';
 
 // Threshold for attaching an idea to a theme by meaning (cosine to the theme's idea
 // cluster centroid). Conservative so unrelated ideas aren't pulled in.
 const THEME_SIM_THRESHOLD = 0.72;
 const MAX_INFERRED_THEMES_PER_IDEA = 1;
-const MAX_SEMANTIC_THEME_EDGE_NODES = 850;
+// The similarity loops run in the compute worker (or a chunked, yielding
+// fallback), so this cap only bounds memory for the embeddings we load — it no
+// longer protects the event loop and can be far more generous than the old 850.
+const MAX_SEMANTIC_THEME_EDGE_NODES = 2500;
 
 // In-memory cache for the semantic theme edges. These are derived from idea
 // embeddings and don't change between graph renders unless the corpus changes,
@@ -90,7 +96,7 @@ interface ThemeMembership {
 }
 
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
-export function buildIdeaGraph(): GraphData {
+export async function buildIdeaGraph(): Promise<GraphData> {
   const db = getDb();
   const ideas = db
     .prepare(
@@ -225,7 +231,7 @@ export function buildIdeaGraph(): GraphData {
   const edgeRows = db
     .prepare(
       `SELECT e.*
-       FROM edges e
+       FROM visible_edges e
        LEFT JOIN works w ON w.nodus_id = e.source_work
        WHERE e.source_work IS NULL
           OR (w.archived = 0 AND w.deep_status = 'done')`
@@ -239,16 +245,23 @@ export function buildIdeaGraph(): GraphData {
     confidence: number;
   }[];
   const nodeIds = new Set(nodes.map((n) => n.id));
+  // Rejected relations never arrive (the query reads visible_edges); confirmed
+  // ones carry their verdict so the UI can render them as user-audited.
+  const feedback = edgeFeedbackMap();
   const ideaEdges: GraphEdge[] = edgeRows
     .filter((e) => nodeIds.has(e.from_id) && nodeIds.has(e.to_id))
-    .map((e) => ({
-      id: e.id,
-      source: e.from_id,
-      target: e.to_id,
-      type: e.type,
-      basis: e.basis,
-      confidence: e.confidence,
-    }));
+    .map((e) => {
+      const verdict = feedback.get(`${e.from_id}|${e.to_id}|${e.type}`);
+      return {
+        id: e.id,
+        source: e.from_id,
+        target: e.to_id,
+        type: e.type,
+        basis: e.basis,
+        confidence: e.confidence,
+        ...(verdict === 'confirmed' ? { verdict } : {}),
+      };
+    });
 
   const themeEdges = memberships.edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
 
@@ -257,7 +270,7 @@ export function buildIdeaGraph(): GraphData {
   // orphaned. Here we link an idea to a theme when it's semantically close to that
   // theme's existing idea cluster (centroid of member embeddings), so the backlog of
   // ideas gets folded under the right parent without re-scanning.
-  const inferredThemeEdges = buildSemanticThemeEdges(themeEdges, nodeIds);
+  const inferredThemeEdges = await buildSemanticThemeEdges(themeEdges, nodeIds);
 
   const edges = [...themeEdges, ...inferredThemeEdges, ...ideaEdges];
 
@@ -387,16 +400,6 @@ function themeRelevance(themeLabel: string, ideaText: string): number {
   return Math.max(thresholdedDirect, aliasScore);
 }
 
-/** Mean of equal-length vectors; null if there are none. */
-function centroid(vectors: number[][]): number[] | null {
-  if (vectors.length === 0) return null;
-  const dim = vectors[0].length;
-  const sum = new Array<number>(dim).fill(0);
-  for (const v of vectors) for (let i = 0; i < dim; i++) sum[i] += v[i] ?? 0;
-  for (let i = 0; i < dim; i++) sum[i] /= vectors.length;
-  return sum;
-}
-
 function compactSignature(values: Iterable<string>): string {
   let h1 = 2166136261;
   let h2 = 2166136261;
@@ -421,11 +424,13 @@ function compactSignature(values: Iterable<string>): string {
  * cosine to that centroid clears the threshold (capped per idea). Pairs that already
  * have an explicit same-work edge are skipped. No-op when ideas lack embeddings.
  *
- * Optimized: loads only theme-member embeddings for centroid computation, then uses
- * the vec_cosine() SQL function to push similarity search into SQLite instead of
- * loading all embeddings into JS memory.
+ * Optimized: loads every embedding for the visible idea nodes in ONE query,
+ * then ships the O(themes × ideas) similarity loops to the compute worker (or a
+ * chunked, event-loop-yielding fallback). The previous version ran a synchronous
+ * vec_cosine() table scan per theme on the main thread, which is exactly the
+ * class of loop that used to freeze the app on large corpora.
  */
-function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): GraphEdge[] {
+async function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>): Promise<GraphEdge[]> {
   if (nodeIds.size > MAX_SEMANTIC_THEME_EDGE_NODES) {
     return [];
   }
@@ -456,13 +461,14 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
     return [];
   }
 
-  // Load only the embeddings for theme-member ideas (not all ideas) to compute centroids.
-  const memberIdeaIds = [...new Set([...membersByTheme.values()].flat())];
-  const memberEmbeddings = new Map<string, number[]>();
-  if (memberIdeaIds.length > 0) {
+  // One batched query: embeddings for every visible idea node. Members feed the
+  // centroids; the full set is the candidate pool the worker scores against.
+  const candidateIdeaIds = [...nodeIds].filter((id) => !id.startsWith('theme:'));
+  const embeddingsById = new Map<string, Float32Array>();
+  if (candidateIdeaIds.length > 0) {
     const db = getDb();
     const config = currentEmbeddingConfig();
-    const placeholders = memberIdeaIds.map(() => '?').join(',');
+    const placeholders = candidateIdeaIds.map(() => '?').join(',');
     const rows = db
       .prepare(
         `SELECT global_id, embedding
@@ -473,49 +479,52 @@ function buildSemanticThemeEdges(themeEdges: GraphEdge[], nodeIds: Set<string>):
             AND embedding_model = ?
             AND embedding_dim IS NOT NULL`
       )
-      .all(...memberIdeaIds, config.provider, config.model) as { global_id: string; embedding: Buffer }[];
+      .all(...candidateIdeaIds, config.provider, config.model) as { global_id: string; embedding: Buffer }[];
     for (const row of rows) {
-      const f32 = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4);
-      memberEmbeddings.set(row.global_id, Array.from(f32));
+      const f32 = new Float32Array(row.embedding.buffer.slice(row.embedding.byteOffset, row.embedding.byteOffset + row.embedding.byteLength));
+      embeddingsById.set(row.global_id, f32);
     }
   }
 
-  const centroids = new Map<string, number[]>();
+  const centroids: LabeledVector[] = [];
+  let maxMembers = 0;
   for (const [themeId, members] of membersByTheme) {
-    const vectors = members.map((m) => memberEmbeddings.get(m)).filter((v): v is number[] => !!v);
-    const c = centroid(vectors);
-    if (c) centroids.set(themeId, c);
+    if (!nodeIds.has(themeId)) continue;
+    const vectors = members.map((m) => embeddingsById.get(m)).filter((v): v is Float32Array => !!v);
+    const c = centroidF32(vectors);
+    if (c) {
+      centroids.push({ id: themeId, vector: c });
+      maxMembers = Math.max(maxMembers, members.length);
+    }
   }
-  if (centroids.size === 0) {
+  if (centroids.length === 0) {
     semanticThemeEdgesCache = { edges: [], nodeIdsKey: cacheKey, ts: now };
     return [];
   }
 
+  const candidates: LabeledVector[] = [...embeddingsById].map(([id, vector]) => ({ id, vector }));
+  // Ask for enough matches per centroid that already-connected members (which
+  // rank highest by construction) can be filtered out afterwards without ever
+  // starving the top-K of fresh ideas.
+  const perCentroid = maxMembers + MAX_INFERRED_THEMES_PER_IDEA;
+  const matches = await computeThemeMatches(centroids, candidates, THEME_SIM_THRESHOLD, perCentroid);
+
   const out: GraphEdge[] = [];
-  for (const [themeId, c] of centroids) {
-    // Use SQL-based similarity to find candidate ideas for this centroid.
-    const similar = findSimilarIdeas(c, THEME_SIM_THRESHOLD, 500);
-    const scored: { ideaId: string; sim: number }[] = [];
-    for (const row of similar) {
-      if (!nodeIds.has(row.global_id)) continue;
-      if (connected.has(`${themeId}|${row.global_id}`)) continue;
-      if (!nodeIds.has(themeId)) continue;
-      scored.push({ ideaId: row.global_id, sim: row.similarity });
-    }
-    scored.sort((a, b) => b.sim - a.sim);
-    for (const { ideaId, sim } of scored.slice(0, MAX_INFERRED_THEMES_PER_IDEA)) {
-      // Avoid duplicates: only add if no existing inferred edge for this pair.
-      if (!out.some((e) => e.source === themeId && e.target === ideaId)) {
-        out.push({
-          id: `theme-sim:${themeId}:${ideaId}`,
-          source: themeId,
-          target: ideaId,
-          type: 'contains',
-          basis: 'inferred',
-          confidence: Number(sim.toFixed(3)),
-        });
-      }
-    }
+  const keptPerTheme = new Map<string, number>();
+  for (const m of matches) {
+    const themeId = m.centroidId;
+    if (connected.has(`${themeId}|${m.candidateId}`)) continue;
+    if ((keptPerTheme.get(themeId) ?? 0) >= MAX_INFERRED_THEMES_PER_IDEA) continue;
+    if (out.some((e) => e.source === themeId && e.target === m.candidateId)) continue;
+    keptPerTheme.set(themeId, (keptPerTheme.get(themeId) ?? 0) + 1);
+    out.push({
+      id: `theme-sim:${themeId}:${m.candidateId}`,
+      source: themeId,
+      target: m.candidateId,
+      type: 'contains',
+      basis: 'inferred',
+      confidence: Number(m.similarity.toFixed(3)),
+    });
   }
   semanticThemeEdgesCache = { edges: out, nodeIdsKey: cacheKey, ts: now };
   return out;
@@ -578,7 +587,7 @@ export function buildAuthorGraph(): GraphData {
 export function getContradictions(): EdgeDetail[] {
   const db = getDb();
   const rows = db
-    .prepare("SELECT id FROM edges WHERE type IN ('contradicts','refutes')")
+    .prepare("SELECT id FROM visible_edges WHERE type IN ('contradicts','refutes')")
     .all() as { id: string }[];
   // getEdgeDetail makes 4 queries per edge; batch the edge rows and idea lookups
   // to reduce round-trips when there are many contradictions.
@@ -741,7 +750,7 @@ function clusterDebateEdges(rows: DebateEdgeRow[]): { clusterId: Map<string, str
 
 function loadSupportCounts(db: ReturnType<typeof getDb>): Map<string, number> {
   const rows = db
-    .prepare("SELECT to_id, COUNT(*) AS n FROM edges WHERE type = 'supports' GROUP BY to_id")
+    .prepare("SELECT to_id, COUNT(*) AS n FROM visible_edges WHERE type = 'supports' GROUP BY to_id")
     .all() as { to_id: string; n: number }[];
   const map = new Map<string, number>();
   for (const r of rows) map.set(r.to_id, r.n);
@@ -769,7 +778,7 @@ function loadThemesByIdea(db: ReturnType<typeof getDb>): Map<string, Set<string>
 export function getDebates(): Debate[] {
   const db = getDb();
   const rows = db
-    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM edges WHERE type IN ('contradicts','refutes')")
+    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM visible_edges WHERE type IN ('contradicts','refutes')")
     .all() as DebateEdgeRow[];
   if (rows.length === 0) return [];
 
@@ -792,7 +801,7 @@ export function getDebates(): Debate[] {
 export function getDebate(edgeId: string): Debate | null {
   const db = getDb();
   const row = db
-    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM edges WHERE id = ? AND type IN ('contradicts','refutes')")
+    .prepare("SELECT id, from_id, to_id, type, basis, confidence, source_work FROM visible_edges WHERE id = ? AND type IN ('contradicts','refutes')")
     .get(edgeId) as DebateEdgeRow | undefined;
   if (!row) return null;
   return assembleDebate(row, row.from_id, 1, loadSupportCounts(db), loadThemesByIdea(db));
@@ -924,7 +933,7 @@ function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
         SELECT source_work AS nodus_id,
                COUNT(*) AS relation_count,
                SUM(CASE WHEN type IN ('contradicts','refutes') THEN 1 ELSE 0 END) AS contradiction_count
-        FROM edges
+        FROM visible_edges
         WHERE source_work IS NOT NULL
         GROUP BY source_work
       ),
@@ -953,7 +962,7 @@ function readPathRows(db: ReturnType<typeof getDb>): ReadingWorkRow[] {
       dependency_stats AS (
         SELECT io.nodus_id, COUNT(DISTINCT e.id) AS dependency_count
         FROM idea_occurrences io
-        JOIN edges e ON e.to_id = io.global_id
+        JOIN visible_edges e ON e.to_id = io.global_id
         WHERE e.type IN ('extends','supports','precondition_of')
         GROUP BY io.nodus_id
       )

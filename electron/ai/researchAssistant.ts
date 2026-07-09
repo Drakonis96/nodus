@@ -391,7 +391,7 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   }
 
   if (selection.graph) {
-    context.grafo = listGraph(selection, linkedWorkIds, scope);
+    context.grafo = await listGraph(selection, linkedWorkIds, scope);
     sections.push('Grafo');
   }
 
@@ -796,10 +796,10 @@ function slimGraphEdge(edge: GraphEdge) {
   };
 }
 
-function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>, scope: RelevanceScope) {
+async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const parts = selection.graphParts;
   const out: SectionPayload = {};
-  const ideaGraph = buildIdeaGraph();
+  const ideaGraph = await buildIdeaGraph();
   const ideaSet = scope.ideaIdSet;
 
   if (parts.ideaNodes) {

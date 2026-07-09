@@ -3484,6 +3484,16 @@ export function GraphView({
             onFontChange={changeDetailFont}
             relations={USE_SIGMA ? ideaRelations : undefined}
             onOpenIdea={openRelatedIdea}
+            onEdgeFeedback={(verdict) => {
+              // A rejected relation vanishes from the graph: refresh and close its detail.
+              if (verdict === 'rejected') {
+                detailSeqRef.current++;
+                setEdgeDetail(null);
+                setDetailLoading(null);
+                clearFocusRef.current();
+              }
+              reload();
+            }}
             onClose={() => {
               detailSeqRef.current++;
               setIdeaDetail(null);

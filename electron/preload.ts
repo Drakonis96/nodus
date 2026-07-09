@@ -104,6 +104,8 @@ const api: NodusApi = {
   getIdeaDetail: (globalId) => ipcRenderer.invoke('graph:ideaDetail', globalId),
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
   getIdeaEdges: (globalId) => ipcRenderer.invoke('graph:ideaEdges', globalId),
+  setEdgeFeedback: (fromId, toId, type, verdict, note) => ipcRenderer.invoke('graph:edgeFeedback:set', fromId, toId, type, verdict, note),
+  listEdgeFeedback: () => ipcRenderer.invoke('graph:edgeFeedback:list'),
   getIdeasByWork: (nodusId, limit, offset) => ipcRenderer.invoke('works:ideasByWork', nodusId, limit, offset),
   getWorkIdeaSynthesis: (nodusId) => ipcRenderer.invoke('works:getIdeaSynthesis', nodusId),
   synthesizeWorkIdeas: (nodusId, model) => ipcRenderer.invoke('works:synthesizeIdeas', nodusId, model),
@@ -349,6 +351,8 @@ const api: NodusApi = {
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
+  exportSyncPackage: () => ipcRenderer.invoke('data:exportSync'),
+  importSyncPackage: () => ipcRenderer.invoke('data:importSync'),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),
