@@ -150,12 +150,15 @@ try {
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'immersion image option disables cleanly');
 
   await page.locator('[data-tour="nav-deepResearch"]').click();
+  // The Deep Research image option now lives in the "New report" composer modal.
+  await page.getByRole('button', { name: 'Nuevo informe', exact: true }).first().click();
   const reportImageToggle = page.getByRole('button', { name: 'Imagen decorativa', exact: true });
   await reportImageToggle.waitFor();
   await reportImageToggle.click();
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 1, 'Deep Research style shown when enabled');
   await reportImageToggle.click();
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'Deep Research image option disables cleanly');
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
   console.log('[e2e] optional image controls toggle in both owner flows');
 
   // ── Real IPC round-trip: the async graph build (compute worker path) ────────
