@@ -99,6 +99,7 @@ import { decomposeQuestion, mapCoverage } from './ai/researchMap';
 import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
 import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
+import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -566,8 +567,26 @@ export function registerIpc(
   h('ideas:backup', async () => ideaDedupe.backupDatabase());
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();
-    await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);
+    await shell.openExternal(zoteroSelectUrl(zoteroKey));
     return zoteroUserId;
+  });
+  // Evidence → the exact PDF page in Zotero's reader. The [[p. N]] markers the
+  // extractor writes are physical 1-based page indices, which is exactly what
+  // zotero://open-pdf expects; when the location has no parseable page (or the
+  // work has no PDF attachment) we fall back to selecting the item.
+  h('works:openAtPage', async (_e, nodusId: string, location: string | null) => {
+    const work = works.getWork(nodusId);
+    if (!work?.zotero_key) return { ok: false, mode: 'none' as const };
+    const page = parsePageNumber(location);
+    if (page !== null) {
+      const attachmentKey = await zotero.resolvePdfAttachmentKey(getSettings().zoteroUserId, work.zotero_key);
+      if (attachmentKey) {
+        await shell.openExternal(zoteroOpenPdfUrl(attachmentKey, page));
+        return { ok: true, mode: 'pdf-page' as const, page };
+      }
+    }
+    await shell.openExternal(zoteroSelectUrl(work.zotero_key));
+    return { ok: true, mode: 'select' as const, page };
   });
   h('shell:openExternal', async (_e, url: string) => {
     // Only follow web/mail links rendered from Markdown — never arbitrary schemes.

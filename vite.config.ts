@@ -63,6 +63,11 @@ export default defineConfig({
         // can spawn it with `new Worker(...)`.
         entry: ['electron/main.ts', 'electron/workers/computeWorker.ts'],
         vite: {
+          // The top-level resolve.alias only applies to the renderer build;
+          // main-process code importing @shared at RUNTIME needs its own copy.
+          resolve: {
+            alias: { '@shared': path.resolve(__dirname, 'shared') },
+          },
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
@@ -81,6 +86,9 @@ export default defineConfig({
       preload: {
         input: path.join(__dirname, 'electron/preload.ts'),
         vite: {
+          resolve: {
+            alias: { '@shared': path.resolve(__dirname, 'shared') },
+          },
           build: {
             outDir: 'dist-electron',
             rollupOptions: {

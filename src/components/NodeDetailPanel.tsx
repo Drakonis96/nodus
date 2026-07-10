@@ -3,6 +3,7 @@ import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView 
 import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
 import { SaveToNotesModal } from './SaveToNotesModal';
 import { buildEdgeNote, buildIdeaNote } from '../notes';
+import { parsePageNumber } from '@shared/pageLocation';
 import { t } from '../i18n';
 
 // Persisted detail-panel sizing, shared by the graph view and the argument map.
@@ -216,7 +217,7 @@ export function NodeDetailPanel({
               <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
               {ideaDetail.evidence.map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                  “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
+                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} />
                 </blockquote>
               ))}
             </div>
@@ -251,7 +252,7 @@ export function NodeDetailPanel({
           )}
           {edgeDetail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-              “{ev.quote}” <span className="text-neutral-500">{ev.location ?? ''}</span>
+              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} />
             </blockquote>
           ))}
           <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />
@@ -267,6 +268,38 @@ export function NodeDetailPanel({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The location tail of an evidence quote. When the location carries a
+ * parseable page ("p. 12"), it becomes a link that opens the work's PDF at
+ * that exact page in Zotero's reader; otherwise it stays plain text.
+ */
+export function EvidenceLocationLink({
+  nodusId,
+  location,
+  suffix = '',
+}: {
+  nodusId: string;
+  location: string | null;
+  suffix?: string;
+}) {
+  const page = parsePageNumber(location);
+  if (page === null) {
+    return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
+  }
+  return (
+    <span className="text-neutral-500 not-italic">
+      <button
+        className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
+        title={t('Abrir el PDF en Zotero por esta página')}
+        onClick={() => void window.nodus.openEvidenceAtPage(nodusId, location)}
+      >
+        <Icon name="external" size={11} /> {location}
+      </button>
+      {suffix}
+    </span>
   );
 }
 

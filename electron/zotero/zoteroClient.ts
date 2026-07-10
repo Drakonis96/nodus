@@ -220,13 +220,44 @@ export async function itemChildren(userId: string, itemKey: string): Promise<Zot
   if (!res.ok) return [];
   const data = (await res.json()) as any[];
   return data
-    .filter((c) => c.data?.itemType === 'attachment')
+    // Zotero's local API answers /items/<unknown>/children with a 200 listing
+    // of UNRELATED library items instead of a 404. Requiring parentItem to
+    // match keeps a stale/foreign key from resolving to someone else's file.
+    .filter((c) => c.data?.itemType === 'attachment' && c.data?.parentItem === itemKey)
     .map((c) => ({
       key: c.data.key,
       contentType: c.data.contentType ?? null,
       linkMode: c.data.linkMode ?? null,
       filename: c.data.filename ?? null,
     }));
+}
+
+// Attachment key per parent item, resolved once per session. Used by the
+// "open evidence at its PDF page" deep link; invalidation is unnecessary at
+// this cadence (a re-added attachment just needs an app restart).
+const pdfAttachmentCache = new Map<string, string | null>();
+
+/**
+ * The Zotero item key of the first PDF attachment under an item (or the item
+ * itself when it IS a standalone PDF attachment). zotero://open-pdf needs the
+ * ATTACHMENT key, not the parent's. Null when the item has no PDF.
+ */
+export async function resolvePdfAttachmentKey(userId: string, itemKey: string): Promise<string | null> {
+  const cached = pdfAttachmentCache.get(itemKey);
+  if (cached !== undefined) return cached;
+  try {
+    const children = await itemChildren(userId, itemKey);
+    let key = children.find((c) => c.contentType === 'application/pdf')?.key ?? null;
+    if (!key) {
+      const self = await itemAsAttachment(userId, itemKey);
+      if (self?.contentType === 'application/pdf') key = self.key;
+    }
+    pdfAttachmentCache.set(itemKey, key);
+    return key;
+  } catch {
+    // Zotero probably closed: don't poison the cache, retry on the next click.
+    return null;
+  }
 }
 
 /**

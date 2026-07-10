@@ -1698,6 +1698,7 @@ export const EN: Record<string, string> = {
   'Buscar en notas…': 'Search notes…',
   'Guardar en notas': 'Save to notes',
   'Auditoría de la relación': 'Relation audit',
+  'Abrir el PDF en Zotero por esta página': 'Open the PDF in Zotero at this page',
   'Auditoría': 'Audit',
   'Auditoría de relaciones': 'Relation audit ledger',
   'Ver y deshacer tus veredictos sobre relaciones (confirmadas y rechazadas)':

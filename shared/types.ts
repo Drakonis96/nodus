@@ -3053,6 +3053,8 @@ export interface NodusApi {
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
+  /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
+  openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
   /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
   openExternal(url: string): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;

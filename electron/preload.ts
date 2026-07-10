@@ -78,6 +78,7 @@ const api: NodusApi = {
   backupDatabase: () => ipcRenderer.invoke('ideas:backup'),
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
+  openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
