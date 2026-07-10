@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 export const migrations: Migration[] = [
   {
