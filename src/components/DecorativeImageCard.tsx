@@ -41,7 +41,6 @@ export function DecorativeImageCard({
   onChange?: (image: DecorativeImage) => void;
 }) {
   const [current, setCurrent] = useState(image);
-  const [style, setStyle] = useState<DecorativeImageStyle>(image?.style ?? defaultStyle);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -51,15 +50,13 @@ export function DecorativeImageCard({
 
   useEffect(() => {
     setCurrent(image);
-    setStyle(image?.style ?? defaultStyle);
-  }, [image, defaultStyle]);
+  }, [image]);
 
   useEffect(() => {
     let mounted = true;
     void window.nodus.getDecorativeImage(entityKind, entityId).then((next) => {
       if (!mounted || !next) return;
       setCurrent(next);
-      setStyle(next.style);
       onChangeRef.current?.(next);
     }).catch(() => {
       /* The owner content remains usable; event updates can still arrive. */
@@ -98,7 +95,6 @@ export function DecorativeImageCard({
     try {
       const pending = await window.nodus.queueDecorativeImage({ entityKind, entityId, action, style: opts.style, visualContext: opts.visualContext });
       setCurrent(pending);
-      setStyle(pending.style);
       onChange?.(pending);
     } catch (reason) {
       setBusy(false);
@@ -138,6 +134,7 @@ export function DecorativeImageCard({
     <DecorativeImageModal
       image={current}
       dataUrl={dataUrl}
+      defaultStyle={defaultStyle}
       busy={busy}
       error={actionError}
       onQueue={(action, opts) => void queue(action, opts)}

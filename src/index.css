@@ -1013,3 +1013,13 @@ body {
 .light .stroke-neutral-800 {
   stroke: #e5e7eb;
 }
+
+/* In-page find (Cmd/Ctrl+F): the CSS Custom Highlight API paints over the layout
+   without touching the DOM, so it never conflicts with React-rendered content. */
+::highlight(nodus-find) {
+  background-color: rgba(250, 204, 21, 0.32);
+}
+::highlight(nodus-find-current) {
+  background-color: #facc15;
+  color: #111827;
+}

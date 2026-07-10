@@ -14,13 +14,14 @@ import type {
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
-import { Badge, Icon, modelLabel } from '../components/ui';
+import { Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { DraftResultMain, SupportMatrix } from './writingShared';
+import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { FindInPage } from '../components/FindInPage';
 import { t, tx } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
@@ -51,10 +52,6 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
   { value: 8, label: 'Máx. 8 secciones' },
   { value: 10, label: 'Máx. 10 secciones' },
 ];
-
-function sectionLimitLabel(limit: DeepResearchSectionLimit): string {
-  return limit === 'auto' ? t('Secciones: Auto') : tx('Máx. {n} secciones', { n: limit });
-}
 
 type SortKey = 'recent' | 'oldest' | 'title';
 
@@ -644,9 +641,10 @@ function ReaderView({
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
 }) {
+  const mainRef = useRef<HTMLElement | null>(null);
   return (
     <div className="h-full flex flex-col min-h-0">
-      <header className="flex items-center gap-3 border-b border-neutral-800 px-4 py-2.5">
+      <header className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
         <button className="btn btn-ghost gap-1.5" onClick={onBack}>
           <Icon name="chevronLeft" /> {t('Volver a la galería')}
         </button>
@@ -654,8 +652,17 @@ function ReaderView({
           <div className="truncate text-sm font-semibold text-neutral-100" title={saved.title}>{saved.title}</div>
           <div className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</div>
         </div>
+        <DraftActionBar
+          exporting={exporting}
+          savingDraft={false}
+          draftSaved
+          onCopy={onCopy}
+          onSaveDraft={() => undefined}
+          onSaveToNotes={onSaveToNotes}
+          onExport={onExport}
+        />
         <button
-          className={`btn btn-ghost gap-1.5 border text-xs ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+          className={`btn btn-ghost gap-1.5 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
           onClick={onToggleMatrix}
         >
           <Icon name="layers" size={13} /> {t('Matriz de apoyo')}
@@ -669,7 +676,7 @@ function ReaderView({
       )}
 
       <div className="min-h-0 flex-1 flex">
-        <main className="min-w-0 flex-1 overflow-y-auto px-6 py-6 max-md:px-4">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-6 py-6 max-md:px-4">
           <div className="mx-auto max-w-3xl space-y-6">
             <DecorativeImageCard
               entityKind="deep_research"
@@ -684,6 +691,8 @@ function ReaderView({
               exporting={exporting}
               savingDraft={false}
               draftSaved
+              hideActions
+              justify
               onCopy={onCopy}
               onSaveDraft={() => undefined}
               onSaveToNotes={onSaveToNotes}
@@ -698,6 +707,7 @@ function ReaderView({
           </aside>
         )}
       </div>
+      <FindInPage targetRef={mainRef} />
     </div>
   );
 }

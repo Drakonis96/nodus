@@ -1322,6 +1322,8 @@ export const EN: Record<string, string> = {
     'Your library of academic reports, generated in a queue and citing the whole corpus.',
   'Nuevo informe': 'New report',
   'Buscar entre tus informes…': 'Search your reports…',
+  'Buscar en la página…': 'Search the page…',
+  '0 resultados': 'No results',
   'Más antiguos': 'Oldest',
   'Por título (A–Z)': 'By title (A–Z)',
   'Vista mosaico': 'Grid view',

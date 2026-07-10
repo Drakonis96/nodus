@@ -11,6 +11,7 @@ export type DecorativeImageQueueAction = 'generate' | 'retry' | 'regenerate';
 export function DecorativeImageModal({
   image,
   dataUrl,
+  defaultStyle = DEFAULT_DECORATIVE_IMAGE_STYLE,
   busy,
   error,
   onQueue,
@@ -19,6 +20,7 @@ export function DecorativeImageModal({
 }: {
   image: DecorativeImage | null;
   dataUrl: string | null;
+  defaultStyle?: DecorativeImageStyle;
   busy: boolean;
   error: string | null;
   onQueue: (action: DecorativeImageQueueAction, opts: { style: DecorativeImageStyle; visualContext?: string }) => void;
@@ -26,7 +28,7 @@ export function DecorativeImageModal({
   onClose: () => void;
 }) {
   const status = image?.status ?? 'not_requested';
-  const [style, setStyle] = useState<DecorativeImageStyle>(image?.style ?? DEFAULT_DECORATIVE_IMAGE_STYLE);
+  const [style, setStyle] = useState<DecorativeImageStyle>(image?.style ?? defaultStyle);
   const [description, setDescription] = useState(image?.visualContext ?? '');
   const [touched, setTouched] = useState(false);
 
@@ -43,7 +45,7 @@ export function DecorativeImageModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const styleChanged = style !== (image?.style ?? DEFAULT_DECORATIVE_IMAGE_STYLE);
+  const styleChanged = style !== (image?.style ?? defaultStyle);
   const descChanged = description.trim() !== (image?.visualContext ?? '').trim();
   const edited = styleChanged || descChanged;
 

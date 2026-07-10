@@ -53,6 +53,7 @@ import {
 } from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { FindInPage } from '../components/FindInPage';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -358,7 +359,6 @@ export function ImmersionView({
       {mode === 'scope' && scope && (
         <ImmersionScopeScreen
           scope={scope}
-          minutes={minutes}
           includeQuiz={includeQuiz}
           generating={generating}
           genProgress={genProgress}
@@ -668,7 +668,6 @@ const GEN_PHASE_LABELS: Record<ImmersionBuildProgress['phase'], string> = {
 
 function ImmersionScopeScreen({
   scope,
-  minutes,
   includeQuiz,
   generating,
   genProgress,
@@ -679,7 +678,6 @@ function ImmersionScopeScreen({
   onCitation,
 }: {
   scope: ImmersionScope;
-  minutes: number;
   includeQuiz: boolean;
   generating: boolean;
   genProgress: ImmersionBuildProgress | null;
@@ -1154,6 +1152,7 @@ function ImmersionPlayer({
           <div className="w-20" />
         )}
       </footer>
+      <FindInPage targetRef={mainRef} />
     </div>
   );
 }
@@ -1316,6 +1315,16 @@ function PanoramaStep({
   const plan = session.plan;
   return (
     <div>
+      {session.image?.status === 'ready' && (
+        <div className="mb-6">
+          <DecorativeImageCard
+            entityKind="immersion"
+            entityId={session.id}
+            image={session.image}
+            defaultStyle={session.image?.style ?? 'antique_book'}
+          />
+        </div>
+      )}
       <StepHeading
         kicker={t('Panorama')}
         title={plan.title}

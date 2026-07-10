@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.5 — 2026-07-10
+
+### Added
+
+- Find in page (Cmd/Ctrl+F) in the Deep Research reader and the immersion player:
+  type to highlight every match and step through them with Enter / Shift+Enter.
+- The immersion decorative image now also opens the panorama as a header.
+
+### Changed
+
+- Deep Research report text is now justified.
+- In the Deep Research reader, the copy / save / export actions moved into the
+  header next to the support-matrix toggle, for a cleaner reading column.
+
 ## 1.4.4 — 2026-07-10
 
 ### Added
