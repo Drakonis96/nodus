@@ -75,7 +75,9 @@ import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, sto
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin } from './copilot/install';
-import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault } from './secrets/secretStore';
+import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
+import { runAutoBackupNow } from './export/autoBackup';
+import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
@@ -985,6 +987,49 @@ export function registerIpc(
     fs.writeFileSync(filePath, buffer);
     return { path: filePath, counts };
   });
+  // automatic encrypted backups (master password lives in the OS keychain)
+  h('backup:setPassword', async (_e, password: string) => {
+    const clean = password.trim();
+    if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
+      throw new Error(`La contraseña maestra debe tener al menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres.`);
+    }
+    setBackupPassword(clean);
+  });
+  h('backup:clearPassword', async () => clearBackupPassword());
+  h('backup:hasPassword', async () => hasBackupPassword());
+  h('backup:chooseFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Elegir carpeta para copias automáticas',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return canceled || filePaths.length === 0 ? null : filePaths[0];
+  });
+  h('backup:runNow', async () => runAutoBackupNow(app.getVersion()));
+  h('backup:saveRecoveryKit', async () => {
+    const password = getBackupPassword();
+    if (!password) return { ok: false, message: 'No hay contraseña maestra configurada.' };
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Guardar kit de recuperación',
+      defaultPath: path.join(app.getPath('documents'), 'nodus-kit-de-recuperacion.txt'),
+      filters: [{ name: 'Texto', extensions: ['txt'] }],
+    });
+    if (canceled || !filePath) return { ok: false, message: 'Cancelado' };
+    fs.writeFileSync(
+      filePath,
+      [
+        'NODUS — KIT DE RECUPERACIÓN DE COPIAS DE SEGURIDAD',
+        '',
+        `Contraseña maestra: ${password}`,
+        '',
+        'Todas las copias automáticas (.nodus) se cifran con esta contraseña.',
+        'Guárdala en un gestor de contraseñas o imprímela. Sin ella, las copias',
+        'NO se pueden restaurar. Las copias automáticas no incluyen claves API.',
+        `Generado: ${new Date().toISOString()}`,
+      ].join('\n')
+    );
+    return { ok: true, message: filePath };
+  });
+
   h('data:importSync', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Importar paquete de sincronización',

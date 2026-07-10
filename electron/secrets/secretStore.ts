@@ -57,6 +57,43 @@ export function clearApiKey(provider: AiProvider): void {
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 
+// ── Master backup password ───────────────────────────────────────────────────
+// One user-chosen password encrypts every automatic backup. Stored like the AI
+// keys: encrypted-at-rest via safeStorage in the active vault dir, never sent
+// to the renderer (the UI only learns whether one exists).
+
+function backupPasswordFile(): string {
+  return path.join(activeVaultDir(), 'backup_password.bin');
+}
+
+export function setBackupPassword(password: string): void {
+  const clean = password.trim();
+  if (!clean) {
+    clearBackupPassword();
+    return;
+  }
+  const file = backupPasswordFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`));
+    return;
+  }
+  fs.writeFileSync(file, safeStorage.encryptString(clean));
+}
+
+export function getBackupPassword(): string | null {
+  return readKeyFile(backupPasswordFile());
+}
+
+export function hasBackupPassword(): boolean {
+  return getBackupPassword() !== null;
+}
+
+export function clearBackupPassword(): void {
+  const file = backupPasswordFile();
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
 /** Map of provider -> whether a key is stored, for the renderer (no keys exposed). */
 export function providerKeyMap(): Record<AiProvider, boolean> {
   return Object.fromEntries(PROVIDERS.map((p) => [p, hasApiKey(p)])) as Record<AiProvider, boolean>;

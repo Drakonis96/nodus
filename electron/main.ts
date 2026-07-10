@@ -7,6 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
+import { maybeRunAutoBackup } from './export/autoBackup';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
@@ -358,6 +359,18 @@ app.whenReady().then(() => {
   const settings = getSettings();
   // Queue resume is opt-in: pending DB state may come from previous automatic versions.
   if (settings.autoResumeQueue) scanQueue.resumePending();
+
+  // Automatic backups: first check shortly after launch (so an overdue backup
+  // runs without waiting a full interval), then a low-frequency heartbeat. The
+  // heavy work (SQLite snapshot + scrypt + AES) is a single async pass and the
+  // schedule state lives in settings, so missed ticks self-correct.
+  const autoBackupTick = () => {
+    void maybeRunAutoBackup(app.getVersion()).then((result) => {
+      if (result) console.log(`[backup] ${result.ok ? 'ok' : 'error'}: ${result.message}`);
+    });
+  };
+  setTimeout(autoBackupTick, 2 * 60 * 1000);
+  setInterval(autoBackupTick, 30 * 60 * 1000);
 
   if (settings.syncMode === 'realtime') startRealtimeSync();
   if (settings.mcpEnabled) void startMcpServer();

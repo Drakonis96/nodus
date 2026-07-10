@@ -353,6 +353,12 @@ const api: NodusApi = {
   importData: (password) => ipcRenderer.invoke('data:import', password),
   exportSyncPackage: () => ipcRenderer.invoke('data:exportSync'),
   importSyncPackage: () => ipcRenderer.invoke('data:importSync'),
+  setBackupPassword: (password) => ipcRenderer.invoke('backup:setPassword', password),
+  clearBackupPassword: () => ipcRenderer.invoke('backup:clearPassword'),
+  hasBackupPassword: () => ipcRenderer.invoke('backup:hasPassword'),
+  chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
+  runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
+  saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),

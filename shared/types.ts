@@ -371,6 +371,24 @@ export interface AppSettings {
    * they can be shown again from Settings.
    */
   sidebarHidden: string[];
+  // ── Automatic encrypted backups ────────────────────────────────────────────
+  // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
+  // Google Drive to get off-machine copies for free). Encrypted with the
+  // master backup password stored in the OS keychain; unlike the manual
+  // export, automatic backups NEVER include API keys or tokens.
+  autoBackupEnabled: boolean;
+  autoBackupFolder: string;
+  autoBackupIntervalHours: number;
+  lastAutoBackupAt: string | null;
+  lastAutoBackupStatus: string | null;
+}
+
+/** Outcome of a manual or scheduled automatic backup run. */
+export interface AutoBackupResult {
+  ok: boolean;
+  message: string;
+  path?: string;
+  prunedCount?: number;
 }
 
 export interface VaultSummary {
@@ -3308,6 +3326,16 @@ export interface NodusApi {
   exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
   /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
   importSyncPackage(): Promise<SyncMergeSummary | null>;
+  /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
+  setBackupPassword(password: string): Promise<void>;
+  clearBackupPassword(): Promise<void>;
+  hasBackupPassword(): Promise<boolean>;
+  /** Folder picker for the automatic-backup destination. Returns the chosen path or null. */
+  chooseBackupFolder(): Promise<string | null>;
+  /** Run one automatic-style backup immediately (no secrets, master password, prune). */
+  runBackupNow(): Promise<AutoBackupResult>;
+  /** Write a plaintext recovery kit (master password) to a user-chosen file. */
+  saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;

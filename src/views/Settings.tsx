@@ -75,6 +75,9 @@ export function Settings({
   const [importOpen, setImportOpen] = useState(false);
   const [importPassword, setImportPassword] = useState('');
   const [importingBackup, setImportingBackup] = useState(false);
+  const [autoBackupHasPassword, setAutoBackupHasPassword] = useState(false);
+  const [autoBackupPasswordInput, setAutoBackupPasswordInput] = useState('');
+  const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [copilotBusy, setCopilotBusy] = useState(false);
@@ -90,6 +93,16 @@ export function Settings({
       setUpdateMessage(event.message);
       setCheckingUpdate(event.status === 'checking');
     });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void window.nodus.hasBackupPassword().then((has) => {
+      if (active) setAutoBackupHasPassword(has);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -701,6 +714,123 @@ export function Settings({
               <p className="mt-1 text-xs text-neutral-500">
                 {t('Lleva tus notas, borradores, búsquedas guardadas y auditorías de relaciones a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
               </p>
+            </div>
+            <div className="mt-2 border-t border-neutral-800 pt-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm">{t('Copias de seguridad automáticas')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {t('Copias cifradas periódicas en una carpeta a tu elección (apúntala a iCloud Drive o Google Drive para tenerlas fuera de este equipo). No incluyen claves API.')}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-indigo-500"
+                  checked={settings.autoBackupEnabled}
+                  onChange={(e) => void patch({ autoBackupEnabled: e.target.checked })}
+                />
+              </div>
+              {settings.autoBackupEnabled && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn btn-ghost border border-neutral-700"
+                      onClick={async () => {
+                        const folder = await window.nodus.chooseBackupFolder();
+                        if (folder) await patch({ autoBackupFolder: folder });
+                      }}
+                    >
+                      <Icon name="folder" /> {t('Elegir carpeta')}
+                    </button>
+                    <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={settings.autoBackupFolder}>
+                      {settings.autoBackupFolder || t('Sin carpeta elegida')}
+                    </span>
+                    <select
+                      className="input w-auto text-xs"
+                      value={settings.autoBackupIntervalHours}
+                      onChange={(e) => void patch({ autoBackupIntervalHours: Number(e.target.value) })}
+                    >
+                      <option value={12}>{t('Cada 12 horas')}</option>
+                      <option value={24}>{t('Cada día')}</option>
+                      <option value={168}>{t('Cada semana')}</option>
+                    </select>
+                  </div>
+                  {autoBackupHasPassword ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-emerald-400">{t('Contraseña maestra configurada (guardada en el llavero del sistema).')}</span>
+                      <button
+                        className="btn btn-ghost border border-neutral-700 text-xs"
+                        onClick={async () => {
+                          const result = await window.nodus.saveBackupRecoveryKit();
+                          flash(result.ok ? `${t('Kit de recuperación guardado en')} ${result.message}` : result.message);
+                        }}
+                      >
+                        {t('Guardar kit de recuperación')}
+                      </button>
+                      <button
+                        className="btn btn-ghost border border-neutral-700 text-xs"
+                        onClick={async () => {
+                          await window.nodus.clearBackupPassword();
+                          setAutoBackupHasPassword(false);
+                          flash(t('Contraseña maestra eliminada. Las copias automáticas quedan en pausa.'));
+                        }}
+                      >
+                        {t('Cambiar contraseña')}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="password"
+                        className="input w-64"
+                        placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
+                        value={autoBackupPasswordInput}
+                        onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
+                      />
+                      <button
+                        className="btn btn-ghost border border-neutral-700"
+                        disabled={autoBackupPasswordInput.trim().length < 8}
+                        onClick={async () => {
+                          try {
+                            await window.nodus.setBackupPassword(autoBackupPasswordInput);
+                            setAutoBackupPasswordInput('');
+                            setAutoBackupHasPassword(true);
+                            flash(t('Contraseña maestra guardada. Descarga el kit de recuperación: sin la contraseña, las copias no se pueden restaurar.'));
+                          } catch (e) {
+                            flash(e instanceof Error ? e.message : String(e));
+                          }
+                        }}
+                      >
+                        {t('Guardar contraseña')}
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn btn-ghost border border-neutral-700"
+                      disabled={autoBackupRunning || !settings.autoBackupFolder || !autoBackupHasPassword}
+                      onClick={async () => {
+                        setAutoBackupRunning(true);
+                        try {
+                          const result = await window.nodus.runBackupNow();
+                          flash(result.message);
+                          await onChange();
+                        } finally {
+                          setAutoBackupRunning(false);
+                        }
+                      }}
+                    >
+                      <Icon name="download" /> {autoBackupRunning ? t('Copiando…') : t('Hacer copia ahora')}
+                    </button>
+                    {settings.lastAutoBackupStatus && (
+                      <span className="min-w-0 flex-1 truncate text-xs text-neutral-500" title={settings.lastAutoBackupStatus}>
+                        {settings.lastAutoBackupAt ? `${new Date(settings.lastAutoBackupAt).toLocaleString()} · ` : ''}
+                        {settings.lastAutoBackupStatus}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </Section>
       )}
