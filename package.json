@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "npm run typecheck && vite build",
-    "test": "node scripts/test-backup-crypto.mjs && node scripts/test-vaults.mjs && node scripts/test-macos-update-helper.mjs && node scripts/test-projects.mjs && node scripts/test-project-guide.mjs && node scripts/test-study-guide.mjs && node scripts/test-hypothesis-lab.mjs && node scripts/test-manuscript-verifier.mjs && node scripts/test-light-theme-utilities.mjs && node scripts/test-work-idea-synthesis.mjs && node scripts/test-search-health.mjs && node scripts/test-decorative-images.mjs && node scripts/test-citation-sanitize.mjs && node scripts/test-citation-preview.mjs && node scripts/test-chapter-relations.mjs && node scripts/test-text-recovery.mjs && node scripts/test-copilot-addin.mjs && node scripts/test-deep-research.mjs && node scripts/test-deep-research-client.mjs && node scripts/test-immersion.mjs && node scripts/test-background-jobs.mjs && node scripts/test-model-independence.mjs && node scripts/test-mcp.mjs && node scripts/test-graph-compute.mjs && node scripts/test-edge-feedback.mjs && node scripts/test-idea-identity.mjs && node scripts/test-sync-package.mjs && node scripts/test-auto-backup.mjs && node scripts/test-pdf-jump.mjs",
+    "test": "node scripts/test-backup-crypto.mjs && node scripts/test-vaults.mjs && node scripts/test-macos-update-helper.mjs && node scripts/test-projects.mjs && node scripts/test-project-guide.mjs && node scripts/test-study-guide.mjs && node scripts/test-hypothesis-lab.mjs && node scripts/test-manuscript-verifier.mjs && node scripts/test-light-theme-utilities.mjs && node scripts/test-work-idea-synthesis.mjs && node scripts/test-search-health.mjs && node scripts/test-decorative-images.mjs && node scripts/test-citation-sanitize.mjs && node scripts/test-citation-preview.mjs && node scripts/test-chapter-relations.mjs && node scripts/test-text-recovery.mjs && node scripts/test-copilot-addin.mjs && node scripts/test-deep-research.mjs && node scripts/test-deep-research-client.mjs && node scripts/test-immersion.mjs && node scripts/test-background-jobs.mjs && node scripts/test-model-independence.mjs && node scripts/test-mcp.mjs && node scripts/test-graph-compute.mjs && node scripts/test-edge-feedback.mjs && node scripts/test-idea-identity.mjs && node scripts/test-sync-package.mjs && node scripts/test-auto-backup.mjs && node scripts/test-pdf-jump.mjs && node scripts/test-speakable.mjs",
     "test:e2e": "node scripts/test-e2e-smoke.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@diffusionstudio/vits-web": "^1.0.3",
     "@google/genai": "^2.11.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^0.1.65",

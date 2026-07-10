@@ -23,6 +23,13 @@ const mainExternals = [
   'tesseract.js',
   '@napi-rs/canvas',
   '@anthropic-ai/sdk',
+  '@google/genai',
+  // ws (pulled in by the SDKs above) optionally requires these native addons via
+  // try/catch; keep them external so that fallback works instead of the bundler
+  // hard-failing to resolve an uninstalled optional dependency.
+  'ws',
+  'bufferutil',
+  'utf-8-validate',
   '@modelcontextprotocol/sdk',
   '@modelcontextprotocol/sdk/server/mcp.js',
   '@modelcontextprotocol/sdk/server/streamableHttp.js',

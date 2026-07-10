@@ -352,6 +352,45 @@ export interface ModelInfo {
  *  on reasoning models where the provider supports it (much faster for scanning). */
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
 
+// ── Audio / text-to-speech ───────────────────────────────────────────────────
+/** Audio (text-to-speech) backends. Piper runs fully local and cross-platform;
+ *  more providers (a local neural model, a cloud API) slot in behind the same
+ *  settings + generation surface without changing callers. */
+export type AudioProvider = 'piper';
+
+/** The two content kinds that can be narrated. Values match DecorativeImageEntityKind. */
+export type AudioEntityKind = 'deep_research' | 'immersion';
+
+/** One generated audio file for a segment (stage/section) of a report or immersion. */
+export interface AudioClip {
+  id: string;
+  entityKind: AudioEntityKind;
+  entityId: string;
+  /** 0-based order within the entity (a report section or an immersion stage). */
+  segmentIndex: number;
+  /** Human label of the segment, e.g. "Resumen" or "Estación 2 · El viajero". */
+  segmentLabel: string;
+  provider: AudioProvider;
+  voice: string;
+  language: string;
+  /** File name (relative to the vault audio dir). */
+  fileName: string;
+  bytes: number;
+  durationSec: number;
+  sampleRate: number;
+  createdAt: string;
+  /** True when the metadata row exists but the audio file is gone (e.g. after a
+   *  restore from backup, which never carries the regenerable audio files). */
+  missing: boolean;
+}
+
+/** A speakable segment extracted from an entity: the plain prose to narrate. */
+export interface AudioSegment {
+  index: number;
+  label: string;
+  text: string;
+}
+
 export interface AppSettings {
   embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
@@ -386,6 +425,12 @@ export interface AppSettings {
   imageProvider: ImageProvider;
   imageModel: string;
   imageStyle: DecorativeImageStyle;
+  /** Audio narration backend. Only 'piper' (local) for now; extensible later. */
+  audioProvider: AudioProvider;
+  /** Selected Piper voice id (e.g. "es_ES-sharvard-medium"). Empty until chosen. */
+  audioVoice: string;
+  /** Playback/synthesis speed multiplier (1.0 = natural). Clamped 0.7–1.3. */
+  audioSpeed: number;
   syncMode: SyncMode;
   readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
@@ -3126,6 +3171,19 @@ export interface NodusApi {
   revertDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage>;
   deleteDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage>;
   onDecorativeImageChanged(cb: (image: DecorativeImage) => void): () => void;
+
+  // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
+  getAudioSegments(entityKind: AudioEntityKind, entityId: string): Promise<AudioSegment[]>;
+  listAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<AudioClip[]>;
+  clearAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
+  saveAudioClip(
+    entityKind: AudioEntityKind,
+    entityId: string,
+    input: { segmentIndex: number; segmentLabel: string; voice: string; language: string; bytes: Uint8Array }
+  ): Promise<AudioClip>;
+  getAudioClipDataUrl(clipId: string): Promise<string | null>;
+  deleteAudioClip(clipId: string): Promise<void>;
+  deleteEntityAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;

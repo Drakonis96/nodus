@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
+  AudioEntityKind,
   AddProjectLinkInput,
   ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
@@ -94,6 +95,15 @@ import {
   saveCustomDecorativeImage,
 } from './ai/decorativeImages';
 import { getDecorativeImage, getDecorativeImageData } from './db/decorativeImagesRepo';
+import {
+  clearEntityClips,
+  deleteClip as deleteAudioClip,
+  deleteEntityClips,
+  getEntitySegments,
+  listEntityClips,
+  readClipBytes,
+  saveClip,
+} from './audio/audioService';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
@@ -425,6 +435,34 @@ export function registerIpc(
   h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     deleteDecorativeImage(entityKind, entityId)
   );
+
+  // audio / text-to-speech. Synthesis runs in the renderer (Piper via WebAssembly);
+  // the main process supplies the speakable segments and persists the resulting WAVs.
+  h('audio:segments', async (_e, entityKind: AudioEntityKind, entityId: string) =>
+    getEntitySegments(entityKind, entityId)
+  );
+  h('audio:listClips', async (_e, entityKind: AudioEntityKind, entityId: string) =>
+    listEntityClips(entityKind, entityId)
+  );
+  h('audio:clearClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
+    clearEntityClips(entityKind, entityId);
+  });
+  h('audio:saveClip', async (
+    _e,
+    entityKind: AudioEntityKind,
+    entityId: string,
+    input: { segmentIndex: number; segmentLabel: string; voice: string; language: string; bytes: Uint8Array }
+  ) => saveClip(entityKind, entityId, { ...input, bytes: input.bytes }));
+  h('audio:clipData', async (_e, clipId: string) => {
+    const data = readClipBytes(clipId);
+    return data ? `data:${data.mime};base64,${data.bytes.toString('base64')}` : null;
+  });
+  h('audio:deleteClip', async (_e, clipId: string) => {
+    deleteAudioClip(clipId);
+  });
+  h('audio:deleteEntityClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
+    deleteEntityClips(entityKind, entityId);
+  });
 
   // zotero
   h('zotero:ping', async () => {

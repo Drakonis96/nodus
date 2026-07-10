@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Local audio narration: generate spoken audio of a Deep Research report or an
+  immersion with a fully local, offline voice (Piper, running via WebAssembly).
+  Audio is produced section by section (or stage by stage), so you can start
+  listening while the rest is still being generated.
+- Voice manager in Settings → AI → "Audio y voz": download or remove Spanish
+  (Spain / Mexico) and English voices on demand, pick the active voice, and set
+  a playback speed. Downloaded voices are cached locally and reused offline.
+- Each report/immersion gets an audio panel to generate, play (one clip or all
+  in sequence), regenerate and delete its narration. Citation buttons are never
+  read aloud — only the prose. Generated audio is stored per vault and excluded
+  from backups and sync (it is regenerable on demand).
+
 ## 1.4.7 — 2026-07-10
 
 ### Added

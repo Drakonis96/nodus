@@ -21,6 +21,7 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 import { t, tx } from '../i18n';
 import {
@@ -686,6 +687,7 @@ function ReaderView({
               interactive
               onChange={onImageChange}
             />
+            <AudioPanel entityKind="deep_research" entityId={saved.id} />
             <DraftResultMain
               draft={saved.draft}
               exporting={exporting}

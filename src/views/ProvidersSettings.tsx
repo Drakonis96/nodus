@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { AiProvider, AppSettings, ImageModelInfo, ModelInfo, ModelRef, VaultSummary } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
+import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { AI_PROVIDERS, PROVIDER_LABELS, modelLabel, sameModel } from '../components/ui';
 import { t, tx } from '../i18n';
 
@@ -80,6 +81,7 @@ export function ProvidersSettings({
       </div>
     </section>
     <ImageGenerationSettings settings={settings} onChange={onChange} />
+    <AudioGenerationSettings settings={settings} onChange={onChange} />
     </>
   );
 }

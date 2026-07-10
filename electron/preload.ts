@@ -61,6 +61,17 @@ const api: NodusApi = {
     return () => ipcRenderer.removeListener('images:changed', listener);
   },
 
+  // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
+  getAudioSegments: (entityKind, entityId) => ipcRenderer.invoke('audio:segments', entityKind, entityId),
+  listAudioClips: (entityKind, entityId) => ipcRenderer.invoke('audio:listClips', entityKind, entityId),
+  clearAudioClips: (entityKind, entityId) =>
+    ipcRenderer.invoke('audio:clearClips', entityKind, entityId).then(() => undefined),
+  saveAudioClip: (entityKind, entityId, input) => ipcRenderer.invoke('audio:saveClip', entityKind, entityId, input),
+  getAudioClipDataUrl: (clipId) => ipcRenderer.invoke('audio:clipData', clipId),
+  deleteAudioClip: (clipId) => ipcRenderer.invoke('audio:deleteClip', clipId).then(() => undefined),
+  deleteEntityAudioClips: (entityKind, entityId) =>
+    ipcRenderer.invoke('audio:deleteEntityClips', entityKind, entityId).then(() => undefined),
+
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
   zoteroChildCollections: (parentKey) => ipcRenderer.invoke('zotero:childCollections', parentKey),

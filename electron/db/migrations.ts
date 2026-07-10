@@ -940,6 +940,33 @@ export const migrations: Migration[] = [
       ALTER TABLE decorative_images ADD COLUMN prev_source TEXT;
     `,
   },
+  {
+    version: 31,
+    up: /* sql */ `
+      -- Metadata for locally generated narration (text-to-speech) clips. The audio
+      -- files themselves live on disk under the vault's audio/ directory, NOT in
+      -- SQLite: they are large and fully regenerable, so they are deliberately kept
+      -- out of backups and .nodussync (which carry only the database). A restored or
+      -- synced database therefore keeps the metadata but the repository flags any row
+      -- whose file is absent as "missing" so the UI can offer to regenerate it.
+      CREATE TABLE audio_clips (
+        id            TEXT PRIMARY KEY,
+        entity_kind   TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id     TEXT NOT NULL,
+        segment_index INTEGER NOT NULL,
+        segment_label TEXT NOT NULL DEFAULT '',
+        provider      TEXT NOT NULL DEFAULT 'piper',
+        voice         TEXT NOT NULL DEFAULT '',
+        language      TEXT NOT NULL DEFAULT '',
+        file_name     TEXT NOT NULL,
+        bytes         INTEGER NOT NULL DEFAULT 0,
+        duration_sec  REAL NOT NULL DEFAULT 0,
+        sample_rate   INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_audio_clips_entity ON audio_clips(entity_kind, entity_id, segment_index);
+    `,
+  },
 ];
 
 export function runMigrations(db: Database.Database): void {

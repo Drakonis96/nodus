@@ -53,6 +53,7 @@ import {
 } from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
@@ -998,6 +999,9 @@ function ImmersionPlayer({
                 interactive
                 onChange={(image) => onSession({ ...session, image })}
               />
+            </div>
+            <div className="mt-5">
+              <AudioPanel entityKind="immersion" entityId={session.id} />
             </div>
             <div className="mt-7 flex flex-col items-center">
               <button
