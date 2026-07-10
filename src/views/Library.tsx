@@ -1472,7 +1472,7 @@ export function Library({
                     />
                     <RowIconButton
                       title={t('Preguntar al asistente sobre esta obra')}
-                      icon="wand"
+                      icon="chat"
                       tone="violet"
                       onClick={() =>
                         onOpenAssistant({

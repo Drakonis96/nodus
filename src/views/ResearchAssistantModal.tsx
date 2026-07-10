@@ -547,7 +547,7 @@ export function ResearchAssistantModal({
       >
         <header className="px-4 py-3 border-b border-neutral-800 flex items-center gap-3">
           <div className="flex items-center gap-2 font-semibold">
-            <Icon name="wand" className="text-indigo-300" />
+            <Icon name="chat" className="text-indigo-300" />
             {t('Asistente de investigación')}
           </div>
           <select
@@ -632,7 +632,7 @@ export function ResearchAssistantModal({
                   <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="grid h-12 w-12 place-items-center rounded-full border border-indigo-900/70 bg-indigo-950/30 text-indigo-300">
-                        <Icon name="wand" size={22} />
+                        <Icon name="chat" size={22} />
                       </span>
                       <p className="max-w-md text-sm text-neutral-400">
                         {t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}

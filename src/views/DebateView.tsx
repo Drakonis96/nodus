@@ -321,7 +321,7 @@ function DebateCard({
             })
           }
         >
-          <Icon name="wand" size={13} /> {t('Asistente')}
+          <Icon name="chat" size={13} /> {t('Asistente')}
         </button>
         <button className="btn btn-ghost border border-neutral-700 text-xs gap-1.5" onClick={onAnalyze} disabled={analysis?.loading}>
           <Icon name="wand" size={13} /> {analysis ? t('Reanalizar con IA') : t('Analizar debate (IA)')}

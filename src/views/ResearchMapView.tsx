@@ -431,7 +431,7 @@ function SubQuestionCard({
                 })
               }
             >
-              <Icon name="wand" size={13} /> {t('Asistente')}
+              <Icon name="chat" size={13} /> {t('Asistente')}
             </button>
           )}
           {mapped?.coverageStatus && mapped.coverageStatus !== 'uncovered' && (

@@ -280,7 +280,7 @@ export function App() {
     }));
     const actions: Command[] = [
       { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
-      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'wand', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
     ];
     return [...navCommands, ...actions];
@@ -384,7 +384,7 @@ export function App() {
           title={settings.defaultModel ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
           onClick={() => openAssistant()}
         >
-          <Icon name="wand" /> {t('Asistente')}
+          <Icon name="chat" /> {t('Asistente')}
         </button>
         <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
           <Icon name="folder" /> {t('Colecciones')}

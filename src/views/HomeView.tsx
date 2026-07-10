@@ -439,7 +439,7 @@ function renderPrimaryAction(
     case 'assistant':
       return (
         <button className="btn btn-primary gap-1.5" onClick={handlers.onOpenAssistant}>
-          <Icon name="wand" /> {action.label}
+          <Icon name="chat" /> {action.label}
         </button>
       );
     case 'view':
