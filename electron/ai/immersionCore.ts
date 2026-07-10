@@ -31,7 +31,7 @@ import type {
 
 export const IMMERSION_LIMITS = {
   minStations: 3,
-  maxStations: 8,
+  maxStations: 24,
   ideasPerStation: 12,
   passagesPerStation: 6,
   positionsPerStation: 6,
@@ -252,13 +252,22 @@ export interface ImmersionDeps {
 
 type ProgressFn = (p: ImmersionBuildProgress) => void;
 
-/** Number of guided stations that fit the requested time budget and the material. */
+/** Target number of guided stations for the chosen depth and the material.
+ *
+ *  Depth scales with the budget, anchored on the three presets and interpolated
+ *  in between: ~6 stations for a quick pass (90 min), ~12 for an afternoon
+ *  (150 min), ~20 for a deep dive (240 min). This is a TARGET the planner aims
+ *  for — the model may plan somewhat fewer or more when the topic warrants it,
+ *  including several consecutive stations that deepen the same thread. */
 export function resolveStationCount(minutes: number, ideaCount: number): number {
-  const fixed = IMMERSION_TIME.panorama + IMMERSION_TIME.contrasts + IMMERSION_TIME.frontiers + IMMERSION_TIME.exam;
-  const byTime = Math.floor((minutes - fixed) / IMMERSION_TIME.station);
-  // Each station needs enough distinct material to be worth a stop.
-  const byMaterial = Math.floor(ideaCount / 4);
-  return clamp(Math.min(byTime, Math.max(IMMERSION_LIMITS.minStations, byMaterial)), IMMERSION_LIMITS.minStations, IMMERSION_LIMITS.maxStations);
+  const byTime = Math.round(((minutes - 90) * 14) / 150) + 6;
+  // Each station still needs its own distinct material to be worth a stop.
+  const byMaterial = Math.floor(ideaCount / 3);
+  return clamp(
+    Math.min(byTime, Math.max(IMMERSION_LIMITS.minStations, byMaterial)),
+    IMMERSION_LIMITS.minStations,
+    IMMERSION_LIMITS.maxStations
+  );
 }
 
 export async function orchestrateImmersion(
@@ -422,25 +431,27 @@ export async function orchestrateImmersion(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function curriculumInput(topic: string, language: 'es' | 'en', stationCount: number, material: ImmersionMaterial): CurriculumInput {
+  // A longer route needs more raw material to distribute; the planner sees a
+  // generous slice so it can build coherent, deepening threads across stations.
   return {
     topic,
     language,
     stationCount,
-    ideas: material.ideas.slice(0, 60).map((i) => ({
+    ideas: material.ideas.slice(0, 90).map((i) => ({
       id: i.id,
       label: i.label,
       statement: clip(i.statement, 240),
       authors: i.authors.slice(0, 4),
       themes: i.themes.slice(0, 4),
     })),
-    passages: material.passages.slice(0, 24).map((p) => ({
+    passages: material.passages.slice(0, 32).map((p) => ({
       id: p.id,
       workTitle: p.workTitle,
       pageLabel: p.pageLabel,
       excerpt: clip(p.text, 260),
     })),
-    authors: material.authors.slice(0, 16).map((a) => a.name),
-    debates: material.debates.slice(0, 10).map((d) => ({ fromLabel: d.fromLabel, toLabel: d.toLabel, type: d.type })),
+    authors: material.authors.slice(0, 20).map((a) => a.name),
+    debates: material.debates.slice(0, 14).map((d) => ({ fromLabel: d.fromLabel, toLabel: d.toLabel, type: d.type })),
   };
 }
 
@@ -566,7 +577,9 @@ function normalizeCurriculum(
       passageIds: strList(s.passageIds).filter((id) => passageIds.has(id)),
     }))
     .filter((s) => s.title && s.question && s.ideaIds.length > 0)
-    .slice(0, stationCount);
+    // The planner is given a target but keeps discretion over the exact count;
+    // only the hard ceiling is enforced here so a rich topic can breathe.
+    .slice(0, IMMERSION_LIMITS.maxStations);
   if (stations.length < IMMERSION_LIMITS.minStations) {
     return fallbackCurriculum(topic, material, stationCount);
   }

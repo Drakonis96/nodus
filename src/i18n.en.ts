@@ -1317,6 +1317,44 @@ export const EN: Record<string, string> = {
   'Del grafo a un borrador con fuentes verificables.': 'From the graph to a draft with verifiable sources.',
   // Deep Research
   'Deep Research': 'Deep Research',
+  // ── Deep Research gallery + queue + reader ───────────────────────────────
+  'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.':
+    'Your library of academic reports, generated in a queue and citing the whole corpus.',
+  'Nuevo informe': 'New report',
+  'Buscar entre tus informes…': 'Search your reports…',
+  'Más antiguos': 'Oldest',
+  'Por título (A–Z)': 'By title (A–Z)',
+  'Vista mosaico': 'Grid view',
+  'Vista lista': 'List view',
+  'Cargando informes…': 'Loading reports…',
+  'Ningún informe coincide con tu búsqueda.': 'No report matches your search.',
+  'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.':
+    'No reports yet. Create the first one and it will live here, ready to read full-screen.',
+  'Cola de generación · {n} en curso': 'Generation queue · {n} in progress',
+  'Limpiar fallidos': 'Clear failed',
+  'pág.': 'pp.',
+  'Quitar de la cola': 'Remove from queue',
+  'Falló': 'Failed',
+  'Abrir a pantalla completa': 'Open full-screen',
+  'Leer': 'Read',
+  'Reutilizar la idea para un informe nuevo': 'Reuse the idea for a new report',
+  'Volver a la galería': 'Back to gallery',
+  'El informe desarrolla tu idea por completo, citando todo el corpus.':
+    'The report develops your idea in full, citing the whole corpus.',
+  'Se añadirá a la cola ({n} en curso) y se generará cuando termine el anterior.':
+    'It will be added to the queue ({n} in progress) and generated once the previous one finishes.',
+  'Se genera en segundo plano: puedes cerrar esto y seguir trabajando.':
+    'It generates in the background: you can close this and keep working.',
+  'Añadir a la cola': 'Add to queue',
+  'Informe añadido a la cola. Se generará en segundo plano.': 'Report added to the queue. It will generate in the background.',
+  'Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.':
+    'Press “New report” and write the question or idea. The report turns it into a multi-page text, not a short answer.',
+  '2. Encola los que quieras': '2. Queue as many as you want',
+  'Añade varios informes a la cola: se generan en cadena, uno tras otro, mientras sigues trabajando.':
+    'Add several reports to the queue: they generate one after another while you keep working.',
+  '4. Lee a pantalla completa': '4. Read full-screen',
+  'Abre cualquier informe de la galería para leerlo a pantalla completa, revisar sus citas y exportarlo a Markdown o PDF.':
+    'Open any report in the gallery to read it full-screen, review its citations and export it to Markdown or PDF.',
   'Taller': 'Workshop',
   'Informe guardado localmente.': 'Report saved locally.',
   'Informe guardado abierto. Puedes exportarlo o reutilizar su idea para regenerarlo.':
@@ -2157,6 +2195,9 @@ export const EN: Record<string, string> = {
   Exprés: 'Express',
   'Una tarde': 'One afternoon',
   Profunda: 'Deep',
+  '~6 paradas': '~6 stops',
+  '~12 paradas': '~12 stops',
+  '~20 paradas': '~20 stops',
   'Cartografiando…': 'Mapping…',
   'Explorar el territorio': 'Explore the territory',
   'Las preguntas siempre se pueden saltar durante la sesión': 'Questions can always be skipped during the session',
@@ -2176,8 +2217,8 @@ export const EN: Record<string, string> = {
   obras: 'works',
   autores: 'authors',
   debates: 'debates',
-  'Plan para {min} min: ~{n} estaciones guiadas, con panorama, contrastes, fronteras y examen final{quiz}.':
-    'Plan for {min} min: ~{n} guided stations, with panorama, contrasts, frontiers and a final exam{quiz}.',
+  'Ruta de ~{n} estaciones guiadas: panorama, contrastes, fronteras y examen final{quiz}. La IA ajusta el número según lo que el tema pida.':
+    'A route of ~{n} guided stations: panorama, contrasts, frontiers and a final exam{quiz}. The AI adjusts the number to what the topic needs.',
   '(sin preguntas)': '(no questions)',
   'Voces principales': 'Leading voices',
   '{n} ideas relevantes': '{n} relevant ideas',

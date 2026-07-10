@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.4 — 2026-07-10
+
+### Added
+
+- Deep Research is now a gallery of your saved reports: search across them, sort
+  by date or title, and switch between a grid (mosaic) and a list view.
+- A generation queue — line up several reports and Nodus generates them one after
+  another in the background while you keep working.
+- An immersive full-screen reader for each report, with a back button to the
+  gallery and its decorative image, citations and export in one place.
+
+### Changed
+
+- Deeper immersions: routes now scale with the chosen depth (~6 stations for a
+  quick pass, ~12 for an afternoon, ~20 for a deep dive), and the planner may use
+  a coherent few more or fewer as the topic warrants.
+- The immersion curriculum planner was reworked to build a progressive,
+  well-sequenced route that can devote several consecutive stations to deepening a
+  single rich thread instead of cramming it into one stop.
+- Immersion time estimates now reflect the actual length of the planned route.
+
 ## 1.4.3 — 2026-07-10
 
 ### Added

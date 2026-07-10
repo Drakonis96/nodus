@@ -70,9 +70,9 @@ const OPEN_FILTERS: GraphFilters = {
 };
 
 const TIME_PRESETS: { minutes: number; label: string; hint: string }[] = [
-  { minutes: 90, label: 'Exprés', hint: '~90 min' },
-  { minutes: 150, label: 'Una tarde', hint: '~2,5 h' },
-  { minutes: 240, label: 'Profunda', hint: '~4 h' },
+  { minutes: 90, label: 'Exprés', hint: '~6 paradas' },
+  { minutes: 150, label: 'Una tarde', hint: '~12 paradas' },
+  { minutes: 240, label: 'Profunda', hint: '~20 paradas' },
 ];
 
 const STEP_MINUTES = { panorama: 15, station: 28, contrasts: 15, frontiers: 8, exam: 18 } as const;
@@ -253,7 +253,7 @@ export function ImmersionView({
     setScoping(true);
     setScope(null);
     try {
-      const result = await window.nodus.buildImmersionScope({ topic: topic.trim() });
+      const result = await window.nodus.buildImmersionScope({ topic: topic.trim(), minutes });
       setScope(result);
       setMode('scope');
     } catch (e) {
@@ -521,7 +521,7 @@ function ImmersionHome({
                   }`}
                 >
                   <span className="font-medium">{t(preset.label)}</span>
-                  <span className="ml-1.5 opacity-70">{preset.hint}</span>
+                  <span className="ml-1.5 opacity-70">{t(preset.hint)}</span>
                 </button>
               ))}
               <button
@@ -720,8 +720,7 @@ function ImmersionScopeScreen({
           </div>
 
           <div className="mt-4 rounded-lg border border-indigo-800/60 bg-indigo-950/25 p-3 text-xs text-indigo-200">
-            {tx('Plan para {min} min: ~{n} estaciones guiadas, con panorama, contrastes, fronteras y examen final{quiz}.', {
-              min: minutes,
+            {tx('Ruta de ~{n} estaciones guiadas: panorama, contrastes, fronteras y examen final{quiz}. La IA ajusta el número según lo que el tema pida.', {
               n: scope.estimatedStations,
               quiz: includeQuiz ? '' : ` ${t('(sin preguntas)')}`,
             })}
@@ -877,6 +876,9 @@ function ImmersionPlayer({
   onSaveToNotes: () => void;
 }) {
   const steps = useMemo(() => playerSteps(session), [session]);
+  // Honest total study time from the actual route, not the requested budget:
+  // a deep route can hold far more stations than a single afternoon.
+  const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
   const progress = session.progress;
   const current = Math.min(progress.currentStep, steps.length - 1);
   const [direction, setDirection] = useState(1);
@@ -985,7 +987,7 @@ function ImmersionPlayer({
                   s: session.plan.stats.stations,
                   i: session.plan.stats.ideas,
                   w: session.plan.stats.works,
-                  m: session.minutes,
+                  m: totalMinutes,
                 })}
               </p>
             </div>

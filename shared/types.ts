@@ -2786,6 +2786,8 @@ export interface StudyAnswerAssessment {
 
 export interface ImmersionScopeRequest {
   topic: string;
+  /** Chosen time budget, so the station estimate matches the depth tier. */
+  minutes?: number;
 }
 
 /** One idea inside the topic territory, ranked by relevance (no AI involved). */

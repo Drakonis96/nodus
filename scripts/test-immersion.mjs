@@ -146,15 +146,15 @@ try {
     }),
   });
 
-  // ── resolveStationCount bounds ──────────────────────────────────────────────
-  assert.equal(
-    resolveStationCount(240, 60),
-    Math.max(IMMERSION_LIMITS.minStations, Math.min(8, Math.floor((240 - FIXED_MINUTES) / IMMERSION_TIME.station))),
-    'station count for 240min'
-  );
+  // ── resolveStationCount: depth tiers (express ~6 / afternoon ~12 / deep ~20) ─
+  assert.equal(resolveStationCount(90, 60), 6, 'express targets ~6 stations');
+  assert.equal(resolveStationCount(150, 60), 12, 'an afternoon targets ~12 stations');
+  assert.equal(resolveStationCount(240, 60), 20, 'a deep dive targets ~20 stations');
   assert.equal(resolveStationCount(30, 60), IMMERSION_LIMITS.minStations, 'never below min stations');
   assert.equal(resolveStationCount(600, 500), IMMERSION_LIMITS.maxStations, 'never above max stations');
   assert.equal(resolveStationCount(600, 8), IMMERSION_LIMITS.minStations, 'thin material limits stations');
+  // A rich deep route can hold far more stations than the old cap of 8.
+  assert.ok(IMMERSION_LIMITS.maxStations >= 20, 'the ceiling allows deep, multi-station routes');
 
   // ── Happy path ──────────────────────────────────────────────────────────────
   {

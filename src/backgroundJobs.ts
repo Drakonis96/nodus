@@ -191,3 +191,119 @@ export function startDeepResearchGeneration(key: string, request: DeepResearchRe
     }
   });
 }
+
+// ── Deep Research queue: chained sequential generation ───────────────────────
+//
+// Reports are queued and generated one after another. The controller lives at
+// module scope (not inside a view) so a queue keeps draining while the user
+// navigates elsewhere. Only one report runs at a time, under the shared main
+// job key, so the existing progress subscription keeps working unchanged.
+
+export type DeepResearchQueueStatus = 'queued' | 'running' | 'completed' | 'failed';
+
+export interface DeepResearchQueueItem {
+  id: string;
+  request: DeepResearchRequest;
+  title: string;
+  status: DeepResearchQueueStatus;
+  error: string | null;
+  savedDraftId: string | null;
+  enqueuedAt: string;
+}
+
+const deepQueue: DeepResearchQueueItem[] = [];
+const deepQueueListeners = new Set<(items: DeepResearchQueueItem[]) => void>();
+let deepQueueSeq = 0;
+let deepQueueDraining = false;
+
+function snapshotDeepQueue(): DeepResearchQueueItem[] {
+  return deepQueue.map((item) => ({ ...item }));
+}
+
+function notifyDeepQueue(): void {
+  const snapshot = snapshotDeepQueue();
+  for (const listener of deepQueueListeners) listener(snapshot);
+}
+
+export function subscribeDeepResearchQueue(listener: (items: DeepResearchQueueItem[]) => void): () => void {
+  deepQueueListeners.add(listener);
+  listener(snapshotDeepQueue());
+  return () => {
+    deepQueueListeners.delete(listener);
+  };
+}
+
+export function getDeepResearchQueue(): DeepResearchQueueItem[] {
+  return snapshotDeepQueue();
+}
+
+function objectivePreview(objective: string): string {
+  const clean = objective.replace(/\s+/g, ' ').trim();
+  return clean.length > 100 ? `${clean.slice(0, 100)}…` : clean || 'Informe sin título';
+}
+
+export function enqueueDeepResearch(request: DeepResearchRequest): DeepResearchQueueItem {
+  const item: DeepResearchQueueItem = {
+    id: `drq-${Date.now()}-${++deepQueueSeq}`,
+    request,
+    title: objectivePreview(request.objective),
+    status: 'queued',
+    error: null,
+    savedDraftId: null,
+    enqueuedAt: new Date().toISOString(),
+  };
+  deepQueue.push(item);
+  notifyDeepQueue();
+  drainDeepQueue();
+  return item;
+}
+
+/** Remove a still-queued item. A running report is never dropped mid-flight. */
+export function removeQueuedDeepResearch(id: string): boolean {
+  const index = deepQueue.findIndex((item) => item.id === id);
+  if (index === -1 || deepQueue[index].status !== 'queued') return false;
+  deepQueue.splice(index, 1);
+  notifyDeepQueue();
+  return true;
+}
+
+/** Drop finished (completed/failed) entries the user has acknowledged. */
+export function clearFinishedDeepResearch(): void {
+  for (let i = deepQueue.length - 1; i >= 0; i--) {
+    if (deepQueue[i].status === 'completed' || deepQueue[i].status === 'failed') deepQueue.splice(i, 1);
+  }
+  notifyDeepQueue();
+}
+
+function drainDeepQueue(): void {
+  if (deepQueueDraining) return;
+  const next = deepQueue.find((item) => item.status === 'queued');
+  if (!next) return;
+  deepQueueDraining = true;
+  next.status = 'running';
+  notifyDeepQueue();
+
+  const job = startDeepResearchGeneration(DEEP_RESEARCH_MAIN_JOB_KEY, next.request);
+  const unsubscribe = subscribeBackgroundJob<DeepResearchRequest, DeepResearchProgress, DeepResearchGenerationResult>(
+    DEEP_RESEARCH_MAIN_JOB_KEY,
+    (current) => {
+      if (!current || current.id !== job.id) return;
+      if (current.status === 'completed') {
+        next.status = 'completed';
+        next.savedDraftId = current.result?.savedDraft?.id ?? null;
+        finish();
+      } else if (current.status === 'failed') {
+        next.status = 'failed';
+        next.error = current.error;
+        finish();
+      }
+    }
+  );
+
+  function finish(): void {
+    unsubscribe();
+    deepQueueDraining = false;
+    notifyDeepQueue();
+    drainDeepQueue();
+  }
+}
