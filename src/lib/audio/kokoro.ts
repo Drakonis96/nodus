@@ -1,5 +1,6 @@
 import type { KokoroTTS } from 'kokoro-js';
 import type { AudioEngine, AudioVoice } from './types';
+import { encodeWavPcm16 } from './wav';
 
 // Kokoro provider: one shared 82M model (StyleTTS2) powers many high-quality
 // English voices (US + UK). Runs via kokoro-js on onnxruntime-web (WASM). The
@@ -101,6 +102,8 @@ export const kokoroEngine: AudioEngine = {
     // valid members but arrive as plain strings, so widen through the options type.
     const options = { voice: voiceId, speed: 1 } as unknown as Parameters<KokoroTTS['generate']>[1];
     const audio = await model.generate(text, options);
-    return new Uint8Array(await audio.toBlob().arrayBuffer());
+    // RawAudio.toBlob() writes 32-bit float WAV, which Chromium's <audio> cannot
+    // play; re-encode the raw samples as 16-bit PCM WAV instead.
+    return encodeWavPcm16(audio.audio as Float32Array, audio.sampling_rate);
   },
 };

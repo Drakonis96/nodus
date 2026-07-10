@@ -358,10 +358,18 @@ export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
  *  per-language voices (incl. Spanish); Kokoro is a single English model with many
  *  high-quality voices. More providers (e.g. a cloud API) slot in behind the same
  *  settings + generation surface without changing callers. */
-export type AudioProvider = 'piper' | 'kokoro';
+export type AudioProvider = 'piper' | 'kokoro' | 'hume';
 
 /** The two content kinds that can be narrated. Values match DecorativeImageEntityKind. */
 export type AudioEntityKind = 'deep_research' | 'immersion';
+
+/** One Hume voice as returned by the voice-list endpoint. `humeProvider` says which
+ *  Hume library it belongs to (needed to synthesize with it). */
+export interface HumeVoiceInfo {
+  id: string;
+  name: string;
+  humeProvider: 'HUME_AI' | 'CUSTOM_VOICE';
+}
 
 /** One generated audio file for a segment (stage/section) of a report or immersion. */
 export interface AudioClip {
@@ -3186,6 +3194,13 @@ export interface NodusApi {
   getAudioClipDataUrl(clipId: string): Promise<string | null>;
   deleteAudioClip(clipId: string): Promise<void>;
   deleteEntityAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
+  // Hume cloud TTS (BYO-key). The key is stored in the main process; the renderer
+  // only learns whether one exists, the voice list, and the audio bytes.
+  humeStatus(): Promise<{ hasKey: boolean }>;
+  humeSetKey(key: string): Promise<{ hasKey: boolean }>;
+  humeClearKey(): Promise<{ hasKey: boolean }>;
+  humeVoices(): Promise<HumeVoiceInfo[]>;
+  humeSynthesize(voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string): Promise<Uint8Array>;
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;

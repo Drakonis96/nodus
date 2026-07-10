@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AudioClip, AudioEntityKind } from '@shared/types';
+import type { AudioClip, AudioEntityKind, AudioProvider } from '@shared/types';
 import { findVoice, getEngine } from '../lib/audio';
-import type { AudioProvider } from '@shared/types';
+import { useAudioPlayer, type PlayerTrack } from './AudioPlayer';
 import { t, tx } from '../i18n';
 
 /**
  * Reusable narration panel for a Deep Research report or an immersion. It asks
  * the main process for the speakable segments (sections / stages), synthesises
- * each one locally in the renderer (Piper via WebAssembly), and hands the WAV
- * bytes back to be persisted. It shows live progress, plays clips back (one at a
- * time or the whole thing sequentially), and manages (deletes) them. Audio never
- * leaves the machine.
+ * each one with the active voice provider, and hands the WAV bytes back to be
+ * persisted. Playback is delegated to the app-wide player (the bottom strip), so
+ * there is a single audio stream across the whole app.
  */
 interface RunProgress {
   done: number;
@@ -27,17 +26,13 @@ export function AudioPanel({
   entityId: string;
   compact?: boolean;
 }) {
+  const player = useAudioPlayer();
   const [clips, setClips] = useState<AudioClip[]>([]);
   const [run, setRun] = useState<RunProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voiceReady, setVoiceReady] = useState<boolean | null>(null);
-  const [playingId, setPlayingId] = useState<string | null>(null);
-  const [speed, setSpeed] = useState(1);
-  const autoplay = useRef(false);
   const cancelRef = useRef(false);
   const clipsDoneRef = useRef(0);
-  const urlCache = useRef<Map<string, string>>(new Map());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const mounted = useRef(true);
 
   const generating = run != null;
@@ -49,7 +44,6 @@ export function AudioPanel({
 
   const checkVoice = async (): Promise<{ provider: AudioProvider; voiceId: string } | null> => {
     const settings = await window.nodus.getSettings();
-    setSpeed(settings.audioSpeed ?? 1);
     const provider = settings.audioProvider ?? 'piper';
     const chosen = settings.audioVoice;
     if (!chosen) {
@@ -68,21 +62,26 @@ export function AudioPanel({
     return () => {
       mounted.current = false;
       cancelRef.current = true;
-      for (const url of urlCache.current.values()) URL.revokeObjectURL(url);
-      urlCache.current.clear();
     };
+    // eslint-disable-next-line
   }, [entityKind, entityId]);
 
   const totalDuration = useMemo(() => clips.reduce((acc, c) => acc + c.durationSec, 0), [clips]);
+  const playable = useMemo<PlayerTrack[]>(
+    () => clips.filter((c) => !c.missing).map((c) => ({ id: c.id, label: c.segmentLabel })),
+    [clips]
+  );
 
   const generate = async () => {
     setError(null);
     const chosen = await checkVoice();
-    const voice = chosen ? findVoice(chosen.provider, chosen.voiceId) : undefined;
-    if (!chosen || !voice) {
-      setError(t('Elige y descarga una voz en Ajustes → IA → Audio y voz.'));
+    if (!chosen) {
+      setError(t('Elige y prepara una voz en Ajustes → IA → Audio y voz.'));
       return;
     }
+    // Local voices carry static metadata; cloud (Hume) voices are dynamic, so the
+    // language is best-effort and defaults to empty.
+    const language = findVoice(chosen.provider, chosen.voiceId)?.language ?? '';
     const engine = getEngine(chosen.provider);
     let segments;
     try {
@@ -97,10 +96,8 @@ export function AudioPanel({
     }
 
     cancelRef.current = false;
-    stop();
+    player.stop();
     await window.nodus.clearAudioClips(entityKind, entityId);
-    for (const url of urlCache.current.values()) URL.revokeObjectURL(url);
-    urlCache.current.clear();
     setClips([]);
     setRun({ done: 0, total: segments.length, label: t('Preparando…') });
 
@@ -115,7 +112,7 @@ export function AudioPanel({
           segmentLabel: segment.label,
           provider: chosen.provider,
           voice: chosen.voiceId,
-          language: voice.language,
+          language,
           bytes,
         });
         clipsDoneRef.current += 1;
@@ -134,68 +131,20 @@ export function AudioPanel({
     cancelRef.current = true;
   };
 
-  const clipUrl = async (clip: AudioClip): Promise<string | null> => {
-    const cached = urlCache.current.get(clip.id);
-    if (cached) return cached;
-    const dataUrl = await window.nodus.getAudioClipDataUrl(clip.id);
-    if (!dataUrl) return null;
-    const blob = await (await fetch(dataUrl)).blob();
-    const url = URL.createObjectURL(blob);
-    urlCache.current.set(clip.id, url);
-    return url;
-  };
-
-  const playClip = async (clip: AudioClip, chain = false) => {
-    if (clip.missing) return;
-    const url = await clipUrl(clip);
-    const el = audioRef.current;
-    if (!url || !el) return;
-    el.src = url;
-    el.playbackRate = speed;
-    // Preserve pitch when the user speeds up / slows down playback.
-    (el as HTMLAudioElement & { preservesPitch?: boolean }).preservesPitch = true;
-    autoplay.current = chain;
-    setPlayingId(clip.id);
-    void el.play().catch(() => setPlayingId(null));
-  };
-
-  const playAll = async () => {
-    const first = clips.find((c) => !c.missing);
-    if (first) await playClip(first, true);
-  };
-
-  const onEnded = () => {
-    if (!autoplay.current) {
-      setPlayingId(null);
-      return;
-    }
-    const idx = clips.findIndex((c) => c.id === playingId);
-    const next = clips.slice(idx + 1).find((c) => !c.missing);
-    if (next) void playClip(next, true);
-    else setPlayingId(null);
-  };
-
-  const stop = () => {
-    audioRef.current?.pause();
-    autoplay.current = false;
-    setPlayingId(null);
+  const playFrom = (clip: AudioClip) => {
+    const idx = playable.findIndex((tk) => tk.id === clip.id);
+    if (idx >= 0) player.play(playable, idx);
   };
 
   const deleteClip = async (id: string) => {
+    if (player.currentTrackId === id) player.stop();
     await window.nodus.deleteAudioClip(id);
-    const url = urlCache.current.get(id);
-    if (url) {
-      URL.revokeObjectURL(url);
-      urlCache.current.delete(id);
-    }
     await refreshClips();
   };
 
   const deleteAll = async () => {
-    stop();
+    player.stop();
     await window.nodus.deleteEntityAudioClips(entityKind, entityId);
-    for (const url of urlCache.current.values()) URL.revokeObjectURL(url);
-    urlCache.current.clear();
     await refreshClips();
   };
 
@@ -218,7 +167,7 @@ export function AudioPanel({
         <div className="flex items-center gap-2">
           {hasClips && !generating && (
             <>
-              <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => void playAll()}>
+              <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => player.play(playable, 0)} disabled={playable.length === 0}>
                 ▶ {t('Reproducir todo')}
               </button>
               <button className="btn btn-ghost text-xs text-red-400" onClick={() => void deleteAll()}>
@@ -240,7 +189,7 @@ export function AudioPanel({
 
       {voiceReady === false && !generating && (
         <div className="mt-2 text-xs text-amber-400/90">
-          {t('Elige y descarga una voz en Ajustes → IA → Audio y voz para poder narrar.')}
+          {t('Elige y prepara una voz en Ajustes → IA → Audio y voz para poder narrar.')}
         </div>
       )}
 
@@ -267,17 +216,18 @@ export function AudioPanel({
       {hasClips && (
         <ul className="mt-3 space-y-1">
           {clips.map((clip) => {
-            const isPlaying = playingId === clip.id;
+            const isCurrent = player.currentTrackId === clip.id;
+            const isPlaying = isCurrent && player.isPlaying;
             return (
               <li
                 key={clip.id}
-                className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${isPlaying ? 'bg-indigo-950/40' : 'hover:bg-neutral-900/60'}`}
+                className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${isCurrent ? 'bg-indigo-950/40' : 'hover:bg-neutral-900/60'}`}
               >
                 <button
                   className="shrink-0 text-neutral-300 disabled:text-neutral-600"
-                  title={clip.missing ? t('Archivo no disponible') : isPlaying ? t('Detener') : t('Reproducir')}
+                  title={clip.missing ? t('Archivo no disponible') : isPlaying ? t('Pausa') : t('Reproducir')}
                   disabled={clip.missing}
-                  onClick={() => (isPlaying ? stop() : void playClip(clip))}
+                  onClick={() => (isCurrent ? player.toggle() : playFrom(clip))}
                 >
                   {clip.missing ? '⚠' : isPlaying ? '⏸' : '▶'}
                 </button>
@@ -301,8 +251,6 @@ export function AudioPanel({
           })}
         </ul>
       )}
-
-      <audio ref={audioRef} onEnded={onEnded} className="hidden" />
     </div>
   );
 }

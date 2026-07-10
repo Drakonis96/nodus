@@ -2,11 +2,12 @@ import type { AudioProvider } from '@shared/types';
 import type { AudioEngine, AudioVoice } from './types';
 import { piperEngine } from './piper';
 import { kokoroEngine } from './kokoro';
+import { humeEngine } from './hume';
 
 export type { AudioEngine, AudioVoice } from './types';
 
-/** All local TTS engines, in the order they should appear in the picker. */
-export const AUDIO_ENGINES: AudioEngine[] = [piperEngine, kokoroEngine];
+/** All TTS engines, in the order they should appear in the picker. */
+export const AUDIO_ENGINES: AudioEngine[] = [piperEngine, kokoroEngine, humeEngine];
 
 export const AUDIO_PROVIDERS: AudioProvider[] = AUDIO_ENGINES.map((e) => e.provider);
 

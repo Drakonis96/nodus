@@ -105,6 +105,13 @@ import {
   readClipBytes,
   saveClip,
 } from './audio/audioService';
+import {
+  clearHumeKey,
+  humeHasKey,
+  listHumeVoices,
+  setHumeKey,
+  synthesizeHume,
+} from './audio/hume';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
@@ -463,6 +470,23 @@ export function registerIpc(
   });
   h('audio:deleteEntityClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
     deleteEntityClips(entityKind, entityId);
+  });
+
+  // Hume (cloud TTS): key stays in the main process; the renderer only sees
+  // whether a key exists, the voice list, and the resulting audio bytes.
+  h('audio:humeStatus', async () => ({ hasKey: humeHasKey() }));
+  h('audio:humeSetKey', async (_e, key: string) => {
+    setHumeKey(key);
+    return { hasKey: humeHasKey() };
+  });
+  h('audio:humeClearKey', async () => {
+    clearHumeKey();
+    return { hasKey: humeHasKey() };
+  });
+  h('audio:humeVoices', async () => listHumeVoices());
+  h('audio:humeSynthesize', async (_e, voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string) => {
+    const bytes = await synthesizeHume(voiceId, provider, text);
+    return new Uint8Array(bytes);
   });
 
   // zotero

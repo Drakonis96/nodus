@@ -71,6 +71,12 @@ const api: NodusApi = {
   deleteAudioClip: (clipId) => ipcRenderer.invoke('audio:deleteClip', clipId).then(() => undefined),
   deleteEntityAudioClips: (entityKind, entityId) =>
     ipcRenderer.invoke('audio:deleteEntityClips', entityKind, entityId).then(() => undefined),
+  humeStatus: () => ipcRenderer.invoke('audio:humeStatus'),
+  humeSetKey: (key) => ipcRenderer.invoke('audio:humeSetKey', key),
+  humeClearKey: () => ipcRenderer.invoke('audio:humeClearKey'),
+  humeVoices: () => ipcRenderer.invoke('audio:humeVoices'),
+  humeSynthesize: (voiceId, provider, text) =>
+    ipcRenderer.invoke('audio:humeSynthesize', voiceId, provider, text),
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),

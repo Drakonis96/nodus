@@ -25,7 +25,7 @@ function toClip(row: AudioClipRow): AudioClip {
     entityId: row.entity_id,
     segmentIndex: row.segment_index,
     segmentLabel: row.segment_label,
-    provider: row.provider === 'kokoro' ? 'kokoro' : 'piper',
+    provider: row.provider === 'kokoro' || row.provider === 'hume' ? row.provider : 'piper',
     voice: row.voice,
     language: row.language,
     fileName: row.file_name,
