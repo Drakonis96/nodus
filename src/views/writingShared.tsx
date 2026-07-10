@@ -22,6 +22,7 @@ export function DraftResultMain({
   draft,
   exporting,
   savingDraft,
+  draftSaved = false,
   onCopy,
   onSaveDraft,
   onSaveToNotes,
@@ -31,6 +32,8 @@ export function DraftResultMain({
   draft: WritingWorkshopDraft;
   exporting: boolean;
   savingDraft: boolean;
+  /** Deep Research auto-saves completed background reports. */
+  draftSaved?: boolean;
   onCopy: () => void;
   onSaveDraft: () => void;
   onSaveToNotes: () => void;
@@ -48,8 +51,9 @@ export function DraftResultMain({
           <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onCopy}>
             <Icon name="check" /> {t('Copiar')}
           </button>
-          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft}>
-            <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
+          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft || draftSaved}>
+            <Icon name={savingDraft ? 'sync' : draftSaved ? 'check' : 'save'} className={savingDraft ? 'animate-spin' : ''} />{' '}
+            {savingDraft ? t('Guardando…') : draftSaved ? t('Guardado') : t('Guardar borrador')}
           </button>
           <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveToNotes}>
             <Icon name="notebook" /> {t('Guardar en notas')}

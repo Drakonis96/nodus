@@ -1362,14 +1362,22 @@ export const EN: Record<string, string> = {
   'Sin proyecto': 'No project',
   'Generar informe': 'Generate report',
   'Generando informe…': 'Generating report…',
+  'No se pudo generar el informe.': 'The report could not be generated.',
   'Escribe la idea de investigación antes de generar el informe.': 'Write the research idea before generating the report.',
   'Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.':
     'Write the research idea or question. The report will develop it fully, citing every work in the corpus.',
   'Cobertura del corpus completo': 'Full-corpus coverage',
   'Sin selección manual: el informe elige y cita las fuentes por ti.':
     'No manual selection: the report picks and cites the sources for you.',
+  'Puedes cambiar de sección: el informe seguirá en segundo plano y recuperarás este progreso al volver.':
+    'You can switch sections: the report will continue in the background and this progress will return when you come back.',
   'Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.':
     'Report generated: {s} sections · ~{p} pages · {i} ideas cited.',
+  'Informe generado y guardado: {s} secciones · ~{p} páginas · {i} ideas citadas.':
+    'Report generated and saved: {s} sections · ~{p} pages · {i} ideas cited.',
+  'Informe generado, pero no se pudo guardar automáticamente: {error}':
+    'The report was generated but could not be saved automatically: {error}',
+  'El informe está listo y puedes guardarlo manualmente.': 'The report is ready and you can save it manually.',
   'El informe aparecerá aquí. Escribe tu idea de investigación y pulsa «Generar informe».':
     'The report will appear here. Write your research idea and press “Generate report”.',
   'Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.':
@@ -2179,6 +2187,9 @@ export const EN: Record<string, string> = {
   'Generando tu inmersión…': 'Generating your immersion…',
   'Cada respuesta de la IA se guarda: este recorrido será tuyo para siempre y podrás retomarlo sin regenerar nada.':
     'Every AI answer is saved: this route is yours forever and you can resume it without regenerating anything.',
+  'Puedes cambiar de sección: la generación seguirá en segundo plano y este progreso reaparecerá cuando vuelvas.':
+    'You can switch sections: generation will continue in the background and this progress will reappear when you return.',
+  'No se pudo generar la inmersión.': 'The immersion could not be generated.',
   'Cartografiando el territorio': 'Mapping the territory',
   'Diseñando la ruta': 'Designing the route',
   'Redactando el panorama': 'Writing the panorama',
@@ -2273,6 +2284,8 @@ export const EN: Record<string, string> = {
   'Profundiza: informe Deep Research del tema': 'Go deeper: Deep Research report on the topic',
   'Ahora que dominas el tema, genera el informe académico de varias páginas con todas las fuentes citadas. Se guarda en Deep Research y podrás exportarlo o citarlo en tu escritura.':
     'Now that you master the topic, generate the multi-page academic report with every source cited. It is saved in Deep Research so you can export it or cite it in your writing.',
+  'Puedes cambiar de sección: el informe seguirá generándose y mostrará el progreso al volver.':
+    'You can switch sections: the report will keep generating and show its progress when you return.',
   'Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.':
     'Dossier saved: “{t}” · {s} sections · ~{p} pages. Find it in Deep Research → saved reports.',
   'Generar de nuevo': 'Generate again',

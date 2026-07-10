@@ -11,11 +11,13 @@ export function ModelPicker({
   value,
   onChange,
   compact,
+  disabled,
 }: {
   settings: AppSettings;
   value: ModelRef | null;
   onChange: (m: ModelRef | null) => void;
   compact?: boolean;
+  disabled?: boolean;
 }) {
   const favorites = settings.favorites ?? [];
   const serialize = (m: ModelRef) => `${m.provider}::${m.model}`;
@@ -23,6 +25,7 @@ export function ModelPicker({
   return (
     <select
       className={`input ${compact ? 'text-xs py-1' : ''}`}
+      disabled={disabled}
       value={value ? serialize(value) : ''}
       onChange={(e) => {
         if (!e.target.value) return onChange(null);

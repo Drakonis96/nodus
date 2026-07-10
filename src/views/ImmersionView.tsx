@@ -36,6 +36,19 @@ import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import { GRAPH_NODE_TYPES, EDGE_TYPE_COLORS, type GraphFilters } from './graph/model';
 import { t, tx } from '../i18n';
+import {
+  IMMERSION_GENERATION_JOB_KEY,
+  IMMERSION_DOSSIER_JOB_PREFIX,
+  clearBackgroundJob,
+  findLatestBackgroundJob,
+  getBackgroundJob,
+  immersionDossierJobKey,
+  startDeepResearchGeneration,
+  startImmersionGeneration,
+  subscribeBackgroundJob,
+  type DeepResearchGenerationJob,
+  type ImmersionGenerationJob,
+} from '../backgroundJobs';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -158,8 +171,10 @@ export function ImmersionView({
 
   const [scope, setScope] = useState<ImmersionScope | null>(null);
   const [scoping, setScoping] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<ImmersionBuildProgress | null>(null);
+  const [generationJob, setGenerationJob] = useState<ImmersionGenerationJob | null>(() =>
+    getBackgroundJob(IMMERSION_GENERATION_JOB_KEY)
+  );
+  const appliedGenerationRef = useRef<string | null>(null);
 
   const [session, setSession] = useState<ImmersionSession | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -168,6 +183,13 @@ export function ImmersionView({
   const [error, setError] = useState<string | null>(null);
 
   const hasModel = !!model;
+  const generating = generationJob?.status === 'running';
+  const genProgress = generationJob?.progress ?? null;
+
+  useEffect(
+    () => subscribeBackgroundJob(IMMERSION_GENERATION_JOB_KEY, setGenerationJob),
+    []
+  );
 
   const refreshSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -183,6 +205,39 @@ export function ImmersionView({
   useEffect(() => {
     void refreshSessions();
   }, [refreshSessions]);
+
+  useEffect(() => {
+    if (!generationJob) {
+      appliedGenerationRef.current = null;
+      return;
+    }
+    if (appliedGenerationRef.current !== generationJob.id) {
+      const { request, scope: savedScope } = generationJob.request;
+      appliedGenerationRef.current = generationJob.id;
+      setScope(savedScope);
+      setTopic(request.topic);
+      setMinutes(request.minutes);
+      setIncludeQuiz(request.includeQuiz);
+      setLanguage(request.language ?? 'es');
+      setModel(request.model ?? null);
+    }
+    if (generationJob.status === 'running') {
+      setError(null);
+      setMode('scope');
+      return;
+    }
+    if (generationJob.status === 'failed') {
+      setError(generationJob.error ?? t('No se pudo generar la inmersión.'));
+      setMode('scope');
+      return;
+    }
+    if (generationJob.result) {
+      setError(null);
+      setSession(generationJob.result);
+      setMode('player');
+      void refreshSessions();
+    }
+  }, [generationJob, refreshSessions]);
 
   const exploreScope = async () => {
     if (!topic.trim()) return;
@@ -200,24 +255,13 @@ export function ImmersionView({
     }
   };
 
-  const startImmersion = async () => {
+  const startImmersion = () => {
     if (!scope) return;
     setError(null);
-    setGenerating(true);
-    setGenProgress(null);
-    try {
-      const created = await window.nodus.generateImmersionSession(
-        { topic: scope.topic, language, minutes, includeQuiz, model },
-        { onProgress: (p) => setGenProgress(p) }
-      );
-      setSession(created);
-      setMode('player');
-      void refreshSessions();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setGenerating(false);
-    }
+    startImmersionGeneration({
+      scope,
+      request: { topic: scope.topic, language, minutes, includeQuiz, model },
+    });
   };
 
   const openSession = async (id: string) => {
@@ -236,6 +280,15 @@ export function ImmersionView({
     }
   };
 
+  useEffect(() => {
+    const dossier = findLatestBackgroundJob<unknown, unknown, unknown>(IMMERSION_DOSSIER_JOB_PREFIX);
+    if (!dossier) return;
+    const sessionId = dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length);
+    if (sessionId) void openSession(sessionId);
+    // Reconnect only when this view is mounted. The session itself persists its
+    // current player step, so opening it returns directly to the report card.
+  }, []);
+
   const deleteSession = async (summary: ImmersionSessionSummary) => {
     const ok = await confirm({
       title: t('Eliminar inmersión'),
@@ -249,6 +302,8 @@ export function ImmersionView({
   };
 
   const exitPlayer = () => {
+    if (generationJob?.status !== 'running') clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob?.id);
+    if (session) clearBackgroundJob(immersionDossierJobKey(session.id));
     setSession(null);
     setMode('home');
     void refreshSessions();
@@ -291,7 +346,10 @@ export function ImmersionView({
           error={error}
           hasModel={hasModel}
           onBack={() => {
-            if (!generating) setMode('home');
+            if (!generating) {
+              if (generationJob) clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob.id);
+              setMode('home');
+            }
           }}
           onStart={() => void startImmersion()}
           onCitation={setCitation}
@@ -704,6 +762,9 @@ function ImmersionScopeScreen({
                 </h3>
                 <p className="mt-1 text-xs text-neutral-500">
                   {t('Cada respuesta de la IA se guarda: este recorrido será tuyo para siempre y podrás retomarlo sin regenerar nada.')}
+                </p>
+                <p className="mt-2 text-xs text-indigo-300">
+                  {t('Puedes cambiar de sección: la generación seguirá en segundo plano y este progreso reaparecerá cuando vuelvas.')}
                 </p>
                 <ol className="mt-4 space-y-1.5">
                   {GEN_PHASES.map((phase) => {
@@ -1502,38 +1563,32 @@ function ExamStep({
 
   // Deepen after mastering: hand the topic to the Deep Research engine and keep
   // the resulting multi-page cited report among the saved Deep Research drafts.
-  const [dossierBusy, setDossierBusy] = useState(false);
-  const [dossierMsg, setDossierMsg] = useState<string | null>(null);
-  const [dossierDone, setDossierDone] = useState(false);
-  const generateDossier = async () => {
-    setDossierBusy(true);
-    setDossierDone(false);
-    setDossierMsg(null);
-    try {
-      const report = await window.nodus.generateDeepResearchReport(
-        {
-          objective: session.plan.topic,
-          language: session.plan.language,
-          targetLength: 'standard',
-          sectionLimit: 'auto',
-          model: session.model,
-        },
-        { onProgress: (p) => setDossierMsg(p.message) }
-      );
-      await window.nodus.saveWritingWorkshopDraft({ draft: report.draft, model: session.model });
-      setDossierDone(true);
-      setDossierMsg(
-        tx('Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.', {
+  const dossierKey = immersionDossierJobKey(session.id);
+  const [dossierJob, setDossierJob] = useState<DeepResearchGenerationJob | null>(() => getBackgroundJob(dossierKey));
+  useEffect(() => subscribeBackgroundJob(dossierKey, setDossierJob), [dossierKey]);
+  const dossierBusy = dossierJob?.status === 'running';
+  const dossierDone = dossierJob?.status === 'completed' && !!dossierJob.result?.savedDraft;
+  let dossierMsg: string | null = null;
+  if (dossierJob?.status === 'running') dossierMsg = dossierJob.progress?.message ?? t('Generando informe…');
+  if (dossierJob?.status === 'failed') dossierMsg = dossierJob.error;
+  if (dossierJob?.status === 'completed' && dossierJob.result) {
+    const { report, saveError } = dossierJob.result;
+    dossierMsg = saveError
+      ? tx('Informe generado, pero no se pudo guardar automáticamente: {error}', { error: saveError })
+      : tx('Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.', {
           t: report.draft.title,
           s: report.meta.sections,
           p: report.meta.pages,
-        })
-      );
-    } catch (e) {
-      setDossierMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDossierBusy(false);
-    }
+        });
+  }
+  const generateDossier = () => {
+    startDeepResearchGeneration(dossierKey, {
+      objective: session.plan.topic,
+      language: session.plan.language,
+      targetLength: 'standard',
+      sectionLimit: 'auto',
+      model: session.model,
+    });
   };
 
   return (
@@ -1584,6 +1639,11 @@ function ExamStep({
               <p className="mt-1 text-xs leading-5 text-neutral-500">
                 {t('Ahora que dominas el tema, genera el informe académico de varias páginas con todas las fuentes citadas. Se guarda en Deep Research y podrás exportarlo o citarlo en tu escritura.')}
               </p>
+              {dossierBusy && (
+                <p className="mt-1 text-xs text-indigo-300">
+                  {t('Puedes cambiar de sección: el informe seguirá generándose y mostrará el progreso al volver.')}
+                </p>
+              )}
               {dossierMsg && (
                 <div className={`mt-2 rounded-md border px-3 py-2 text-xs ${dossierDone ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300' : 'border-neutral-800 bg-neutral-950/60 text-neutral-400'}`}>
                   {dossierMsg}

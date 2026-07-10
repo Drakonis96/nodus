@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
   DeepResearchMeta,
@@ -17,6 +17,14 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { DraftResultMain, Metric, SavedDraftsPanel, SupportMatrix } from './writingShared';
 import { t, tx } from '../i18n';
+import {
+  DEEP_RESEARCH_MAIN_JOB_KEY,
+  clearBackgroundJob,
+  getBackgroundJob,
+  startDeepResearchGeneration,
+  subscribeBackgroundJob,
+  type DeepResearchGenerationJob,
+} from '../backgroundJobs';
 
 const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   adaptive: 'Adaptativo (según corpus)',
@@ -51,10 +59,13 @@ export function DeepResearchView({
   const [selectedModel, setSelectedModel] = useState(settings.synthesisModel ?? settings.defaultModel);
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
-  const [deepRunning, setDeepRunning] = useState(false);
-  const [deepProgress, setDeepProgress] = useState<DeepResearchProgress | null>(null);
+  const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>
+    getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
+  );
+  const appliedJobRef = useRef<string | null>(null);
   const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
   const [reusingDraftId, setReusingDraftId] = useState<string | null>(null);
@@ -67,6 +78,13 @@ export function DeepResearchView({
   const [error, setError] = useState<string | null>(null);
 
   const hasModel = !!selectedModel;
+  const deepRunning = deepJob?.status === 'running';
+  const deepProgress = deepJob?.progress ?? null;
+
+  useEffect(
+    () => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob),
+    []
+  );
 
   const refreshSavedDrafts = useCallback(async () => {
     setLoadingSavedDrafts(true);
@@ -84,7 +102,55 @@ export function DeepResearchView({
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
 
-  const runDeepResearch = async () => {
+  useEffect(() => {
+    if (!deepJob) {
+      appliedJobRef.current = null;
+      return;
+    }
+    if (appliedJobRef.current !== deepJob.id) {
+      appliedJobRef.current = deepJob.id;
+      setObjective(deepJob.request.objective);
+      setLanguage(deepJob.request.language ?? 'es');
+      setDeepTarget(deepJob.request.targetLength ?? 'adaptive');
+      setDeepSectionLimit(deepJob.request.sectionLimit ?? 'auto');
+      setSelectedModel(deepJob.request.model ?? null);
+      if (deepJob.status === 'running') {
+        setDraft(null);
+        setDraftSaved(false);
+        setDeepMeta(null);
+        setMessage(null);
+      }
+    }
+    if (deepJob.status === 'running') {
+      setError(null);
+      return;
+    }
+    if (deepJob.status === 'failed') {
+      setError(deepJob.error ?? t('No se pudo generar el informe.'));
+      return;
+    }
+    if (deepJob.result) {
+      const { report, savedDraft, saveError } = deepJob.result;
+      setDraft(report.draft);
+      setDeepMeta(report.meta);
+      setDraftSaved(!!savedDraft);
+      setError(saveError ? tx('Informe generado, pero no se pudo guardar automáticamente: {error}', { error: saveError }) : null);
+      setMessage(
+        saveError
+          ? t('El informe está listo y puedes guardarlo manualmente.')
+          : tx('Informe generado y guardado: {s} secciones · ~{p} páginas · {i} ideas citadas.', {
+              s: report.meta.sections,
+              p: report.meta.pages,
+              i: report.meta.ideasCovered,
+            })
+      );
+      if (savedDraft) {
+        setSavedDrafts((current) => [savedDraft, ...current.filter((item) => item.id !== savedDraft.id)]);
+      }
+    }
+  }, [deepJob]);
+
+  const runDeepResearch = () => {
     if (!objective.trim()) {
       setError(t('Escribe la idea de investigación antes de generar el informe.'));
       return;
@@ -92,34 +158,15 @@ export function DeepResearchView({
     setError(null);
     setMessage(null);
     setDraft(null);
+    setDraftSaved(false);
     setDeepMeta(null);
-    setDeepProgress(null);
-    setDeepRunning(true);
-    try {
-      const report = await window.nodus.generateDeepResearchReport(
-        {
-          objective,
-          language,
-          targetLength: deepTarget,
-          sectionLimit: deepSectionLimit,
-          model: selectedModel,
-        },
-        { onProgress: (p) => setDeepProgress(p) }
-      );
-      setDraft(report.draft);
-      setDeepMeta(report.meta);
-      setMessage(
-        tx('Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.', {
-          s: report.meta.sections,
-          p: report.meta.pages,
-          i: report.meta.ideasCovered,
-        })
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDeepRunning(false);
-    }
+    startDeepResearchGeneration(DEEP_RESEARCH_MAIN_JOB_KEY, {
+      objective,
+      language,
+      targetLength: deepTarget,
+      sectionLimit: deepSectionLimit,
+      model: selectedModel,
+    });
   };
 
   const exportDraft = async (format: 'markdown' | 'pdf') => {
@@ -151,6 +198,7 @@ export function DeepResearchView({
     try {
       const saved = await window.nodus.saveWritingWorkshopDraft({ draft, model: selectedModel });
       setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setDraftSaved(true);
       setMessage(t('Informe guardado localmente.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -160,23 +208,27 @@ export function DeepResearchView({
   };
 
   const openSavedDraft = (saved: WritingWorkshopSavedDraft) => {
+    clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
     setError(null);
     setMessage(t('Informe guardado abierto. Puedes exportarlo o reutilizar su idea para regenerarlo.'));
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language);
     setDraft(saved.draft);
+    setDraftSaved(true);
     setDeepMeta(null);
     if (saved.model) setSelectedModel(saved.model);
   };
 
   const reuseSavedPrompt = (saved: WritingWorkshopSavedDraft) => {
     if (reusingDraftId) return;
+    clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
     setReusingDraftId(saved.id);
     setError(null);
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language);
     if (saved.model) setSelectedModel(saved.model);
     setDraft(null);
+    setDraftSaved(false);
     setDeepMeta(null);
     setMessage(t('Idea reutilizada: ajusta los parámetros y genera un informe actualizado.'));
     setReusingDraftId(null);
@@ -215,7 +267,11 @@ export function DeepResearchView({
         <select
           className="input"
           value={deepTarget}
-          onChange={(e) => setDeepTarget(e.target.value as DeepResearchTargetLength)}
+          disabled={deepRunning}
+          onChange={(e) => {
+            if (!deepRunning) clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
+            setDeepTarget(e.target.value as DeepResearchTargetLength);
+          }}
           title={t('Extensión objetivo del informe')}
         >
           {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
@@ -227,9 +283,11 @@ export function DeepResearchView({
         <select
           className="input"
           value={String(deepSectionLimit)}
-          onChange={(e) =>
-            setDeepSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))
-          }
+          disabled={deepRunning}
+          onChange={(e) => {
+            if (!deepRunning) clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
+            setDeepSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit));
+          }}
           title={t('Número máximo de secciones (menos secciones = mayor profundidad)')}
         >
           {DEEP_SECTION_OPTIONS.map((option) => (
@@ -238,12 +296,29 @@ export function DeepResearchView({
             </option>
           ))}
         </select>
-        <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as 'es' | 'en' | 'fr')}>
+        <select
+          className="input"
+          value={language}
+          disabled={deepRunning}
+          onChange={(e) => {
+            if (!deepRunning) clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
+            setLanguage(e.target.value as 'es' | 'en' | 'fr');
+          }}
+        >
           <option value="es">Español</option>
           <option value="en">English</option>
           <option value="fr">Français</option>
         </select>
-        <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact />
+        <ModelPicker
+          settings={settings}
+          value={selectedModel}
+          onChange={(next) => {
+            if (!deepRunning) clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
+            setSelectedModel(next);
+          }}
+          compact
+          disabled={deepRunning}
+        />
         <div className="flex-1" />
         <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setShowTutorial((value) => !value)}>
           <Icon name="help" />
@@ -264,7 +339,11 @@ export function DeepResearchView({
         <textarea
           className="input w-full min-h-20 resize-y"
           value={objective}
-          onChange={(e) => setObjective(e.target.value)}
+          disabled={deepRunning}
+          onChange={(e) => {
+            if (!deepRunning) clearBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY);
+            setObjective(e.target.value);
+          }}
           placeholder={t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')}
         />
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
@@ -273,6 +352,11 @@ export function DeepResearchView({
           <Badge>{sectionLimitLabel(deepSectionLimit)}</Badge>
           {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
           <span className="text-neutral-600">{t('Sin selección manual: el informe elige y cita las fuentes por ti.')}</span>
+          {deepRunning && (
+            <span className="text-indigo-300">
+              {t('Puedes cambiar de sección: el informe seguirá en segundo plano y recuperarás este progreso al volver.')}
+            </span>
+          )}
         </div>
       </div>
 
@@ -310,6 +394,7 @@ export function DeepResearchView({
               draft={draft}
               exporting={exporting}
               savingDraft={savingDraft}
+              draftSaved={draftSaved}
               onCopy={copyDraft}
               onSaveDraft={saveDraft}
               onSaveToNotes={() => setSavingToNotes(true)}
