@@ -1698,6 +1698,14 @@ export const EN: Record<string, string> = {
   'Buscar en notas…': 'Search notes…',
   'Guardar en notas': 'Save to notes',
   'Auditoría de la relación': 'Relation audit',
+  'Auditoría': 'Audit',
+  'Auditoría de relaciones': 'Relation audit ledger',
+  'Ver y deshacer tus veredictos sobre relaciones (confirmadas y rechazadas)':
+    'Review and undo your relation verdicts (confirmed and rejected)',
+  'Aún no has auditado ninguna relación. Abre una arista en el grafo y usa «Confirmar» o «Marcar como incorrecta».':
+    'You have not audited any relation yet. Open an edge in the graph and use “Confirm” or “Mark as incorrect”.',
+  'Rechazadas (ocultas del grafo y de los análisis)': 'Rejected (hidden from the graph and analyses)',
+  'Confirmadas por ti': 'Confirmed by you',
   'Has confirmado esta relación.': 'You have confirmed this relation.',
   'Has marcado esta relación como incorrecta: desaparecerá del grafo y de los análisis.':
     'You marked this relation as incorrect: it will disappear from the graph and analyses.',

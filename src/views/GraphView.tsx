@@ -6,6 +6,7 @@ import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
+import { EdgeAuditModal } from './EdgeAuditModal';
 import { TutorPanel } from './TutorPanel';
 import { SigmaGraph, type SigmaGraphApi, type GraphViewLevel } from './graph/SigmaGraph';
 import { buildThemeConstellation, buildThemeBackbone } from './graph/model';
@@ -1421,6 +1422,7 @@ export function GraphView({
   }, []);
   const [lens, setLens] = useState<GraphLens>(loadLens);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [ideaDupesOpen, setIdeaDupesOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
@@ -3178,6 +3180,15 @@ export function GraphView({
           {lens === 'ideas' && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
+              title={t('Ver y deshacer tus veredictos sobre relaciones (confirmadas y rechazadas)')}
+              onClick={() => setAuditOpen(true)}
+            >
+              <Icon name="check" /> {t('Auditoría')}
+            </button>
+          )}
+          {lens === 'ideas' && (
+            <button
+              className="btn btn-ghost border border-neutral-700 gap-1.5"
               title={t('Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado')}
               onClick={() => setIdeaDupesOpen(true)}
             >
@@ -3520,6 +3531,15 @@ export function GraphView({
         <IdeaDuplicatesModal
           onClose={() => {
             setIdeaDupesOpen(false);
+            reload();
+          }}
+        />
+      )}
+      {auditOpen && (
+        <EdgeAuditModal
+          onClose={() => setAuditOpen(false)}
+          onChanged={() => {
+            // An undone rejection puts the edge back: refresh the live graph.
             reload();
           }}
         />
