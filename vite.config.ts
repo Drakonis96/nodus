@@ -47,6 +47,12 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),
       events: eventsPolyfill,
+      // Use kokoro-js's self-contained browser bundle for local TTS. Its default
+      // entry pulls in @huggingface/transformers, which vite-plugin-electron-
+      // renderer resolves to a Node build that `require('path')` — unsupported in
+      // the sandboxed renderer. The web bundle inlines the WASM transformers build
+      // and has no node-builtin requires.
+      'kokoro-js': path.resolve(__dirname, 'node_modules/kokoro-js/dist/kokoro.web.js'),
     },
   },
   optimizeDeps: {

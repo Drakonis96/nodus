@@ -353,10 +353,12 @@ export interface ModelInfo {
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
 
 // ── Audio / text-to-speech ───────────────────────────────────────────────────
-/** Audio (text-to-speech) backends. Piper runs fully local and cross-platform;
- *  more providers (a local neural model, a cloud API) slot in behind the same
+/** Audio (text-to-speech) backends. Both current providers run fully local in the
+ *  renderer via WebAssembly (cross-platform, offline). Piper has native-sounding
+ *  per-language voices (incl. Spanish); Kokoro is a single English model with many
+ *  high-quality voices. More providers (e.g. a cloud API) slot in behind the same
  *  settings + generation surface without changing callers. */
-export type AudioProvider = 'piper';
+export type AudioProvider = 'piper' | 'kokoro';
 
 /** The two content kinds that can be narrated. Values match DecorativeImageEntityKind. */
 export type AudioEntityKind = 'deep_research' | 'immersion';
@@ -3179,7 +3181,7 @@ export interface NodusApi {
   saveAudioClip(
     entityKind: AudioEntityKind,
     entityId: string,
-    input: { segmentIndex: number; segmentLabel: string; voice: string; language: string; bytes: Uint8Array }
+    input: { segmentIndex: number; segmentLabel: string; provider: AudioProvider; voice: string; language: string; bytes: Uint8Array }
   ): Promise<AudioClip>;
   getAudioClipDataUrl(clipId: string): Promise<string | null>;
   deleteAudioClip(clipId: string): Promise<void>;

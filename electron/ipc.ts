@@ -4,6 +4,7 @@ import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
   AudioEntityKind,
+  AudioProvider,
   AddProjectLinkInput,
   ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
@@ -451,7 +452,7 @@ export function registerIpc(
     _e,
     entityKind: AudioEntityKind,
     entityId: string,
-    input: { segmentIndex: number; segmentLabel: string; voice: string; language: string; bytes: Uint8Array }
+    input: { segmentIndex: number; segmentLabel: string; provider: AudioProvider; voice: string; language: string; bytes: Uint8Array }
   ) => saveClip(entityKind, entityId, { ...input, bytes: input.bytes }));
   h('audio:clipData', async (_e, clipId: string) => {
     const data = readClipBytes(clipId);

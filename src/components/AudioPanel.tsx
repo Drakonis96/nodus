@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AudioClip, AudioEntityKind } from '@shared/types';
-import { findVoice, storedVoices, synthesize } from '../lib/tts';
-import type { VoiceId } from '@diffusionstudio/vits-web';
+import { findVoice, getEngine } from '../lib/audio';
+import type { AudioProvider } from '@shared/types';
 import { t, tx } from '../i18n';
 
 /**
@@ -47,18 +47,18 @@ export function AudioPanel({
     if (mounted.current) setClips(list);
   };
 
-  const checkVoice = async () => {
+  const checkVoice = async (): Promise<{ provider: AudioProvider; voiceId: string } | null> => {
     const settings = await window.nodus.getSettings();
     setSpeed(settings.audioSpeed ?? 1);
+    const provider = settings.audioProvider ?? 'piper';
     const chosen = settings.audioVoice;
     if (!chosen) {
       if (mounted.current) setVoiceReady(false);
       return null;
     }
-    const stored = await storedVoices();
-    const ready = stored.includes(chosen);
+    const ready = (await getEngine(provider).ready()).has(chosen);
     if (mounted.current) setVoiceReady(ready);
-    return ready ? chosen : null;
+    return ready ? { provider, voiceId: chosen } : null;
   };
 
   useEffect(() => {
@@ -77,12 +77,13 @@ export function AudioPanel({
 
   const generate = async () => {
     setError(null);
-    const voiceId = await checkVoice();
-    const voice = voiceId ? findVoice(voiceId) : undefined;
-    if (!voiceId || !voice) {
+    const chosen = await checkVoice();
+    const voice = chosen ? findVoice(chosen.provider, chosen.voiceId) : undefined;
+    if (!chosen || !voice) {
       setError(t('Elige y descarga una voz en Ajustes → IA → Audio y voz.'));
       return;
     }
+    const engine = getEngine(chosen.provider);
     let segments;
     try {
       segments = await window.nodus.getAudioSegments(entityKind, entityId);
@@ -107,12 +108,13 @@ export function AudioPanel({
       for (const segment of segments) {
         if (cancelRef.current) break;
         setRun({ done: clipsDoneRef.current, total: segments.length, label: segment.label });
-        const bytes = await synthesize(segment.text, voiceId as VoiceId);
+        const bytes = await engine.synthesize(segment.text, chosen.voiceId);
         if (cancelRef.current) break;
         const clip = await window.nodus.saveAudioClip(entityKind, entityId, {
           segmentIndex: segment.index,
           segmentLabel: segment.label,
-          voice: voiceId,
+          provider: chosen.provider,
+          voice: chosen.voiceId,
           language: voice.language,
           bytes,
         });

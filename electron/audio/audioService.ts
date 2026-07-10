@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { AudioClip, AudioEntityKind, AudioSegment } from '@shared/types';
+import type { AudioClip, AudioEntityKind, AudioProvider, AudioSegment } from '@shared/types';
 import { getDb } from '../db/database';
 import { deepResearchSegments, immersionSegments } from './speakable';
 import { audioDir, audioFilePath } from './audioPaths';
@@ -62,6 +62,7 @@ export function getEntitySegments(kind: AudioEntityKind, id: string): AudioSegme
 export interface SaveClipInput {
   segmentIndex: number;
   segmentLabel: string;
+  provider: AudioProvider;
   voice: string;
   language: string;
   /** WAV bytes produced by the renderer. */
@@ -81,7 +82,7 @@ export function saveClip(kind: AudioEntityKind, id: string, input: SaveClipInput
     entityId: id,
     segmentIndex: input.segmentIndex,
     segmentLabel: input.segmentLabel,
-    provider: 'piper',
+    provider: input.provider,
     voice: input.voice,
     language: input.language,
     fileName,

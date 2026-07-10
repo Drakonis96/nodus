@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AppSettings } from '@shared/types';
-import { AUDIO_VOICES, downloadVoice, removeVoice, storedVoices, type AudioVoice } from '../lib/tts';
+import type { AppSettings, AudioProvider } from '@shared/types';
+import { AUDIO_ENGINES, getEngine, type AudioVoice } from '../lib/audio';
 import { t, tx } from '../i18n';
 
 const GENDER_LABEL: Record<AudioVoice['gender'], string> = {
@@ -16,15 +16,18 @@ export function AudioGenerationSettings({
   settings: AppSettings;
   onChange: () => Promise<unknown>;
 }) {
-  const [stored, setStored] = useState<string[]>([]);
+  const provider: AudioProvider = settings.audioProvider ?? 'piper';
+  const engine = getEngine(provider);
+
+  const [ready, setReady] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
   const refresh = async () => {
-    const s = await storedVoices();
-    if (mounted.current) setStored(s);
+    const r = await engine.ready();
+    if (mounted.current) setReady(r);
   };
 
   useEffect(() => {
@@ -33,27 +36,38 @@ export function AudioGenerationSettings({
     return () => {
       mounted.current = false;
     };
-  }, []);
+    // eslint-disable-next-line
+  }, [provider]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, AudioVoice[]>();
-    for (const v of AUDIO_VOICES) {
+    for (const v of engine.voices) {
       const list = map.get(v.languageLabel) ?? [];
       list.push(v);
       map.set(v.languageLabel, list);
     }
     return [...map.entries()];
-  }, []);
+  }, [engine]);
 
-  const download = async (v: AudioVoice) => {
+  const modelReady = engine.modelStyle === 'single-model' ? ready.size > 0 : true;
+  const MODEL_KEY = '__model__';
+
+  const setProvider = async (p: AudioProvider) => {
+    await window.nodus.updateSettings({ audioProvider: p });
+    // If the currently selected voice does not belong to the new provider, clear it.
+    const belongs = getEngine(p).voices.some((v) => v.id === settings.audioVoice);
+    if (!belongs) await window.nodus.updateSettings({ audioVoice: '' });
+    await onChange();
+  };
+
+  const download = async (key: string, voiceId: string) => {
     setError(null);
-    setBusy(v.id);
-    setProgress((p) => ({ ...p, [v.id]: 0 }));
+    setBusy(key);
+    setProgress((p) => ({ ...p, [key]: 0 }));
     try {
-      await downloadVoice(v.id, (fraction) => mounted.current && setProgress((p) => ({ ...p, [v.id]: fraction })));
+      await engine.download(voiceId, (f) => mounted.current && setProgress((p) => ({ ...p, [key]: f })));
       await refresh();
-      // Auto-select the first voice the user downloads, for convenience.
-      if (!settings.audioVoice) await selectVoice(v.id);
+      if (engine.modelStyle === 'per-voice' && !settings.audioVoice) await selectVoice(voiceId);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -61,17 +75,17 @@ export function AudioGenerationSettings({
         setBusy(null);
         setProgress((p) => {
           const next = { ...p };
-          delete next[v.id];
+          delete next[key];
           return next;
         });
       }
     }
   };
 
-  const remove = async (v: AudioVoice) => {
-    setBusy(v.id);
+  const remove = async (key: string, voiceId: string) => {
+    setBusy(key);
     try {
-      await removeVoice(v.id);
+      await engine.remove(voiceId);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -96,7 +110,7 @@ export function AudioGenerationSettings({
         <div>
           <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide">{t('Audio y voz')}</h2>
           <p className="mt-1 text-xs leading-5 text-neutral-500">
-            {t('Narra tus informes de Deep Research y tus inmersiones con una voz local (Piper). Descarga una voz una vez y se reutiliza sin conexión. La generación puede tardar según la longitud; se hace por secciones y en segundo plano. Más adelante se añadirán otros proveedores (voz en la nube).')}
+            {t('Narra tus informes de Deep Research y tus inmersiones con una voz local. La generación se hace por secciones y en segundo plano; puede tardar según la longitud.')}
           </p>
         </div>
         <span className="shrink-0 rounded-full bg-emerald-950/50 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
@@ -104,6 +118,27 @@ export function AudioGenerationSettings({
         </span>
       </div>
 
+      {/* Provider selector */}
+      <div className="mt-4">
+        <div className="text-xs text-neutral-500">{t('Proveedor de voz')}</div>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {AUDIO_ENGINES.map((e) => {
+            const active = e.provider === provider;
+            return (
+              <button
+                key={e.provider}
+                className={`rounded-lg border px-3 py-2 text-left text-xs transition ${active ? 'border-indigo-500 bg-indigo-950/40' : 'border-neutral-700 hover:border-neutral-600'}`}
+                onClick={() => void setProvider(e.provider)}
+              >
+                <div className="font-medium text-neutral-200">{e.label}</div>
+                <div className="mt-0.5 max-w-[18rem] text-[10px] leading-4 text-neutral-500">{t(e.description)}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Speed */}
       <div className="mt-4 flex items-center gap-3">
         <label className="text-xs text-neutral-500">{t('Velocidad de reproducción')}</label>
         <input
@@ -120,13 +155,41 @@ export function AudioGenerationSettings({
 
       {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
 
+      {/* Single-model download (Kokoro) */}
+      {engine.modelStyle === 'single-model' && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-neutral-800 px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-neutral-200">{tx('Modelo {label} (inglés)', { label: engine.label })}</div>
+            <div className="text-[10px] text-neutral-500">{tx('~{n} MB · una sola descarga para todas las voces', { n: engine.modelSizeMb ?? 0 })}</div>
+            {progress[MODEL_KEY] != null && (
+              <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-neutral-800">
+                <div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.round((progress[MODEL_KEY] ?? 0) * 100)}%` }} />
+              </div>
+            )}
+          </div>
+          {modelReady ? (
+            <button className="btn btn-ghost text-xs text-red-400" disabled={busy === MODEL_KEY} onClick={() => void remove(MODEL_KEY, MODEL_KEY)}>
+              {t('Eliminar modelo')}
+            </button>
+          ) : progress[MODEL_KEY] != null ? (
+            <span className="text-xs text-neutral-400">{tx('{n}%', { n: Math.round((progress[MODEL_KEY] ?? 0) * 100) })}</span>
+          ) : (
+            <button className="btn btn-ghost border border-neutral-700 text-xs" disabled={busy === MODEL_KEY} onClick={() => void download(MODEL_KEY, MODEL_KEY)}>
+              {t('Descargar modelo')}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Voice list */}
       <div className="mt-4 space-y-4">
         {grouped.map(([languageLabel, list]) => (
           <div key={languageLabel}>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{languageLabel}</div>
             <div className="rounded-lg border border-neutral-800">
               {list.map((v) => {
-                const isDown = stored.includes(v.id);
+                const perVoice = engine.modelStyle === 'per-voice';
+                const isReady = perVoice ? ready.has(v.id) : modelReady;
                 const frac = progress[v.id];
                 const downloading = frac != null;
                 const selected = settings.audioVoice === v.id;
@@ -138,16 +201,18 @@ export function AudioGenerationSettings({
                   >
                     <button
                       className="shrink-0"
-                      title={isDown ? t('Usar esta voz') : t('Descárgala para poder usarla')}
-                      disabled={!isDown}
-                      onClick={() => isDown && void selectVoice(v.id)}
+                      title={isReady ? t('Usar esta voz') : t('Descárgala para poder usarla')}
+                      disabled={!isReady}
+                      onClick={() => isReady && void selectVoice(v.id)}
                     >
-                      <span className={`inline-block h-3 w-3 rounded-full border ${selected ? 'border-indigo-400 bg-indigo-400' : isDown ? 'border-neutral-500' : 'border-neutral-700'}`} />
+                      <span className={`inline-block h-3 w-3 rounded-full border ${selected ? 'border-indigo-400 bg-indigo-400' : isReady ? 'border-neutral-500' : 'border-neutral-700'}`} />
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-neutral-200">{v.name}</span>
-                        <span className="text-[10px] text-neutral-500">{t(GENDER_LABEL[v.gender])} · {v.quality} · {v.sizeMb} MB</span>
+                        <span className="text-[10px] text-neutral-500">
+                          {t(GENDER_LABEL[v.gender])} · {v.quality}{v.sizeMb ? ` · ${v.sizeMb} MB` : ''}
+                        </span>
                         {selected && <span className="text-[10px] text-indigo-300">● {t('en uso')}</span>}
                       </div>
                       {downloading && (
@@ -156,17 +221,21 @@ export function AudioGenerationSettings({
                         </div>
                       )}
                     </div>
-                    {isDown ? (
-                      <button className="btn btn-ghost text-xs text-red-400" disabled={busy === v.id} onClick={() => void remove(v)}>
-                        {t('Eliminar')}
-                      </button>
-                    ) : downloading ? (
-                      <span className="text-xs text-neutral-400">{tx('{n}%', { n: pct })}</span>
-                    ) : (
-                      <button className="btn btn-ghost border border-neutral-700 text-xs" disabled={busy === v.id} onClick={() => void download(v)}>
-                        {t('Descargar')}
-                      </button>
-                    )}
+                    {perVoice ? (
+                      isReady ? (
+                        <button className="btn btn-ghost text-xs text-red-400" disabled={busy === v.id} onClick={() => void remove(v.id, v.id)}>
+                          {t('Eliminar')}
+                        </button>
+                      ) : downloading ? (
+                        <span className="text-xs text-neutral-400">{tx('{n}%', { n: pct })}</span>
+                      ) : (
+                        <button className="btn btn-ghost border border-neutral-700 text-xs" disabled={busy === v.id} onClick={() => void download(v.id, v.id)}>
+                          {t('Descargar')}
+                        </button>
+                      )
+                    ) : !modelReady ? (
+                      <span className="text-[10px] text-neutral-600">{t('descarga el modelo')}</span>
+                    ) : null}
                   </div>
                 );
               })}
