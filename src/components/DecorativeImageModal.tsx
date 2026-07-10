@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DecorativeImage, DecorativeImageStyle } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES, DEFAULT_DECORATIVE_IMAGE_STYLE, imageStyleTemplate } from '@shared/imageStyles';
 import { Icon } from './ui';
@@ -15,6 +15,8 @@ export function DecorativeImageModal({
   busy,
   error,
   onQueue,
+  onUpload,
+  onRevert,
   onDelete,
   onClose,
 }: {
@@ -24,6 +26,8 @@ export function DecorativeImageModal({
   busy: boolean;
   error: string | null;
   onQueue: (action: DecorativeImageQueueAction, opts: { style: DecorativeImageStyle; visualContext?: string }) => void;
+  onUpload: (file: File) => void;
+  onRevert: () => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
@@ -31,6 +35,13 @@ export function DecorativeImageModal({
   const [style, setStyle] = useState<DecorativeImageStyle>(image?.style ?? defaultStyle);
   const [description, setDescription] = useState(image?.visualContext ?? '');
   const [touched, setTouched] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const onFilePicked = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (file) onUpload(file);
+  };
 
   // Reflect an AI-generated scene as it arrives, but never clobber the user's edits.
   useEffect(() => {
@@ -129,6 +140,31 @@ export function DecorativeImageModal({
               {t('El estilo y las protecciones de «sin texto» se aplican automáticamente al generar.')}
             </span>
           </label>
+
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/40">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700"
+                onClick={() => fileRef.current?.click()}
+                disabled={busy || status === 'pending'}
+              >
+                <Icon name="upload" size={14} /> {t('Subir mi imagen')}
+              </button>
+              {image?.hasPrevious && (
+                <button
+                  className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700"
+                  onClick={onRevert}
+                  disabled={busy || status === 'pending'}
+                >
+                  <Icon name="chevronLeft" size={14} /> {t('Volver a la imagen anterior')}
+                </button>
+              )}
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFilePicked} />
+            </div>
+            <p className="mt-2 text-[11px] text-neutral-500">
+              {t('Tu imagen se comprime automáticamente para no sobrecargar el almacenamiento.')}
+            </p>
+          </div>
 
           {error && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">

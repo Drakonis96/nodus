@@ -1,6 +1,7 @@
 import type {
   DecorativeImage,
   DecorativeImageEntityKind,
+  DecorativeImageSource,
   DecorativeImageStatus,
   DecorativeImageStyle,
   ImageProvider,
@@ -23,6 +24,8 @@ interface ImageRow {
   image_blob: Buffer | null;
   thumbnail_blob: Buffer | null;
   error: string | null;
+  source: DecorativeImageSource | null;
+  prev_image_blob: Buffer | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,9 +44,30 @@ function toImage(row: ImageRow): DecorativeImage {
     assetRef: row.asset_ref,
     mimeType: row.mime_type,
     error: row.error,
+    source: row.source,
+    hasPrevious: row.prev_image_blob != null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+const ASSET_REF = (entityKind: DecorativeImageEntityKind, entityId: string): string =>
+  `db:decorative-image:${entityKind}:${entityId}`;
+
+/** Copy the current ready image into the single previous-image snapshot slot.
+ *  A no-op unless a real image is present, so a failed retry never wipes the
+ *  snapshot the user may still want to restore. */
+function snapshotCurrentAsPrevious(entityKind: DecorativeImageEntityKind, entityId: string): void {
+  getDb()
+    .prepare(
+      `UPDATE decorative_images SET
+         prev_image_blob = image_blob, prev_thumbnail_blob = thumbnail_blob,
+         prev_mime_type = mime_type, prev_style = style,
+         prev_visual_context = visual_context, prev_prompt = prompt,
+         prev_provider = provider, prev_model = model, prev_source = source
+       WHERE entity_kind = ? AND entity_id = ? AND status = 'ready' AND image_blob IS NOT NULL`
+    )
+    .run(entityKind, entityId);
 }
 
 export function getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): DecorativeImage | null {
@@ -116,6 +140,9 @@ export function markDecorativeImagePending(input: {
   const current = getDecorativeImage(input.entityKind, input.entityId);
   const context = input.preserveContext ? current?.visualContext ?? null : null;
   const prompt = input.preservePrompt ? current?.prompt ?? null : null;
+  // Preserve the current image before the pending state clears its bytes, so a
+  // regeneration can be undone from the design modal.
+  snapshotCurrentAsPrevious(input.entityKind, input.entityId);
   getDb()
     .prepare(
       `INSERT INTO decorative_images (
@@ -161,15 +188,70 @@ export function saveDecorativeImageReady(
   thumbnail: Buffer
 ): DecorativeImage {
   const now = new Date().toISOString();
-  const assetRef = `db:decorative-image:${entityKind}:${entityId}`;
   getDb()
     .prepare(
       `UPDATE decorative_images SET
-         status = 'ready', asset_ref = ?, mime_type = 'image/jpeg',
+         status = 'ready', source = 'ai', asset_ref = ?, mime_type = 'image/jpeg',
          image_blob = ?, thumbnail_blob = ?, error = NULL, updated_at = ?
        WHERE entity_kind = ? AND entity_id = ?`
     )
-    .run(assetRef, image, thumbnail, now, entityKind, entityId);
+    .run(ASSET_REF(entityKind, entityId), image, thumbnail, now, entityKind, entityId);
+  return getDecorativeImage(entityKind, entityId)!;
+}
+
+/** Store a user-uploaded (already compressed) image, snapshotting the current
+ *  one so the upload can be undone. Creates the row if the entity had none. */
+export function saveCustomDecorativeImageReady(
+  entityKind: DecorativeImageEntityKind,
+  entityId: string,
+  image: Buffer,
+  thumbnail: Buffer,
+  style: DecorativeImageStyle = DEFAULT_DECORATIVE_IMAGE_STYLE
+): DecorativeImage {
+  const now = new Date().toISOString();
+  const save = getDb().transaction(() => {
+    snapshotCurrentAsPrevious(entityKind, entityId);
+    getDb()
+      .prepare(
+        `INSERT INTO decorative_images (
+           entity_kind, entity_id, requested, status, source, style,
+           asset_ref, mime_type, image_blob, thumbnail_blob, created_at, updated_at
+         ) VALUES (?, ?, 1, 'ready', 'custom', ?, ?, 'image/jpeg', ?, ?, ?, ?)
+         ON CONFLICT(entity_kind, entity_id) DO UPDATE SET
+           requested = 1, status = 'ready', source = 'custom',
+           asset_ref = excluded.asset_ref, mime_type = 'image/jpeg',
+           image_blob = excluded.image_blob, thumbnail_blob = excluded.thumbnail_blob,
+           provider = NULL, model = NULL, prompt = NULL, error = NULL,
+           updated_at = excluded.updated_at`
+      )
+      .run(entityKind, entityId, style, ASSET_REF(entityKind, entityId), image, thumbnail, now, now);
+  });
+  save();
+  return getDecorativeImage(entityKind, entityId)!;
+}
+
+/** Restore the previous-image snapshot as the current image and clear the slot. */
+export function restorePreviousDecorativeImage(
+  entityKind: DecorativeImageEntityKind,
+  entityId: string
+): DecorativeImage {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE decorative_images SET
+         requested = 1, status = 'ready',
+         image_blob = prev_image_blob, thumbnail_blob = prev_thumbnail_blob,
+         mime_type = COALESCE(prev_mime_type, 'image/jpeg'), asset_ref = ?,
+         style = COALESCE(prev_style, style), visual_context = prev_visual_context,
+         prompt = prev_prompt, provider = prev_provider, model = prev_model,
+         source = prev_source, error = NULL,
+         prev_image_blob = NULL, prev_thumbnail_blob = NULL, prev_mime_type = NULL,
+         prev_style = NULL, prev_visual_context = NULL, prev_prompt = NULL,
+         prev_provider = NULL, prev_model = NULL, prev_source = NULL,
+         updated_at = ?
+       WHERE entity_kind = ? AND entity_id = ? AND prev_image_blob IS NOT NULL`
+    )
+    .run(ASSET_REF(entityKind, entityId), now, entityKind, entityId);
   return getDecorativeImage(entityKind, entityId)!;
 }
 

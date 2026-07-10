@@ -104,6 +104,105 @@ try {
   assert.ok(imageModal.includes("action: 'regenerate'") && imageModal.includes('coste adicional'), 'the design modal regenerates and discloses the new cost');
   assert.ok(imageModal.includes('Descripción de la escena'), 'the design modal lets the user edit the scene');
 
+  // Custom upload + revert-to-previous are reachable from the same design modal.
+  assert.ok(imageModal.includes("t('Subir mi imagen')") && imageModal.includes('accept="image/*"'), 'the modal offers a user image upload');
+  assert.ok(imageModal.includes('image?.hasPrevious') && imageModal.includes("t('Volver a la imagen anterior')"), 'the modal offers reverting to the previous image only when one exists');
+  assert.ok(card.includes('compressImageForUpload') && card.includes('canvas.toBlob'), 'uploads are pre-compressed in the renderer before crossing the bridge');
+  assert.ok(card.includes('uploadDecorativeImage') && card.includes('revertDecorativeImage'), 'the card wires upload and revert to the bridge');
+  assert.ok(service.includes('saveCustomDecorativeImage') && service.includes('optimizedJpegs({ bytes'), 'a custom upload runs through the shared JPEG/thumbnail pipeline');
+  assert.ok(service.includes('export function revertDecorativeImage') && service.includes('invalidateDecorativeImageGeneration'), 'revert discards any in-flight generation');
+  assert.ok(ipc.includes("h('images:upload'") && ipc.includes("h('images:revert'"), 'upload and revert are exposed over IPC');
+  assert.ok(ipc.includes("e.sender.send('images:changed', image)"), 'upload/revert broadcast so other mounted cards stay in sync');
+  for (const column of ['source', 'prev_image_blob', 'prev_thumbnail_blob', 'prev_style', 'prev_source']) {
+    assert.ok(migration.includes(column), `migration persists ${column}`);
+  }
+
+  // Drive the real repository: regenerate snapshots the prior image, revert
+  // restores it, a failed retry never wipes the snapshot, and an upload lands
+  // as a 'custom' image that is itself undoable.
+  const require = createRequire(import.meta.url);
+  const Database = require('better-sqlite3');
+  const repoOutfile = path.join(tmp, 'decorativeRepo.mjs');
+  await build({
+    entryPoints: [path.join(root, 'electron/db/decorativeImagesRepo.ts')],
+    outfile: repoOutfile,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    external: ['@shared/types'],
+    plugins: [{
+      name: 'inject-decorative-deps',
+      setup(builder) {
+        builder.onResolve({ filter: /\/database$/ }, () => ({ path: 'database', namespace: 'dec-db' }));
+        builder.onLoad({ filter: /.*/, namespace: 'dec-db' }, () => ({
+          contents: 'export function getDb(){ return globalThis.__nodusDecorativeRepoDb; }',
+          loader: 'js',
+        }));
+        builder.onResolve({ filter: /@shared\/imageStyles$/ }, () => ({ path: 'styles', namespace: 'dec-styles' }));
+        builder.onLoad({ filter: /.*/, namespace: 'dec-styles' }, () => ({
+          contents: "export const DEFAULT_DECORATIVE_IMAGE_STYLE = 'antique_book';",
+          loader: 'js',
+        }));
+      },
+    }],
+    logLevel: 'silent',
+  });
+  const repoDb = new Database(':memory:');
+  globalThis.__nodusDecorativeRepoDb = repoDb;
+  repoDb.exec(`
+    CREATE TABLE decorative_images (
+      entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL,
+      requested INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'not_requested',
+      provider TEXT, model TEXT, style TEXT NOT NULL DEFAULT 'antique_book',
+      visual_context TEXT, prompt TEXT, asset_ref TEXT, mime_type TEXT,
+      image_blob BLOB, thumbnail_blob BLOB, error TEXT, source TEXT,
+      prev_image_blob BLOB, prev_thumbnail_blob BLOB, prev_mime_type TEXT,
+      prev_style TEXT, prev_visual_context TEXT, prev_prompt TEXT,
+      prev_provider TEXT, prev_model TEXT, prev_source TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      PRIMARY KEY (entity_kind, entity_id)
+    );
+  `);
+  const repo = await import(pathToFileURL(repoOutfile).href);
+  const K = 'immersion', ID = 's1';
+  const pend = (style, preserveContext = true, preservePrompt = false) =>
+    repo.markDecorativeImagePending({ entityKind: K, entityId: ID, provider: 'google', model: 'm', style, preserveContext, preservePrompt });
+  const bytesOf = () => repo.getDecorativeImageData(K, ID)?.bytes.toString('utf8') ?? null;
+
+  pend('antique_book', false, false);
+  let img = repo.saveDecorativeImageReady(K, ID, Buffer.from('A-full'), Buffer.from('A-thumb'));
+  assert.equal(img.status, 'ready'); assert.equal(img.source, 'ai'); assert.equal(img.hasPrevious, false);
+  assert.equal(bytesOf(), 'A-full');
+
+  pend('watercolor');
+  assert.equal(repo.getDecorativeImage(K, ID).status, 'pending');
+  assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'pending regeneration snapshots the prior image');
+  img = repo.saveDecorativeImageReady(K, ID, Buffer.from('B-full'), Buffer.from('B-thumb'));
+  assert.equal(img.hasPrevious, true, 'the snapshot survives the new image becoming ready');
+  assert.equal(bytesOf(), 'B-full');
+
+  img = repo.restorePreviousDecorativeImage(K, ID);
+  assert.equal(img.status, 'ready'); assert.equal(img.hasPrevious, false); assert.equal(bytesOf(), 'A-full');
+
+  pend('antique_book');
+  assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true);
+  repo.saveDecorativeImageFailure(K, ID, 'boom');
+  assert.equal(repo.getDecorativeImage(K, ID).status, 'failed');
+  assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'a failure keeps the snapshot');
+  pend('antique_book', false, true);
+  assert.equal(repo.getDecorativeImage(K, ID).hasPrevious, true, 'a retry after failure preserves the previous image');
+  repo.saveDecorativeImageReady(K, ID, Buffer.from('C-full'), Buffer.from('C-thumb'));
+
+  img = repo.saveCustomDecorativeImageReady(K, ID, Buffer.from('U-full'), Buffer.from('U-thumb'), 'watercolor');
+  assert.equal(img.source, 'custom'); assert.equal(img.status, 'ready'); assert.equal(img.hasPrevious, true);
+  assert.equal(bytesOf(), 'U-full');
+  img = repo.restorePreviousDecorativeImage(K, ID);
+  assert.equal(img.source, 'ai', 'reverting an upload restores the generated image it replaced');
+  assert.equal(bytesOf(), 'C-full');
+  repoDb.close();
+  delete globalThis.__nodusDecorativeRepoDb;
+
   // Every result click opens one common modal; graph navigation lives in its
   // explicit secondary action. The disclosure arrow only rotates.
   assert.ok(searchView.includes('onClick={() => setSelectedResult(r)}'));
@@ -135,8 +234,6 @@ try {
     }],
     logLevel: 'silent',
   });
-  const require = createRequire(import.meta.url);
-  const Database = require('better-sqlite3');
   const db = new Database(':memory:');
   globalThis.__nodusDecorativeTestDb = db;
   db.exec(`

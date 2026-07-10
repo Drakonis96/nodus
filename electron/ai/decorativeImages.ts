@@ -18,6 +18,8 @@ import {
   markDecorativeImageNotRequested,
   markDecorativeImagePending,
   removeDecorativeImage,
+  restorePreviousDecorativeImage,
+  saveCustomDecorativeImageReady,
   saveDecorativeImageFailure,
   saveDecorativeImagePrompt,
   saveDecorativeImageReady,
@@ -336,6 +338,35 @@ export function applyDecorativeImageOption(
 export function deleteDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): DecorativeImage {
   invalidateDecorativeImageGeneration(entityKind, entityId);
   return removeDecorativeImage(entityKind, entityId);
+}
+
+/** Persist a user-supplied image. The renderer pre-shrinks it; here it goes
+ *  through the same JPEG/thumbnail pipeline as generated images so storage stays
+ *  small and consistent regardless of the original file. */
+export async function saveCustomDecorativeImage(
+  entityKind: DecorativeImageEntityKind,
+  entityId: string,
+  bytes: Buffer,
+  style?: DecorativeImageStyle
+): Promise<DecorativeImage> {
+  // Any in-flight generation must not overwrite the image the user just chose.
+  invalidateDecorativeImageGeneration(entityKind, entityId);
+  if (!bytes.length) throw new Error('El archivo de imagen está vacío.');
+  const optimized = await optimizedJpegs({ bytes, mimeType: 'image/jpeg' });
+  return saveCustomDecorativeImageReady(
+    entityKind,
+    entityId,
+    optimized.image,
+    optimized.thumbnail,
+    style ?? getDecorativeImage(entityKind, entityId)?.style ?? getSettings().imageStyle
+  );
+}
+
+/** Restore the image that preceded the last regeneration or upload. */
+export function revertDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): DecorativeImage {
+  // Discard any pending generation so it cannot clobber the restored image.
+  invalidateDecorativeImageGeneration(entityKind, entityId);
+  return restorePreviousDecorativeImage(entityKind, entityId);
 }
 
 export function invalidateDecorativeImageGeneration(

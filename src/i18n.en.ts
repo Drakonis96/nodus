@@ -2414,6 +2414,14 @@ export const EN: Record<string, string> = {
   'La imagen no pudo generarse.': 'The image could not be generated.',
   'Al generar se solicita una imagen nueva, que puede tener un coste adicional.':
     'Generating requests a new image, which may incur an additional cost.',
+  'Subir mi imagen': 'Upload my image',
+  'Volver a la imagen anterior': 'Back to previous image',
+  'Tu imagen se comprime automáticamente para no sobrecargar el almacenamiento.':
+    'Your image is compressed automatically to avoid overloading storage.',
+  'No se pudo leer el archivo de imagen.': 'The image file could not be read.',
+  'No se pudo procesar la imagen.': 'The image could not be processed.',
+  'No se pudo comprimir la imagen.': 'The image could not be compressed.',
+  'El archivo de imagen está vacío.': 'The image file is empty.',
 
   // ── Shared search result detail modal ────────────────────────────────────
   'El elemento ya no está disponible.': 'This item is no longer available.',

@@ -1111,7 +1111,7 @@ function ImmersionPlayer({
             >
               <div className="min-w-0 max-w-[56rem] flex-1">
                 {step.kind === 'panorama' && (
-                  <PanoramaStep session={session} onCitation={onCitation} onJump={(i) => goTo(i)} />
+                  <PanoramaStep session={session} onCitation={onCitation} onJump={(i) => goTo(i)} onSession={onSession} />
                 )}
                 {step.kind === 'station' && (
                   <StationStep
@@ -1307,21 +1307,25 @@ function PanoramaStep({
   session,
   onCitation,
   onJump,
+  onSession,
 }: {
   session: ImmersionSession;
   onCitation: (c: CitationTarget) => void;
   onJump: (stepIndex: number) => void;
+  onSession: (s: ImmersionSession) => void;
 }) {
   const plan = session.plan;
   return (
     <div>
-      {session.image?.status === 'ready' && (
+      {(session.image?.status === 'ready' || session.image?.status === 'pending') && (
         <div className="mb-6">
           <DecorativeImageCard
             entityKind="immersion"
             entityId={session.id}
             image={session.image}
             defaultStyle={session.image?.style ?? 'antique_book'}
+            interactive
+            onChange={(image) => onSession({ ...session, image })}
           />
         </div>
       )}

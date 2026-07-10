@@ -66,6 +66,7 @@ import type {
   VaultSwitchResult,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
+  DecorativeImageStyle,
   SearchResultKind,
 } from '@shared/types';
 
@@ -89,6 +90,8 @@ import {
   interruptDecorativeImageGenerations,
   invalidateDecorativeImageGeneration,
   queueDecorativeImageGeneration,
+  revertDecorativeImage,
+  saveCustomDecorativeImage,
 } from './ai/decorativeImages';
 import { getDecorativeImage, getDecorativeImageData } from './db/decorativeImagesRepo';
 import * as zotero from './zotero/zoteroClient';
@@ -409,6 +412,16 @@ export function registerIpc(
       if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
     })
   );
+  h('images:upload', async (e, entityKind: DecorativeImageEntityKind, entityId: string, bytes: Uint8Array, style?: DecorativeImageStyle) => {
+    const image = await saveCustomDecorativeImage(entityKind, entityId, Buffer.from(bytes), style);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    return image;
+  });
+  h('images:revert', async (e, entityKind: DecorativeImageEntityKind, entityId: string) => {
+    const image = revertDecorativeImage(entityKind, entityId);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    return image;
+  });
   h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     deleteDecorativeImage(entityKind, entityId)
   );

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 export const migrations: Migration[] = [
   {
@@ -919,6 +919,25 @@ export const migrations: Migration[] = [
         PRIMARY KEY (entity_kind, entity_id)
       );
       CREATE INDEX idx_decorative_images_status ON decorative_images(status, updated_at DESC);
+    `,
+  },
+  {
+    version: 30,
+    up: /* sql */ `
+      -- Track how the current image was produced ('ai' | 'custom'), and keep a
+      -- single-level snapshot of the previous ready image so a regeneration or a
+      -- user upload can be undone. The snapshot columns mirror the live ones and
+      -- live in SQLite too, so backups stay self-contained.
+      ALTER TABLE decorative_images ADD COLUMN source TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_image_blob BLOB;
+      ALTER TABLE decorative_images ADD COLUMN prev_thumbnail_blob BLOB;
+      ALTER TABLE decorative_images ADD COLUMN prev_mime_type TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_style TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_visual_context TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_prompt TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_provider TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_model TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_source TEXT;
     `,
   },
 ];
