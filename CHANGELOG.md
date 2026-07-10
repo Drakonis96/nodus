@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.7 — 2026-07-10
+
+### Added
+
+- The image "Design" panel is now reachable inside the immersion player (on the
+  panorama), not only on the setup screen and the Deep Research reader.
+- Upload your own decorative image from the Design panel, in both the immersion
+  and Deep Research views. Uploads are compressed automatically to keep local
+  storage light.
+- After regenerating an image you can go back to the previous one with a single
+  click.
+
 ## 1.4.6 — 2026-07-10
 
 ### Fixed
