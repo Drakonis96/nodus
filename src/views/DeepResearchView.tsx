@@ -25,6 +25,7 @@ import {
   subscribeBackgroundJob,
   type DeepResearchGenerationJob,
 } from '../backgroundJobs';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 
 const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   adaptive: 'Adaptativo (según corpus)',
@@ -56,7 +57,7 @@ export function DeepResearchView({
 }) {
   const [objective, setObjective] = useState('');
   const [language, setLanguage] = useState<'es' | 'en' | 'fr'>('es');
-  const [selectedModel, setSelectedModel] = useState(settings.synthesisModel ?? settings.defaultModel);
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>

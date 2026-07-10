@@ -163,7 +163,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
         title: newTitle,
         kind: newKind,
         brief: newBrief,
-        model: settings.defaultModel,
+        model: settings.synthesisModel,
       });
       setNewTitle('');
       setNewBrief('');
@@ -319,7 +319,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
         chapterId: selectedChapter.id,
         sectionId: selectedChapter.sectionId,
         mode,
-        model: detail.project.model ?? settings.defaultModel,
+        model: detail.project.model ?? settings.synthesisModel,
         limit: 16,
       });
       setSuggestions(next);
@@ -344,7 +344,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     try {
       const result = await window.nodus.analyzeChapterRelations({
         chapterId: selectedChapter.id,
-        model: detail.project.model ?? settings.defaultModel,
+        model: detail.project.model ?? settings.synthesisModel,
         force,
       });
       setRelations(result);
@@ -367,7 +367,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     try {
       const result = await window.nodus.verifyManuscriptCitations({
         chapterId: selectedChapter.id,
-        model: detail.project.model ?? settings.defaultModel,
+        model: detail.project.model ?? settings.synthesisModel,
         language: settings.uiLanguage,
         maxClaims: 80,
       });

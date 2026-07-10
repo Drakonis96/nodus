@@ -65,10 +65,10 @@ function withPromptLanguage<T extends { system: string }>(opts: T): T {
   return { ...opts, system: `${opts.system}${directive}` };
 }
 
-/** Resolve which model to use: explicit override, else the configured default. */
+/** Resolve which model to use: explicit override, else the synthesis workload. */
 function resolveModel(override?: ModelRef | null): ModelRef {
   if (override?.provider && override.model) return override;
-  const def = getSettings().defaultModel;
+  const def = getSettings().synthesisModel;
   if (!def?.provider || !def.model) {
     throw new AiError('No hay un modelo de IA configurado. Elige uno en Ajustes.', false, true);
   }
@@ -264,7 +264,7 @@ async function parseOrRepair<T>(
  * JSON completion that retries (lower temperature, then no JSON mode) only when text
  * came back but failed to parse. A provider/transport failure (timeout, empty, etc.)
  * aborts on the first attempt so a hung provider can't stall for minutes.
- * Uses the given model override or the configured default model.
+ * Uses the given model override or the configured synthesis model.
  */
 export async function completeJson<T>(
   opts: CallOpts,

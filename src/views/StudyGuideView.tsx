@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type {
   AppSettings,
-  ModelRef,
   StudyAnswerAssessment,
   StudyAuthorPlan,
   StudyGuidePlan,
@@ -16,6 +15,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import type { PendingAssistantNavigationTarget, PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
@@ -63,7 +63,7 @@ export function StudyGuideView({
   const [loading, setLoading] = useState(false);
   const [loadPhase, setLoadPhase] = useState<StudyPlanLoadPhase>('idle');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'studyModel');
   const [session, setSession] = useState<StudySession | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);

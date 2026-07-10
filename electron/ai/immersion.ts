@@ -344,7 +344,8 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
 export async function buildImmersionScope(request: ImmersionScopeRequest): Promise<ImmersionScope> {
   const material = await buildImmersionMaterial(request.topic);
   const warnings: string[] = [];
-  const plannedModel = getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const plannedModel = settings.immersionModel ?? settings.synthesisModel ?? null;
   const aiKeyAvailable = plannedModel != null && getApiKey(plannedModel.provider) != null;
   if (!aiKeyAvailable) {
     warnings.push(
@@ -401,7 +402,8 @@ export async function generateImmersionSession(
   request: ImmersionRequest,
   onProgress?: (p: ImmersionBuildProgress) => void
 ): Promise<ImmersionSession> {
-  const model = request.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const model = request.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
   const plan = await orchestrateImmersion({ ...request, model }, realDeps(model), onProgress);
   return saveImmersionSession(plan, model);
 }
@@ -470,7 +472,8 @@ export async function evaluateImmersionAnswer(request: ImmersionAnswerRequest): 
       answeredAt: new Date().toISOString(),
     };
   } else {
-    const model = request.model ?? session.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+    const settings = getSettings();
+    const model = request.model ?? session.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
     let assessment: ImmersionAssessment;
     if (!model) {
       assessment = heuristicAssessment(question, request.answer, session);

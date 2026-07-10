@@ -230,14 +230,14 @@ export function App() {
 
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
-      if (!settings?.defaultModel) {
+      if (!(settings?.chatModel ?? settings?.synthesisModel)) {
         setView('settings');
         return;
       }
       setAssistantTarget(target ? { ...target, nonce: Date.now() } : null);
       setResearchOpen(true);
     },
-    [settings?.defaultModel]
+    [settings?.chatModel, settings?.synthesisModel]
   );
 
   const openGraphFromAssistant = useCallback(
@@ -353,35 +353,14 @@ export function App() {
             {lastSync.summary}
           </span>
         )}
-        {settings.favorites.length > 0 && (
-          <select
-            data-tour="model"
-            className="input text-xs py-1"
-            title={t('Modelo predeterminado para escaneos')}
-            value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
-            onChange={async (e) => {
-              if (!e.target.value) return;
-              const [provider, model] = e.target.value.split('::');
-              await window.nodus.updateSettings({ defaultModel: { provider: provider as any, model } });
-              void reloadSettings();
-            }}
-          >
-            {!settings.defaultModel && <option value="">{t('Modelo: sin configurar')}</option>}
-            {settings.favorites.map((m) => (
-              <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>
-                {m.provider} · {m.model}
-              </option>
-            ))}
-          </select>
-        )}
-        {!settings.defaultModel && (
+        {(!settings.extractionModel || !settings.synthesisModel) && (
           <button data-tour="model" className="btn btn-ghost text-amber-400 gap-1.5" onClick={() => setView('settings')}>
             <Icon name="alert" /> {t('Configura un modelo de IA')}
           </button>
         )}
         <button
           className="btn btn-ghost gap-1.5"
-          title={settings.defaultModel ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
+          title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
           onClick={() => openAssistant()}
         >
           <Icon name="chat" /> {t('Asistente')}
@@ -477,7 +456,6 @@ export function App() {
           )}
           {view === 'library' && (
             <Library
-              settings={settings}
               target={libraryTarget}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}

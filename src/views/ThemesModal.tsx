@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { AppSettings, ManagedTheme, ModelRef, ReprocessProgress } from '@shared/types';
+import type { AppSettings, ManagedTheme, ReprocessProgress } from '@shared/types';
 import { Icon } from '../components/ui';
-import { ModelPicker } from '../components/ModelPicker';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { t, tx } from '../i18n';
 
@@ -29,7 +28,6 @@ export function ThemesModal({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState('');
   const [pendingDelete, setPendingDelete] = useState<ManagedTheme | null>(null);
-  const [model, setModel] = useState<ModelRef | null>(settings.extractionModel ?? null);
   const [notice, setNotice] = useState<string | null>(null);
   const [includeRelations, setIncludeRelations] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
@@ -133,7 +131,7 @@ export function ThemesModal({
     try {
       const result = await window.nodus.reprocessThemeConnections(
         { relations: includeRelations },
-        model,
+        undefined,
         (p) => setProgress(p)
       );
       if (result.ideas === 0) {
@@ -177,7 +175,7 @@ export function ThemesModal({
           <p className="text-xs text-neutral-400 leading-relaxed">
             {t('Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros nuevos.')}{' '}
             <span className="text-neutral-300">{t('Reprocesar')}</span>{' '}
-            {t('coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con el modelo seleccionado, sin volver a leer los documentos ni re-extraer ideas.')}
+            {t('coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con los modelos configurados en Ajustes, sin volver a leer los documentos ni re-extraer ideas.')}
           </p>
 
           {/* Add a manual theme */}
@@ -341,12 +339,7 @@ export function ThemesModal({
           )}
 
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-neutral-500 shrink-0">{t('Modelo:')}</span>
-              <div className="min-w-0 flex-1">
-                <ModelPicker settings={settings} value={model} onChange={setModel} compact />
-              </div>
-            </div>
+            <div className="text-xs text-neutral-500">{t('Modelos de análisis: Ajustes')}</div>
             <button
               className="btn btn-primary w-full gap-1.5"
               title={t('Reagrupa las ideas ya extraídas bajo los temas (no re-extrae ideas ni lee documentos)')}

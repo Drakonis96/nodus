@@ -287,11 +287,13 @@ export interface AppSettings {
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).
   providerKeys: Record<AiProvider, boolean>;
-  // Favorite models the user pinned, and the one used by default for scans.
+  // Favorite models the user pinned. Workload and feature selectors below are
+  // deliberately independent: changing one must never retarget another flow.
   favorites: ModelRef[];
+  /** @deprecated Legacy global selector, retained only for one-time migration. */
   defaultModel: ModelRef | null;
   extractionModel: ModelRef | null;
-  // Synthesis/tutor: long-form answers (research assistant, tutor narrative).
+  // General long-form synthesis and initial fallback for feature-local pickers.
   synthesisModel: ModelRef | null;
   // Short orientation summaries of individual works. Falls back to synthesisModel.
   summaryModel: ModelRef | null;
@@ -299,6 +301,17 @@ export interface AppSettings {
   // synthesisModel so a fast model can be used here without slowing long-form output.
   // Falls back to synthesisModel when unset.
   fusionModel: ModelRef | null;
+  // Per-feature choices. Null means "seed from synthesisModel until the user
+  // chooses inside that feature"; once chosen, each value persists separately.
+  chatModel: ModelRef | null;
+  deepResearchModel: ModelRef | null;
+  immersionModel: ModelRef | null;
+  writingModel: ModelRef | null;
+  argumentMapModel: ModelRef | null;
+  authorModel: ModelRef | null;
+  studyModel: ModelRef | null;
+  tutorModel: ModelRef | null;
+  hypothesisModel: ModelRef | null;
   syncMode: SyncMode;
   readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
@@ -612,7 +625,7 @@ export interface QueueItem {
   detail?: string | null;
   /** 0..1 progress within the current item (extraction/OCR), when known. */
   subPct?: number | null;
-  /** Optional model override for this job; falls back to the default model when null. */
+  /** Optional explicit override; null lets the job resolve its workload setting. */
   model?: ModelRef | null;
   /**
    * When set on a deep job, forces the full chain (summary + index + bridge discovery)
@@ -2727,7 +2740,7 @@ export interface ImmersionScope {
   topic: string;
   generatedAt: string;
   embeddingAvailable: boolean;
-  /** Whether the configured synthesis/default model has a usable API key; without it generation would degrade to structural content. */
+  /** Whether the configured immersion/synthesis model has a usable API key; without it generation would degrade to structural content. */
   aiKeyAvailable: boolean;
   ideas: ImmersionScopeIdea[];
   works: ImmersionScopeWork[];

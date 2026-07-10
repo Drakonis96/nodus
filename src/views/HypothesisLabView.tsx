@@ -7,13 +7,13 @@ import type {
   HypothesisLabMode,
   HypothesisLabResult,
   HypothesisMaturity,
-  ModelRef,
   Project,
 } from '@shared/types';
 import type { PendingAssistantNavigationTarget, PendingGraphNavigationTarget } from '../navigation';
 import { Badge, Icon, Spinner, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t, tx } from '../i18n';
 
 const MODE_LABELS: Record<HypothesisLabMode, string> = {
@@ -59,7 +59,7 @@ export function HypothesisLabView({
   const [objective, setObjective] = useState('');
   const [mode, setMode] = useState<HypothesisLabMode>('exploratory');
   const [maxCandidates, setMaxCandidates] = useState(6);
-  const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'hypothesisModel');
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
   const [result, setResult] = useState<HypothesisLabResult | null>(null);

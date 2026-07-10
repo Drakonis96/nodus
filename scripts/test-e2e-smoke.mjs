@@ -69,6 +69,46 @@ try {
   assert.equal(bridge.hasEdgeFeedback, true, 'setEdgeFeedback available');
   console.log('[e2e] preload bridge ok');
 
+  // ── Main header: model selection belongs to Settings/features, never global ─
+  const smokeModel = { provider: 'openai', model: 'smoke-model' };
+  const chatModel = { provider: 'openrouter', model: 'smoke-chat-model' };
+  const migrated = await page.evaluate((model) =>
+    window.nodus.updateSettings({
+      defaultModel: model,
+      extractionModel: null,
+      synthesisModel: null,
+      summaryModel: null,
+      fusionModel: null,
+    }), smokeModel);
+  assert.equal(migrated.defaultModel, null, 'legacy global choice retired after migration');
+  for (const key of ['extractionModel', 'synthesisModel', 'summaryModel', 'fusionModel']) {
+    assert.deepEqual(migrated[key], smokeModel, `legacy model migrated into ${key}`);
+  }
+  const independent = await page.evaluate(({ model, chat }) =>
+    window.nodus.updateSettings({
+      onboardingComplete: true,
+      tourComplete: true,
+      advancedTourComplete: true,
+      favorites: [model, chat],
+      extractionModel: model,
+      synthesisModel: model,
+      summaryModel: chat,
+      fusionModel: chat,
+      chatModel: chat,
+      deepResearchModel: model,
+      immersionModel: chat,
+    }), { model: smokeModel, chat: chatModel });
+  assert.deepEqual(independent.chatModel, chatModel, 'chat model persists independently');
+  assert.deepEqual(independent.deepResearchModel, smokeModel, 'Deep Research model persists independently');
+  assert.deepEqual(independent.immersionModel, chatModel, 'immersion model persists independently');
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('header'));
+  assert.equal(await page.locator('header select[data-tour="model"]').count(), 0, 'global header model selector removed');
+  await page.getByRole('button', { name: 'Asistente', exact: true }).click();
+  assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
+  await page.locator('button[title="Cerrar"]').click();
+  console.log('[e2e] header has no global model selector');
+
   // ── Real IPC round-trip: the async graph build (compute worker path) ────────
   const graph = await page.evaluate(() => window.nodus.getGraph('ideas'));
   assert.ok(graph && Array.isArray(graph.nodes) && Array.isArray(graph.edges), 'graph:get returns {nodes, edges}');

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType, ModelRef } from '@shared/types';
+import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType } from '@shared/types';
 import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import {
@@ -17,6 +17,7 @@ import {
   type DetailLoading,
 } from '../components/NodeDetailPanel';
 import { useDismissableLayer } from '../hooks';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t, tx } from '../i18n';
 
 const RELATION_LABELS: Record<string, string> = {
@@ -73,7 +74,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
   const [seedSearchOpen, setSeedSearchOpen] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState('');
   const [minConnections, setMinConnections] = useState(0);
-  const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'argumentMapModel');
   const [map, setMap] = useState<ArgumentMap | null>(null);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,7 +250,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
     setDetailFontSize((v) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, v + delta)));
   };
 
-  const hasModel = !!(settings.defaultModel || model);
+  const hasModel = !!model;
   const isAuto = mode === 'auto';
 
   return (

@@ -2289,5 +2289,23 @@ export const EN: Record<string, string> = {
   'Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.':
     'Dossier saved: “{t}” · {s} sections · ~{p} pages. Find it in Deep Research → saved reports.',
   'Generar de nuevo': 'Generate again',
+  'Seleccionar modelo': 'Select model',
+  'Usar modelo de síntesis': 'Use synthesis model',
+  'Modelo inicial para las tareas de IA ({n} disponibles)': 'Initial model for AI tasks ({n} available)',
+  'Modelos favoritos para los selectores independientes': 'Favorite models for independent selectors',
+  'Los modelos de análisis se configuran en Ajustes.': 'Analysis models are configured in Settings.',
+  'Modelos de análisis: Ajustes': 'Analysis models: Settings',
+  'coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con los modelos configurados en Ajustes, sin volver a leer los documentos ni re-extraer ideas.':
+    'takes the already extracted ideas (claims, findings…) and groups them again under these themes using the models configured in Settings, without rereading documents or re-extracting ideas.',
+  'Cada tarea usa su propio modelo. Los escaneos, resúmenes, fusión y embeddings obedecen estos ajustes; Chat, Deep Research, Inmersión y las demás herramientas conservan el modelo elegido dentro de su propia sección.':
+    'Each task uses its own model. Scans, summaries, fusion and embeddings follow these settings; Chat, Deep Research, Immersion and the other tools retain the model chosen inside their own section.',
+  'Modelo de síntesis general (fallback inicial para herramientas con selector propio)':
+    'General synthesis model (initial fallback for tools with their own selector)',
+  'modelos por tarea': 'models by task',
+  'Extracción: {provider}': 'Extraction: {provider}',
+  'Síntesis: {provider}': 'Synthesis: {provider}',
+  'Configura los modelos de IA': 'Configure AI models',
+  'La sincronización puede funcionar, pero Nodus necesita modelos separados de extracción y síntesis para analizar el corpus.':
+    'Sync can work, but Nodus needs separate extraction and synthesis models to analyze the corpus.',
   // <<END_EN>>
 };

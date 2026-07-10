@@ -60,7 +60,10 @@ interface BackupInventory {
   };
   modelSettings: Pick<
     AppSettings,
-    'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
   >;
   apiKeyProviders: AiProvider[];
 }
@@ -341,7 +344,10 @@ function settingsMatchInventory(
 function modelSettings(
   settings: Pick<
     AppSettings,
-    'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -353,6 +359,15 @@ function modelSettings(
     synthesisModel: settings.synthesisModel,
     summaryModel: settings.summaryModel,
     fusionModel: settings.fusionModel,
+    chatModel: settings.chatModel,
+    deepResearchModel: settings.deepResearchModel,
+    immersionModel: settings.immersionModel,
+    writingModel: settings.writingModel,
+    argumentMapModel: settings.argumentMapModel,
+    authorModel: settings.authorModel,
+    studyModel: settings.studyModel,
+    tutorModel: settings.tutorModel,
+    hypothesisModel: settings.hypothesisModel,
   };
 }
 

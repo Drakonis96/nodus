@@ -16,6 +16,7 @@ import { SourceCitationModal, type CitationTarget } from '../components/SourceCi
 import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget, type PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 
 const DEFAULT_SELECTION: ResearchContextSelection = {
   ideas: false,
@@ -201,7 +202,7 @@ export function ResearchAssistantModal({
   const [input, setInput] = useState('');
   const [contextTitle, setContextTitle] = useState<string | null>(null);
   const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
-  const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'chatModel');
   const [sending, setSending] = useState(false);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -238,11 +239,11 @@ export function ResearchAssistantModal({
       models.push(model);
     };
     add(settings.synthesisModel);
-    add(settings.defaultModel);
+    add(settings.chatModel);
     add(selectedModel);
     for (const model of settings.favorites ?? []) add(model);
     return models;
-  }, [settings.defaultModel, settings.favorites, settings.synthesisModel, selectedModel]);
+  }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel]);
 
   const refreshConversations = useCallback(async () => {
     setConversations(await window.nodus.listConversations(true));

@@ -837,17 +837,20 @@ export function Settings({
 
       {visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia') && (
           <Section title={t('IA avanzada')}>
+            <p className="mb-4 text-sm leading-6 text-neutral-400">
+              {t('Cada tarea usa su propio modelo. Los escaneos, resúmenes, fusión y embeddings obedecen estos ajustes; Chat, Deep Research, Inmersión y las demás herramientas conservan el modelo elegido dentro de su propia sección.')}
+            </p>
             <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
             </Row>
-            <Row label={t('Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)')}>
+            <Row label={t('Modelo de síntesis general (fallback inicial para herramientas con selector propio)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
             </Row>
             <Row label={t('Modelo de resúmenes (orientación por obra; no genera evidencia citable)')}>
-              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} />
+              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} emptyLabel="Usar modelo de síntesis" />
             </Row>
             <Row label={t('Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)')}>
-              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
+              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} emptyLabel="Usar modelo de síntesis" />
             </Row>
             <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
               <EmbeddingModelControl settings={settings} onPatch={patch} />

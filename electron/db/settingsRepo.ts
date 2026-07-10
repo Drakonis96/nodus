@@ -11,6 +11,15 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   synthesisModel: null,
   summaryModel: null,
   fusionModel: null,
+  chatModel: null,
+  deepResearchModel: null,
+  immersionModel: null,
+  writingModel: null,
+  argumentMapModel: null,
+  authorModel: null,
+  studyModel: null,
+  tutorModel: null,
+  hypothesisModel: null,
   syncMode: 'manual',
   readTag: 'leído',
   autoLightScan: false,
@@ -80,6 +89,18 @@ export function getSettings(): AppSettings {
   const merged = { ...DEFAULTS, ...parsed };
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
   if (!merged.embeddingModel?.trim()) merged.embeddingModel = defaultEmbeddingModel(merged.embeddingProvider);
+  // v1.4.0 and older exposed one global header selector. Preserve that user's
+  // choice once by seeding the workload settings, then retire the global value
+  // so future selectors cannot affect one another through a hidden fallback.
+  const legacyDefault = (parsed as Partial<AppSettings>).defaultModel;
+  if (legacyDefault) {
+    merged.extractionModel ??= legacyDefault;
+    merged.synthesisModel ??= legacyDefault;
+    merged.summaryModel ??= legacyDefault;
+    merged.fusionModel ??= legacyDefault;
+    merged.defaultModel = null;
+    writeRaw('app', JSON.stringify(merged));
+  }
   return { ...merged, providerKeys: providerKeyMap() };
 }
 

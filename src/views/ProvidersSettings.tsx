@@ -25,19 +25,7 @@ export function ProvidersSettings({
   const toggleFav = async (m: ModelRef) => {
     const currentlyFav = isFav(m);
     const next = currentlyFav ? favorites.filter((f) => !sameModel(f, m)) : [...favorites, m];
-    const patch: Partial<AppSettings> = { favorites: next };
-    // Removing the model that is the current default clears the default too.
-    if (currentlyFav && sameModel(settings.defaultModel, m)) patch.defaultModel = null;
-    if (currentlyFav && sameModel(settings.extractionModel, m)) patch.extractionModel = null;
-    if (currentlyFav && sameModel(settings.synthesisModel, m)) patch.synthesisModel = null;
-    if (currentlyFav && sameModel(settings.fusionModel, m)) patch.fusionModel = null;
-    await window.nodus.updateSettings(patch);
-    await onChange();
-  };
-
-  const setDefault = async (m: ModelRef) => {
-    const next = isFav(m) ? favorites : [...favorites, m];
-    await window.nodus.updateSettings({ defaultModel: m, favorites: next });
+    await window.nodus.updateSettings({ favorites: next });
     await onChange();
   };
 
@@ -54,31 +42,17 @@ export function ProvidersSettings({
         className="mb-4"
       />
 
-      {/* Current default + favorites */}
+      {/* Favorites feed every independent workload/feature selector. */}
       <div className="mb-4 text-sm">
-        <div className="text-neutral-400">
-          {t('Modelo predeterminado:')}{' '}
-          {settings.defaultModel ? (
-            <span className="text-neutral-100">📌 {modelLabel(settings.defaultModel)}</span>
-          ) : (
-            <span className="text-amber-400">{t('sin configurar')}</span>
-          )}
-        </div>
+        <div className="text-neutral-400">{t('Modelos favoritos para los selectores independientes')}</div>
         {favorites.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {favorites.map((m) => (
               <span
                 key={`${m.provider}::${m.model}`}
-                className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${
-                  sameModel(m, settings.defaultModel) ? 'bg-indigo-800 text-indigo-100' : 'bg-neutral-800 text-neutral-300'
-                }`}
+                className="text-xs px-2 py-0.5 rounded flex items-center gap-1 bg-neutral-800 text-neutral-300"
               >
-                {sameModel(m, settings.defaultModel) ? '📌' : '⭐'} {modelLabel(m)}
-                {!sameModel(m, settings.defaultModel) && (
-                  <button className="text-neutral-500 hover:text-indigo-300" title={t('Marcar como predeterminado')} onClick={() => setDefault(m)}>
-                    📌
-                  </button>
-                )}
+                ⭐ {modelLabel(m)}
                 <button className="text-neutral-500 hover:text-red-400" title={t('Quitar de favoritos')} onClick={() => toggleFav(m)}>
                   ✕
                 </button>
@@ -99,7 +73,6 @@ export function ProvidersSettings({
             onChange={onChange}
             isFav={isFav}
             toggleFav={toggleFav}
-            setDefault={setDefault}
           />
         ))}
       </div>
@@ -115,7 +88,6 @@ function ProviderRow({
   onChange,
   isFav,
   toggleFav,
-  setDefault,
 }: {
   provider: AiProvider;
   settings: AppSettings;
@@ -124,7 +96,6 @@ function ProviderRow({
   onChange: () => Promise<unknown>;
   isFav: (m: ModelRef) => boolean;
   toggleFav: (m: ModelRef) => Promise<void>;
-  setDefault: (m: ModelRef) => Promise<void>;
 }) {
   const [keyInput, setKeyInput] = useState('');
   const [models, setModels] = useState<ModelInfo[] | null>(null);
@@ -203,7 +174,7 @@ function ProviderRow({
 
           {models && (
             <div className="max-h-64 overflow-y-auto border border-neutral-800 rounded">
-              <ModelList provider={provider} models={shown} isFav={isFav} toggleFav={toggleFav} setDefault={setDefault} settings={settings} />
+              <ModelList provider={provider} models={shown} isFav={isFav} toggleFav={toggleFav} />
               {filtered.length > shown.length && (
                 <div className="text-xs text-neutral-600 p-2">{tx('Mostrando {n}; refina la búsqueda para ver más.', { n: shown.length })}</div>
               )}
@@ -220,15 +191,11 @@ function ModelList({
   models,
   isFav,
   toggleFav,
-  setDefault,
-  settings,
 }: {
   provider: AiProvider;
   models: ModelInfo[];
   isFav: (m: ModelRef) => boolean;
   toggleFav: (m: ModelRef) => Promise<void>;
-  setDefault: (m: ModelRef) => Promise<void>;
-  settings: AppSettings;
 }) {
   // OpenRouter: render grouped by upstream provider.
   const rows: JSX.Element[] = [];
@@ -244,14 +211,10 @@ function ModelList({
       );
     }
     const fav = isFav(ref);
-    const def = sameModel(ref, settings.defaultModel);
     rows.push(
       <div key={m.id} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-900/60">
         <button className={fav ? 'text-amber-400' : 'text-neutral-600 hover:text-amber-300'} title={t('Favorito')} onClick={() => toggleFav(ref)}>
           {fav ? '⭐' : '☆'}
-        </button>
-        <button className={def ? 'text-indigo-400' : 'text-neutral-600 hover:text-indigo-300'} title={t('Predeterminado')} onClick={() => setDefault(ref)}>
-          📌
         </button>
         <span className="flex-1 truncate" title={m.name ?? m.id}>
           {m.name ? `${m.id}` : m.id}

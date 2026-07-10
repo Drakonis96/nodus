@@ -49,6 +49,7 @@ import {
   type DeepResearchGenerationJob,
   type ImmersionGenerationJob,
 } from '../backgroundJobs';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -167,7 +168,7 @@ export function ImmersionView({
   const [minutes, setMinutes] = useState(150);
   const [includeQuiz, setIncludeQuiz] = useState(true);
   const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'en' ? 'en' : 'es');
-  const [model, setModel] = useState(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'immersionModel');
 
   const [scope, setScope] = useState<ImmersionScope | null>(null);
   const [scoping, setScoping] = useState(false);
@@ -425,7 +426,7 @@ function ImmersionHome({
   minutes: number;
   includeQuiz: boolean;
   language: 'es' | 'en';
-  model: AppSettings['defaultModel'];
+  model: AppSettings['immersionModel'];
   hasModel: boolean;
   scoping: boolean;
   openingId: string | null;
@@ -434,7 +435,7 @@ function ImmersionHome({
   onMinutes: (v: number) => void;
   onIncludeQuiz: (v: boolean) => void;
   onLanguage: (v: 'es' | 'en') => void;
-  onModel: (m: AppSettings['defaultModel']) => void;
+  onModel: (m: AppSettings['immersionModel']) => void;
   onExplore: () => void;
   onOpenSession: (id: string) => void;
   onDeleteSession: (s: ImmersionSessionSummary) => void;

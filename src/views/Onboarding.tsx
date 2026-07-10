@@ -75,8 +75,11 @@ export function Onboarding({
       await window.nodus.updateSettings({
         monitoredCollections: Array.from(selected),
         readTag,
-        defaultModel: ref,
         favorites: ref ? [ref] : [],
+        extractionModel: ref,
+        synthesisModel: ref,
+        summaryModel: ref,
+        fusionModel: ref,
         zoteroStoragePath: storagePath,
         onboardingComplete: true,
       });
@@ -223,7 +226,7 @@ export function Onboarding({
             {modelError && <div className="text-sm text-red-400">{modelError}</div>}
             {models.length > 0 && (
               <label className="block text-sm">
-                {tx('Modelo predeterminado ({n} disponibles)', { n: models.length })}
+                {tx('Modelo inicial para las tareas de IA ({n} disponibles)', { n: models.length })}
                 <select className="input w-full mt-1" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>

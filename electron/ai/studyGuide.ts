@@ -435,7 +435,8 @@ export async function generateStudySession(request: StudySessionRequest): Promis
   if (!authorPlan) throw new Error('Autor no encontrado en el plan de estudio');
   const dossier = buildAuthorDossier(request.authorId);
   const authorName = dossier?.fullName || authorPlan.fullName || authorPlan.name;
-  const chosen = request.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const chosen = request.model ?? settings.studyModel ?? settings.synthesisModel ?? null;
   const fallback = fallbackSession(authorName, plan, authorPlan, chosen);
   const passages = await loadSessionPassages(objective, authorPlan.recommendedWorks, Boolean(request.useFullText));
 
@@ -540,7 +541,8 @@ function fallbackAssessment(request: StudyAnswerRequest, dossier: AuthorDossier 
 export async function evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment> {
   const dossier = buildAuthorDossier(request.authorId);
   if (!dossier) throw new Error('Autor no encontrado');
-  const chosen = request.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const chosen = request.model ?? settings.studyModel ?? settings.synthesisModel ?? null;
   if (!chosen) return fallbackAssessment(request, dossier, chosen);
 
   const system =

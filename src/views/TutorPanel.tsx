@@ -3,6 +3,7 @@ import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorSave
 import { Icon, Spinner, modelLabel } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t, tx, getActiveLang } from '../i18n';
 
 type Phase = 'setup' | 'routes' | 'touring';
@@ -38,7 +39,7 @@ export function TutorPanel({
   const [mode, setMode] = useState<TutorMode>('overview');
   const [setupTab, setSetupTab] = useState<SetupTab>('generate');
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'tutorModel');
   const [generating, setGenerating] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [plan, setPlan] = useState<TutorPlan | null>(null);
@@ -67,11 +68,11 @@ export function TutorPanel({
       models.push(m);
     };
     add(settings.synthesisModel);
-    add(settings.defaultModel);
+    add(settings.tutorModel);
     add(selectedModel);
     for (const m of settings.favorites ?? []) add(m);
     return models;
-  }, [settings.synthesisModel, settings.defaultModel, settings.favorites, selectedModel]);
+  }, [settings.synthesisModel, settings.tutorModel, settings.favorites, selectedModel]);
 
   const stepKey = (routeId: string, index: number) => `${routeId}:${index}`;
 

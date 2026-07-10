@@ -1,10 +1,10 @@
 import type { AppSettings, ModelRef } from '@shared/types';
 import { modelLabel, sameModel } from './ui';
-import { t, tx } from '../i18n';
+import { t } from '../i18n';
 
 /**
- * Lets the user pick which model a scan should use: the default, or any favorite.
- * Returns null to mean "use the configured default model".
+ * Shared selector over favorite models plus the currently persisted value.
+ * Null means no explicit choice (the owning workload may define its own fallback).
  */
 export function ModelPicker({
   settings,
@@ -12,15 +12,18 @@ export function ModelPicker({
   onChange,
   compact,
   disabled,
+  emptyLabel,
 }: {
   settings: AppSettings;
   value: ModelRef | null;
   onChange: (m: ModelRef | null) => void;
   compact?: boolean;
   disabled?: boolean;
+  emptyLabel?: string;
 }) {
   const favorites = settings.favorites ?? [];
   const serialize = (m: ModelRef) => `${m.provider}::${m.model}`;
+  const valueIsFavorite = value ? favorites.some((model) => sameModel(model, value)) : false;
 
   return (
     <select
@@ -32,13 +35,12 @@ export function ModelPicker({
         const [provider, model] = e.target.value.split('::');
         onChange({ provider: provider as ModelRef['provider'], model });
       }}
-      title={t('Modelo para el escaneo')}
+      title={t('Seleccionar modelo')}
     >
-      <option value="">
-        {settings.defaultModel ? tx('Predeterminado ({model})', { model: modelLabel(settings.defaultModel) }) : t('Predeterminado (sin configurar)')}
-      </option>
+      <option value="">{emptyLabel ? t(emptyLabel) : t('Sin modelo seleccionado')}</option>
+      {value && !valueIsFavorite && <option value={serialize(value)}>{modelLabel(value)}</option>}
       {favorites.map((m) => (
-        <option key={serialize(m)} value={serialize(m)} disabled={sameModel(m, settings.defaultModel)}>
+        <option key={serialize(m)} value={serialize(m)}>
           {modelLabel(m)}
         </option>
       ))}

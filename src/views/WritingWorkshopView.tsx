@@ -26,6 +26,7 @@ import type { MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
 import { DraftResultMain, KIND_LABELS, SavedDraftsPanel, SupportMatrix } from './writingShared';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t, tx } from '../i18n';
 
 /** Manual workshop kinds shown in the kind selector (deep_research has its own view). */
@@ -76,7 +77,7 @@ export function WritingWorkshopView({
     tone: 'academic',
     language: 'es',
   });
-  const [selectedModel, setSelectedModel] = useState(settings.synthesisModel ?? settings.defaultModel);
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'writingModel');
   const [snapshot, setSnapshot] = useState<WritingWorkshopSnapshot | null>(null);
   const [selection, setSelection] = useState<WritingWorkshopSelection>(EMPTY_SELECTION);
   const [projects, setProjects] = useState<Project[]>([]);
