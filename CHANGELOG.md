@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.6 — 2026-07-10
+
+### Fixed
+
+- Search bars: the magnifying-glass icon no longer overlaps the placeholder text
+  in the Settings and Deep Research search fields.
+
 ## 1.4.5 — 2026-07-10
 
 ### Added

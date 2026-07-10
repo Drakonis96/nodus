@@ -493,6 +493,9 @@ body {
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
 }
+/* `.input` is declared after `@tailwind utilities`, so its `px-3` wins over a
+   plain `pl-*` utility (same specificity, later in source). For an input with a
+   leading icon, use this class instead of `pl-*` — its two-class selector wins. */
 .input.input-with-leading-icon {
   padding-left: 2rem;
 }

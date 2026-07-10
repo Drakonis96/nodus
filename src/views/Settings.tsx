@@ -304,7 +304,7 @@ export function Settings({
         <label className="relative w-full sm:w-80">
           <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
           <input
-            className="input w-full pl-9"
+            className="input input-with-leading-icon w-full"
             value={settingsQuery}
             onChange={(e) => setSettingsQuery(e.target.value)}
             placeholder={t('Buscar en ajustes…')}
