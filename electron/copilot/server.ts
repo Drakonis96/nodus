@@ -28,7 +28,7 @@ interface EditorState {
   selectionText: string;
 }
 
-let editorState: EditorState = { paragraphText: '', selectionText: '' };
+const editorState: EditorState = { paragraphText: '', selectionText: '' };
 let pendingInsertionResolvers: ((text: string) => void)[] = [];
 
 
