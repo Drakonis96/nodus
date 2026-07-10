@@ -37,8 +37,11 @@ try {
   const { DECORATIVE_IMAGE_STYLES, DEFAULT_DECORATIVE_IMAGE_STYLE, buildDecorativeImagePrompt } =
     await import(pathToFileURL(outfile).href);
   assert.equal(DEFAULT_DECORATIVE_IMAGE_STYLE, 'antique_book');
-  assert.equal(DECORATIVE_IMAGE_STYLES.length, 7, 'the seven centralized style choices remain available');
-  assert.equal(new Set(DECORATIVE_IMAGE_STYLES.map((style) => style.id)).size, 7, 'style ids are unique');
+  assert.equal(DECORATIVE_IMAGE_STYLES.length, 12, 'the centralized style choices (illustrated + photographic) remain available');
+  assert.equal(new Set(DECORATIVE_IMAGE_STYLES.map((style) => style.id)).size, 12, 'style ids are unique');
+  for (const id of ['realistic_photo', 'vintage_photograph', 'black_and_white', 'cinematic', 'oil_painting']) {
+    assert.ok(DECORATIVE_IMAGE_STYLES.some((style) => style.id === id), `photographic/realistic style ${id} is available`);
+  }
   for (const style of DECORATIVE_IMAGE_STYLES) {
     const prompt = buildDecorativeImagePrompt(style.id, `  Escena   visual de ${style.label}  `);
     assert.ok(prompt.length <= 560, 'final prompt is deliberately bounded');
@@ -46,13 +49,14 @@ try {
     assert.ok(!/\s{2,}/.test(prompt), 'visual context whitespace is compacted');
   }
 
-  const [service, ipc, jobs, migration, imageModels, card, searchView, searchModal, app] = await Promise.all([
+  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, searchModal, app] = await Promise.all([
     readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
     readFile(path.join(root, 'src/backgroundJobs.ts'), 'utf8'),
     readFile(path.join(root, 'electron/db/migrations.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ai/imageModels.ts'), 'utf8'),
     readFile(path.join(root, 'src/components/DecorativeImageCard.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/components/DecorativeImageModal.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/SearchView.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/SearchResultModal.tsx'), 'utf8'),
     readFile(path.join(root, 'src/App.tsx'), 'utf8'),
@@ -66,6 +70,7 @@ try {
   assert.ok(service.includes('active.get(key) !== token'), 'stale/deleted attempts cannot overwrite image state');
   assert.ok(service.includes('interruptDecorativeImageGenerations'), 'vault/app shutdown can invalidate process-local image work');
   assert.ok(service.includes('Máximo 45 palabras') && service.includes('maxTokens: 100'), 'visual-context call is short');
+  assert.ok(service.includes('request.visualContext') && service.includes('buildDecorativeImagePrompt(style, context)'), 'a user-edited scene rebuilds the styled prompt');
   assert.ok(service.includes('noRetry: true') && service.includes('maxRetries: 0'), 'text and Google image calls are single-attempt');
   assert.ok(service.includes('IMAGE_CONTEXT_TIMEOUT_MS = 45_000') && service.includes('IMAGE_TIMEOUT_MS = 120_000'), 'both context and image work are time-bounded');
   assert.ok(!/for\s*\([^)]*retry|while\s*\([^)]*retry/i.test(service), 'there is no automatic retry loop');
@@ -92,7 +97,12 @@ try {
   }
   assert.ok(card.includes("if (thumbnail)"));
   assert.ok(card.includes("current?.status !== 'ready' || !dataUrl) return null"), 'missing thumbnails render no broken space');
-  assert.ok(card.includes("action === 'regenerate'") && card.includes('coste adicional'), 'regeneration confirms the new cost');
+  // The main views stay uncluttered: a single "Design" pill opens the modal,
+  // where style/scene editing and regeneration live. Cost is disclosed there.
+  assert.ok(card.includes('DesignPill') && card.includes('DecorativeImageModal'), 'the card exposes only a design entry point and hosts the modal');
+  assert.ok(!card.includes("t('Regenerar')"), 'the card no longer renders an inline regenerate button');
+  assert.ok(imageModal.includes("action: 'regenerate'") && imageModal.includes('coste adicional'), 'the design modal regenerates and discloses the new cost');
+  assert.ok(imageModal.includes('Descripción de la escena'), 'the design modal lets the user edit the scene');
 
   // Every result click opens one common modal; graph navigation lives in its
   // explicit secondary action. The disclosure arrow only rotates.

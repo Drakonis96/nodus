@@ -43,6 +43,31 @@ export const DECORATIVE_IMAGE_STYLES: DecorativeImageStyleTemplate[] = [
     label: 'Ilustración editorial contemporánea',
     prompt: 'contemporary editorial illustration, conceptually striking, clean shapes, sophisticated vivid palette',
   },
+  {
+    id: 'realistic_photo',
+    label: 'Fotografía realista',
+    prompt: 'photorealistic photograph, natural lighting, lifelike detail, shallow depth of field, high dynamic range',
+  },
+  {
+    id: 'vintage_photograph',
+    label: 'Fotografía histórica',
+    prompt: 'vintage archival photograph, authentic period detail, aged film grain, faded tones, documentary realism',
+  },
+  {
+    id: 'black_and_white',
+    label: 'Blanco y negro',
+    prompt: 'dramatic black and white photograph, rich tonal contrast, fine grain, timeless monochrome composition',
+  },
+  {
+    id: 'cinematic',
+    label: 'Cinematográfico',
+    prompt: 'cinematic film still, dramatic lighting, atmospheric depth, moody color grade, widescreen composition',
+  },
+  {
+    id: 'oil_painting',
+    label: 'Pintura al óleo',
+    prompt: 'classical oil painting, expressive brushwork, layered impasto texture, rich chiaroscuro, museum quality',
+  },
 ];
 
 export const DEFAULT_DECORATIVE_IMAGE_STYLE: DecorativeImageStyle = 'antique_book';

@@ -264,7 +264,12 @@ export type DecorativeImageStyle =
   | 'watercolor'
   | 'historical_collage'
   | 'modernist_poster'
-  | 'contemporary_editorial';
+  | 'contemporary_editorial'
+  | 'realistic_photo'
+  | 'vintage_photograph'
+  | 'black_and_white'
+  | 'cinematic'
+  | 'oil_painting';
 
 /** The opt-in choice stored with one generation request. */
 export interface DecorativeImageOption {
@@ -309,6 +314,8 @@ export interface DecorativeImageActionRequest {
   entityId: string;
   action: 'generate' | 'retry' | 'regenerate';
   style?: DecorativeImageStyle;
+  /** Optional user-edited scene description. Rebuilds the prompt for this style. */
+  visualContext?: string;
 }
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';

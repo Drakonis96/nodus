@@ -290,19 +290,26 @@ export function queueDecorativeImageGeneration(
   const style = request.action === 'retry' && current?.style
     ? current.style
     : request.style ?? current?.style ?? settings.imageStyle ?? DEFAULT_DECORATIVE_IMAGE_STYLE;
+  // A user-edited scene description overrides the stored context; the prompt is
+  // rebuilt for the chosen style so the "no text" guardrails always survive.
+  const editedContext = request.action !== 'retry' ? request.visualContext?.replace(/\s+/g, ' ').trim() : undefined;
   const pending = markDecorativeImagePending({
     entityKind: request.entityKind,
     entityId: request.entityId,
     provider,
     model,
     style,
-    preserveContext: request.action === 'retry' || request.action === 'regenerate',
+    preserveContext: !editedContext && (request.action === 'retry' || request.action === 'regenerate'),
     preservePrompt: request.action === 'retry',
   });
+  if (editedContext) {
+    const context = editedContext.slice(0, 260);
+    saveDecorativeImagePrompt(request.entityKind, request.entityId, context, buildDecorativeImagePrompt(style, context));
+  }
   const token = Symbol(key);
   active.set(key, token);
   setTimeout(() => void runGeneration(request, token, onChanged), 0);
-  return pending;
+  return editedContext ? getDecorativeImage(request.entityKind, request.entityId) ?? pending : pending;
 }
 
 export function markNotRequested(

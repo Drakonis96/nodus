@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.4.3 — 2026-07-10
+
+### Added
+
+- New "Image design" dialog for Inmersión and Deep Research: preview the image,
+  switch style, edit the scene description, and regenerate or delete it in one place.
+- Five photographic and realistic decorative styles — realistic photograph,
+  vintage photograph, black & white, cinematic, and oil painting (twelve in total).
+- An editable scene description that rebuilds the prompt for the chosen style while
+  preserving the "no text" safeguards.
+
+### Changed
+
+- Decorative images now render larger and more polished. The inline action buttons
+  are replaced by a single unobtrusive "Design" pill that opens the design dialog,
+  keeping the Inmersión and Deep Research views uncluttered.
+- The "immersion ready" screen is now part of the main immersion view instead of a
+  separate standalone page.
+
 ## 1.4.2 — 2026-07-10
 
 ### Added

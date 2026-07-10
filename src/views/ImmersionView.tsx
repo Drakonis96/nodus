@@ -965,40 +965,52 @@ function ImmersionPlayer({
 
   if (!progress.startedAt) {
     return (
-      <div className="h-full overflow-y-auto bg-neutral-950">
-        <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-6 py-10">
-          <button className="btn btn-ghost mb-5 w-fit gap-1.5" onClick={onExit}>
+      <div className="h-full flex flex-col min-h-0">
+        <header className="flex items-center gap-3 border-b border-neutral-800 px-4 py-3">
+          <button className="btn btn-ghost gap-1.5" onClick={onExit}>
             <Icon name="chevronLeft" /> {t('Volver')}
           </button>
-          <div className="mb-5 text-center">
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-300">{t('Tu inmersión está lista')}</div>
-            <h1 className="mt-2 text-3xl font-semibold text-neutral-100">{session.plan.title}</h1>
-            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
-              {tx('{s} estaciones · {i} ideas · {w} obras · ~{m} minutos', {
-                s: session.plan.stats.stations,
-                i: session.plan.stats.ideas,
-                w: session.plan.stats.works,
-                m: session.minutes,
-              })}
-            </p>
+          <div className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+            <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
           </div>
-          <DecorativeImageCard
-            entityKind="immersion"
-            entityId={session.id}
-            image={session.image}
-            defaultStyle={session.image?.style ?? 'antique_book'}
-            interactive
-            onChange={(image) => onSession({ ...session, image })}
-          />
-          <button
-            className="btn btn-primary mx-auto mt-5 gap-2 !px-8 !py-3 text-base"
-            onClick={() => persist({ ...progress, startedAt: new Date().toISOString() })}
-          >
-            <Icon name="play" /> {t('Comenzar inmersión')}
-          </button>
-          {session.image?.status === 'pending' && (
-            <p className="mt-2 text-center text-xs text-neutral-600">{t('Puedes empezar ya: la imagen nunca bloquea el contenido.')}</p>
-          )}
+          <div className="flex-1" />
+        </header>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-6 py-10">
+            <div className="text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500 dark:text-indigo-300">{t('Tu inmersión está lista')}</div>
+              <h1 className="mt-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{session.plan.title}</h1>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+                {tx('{s} estaciones · {i} ideas · {w} obras · ~{m} minutos', {
+                  s: session.plan.stats.stations,
+                  i: session.plan.stats.ideas,
+                  w: session.plan.stats.works,
+                  m: session.minutes,
+                })}
+              </p>
+            </div>
+            <div className="mt-7">
+              <DecorativeImageCard
+                entityKind="immersion"
+                entityId={session.id}
+                image={session.image}
+                defaultStyle={session.image?.style ?? 'antique_book'}
+                interactive
+                onChange={(image) => onSession({ ...session, image })}
+              />
+            </div>
+            <div className="mt-7 flex flex-col items-center">
+              <button
+                className="btn btn-primary gap-2 !px-8 !py-3 text-base"
+                onClick={() => persist({ ...progress, startedAt: new Date().toISOString() })}
+              >
+                <Icon name="play" /> {t('Comenzar inmersión')}
+              </button>
+              {session.image?.status === 'pending' && (
+                <p className="mt-2 text-center text-xs text-neutral-500">{t('Puedes empezar ya: la imagen nunca bloquea el contenido.')}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );

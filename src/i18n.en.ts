@@ -2336,6 +2336,11 @@ export const EN: Record<string, string> = {
   'Collage histórico': 'Historical collage',
   'Cartel modernista': 'Modernist poster',
   'Ilustración editorial contemporánea': 'Contemporary editorial illustration',
+  'Fotografía realista': 'Realistic photograph',
+  'Fotografía histórica': 'Vintage photograph',
+  'Blanco y negro': 'Black & white',
+  Cinematográfico: 'Cinematic',
+  'Pintura al óleo': 'Oil painting',
   'Imagen decorativa': 'Decorative image',
   'Se genera una sola vez después de guardar la inmersión': 'Generated once after the immersion has been saved',
   'La imagen se genera una sola vez después de guardar el informe': 'Generated once after the report has been saved',
@@ -2353,6 +2358,19 @@ export const EN: Record<string, string> = {
   'Generar inmersión': 'Generate immersion',
   'Tu inmersión está lista': 'Your immersion is ready',
   'Puedes empezar ya: la imagen nunca bloquea el contenido.': 'You can start now: the image never blocks the content.',
+  Diseño: 'Design',
+  'Diseño de la imagen': 'Image design',
+  'Ajusta el estilo y la escena. Se genera una imagen nueva.': 'Adjust the style and scene. A new image is generated.',
+  'Descripción de la escena': 'Scene description',
+  'Describe la escena que quieres ver. Si lo dejas vacío, se deduce del contenido.':
+    'Describe the scene you want. If left empty, it is inferred from the content.',
+  'El estilo y las protecciones de «sin texto» se aplican automáticamente al generar.':
+    'The style and the “no text” safeguards are applied automatically on generation.',
+  'La imagen aparecerá aquí una vez generada.': 'The image will appear here once generated.',
+  'Añadir imagen decorativa': 'Add decorative image',
+  'La imagen no pudo generarse.': 'The image could not be generated.',
+  'Al generar se solicita una imagen nueva, que puede tener un coste adicional.':
+    'Generating requests a new image, which may incur an additional cost.',
 
   // ── Shared search result detail modal ────────────────────────────────────
   'El elemento ya no está disponible.': 'This item is no longer available.',

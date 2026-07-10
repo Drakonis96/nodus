@@ -1,9 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DecorativeImage, DecorativeImageEntityKind, DecorativeImageStyle } from '@shared/types';
-import { DECORATIVE_IMAGE_STYLES, imageStyleTemplate } from '@shared/imageStyles';
 import { confirm } from './feedback';
 import { Icon } from './ui';
 import { t } from '../i18n';
+import { DecorativeImageModal, type DecorativeImageQueueAction } from './DecorativeImageModal';
+
+/** A small pill button that opens the design modal without cluttering the view. */
+function DesignPill({ onClick, floating = false }: { onClick: () => void; floating?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        floating
+          ? 'absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/55 px-3 py-1.5 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition hover:bg-black/70'
+          : 'inline-flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white/70 px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:border-neutral-400 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-300 dark:hover:border-neutral-500'
+      }
+    >
+      <Icon name="palette" size={13} /> {t('Diseño')}
+    </button>
+  );
+}
 
 export function DecorativeImageCard({
   entityKind,
@@ -29,6 +45,7 @@ export function DecorativeImageCard({
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -75,19 +92,11 @@ export function DecorativeImageCard({
     };
   }, [current?.status, current?.updatedAt, entityKind, entityId, thumbnail]);
 
-  const queue = async (action: 'generate' | 'retry' | 'regenerate') => {
-    if (action === 'regenerate') {
-      const ok = await confirm({
-        title: t('Regenerar imagen'),
-        message: t('Se realizará una nueva generación y puede producir un coste adicional. ¿Continuar?'),
-        confirmLabel: t('Regenerar'),
-      });
-      if (!ok) return;
-    }
+  const queue = async (action: DecorativeImageQueueAction, opts: { style: DecorativeImageStyle; visualContext?: string }) => {
     setBusy(true);
     setActionError(null);
     try {
-      const pending = await window.nodus.queueDecorativeImage({ entityKind, entityId, action, style });
+      const pending = await window.nodus.queueDecorativeImage({ entityKind, entityId, action, style: opts.style, visualContext: opts.visualContext });
       setCurrent(pending);
       setStyle(pending.style);
       onChange?.(pending);
@@ -111,6 +120,7 @@ export function DecorativeImageCard({
       setCurrent(next);
       setDataUrl(null);
       setBusy(false);
+      setModalOpen(false);
       onChange?.(next);
     } catch (reason) {
       setActionError(reason instanceof Error ? reason.message : String(reason));
@@ -123,71 +133,70 @@ export function DecorativeImageCard({
   }
 
   const status = current?.status ?? 'not_requested';
+
+  const modal = interactive && modalOpen && (
+    <DecorativeImageModal
+      image={current}
+      dataUrl={dataUrl}
+      busy={busy}
+      error={actionError}
+      onQueue={(action, opts) => void queue(action, opts)}
+      onDelete={() => void remove()}
+      onClose={() => setModalOpen(false)}
+    />
+  );
+
+  if (status === 'ready' && dataUrl) {
+    return (
+      <>
+        <figure className={`group relative overflow-hidden rounded-2xl border border-neutral-200 shadow-xl shadow-black/10 ring-1 ring-black/5 dark:border-neutral-800 dark:shadow-black/40 ${className}`}>
+          <img src={dataUrl} alt="" decoding="async" className="aspect-[16/9] max-h-[26rem] w-full object-cover" />
+          {interactive && <DesignPill floating onClick={() => setModalOpen(true)} />}
+        </figure>
+        {modal}
+      </>
+    );
+  }
+
+  if (status === 'pending') {
+    return (
+      <>
+        <div className={`flex aspect-[16/9] max-h-[26rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950/40 ${className}`}>
+          <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-300">
+            <Icon name="sync" className="animate-spin" /> {t('Generando imagen decorativa en segundo plano…')}
+          </div>
+          {interactive && <DesignPill onClick={() => setModalOpen(true)} />}
+        </div>
+        {modal}
+      </>
+    );
+  }
+
+  if (status === 'failed') {
+    return (
+      <>
+        <div className={`flex aspect-[16/9] max-h-[26rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-amber-300 bg-amber-50 px-6 text-center dark:border-amber-900/50 dark:bg-amber-950/20 ${className}`}>
+          <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+            <Icon name="alert" size={16} /> {t('La imagen no pudo generarse.')}
+          </div>
+          {interactive && <DesignPill onClick={() => setModalOpen(true)} />}
+        </div>
+        {modal}
+      </>
+    );
+  }
+
+  // not_requested — a slim, unobtrusive entry point (never a big empty frame).
+  if (!interactive) return null;
   return (
-    <section className={`overflow-hidden rounded-xl border border-neutral-200 bg-white/70 dark:border-neutral-800 dark:bg-neutral-950/40 ${className}`}>
-      {dataUrl && (
-        <img src={dataUrl} alt="" decoding="async" className="aspect-[16/9] max-h-[28rem] w-full object-cover" />
-      )}
-      {status === 'pending' && (
-        <div className="flex min-h-32 items-center justify-center gap-2 p-5 text-sm text-indigo-600 dark:text-indigo-300">
-          <Icon name="sync" className="animate-spin" /> {t('Generando imagen decorativa en segundo plano…')}
-        </div>
-      )}
-      {status === 'failed' && (
-        <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
-          <Icon name="alert" size={14} className="mt-0.5" />
-          <div className="min-w-0 flex-1">
-            <div>{t('La imagen no pudo generarse. El contenido está guardado y funciona con normalidad.')}</div>
-            {current?.error && <div className="mt-1 break-words text-amber-700/70 dark:text-amber-400/70">{current.error}</div>}
-          </div>
-        </div>
-      )}
-      {actionError && (
-        <div className="border-b border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
-          {actionError}
-        </div>
-      )}
-      {interactive && (
-        <div className="flex flex-wrap items-center gap-2 p-3">
-          <label className="min-w-[13rem] flex-1 text-[10px] uppercase tracking-wide text-neutral-500">
-            {t('Estilo')}
-            <select className="input mt-1 w-full !py-1.5 text-xs" value={style} onChange={(event) => setStyle(event.target.value as DecorativeImageStyle)} disabled={status === 'pending'}>
-              {DECORATIVE_IMAGE_STYLES.map((entry) => <option key={entry.id} value={entry.id}>{t(entry.label)}</option>)}
-            </select>
-          </label>
-          <div className="flex flex-wrap items-center gap-2 self-end">
-            {status === 'not_requested' && (
-              <button className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700" disabled={busy} onClick={() => void queue('generate')}>
-                <Icon name={busy ? 'sync' : 'palette'} className={busy ? 'animate-spin' : ''} /> {t('Generar imagen')}
-              </button>
-            )}
-            {status === 'failed' && (
-              <button className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700" disabled={busy} onClick={() => void queue('retry')}>
-                <Icon name={busy ? 'sync' : 'refresh'} className={busy ? 'animate-spin' : ''} /> {t('Reintentar')}
-              </button>
-            )}
-            {status === 'pending' && (
-              <button className="btn btn-ghost gap-1.5 border border-neutral-300 text-red-600 dark:border-neutral-700 dark:text-red-400" onClick={() => void remove()}>
-                <Icon name="trash" /> {t('Eliminar imagen')}
-              </button>
-            )}
-            {status === 'ready' && (
-              <>
-                <button className="btn btn-ghost gap-1.5 border border-neutral-300 dark:border-neutral-700" onClick={() => void queue('regenerate')}>
-                  <Icon name="refresh" /> {t('Regenerar')}
-                </button>
-                <button className="btn btn-ghost gap-1.5 border border-neutral-300 text-red-600 dark:border-neutral-700 dark:text-red-400" onClick={() => void remove()}>
-                  <Icon name="trash" /> {t('Eliminar imagen')}
-                </button>
-              </>
-            )}
-          </div>
-          <div className="w-full text-[10px] text-neutral-600">
-            {t(imageStyleTemplate(style).label)}
-            {current?.provider && current.model ? ` · ${current.provider}/${current.model}` : ''}
-          </div>
-        </div>
-      )}
-    </section>
+    <>
+      <button
+        onClick={() => setModalOpen(true)}
+        className={`inline-flex items-center gap-2 rounded-full border border-dashed border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-500 transition hover:border-indigo-400 hover:text-indigo-500 dark:border-neutral-700 dark:text-neutral-400 dark:hover:border-indigo-600 dark:hover:text-indigo-300 ${className}`}
+      >
+        <Icon name="palette" size={15} /> {t('Añadir imagen decorativa')}
+      </button>
+      {modal}
+    </>
   );
 }
