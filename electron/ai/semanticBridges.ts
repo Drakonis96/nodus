@@ -11,6 +11,7 @@ import {
 } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
+import { yieldToEventLoop, YIELD_EVERY } from '../util/async';
 
 const SIM_THRESHOLD = 0.70;
 const TOP_K_PER_IDEA = 12;
@@ -134,7 +135,7 @@ function loadExistingEdgePairs(): Set<string> {
   return set;
 }
 
-function findCandidates(): Candidate[] {
+async function findCandidates(): Promise<Candidate[]> {
   const ideas = ideasWithEmbeddings();
   if (ideas.length < 2) return [];
 
@@ -145,7 +146,12 @@ function findCandidates(): Candidate[] {
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
   const seenPairs = new Set<string>();
 
+  // Each findSimilarIdeas() is a synchronous full-table vec_cosine scan, so this
+  // loop is O(N²) on the single main-thread event loop. Yield periodically so the
+  // UI and IPC stay responsive while bridge discovery runs in the background.
+  let scanned = 0;
   for (const a of ideas) {
+    if (++scanned % YIELD_EVERY === 0) await yieldToEventLoop();
     const similar = findSimilarIdeas(a.embedding, SIM_THRESHOLD, TOP_K_PER_IDEA, { excludeIds: [a.global_id] });
     for (const hit of similar) {
       const b = ideaById.get(hit.global_id);
@@ -312,7 +318,7 @@ export async function discoverSemanticBridges(
   try {
     emit({ phase: 'scan', label: 'Escaneando pares semánticos', current: 0, total: 0, candidatesFound: 0, bridgesAdded: 0 });
 
-    const candidates = findCandidates();
+    const candidates = await findCandidates();
     const crossTheme = candidates.filter((c) => c.crossTheme).length;
 
     emit({ phase: 'scan', label: `${candidates.length} candidatos encontrados (${crossTheme} cross-tema)`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: 0 });

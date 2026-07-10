@@ -9,6 +9,7 @@ import type {
   ChapterSuggestionMode,
   ChapterSuggestionStatus,
   ManuscriptClaimCheck,
+  ManuscriptClaimSeverity,
   ManuscriptClaimStatus,
   ManuscriptEvidenceCandidate,
   ManuscriptVerificationResult,
@@ -23,9 +24,12 @@ import type {
   ProjectSectionStatus,
 } from '@shared/types';
 import { buildProjectGuide, type ProjectGuide, type ProjectGuideAction, type ProjectGuideStepStatus } from '@shared/projectGuide';
+import { summarizeChecks } from '@shared/manuscriptVerifier';
 import { Icon } from '../components/ui';
+import { confirm } from '../components/feedback';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
+import { ProjectGuideStepModal } from '../components/ProjectGuideStepModal';
 import { notifyDataChanged, useDataRefresh } from '../hooks';
 import { t, tx } from '../i18n';
 
@@ -58,8 +62,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [newTitle, setNewTitle] = useState('');
   const [newBrief, setNewBrief] = useState('');
   const [newKind, setNewKind] = useState<ProjectKind>('thesis');
-  const [briefEditing, setBriefEditing] = useState(false);
-  const [briefDraft, setBriefDraft] = useState('');
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
@@ -138,8 +141,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   }, [selectedChapter, loadChapterArtifacts]);
 
   useEffect(() => {
-    setBriefDraft(detail?.project.brief ?? '');
-    setBriefEditing(false);
+    setEditingStepId(null);
   }, [detail?.project.id]);
 
   const refreshActiveProject = useCallback(async () => {
@@ -176,11 +178,14 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
   const deleteActiveProject = async () => {
     if (!detail) return;
-    const ok = window.confirm(
-      tx('¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.', {
+    const ok = await confirm({
+      title: t('Eliminar proyecto'),
+      message: tx('¿Eliminar el proyecto «{title}»? Se borrarán sus secciones, vínculos y capítulos. Las notas y carpetas creadas se conservan. Esta acción no se puede deshacer.', {
         title: detail.project.title,
-      })
-    );
+      }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
     if (!ok) return;
     setBusy('delete-project');
     try {
@@ -196,12 +201,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     }
   };
 
-  const saveProjectBrief = async () => {
+  const saveProjectBrief = async (brief: string) => {
     if (!detail) return;
     setBusy('save-brief');
     try {
-      await window.nodus.updateProject({ id: detail.project.id, brief: briefDraft.trim() });
-      setBriefEditing(false);
+      await window.nodus.updateProject({ id: detail.project.id, brief: brief.trim() });
+      setEditingStepId(null);
       setMessage(t('Brief actualizado. El flujo guiado ya usa este objetivo.'));
       notifyDataChanged();
       await refreshActiveProject();
@@ -220,6 +225,30 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     setBusy(`section-${role}`);
     try {
       await window.nodus.updateProjectSection({ id: section.id, status });
+      setEditingStepId(null);
+      setMessage(successMessage);
+      notifyDataChanged();
+      await refreshActiveProject();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const updateSectionStatuses = async (
+    updates: { role: ProjectSectionRole; status: ProjectSectionStatus }[],
+    successMessage: string
+  ) => {
+    const resolved = updates
+      .map(({ role, status }) => {
+        const section = sectionByRole(role);
+        return section ? { id: section.id, status } : null;
+      })
+      .filter((item): item is { id: string; status: ProjectSectionStatus } => item !== null);
+    if (resolved.length === 0) return;
+    setBusy('section-batch');
+    try {
+      await Promise.all(resolved.map((item) => window.nodus.updateProjectSection(item)));
+      setEditingStepId(null);
       setMessage(successMessage);
       notifyDataChanged();
       await refreshActiveProject();
@@ -257,7 +286,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       if (chapter) {
         setSelectedChapterId(chapter.id);
         setTab('texto');
-        setMessage(t('Capitulo importado y guardado como nota vinculada.'));
+        setMessage(t('Capítulo importado y guardado como nota vinculada.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -272,7 +301,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     try {
       const updated = await window.nodus.updateProjectChapter(selectedChapter.id, chapterMarkdown);
       if (updated) {
-        setMessage(t('Capitulo guardado con version previa recuperable.'));
+        setMessage(t('Capítulo guardado con versión previa recuperable.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -357,6 +386,32 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     }
   };
 
+  const applyCitation = async (claim: ManuscriptClaimCheck, candidate: ManuscriptEvidenceCandidate) => {
+    if (!selectedChapter) return;
+    const citationMarkdown = `[${candidate.label}](${candidate.citation})`;
+    setBusy(candidateApplyKey(claim.id, candidate));
+    try {
+      const result = await window.nodus.applyManuscriptCitation({
+        chapterId: selectedChapter.id,
+        excerpt: claim.excerpt,
+        citationMarkdown,
+      });
+      if (result?.applied && result.chapter) {
+        setChapterMarkdown(result.chapter.currentMarkdown);
+        // Keep the verification panel: update this claim in place instead of reloading
+        // chapter artifacts (which would clear the results). Refresh only version history.
+        setVerification((prev) => (prev ? markClaimCited(prev, claim.id, citationMarkdown) : prev));
+        setVersions(await window.nodus.listProjectChapterVersions(selectedChapter.id));
+        setMessage(t('Cita aplicada al borrador sobre una versión nueva recuperable.'));
+        notifyDataChanged();
+      } else {
+        setMessage(t('No se pudo localizar la frase exacta en el borrador; insértala manualmente desde el texto.'));
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const updateSuggestion = async (suggestion: ProjectInsertionSuggestion, status: ChapterSuggestionStatus) => {
     const updated = await window.nodus.updateProjectSuggestionStatus(suggestion.id, status);
     if (updated) setSuggestions((items) => items.map((item) => (item.id === updated.id ? updated : item)));
@@ -369,7 +424,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       const updated = await window.nodus.applyProjectSuggestions({ chapterId: selectedChapter.id, suggestionIds: ids });
       if (updated) {
         setChapterMarkdown(updated.currentMarkdown);
-        setMessage(t('Sugerencias aplicadas sobre una version nueva del borrador.'));
+        setMessage(t('Sugerencias aplicadas sobre una versión nueva del borrador.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -384,7 +439,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       const chapter = await window.nodus.restoreProjectChapterVersion(versionId);
       if (chapter) {
         setChapterMarkdown(chapter.currentMarkdown);
-        setMessage(t('Version restaurada. Se guardo una copia previa antes de restaurar.'));
+        setMessage(t('Versión restaurada. Se guardó una copia previa antes de restaurar.'));
         notifyDataChanged();
         await refreshActiveProject();
       }
@@ -398,7 +453,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     setBusy('export-chapter');
     try {
       const result = await window.nodus.exportProjectChapter({ chapterId: selectedChapter.id, format: chapterExportFormat });
-      if (result) setMessage(`${t('Capitulo exportado:')} ${result.path}`);
+      if (result) setMessage(`${t('Capítulo exportado:')} ${result.path}`);
     } finally {
       setBusy(null);
     }
@@ -416,10 +471,6 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   };
 
   const runGuideAction = (action: ProjectGuideAction) => {
-    if (action === 'edit_brief') {
-      setBriefEditing(true);
-      return;
-    }
     if (action === 'mark_coverage') {
       void updateSectionStatus('coverage', 'in_progress', t('Cobertura marcada como en curso.'));
       return;
@@ -433,10 +484,12 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       return;
     }
     if (action === 'import_chapter') {
+      setEditingStepId(null);
       void importChapter();
       return;
     }
     if (action === 'review_chapter') {
+      setEditingStepId(null);
       if (!selectedChapter) {
         void importChapter();
         return;
@@ -451,10 +504,10 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
     .map((suggestion) => suggestion.id);
 
   return (
-    <div className="h-full flex min-h-0 bg-neutral-950">
-      <aside className="w-72 shrink-0 border-r border-neutral-800 p-3 flex flex-col gap-3 overflow-y-auto">
+    <div className="h-full flex min-h-0 bg-white dark:bg-neutral-950">
+      <aside className="w-72 shrink-0 border-r border-neutral-200 p-3 flex flex-col gap-3 overflow-y-auto dark:border-neutral-800">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{t('Proyectos')}</h2>
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{t('Proyectos')}</h2>
           <button className="btn btn-ghost text-xs gap-1.5" onClick={() => void loadProjects()}>
             <Icon name="sync" size={14} /> {t('Actualizar')}
           </button>
@@ -464,25 +517,25 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             <button
               key={project.id}
               className={`w-full text-left border rounded-lg p-3 transition-colors ${
-                activeId === project.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:bg-neutral-900'
+                activeId === project.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
               }`}
               onClick={() => setActiveId(project.id)}
             >
-              <div className="font-medium text-sm truncate">{project.title}</div>
+              <div className="font-medium text-sm truncate text-neutral-900 dark:text-neutral-100">{project.title}</div>
               <div className="text-xs text-neutral-500 mt-1">{kindLabel(project.kind)} · {project.status}</div>
             </button>
           ))}
           {projects.length === 0 && (
-            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-4">
-              {t('Aun no hay proyectos. Crea uno para vincular notas, materiales y capitulos.')}
+            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
+              {t('Aún no hay proyectos. Crea uno para vincular notas, materiales y capítulos.')}
             </div>
           )}
         </div>
-        <div className="border border-neutral-800 rounded-lg p-3 space-y-2">
-          <div className="text-xs font-semibold text-neutral-300">{t('Nuevo proyecto')}</div>
+        <div className="border border-neutral-200 rounded-lg p-3 space-y-2 dark:border-neutral-800">
+          <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{t('Nuevo proyecto')}</div>
           <input
             className="input w-full text-sm"
-            placeholder={t('Titulo')}
+            placeholder={t('Título')}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
           />
@@ -508,22 +561,22 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
           <div className="h-full flex items-center justify-center text-neutral-500">{t('Selecciona o crea un proyecto.')}</div>
         ) : (
           <>
-            <header className="border-b border-neutral-800 px-5 py-4 flex items-start gap-4">
+            <header className="border-b border-neutral-200 px-5 py-4 flex items-start gap-4 dark:border-neutral-800">
               <div className="min-w-0 flex-1">
                 <div className="text-xs uppercase tracking-wide text-neutral-500">{kindLabel(detail.project.kind)}</div>
-                <h1 className="text-xl font-semibold truncate">{detail.project.title}</h1>
-                <p className="text-sm text-neutral-400 line-clamp-2 mt-1">{detail.project.brief || t('Sin brief definido.')}</p>
+                <h1 className="text-xl font-semibold truncate text-neutral-900 dark:text-neutral-100">{detail.project.title}</h1>
+                <p className="text-sm text-neutral-500 line-clamp-2 mt-1 dark:text-neutral-400">{detail.project.brief || t('Sin brief definido.')}</p>
               </div>
               <div className="flex items-center gap-2">
                 <select className="input text-xs" value={projectExportFormat} onChange={(e) => setProjectExportFormat(e.target.value as ProjectExportFormat)}>
                   <option value="markdown">Markdown</option>
                   <option value="json">JSON</option>
                 </select>
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={exportProjectFile} disabled={busy === 'export-project'}>
+                <button className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700" onClick={exportProjectFile} disabled={busy === 'export-project'}>
                   <Icon name={busy === 'export-project' ? 'sync' : 'download'} className={busy === 'export-project' ? 'animate-spin' : ''} /> {t('Exportar proyecto')}
                 </button>
                 <button
-                  className="btn btn-ghost border border-neutral-700 gap-1.5 text-red-300 hover:bg-red-950/40"
+                  className="btn btn-ghost border border-red-300 gap-1.5 text-red-700 hover:bg-red-100 dark:border-neutral-700 dark:text-red-300 dark:hover:bg-red-950/40"
                   onClick={deleteActiveProject}
                   disabled={busy === 'delete-project'}
                   title={t('Eliminar proyecto')}
@@ -534,10 +587,10 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
             </header>
 
             {message && (
-              <div className="mx-5 mt-3 px-3 py-2 rounded-lg border border-neutral-800 bg-neutral-900 text-sm text-neutral-300 flex items-center gap-2">
-                <Icon name="check" size={14} className="text-emerald-400" />
+              <div className="mx-5 mt-3 px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-100 text-sm text-neutral-700 flex items-center gap-2 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+                <Icon name="check" size={14} className="text-emerald-600 dark:text-emerald-400" />
                 <span className="flex-1">{message}</span>
-                <button className="text-neutral-500 hover:text-neutral-200" onClick={() => setMessage(null)}>x</button>
+                <button className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200" onClick={() => setMessage(null)}>x</button>
               </div>
             )}
 
@@ -545,21 +598,28 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
               <ProjectGuidePanel
                 guide={guide}
                 busy={busy}
-                briefDraft={briefDraft}
-                briefEditing={briefEditing}
-                onBriefDraftChange={setBriefDraft}
-                onEditBrief={() => setBriefEditing(true)}
-                onCancelBrief={() => {
-                  setBriefDraft(detail.project.brief);
-                  setBriefEditing(false);
-                }}
-                onSaveBrief={() => void saveProjectBrief()}
-                onAction={(action) => runGuideAction(action)}
+                onStepClick={(stepId) => setEditingStepId(stepId)}
+              />
+            )}
+            {guide && editingStepId && (
+              <ProjectGuideStepModal
+                step={guide.steps.find((s) => s.id === editingStepId)!}
+                detail={detail}
+                busy={busy}
+                onClose={() => setEditingStepId(null)}
+                onSaveBrief={(brief) => void saveProjectBrief(brief)}
+                onUpdateSections={(updates) =>
+                  void updateSectionStatuses(
+                    updates,
+                    t('Sección actualizada. El flujo guiado refleja el cambio.')
+                  )
+                }
+                onRunAction={(action) => runGuideAction(action)}
               />
             )}
 
             <div className="grid grid-cols-[minmax(220px,300px)_1fr] gap-0 flex-1 min-h-0">
-              <section className="border-r border-neutral-800 p-4 overflow-y-auto">
+              <section className="border-r border-neutral-200 p-4 overflow-y-auto dark:border-neutral-800">
                 <div className="grid grid-cols-3 gap-2 mb-4">
                   <Stat label={t('Secciones')} value={detail.stats.sections} />
                   <Stat label={t('Materiales')} value={detail.stats.links} />
@@ -568,37 +628,37 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold">{t('Secciones')}</h3>
                   <button className="btn btn-primary text-xs gap-1.5" onClick={importChapter} disabled={busy === 'import'}>
-                    <Icon name={busy === 'import' ? 'sync' : 'upload'} className={busy === 'import' ? 'animate-spin' : ''} /> {t('Subir capitulo')}
+                    <Icon name={busy === 'import' ? 'sync' : 'upload'} className={busy === 'import' ? 'animate-spin' : ''} /> {t('Subir capítulo')}
                   </button>
                 </div>
                 <div className="space-y-2">
                   {detail.sections.map((section) => (
-                    <div key={section.id} className="border border-neutral-800 rounded-lg p-3">
-                      <div className="text-sm font-medium">{section.title}</div>
+                    <div key={section.id} className="border border-neutral-200 rounded-lg p-3 dark:border-neutral-800">
+                      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{section.title}</div>
                       <div className="text-xs text-neutral-500">{section.role} · {section.status}</div>
                     </div>
                   ))}
                 </div>
-                <h3 className="text-sm font-semibold mt-5 mb-2">{t('Capitulos')}</h3>
+                <h3 className="text-sm font-semibold mt-5 mb-2">{t('Capítulos')}</h3>
                 <div className="space-y-2">
                   {detail.chapters.map((chapter) => (
                     <button
                       key={chapter.id}
                       className={`w-full text-left border rounded-lg p-3 ${
-                        selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-800 hover:bg-neutral-900'
+                        selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
                       }`}
                       onClick={() => {
                         setSelectedChapterId(chapter.id);
                         setTab('texto');
                       }}
                     >
-                      <div className="text-sm font-medium truncate">{chapter.title}</div>
+                      <div className="text-sm font-medium truncate text-neutral-900 dark:text-neutral-100">{chapter.title}</div>
                       <div className="text-xs text-neutral-500">{chapter.wordCount} {t('palabras')} · {chapter.sourceFormat}</div>
                     </button>
                   ))}
                   {detail.chapters.length === 0 && (
-                    <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-4">
-                      {t('Sube un capitulo para empezar a trabajar sobre el manuscrito.')}
+                    <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
+                      {t('Sube un capítulo para empezar a trabajar sobre el manuscrito.')}
                     </div>
                   )}
                 </div>
@@ -606,18 +666,18 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
               <section className="min-w-0 min-h-0 flex flex-col">
                 {!selectedChapter ? (
-                  <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capitulo seleccionado.')}</div>
+                  <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capítulo seleccionado.')}</div>
                 ) : (
                   <>
-                    <div className="border-b border-neutral-800 p-3 flex flex-wrap items-center gap-2">
+                    <div className="border-b border-neutral-200 p-3 flex flex-wrap items-center gap-2 dark:border-neutral-800">
                       <div className="min-w-0 flex-1">
-                        <div className="font-semibold truncate">{selectedChapter.title}</div>
+                        <div className="font-semibold truncate text-neutral-900 dark:text-neutral-100">{selectedChapter.title}</div>
                         <div className="text-xs text-neutral-500">{selectedChapter.wordCount} {t('palabras')} · {selectedChapter.originalFileName ?? selectedChapter.sourceFormat}</div>
                       </div>
                       {(['texto', 'relaciones', 'verificacion', 'sugerencias', 'versiones', 'exportar'] as ChapterTab[]).map((item) => (
                         <button
                           key={item}
-                          className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+                          className={`btn text-xs ${tab === item ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`}
                           onClick={() => setTab(item)}
                         >
                           {tabLabel(item)}
@@ -627,15 +687,15 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
                     {tab === 'texto' && (
                       <div className="flex-1 min-h-0 grid grid-cols-2">
-                        <div className="border-r border-neutral-800 min-h-0 flex flex-col">
-                          <div className="p-3 border-b border-neutral-800 flex items-center gap-2">
+                        <div className="border-r border-neutral-200 min-h-0 flex flex-col dark:border-neutral-800">
+                          <div className="p-3 border-b border-neutral-200 flex items-center gap-2 dark:border-neutral-800">
                             <button className="btn btn-primary gap-1.5" onClick={saveChapter} disabled={busy === 'save-chapter'}>
                               <Icon name={busy === 'save-chapter' ? 'sync' : 'check'} className={busy === 'save-chapter' ? 'animate-spin' : ''} /> {t('Guardar')}
                             </button>
-                            <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea version previa.')}</div>
+                            <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea versión previa.')}</div>
                           </div>
                           <textarea
-                            className="flex-1 min-h-0 bg-neutral-950 text-neutral-100 p-4 outline-none resize-none font-mono text-sm leading-relaxed"
+                            className="flex-1 min-h-0 bg-white text-neutral-900 p-4 outline-none resize-none font-mono text-sm leading-relaxed dark:bg-neutral-950 dark:text-neutral-100"
                             value={chapterMarkdown}
                             onChange={(e) => setChapterMarkdown(e.target.value)}
                           />
@@ -647,7 +707,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'relaciones' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="flex items-center gap-2 mb-4">
                           <button className="btn btn-primary gap-1.5" onClick={() => void analyzeRelations(true)} disabled={busy === 'relations'}>
                             <Icon name={busy === 'relations' ? 'sync' : 'network'} className={busy === 'relations' ? 'animate-spin' : ''} /> {t('Analizar relaciones')}
@@ -672,7 +732,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             <ChapterIdeaCard key={idea.id} idea={idea} relations={rels} onOpen={(c) => setCitation(c)} />
                           ))}
                           {(!relations || !relations.analyzed) && busy !== 'relations' && (
-                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
+                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-5 dark:border-neutral-800">
                               {t('Analiza las relaciones para ver cómo conecta este capítulo con toda tu biblioteca.')}
                             </div>
                           )}
@@ -681,7 +741,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'verificacion' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="mb-4 flex flex-wrap items-center gap-2">
                           <button className="btn btn-primary gap-1.5" onClick={() => void verifyManuscript()} disabled={busy === 'verify-manuscript'}>
                             <Icon name={busy === 'verify-manuscript' ? 'sync' : 'search'} className={busy === 'verify-manuscript' ? 'animate-spin' : ''} /> {t('Verificar citas')}
@@ -709,7 +769,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                         {verification?.warnings.length ? (
                           <div className="mb-4 space-y-2">
                             {verification.warnings.map((warning) => (
-                              <div key={warning} className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                              <div key={warning} className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
                                 <Icon name="alert" size={14} className="mt-0.5" />
                                 <span>{warning}</span>
                               </div>
@@ -719,7 +779,13 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
                         <div className="space-y-3">
                           {verification?.claims.map((claim) => (
-                            <ManuscriptClaimCard key={claim.id} claim={claim} onOpen={(target) => setCitation(target)} />
+                            <ManuscriptClaimCard
+                              key={claim.id}
+                              claim={claim}
+                              busy={busy}
+                              onOpen={(target) => setCitation(target)}
+                              onApplyCitation={(candidate) => void applyCitation(claim, candidate)}
+                            />
                           ))}
                           {!verification && busy !== 'verify-manuscript' && (
                             <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-5 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
@@ -736,20 +802,20 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'sugerencias' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 bg-white dark:bg-transparent">
                         <div className="flex items-center gap-2 mb-4">
                           <select className="input text-sm" value={mode} onChange={(e) => setMode(e.target.value as ChapterSuggestionMode)}>
-                            <option value="suggest">{t('Sugerir ubicacion')}</option>
+                            <option value="suggest">{t('Sugerir ubicación')}</option>
                             <option value="insert">{t('Insertar en borrador')}</option>
                           </select>
                           <button className="btn btn-primary gap-1.5" onClick={generateSuggestions} disabled={busy === 'suggest'}>
                             <Icon name={busy === 'suggest' ? 'sync' : 'wand'} className={busy === 'suggest' ? 'animate-spin' : ''} /> {t('Generar sugerencias')}
                           </button>
                           <button
-                            className="btn btn-ghost border border-neutral-700 gap-1.5"
+                            className="btn btn-ghost border border-neutral-300 gap-1.5 dark:border-neutral-700"
                             onClick={() => applySuggestions(verifiedSuggestionIds)}
                             disabled={busy === 'apply' || verifiedSuggestionIds.length === 0 || mode !== 'insert'}
-                            title={mode !== 'insert' ? t('Cambia a Insertar en borrador para aplicar automaticamente.') : undefined}
+                            title={mode !== 'insert' ? t('Cambia a Insertar en borrador para aplicar automáticamente.') : undefined}
                           >
                             <Icon name={busy === 'apply' ? 'sync' : 'check'} className={busy === 'apply' ? 'animate-spin' : ''} /> {t('Aplicar todas verificadas')}
                           </button>
@@ -766,7 +832,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                             />
                           ))}
                           {suggestions.length === 0 && (
-                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-800 rounded-lg p-5">
+                            <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-5 dark:border-neutral-800">
                               {t('Genera sugerencias para que Nodus proponga inserciones con citas verificables.')}
                             </div>
                           )}
@@ -775,29 +841,29 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     )}
 
                     {tab === 'versiones' && (
-                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+                      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 bg-white dark:bg-transparent">
                         {versions.map((version) => (
-                          <div key={version.id} className="border border-neutral-800 rounded-lg p-3">
+                          <div key={version.id} className="border border-neutral-200 rounded-lg p-3 dark:border-neutral-800">
                             <div className="flex items-center gap-3">
                               <div className="flex-1">
-                                <div className="font-medium text-sm">{version.label}</div>
+                                <div className="font-medium text-sm text-neutral-900 dark:text-neutral-100">{version.label}</div>
                                 <div className="text-xs text-neutral-500">{new Date(version.createdAt).toLocaleString()}</div>
                               </div>
-                              <button className="btn btn-ghost border border-neutral-700" onClick={() => void restoreVersion(version.id)} disabled={busy === `restore-${version.id}`}>
+                              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => void restoreVersion(version.id)} disabled={busy === `restore-${version.id}`}>
                                 {t('Restaurar')}
                               </button>
                             </div>
                             <pre className="mt-3 max-h-36 overflow-hidden text-xs text-neutral-500 whitespace-pre-wrap">{version.markdown.slice(0, 900)}</pre>
                           </div>
                         ))}
-                        {versions.length === 0 && <div className="text-sm text-neutral-500">{t('Aun no hay versiones guardadas.')}</div>}
+                        {versions.length === 0 && <div className="text-sm text-neutral-500">{t('Aún no hay versiones guardadas.')}</div>}
                       </div>
                     )}
 
                     {tab === 'exportar' && (
-                      <div className="flex-1 p-5">
-                        <div className="max-w-md border border-neutral-800 rounded-lg p-4 space-y-3">
-                          <div className="font-semibold">{t('Exportar capitulo actual')}</div>
+                      <div className="flex-1 p-5 bg-white dark:bg-transparent">
+                        <div className="max-w-md border border-neutral-200 rounded-lg p-4 space-y-3 dark:border-neutral-800">
+                          <div className="font-semibold text-neutral-900 dark:text-neutral-100">{t('Exportar capítulo actual')}</div>
                           <select className="input w-full" value={chapterExportFormat} onChange={(e) => setChapterExportFormat(e.target.value as ChapterExportFormat)}>
                             <option value="markdown">Markdown</option>
                             <option value="txt">TXT</option>
@@ -825,8 +891,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="border border-neutral-800 rounded-lg p-2">
-      <div className="text-lg font-semibold">{value}</div>
+    <div className="border border-neutral-200 rounded-lg p-2 dark:border-neutral-800">
+      <div className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{value}</div>
       <div className="text-[11px] text-neutral-500">{label}</div>
     </div>
   );
@@ -892,12 +958,39 @@ function claimStatusMeta(status: ManuscriptClaimStatus): { label: string; classN
   }
 }
 
+function candidateApplyKey(claimId: string, candidate: ManuscriptEvidenceCandidate): string {
+  return `apply-citation:${claimId}:${candidate.kind}:${candidate.refId}`;
+}
+
+function markClaimCited(
+  result: ManuscriptVerificationResult,
+  claimId: string,
+  citationMarkdown: string
+): ManuscriptVerificationResult {
+  const claims = result.claims.map((claim) =>
+    claim.id === claimId
+      ? {
+          ...claim,
+          status: 'covered' as ManuscriptClaimStatus,
+          severity: 'info' as ManuscriptClaimSeverity,
+          hasCitation: true,
+          existingCitations: [...claim.existingCitations, citationMarkdown],
+        }
+      : claim
+  );
+  return { ...result, claims, summary: summarizeChecks(claims, result.summary.totalClaims) };
+}
+
 function ManuscriptClaimCard({
   claim,
+  busy,
   onOpen,
+  onApplyCitation,
 }: {
   claim: ManuscriptClaimCheck;
+  busy: string | null;
   onOpen: (citation: CitationTarget) => void;
+  onApplyCitation: (candidate: ManuscriptEvidenceCandidate) => void;
 }) {
   const meta = claimStatusMeta(claim.status);
   return (
@@ -933,13 +1026,22 @@ function ManuscriptClaimCard({
       )}
 
       <div className="mt-3">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{t('Candidatos de cita')}</div>
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+          {t('Candidatos de cita')} <span className="font-normal normal-case text-neutral-400">· {t('ordenados por afinidad')}</span>
+        </div>
         {claim.suggestedCitations.length === 0 ? (
           <div className="text-xs text-neutral-500">{t('Sin citas sugeridas.')}</div>
         ) : (
           <div className="grid gap-2 md:grid-cols-2">
             {claim.suggestedCitations.map((candidate) => (
-              <EvidenceCandidateButton key={`${candidate.kind}:${candidate.refId}`} candidate={candidate} onOpen={onOpen} />
+              <EvidenceCandidateButton
+                key={`${candidate.kind}:${candidate.refId}`}
+                claimId={claim.id}
+                candidate={candidate}
+                busy={busy}
+                onOpen={onOpen}
+                onApply={onApplyCitation}
+              />
             ))}
           </div>
         )}
@@ -949,52 +1051,70 @@ function ManuscriptClaimCard({
 }
 
 function EvidenceCandidateButton({
+  claimId,
   candidate,
+  busy,
   onOpen,
+  onApply,
 }: {
+  claimId: string;
   candidate: ManuscriptEvidenceCandidate;
+  busy: string | null;
   onOpen: (citation: CitationTarget) => void;
+  onApply: (candidate: ManuscriptEvidenceCandidate) => void;
 }) {
   const title = candidate.workTitle && candidate.workTitle !== candidate.label ? `${candidate.label} · ${candidate.workTitle}` : candidate.label;
+  const applying = busy === candidateApplyKey(claimId, candidate);
   return (
-    <button
-      type="button"
-      className="min-w-0 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:bg-neutral-900"
-      onClick={() => onOpen({ kind: candidate.kind, id: candidate.refId })}
+    <div
+      className={`flex min-w-0 flex-col rounded-md border px-3 py-2 ${
+        candidate.aiEndorsed
+          ? 'border-indigo-300 bg-indigo-50/70 dark:border-indigo-700/60 dark:bg-indigo-950/25'
+          : 'border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50'
+      }`}
     >
       <div className="flex items-center gap-2">
         <Icon name={candidate.kind === 'idea' ? 'bulb' : 'quote'} size={13} className="text-indigo-500 dark:text-indigo-300" />
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800 dark:text-neutral-100">{title}</span>
+        {candidate.aiEndorsed && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded border border-indigo-300 bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-900/40 dark:text-indigo-200">
+            <Icon name="check" size={10} /> {t('Recomendada')}
+          </span>
+        )}
         <span className="shrink-0 text-[10px] tabular-nums text-neutral-500">{Math.round(candidate.score * 100)}%</span>
       </div>
       <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{candidate.snippet}</p>
       {candidate.pageLabel && <div className="mt-1 text-[11px] text-neutral-500">{candidate.pageLabel}</div>}
-    </button>
+      <div className="mt-2 flex items-center gap-1.5">
+        <button
+          type="button"
+          className="btn btn-primary gap-1 px-2 py-1 text-[11px]"
+          onClick={() => onApply(candidate)}
+          disabled={busy !== null}
+        >
+          <Icon name={applying ? 'sync' : 'check'} size={12} className={applying ? 'animate-spin' : ''} /> {t('Aplicar cita')}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost gap-1 px-2 py-1 text-[11px]"
+          onClick={() => onOpen({ kind: candidate.kind, id: candidate.refId })}
+        >
+          <Icon name="quote" size={12} /> {t('Ver fuente')}
+        </button>
+      </div>
+    </div>
   );
 }
 
 function ProjectGuidePanel({
   guide,
   busy,
-  briefDraft,
-  briefEditing,
-  onBriefDraftChange,
-  onEditBrief,
-  onCancelBrief,
-  onSaveBrief,
-  onAction,
+  onStepClick,
 }: {
   guide: ProjectGuide;
   busy: string | null;
-  briefDraft: string;
-  briefEditing: boolean;
-  onBriefDraftChange: (value: string) => void;
-  onEditBrief: () => void;
-  onCancelBrief: () => void;
-  onSaveBrief: () => void;
-  onAction: (action: ProjectGuideAction) => void;
+  onStepClick: (stepId: string) => void;
 }) {
-  const next = guide.nextStep;
   const disabled = Boolean(busy);
 
   return (
@@ -1008,23 +1128,15 @@ function ProjectGuidePanel({
               {guide.doneCount}/{guide.totalCount}
             </span>
           </div>
-          <p className="mt-1 text-xs text-neutral-500">{next ? t(next.summary) : t(guide.subtitle)}</p>
+          <p className="mt-1 text-xs text-neutral-500">{t(guide.subtitle)}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-ghost border border-neutral-300 text-xs gap-1.5 dark:border-neutral-700" onClick={onEditBrief} disabled={disabled}>
-            <Icon name="edit" size={13} /> {t('Editar brief')}
-          </button>
-          {next ? (
-            <button className="btn btn-primary text-xs gap-1.5" onClick={() => onAction(next.action)} disabled={disabled}>
-              <Icon name={busy ? 'sync' : actionIcon(next.action)} size={13} className={busy ? 'animate-spin' : ''} />
-              {t(next.actionLabel)}
-            </button>
-          ) : (
+        {guide.doneCount === guide.totalCount && (
+          <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
               <Icon name="check" size={13} /> {t('Completado')}
             </span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
@@ -1033,35 +1145,22 @@ function ProjectGuidePanel({
 
       <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-6">
         {guide.steps.map((step) => (
-          <div key={step.id} className={`min-w-0 rounded-md border px-2.5 py-2 ${guideStepClass(step.status)}`}>
+          <button
+            key={step.id}
+            type="button"
+            className={`min-w-0 rounded-md border px-2.5 py-2 text-left transition-opacity hover:opacity-90 ${guideStepClass(step.status)}`}
+            onClick={() => onStepClick(step.id)}
+            disabled={disabled}
+            title={t(step.title)}
+          >
             <div className="flex items-center gap-1.5">
               <Icon name={guideStepIcon(step.status)} size={13} />
               <span className="truncate text-xs font-medium">{t(step.title)}</span>
             </div>
-            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">{step.evidence}</p>
-          </div>
+            <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500 dark:text-neutral-500">{step.evidence}</p>
+          </button>
         ))}
       </div>
-
-      {briefEditing && (
-        <div className="mt-3 rounded-md border border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-neutral-950">
-          <textarea
-            className="input min-h-20 w-full resize-y text-sm"
-            value={briefDraft}
-            onChange={(e) => onBriefDraftChange(e.target.value)}
-            placeholder={t('Objetivo, alcance, pregunta principal y criterio de selección')}
-          />
-          <div className="mt-2 flex justify-end gap-2">
-            <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={onCancelBrief} disabled={busy === 'save-brief'}>
-              {t('Cancelar')}
-            </button>
-            <button className="btn btn-primary text-xs gap-1.5" onClick={onSaveBrief} disabled={busy === 'save-brief'}>
-              <Icon name={busy === 'save-brief' ? 'sync' : 'check'} size={13} className={busy === 'save-brief' ? 'animate-spin' : ''} />
-              {t('Guardar brief')}
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -1080,26 +1179,26 @@ function SuggestionCard({
   canApply: boolean;
 }) {
   return (
-    <div className={`border rounded-lg p-4 ${suggestion.blockedReason ? 'border-amber-600/50 bg-amber-500/5' : 'border-neutral-800'}`}>
+    <div className={`border rounded-lg p-4 ${suggestion.blockedReason ? 'border-amber-300 bg-amber-50 dark:border-amber-600/50 dark:bg-amber-500/5' : 'border-neutral-200 dark:border-neutral-800'}`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{suggestion.refLabel}</div>
+          <div className="text-sm font-semibold truncate text-neutral-900 dark:text-neutral-100">{suggestion.refLabel}</div>
           <div className="text-xs text-neutral-500">
             {suggestion.kind} · {suggestion.operation} · {suggestion.status} · {Math.round(suggestion.confidence * 100)}%
           </div>
         </div>
-        <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => onStatus('accepted')} disabled={suggestion.status === 'accepted'}>
+        <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={() => onStatus('accepted')} disabled={suggestion.status === 'accepted'}>
           {t('Aceptar')}
         </button>
-        <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => onStatus('rejected')} disabled={suggestion.status === 'rejected'}>
+        <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" onClick={() => onStatus('rejected')} disabled={suggestion.status === 'rejected'}>
           {t('Rechazar')}
         </button>
         <button className="btn btn-primary text-xs" onClick={onApply} disabled={!canApply}>
           {t('Aplicar')}
         </button>
       </div>
-      {suggestion.blockedReason && <div className="mt-2 text-xs text-amber-300">{suggestion.blockedReason}</div>}
-      <div className="mt-3 border border-neutral-800 rounded-lg p-3 bg-neutral-950">
+      {suggestion.blockedReason && <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">{suggestion.blockedReason}</div>}
+      <div className="mt-3 border border-neutral-200 rounded-lg p-3 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950">
         <Markdown content={suggestion.proposedText} onCitation={onCitation} />
       </div>
       <div className="mt-2 text-xs text-neutral-500">{suggestion.rationale}</div>
@@ -1108,11 +1207,11 @@ function SuggestionCard({
 }
 
 const RELATION_META: Record<ChapterRelationType, { label: string; color: string }> = {
-  supports: { label: 'apoya', color: 'text-emerald-300 border-emerald-700/60 bg-emerald-900/20' },
-  contradicts: { label: 'contradice', color: 'text-red-300 border-red-700/60 bg-red-900/20' },
-  refines: { label: 'matiza', color: 'text-amber-300 border-amber-700/60 bg-amber-900/20' },
-  extends: { label: 'amplía', color: 'text-cyan-300 border-cyan-700/60 bg-cyan-900/20' },
-  related: { label: 'relacionada', color: 'text-neutral-300 border-neutral-700 bg-neutral-800/40' },
+  supports: { label: 'apoya', color: 'text-emerald-700 border-emerald-200 bg-emerald-50 dark:text-emerald-300 dark:border-emerald-700/60 dark:bg-emerald-900/20' },
+  contradicts: { label: 'contradice', color: 'text-red-700 border-red-200 bg-red-50 dark:text-red-300 dark:border-red-700/60 dark:bg-red-900/20' },
+  refines: { label: 'matiza', color: 'text-amber-700 border-amber-200 bg-amber-50 dark:text-amber-300 dark:border-amber-700/60 dark:bg-amber-900/20' },
+  extends: { label: 'amplía', color: 'text-cyan-700 border-cyan-200 bg-cyan-50 dark:text-cyan-300 dark:border-cyan-700/60 dark:bg-cyan-900/20' },
+  related: { label: 'relacionada', color: 'text-neutral-600 border-neutral-300 bg-neutral-100 dark:text-neutral-300 dark:border-neutral-700 dark:bg-neutral-800/40' },
 };
 
 const RELATION_TARGET_ICON: Record<ChapterIdeaRelation['targetKind'], string> = {
@@ -1136,14 +1235,14 @@ function ChapterIdeaCard({
     onOpen({ kind: relation.targetKind, id: relation.targetId });
   };
   return (
-    <div className="border border-neutral-800 rounded-lg p-4">
+    <div className="border border-neutral-200 rounded-lg p-4 dark:border-neutral-800">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-wide rounded border border-indigo-700/60 bg-indigo-900/20 text-indigo-300 px-1.5 py-0.5">
+        <span className="text-[10px] uppercase tracking-wide rounded border border-indigo-200 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 dark:border-indigo-700/60 dark:bg-indigo-900/20 dark:text-indigo-300">
           {idea.type}
         </span>
-        <div className="font-semibold text-sm">{idea.label}</div>
+        <div className="font-semibold text-sm text-neutral-900 dark:text-neutral-100">{idea.label}</div>
       </div>
-      <p className="text-sm text-neutral-400 mt-1">{idea.statement}</p>
+      <p className="text-sm text-neutral-500 mt-1 dark:text-neutral-400">{idea.statement}</p>
       <div className="mt-3 space-y-1.5">
         {relations.length === 0 && (
           <div className="text-xs text-neutral-600">{t('Sin relaciones encontradas en la biblioteca.')}</div>
@@ -1154,16 +1253,16 @@ function ChapterIdeaCard({
           return (
             <div
               key={relation.id}
-              className={`flex items-start gap-2 rounded-md border border-neutral-800 bg-neutral-900/40 px-2.5 py-1.5 ${clickable ? 'cursor-pointer hover:border-neutral-700' : ''}`}
+              className={`flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-100/70 px-2.5 py-1.5 dark:border-neutral-800 dark:bg-neutral-900/40 ${clickable ? 'cursor-pointer hover:border-neutral-300 dark:hover:border-neutral-700' : ''}`}
               onClick={() => clickable && openTarget(relation)}
             >
               <span className={`shrink-0 mt-0.5 text-[10px] rounded border px-1.5 py-0.5 ${meta.color}`}>{t(meta.label)}</span>
               <Icon name={RELATION_TARGET_ICON[relation.targetKind]} size={13} className="mt-1 shrink-0 text-neutral-500" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm text-neutral-100">{relation.targetLabel}</span>
+                  <span className="truncate text-sm text-neutral-900 dark:text-neutral-100">{relation.targetLabel}</span>
                   {relation.targetSubtitle && <span className="shrink-0 truncate text-xs text-neutral-500">{relation.targetSubtitle}</span>}
-                  <span className="ml-auto shrink-0 text-[10px] tabular-nums text-neutral-600">{Math.round((relation.confidence || relation.similarity) * 100)}%</span>
+                  <span className="ml-auto shrink-0 text-[10px] tabular-nums text-neutral-500 dark:text-neutral-600">{Math.round((relation.confidence || relation.similarity) * 100)}%</span>
                 </div>
                 {relation.rationale && <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">{relation.rationale}</p>}
               </div>
@@ -1179,23 +1278,6 @@ function kindLabel(kind: ProjectKind): string {
   return PROJECT_KIND_OPTIONS.find((option) => option.value === kind)?.label ?? kind;
 }
 
-function actionIcon(action: ProjectGuideAction): string {
-  switch (action) {
-    case 'edit_brief':
-      return 'edit';
-    case 'mark_coverage':
-      return 'map';
-    case 'mark_materials':
-      return 'book';
-    case 'mark_outline':
-      return 'layers';
-    case 'import_chapter':
-      return 'upload';
-    case 'review_chapter':
-      return 'wand';
-  }
-}
-
 function guideStepIcon(status: ProjectGuideStepStatus): string {
   if (status === 'done') return 'check';
   if (status === 'current') return 'compass';
@@ -1204,7 +1286,7 @@ function guideStepIcon(status: ProjectGuideStepStatus): string {
 
 function guideStepClass(status: ProjectGuideStepStatus): string {
   if (status === 'done') return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-200';
-  if (status === 'current') return 'border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-600/70 dark:bg-indigo-900/30 dark:text-indigo-100';
+  if (status === 'current') return 'border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-600/70 dark:bg-indigo-900/30 dark:text-indigo-100';
   return 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950/70 dark:text-neutral-500';
 }
 

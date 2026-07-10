@@ -140,7 +140,7 @@ export function IdeaDuplicatesModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {backupPath && (
-          <div className="flex items-start gap-2 border-b border-emerald-900/50 bg-emerald-950/30 px-4 py-2 text-xs text-emerald-300">
+          <div className="flex items-start gap-2 border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
             <Icon name="save" size={13} className="mt-0.5" />
             <span className="min-w-0 break-all">
               {t('Copia de seguridad creada antes de fusionar:')} <span className="font-mono">{backupPath}</span>
@@ -148,7 +148,7 @@ export function IdeaDuplicatesModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
         {error && (
-          <div className="border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">{error}</div>
+          <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">{error}</div>
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">

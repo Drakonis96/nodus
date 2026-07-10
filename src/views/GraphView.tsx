@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
-import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT } from '../components/NodeDetailPanel';
+import { NodeDetailPanel, loadNumber, DETAIL_WIDTH_KEY, DETAIL_FONT_KEY, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_FONT, DETAIL_MAX_FONT, DETAIL_DEFAULT_FONT, type RelationRow } from '../components/NodeDetailPanel';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { ThemesModal } from './ThemesModal';
 import { IdeaDuplicatesModal } from './IdeaDuplicatesModal';
+import { EdgeAuditModal } from './EdgeAuditModal';
 import { TutorPanel } from './TutorPanel';
-import { SigmaGraph, type SigmaGraphApi } from './graph/SigmaGraph';
+import { SigmaGraph, type SigmaGraphApi, type GraphViewLevel } from './graph/SigmaGraph';
+import { buildThemeConstellation, buildThemeBackbone } from './graph/model';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 import { t, tx } from '../i18n';
@@ -1346,6 +1348,11 @@ function authorPhysicalEdgeIds(edges: GraphData['edges'], nodeCount: number): Se
   return physical;
 }
 
+// Semantic-zoom navigation state for the Sigma engine's overview preset:
+//   corpus → constellation of themes · theme → that theme's backbone ·
+//   full → the classic idea graph (used when a deep-link focuses a node/edge).
+type GraphLevelState = { level: 'corpus' } | { level: 'theme'; theme: string } | { level: 'full' };
+
 export function GraphView({
   settings,
   onSettingsChange,
@@ -1415,6 +1422,7 @@ export function GraphView({
   }, []);
   const [lens, setLens] = useState<GraphLens>(loadLens);
   const [themesModalOpen, setThemesModalOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [ideaDupesOpen, setIdeaDupesOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
   const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
@@ -1423,6 +1431,9 @@ export function GraphView({
   const [graphLoading, setGraphLoading] = useState(false);
   const [filters, setFilters] = useState<Filters>(loadFilters);
   const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
+  const [graphLevel, setGraphLevel] = useState<GraphLevelState>({ level: 'corpus' });
+  // How many of a theme's most-connected ideas the backbone (level 2) shows.
+  const [backboneCap, setBackboneCap] = useState(90);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1');
   const [contextNotice, setContextNotice] = useState<string | null>(null);
@@ -1707,6 +1718,47 @@ export function GraphView({
       return el;
     });
   }, [activePreset, data, filters, lens]);
+
+  // ── Semantic-zoom levels (Sigma engine, overview preset) ────────────────────
+  // Levels only apply to the plain idea overview. Search and work-scoped views
+  // keep the classic full graph so those flows behave exactly as before.
+  const levelsActive =
+    USE_SIGMA && lens === 'ideas' && activePreset === 'overview' && !filters.search.trim() && filters.workIds.length === 0;
+  const activeThemeLabel = !levelsActive
+    ? null
+    : graphLevel.level === 'theme'
+      ? graphLevel.theme
+      : graphLevel.level === 'corpus' && filters.theme
+        ? filters.theme
+        : null;
+  const constellationModel = useMemo(() => (levelsActive ? buildThemeConstellation(data) : null), [levelsActive, data]);
+  const backboneModel = useMemo(
+    () => (levelsActive && activeThemeLabel ? buildThemeBackbone(data, activeThemeLabel, backboneCap) : null),
+    [levelsActive, activeThemeLabel, data, backboneCap]
+  );
+  // Total ideas in the active theme (for the "showing N of M" control at level 2).
+  const activeThemeTotal = useMemo(() => {
+    if (!activeThemeLabel || !constellationModel) return 0;
+    const key = activeThemeLabel.trim().toLowerCase();
+    return constellationModel.nodes.find((n) => n.label.trim().toLowerCase() === key)?.workCount ?? 0;
+  }, [activeThemeLabel, constellationModel]);
+  const backboneShown = backboneModel?.nodes.length ?? 0;
+  const graphOverrideModel =
+    !levelsActive || graphLevel.level === 'full' ? null : activeThemeLabel ? backboneModel : constellationModel;
+  const graphViewLevel: GraphViewLevel =
+    !levelsActive || graphLevel.level === 'full' ? 'full' : activeThemeLabel ? 'theme' : 'corpus';
+
+  const drillIntoTheme = useCallback((_nodeId: string, label: string) => {
+    setIdeaDetail(null);
+    setEdgeDetail(null);
+    setDetailLoading(null);
+    setBackboneCap(90);
+    setGraphLevel({ level: 'theme', theme: label });
+  }, []);
+  const backToCorpus = useCallback(() => {
+    setGraphLevel({ level: 'corpus' });
+    setFilters((f) => (f.theme ? { ...f, theme: '' } : f));
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -2732,6 +2784,63 @@ export function GraphView({
     setDetailLoading(null);
   }, []);
 
+  // ── Idea relations (for the navigable "Conectada con" list) ─────────────────
+  const nodeById = useMemo(() => {
+    const map = new Map<string, GraphData['nodes'][number]>();
+    for (const node of data.nodes) map.set(node.id, node);
+    return map;
+  }, [data]);
+
+  // Every typed relation of the open idea — from the FULL edge set, so cross-theme
+  // links surface here even while the graph view is scoped to one theme.
+  const ideaRelations = useMemo<RelationRow[]>(() => {
+    const idea = ideaDetail?.idea;
+    if (!idea) return [];
+    const id = idea.global_id;
+    const norm = (s: string) => s.trim().toLowerCase();
+    const themeKey = activeThemeLabel ? norm(activeThemeLabel) : null;
+    const rows: (RelationRow & { conf: number })[] = [];
+    const seen = new Set<string>();
+    for (const edge of data.edges) {
+      if (edge.type === 'contains') continue;
+      const other = edge.source === id ? edge.target : edge.target === id ? edge.source : null;
+      if (!other) continue;
+      const pairKey = `${other}|${edge.type}`;
+      if (seen.has(pairKey)) continue;
+      const neighbor = nodeById.get(other);
+      if (!neighbor || neighbor.type === 'theme') continue;
+      seen.add(pairKey);
+      const neighborThemes = neighbor.themes ?? [];
+      const isBridge = themeKey != null && !neighborThemes.some((l) => norm(l) === themeKey);
+      // Only label the theme when it adds information: for a bridge, the theme it
+      // reaches into; at the full graph, the neighbour's theme as context. A
+      // same-theme neighbour needs no label.
+      const themeLabel = isBridge
+        ? neighborThemes.find((l) => themeKey == null || norm(l) !== themeKey) ?? neighborThemes[0]
+        : themeKey == null
+          ? neighborThemes[0]
+          : undefined;
+      rows.push({
+        id: other,
+        label: neighbor.label,
+        relLabel: t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type,
+        relColor: EDGE_TYPE_COLORS[edge.type] ?? '#888',
+        themeLabel,
+        isBridge,
+        conf: edge.confidence,
+      });
+    }
+    // Surface cross-theme bridges first, then by confidence.
+    rows.sort((a, b) => Number(b.isBridge) - Number(a.isBridge) || b.conf - a.conf);
+    return rows.slice(0, 40).map(({ conf: _conf, ...row }) => row);
+  }, [ideaDetail, data, nodeById, activeThemeLabel]);
+
+  const openRelatedIdea = useCallback((ideaId: string) => {
+    const neighbor = nodeById.get(ideaId);
+    onSigmaOpenNode(ideaId, neighbor?.label ?? '', neighbor?.type ?? '');
+    if (USE_SIGMA) sigmaApiRef.current?.focusNode(ideaId);
+  }, [nodeById, onSigmaOpenNode]);
+
   // ── Minimap ────────────────────────────────────────────────────────────────
   const drawMinimap = useCallback(() => {
     const cy = cyRef.current;
@@ -2905,6 +3014,9 @@ export function GraphView({
       setLayoutMode(next.layoutMode);
       setHighlightDepth(next.depth);
       setFiltersOpen(false);
+      // A plain preset switch (no deep-link) re-enters the graph at the theme
+      // overview; deep-link targets set their own level in the navigation effect.
+      if (!navigationTarget) setGraphLevel(next.filters.theme ? { level: 'theme', theme: next.filters.theme } : { level: 'corpus' });
       if (id !== 'reading' || !navigationTarget?.workId) {
         setContextNotice(null);
         setContextZoteroKey(null);
@@ -2933,6 +3045,11 @@ export function GraphView({
     lastNavigationNonceRef.current = target.nonce;
     const preset = target.preset ?? (target.edgeId ? 'contradictions' : target.workId ? 'reading' : 'overview');
     applyPreset(preset, target);
+    // Keep the semantic-zoom level consistent with the deep-link: a focused node,
+    // edge or work needs the full graph; a theme link opens that theme's backbone.
+    if (target.nodeId || target.edgeId || target.workId) setGraphLevel({ level: 'full' });
+    else if (target.theme) setGraphLevel({ level: 'theme', theme: target.theme });
+    else setGraphLevel({ level: 'corpus' });
     if (target.openTutor) setTutorOpen(true);
     setContextNotice(navigationNotice(target, preset));
     setContextZoteroKey(target.zoteroKey ?? null);
@@ -3063,6 +3180,15 @@ export function GraphView({
           {lens === 'ideas' && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
+              title={t('Ver y deshacer tus veredictos sobre relaciones (confirmadas y rechazadas)')}
+              onClick={() => setAuditOpen(true)}
+            >
+              <Icon name="check" /> {t('Auditoría')}
+            </button>
+          )}
+          {lens === 'ideas' && (
+            <button
+              className="btn btn-ghost border border-neutral-700 gap-1.5"
               title={t('Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado')}
               onClick={() => setIdeaDupesOpen(true)}
             >
@@ -3188,6 +3314,9 @@ export function GraphView({
                 preset={activePreset}
                 highlightDepth={highlightDepth}
                 lightTheme={typeof document !== 'undefined' && document.documentElement.classList.contains('light')}
+                overrideModel={graphOverrideModel}
+                viewLevel={graphViewLevel}
+                onDrillDown={drillIntoTheme}
                 onOpenNode={onSigmaOpenNode}
                 onOpenEdge={onSigmaOpenEdge}
                 onClearFocus={onSigmaClear}
@@ -3211,6 +3340,69 @@ export function GraphView({
                 <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
                 {t('Reorganizando grafo…')}
               </div>
+            </div>
+          )}
+
+          {/* Semantic-zoom breadcrumb (Sigma overview) */}
+          {USE_SIGMA && levelsActive && (
+            <div className="absolute top-3 left-3 z-10 flex max-w-[70%] flex-col gap-1.5">
+              {graphViewLevel === 'corpus' ? (
+                <div className="card flex items-center gap-1.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-400">
+                  <Icon name="layers" size={13} />
+                  {tx('{n} temas · haz clic para explorar', { n: themes.length })}
+                </div>
+              ) : (
+                <div className="card flex items-center gap-0.5 bg-neutral-900/90 px-1 py-1 text-xs">
+                  <button
+                    className="flex items-center gap-1 rounded px-1.5 py-1 text-neutral-300 hover:bg-neutral-800"
+                    onClick={backToCorpus}
+                    title={t('Volver a los temas del corpus')}
+                  >
+                    <Icon name="chevronLeft" size={13} />
+                    {t('Corpus')}
+                  </button>
+                  {graphViewLevel === 'theme' && activeThemeLabel && (
+                    <>
+                      <span className="text-neutral-600">/</span>
+                      <span className="max-w-[280px] truncate px-1 font-medium text-neutral-100" title={activeThemeLabel}>
+                        {activeThemeLabel}
+                      </span>
+                    </>
+                  )}
+                  {graphViewLevel === 'full' && (
+                    <span className="px-1 text-neutral-400">{t('Idea enfocada')}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Level-2 density control: how many of the theme's ideas to show. */}
+              {graphViewLevel === 'theme' && activeThemeTotal > 0 && (
+                <div className="card flex items-center gap-2.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-300">
+                  <span className="whitespace-nowrap tabular-nums text-neutral-400">
+                    {backboneCap >= activeThemeTotal
+                      ? tx('Todas · {n} ideas', { n: activeThemeTotal })
+                      : tx('{n} de {m} más conectadas', { n: backboneShown, m: activeThemeTotal })}
+                  </span>
+                  <input
+                    type="range"
+                    min={20}
+                    max={Math.min(400, Math.max(90, activeThemeTotal))}
+                    step={10}
+                    value={Math.min(backboneCap, Math.min(400, Math.max(90, activeThemeTotal)))}
+                    onChange={(e) => setBackboneCap(parseInt(e.target.value, 10))}
+                    className="h-1 w-28 cursor-pointer accent-indigo-400"
+                    title={t('Cuántas ideas mostrar (por conectividad)')}
+                    aria-label={t('Número de ideas a mostrar')}
+                  />
+                  <button
+                    className={`rounded px-1.5 py-0.5 font-medium ${backboneCap >= activeThemeTotal ? 'bg-indigo-500/25 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setBackboneCap((c) => (c >= activeThemeTotal ? 90 : activeThemeTotal))}
+                    title={t('Mostrar todas las ideas del tema (puede ir más lento)')}
+                  >
+                    {t('Todas')}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -3301,6 +3493,18 @@ export function GraphView({
             fontSize={detailFontSize}
             onWidthChange={setDetailWidth}
             onFontChange={changeDetailFont}
+            relations={USE_SIGMA ? ideaRelations : undefined}
+            onOpenIdea={openRelatedIdea}
+            onEdgeFeedback={(verdict) => {
+              // A rejected relation vanishes from the graph: refresh and close its detail.
+              if (verdict === 'rejected') {
+                detailSeqRef.current++;
+                setEdgeDetail(null);
+                setDetailLoading(null);
+                clearFocusRef.current();
+              }
+              reload();
+            }}
             onClose={() => {
               detailSeqRef.current++;
               setIdeaDetail(null);
@@ -3327,6 +3531,15 @@ export function GraphView({
         <IdeaDuplicatesModal
           onClose={() => {
             setIdeaDupesOpen(false);
+            reload();
+          }}
+        />
+      )}
+      {auditOpen && (
+        <EdgeAuditModal
+          onClose={() => setAuditOpen(false)}
+          onChanged={() => {
+            // An undone rejection puts the edge back: refresh the live graph.
             reload();
           }}
         />

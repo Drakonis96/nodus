@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AppSettings, CorpusHealthBucketId, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView } from './views/HomeView';
 import { Library } from './views/Library';
@@ -10,6 +10,7 @@ import { ResearchMapView } from './views/ResearchMapView';
 import { HypothesisLabView } from './views/HypothesisLabView';
 import { ReadingPathView } from './views/ReadingPathView';
 import { WritingWorkshopView } from './views/WritingWorkshopView';
+import { DeepResearchView } from './views/DeepResearchView';
 import { ProjectsView } from './views/ProjectsView';
 import { NotesView } from './views/NotesView';
 import { SearchView } from './views/SearchView';
@@ -17,6 +18,7 @@ import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { AuthorsView } from './views/AuthorsView';
 import { StudyGuideView } from './views/StudyGuideView';
+import { ImmersionView } from './views/ImmersionView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
@@ -24,18 +26,26 @@ import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher } from './components/VaultSwitcher';
+import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { Icon } from './components/ui';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { notifyDataChanged, useDataRefresh } from './hooks';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
+  PendingLibraryNavigationTarget,
   View,
 } from './navigation';
-import { orderedNav } from './navigation';
+import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
+
+// Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
+const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -43,9 +53,19 @@ export function App() {
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
   const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
+  // Per-group collapse state for the sidebar (Explorar · Analizar · Escribir),
+  // persisted so a user's folded groups survive restarts.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('nodus.collapsedGroups') || '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  });
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
   // A note the user opened from global search; the nonce re-triggers even if the
   // same note is chosen twice.
@@ -57,15 +77,16 @@ export function App() {
   const [hasData, setHasData] = useState<boolean | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
-  // Sidebar sections in the user's chosen order (Home always pinned first,
-  // Settings always last), minus any the user has hidden. Home and Settings can
-  // never be hidden, so they always stay reachable.
-  const nav = useMemo(() => {
-    const hidden = new Set(settings?.sidebarHidden ?? []);
-    return orderedNav(settings?.sidebarOrder ?? []).filter(
-      (n) => n.id === 'home' || n.id === 'settings' || !hidden.has(n.id),
-    );
-  }, [settings?.sidebarOrder, settings?.sidebarHidden]);
+  // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
+  // each group in the user's chosen order, minus any hidden sections. Home is
+  // pinned first and Settings last, both outside every group and never hidden.
+  const navGroups = useMemo(
+    () => groupedNav(settings?.sidebarOrder ?? [], settings?.sidebarHidden ?? []),
+    [settings?.sidebarOrder, settings?.sidebarHidden]
+  );
+  const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
+  const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
@@ -148,6 +169,28 @@ export function App() {
     });
   };
 
+  const toggleGroup = (id: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem('nodus.collapsedGroups', JSON.stringify([...next]));
+      return next;
+    });
+  };
+
+  // Global command palette: ⌘K / Ctrl+K toggles it from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const onSync = async () => {
     setSyncing(true);
     try {
@@ -162,6 +205,11 @@ export function App() {
   const navigate = useCallback((nextView: View, graph?: PendingGraphNavigationTarget) => {
     if (graph) setGraphTarget({ ...graph, nonce: Date.now() });
     setView(nextView);
+  }, []);
+
+  const openLibraryBucket = useCallback((healthBucket: CorpusHealthBucketId) => {
+    setLibraryTarget({ healthBucket, nonce: Date.now() });
+    setView('library');
   }, []);
 
   useEffect(() => {
@@ -214,6 +262,30 @@ export function App() {
     notifyDataChanged();
   }, [refreshHasData, reloadSettings, reloadVaults]);
 
+  // Command palette entries: every navigation destination (grouped like the
+  // sidebar) plus the header's global actions. Rebuilt when the language changes
+  // so labels stay translated.
+  const paletteCommands = useMemo<Command[]>(() => {
+    const groupLabel = new Map(NAV_GROUPS.map((g) => [g.id, t(g.label)] as const));
+    const bySection = [
+      ...NAV_ITEMS.filter((n) => !n.group),
+      ...NAV_GROUPS.flatMap((g) => NAV_ITEMS.filter((n) => n.group === g.id)),
+    ];
+    const navCommands: Command[] = bySection.map((n) => ({
+      id: `nav:${n.id}`,
+      label: t(n.label),
+      section: n.group ? groupLabel.get(n.group)! : t('General'),
+      icon: n.icon,
+      run: () => setView(n.id),
+    }));
+    const actions: Command[] = [
+      { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
+      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'wand', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+    ];
+    return [...navCommands, ...actions];
+  }, [settings?.uiLanguage, onSync, openAssistant]);
+
   if (loadError) {
     return (
       <div className="h-full flex flex-col items-center justify-center gap-3 p-8 text-center">
@@ -252,7 +324,7 @@ export function App() {
         <button
           className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
           onClick={toggleNav}
-          title={navCollapsed ? 'Mostrar el menú lateral' : 'Ocultar el menú lateral (más espacio para el grafo)'}
+          title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
           <img src={nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
@@ -264,13 +336,28 @@ export function App() {
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
         />
+        {/* Command-palette launcher: advertises the ⌘K/Ctrl+K shortcut and gives
+            mouse users a way in. Opens the same palette as the keyboard shortcut. */}
+        <button
+          className="btn btn-ghost gap-2 text-neutral-400"
+          onClick={() => setPaletteOpen(true)}
+          title={t('Paleta de comandos')}
+        >
+          <Icon name="search" />
+          <span className="hidden lg:inline">{t('Comandos')}</span>
+          <kbd className="composer-kbd">{PALETTE_HINT}</kbd>
+        </button>
         <div className="flex-1" />
-        {lastSync && <span className="text-xs text-neutral-500">{lastSync.summary}</span>}
+        {lastSync && (
+          <span className="text-xs text-neutral-500 truncate max-w-[14rem]" title={lastSync.summary}>
+            {lastSync.summary}
+          </span>
+        )}
         {settings.favorites.length > 0 && (
           <select
             data-tour="model"
             className="input text-xs py-1"
-            title="Modelo predeterminado para escaneos"
+            title={t('Modelo predeterminado para escaneos')}
             value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
             onChange={async (e) => {
               if (!e.target.value) return;
@@ -308,39 +395,72 @@ export function App() {
       </header>
 
       {settings.demoMode && (
-        <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-500/10 border-b border-amber-500/30 text-amber-300 text-xs">
+        <div className="flex items-center gap-3 px-4 py-1.5 bg-amber-100 border-b border-amber-300 text-amber-800 text-xs dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
           <Icon name="alert" size={14} />
           <span className="flex-1">
             {t('Modo demostración: estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
           </span>
-          <button className="btn btn-ghost border border-amber-500/40 text-amber-200 py-0.5" onClick={() => void exitDemo()} disabled={demoBusy}>
+          <button className="btn btn-ghost border border-amber-400/60 text-amber-800 py-0.5 dark:border-amber-500/40 dark:text-amber-200" onClick={() => void exitDemo()} disabled={demoBusy}>
             {demoBusy ? t('Saliendo…') : t('Salir del modo demo')}
           </button>
         </div>
       )}
 
       <div className="flex-1 flex min-h-0">
-        {/* Sidebar (collapsible via the Nodus logo) */}
+        {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
+            Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
         {!navCollapsed && (
-          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1">
-            {nav.map((n) => (
-              <button
-                key={n.id}
-                data-tour={`nav-${n.id}`}
-                onClick={() => setView(n.id)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                  view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
-                }`}
-              >
-                <Icon name={n.icon} className="opacity-70" />
-                {t(n.label)}
-              </button>
-            ))}
+          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1 overflow-y-auto">
+            {(() => {
+              const navButton = (n: { id: View; icon: string; label: string }) => (
+                <button
+                  key={n.id}
+                  data-tour={`nav-${n.id}`}
+                  onClick={() => setView(n.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                    view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                  }`}
+                >
+                  <Icon name={n.icon} className="opacity-70" />
+                  {t(n.label)}
+                </button>
+              );
+              return (
+                <>
+                  {navButton(homeItem)}
+                  {navGroups.map((group) => {
+                    const collapsed = collapsedGroups.has(group.id);
+                    const hasActive = group.items.some((n) => n.id === view);
+                    return (
+                      <div key={group.id} className="mt-2 flex flex-col gap-1">
+                        <button
+                          onClick={() => toggleGroup(group.id)}
+                          aria-expanded={!collapsed}
+                          title={collapsed ? t('Mostrar grupo') : t('Plegar grupo')}
+                          className={`flex items-center gap-1 px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-left transition-colors ${
+                            collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
+                          }`}
+                        >
+                          <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={11} />
+                          {t(group.label)}
+                        </button>
+                        {!collapsed && group.items.map((n) => navButton(n))}
+                      </div>
+                    );
+                  })}
+                  <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                </>
+              );
+            })()}
           </nav>
         )}
 
         {/* Main view */}
         <main className="flex-1 min-w-0 overflow-hidden">
+          {/* Per-view crash isolation: a render error in one section shows a
+              recovery card here instead of blanking the whole window. key={view}
+              clears the error automatically when the user switches sections. */}
+          <AppErrorBoundary key={view}>
           {view === 'home' && (
             <HomeView
               settings={settings}
@@ -348,6 +468,7 @@ export function App() {
               syncing={syncing}
               onSync={onSync}
               onNavigate={(target) => navigate(target)}
+              onOpenLibraryBucket={openLibraryBucket}
               onOpenAssistant={() => openAssistant()}
               showDemoOffer={hasData === false && !settings.demoMode}
               demoBusy={demoBusy}
@@ -357,6 +478,7 @@ export function App() {
           {view === 'library' && (
             <Library
               settings={settings}
+              target={libraryTarget}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
@@ -372,6 +494,9 @@ export function App() {
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
             />
+          )}
+          {view === 'immersion' && (
+            <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />
           )}
           {view === 'gaps' && (
             <GapsView
@@ -401,6 +526,7 @@ export function App() {
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'deepResearch' && <DeepResearchView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'projects' && <ProjectsView settings={settings} />}
           {view === 'search' && (
             <SearchView
@@ -421,6 +547,7 @@ export function App() {
               onVaultsChanged={reloadVaults}
             />
           )}
+          </AppErrorBoundary>
         </main>
       </div>
 
@@ -429,6 +556,10 @@ export function App() {
         <EmbeddingProgressBar />
         <PassageProgressBar />
       </div>
+
+      <FeedbackHost />
+
+      {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
 
       {collectionsOpen && (
         <CollectionsModal

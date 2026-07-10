@@ -39,9 +39,14 @@ function cleanPassword(password: string): string {
   return password.trim();
 }
 
+/** Backups may be keyed by a user-chosen master password, so the floor is a
+ * usability minimum (UI enforces it at set time); scrypt provides the actual
+ * brute-force resistance. Generated one-off passwords remain ~32 chars. */
+export const MIN_BACKUP_PASSWORD_LENGTH = 8;
+
 function deriveKey(password: string, salt: Buffer): Buffer {
   const clean = cleanPassword(password);
-  if (clean.length < 20) {
+  if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
     throw new Error('La contraseña de la copia de seguridad no es válida.');
   }
   return scryptSync(clean, salt, KEY_BYTES, {

@@ -31,10 +31,10 @@ export class GraphErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="absolute inset-0 flex items-center justify-center p-6">
-          <div className="max-w-md rounded-lg border border-red-900/60 bg-red-950/20 p-4 text-sm text-red-200">
-            <div className="font-medium text-red-100">{t('El grafo no se pudo renderizar')}</div>
-            <p className="mt-1 text-red-300/90 break-words">{this.state.error.message}</p>
-            <button className="btn btn-ghost border border-red-800 mt-3" onClick={this.reset}>
+          <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200">
+            <div className="font-medium text-red-800 dark:text-red-100">{t('El grafo no se pudo renderizar')}</div>
+            <p className="mt-1 text-red-600/90 break-words dark:text-red-300/90">{this.state.error.message}</p>
+            <button className="btn btn-ghost border border-red-300 mt-3 dark:border-red-800" onClick={this.reset}>
               {t('Reintentar')}
             </button>
           </div>

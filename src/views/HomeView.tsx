@@ -3,6 +3,7 @@ import type {
   AppSettings,
   CorpusHealth,
   CorpusHealthBucket,
+  CorpusHealthBucketId,
   EdgeDetail,
   GapAggregate,
   GraphData,
@@ -23,6 +24,8 @@ interface HomeViewProps {
   syncing: boolean;
   onSync: () => Promise<void>;
   onNavigate: (target: HomeTarget) => void;
+  /** Open the Library pre-filtered to a corpus-health bucket clicked in the health panel. */
+  onOpenLibraryBucket: (bucket: CorpusHealthBucketId) => void;
   onOpenAssistant: () => void;
   /** Show the "load sample data" card (empty database, not already in demo mode). */
   showDemoOffer: boolean;
@@ -47,6 +50,7 @@ export function HomeView({
   syncing,
   onSync,
   onNavigate,
+  onOpenLibraryBucket,
   onOpenAssistant,
   showDemoOffer,
   demoBusy,
@@ -190,7 +194,7 @@ export function HomeView({
       {snapshot?.health && snapshot.health.totalWorks > 0 && (
         <CorpusHealthPanel
           health={snapshot.health}
-          onNavigate={onNavigate}
+          onOpenBucket={onOpenLibraryBucket}
           onIndexIdeas={indexPending}
           onIndexPassages={indexPassages}
         />
@@ -520,7 +524,7 @@ interface HealthAction {
 
 function buildHealthActions(
   health: CorpusHealth,
-  handlers: { onNavigate: (t: HomeTarget) => void; onIndexIdeas: () => void; onIndexPassages: () => void }
+  handlers: { onOpenBucket: (bucket: CorpusHealthBucketId) => void; onIndexIdeas: () => void; onIndexPassages: () => void }
 ): HealthAction[] {
   const actions: HealthAction[] = [];
   if (health.deepPriority.count > 0) {
@@ -528,7 +532,7 @@ function buildHealthActions(
       label: tx('Analiza a fondo {n} obra(s) prioritaria(s)', { n: health.deepPriority.count }),
       detail: t('Marcadas como leídas o seleccionadas, pero todavía sin ideas extraídas.'),
       tone: 'indigo',
-      run: () => handlers.onNavigate('library'),
+      run: () => handlers.onOpenBucket('deepPriority'),
     });
   }
   if (health.lightOnly.count > 0) {
@@ -536,7 +540,7 @@ function buildHealthActions(
       label: tx('Profundiza {n} obra(s) con solo análisis ligero', { n: health.lightOnly.count }),
       detail: t('Tienen temas pero aún no ideas; son las candidatas naturales al análisis profundo.'),
       tone: 'cyan',
-      run: () => handlers.onNavigate('library'),
+      run: () => handlers.onOpenBucket('lightOnly'),
     });
   }
   if (health.embeddings.pendingIdeas > 0) {
@@ -560,7 +564,7 @@ function buildHealthActions(
       label: tx('Recupera el texto de {n} obra(s)', { n: health.pdfsToRecover.count }),
       detail: t('No se pudo extraer texto, pero hay vía de recuperación (re-escanear, OCR o descargar por DOI).'),
       tone: 'red',
-      run: () => handlers.onNavigate('library'),
+      run: () => handlers.onOpenBucket('pdfsToRecover'),
     });
   }
   return actions;
@@ -568,16 +572,16 @@ function buildHealthActions(
 
 function CorpusHealthPanel({
   health,
-  onNavigate,
+  onOpenBucket,
   onIndexIdeas,
   onIndexPassages,
 }: {
   health: CorpusHealth;
-  onNavigate: (target: HomeTarget) => void;
+  onOpenBucket: (bucket: CorpusHealthBucketId) => void;
   onIndexIdeas: () => void;
   onIndexPassages: () => void;
 }) {
-  const actions = buildHealthActions(health, { onNavigate, onIndexIdeas, onIndexPassages });
+  const actions = buildHealthActions(health, { onOpenBucket, onIndexIdeas, onIndexPassages });
   const embeddedPct =
     health.embeddings.totalIdeas > 0
       ? Math.round((health.embeddings.embeddedIdeas / health.embeddings.totalIdeas) * 100)
@@ -604,28 +608,28 @@ function CorpusHealthPanel({
           label={t('Sin texto')}
           bucket={health.withoutText}
           tone={health.withoutText.count > 0 ? 'amber' : 'neutral'}
-          onClick={() => onNavigate('library')}
+          onClick={() => onOpenBucket('withoutText')}
         />
         <HealthBucketTile
           icon="tag"
           label={t('Solo análisis ligero')}
           bucket={health.lightOnly}
           tone={health.lightOnly.count > 0 ? 'cyan' : 'neutral'}
-          onClick={() => onNavigate('library')}
+          onClick={() => onOpenBucket('lightOnly')}
         />
         <HealthBucketTile
           icon="bulb"
           label={t('Prioritarias por analizar')}
           bucket={health.deepPriority}
           tone={health.deepPriority.count > 0 ? 'indigo' : 'neutral'}
-          onClick={() => onNavigate('library')}
+          onClick={() => onOpenBucket('deepPriority')}
         />
         <HealthBucketTile
           icon="download"
           label={t('Recuperar texto')}
           bucket={health.pdfsToRecover}
           tone={health.pdfsToRecover.count > 0 ? 'red' : 'neutral'}
-          onClick={() => onNavigate('library')}
+          onClick={() => onOpenBucket('pdfsToRecover')}
         />
         <div className="rounded-lg border border-neutral-800 px-3 py-2">
           <div className="flex items-center gap-1.5 text-xs text-neutral-500">

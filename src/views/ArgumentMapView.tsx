@@ -433,7 +433,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NODE_COLORS[s.type as IdeaType] ?? '#888' }} />
                           <span className="font-medium text-sm text-neutral-100 truncate">{s.label}</span>
                           {s.debateCount > 0 && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">{tx('{n} debate(s)', { n: s.debateCount })}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400">{tx('{n} debate(s)', { n: s.debateCount })}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-neutral-500 flex-wrap">

@@ -114,9 +114,9 @@ const STEPS: AdvancedTourStep[] = [
   },
   {
     stage: 'Paso 6 · Escribir',
-    view: 'writing',
+    view: 'deepResearch',
     title: 'Deep Research: un informe citado de principio a fin',
-    body: 'Dentro de Escritura, el modo Deep Research orquesta un informe extenso y multi-apartado sobre una pregunta: planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.',
+    body: 'Deep Research es su propia sección: orquesta un informe extenso y multi-apartado sobre una pregunta —planifica las secciones, reúne la evidencia de tu corpus y redacta con citas comprobables—. Ideal cuando necesitas un estado de la cuestión sólido y trazable, no solo un párrafo suelto.',
   },
   {
     stage: 'Paso 6 · Escribir',

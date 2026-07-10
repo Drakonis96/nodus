@@ -403,7 +403,8 @@ function SideColumn({
             <span className="block line-clamp-2">“{ev.quote}”</span>
             <button
               className="mt-1 inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 not-italic"
-              onClick={() => void window.nodus.openInZotero(w.zotero_key)}
+              title={t('Abrir el PDF en Zotero por esta página')}
+              onClick={() => void window.nodus.openEvidenceAtPage(w.nodus_id, ev.location)}
             >
               <Icon name="external" size={12} /> {ev.location ?? 'Zotero'}
             </button>

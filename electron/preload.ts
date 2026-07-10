@@ -10,6 +10,11 @@ import type {
   ChapterRelationsProgress,
 } from '@shared/types';
 
+// Tracks the research-chat stream currently in flight so `cancelResearchChat`
+// can abort it without the renderer having to juggle request ids. Only one chat
+// stream runs at a time (the composer is disabled while sending).
+let activeChatRequestId: string | null = null;
+
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -74,6 +79,7 @@ const api: NodusApi = {
   backupDatabase: () => ipcRenderer.invoke('ideas:backup'),
   getWorkMeta: (nodusId) => ipcRenderer.invoke('works:meta', nodusId),
   openInZotero: (zoteroKey) => ipcRenderer.invoke('works:openInZotero', zoteroKey).then(() => undefined),
+  openEvidenceAtPage: (nodusId, location) => ipcRenderer.invoke('works:openAtPage', nodusId, location),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url).then(() => undefined),
   uploadText: (nodusId, filePath) => ipcRenderer.invoke('works:uploadText', nodusId, filePath),
 
@@ -100,6 +106,8 @@ const api: NodusApi = {
   getIdeaDetail: (globalId) => ipcRenderer.invoke('graph:ideaDetail', globalId),
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
   getIdeaEdges: (globalId) => ipcRenderer.invoke('graph:ideaEdges', globalId),
+  setEdgeFeedback: (fromId, toId, type, verdict, note) => ipcRenderer.invoke('graph:edgeFeedback:set', fromId, toId, type, verdict, note),
+  listEdgeFeedback: () => ipcRenderer.invoke('graph:edgeFeedback:list'),
   getIdeasByWork: (nodusId, limit, offset) => ipcRenderer.invoke('works:ideasByWork', nodusId, limit, offset),
   getWorkIdeaSynthesis: (nodusId) => ipcRenderer.invoke('works:getIdeaSynthesis', nodusId),
   synthesizeWorkIdeas: (nodusId, model) => ipcRenderer.invoke('works:synthesizeIdeas', nodusId, model),
@@ -117,6 +125,25 @@ const api: NodusApi = {
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),
   generateStudySession: (request) => ipcRenderer.invoke('study:session', request),
   evaluateStudyAnswer: (request) => ipcRenderer.invoke('study:answer', request),
+
+  buildImmersionScope: (request) => ipcRenderer.invoke('immersion:scope', request),
+  generateImmersionSession: async (request, handlers) => {
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onProgress = (_e: unknown, id: string, progress: import('@shared/types').ImmersionBuildProgress) => {
+      if (id === requestId) handlers?.onProgress?.(progress);
+    };
+    ipcRenderer.on('immersion:generate:progress', onProgress);
+    try {
+      return await ipcRenderer.invoke('immersion:generate', requestId, request);
+    } finally {
+      ipcRenderer.removeListener('immersion:generate:progress', onProgress);
+    }
+  },
+  listImmersionSessions: () => ipcRenderer.invoke('immersion:list'),
+  getImmersionSession: (id) => ipcRenderer.invoke('immersion:get', id),
+  setImmersionProgress: (id, progress) => ipcRenderer.invoke('immersion:progress:set', id, progress).then(() => undefined),
+  answerImmersionQuestion: (request) => ipcRenderer.invoke('immersion:answer', request),
+  deleteImmersionSession: (id) => ipcRenderer.invoke('immersion:delete', id).then(() => undefined),
 
   listManagedThemes: () => ipcRenderer.invoke('themes:listManaged'),
   addManualTheme: (label) => ipcRenderer.invoke('themes:add', label),
@@ -188,14 +215,19 @@ const api: NodusApi = {
     };
     ipcRenderer.on('research:chatStream:delta', onDelta);
     ipcRenderer.on('research:chatStream:reasoning', onReasoning);
+    activeChatRequestId = requestId;
     try {
       const response = await ipcRenderer.invoke('research:chatStream', requestId, request);
       handlers.onStats?.(response.stats);
       return response;
     } finally {
+      if (activeChatRequestId === requestId) activeChatRequestId = null;
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
     }
+  },
+  cancelResearchChat: async () => {
+    if (activeChatRequestId) await ipcRenderer.invoke('research:chatStream:cancel', activeChatRequestId);
   },
 
   getWritingWorkshopSnapshot: (brief) => ipcRenderer.invoke('writing:snapshot', brief),
@@ -279,6 +311,7 @@ const api: NodusApi = {
   updateNoteFolderSummary: (id, summary) => ipcRenderer.invoke('notes:folders:updateSummary', id, summary),
   suggestFolderIdeas: (folderId) => ipcRenderer.invoke('notes:folders:suggestIdeas', folderId),
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
+  getCitationPreview: (ref) => ipcRenderer.invoke('citations:preview', ref),
   globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
   semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
   findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),
@@ -314,11 +347,20 @@ const api: NodusApi = {
     return () => ipcRenderer.removeListener('projects:chapterRelations:progress', listener);
   },
   verifyManuscriptCitations: (request) => ipcRenderer.invoke('projects:manuscript:verify', request),
+  applyManuscriptCitation: (request) => ipcRenderer.invoke('projects:manuscript:applyCitation', request),
   exportProject: (request) => ipcRenderer.invoke('projects:export', request),
   exportProjectChapter: (request) => ipcRenderer.invoke('projects:chapters:export', request),
 
   exportData: () => ipcRenderer.invoke('data:export'),
   importData: (password) => ipcRenderer.invoke('data:import', password),
+  exportSyncPackage: () => ipcRenderer.invoke('data:exportSync'),
+  importSyncPackage: () => ipcRenderer.invoke('data:importSync'),
+  setBackupPassword: (password) => ipcRenderer.invoke('backup:setPassword', password),
+  clearBackupPassword: () => ipcRenderer.invoke('backup:clearPassword'),
+  hasBackupPassword: () => ipcRenderer.invoke('backup:hasPassword'),
+  chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
+  runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
+  saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),

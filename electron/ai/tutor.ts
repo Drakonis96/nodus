@@ -477,7 +477,7 @@ async function repairPlanCoverage(params: {
 }
 
 export async function buildTutorPlan(request: TutorPlanRequest): Promise<TutorPlan> {
-  const graph = buildIdeaGraph();
+  const graph = await buildIdeaGraph();
   if (graph.nodes.length === 0) {
     throw new Error('El grafo aún no tiene ideas. Analiza algunas obras antes de iniciar el modo Tutor.');
   }

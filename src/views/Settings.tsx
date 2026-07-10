@@ -10,9 +10,10 @@ import type {
 } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
-import { orderedNav } from '../navigation';
+import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 
 const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
@@ -74,6 +75,9 @@ export function Settings({
   const [importOpen, setImportOpen] = useState(false);
   const [importPassword, setImportPassword] = useState('');
   const [importingBackup, setImportingBackup] = useState(false);
+  const [autoBackupHasPassword, setAutoBackupHasPassword] = useState(false);
+  const [autoBackupPasswordInput, setAutoBackupPasswordInput] = useState('');
+  const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
   const [copilotBusy, setCopilotBusy] = useState(false);
@@ -91,6 +95,16 @@ export function Settings({
       setUpdateMessage(event.message);
       setCheckingUpdate(event.status === 'checking');
     });
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void window.nodus.hasBackupPassword().then((has) => {
+      if (active) setAutoBackupHasPassword(has);
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -155,10 +169,13 @@ export function Settings({
     );
   };
 
-  const startReset = () => {
-    const ok = window.confirm(
-      t('Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.\n\n¿Continuar?')
-    );
+  const startReset = async () => {
+    const ok = await confirm({
+      title: t('Reinicializar el grafo'),
+      message: t('Reinicializar el grafo borrará TODAS las ideas, temas, conexiones, autores y huecos, y dejará cada obra sin analizar. Tu biblioteca de Zotero y tus ajustes se conservan. Esta acción no se puede deshacer.'),
+      confirmLabel: t('Continuar'),
+      danger: true,
+    });
     if (!ok) return;
     setResetInput('');
     setResetCode(String(Math.floor(1000 + Math.random() * 9000)));
@@ -665,15 +682,15 @@ export function Settings({
       {visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña') && (
           <Section title={t('Datos')}>
             {settings.demoMode && (
-              <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
                 <div>
-                  <label className="text-sm text-amber-300">{t('Modo demo activo')}</label>
+                  <label className="text-sm text-amber-700 dark:text-amber-300">{t('Modo demo activo')}</label>
                   <p className="text-xs text-neutral-500 mt-0.5">
                     {t('Estás viendo un corpus de ejemplo. Sal del modo demo para empezar con tu propia biblioteca.')}
                   </p>
                 </div>
                 <button
-                  className="btn border border-amber-700 text-amber-300 hover:bg-amber-950/50 shrink-0"
+                  className="btn border border-amber-300 text-amber-700 hover:bg-amber-100 shrink-0 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-950/50"
                   onClick={async () => {
                     await window.nodus.clearDemoData();
                     await onChange();
@@ -701,6 +718,157 @@ export function Settings({
             <p className="text-xs text-neutral-500">
               {t('La copia incluye todos los datos de Nodus: textos extraídos, embeddings de ideas, resúmenes y pasajes, modelos seleccionados, grafo, ajustes y claves API, dentro de un archivo cifrado.')}
             </p>
+            <div className="mt-2 border-t border-neutral-800 pt-3">
+              <label className="text-sm">{t('Sincronización entre equipos')}</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={async () => {
+                    const result = await window.nodus.exportSyncPackage();
+                    if (result) flash(`${t('Exportado')}: ${result.path}`);
+                  }}
+                >
+                  <Icon name="download" /> {t('Exportar paquete de sync (.nodussync)')}
+                </button>
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={async () => {
+                    try {
+                      const summary = await window.nodus.importSyncPackage();
+                      if (!summary) return;
+                      const total = (c: { inserted: number; updated: number }) => c.inserted + c.updated;
+                      const applied =
+                        total(summary.notes) + total(summary.noteFolders) + total(summary.writingDrafts) + total(summary.savedSearches) + total(summary.edgeFeedback);
+                      flash(`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`);
+                    } catch (e) {
+                      flash(e instanceof Error ? e.message : String(e));
+                    }
+                  }}
+                >
+                  <Icon name="upload" /> {t('Importar paquete de sync (.nodussync)')}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-neutral-500">
+                {t('Lleva tus notas, borradores, búsquedas guardadas y auditorías de relaciones a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
+              </p>
+            </div>
+            <div className="mt-2 border-t border-neutral-800 pt-3">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm">{t('Copias de seguridad automáticas')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">
+                    {t('Copias cifradas periódicas en una carpeta a tu elección (apúntala a iCloud Drive o Google Drive para tenerlas fuera de este equipo). No incluyen claves API.')}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-indigo-500"
+                  checked={settings.autoBackupEnabled}
+                  onChange={(e) => void patch({ autoBackupEnabled: e.target.checked })}
+                />
+              </div>
+              {settings.autoBackupEnabled && (
+                <div className="mt-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn btn-ghost border border-neutral-700"
+                      onClick={async () => {
+                        const folder = await window.nodus.chooseBackupFolder();
+                        if (folder) await patch({ autoBackupFolder: folder });
+                      }}
+                    >
+                      <Icon name="folder" /> {t('Elegir carpeta')}
+                    </button>
+                    <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={settings.autoBackupFolder}>
+                      {settings.autoBackupFolder || t('Sin carpeta elegida')}
+                    </span>
+                    <select
+                      className="input w-auto text-xs"
+                      value={settings.autoBackupIntervalHours}
+                      onChange={(e) => void patch({ autoBackupIntervalHours: Number(e.target.value) })}
+                    >
+                      <option value={12}>{t('Cada 12 horas')}</option>
+                      <option value={24}>{t('Cada día')}</option>
+                      <option value={168}>{t('Cada semana')}</option>
+                    </select>
+                  </div>
+                  {autoBackupHasPassword ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-emerald-400">{t('Contraseña maestra configurada (guardada en el llavero del sistema).')}</span>
+                      <button
+                        className="btn btn-ghost border border-neutral-700 text-xs"
+                        onClick={async () => {
+                          const result = await window.nodus.saveBackupRecoveryKit();
+                          flash(result.ok ? `${t('Kit de recuperación guardado en')} ${result.message}` : result.message);
+                        }}
+                      >
+                        {t('Guardar kit de recuperación')}
+                      </button>
+                      <button
+                        className="btn btn-ghost border border-neutral-700 text-xs"
+                        onClick={async () => {
+                          await window.nodus.clearBackupPassword();
+                          setAutoBackupHasPassword(false);
+                          flash(t('Contraseña maestra eliminada. Las copias automáticas quedan en pausa.'));
+                        }}
+                      >
+                        {t('Cambiar contraseña')}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="password"
+                        className="input w-64"
+                        placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
+                        value={autoBackupPasswordInput}
+                        onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
+                      />
+                      <button
+                        className="btn btn-ghost border border-neutral-700"
+                        disabled={autoBackupPasswordInput.trim().length < 8}
+                        onClick={async () => {
+                          try {
+                            await window.nodus.setBackupPassword(autoBackupPasswordInput);
+                            setAutoBackupPasswordInput('');
+                            setAutoBackupHasPassword(true);
+                            flash(t('Contraseña maestra guardada. Descarga el kit de recuperación: sin la contraseña, las copias no se pueden restaurar.'));
+                          } catch (e) {
+                            flash(e instanceof Error ? e.message : String(e));
+                          }
+                        }}
+                      >
+                        {t('Guardar contraseña')}
+                      </button>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      className="btn btn-ghost border border-neutral-700"
+                      disabled={autoBackupRunning || !settings.autoBackupFolder || !autoBackupHasPassword}
+                      onClick={async () => {
+                        setAutoBackupRunning(true);
+                        try {
+                          const result = await window.nodus.runBackupNow();
+                          flash(result.message);
+                          await onChange();
+                        } finally {
+                          setAutoBackupRunning(false);
+                        }
+                      }}
+                    >
+                      <Icon name="download" /> {autoBackupRunning ? t('Copiando…') : t('Hacer copia ahora')}
+                    </button>
+                    {settings.lastAutoBackupStatus && (
+                      <span className="min-w-0 flex-1 truncate text-xs text-neutral-500" title={settings.lastAutoBackupStatus}>
+                        {settings.lastAutoBackupAt ? `${new Date(settings.lastAutoBackupAt).toLocaleString()} · ` : ''}
+                        {settings.lastAutoBackupStatus}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </Section>
       )}
 
@@ -840,16 +1008,16 @@ export function Settings({
       )}
 
       {visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos') && (
-          <section className="card p-4 mb-4 border border-red-900/60">
-            <h2 className="text-sm font-semibold text-red-400 uppercase tracking-wide mb-3">{t('Zona de peligro')}</h2>
+          <section className="card p-4 mb-4 border border-red-200 dark:border-red-900/60">
+            <h2 className="text-sm font-semibold text-red-600 uppercase tracking-wide mb-3 dark:text-red-400">{t('Zona de peligro')}</h2>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <label className="text-sm text-neutral-300">{t('Reinicializar grafo')}</label>
+                <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Reinicializar grafo')}</label>
                 <p className="text-xs text-neutral-500 mt-0.5">
                   {t('Borra todas las ideas, temas, conexiones, autores y huecos, y deja cada obra sin analizar. La biblioteca y los ajustes se conservan.')}
                 </p>
               </div>
-              <button className="btn border border-red-800 text-red-300 hover:bg-red-950/50 shrink-0" onClick={startReset}>
+              <button className="btn border border-red-300 text-red-700 hover:bg-red-50 shrink-0 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50" onClick={startReset}>
                 <Icon name="trash" /> {t('Reinicializar…')}
               </button>
             </div>
@@ -859,11 +1027,11 @@ export function Settings({
       {resetCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => !resetting && setResetCode(null)}>
           <div className="card p-5 max-w-sm w-full space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-semibold text-red-400">{t('Confirmación final')}</h3>
-            <p className="text-sm text-neutral-300">
+            <h3 className="font-semibold text-red-600 dark:text-red-400">{t('Confirmación final')}</h3>
+            <p className="text-sm text-neutral-700 dark:text-neutral-300">
               {t('Esto borrará todo el grafo de forma permanente. Para confirmar, escribe este código:')}
             </p>
-            <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-100 bg-neutral-950 rounded-lg py-3 select-none">
+            <div className="text-center text-3xl font-mono tracking-[0.5em] text-neutral-900 bg-neutral-100 rounded-lg py-3 select-none dark:text-neutral-100 dark:bg-neutral-950">
               {resetCode}
             </div>
             <input
@@ -883,7 +1051,7 @@ export function Settings({
                 {t('Cancelar')}
               </button>
               <button
-                className="btn border border-red-800 text-red-300 hover:bg-red-950/50 disabled:opacity-40"
+                className="btn border border-red-300 text-red-700 hover:bg-red-50 disabled:opacity-40 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/50"
                 disabled={resetInput !== resetCode || resetting}
                 onClick={() => void confirmReset()}
               >
@@ -1056,9 +1224,11 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
 }
 
 /**
- * Reorder and show/hide the sidebar sections. Home (pinned first) and Settings
- * (pinned last) can neither be moved nor hidden, so they are not shown here; the
- * saved order is the list of the remaining view ids.
+ * Reorder and show/hide the sidebar sections, grouped like the sidebar itself
+ * (Explorar · Analizar · Escribir). Home (pinned first) and Settings (pinned
+ * last) can neither be moved nor hidden, so they are not shown here. Reordering
+ * is constrained to within a group; the saved order is the flat list of the
+ * remaining view ids, from which {@link groupedNav} derives each group's order.
  */
 function SidebarOrderEditor({
   sidebarOrder,
@@ -1071,16 +1241,22 @@ function SidebarOrderEditor({
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
 }) {
-  const items = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const orderedAll = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const groups = NAV_GROUPS.map((g) => ({ ...g, items: orderedAll.filter((n) => n.group === g.id) }));
   const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const move = (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (target < 0 || target >= items.length) return;
-    const ids = items.map((n) => n.id);
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+  const move = (id: string, dir: -1 | 1) => {
+    const group = groups.find((g) => g.items.some((n) => n.id === id));
+    if (!group) return;
+    const gi = group.items.findIndex((n) => n.id === id);
+    const target = gi + dir;
+    if (target < 0 || target >= group.items.length) return;
+    const ids: string[] = orderedAll.map((n) => n.id);
+    const ia = ids.indexOf(id);
+    const ib = ids.indexOf(group.items[target].id);
+    [ids[ia], ids[ib]] = [ids[ib], ids[ia]];
     onReorder(ids);
   };
 
@@ -1091,91 +1267,104 @@ function SidebarOrderEditor({
     onToggleHidden([...next]);
   };
 
+  // Drag-and-drop only rearranges within the same group; cross-group drops are ignored.
   const drop = (targetId: string) => {
     if (!draggingId || draggingId === targetId) return;
-    const ids: string[] = items.map((n) => n.id);
+    const src = orderedAll.find((n) => n.id === draggingId);
+    const tgt = orderedAll.find((n) => n.id === targetId);
+    if (!src || !tgt || src.group !== tgt.group) return;
+    const ids: string[] = orderedAll.map((n) => n.id);
     const from = ids.indexOf(draggingId);
-    const to = ids.indexOf(targetId);
-    if (from < 0 || to < 0) return;
+    if (from < 0) return;
     ids.splice(from, 1);
+    const to = ids.indexOf(targetId);
     ids.splice(to, 0, draggingId);
     onReorder(ids);
   };
 
   return (
-    <ul className="space-y-1">
-      {items.map((item, index) => (
-        <li
-          key={item.id}
-          draggable
-          onDragStart={(e) => {
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', item.id);
-            setDraggingId(item.id);
-          }}
-          onDragEnter={() => setDragOverId(item.id)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            drop(item.id);
-            setDraggingId(null);
-            setDragOverId(null);
-          }}
-          onDragEnd={() => {
-            setDraggingId(null);
-            setDragOverId(null);
-          }}
-          className={`flex items-center gap-2 rounded-md border bg-neutral-900/40 px-3 py-1.5 transition-colors ${
-            draggingId === item.id ? 'opacity-40' : ''
-          } ${
-            dragOverId === item.id && draggingId !== item.id
-              ? 'border-indigo-500 border-dashed'
-              : 'border-neutral-800'
-          }`}
-        >
-          <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
-          <Icon
-            name={item.icon}
-            size={15}
-            className={`shrink-0 ${hidden.has(item.id) ? 'text-neutral-700' : 'text-neutral-500'}`}
-          />
-          <span
-            className={`flex-1 min-w-0 truncate text-sm ${
-              hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
-            }`}
-          >
-            {t(item.label)}
-          </span>
-          <button
-            className={`p-1 rounded hover:bg-neutral-800 ${
-              hidden.has(item.id)
-                ? 'text-neutral-600 hover:text-neutral-300'
-                : 'text-neutral-500 hover:text-neutral-100'
-            }`}
-            title={hidden.has(item.id) ? t('Mostrar') : t('Ocultar')}
-            onClick={() => toggleHidden(item.id)}
-          >
-            <Icon name={hidden.has(item.id) ? 'eyeOff' : 'eye'} size={14} />
-          </button>
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
-            title={t('Subir')}
-            disabled={index === 0}
-            onClick={() => move(index, -1)}
-          >
-            <Icon name="arrowUp" size={14} />
-          </button>
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
-            title={t('Bajar')}
-            disabled={index === items.length - 1}
-            onClick={() => move(index, 1)}
-          >
-            <Icon name="arrowDown" size={14} />
-          </button>
-        </li>
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <div key={group.id}>
+          <div className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+            {t(group.label)}
+          </div>
+          <ul className="space-y-1">
+            {group.items.map((item, gi) => (
+              <li
+                key={item.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', item.id);
+                  setDraggingId(item.id);
+                }}
+                onDragEnter={() => setDragOverId(item.id)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  drop(item.id);
+                  setDraggingId(null);
+                  setDragOverId(null);
+                }}
+                onDragEnd={() => {
+                  setDraggingId(null);
+                  setDragOverId(null);
+                }}
+                className={`flex items-center gap-2 rounded-md border bg-neutral-900/40 px-3 py-1.5 transition-colors ${
+                  draggingId === item.id ? 'opacity-40' : ''
+                } ${
+                  dragOverId === item.id && draggingId !== item.id
+                    ? 'border-indigo-500 border-dashed'
+                    : 'border-neutral-800'
+                }`}
+              >
+                <Icon name="list" size={13} className="shrink-0 cursor-grab text-neutral-600" />
+                <Icon
+                  name={item.icon}
+                  size={15}
+                  className={`shrink-0 ${hidden.has(item.id) ? 'text-neutral-700' : 'text-neutral-500'}`}
+                />
+                <span
+                  className={`flex-1 min-w-0 truncate text-sm ${
+                    hidden.has(item.id) ? 'text-neutral-600 line-through' : 'text-neutral-200'
+                  }`}
+                >
+                  {t(item.label)}
+                </span>
+                <button
+                  className={`p-1 rounded hover:bg-neutral-800 ${
+                    hidden.has(item.id)
+                      ? 'text-neutral-600 hover:text-neutral-300'
+                      : 'text-neutral-500 hover:text-neutral-100'
+                  }`}
+                  title={hidden.has(item.id) ? t('Mostrar') : t('Ocultar')}
+                  onClick={() => toggleHidden(item.id)}
+                >
+                  <Icon name={hidden.has(item.id) ? 'eyeOff' : 'eye'} size={14} />
+                </button>
+                <button
+                  className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+                  title={t('Subir')}
+                  disabled={gi === 0}
+                  onClick={() => move(item.id, -1)}
+                >
+                  <Icon name="arrowUp" size={14} />
+                </button>
+                <button
+                  className="p-1 rounded text-neutral-500 hover:text-neutral-100 hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-500"
+                  title={t('Bajar')}
+                  disabled={gi === group.items.length - 1}
+                  onClick={() => move(item.id, 1)}
+                >
+                  <Icon name="arrowDown" size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

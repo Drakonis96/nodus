@@ -2,12 +2,13 @@ import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
 import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
+import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
 
 function normalizeZoteroTag(tag: string): string {
   return tag.trim().normalize('NFC').toLowerCase();
 }
 
-function toView(row: Work, themes: string[], zoteroTags: string[]): WorkView {
+function toView(row: Work, themes: string[], zoteroTags: string[], ideaCount: number): WorkView {
   const { authors_json, ...rest } = row;
   let authors: string[] = [];
   try {
@@ -15,14 +16,36 @@ function toView(row: Work, themes: string[], zoteroTags: string[]): WorkView {
   } catch {
     authors = [];
   }
-  return { ...rest, authors, themes, zoteroTags };
+  return { ...rest, authors, themes, zoteroTags, ideaCount };
+}
+
+/** Count extracted ideas (idea_occurrences) for a single work. */
+function ideaCountFor(nodusId: string): number {
+  const row = getDb()
+    .prepare('SELECT COUNT(*) AS n FROM idea_occurrences WHERE nodus_id = ?')
+    .get(nodusId) as { n: number } | undefined;
+  return row?.n ?? 0;
+}
+
+/** Batch-count extracted ideas per work in one grouped query, keyed by nodus_id. */
+function ideaCountsForWorks(nodusIds: string[]): Map<string, number> {
+  const result = new Map<string, number>();
+  if (nodusIds.length === 0) return result;
+  const placeholders = nodusIds.map(() => '?').join(',');
+  const rows = getDb()
+    .prepare(
+      `SELECT nodus_id, COUNT(*) AS n FROM idea_occurrences WHERE nodus_id IN (${placeholders}) GROUP BY nodus_id`
+    )
+    .all(...nodusIds) as { nodus_id: string; n: number }[];
+  for (const row of rows) result.set(row.nodus_id, row.n);
+  return result;
 }
 
 export function getWork(nodusId: string): WorkView | null {
   const db = getDb();
   const row = db.prepare('SELECT * FROM works WHERE nodus_id = ?').get(nodusId) as Work | undefined;
   if (!row) return null;
-  return toView(row, themesFor(nodusId), zoteroTagsFor(nodusId));
+  return toView(row, themesFor(nodusId), zoteroTagsFor(nodusId), ideaCountFor(nodusId));
 }
 
 /**
@@ -47,8 +70,17 @@ export function getWorksByIds(nodusIds: string[]): Map<string, WorkView> {
     .all(...nodusIds) as { nodus_id: string; label: string }[];
   const themesByWork = groupLabels(themeRows);
   const zoteroTagsByWork = zoteroTagsForWorks(nodusIds);
+  const ideaCountsByWork = ideaCountsForWorks(nodusIds);
   for (const row of rows) {
-    result.set(row.nodus_id, toView(row, themesByWork.get(row.nodus_id) ?? [], zoteroTagsByWork.get(row.nodus_id) ?? []));
+    result.set(
+      row.nodus_id,
+      toView(
+        row,
+        themesByWork.get(row.nodus_id) ?? [],
+        zoteroTagsByWork.get(row.nodus_id) ?? [],
+        ideaCountsByWork.get(row.nodus_id) ?? 0
+      )
+    );
   }
   return result;
 }
@@ -216,6 +248,11 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
       }
     }
   }
+  if (filter.healthBucket) {
+    // Replay the exact predicate the corpus-health notice counted, so the list
+    // matches the number the user clicked.
+    clauses.push(`(${HEALTH_BUCKET_WHERE[filter.healthBucket]})`);
+  }
   if (filter.yearMin != null) {
     clauses.push('year >= @yearMin');
     params.yearMin = filter.yearMin;
@@ -302,8 +339,16 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
     .all(...ids) as { nodus_id: string; label: string }[];
   const themesByWork = groupLabels(themeRows);
   const zoteroTagsByWork = zoteroTagsForWorks(ids);
+  const ideaCountsByWork = ideaCountsForWorks(ids);
 
-  return rows.map((r) => toView(r, themesByWork.get(r.nodus_id) ?? [], zoteroTagsByWork.get(r.nodus_id) ?? []));
+  return rows.map((r) =>
+    toView(
+      r,
+      themesByWork.get(r.nodus_id) ?? [],
+      zoteroTagsByWork.get(r.nodus_id) ?? [],
+      ideaCountsByWork.get(r.nodus_id) ?? 0
+    )
+  );
 }
 
 export interface UpsertWorkInput {

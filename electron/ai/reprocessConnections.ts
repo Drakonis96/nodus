@@ -25,6 +25,7 @@ import {
 } from '../db/ideasRepo';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { completeJson } from './aiClient';
+import { yieldToEventLoop, YIELD_EVERY } from '../util/async';
 
 const THEME_BATCH = 30;
 const RELATION_TOP_K_PER_IDEA = 10;
@@ -357,7 +358,12 @@ async function reprocessRelations(
 
   const candidates: RelationCandidate[] = [];
   const seenPairs = new Set<string>();
+  // Each findSimilarIdeas() is a synchronous full-table vec_cosine scan, so this
+  // loop is O(N²) on the single main-thread event loop. Yield periodically so the
+  // UI and IPC stay responsive while the batch runs in the background.
+  let scanned = 0;
   for (const idea of embeddedIdeas) {
+    if (++scanned % YIELD_EVERY === 0) await yieldToEventLoop();
     const similar = findSimilarIdeas(idea.embedding, 0.68, RELATION_TOP_K_PER_IDEA, { excludeIds: [idea.global_id] });
     for (const hit of similar) {
       if (!activeIds.has(hit.global_id)) continue;

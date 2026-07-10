@@ -3,6 +3,7 @@ import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@sh
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import {
   OccurrenceCard,
+  EvidenceLocationLink,
   loadNumber,
   DETAIL_MIN_WIDTH,
   DETAIL_MAX_WIDTH,
@@ -324,7 +325,7 @@ export function IdeasView({
                   <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
                   {detail.evidence.map((ev) => (
                     <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                      "{ev.quote}" <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
+                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} />
                     </blockquote>
                   ))}
                 </div>
@@ -458,7 +459,7 @@ function ConnectedIdeaRow({
                       key={ev.id}
                       className="border-l-2 border-indigo-700 pl-2 mt-1 text-xs italic text-neutral-400"
                     >
-                      "{ev.quote}" {ev.location ?? ''}
+                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} />
                     </blockquote>
                   ))}
                 </div>

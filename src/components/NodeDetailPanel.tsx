@@ -3,6 +3,7 @@ import type { EdgeDetail, IdeaDetail, IdeaType, WorkMeta, WorkSummary, WorkView 
 import { EDGE_LABELS, NODE_LABELS, Badge, Icon } from './ui';
 import { SaveToNotesModal } from './SaveToNotesModal';
 import { buildEdgeNote, buildIdeaNote } from '../notes';
+import { parsePageNumber } from '@shared/pageLocation';
 import { t } from '../i18n';
 
 // Persisted detail-panel sizing, shared by the graph view and the argument map.
@@ -34,6 +35,17 @@ export interface DetailLoading {
  * `loading` is set (so taps/selections never feel frozen), then fills with the
  * idea or edge detail. Reused by the graph view and the argument map.
  */
+/** One typed relation of the open idea, ready to render + navigate. */
+export interface RelationRow {
+  id: string;
+  label: string;
+  relLabel: string;
+  relColor: string;
+  themeLabel?: string;
+  /** True when the neighbour lives in a different theme (a cross-theme bridge). */
+  isBridge: boolean;
+}
+
 export function NodeDetailPanel({
   ideaDetail,
   edgeDetail,
@@ -43,6 +55,9 @@ export function NodeDetailPanel({
   onWidthChange,
   onFontChange,
   onClose,
+  relations,
+  onOpenIdea,
+  onEdgeFeedback,
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
@@ -52,6 +67,12 @@ export function NodeDetailPanel({
   onWidthChange: (width: number) => void;
   onFontChange: (delta: number) => void;
   onClose: () => void;
+  /** Typed relations of the open idea (cross-theme included); enables the
+   *  navigable "Conectada con" list. */
+  relations?: RelationRow[];
+  onOpenIdea?: (ideaId: string) => void;
+  /** Called after the user sets/clears an audit verdict, so the host view can refresh its graph. */
+  onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
 }) {
   // A note pending capture: built lazily from whichever detail is open.
   const [saving, setSaving] = useState<{ content: string; title: string; ref: string } | null>(null);
@@ -153,6 +174,38 @@ export function NodeDetailPanel({
             <h3 className="font-semibold mt-2">{ideaDetail.idea.label}</h3>
             <p className="text-neutral-400 mt-1">{ideaDetail.idea.statement}</p>
           </div>
+          {relations && relations.length > 0 && (
+            <div>
+              <div className="text-xs uppercase text-neutral-500 mb-1">{t('Conectada con')}</div>
+              <div className="-mx-1">
+                {relations.map((r) => (
+                  <button
+                    key={r.id}
+                    className="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-800"
+                    onClick={() => onOpenIdea?.(r.id)}
+                    title={t('Abrir esta idea')}
+                  >
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.relColor }} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block leading-snug text-neutral-200">{r.label}</span>
+                      <span className="text-[11px] text-neutral-500">
+                        {r.relLabel}
+                        {r.themeLabel && (
+                          <>
+                            {' · '}
+                            <span className={r.isBridge ? 'font-medium text-amber-400' : 'text-neutral-500'}>
+                              {r.isBridge ? '→ ' : ''}
+                              {r.themeLabel}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <div className="text-xs uppercase text-neutral-500 mb-1">{t('Obras que la desarrollan')}</div>
             {ideaDetail.occurrences.map((o) => (
@@ -164,7 +217,7 @@ export function NodeDetailPanel({
               <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
               {ideaDetail.evidence.map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                  “{ev.quote}” <span className="text-neutral-500 not-italic">{ev.location ?? ''} · {ev.kind}</span>
+                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} />
                 </blockquote>
               ))}
             </div>
@@ -199,9 +252,10 @@ export function NodeDetailPanel({
           )}
           {edgeDetail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-              “{ev.quote}” <span className="text-neutral-500">{ev.location ?? ''}</span>
+              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} />
             </blockquote>
           ))}
+          <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />
         </div>
       )}
       {saving && (
@@ -213,6 +267,111 @@ export function NodeDetailPanel({
           onClose={() => setSaving(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * The location tail of an evidence quote. When the location carries a
+ * parseable page ("p. 12"), it becomes a link that opens the work's PDF at
+ * that exact page in Zotero's reader; otherwise it stays plain text.
+ */
+export function EvidenceLocationLink({
+  nodusId,
+  location,
+  suffix = '',
+}: {
+  nodusId: string;
+  location: string | null;
+  suffix?: string;
+}) {
+  const page = parsePageNumber(location);
+  if (page === null) {
+    return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
+  }
+  return (
+    <span className="text-neutral-500 not-italic">
+      <button
+        className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
+        title={t('Abrir el PDF en Zotero por esta página')}
+        onClick={() => void window.nodus.openEvidenceAtPage(nodusId, location)}
+      >
+        <Icon name="external" size={11} /> {location}
+      </button>
+      {suffix}
+    </span>
+  );
+}
+
+/**
+ * Audit controls for one relation. The verdict is keyed by the idea pair +
+ * type in the DB, so it survives rescans: a rejected relation stays hidden
+ * even if a pipeline pass recreates the edge row.
+ */
+function EdgeAuditControls({
+  edgeDetail,
+  onEdgeFeedback,
+}: {
+  edgeDetail: EdgeDetail;
+  onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
+}) {
+  const [verdict, setVerdict] = useState<'rejected' | 'confirmed' | null>(edgeDetail.feedback?.verdict ?? null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setVerdict(edgeDetail.feedback?.verdict ?? null);
+  }, [edgeDetail.edge.id, edgeDetail.feedback?.verdict]);
+
+  const apply = async (next: 'rejected' | 'confirmed' | null) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await window.nodus.setEdgeFeedback(edgeDetail.edge.from_id, edgeDetail.edge.to_id, edgeDetail.edge.type, next);
+      setVerdict(next);
+      onEdgeFeedback?.(next);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-neutral-800 bg-neutral-950/35 p-3 space-y-2">
+      <div className="text-xs uppercase text-neutral-500">{t('Auditoría de la relación')}</div>
+      {verdict === 'confirmed' && <p className="text-xs text-emerald-400">{t('Has confirmado esta relación.')}</p>}
+      {verdict === 'rejected' && (
+        <p className="text-xs text-red-400">{t('Has marcado esta relación como incorrecta: desaparecerá del grafo y de los análisis.')}</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {verdict !== 'confirmed' && (
+          <button
+            className="card px-2 py-1 text-xs text-emerald-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Marcar esta relación como verificada por ti')}
+            onClick={() => void apply('confirmed')}
+          >
+            ✓ {t('Confirmar')}
+          </button>
+        )}
+        {verdict !== 'rejected' && (
+          <button
+            className="card px-2 py-1 text-xs text-red-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Ocultar esta relación del grafo y de los análisis (persiste tras re-análisis)')}
+            onClick={() => void apply('rejected')}
+          >
+            ✕ {t('Marcar como incorrecta')}
+          </button>
+        )}
+        {verdict !== null && (
+          <button
+            className="card px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800 disabled:opacity-50"
+            disabled={busy}
+            title={t('Quitar el veredicto y volver al estado derivado')}
+            onClick={() => void apply(null)}
+          >
+            {t('Deshacer')}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

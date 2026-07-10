@@ -181,7 +181,7 @@ function disputesAmong(ids: string[]): DisputeEdge[] {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db
     .prepare(
-      `SELECT id, from_id, to_id, type FROM edges
+      `SELECT id, from_id, to_id, type FROM visible_edges
         WHERE type IN ('contradicts','refutes')
           AND from_id IN (${placeholders}) AND to_id IN (${placeholders})`
     )

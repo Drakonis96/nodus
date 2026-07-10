@@ -288,8 +288,8 @@ export function VaultSwitcher({
             )}
 
             {dangerVault && (
-              <div className="vault-danger-panel space-y-2 rounded-md border border-red-900/60 bg-red-950/20 p-2">
-                <div className="vault-danger-title text-xs font-medium text-red-300">{t('Zona peligrosa')}</div>
+              <div className="vault-danger-panel space-y-2 rounded-md border border-red-200 bg-red-50 p-2 dark:border-red-900/60 dark:bg-red-950/20">
+                <div className="vault-danger-title text-xs font-medium text-red-700 dark:text-red-300">{t('Zona peligrosa')}</div>
                 <label className="block space-y-1">
                   <span className="text-xs text-neutral-500">{t('Vault objetivo')}</span>
                   <select

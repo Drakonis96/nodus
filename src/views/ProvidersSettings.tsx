@@ -258,7 +258,7 @@ function ModelList({
         </span>
         {m.reasoning && (
           <span
-            className="shrink-0 rounded bg-amber-950/60 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-400/90"
+            className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-700 dark:bg-amber-950/60 dark:text-amber-400/90"
             title={t('Modelo de razonamiento: más lento para escanear.')}
           >
             {t('razona')}

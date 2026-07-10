@@ -264,11 +264,11 @@ export function StudyGuideView({
             </label>
           </div>
         </div>
-        {plan ? <PlanStats plan={plan} /> : <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-3"><Spinner label={t('Calculando plan...')} /></div>}
+        {plan ? <PlanStats plan={plan} /> : <div className="rounded-lg border border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-800 dark:bg-neutral-900/40"><Spinner label={t('Calculando plan...')} /></div>}
       </div>
 
       {plan?.semanticFocusSummary && (
-        <div className={`mb-3 rounded-lg border px-3 py-2 text-xs ${plan.semanticFocusUsed ? 'border-cyan-900 bg-cyan-950/30 text-cyan-200' : 'border-neutral-800 bg-neutral-900/50 text-neutral-400'}`}>
+        <div className={`mb-3 rounded-lg border px-3 py-2 text-xs ${plan.semanticFocusUsed ? 'border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-900 dark:bg-cyan-950/30 dark:text-cyan-200' : 'border-neutral-200 bg-neutral-100 text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-400'}`}>
           {plan.semanticFocusSummary}
         </div>
       )}
@@ -361,12 +361,12 @@ function StudyPlanLoadingBar({ phase }: { phase: StudyPlanLoadPhase }) {
           : t('Preparando ruta de estudio…');
 
   return (
-    <div className="mb-4 rounded-lg border border-indigo-900/50 bg-indigo-950/25 px-3 py-2 dark:border-indigo-900/60">
-      <div className="flex items-center gap-2 text-xs text-indigo-200">
+    <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 dark:border-indigo-900/60 dark:bg-indigo-950/25">
+      <div className="flex items-center gap-2 text-xs text-indigo-700 dark:text-indigo-200">
         <Spinner />
         <span>{label}</span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-900/80 dark:bg-neutral-900">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-900">
         <div className="study-plan-progress h-full w-1/3 rounded-full bg-indigo-500" />
       </div>
     </div>

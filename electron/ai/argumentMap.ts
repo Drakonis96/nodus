@@ -97,7 +97,7 @@ function buildLocalSubgraph(seedId: string): {
 
   const allEdges = getDb()
     .prepare(
-      `SELECT id, from_id, to_id, type, basis, confidence FROM edges WHERE type != 'contains'`
+      `SELECT id, from_id, to_id, type, basis, confidence FROM visible_edges WHERE type != 'contains'`
     )
     .all() as EdgeRow[];
 
@@ -376,7 +376,7 @@ export function discoverArgumentRoutes(): ArgumentRouteSuggestion[] {
 
   const allEdges = getDb()
     .prepare(
-      `SELECT id, from_id, to_id, type, basis, confidence FROM edges WHERE type != 'contains'`
+      `SELECT id, from_id, to_id, type, basis, confidence FROM visible_edges WHERE type != 'contains'`
     )
     .all() as EdgeRow[];
 

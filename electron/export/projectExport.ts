@@ -42,7 +42,7 @@ export async function exportProjectChapter(
   if (!chapter) return null;
   const ext = request.format === 'markdown' ? 'md' : request.format;
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar capitulo',
+    title: 'Exportar capítulo',
     defaultPath: path.join(app.getPath('documents'), `${slug(chapter.title)}.${ext}`),
     filters: [filterForChapter(request.format)],
   });

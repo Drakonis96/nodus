@@ -26,12 +26,15 @@ interface ExportManifestBase {
 
 interface BackupManifest {
   format: 'nodus.encrypted-backup';
-  formatVersion: 1 | 2;
+  // v3 = secret-free backup (no API keys / tokens inside). Older app versions
+  // reject v3 cleanly instead of importing it and wiping their local keys.
+  formatVersion: 1 | 2 | 3;
   schemaVersion: number;
   appVersion: string;
   date: string;
   zoteroUserId: string;
   cipher: BackupCipherMetadata;
+  includesSecrets?: boolean;
 }
 
 interface PayloadManifest {
@@ -70,18 +73,21 @@ type BackupSettings = Omit<AppSettings, 'providerKeys' | 'mcpToken'>;
  * the source of truth and includes every Nodus table, including Float32 BLOB
  * embeddings, full-text passages, extraction cache and chat history.
  */
-export async function exportData(): Promise<{ path: string; password: string } | null> {
-  const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Exportar biblioteca Nodus',
-    defaultPath: path.join(app.getPath('documents'), `nodus-export-${Date.now()}.nodus`),
-    filters: [{ name: 'Nodus', extensions: ['nodus'] }],
-  });
-  if (canceled || !filePath) return null;
-
+/**
+ * Build the complete encrypted `.nodus` archive in memory. Shared by the manual
+ * export (dialog + generated password + secrets) and the automatic scheduled
+ * backup (master password, secrets EXCLUDED). Dialog-free so it can run
+ * headless and be exercised by tests.
+ */
+export async function createBackupArchive(options: {
+  password: string;
+  includeSecrets: boolean;
+  appVersion: string;
+}): Promise<Buffer> {
   const settings = getSettings();
   const manifest: ExportManifestBase = {
     schemaVersion: SCHEMA_VERSION,
-    appVersion: app.getVersion(),
+    appVersion: options.appVersion,
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
@@ -89,15 +95,17 @@ export async function exportData(): Promise<{ path: string; password: string } |
   // A restored backup must not silently re-enable an endpoint with a credential
   // copied from another machine. The port is retained as a convenience.
   const nonSecret: BackupSettings = { ...withoutToken, mcpEnabled: false };
-  const apiKeys = readApiKeys();
+  const apiKeys = options.includeSecrets ? readApiKeys() : {};
   const { database, inventory } = await createDatabaseSnapshot(nonSecret, apiKeys);
 
   const files: Record<string, Buffer> = {
     'database.sqlite': database,
     'settings.json': Buffer.from(JSON.stringify(nonSecret, null, 2)),
-    'api-keys.json': Buffer.from(JSON.stringify(apiKeys, null, 2)),
     'backup-inventory.json': Buffer.from(JSON.stringify(inventory, null, 2)),
   };
+  if (options.includeSecrets) {
+    files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
+  }
   const payloadManifest: PayloadManifest = {
     ...manifest,
     files: Object.fromEntries(
@@ -109,20 +117,32 @@ export async function exportData(): Promise<{ path: string; password: string } |
   const payloadZip = new AdmZip();
   for (const [name, data] of Object.entries(files)) payloadZip.addFile(name, data);
 
-  const password = generateBackupPassword();
-  const { ciphertext, metadata } = encryptBackupPayload(payloadZip.toBuffer(), password);
+  const { ciphertext, metadata } = encryptBackupPayload(payloadZip.toBuffer(), options.password);
   const outerManifest: BackupManifest = {
     format: 'nodus.encrypted-backup',
-    formatVersion: 2,
+    formatVersion: options.includeSecrets ? 2 : 3,
     ...manifest,
     cipher: metadata,
+    includesSecrets: options.includeSecrets,
   };
 
   const zip = new AdmZip();
   zip.addFile('manifest.json', Buffer.from(JSON.stringify(outerManifest, null, 2)));
   zip.addFile('backup.bin', ciphertext);
-  zip.writeZip(filePath);
+  return zip.toBuffer();
+}
 
+export async function exportData(): Promise<{ path: string; password: string } | null> {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Exportar biblioteca Nodus',
+    defaultPath: path.join(app.getPath('documents'), `nodus-export-${Date.now()}.nodus`),
+    filters: [{ name: 'Nodus', extensions: ['nodus'] }],
+  });
+  if (canceled || !filePath) return null;
+
+  const password = generateBackupPassword();
+  const archive = await createBackupArchive({ password, includeSecrets: true, appVersion: app.getVersion() });
+  fs.writeFileSync(filePath, archive);
   return { path: filePath, password };
 }
 
@@ -144,9 +164,12 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
   }
 
   const manifest = JSON.parse(zip.readAsText(manifestEntry)) as BackupManifest;
-  if (manifest.format !== 'nodus.encrypted-backup' || (manifest.formatVersion !== 1 && manifest.formatVersion !== 2)) {
+  const supportedVersions = [1, 2, 3];
+  if (manifest.format !== 'nodus.encrypted-backup' || !supportedVersions.includes(manifest.formatVersion)) {
     return { ok: false, message: 'Formato de copia de seguridad no soportado.' };
   }
+  // v3 backups (automatic) carry no secrets: keys/tokens on this machine are preserved.
+  const includesSecrets = manifest.formatVersion < 3 || manifest.includesSecrets === true;
   if (manifest.schemaVersion > SCHEMA_VERSION) {
     return {
       ok: false,
@@ -181,7 +204,7 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
   const importedSettings = readJsonEntry<BackupSettings>(payload, 'settings.json');
   const importedKeys = readJsonEntry<Partial<Record<AiProvider, string>>>(payload, 'api-keys.json') ?? {};
   const inventory = readJsonEntry<BackupInventory>(payload, 'backup-inventory.json');
-  if (manifest.formatVersion === 2 && !inventory) {
+  if (manifest.formatVersion >= 2 && !inventory) {
     return { ok: false, message: 'Copia inválida: falta el inventario de datos.' };
   }
   if (inventory && !settingsMatchInventory(importedSettings, importedKeys, inventory)) {
@@ -210,11 +233,14 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
       .prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
       .run('app', JSON.stringify(restoredSettings));
   }
-  restoreApiKeys(importedKeys);
+  // Secret-free (automatic) backups leave this machine's keys untouched.
+  if (includesSecrets) restoreApiKeys(importedKeys);
 
   return {
     ok: true,
-    message: 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos, grafo y claves API restaurados.',
+    message: includesSecrets
+      ? 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos, grafo y claves API restaurados.'
+      : 'Importación completa: biblioteca, texto extraído, embeddings, pasajes, modelos y grafo restaurados. Las claves API locales se han conservado (la copia automática no las incluye).',
   };
 }
 

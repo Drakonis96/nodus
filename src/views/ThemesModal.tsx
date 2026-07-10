@@ -283,7 +283,7 @@ export function ThemesModal({
             )}
           </div>
 
-          {notice && <div className="text-xs text-emerald-300 bg-emerald-950/30 border border-emerald-900 rounded-md px-3 py-2">{notice}</div>}
+          {notice && <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 dark:text-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-900">{notice}</div>}
         </div>
 
         <footer className="border-t border-neutral-800 p-3 space-y-3">

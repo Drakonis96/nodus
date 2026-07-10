@@ -71,7 +71,8 @@ export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResul
   const ideas = db
     .prepare(
       `SELECT global_id, type, label, statement FROM ideas
-        WHERE label LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\'
+        WHERE orphaned_at IS NULL
+          AND (label LIKE ? ESCAPE '\\' OR statement LIKE ? ESCAPE '\\')
         ORDER BY length(label) ASC LIMIT ?`
     )
     .all(like, like, limitPerKind) as IdeaRow[];

@@ -63,6 +63,8 @@ export interface WorkView extends Omit<Work, 'authors_json'> {
   authors: string[];
   themes: string[];
   zoteroTags: string[];
+  /** How many ideas have been extracted from this work (idea_occurrences count). */
+  ideaCount: number;
 }
 
 /** One work inside a duplicate group, with enough metadata to choose a canonical. */
@@ -370,6 +372,24 @@ export interface AppSettings {
    * they can be shown again from Settings.
    */
   sidebarHidden: string[];
+  // ── Automatic encrypted backups ────────────────────────────────────────────
+  // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
+  // Google Drive to get off-machine copies for free). Encrypted with the
+  // master backup password stored in the OS keychain; unlike the manual
+  // export, automatic backups NEVER include API keys or tokens.
+  autoBackupEnabled: boolean;
+  autoBackupFolder: string;
+  autoBackupIntervalHours: number;
+  lastAutoBackupAt: string | null;
+  lastAutoBackupStatus: string | null;
+}
+
+/** Outcome of a manual or scheduled automatic backup run. */
+export interface AutoBackupResult {
+  ok: boolean;
+  message: string;
+  path?: string;
+  prunedCount?: number;
 }
 
 export interface VaultSummary {
@@ -647,6 +667,46 @@ export interface GraphEdge {
   type: EdgeType | string;
   basis: EdgeBasis;
   confidence: number;
+  /** User audit verdict. Rejected edges never reach the graph, so only 'confirmed' appears here. */
+  verdict?: EdgeFeedbackVerdict;
+}
+
+// ── Edge audit feedback ──────────────────────────────────────────────────────
+// A user verdict over a derived relation. Keyed by idea pair + relation type
+// (not by edges.id) so it survives rescans that recreate edge rows.
+
+export type EdgeFeedbackVerdict = 'rejected' | 'confirmed';
+
+export interface EdgeFeedback {
+  from_id: string;
+  to_id: string;
+  type: string;
+  verdict: EdgeFeedbackVerdict;
+  note: string;
+  created_at: string;
+}
+
+/** Feedback row enriched with idea labels for listing in the UI. */
+export interface EdgeFeedbackView extends EdgeFeedback {
+  from_label: string;
+  to_label: string;
+}
+
+// ── User-layer sync package (multi-machine) ─────────────────────────────────
+
+export interface SyncTableCounts {
+  inserted: number;
+  updated: number;
+  skipped: number;
+}
+
+/** Per-table outcome of merging a sync package. Merges are additive: nothing local is deleted. */
+export interface SyncMergeSummary {
+  noteFolders: SyncTableCounts;
+  notes: SyncTableCounts;
+  writingDrafts: SyncTableCounts;
+  savedSearches: SyncTableCounts;
+  edgeFeedback: SyncTableCounts;
 }
 
 export interface GraphData {
@@ -684,6 +744,8 @@ export interface EdgeDetail {
   explanation?: string | null;
   evidence: Evidence[];
   trace?: EdgeTrace | null;
+  /** Current audit verdict for this relation, if the user has set one. */
+  feedback?: EdgeFeedback | null;
 }
 
 export interface EdgeTrace {
@@ -1480,6 +1542,19 @@ export interface CitationRef {
   id: string;
 }
 
+/**
+ * Lightweight preview of a cited source, shown in the hover-card that appears
+ * over an inline citation before the user commits to opening the full source
+ * modal. All strings come straight from the corpus (already Spanish); the
+ * caller adds the localized kind label.
+ */
+export interface CitationPreview {
+  kind: CitationKind;
+  title: string;
+  subtitle?: string;
+  snippet?: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Global search
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1567,6 +1642,9 @@ export interface CorpusHealthBucket {
   count: number;
   sample: CorpusHealthWork[];
 }
+
+/** The work-level corpus-health buckets that can be replayed as a Library filter. */
+export type CorpusHealthBucketId = 'withoutText' | 'lightOnly' | 'deepPriority' | 'pdfsToRecover';
 
 export interface CorpusHealth {
   totalWorks: number;
@@ -1826,6 +1904,8 @@ export interface ManuscriptEvidenceCandidate {
   score: number;
   workTitle?: string | null;
   pageLabel?: string | null;
+  /** True when the AI review confirmed this candidate as direct support for the claim. */
+  aiEndorsed?: boolean;
 }
 
 export interface ManuscriptClaimCheck {
@@ -1869,6 +1949,20 @@ export interface ManuscriptVerificationRequest {
   model?: ModelRef | null;
   language?: AppLanguage;
   maxClaims?: number;
+}
+
+export interface ApplyManuscriptCitationRequest {
+  chapterId: string;
+  /** Claim sentence as returned by the verifier; located in the draft with whitespace tolerance. */
+  excerpt: string;
+  /** Citation markdown to append to the sentence, e.g. `[label](nodus://idea/...)`. */
+  citationMarkdown: string;
+}
+
+export interface ApplyManuscriptCitationResult {
+  /** False when the sentence could not be located in the current draft. */
+  applied: boolean;
+  chapter: ProjectChapter | null;
 }
 
 export interface ProjectDetail {
@@ -2591,6 +2685,293 @@ export interface StudyAnswerAssessment {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Inmersión — a fully guided topic-mastery session. Phase 0 (the scope) is pure
+// embeddings + graph, no AI; the generated plan stores every AI answer verbatim
+// so a session can be resumed and replayed forever without new AI calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ImmersionScopeRequest {
+  topic: string;
+}
+
+/** One idea inside the topic territory, ranked by relevance (no AI involved). */
+export interface ImmersionScopeIdea {
+  id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  score: number;
+  themes: string[];
+  authors: string[];
+  workIds: string[];
+}
+
+export interface ImmersionScopeWork {
+  nodusId: string;
+  title: string;
+  authors: string[];
+  year: number | null;
+  zoteroKey: string | null;
+  score: number;
+  ideaCount: number;
+}
+
+export interface ImmersionScopeAuthor {
+  authorId: string | null;
+  name: string;
+  ideaCount: number;
+  workCount: number;
+}
+
+/** Phase 0 — the map of what the corpus knows about a topic (embeddings + graph only). */
+export interface ImmersionScope {
+  topic: string;
+  generatedAt: string;
+  embeddingAvailable: boolean;
+  /** Whether the configured synthesis/default model has a usable API key; without it generation would degrade to structural content. */
+  aiKeyAvailable: boolean;
+  ideas: ImmersionScopeIdea[];
+  works: ImmersionScopeWork[];
+  authors: ImmersionScopeAuthor[];
+  themes: string[];
+  debateCount: number;
+  gapCount: number;
+  passageCount: number;
+  /** The topic subgraph (idea nodes + edges among them), ready for the renderer. */
+  graph: GraphData;
+  estimatedStations: number;
+  warnings: string[];
+}
+
+export interface ImmersionRequest {
+  topic: string;
+  language?: 'es' | 'en';
+  /** Total time budget for the whole immersion, in minutes. */
+  minutes: number;
+  /** Whether stations and the final exam carry retrieval questions (always skippable). */
+  includeQuiz: boolean;
+  model?: ModelRef | null;
+}
+
+/**
+ * A literal quote re-read from the stored full text. `text` always comes from the
+ * database, never from the model — the model only picks the passage and explains
+ * why it matters.
+ */
+export interface ImmersionCitation {
+  passageId: string;
+  workId: string;
+  workTitle: string;
+  authors: string[];
+  year: number | null;
+  zoteroKey: string | null;
+  pageLabel: string | null;
+  text: string;
+  whyItMatters: string;
+  /** Guided close reading: what to notice in this quote and how it bears on the sub-question. */
+  commentary: string;
+}
+
+export interface ImmersionAuthorPosition {
+  authorId: string | null;
+  name: string;
+  position: string;
+  ideaIds: string[];
+}
+
+export interface ImmersionQuizQuestion {
+  id: string;
+  kind: 'choice' | 'open';
+  question: string;
+  /** Choice questions: the options shown; empty for open questions. */
+  options: string[];
+  /** Choice questions: index into `options`; null for open questions. */
+  correctIndex: number | null;
+  /** Choice questions: shown after answering. */
+  explanation: string;
+  /** Open questions: what a solid answer must recover. */
+  expected: string;
+  ideaIds: string[];
+}
+
+/**
+ * One guided stop of the immersion — a complete mini-lesson: framing context,
+ * a long threaded lesson, guided close reading of literal quotes, author
+ * positions, takeaways to retain and optional retrieval questions.
+ */
+export interface ImmersionStation {
+  id: string;
+  title: string;
+  question: string;
+  minutes: number;
+  /** Why this sub-question matters inside the topic (framing before the lesson). */
+  context: string;
+  /** The main lesson: markdown with nodus:// citations, validated against the corpus. */
+  synthesis: string;
+  citations: ImmersionCitation[];
+  positions: ImmersionAuthorPosition[];
+  /** The sentences the reader must retain from this station. */
+  takeaways: string[];
+  /** The ideas this station covers; drives the embedded graph excerpt. */
+  ideaIds: string[];
+  quiz: ImmersionQuizQuestion[];
+}
+
+export interface ImmersionKeyTerm {
+  term: string;
+  definition: string;
+}
+
+export interface ImmersionContrastCell {
+  author: string;
+  authorId: string | null;
+  /** One-sentence stance; empty when this author has no known position. */
+  stance: string;
+  ideaIds: string[];
+}
+
+export interface ImmersionContrastRow {
+  stationId: string;
+  question: string;
+  cells: ImmersionContrastCell[];
+}
+
+export interface ImmersionContrasts {
+  authors: string[];
+  rows: ImmersionContrastRow[];
+}
+
+export interface ImmersionFrontier {
+  kind: 'gap' | 'thin_coverage';
+  statement: string;
+  detail: string;
+  workTitle: string | null;
+}
+
+export interface ImmersionExam {
+  questions: ImmersionQuizQuestion[];
+  /** The "explain it in your own words" closing prompt. */
+  feynman: string;
+}
+
+/** Compact idea reference stored in the plan so answers can be assessed later without the live graph. */
+export interface ImmersionIdeaRef {
+  id: string;
+  label: string;
+  statement: string;
+  authors: string[];
+  workTitles: string[];
+}
+
+export interface ImmersionPlanStats {
+  stations: number;
+  ideas: number;
+  works: number;
+  authors: number;
+  citations: number;
+  quizQuestions: number;
+}
+
+export interface ImmersionPlan {
+  topic: string;
+  title: string;
+  language: 'es' | 'en';
+  minutes: number;
+  generatedAt: string;
+  model: ModelRef | null;
+  /** Phase 1 panorama: markdown with nodus:// citations. */
+  overview: string;
+  keyTerms: ImmersionKeyTerm[];
+  stations: ImmersionStation[];
+  contrasts: ImmersionContrasts;
+  frontiers: ImmersionFrontier[];
+  exam: ImmersionExam;
+  /** The topic subgraph; stations select node subsets from it via ideaIds. */
+  graph: GraphData;
+  ideaIndex: ImmersionIdeaRef[];
+  stats: ImmersionPlanStats;
+  /** Non-null when generation degraded somewhere (a model failure fell back to structural content). */
+  stoppedReason: string | null;
+}
+
+export interface ImmersionAssessment {
+  verdict: 'solid' | 'partial' | 'weak';
+  score: number;
+  feedback: string;
+  missing: string[];
+}
+
+export interface ImmersionAnswerRecord {
+  questionId: string;
+  kind: 'choice' | 'open';
+  answer: string;
+  /** Choice questions: whether the chosen option was right. */
+  correct: boolean | null;
+  /** Open questions: the AI (or heuristic) assessment. */
+  assessment: ImmersionAssessment | null;
+  answeredAt: string;
+}
+
+export interface ImmersionProgress {
+  currentStep: number;
+  furthestStep: number;
+  completedSteps: number[];
+  answers: ImmersionAnswerRecord[];
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface ImmersionSession {
+  id: string;
+  topic: string;
+  language: 'es' | 'en';
+  minutes: number;
+  model: ModelRef | null;
+  plan: ImmersionPlan;
+  progress: ImmersionProgress;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImmersionSessionSummary {
+  id: string;
+  topic: string;
+  title: string;
+  language: 'es' | 'en';
+  minutes: number;
+  stats: ImmersionPlanStats;
+  progressPct: number;
+  finished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImmersionBuildProgress {
+  phase: 'material' | 'curriculum' | 'panorama' | 'station' | 'contrasts' | 'frontiers' | 'exam' | 'assembling' | 'done';
+  message: string;
+  stationIndex?: number;
+  stationTotal?: number;
+  stationTitle?: string;
+}
+
+export interface ImmersionStreamHandlers {
+  onProgress?(progress: ImmersionBuildProgress): void;
+}
+
+export interface ImmersionAnswerRequest {
+  sessionId: string;
+  questionId: string;
+  answer: string;
+  model?: ModelRef | null;
+}
+
+/** The recorded answer (with assessment when open) plus the persisted progress. */
+export interface ImmersionAnswerResult {
+  record: ImmersionAnswerRecord;
+  progress: ImmersionProgress;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -2675,6 +3056,8 @@ export interface NodusApi {
   /** Live bibliographic metadata for a work (journal/book, pages, publisher, …). */
   getWorkMeta(nodusId: string): Promise<WorkMeta | null>;
   openInZotero(zoteroKey: string): Promise<void>;
+  /** Open a work's PDF in Zotero at the page parsed from an evidence/passage location; falls back to selecting the item. */
+  openEvidenceAtPage(nodusId: string, location: string | null): Promise<{ ok: boolean; mode: 'pdf-page' | 'select' | 'none'; page?: number | null }>;
   /** Open an http(s)/mailto link in the user's default browser (used by rendered Markdown). */
   openExternal(url: string): Promise<void>;
   uploadText(nodusId: string, filePath: string): Promise<void>;
@@ -2703,6 +3086,10 @@ export interface NodusApi {
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
   /** Every direct idea↔idea edge touching an idea (its connections). */
   getIdeaEdges(globalId: string): Promise<EdgeDetail[]>;
+  /** Set (or clear with null) the audit verdict for a relation. */
+  setEdgeFeedback(fromId: string, toId: string, type: string, verdict: EdgeFeedbackVerdict | null, note?: string): Promise<void>;
+  /** Every audit verdict, newest first, with idea labels. */
+  listEdgeFeedback(): Promise<EdgeFeedbackView[]>;
   /** Paginated list of the ideas a work develops. */
   getIdeasByWork(nodusId: string, limit: number, offset: number): Promise<IdeaByWorkPage>;
   /** Cached narrated synthesis for the ideas extracted from one work, if present. */
@@ -2737,6 +3124,15 @@ export interface NodusApi {
   }): Promise<StudyProgressRecord>;
   /** Optional AI tutor session for one author, grounded in graph data and indexed passages. */
   generateStudySession(request: StudySessionRequest): Promise<StudySession>;
+
+  // inmersión (guided topic mastery)
+  buildImmersionScope(request: ImmersionScopeRequest): Promise<ImmersionScope>;
+  generateImmersionSession(request: ImmersionRequest, handlers?: ImmersionStreamHandlers): Promise<ImmersionSession>;
+  listImmersionSessions(): Promise<ImmersionSessionSummary[]>;
+  getImmersionSession(id: string): Promise<ImmersionSession | null>;
+  setImmersionProgress(id: string, progress: ImmersionProgress): Promise<void>;
+  answerImmersionQuestion(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult>;
+  deleteImmersionSession(id: string): Promise<void>;
   /** Evaluate a learner's answer against the selected author's extracted ideas. */
   evaluateStudyAnswer(request: StudyAnswerRequest): Promise<StudyAnswerAssessment>;
 
@@ -2788,6 +3184,12 @@ export interface NodusApi {
   // research assistant
   researchChat(request: ResearchChatRequest): Promise<ResearchChatResponse>;
   researchChatStream(request: ResearchChatRequest, handlers: ResearchChatStreamHandlers): Promise<ResearchChatResponse>;
+  /**
+   * Abort the research-chat stream currently in flight. The pending
+   * {@link researchChatStream} promise then resolves with whatever partial
+   * answer had streamed so far (never rejects), so the UI can keep the text.
+   */
+  cancelResearchChat(): Promise<void>;
 
   // writing workshop
   getWritingWorkshopSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
@@ -2876,6 +3278,8 @@ export interface NodusApi {
   suggestFolderIdeas(folderId: string): Promise<FolderIdeaSuggestionsResult>;
   /** Check which inline citations resolve to a real source. Key is `${kind}:${id}`. */
   verifyCitations(refs: CitationRef[]): Promise<Record<string, boolean>>;
+  /** Lightweight preview (title + snippet) of a cited source for its hover-card. Null if it no longer resolves. */
+  getCitationPreview(ref: CitationRef): Promise<CitationPreview | null>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
   globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
   /** Search by meaning over embedded ideas, passages and works. */
@@ -2915,12 +3319,28 @@ export interface NodusApi {
   onChapterRelationsProgress(cb: (p: ChapterRelationsProgress) => void): () => void;
   /** Check uncited manuscript claims against indexed/listed corpus ideas and passages. */
   verifyManuscriptCitations(request: ManuscriptVerificationRequest): Promise<ManuscriptVerificationResult>;
+  /** Insert a chosen citation into the draft at the claim sentence, saving a recoverable version. */
+  applyManuscriptCitation(request: ApplyManuscriptCitationRequest): Promise<ApplyManuscriptCitationResult>;
   exportProject(request: ExportProjectRequest): Promise<{ path: string } | null>;
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 
   // export / import
   exportData(): Promise<{ path: string; password: string } | null>;
   importData(password: string): Promise<{ ok: boolean; message: string }>;
+  /** Export the user layer (notes, drafts, saved searches, edge verdicts) as a portable sync package. */
+  exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
+  /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
+  importSyncPackage(): Promise<SyncMergeSummary | null>;
+  /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
+  setBackupPassword(password: string): Promise<void>;
+  clearBackupPassword(): Promise<void>;
+  hasBackupPassword(): Promise<boolean>;
+  /** Folder picker for the automatic-backup destination. Returns the chosen path or null. */
+  chooseBackupFolder(): Promise<string | null>;
+  /** Run one automatic-style backup immediately (no secrets, master password, prune). */
+  runBackupNow(): Promise<AutoBackupResult>;
+  /** Write a plaintext recovery kit (master password) to a user-chosen file. */
+  saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
@@ -2978,6 +3398,8 @@ export interface WorkFilter {
   summaryStatus?: SummaryStatus | 'all';
   /** Presence conditions that must all be satisfied (AND). `!` prefix = NOT. */
   statusFlags?: Array<'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages'>;
+  /** Restrict to a corpus-health bucket (works without text, light-only, etc.). */
+  healthBucket?: CorpusHealthBucketId;
   theme?: string;
   /** Zotero tags to match. Multiple tags can use any-match (default) or all-match. */
   zoteroTags?: string[];

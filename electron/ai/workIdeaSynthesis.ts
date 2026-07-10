@@ -129,7 +129,7 @@ function connectionLine(globalIds: string[]): string {
   const rows = getDb()
     .prepare(
       `SELECT e.type AS type, f.label AS fromLabel, t.label AS toLabel
-         FROM edges e
+         FROM visible_edges e
          JOIN ideas f ON f.global_id = e.from_id
          JOIN ideas t ON t.global_id = e.to_id
         WHERE e.from_id IN (${placeholders}) AND e.to_id IN (${placeholders})

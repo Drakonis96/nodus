@@ -4,6 +4,7 @@ import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
   AddProjectLinkInput,
+  ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
   AuthorSynthesisExportRequest,
   ChapterSuggestionStatus,
@@ -55,6 +56,10 @@ import type {
   StudyPlanRequest,
   StudySessionRequest,
   StudyAnswerRequest,
+  ImmersionScopeRequest,
+  ImmersionRequest,
+  ImmersionProgress,
+  ImmersionAnswerRequest,
   CreateVaultInput,
   VaultSummary,
   VaultSwitchOptions,
@@ -70,7 +75,9 @@ import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, sto
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
-import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault } from './secrets/secretStore';
+import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
+import { runAutoBackupNow } from './export/autoBackup';
+import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import { listEmbeddingModels, listModels } from './ai/providers';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
@@ -79,6 +86,7 @@ import * as dedupe from './db/dedupeRepo';
 import * as ideaDedupe from './db/ideaDedupeRepo';
 import { listCollectionFacets } from './db/collectionsRepo';
 import * as ideas from './db/ideasRepo';
+import { setEdgeFeedback, listEdgeFeedback } from './db/edgeFeedbackRepo';
 import * as themes from './db/themesRepo';
 import { aggregateGaps, getGapDetail } from './db/gapsRepo';
 import { getSyncLog } from './db/syncRepo';
@@ -90,17 +98,19 @@ import * as rqRepo from './db/researchMapRepo';
 import { decomposeQuestion, mapCoverage } from './ai/researchMap';
 import { exportResearchCoverage } from './export/researchMapExport';
 import { exportData, importData } from './export/exportImport';
+import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
+import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
-import { verifyCitations } from './citations/verifyCitations';
+import { verifyCitations, previewCitation } from './citations/verifyCitations';
 import { globalSearch } from './db/searchRepo';
 import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
 import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
-import { verifyManuscriptCitations } from './ai/manuscriptVerifier';
+import { applyManuscriptCitation, verifyManuscriptCitations } from './ai/manuscriptVerifier';
 import { suggestGapSearch } from './ai/gapSearch';
 import { extractFromPath } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
@@ -113,6 +123,8 @@ import { buildSynthesisMatrix, synthesizeMatrixCell } from './ai/synthesisMatrix
 import { getCachedWorkIdeaSynthesis, synthesizeWorkIdeas } from './ai/workIdeaSynthesis';
 import { exportAuthorSyntheses } from './export/authorSynthesisExport';
 import { buildStudyPlan, evaluateStudyAnswer, generateStudySession } from './ai/studyGuide';
+import { buildImmersionScope, evaluateImmersionAnswer, generateImmersionSession } from './ai/immersion';
+import * as immersionRepo from './db/immersionRepo';
 import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
@@ -206,6 +218,10 @@ export function registerIpc(
   installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
   const h = ipcMain.handle.bind(ipcMain);
+
+  // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
+  // button (`research:chatStream:cancel`) can abort the provider mid-answer.
+  const chatAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
     getWindow()?.webContents.send('vaults:changed', withVaultKeyProviders(getActiveVault()));
@@ -552,8 +568,26 @@ export function registerIpc(
   h('ideas:backup', async () => ideaDedupe.backupDatabase());
   h('works:openInZotero', async (_e, zoteroKey: string) => {
     const { zoteroUserId } = getSettings();
-    await shell.openExternal(`zotero://select/library/items/${zoteroKey}`);
+    await shell.openExternal(zoteroSelectUrl(zoteroKey));
     return zoteroUserId;
+  });
+  // Evidence → the exact PDF page in Zotero's reader. The [[p. N]] markers the
+  // extractor writes are physical 1-based page indices, which is exactly what
+  // zotero://open-pdf expects; when the location has no parseable page (or the
+  // work has no PDF attachment) we fall back to selecting the item.
+  h('works:openAtPage', async (_e, nodusId: string, location: string | null) => {
+    const work = works.getWork(nodusId);
+    if (!work?.zotero_key) return { ok: false, mode: 'none' as const };
+    const page = parsePageNumber(location);
+    if (page !== null) {
+      const attachmentKey = await zotero.resolvePdfAttachmentKey(getSettings().zoteroUserId, work.zotero_key);
+      if (attachmentKey) {
+        await shell.openExternal(zoteroOpenPdfUrl(attachmentKey, page));
+        return { ok: true, mode: 'pdf-page' as const, page };
+      }
+    }
+    await shell.openExternal(zoteroSelectUrl(work.zotero_key));
+    return { ok: true, mode: 'select' as const, page };
   });
   h('shell:openExternal', async (_e, url: string) => {
     // Only follow web/mail links rendered from Markdown — never arbitrary schemes.
@@ -596,6 +630,10 @@ export function registerIpc(
   h('graph:ideaDetail', async (_e, globalId: string) => ideas.getIdeaDetail(globalId));
   h('graph:edgeDetail', async (_e, edgeId: string) => ideas.getEdgeDetail(edgeId));
   h('graph:ideaEdges', async (_e, globalId: string) => ideas.getIdeaEdges(globalId));
+  h('graph:edgeFeedback:set', async (_e, fromId: string, toId: string, type: string, verdict: 'rejected' | 'confirmed' | null, note?: string) =>
+    setEdgeFeedback(fromId, toId, type, verdict, note ?? '')
+  );
+  h('graph:edgeFeedback:list', async () => listEdgeFeedback());
   h('works:ideasByWork', async (_e, nodusId: string, limit: number, offset: number) =>
     ideas.getIdeasByWork(nodusId, limit, offset)
   );
@@ -627,6 +665,21 @@ export function registerIpc(
   }) => studyProgress.setStudyProgress(record));
   h('study:session', async (_e, request: StudySessionRequest) => generateStudySession(request));
   h('study:answer', async (_e, request: StudyAnswerRequest) => evaluateStudyAnswer(request));
+
+  // inmersión (guided topic mastery: scope → generate → resume/replay forever)
+  h('immersion:scope', async (_e, request: ImmersionScopeRequest) => buildImmersionScope(request));
+  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) =>
+    generateImmersionSession(request, (p) => e.sender.send('immersion:generate:progress', requestId, p))
+  );
+  h('immersion:list', async () => immersionRepo.listImmersionSessions());
+  h('immersion:get', async (_e, id: string) => immersionRepo.getImmersionSession(id));
+  h('immersion:progress:set', async (_e, id: string, progress: ImmersionProgress) =>
+    immersionRepo.setImmersionProgress(id, progress)
+  );
+  h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
+  h('immersion:delete', async (_e, id: string) => {
+    immersionRepo.deleteImmersionSession(id);
+  });
 
   // main-theme management ("temas principales")
   h('themes:listManaged', async () => themes.listManagedThemes());
@@ -693,12 +746,28 @@ export function registerIpc(
 
   // research assistant
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
-  h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) =>
-    streamResearchChat(request, (delta, kind) => {
-      const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
-      e.sender.send(channel, requestId, delta);
-    })
-  );
+  h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
+    // Track the in-flight stream so `research:chatStream:cancel` can abort it. On
+    // abort the provider stops mid-answer and streamResearchChat returns whatever
+    // partial text had streamed, which the renderer keeps.
+    const controller = new AbortController();
+    chatAborters.set(requestId, controller);
+    try {
+      return await streamResearchChat(
+        request,
+        (delta, kind) => {
+          const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
+          e.sender.send(channel, requestId, delta);
+        },
+        controller.signal
+      );
+    } finally {
+      chatAborters.delete(requestId);
+    }
+  });
+  h('research:chatStream:cancel', async (_e, requestId: string) => {
+    chatAborters.get(requestId)?.abort();
+  });
 
   // writing workshop
   h('writing:snapshot', async (_e, brief: WritingWorkshopBrief) => buildWritingWorkshopSnapshot(brief));
@@ -809,6 +878,7 @@ export function registerIpc(
   );
   h('notes:folders:suggestIdeas', async (_e, folderId: string) => suggestFolderIdeas(folderId));
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
+  h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)
   );
@@ -845,7 +915,7 @@ export function registerIpc(
     let filePath = input.filePath?.trim() || null;
     if (!filePath) {
       const result = await dialog.showOpenDialog({
-        title: 'Importar capitulo',
+        title: 'Importar capítulo',
         properties: ['openFile'],
         filters: [
           { name: 'Documentos de texto', extensions: ['docx', 'pdf', 'epub', 'md', 'markdown', 'txt'] },
@@ -860,7 +930,7 @@ export function registerIpc(
       ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
       perf: { title: path.basename(filePath), nodusId: input.projectId },
     });
-    if (!doc.text.trim()) throw new Error('No se pudo extraer texto util del capitulo.');
+    if (!doc.text.trim()) throw new Error('No se pudo extraer texto útil del capítulo.');
     return projects.createChapter({
       projectId: input.projectId,
       sectionId: input.sectionId ?? null,
@@ -891,6 +961,9 @@ export function registerIpc(
   );
   h('projects:manuscript:verify', async (_e, request: ManuscriptVerificationRequest) =>
     verifyManuscriptCitations(request)
+  );
+  h('projects:manuscript:applyCitation', async (_e, request: ApplyManuscriptCitationRequest) =>
+    applyManuscriptCitation(request)
   );
   h('projects:export', async (_e, request: ExportProjectRequest) => exportProject(request));
   h('projects:chapters:export', async (_e, request: ExportProjectChapterRequest) =>
@@ -923,6 +996,69 @@ export function registerIpc(
 
   // export / import
   h('data:export', async () => exportData());
+  h('data:exportSync', async () => {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Exportar paquete de sincronización',
+      defaultPath: path.join(app.getPath('documents'), `nodus-sync-${new Date().toISOString().slice(0, 10)}.nodussync`),
+      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
+    });
+    if (canceled || !filePath) return null;
+    const { buffer, counts } = buildSyncPackage(app.getVersion());
+    fs.writeFileSync(filePath, buffer);
+    return { path: filePath, counts };
+  });
+  // automatic encrypted backups (master password lives in the OS keychain)
+  h('backup:setPassword', async (_e, password: string) => {
+    const clean = password.trim();
+    if (clean.length < MIN_BACKUP_PASSWORD_LENGTH) {
+      throw new Error(`La contraseña maestra debe tener al menos ${MIN_BACKUP_PASSWORD_LENGTH} caracteres.`);
+    }
+    setBackupPassword(clean);
+  });
+  h('backup:clearPassword', async () => clearBackupPassword());
+  h('backup:hasPassword', async () => hasBackupPassword());
+  h('backup:chooseFolder', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Elegir carpeta para copias automáticas',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return canceled || filePaths.length === 0 ? null : filePaths[0];
+  });
+  h('backup:runNow', async () => runAutoBackupNow(app.getVersion()));
+  h('backup:saveRecoveryKit', async () => {
+    const password = getBackupPassword();
+    if (!password) return { ok: false, message: 'No hay contraseña maestra configurada.' };
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: 'Guardar kit de recuperación',
+      defaultPath: path.join(app.getPath('documents'), 'nodus-kit-de-recuperacion.txt'),
+      filters: [{ name: 'Texto', extensions: ['txt'] }],
+    });
+    if (canceled || !filePath) return { ok: false, message: 'Cancelado' };
+    fs.writeFileSync(
+      filePath,
+      [
+        'NODUS — KIT DE RECUPERACIÓN DE COPIAS DE SEGURIDAD',
+        '',
+        `Contraseña maestra: ${password}`,
+        '',
+        'Todas las copias automáticas (.nodus) se cifran con esta contraseña.',
+        'Guárdala en un gestor de contraseñas o imprímela. Sin ella, las copias',
+        'NO se pueden restaurar. Las copias automáticas no incluyen claves API.',
+        `Generado: ${new Date().toISOString()}`,
+      ].join('\n')
+    );
+    return { ok: true, message: filePath };
+  });
+
+  h('data:importSync', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Importar paquete de sincronización',
+      properties: ['openFile'],
+      filters: [{ name: 'Nodus Sync', extensions: ['nodussync'] }],
+    });
+    if (canceled || filePaths.length === 0) return null;
+    return mergeSyncPackage(fs.readFileSync(filePaths[0]));
+  });
   h('data:import', async (_e, password: string) => {
     const result = await importData(password);
     // Imports intentionally restore MCP as disabled and tokenless. Stop any

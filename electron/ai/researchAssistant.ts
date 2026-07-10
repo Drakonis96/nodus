@@ -138,7 +138,8 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
 
 export async function streamResearchChat(
   request: ResearchChatRequest,
-  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
+  signal?: AbortSignal
 ): Promise<ResearchChatResponse> {
   const { system, user, stats } = await buildResearchChatPrompt(request);
   const answer = await completeTextStream(
@@ -149,7 +150,8 @@ export async function streamResearchChat(
       maxTokens: 6000,
     },
     onDelta,
-    request.model
+    request.model,
+    signal
   );
 
   return { answer: answer.trim(), stats };
@@ -389,7 +391,7 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   }
 
   if (selection.graph) {
-    context.grafo = listGraph(selection, linkedWorkIds, scope);
+    context.grafo = await listGraph(selection, linkedWorkIds, scope);
     sections.push('Grafo');
   }
 
@@ -794,10 +796,10 @@ function slimGraphEdge(edge: GraphEdge) {
   };
 }
 
-function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>, scope: RelevanceScope) {
+async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const parts = selection.graphParts;
   const out: SectionPayload = {};
-  const ideaGraph = buildIdeaGraph();
+  const ideaGraph = await buildIdeaGraph();
   const ideaSet = scope.ideaIdSet;
 
   if (parts.ideaNodes) {

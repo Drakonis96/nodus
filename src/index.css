@@ -188,14 +188,45 @@ body {
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
 }
+.light .bg-indigo-900\/20 {
+  background-color: #eef2ff;
+}
+.light .bg-emerald-900\/20 {
+  background-color: #ecfdf5;
+}
+.light .bg-red-900\/20 {
+  background-color: #fef2f2;
+}
+.light .bg-amber-900\/20 {
+  background-color: #fffbeb;
+}
+.light .bg-cyan-900\/20 {
+  background-color: #ecfeff;
+}
+.light .bg-neutral-800\/40 {
+  background-color: #f3f4f6;
+}
 .light .bg-neutral-700 {
   background-color: #d4d4d4;
 }
 .light .border-indigo-900\/70 {
   border-color: rgba(129, 140, 248, 0.45);
 }
-.light .border-indigo-700 {
+.light .border-indigo-700,
+.light .border-indigo-700\/60 {
   border-color: #a5b4fc;
+}
+.light .border-emerald-700\/60 {
+  border-color: #6ee7b7;
+}
+.light .border-red-700\/60 {
+  border-color: #fca5a5;
+}
+.light .border-amber-700\/60 {
+  border-color: #fcd34d;
+}
+.light .border-cyan-700\/60 {
+  border-color: #67e8f9;
 }
 .light .ring-indigo-700\/60 {
   --tw-ring-color: rgba(129, 140, 248, 0.48);
@@ -353,6 +384,65 @@ body {
 .light .library-row-action-neutral:focus-visible {
   background-color: #e0e7ff;
   color: #312e81;
+}
+
+/* ── v1 launch: light-mode fills/borders/dividers that had no light equivalent and
+   stayed dark on pale surfaces. Same manual-override style as the rules above; the
+   companion text-* colours are already remapped to dark earlier in this file. Kept
+   after the semantic (.library-active-chip, etc.) rules so those keep winning by
+   specificity where present. ── */
+.light .bg-indigo-950\/30,
+.light .bg-indigo-950\/50 {
+  background-color: #e0e7ff;
+}
+.light .bg-indigo-800\/70 {
+  background-color: #c7d2fe;
+}
+.light .bg-emerald-900\/40 {
+  background-color: #d1fae5;
+}
+.light .bg-cyan-950\/40 {
+  background-color: #ecfeff;
+}
+.light .bg-cyan-950\/50 {
+  background-color: #cffafe;
+}
+.light .bg-red-950\/30,
+.light .bg-red-900\/40 {
+  background-color: #fee2e2;
+}
+.light .bg-amber-950\/50 {
+  background-color: #fef3c7;
+}
+.light .bg-neutral-950\/45 {
+  background-color: rgba(248, 250, 252, 0.86);
+}
+.light .border-indigo-800\/70,
+.light .border-indigo-800\/60 {
+  border-color: #a5b4fc;
+}
+.light .border-cyan-800 {
+  border-color: #67e8f9;
+}
+.light .border-violet-800,
+.light .border-violet-800\/70 {
+  border-color: #c4b5fd;
+}
+.light .border-red-800\/70,
+.light .border-red-800\/60,
+.light .border-red-900\/70 {
+  border-color: #fecaca;
+}
+.light .border-neutral-800\/70 {
+  border-color: #d4d4d4;
+}
+.light .border-green-700,
+.light .border-green-800 {
+  border-color: #86efac;
+}
+.light .divide-neutral-800 > :not([hidden]) ~ :not([hidden]),
+.light .divide-neutral-800\/70 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e5e7eb;
 }
 
 /* Subtle, minimalist scrollbars. */
@@ -703,4 +793,223 @@ body {
 .light .md .citation-link[data-verified='false']:hover {
   background: rgba(220, 38, 38, 0.18);
   color: #991b1b;
+}
+
+/* ── Research assistant chat: micro-interactions ──────────────────────────── */
+
+/* New message bubbles slide in so the conversation feels live (neutralised by
+   the global prefers-reduced-motion rule above). */
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.msg-in {
+  animation: msg-in 0.22s ease-out;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Empty-state starter chips. */
+.suggestion-chip {
+  border: 1px solid rgb(38 38 38);
+  background: rgba(38, 38, 38, 0.4);
+  color: rgb(212 212 212);
+  border-radius: 9999px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.12s;
+}
+.suggestion-chip:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.15);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #e0e7ff;
+  transform: translateY(-1px);
+}
+.suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.light .suggestion-chip {
+  border-color: rgb(226 232 240);
+  background: rgba(15, 23, 42, 0.02);
+  color: #334155;
+}
+.light .suggestion-chip:hover:not(:disabled) {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: #3730a3;
+}
+
+/* Live typing caret at the end of the streaming answer. While a message streams,
+   its markdown flows inline so the caret hugs the last character. */
+.stream-body .md,
+.stream-body .md > :last-child {
+  display: inline;
+}
+.stream-caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.7;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* "Thinking" pulse shown before the first token arrives. */
+.stream-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.stream-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0.35;
+  animation: stream-dot 1.1s ease-in-out infinite;
+}
+.stream-dots i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.stream-dots i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes stream-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 0.9;
+    transform: translateY(-2px);
+  }
+}
+
+/* Keyboard hint under the composer. */
+.composer-kbd {
+  display: inline-block;
+  border: 1px solid rgb(64 64 64);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgb(163 163 163);
+  background: rgba(38, 38, 38, 0.6);
+  font-family: inherit;
+}
+.light .composer-kbd {
+  border-color: rgb(203 213 225);
+  color: #475569;
+  background: #f1f5f9;
+}
+
+/* Citation hover-card: a fixed-position preview so it escapes the chat's scroll
+   clipping; pointer-events:none so moving toward it never steals the hover. */
+.citation-wrap {
+  position: relative;
+  display: inline;
+}
+.citation-card {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: max-content;
+  max-width: 320px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgb(64 64 64);
+  background: rgb(23 23 23);
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgb(212 212 212);
+  animation: fade-in 0.12s ease-out;
+}
+.citation-card[data-placement='top'] {
+  transform: translateY(-100%);
+}
+.citation-card-kind {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgb(129 140 248);
+}
+.citation-card-title {
+  font-weight: 600;
+  color: rgb(244 244 245);
+}
+.citation-card-sub {
+  font-size: 11px;
+  color: rgb(148 163 184);
+}
+.citation-card-snippet {
+  color: rgb(163 163 163);
+}
+.citation-card-loading {
+  color: rgb(115 115 115);
+}
+.light .citation-card {
+  border-color: rgb(203 213 225);
+  background: #ffffff;
+  color: #334155;
+  box-shadow: 0 12px 30px -8px rgba(15, 23, 42, 0.25);
+}
+.light .citation-card-kind {
+  color: #4338ca;
+}
+.light .citation-card-title {
+  color: #0f172a;
+}
+.light .citation-card-sub {
+  color: #64748b;
+}
+.light .citation-card-snippet {
+  color: #475569;
+}
+
+/* ── v1.2.0 Inmersión ─────────────────────────────────────────────────────── */
+/* Hero banner of the Inmersión launcher: a quiet radial glow that works as a
+   deliberate design in BOTH themes (no dark-only gradient utilities). */
+.immersion-hero {
+  background:
+    radial-gradient(52rem 26rem at 88% -20%, rgba(129, 140, 248, 0.16), transparent 60%),
+    radial-gradient(40rem 22rem at -10% 120%, rgba(217, 70, 239, 0.1), transparent 60%),
+    linear-gradient(135deg, rgba(30, 27, 75, 0.5), rgba(10, 10, 10, 0) 55%);
+}
+.light .immersion-hero {
+  background:
+    radial-gradient(52rem 26rem at 88% -20%, rgba(99, 102, 241, 0.14), transparent 60%),
+    radial-gradient(40rem 22rem at -10% 120%, rgba(192, 38, 211, 0.08), transparent 60%),
+    linear-gradient(135deg, #eef2ff, #fafafa 60%, #fdf4ff);
+}
+.light .stroke-neutral-800 {
+  stroke: #e5e7eb;
 }

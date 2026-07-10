@@ -168,6 +168,17 @@ const ASSISTANT_MODES: {
   },
 ];
 
+// Starter prompts offered as clickable chips on an empty chat. They run against
+// whatever context is currently selected (Síntesis by default), so they read as
+// general research openers rather than mode switches.
+const CHAT_SUGGESTIONS = [
+  '¿Cuáles son las ideas más centrales del corpus y por qué?',
+  'Resume las principales contradicciones y tensiones.',
+  '¿Qué huecos de investigación debería priorizar?',
+  'Propón una ruta de lectura para empezar.',
+  '¿Qué autores son clave y cómo se relacionan?',
+];
+
 interface UiMessage extends ChatMessageRecord {
   id: string;
   /** Live reasoning/thinking trace from the model. Transient — never persisted. */
@@ -200,7 +211,15 @@ export function ResearchAssistantModal({
   const [noteTarget, setNoteTarget] = useState<{ content: string; title: string } | null>(null);
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [showContext, setShowContext] = useState(false);
+  // Id of the assistant message currently streaming — drives the live caret and
+  // the "stop" affordance. Null when nothing is in flight.
+  const [streamingId, setStreamingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Whether new stream deltas should keep the view pinned to the bottom. Starts
+  // true on send and flips off as soon as the user scrolls up to read back.
+  const stickToBottomRef = useRef(true);
   const lastInitialTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
   // racing React state updates.
@@ -233,6 +252,14 @@ export function ResearchAssistantModal({
     void refreshConversations();
   }, [refreshConversations]);
 
+  // Auto-grow the composer to fit its content, capped by CSS max-height (then it scrolls).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 224)}px`;
+  }, [input]);
+
   const isNearBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return true;
@@ -247,27 +274,23 @@ export function ResearchAssistantModal({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const onScroll = () => updateJumpIndicator();
+    const onScroll = () => {
+      // The user driving the scrollbar decides whether we keep following the
+      // stream: reading back (scrolling up) releases the pin; returning to the
+      // bottom re-engages it.
+      stickToBottomRef.current = isNearBottom();
+      updateJumpIndicator();
+    };
     el.addEventListener('scroll', onScroll, { passive: true });
     updateJumpIndicator();
     return () => el.removeEventListener('scroll', onScroll);
-  }, [updateJumpIndicator]);
+  }, [updateJumpIndicator, isNearBottom]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
     setShowJumpToBottom(false);
-  }, []);
-
-  const scrollToMessageStart = useCallback((messageId: string) => {
-    window.setTimeout(() => {
-      const el = scrollRef.current;
-      const target = el?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
-      if (!el || !target) return;
-      el.scrollTo({ top: Math.max(0, target.offsetTop - el.offsetTop), behavior: 'smooth' });
-      setShowJumpToBottom(el.scrollHeight > el.clientHeight + 16);
-    }, 0);
   }, []);
 
   const copyMessageMarkdown = useCallback(async (message: UiMessage) => {
@@ -380,21 +403,13 @@ export function ResearchAssistantModal({
     [refreshConversations, selectedModel, selection]
   );
 
-  const send = async () => {
-    const content = input.trim();
-    if (!content || sending || !selectedModel) return;
-
-    // Lazily create the conversation on the first message so empty chats never clutter history.
-    let conversationId = activeId;
-    const isFirstExchange = messagesRef.current.length === 0;
-    if (!conversationId) {
-      const created = await window.nodus.createConversation({ model: selectedModel, selection });
-      conversationId = created.id;
-      setActiveId(created.id);
-    }
-
+  // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
+  // the composer (send) and the regenerate action, which only differ in how they
+  // pick the prior history and the user prompt.
+  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string) => {
+    if (!selectedModel) return;
     const selectionKey = serializeSelection(selection);
-    const priorMessages = messagesRef.current;
+    const isFirstExchange = priorMessages.length === 0;
     const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
@@ -402,10 +417,11 @@ export function ResearchAssistantModal({
       userMessage,
     ].map((m) => ({ role: m.role, content: m.content }));
 
-    setMessages((current) => [...current, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
-    setInput('');
+    setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
-    scrollToMessageStart(assistantId);
+    setStreamingId(assistantId);
+    stickToBottomRef.current = true;
+    window.setTimeout(() => scrollToBottom('auto'), 0);
 
     try {
       const response = await window.nodus.researchChatStream(
@@ -418,7 +434,8 @@ export function ResearchAssistantModal({
                 message.id === assistantId ? { ...message, content: message.content + delta } : message
               )
             );
-            window.setTimeout(updateJumpIndicator, 0);
+            if (stickToBottomRef.current) scrollToBottom('auto');
+            else window.setTimeout(updateJumpIndicator, 0);
           },
           onReasoning: (delta) => {
             if (activeIdRef.current !== conversationId) return;
@@ -430,11 +447,16 @@ export function ResearchAssistantModal({
           },
         }
       );
-      const finalMessages: UiMessage[] = [
-        ...priorMessages,
-        userMessage,
-        { id: assistantId, role: 'assistant', content: response.answer, selectionKey, stats: response.stats },
-      ];
+      // A user-triggered stop resolves with the partial answer; treat an empty
+      // partial as "nothing generated" and drop the placeholder bubble.
+      const answer = response.answer.trim();
+      const finalMessages: UiMessage[] = answer
+        ? [
+            ...priorMessages,
+            userMessage,
+            { id: assistantId, role: 'assistant', content: answer, selectionKey, stats: response.stats },
+          ]
+        : [...priorMessages, userMessage];
       if (activeIdRef.current === conversationId) {
         setMessages(finalMessages);
         window.setTimeout(updateJumpIndicator, 0);
@@ -456,13 +478,53 @@ export function ResearchAssistantModal({
       await persist(conversationId, finalMessages, false);
     } finally {
       setSending(false);
+      setStreamingId(null);
     }
+  };
+
+  const send = async (explicit?: string) => {
+    const content = (explicit ?? input).trim();
+    if (!content || sending || !selectedModel) return;
+
+    // Lazily create the conversation on the first message so empty chats never clutter history.
+    let conversationId = activeId;
+    if (!conversationId) {
+      const created = await window.nodus.createConversation({ model: selectedModel, selection });
+      conversationId = created.id;
+      setActiveId(created.id);
+    }
+    // Only the composer's own text is cleared on send; an explicit prompt (a
+    // suggestion chip) must not wipe a draft the user may have typed.
+    if (!explicit) setInput('');
+    await generate(conversationId, messagesRef.current, content);
+  };
+
+  // Re-answer the most recent user turn (dropping the answer it produced). Uses the
+  // current model + context selection, so it doubles as "try again with this context".
+  const regenerateLast = async () => {
+    if (sending || !selectedModel) return;
+    const current = messagesRef.current;
+    let lastUserIdx = -1;
+    for (let i = current.length - 1; i >= 0; i--) {
+      if (current[i].role === 'user' && current[i].content.trim()) {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    const conversationId = activeIdRef.current;
+    if (lastUserIdx < 0 || !conversationId) return;
+    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content);
+  };
+
+  const handleStop = () => {
+    void window.nodus.cancelResearchChat();
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
+  const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   // Citations always open their evidence first. Navigation to the graph remains
   // available from that detail modal, rather than unexpectedly closing the chat.
   const handleCitation = useCallback((c: MarkdownCitation) => {
@@ -501,6 +563,15 @@ export function ResearchAssistantModal({
               </option>
             ))}
           </select>
+          <button
+            className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
+            title={t('Elegir qué partes del corpus ve el asistente')}
+            onClick={() => setShowContext(true)}
+          >
+            <Icon name="layers" size={13} className="text-indigo-300" />
+            <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
+            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
+          </button>
           {contextTitle && (
             <span className="hidden md:inline-flex max-w-xs items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200">
               <Icon name="fit" size={12} />
@@ -554,114 +625,41 @@ export function ResearchAssistantModal({
             )}
           </aside>
 
-          {/* Context selection */}
-          <aside className="w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 p-4 overflow-y-auto max-h-56 md:max-h-none">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">{t('Contexto')}</h2>
-              <span className="text-xs text-neutral-500">{selectedCount}</span>
-            </div>
-            <div className="mb-4">
-              <div className="text-[11px] uppercase text-neutral-500 mb-2">{t('Modo')}</div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {ASSISTANT_MODES.map((mode) => (
-                  <button
-                    key={mode.id}
-                    className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
-                      activeModeId === mode.id
-                        ? 'border-indigo-700 bg-indigo-950/35'
-                        : 'border-neutral-800 hover:bg-neutral-900'
-                    }`}
-                    title={t(mode.description)}
-                    onClick={() => applyMode(mode)}
-                  >
-                    <div className="flex items-center gap-1.5 text-sm">
-                      <Icon name={mode.icon} size={13} className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'} />
-                      <span>{t(mode.label)}</span>
-                    </div>
-                    <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{t(mode.description)}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="mb-3 flex gap-2">
-              <button
-                className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
-                onClick={() => {
-                  setActiveModeId('custom');
-                  setContextTitle(t('Todo'));
-                  setSelection(cloneSelection(ALL_SELECTION));
-                }}
-              >
-                {t('Todo')}
-              </button>
-              <button
-                className="btn btn-ghost border border-neutral-700 flex-1 text-xs py-1"
-                onClick={() => {
-                  setActiveModeId('custom');
-                  setContextTitle(t('Manual'));
-                  setSelection(cloneSelection(DEFAULT_SELECTION));
-                }}
-              >
-                {t('Nada')}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <ContextCheckbox label={t('Ideas generadas')} checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
-              <ContextCheckbox label={t('Temas principales')} checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
-              <ContextCheckbox label={t('Contradicciones')} checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
-              <ContextCheckbox label={t('Huecos de investigación')} checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
-              <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
-              <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
-              <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
-              <ContextCheckbox label={t('Pasajes de texto completo')} checked={selection.passages} onChange={(v) => updateSelection('passages', v)} />
-              <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
-            </div>
-
-            <div className={`mt-3 pl-3 border-l border-neutral-800 space-y-2 ${selection.graph ? '' : 'opacity-45'}`}>
-              <ContextCheckbox
-                label={t('Nodos de ideas')}
-                checked={selection.graphParts.ideaNodes}
-                disabled={!selection.graph}
-                onChange={(v) => updateGraphPart('ideaNodes', v)}
-              />
-              <ContextCheckbox
-                label={t('Nodos de temas')}
-                checked={selection.graphParts.themeNodes}
-                disabled={!selection.graph}
-                onChange={(v) => updateGraphPart('themeNodes', v)}
-              />
-              <ContextCheckbox
-                label={t('Relaciones de ideas')}
-                checked={selection.graphParts.ideaEdges}
-                disabled={!selection.graph}
-                onChange={(v) => updateGraphPart('ideaEdges', v)}
-              />
-              <ContextCheckbox
-                label={t('Grafo de autores')}
-                checked={selection.graphParts.authorGraph}
-                disabled={!selection.graph}
-                onChange={(v) => updateGraphPart('authorGraph', v)}
-              />
-            </div>
-          </aside>
-
           <section className="flex-1 min-w-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {messages.length === 0 && (
-                  <div className="h-full flex items-center justify-center text-neutral-500 text-sm">
-                    {t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
+                  <div className="h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="grid h-12 w-12 place-items-center rounded-full border border-indigo-900/70 bg-indigo-950/30 text-indigo-300">
+                        <Icon name="wand" size={22} />
+                      </span>
+                      <p className="max-w-md text-sm text-neutral-400">
+                        {t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
+                      </p>
+                    </div>
+                    <div className="flex max-w-xl flex-wrap justify-center gap-2">
+                      {CHAT_SUGGESTIONS.map((suggestion) => (
+                        <button
+                          key={suggestion}
+                          className="suggestion-chip"
+                          disabled={sending || !selectedModel}
+                          onClick={() => void send(t(suggestion))}
+                        >
+                          {t(suggestion)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {messages.map((message) => (
                   <div
                     key={message.id}
                     data-message-id={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`msg-in flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div
-                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-14 text-sm ${
+                      className={`group relative max-w-[78%] rounded-lg border px-3 py-2 pr-16 text-sm ${
                         message.role === 'user'
                           ? 'bg-indigo-600 border-indigo-500 text-white whitespace-pre-wrap'
                           : message.error
@@ -670,6 +668,20 @@ export function ResearchAssistantModal({
                       }`}
                     >
                       <div className="absolute right-2 top-2 flex items-center gap-0.5">
+                        {message.role === 'assistant' &&
+                          !message.error &&
+                          message.id === lastMessageId &&
+                          message.id !== streamingId &&
+                          message.content.trim() && (
+                            <button
+                              className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100 disabled:opacity-40"
+                              title={t('Regenerar respuesta')}
+                              onClick={() => void regenerateLast()}
+                              disabled={sending}
+                            >
+                              <Icon name="refresh" size={13} />
+                            </button>
+                          )}
                         {message.role === 'assistant' && !message.error && message.content.trim() && (
                           <button
                             className="rounded p-1 text-neutral-500 opacity-70 transition hover:bg-neutral-800 hover:text-indigo-300 hover:opacity-100"
@@ -704,13 +716,29 @@ export function ResearchAssistantModal({
                           </div>
                         </details>
                       )}
-                      {message.role === 'assistant' && !message.error && message.content ? (
-                        <Markdown
-                          content={message.content}
-                          onCitation={handleCitation}
-                        />
+                      {message.role === 'assistant' && !message.error ? (
+                        message.content ? (
+                          <div className={message.id === streamingId ? 'stream-body' : undefined}>
+                            <Markdown content={message.content} onCitation={handleCitation} />
+                            {message.id === streamingId && <span aria-hidden className="stream-caret" />}
+                          </div>
+                        ) : message.id === streamingId ? (
+                          <span className="stream-dots" aria-label={t('Generando…')}>
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                        ) : null
                       ) : (
-                        message.content || (message.role === 'assistant' && sending ? '...' : '')
+                        message.content
+                      )}
+                      {message.error && message.id === lastMessageId && !sending && (
+                        <button
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-red-800/70 px-2 py-1 text-xs text-red-200 transition hover:bg-red-900/40"
+                          onClick={() => void regenerateLast()}
+                        >
+                          <Icon name="refresh" size={12} /> {t('Reintentar')}
+                        </button>
                       )}
                       {message.stats && (
                         <div className="mt-2 pt-2 border-t border-neutral-800 text-[11px] text-neutral-500 whitespace-normal">
@@ -735,10 +763,11 @@ export function ResearchAssistantModal({
             </div>
 
             <footer className="border-t border-neutral-800 p-3">
-              <div className="flex gap-2">
+              <div className="flex items-end gap-2">
                 <textarea
-                  className="input flex-1 min-h-[112px] max-h-56 resize-y"
-                  rows={5}
+                  ref={inputRef}
+                  className="input flex-1 min-h-[52px] max-h-56 resize-none"
+                  rows={2}
                   value={input}
                   placeholder={activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   onChange={(e) => setInput(e.target.value)}
@@ -749,19 +778,162 @@ export function ResearchAssistantModal({
                     }
                   }}
                 />
-                <button
-                  className="btn btn-primary self-end h-11 w-11 px-0"
-                  title={t('Enviar')}
-                  onClick={() => void send()}
-                  disabled={sending || !input.trim() || !selectedModel}
-                >
-                  <Icon name={sending ? 'sync' : 'arrowUp'} className={sending ? 'animate-spin' : ''} />
-                </button>
+                {sending ? (
+                  <button
+                    className="btn self-end h-11 w-11 px-0 border border-red-800 bg-red-950/40 text-red-200 transition hover:bg-red-900/50"
+                    title={t('Detener generación')}
+                    onClick={handleStop}
+                  >
+                    <Icon name="stop" />
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-primary self-end h-11 w-11 px-0"
+                    title={t('Enviar')}
+                    onClick={() => void send()}
+                    disabled={!input.trim() || !selectedModel}
+                  >
+                    <Icon name="arrowUp" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-600">
+                <kbd className="composer-kbd">Enter</kbd>
+                <span>{t('para enviar')}</span>
+                <span className="text-neutral-700">·</span>
+                <kbd className="composer-kbd">Shift</kbd>
+                <span>+</span>
+                <kbd className="composer-kbd">Enter</kbd>
+                <span>{t('salto de línea')}</span>
               </div>
             </footer>
           </section>
         </div>
       </div>
+
+      {showContext && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setShowContext(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="flex max-h-[86vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
+              <Icon name="layers" className="text-indigo-300" />
+              <span className="text-sm font-semibold">{t('Contexto del asistente')}</span>
+              <span className="text-xs text-neutral-500">
+                {tx('{n} seleccionados', { n: selectedCount })}
+              </span>
+              <div className="flex-1" />
+              <button className="btn btn-ghost" onClick={() => setShowContext(false)} title={t('Cerrar')}>
+                <Icon name="x" />
+              </button>
+            </header>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <p className="mb-3 text-xs text-neutral-500">
+                {t('Elige un modo o combina las secciones del corpus que el asistente puede leer.')}
+              </p>
+              <div className="mb-4">
+                <div className="mb-2 text-[11px] uppercase text-neutral-500">{t('Modo')}</div>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {ASSISTANT_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
+                        activeModeId === mode.id
+                          ? 'border-indigo-700 bg-indigo-950/35'
+                          : 'border-neutral-800 hover:bg-neutral-900'
+                      }`}
+                      title={t(mode.description)}
+                      onClick={() => applyMode(mode)}
+                    >
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Icon
+                          name={mode.icon}
+                          size={13}
+                          className={activeModeId === mode.id ? 'text-indigo-300' : 'text-neutral-500'}
+                        />
+                        <span>{t(mode.label)}</span>
+                      </div>
+                      <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{t(mode.description)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-3 flex gap-2">
+                <button
+                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
+                  onClick={() => {
+                    setActiveModeId('custom');
+                    setContextTitle(t('Todo'));
+                    setSelection(cloneSelection(ALL_SELECTION));
+                  }}
+                >
+                  {t('Todo')}
+                </button>
+                <button
+                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
+                  onClick={() => {
+                    setActiveModeId('custom');
+                    setContextTitle(t('Manual'));
+                    setSelection(cloneSelection(DEFAULT_SELECTION));
+                  }}
+                >
+                  {t('Nada')}
+                </button>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ContextCheckbox label={t('Ideas generadas')} checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
+                <ContextCheckbox label={t('Temas principales')} checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
+                <ContextCheckbox label={t('Contradicciones')} checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
+                <ContextCheckbox label={t('Huecos de investigación')} checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
+                <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
+                <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
+                <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
+                <ContextCheckbox label={t('Pasajes de texto completo')} checked={selection.passages} onChange={(v) => updateSelection('passages', v)} />
+                <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
+              </div>
+
+              <div className={`mt-3 space-y-2 border-l border-neutral-800 pl-3 ${selection.graph ? '' : 'opacity-45'}`}>
+                <ContextCheckbox
+                  label={t('Nodos de ideas')}
+                  checked={selection.graphParts.ideaNodes}
+                  disabled={!selection.graph}
+                  onChange={(v) => updateGraphPart('ideaNodes', v)}
+                />
+                <ContextCheckbox
+                  label={t('Nodos de temas')}
+                  checked={selection.graphParts.themeNodes}
+                  disabled={!selection.graph}
+                  onChange={(v) => updateGraphPart('themeNodes', v)}
+                />
+                <ContextCheckbox
+                  label={t('Relaciones de ideas')}
+                  checked={selection.graphParts.ideaEdges}
+                  disabled={!selection.graph}
+                  onChange={(v) => updateGraphPart('ideaEdges', v)}
+                />
+                <ContextCheckbox
+                  label={t('Grafo de autores')}
+                  checked={selection.graphParts.authorGraph}
+                  disabled={!selection.graph}
+                  onChange={(v) => updateGraphPart('authorGraph', v)}
+                />
+              </div>
+            </div>
+            <footer className="border-t border-neutral-800 p-3">
+              <button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>
+                {t('Listo')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {pendingDelete && (
         <ConfirmModal

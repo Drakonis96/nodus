@@ -541,7 +541,7 @@ function RoutesPanel({
           <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} ideas', { n: plan.totalIdeas })}</span>
           <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} conexiones', { n: plan.totalConnections })}</span>
           <span className="rounded-md border border-neutral-800 px-1.5 py-0.5">{tx('{n} ideas en rutas', { n: plan.coveredIdeas })}</span>
-          {plan.truncated && <span className="rounded-md border border-amber-800/60 text-amber-300/80 px-1.5 py-0.5">{t('grafo recortado')}</span>}
+          {plan.truncated && <span className="rounded-md border border-amber-200 bg-amber-50 text-amber-700 px-1.5 py-0.5 dark:border-amber-800/60 dark:bg-transparent dark:text-amber-300/80">{t('grafo recortado')}</span>}
         </div>
       </div>
 
@@ -729,14 +729,14 @@ function TourPanel({
         </div>
       </div>
 
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 px-3 py-2.5">
+<div className="rounded-lg border border-neutral-200 bg-neutral-100 px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900/50">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wide text-indigo-300/80 rounded bg-indigo-600/15 px-1.5 py-0.5">
+          <span className="text-[10px] uppercase tracking-wide text-indigo-700 rounded bg-indigo-100 px-1.5 py-0.5 dark:text-indigo-300/80 dark:bg-indigo-600/15">
             {t(STOP_KIND_LABEL[stop.kind])}
           </span>
           <span className="text-sm font-semibold">{stop.title}</span>
         </div>
-        {stop.focus && <p className="text-xs text-neutral-400 mt-1.5">{stop.focus}</p>}
+        {stop.focus && <p className="text-xs text-neutral-500 mt-1.5 dark:text-neutral-400">{stop.focus}</p>}
       </div>
 
       <div className="text-sm text-neutral-200 min-h-[3rem]">
@@ -765,9 +765,9 @@ function TourPanel({
       </div>
 
       {finished && showSavePrompt && (
-        <div className="rounded-lg border border-indigo-700/70 bg-indigo-950/20 p-3">
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-700/70 dark:bg-indigo-950/20">
           <div className="text-sm font-medium">{t('¿Quieres guardar este recorrido?')}</div>
-          <p className="mt-1 text-xs text-neutral-400">{t('Puntúalo para guardarlo y poder repetirlo después.')}</p>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{t('Puntúalo para guardarlo y poder repetirlo después.')}</p>
           <div className="mt-3 flex items-center justify-between gap-3">
             <RatingStars rating={completionRating} onChange={onCompletionRating} />
             <button className="btn btn-primary text-xs gap-1.5" disabled={!completionRating || savingRoute || step?.loading} onClick={onSave}>
@@ -777,7 +777,7 @@ function TourPanel({
         </div>
       )}
       {finished && isSaved && (
-        <div className="rounded-lg border border-emerald-800/60 bg-emerald-900/20 px-3 py-2 text-xs text-emerald-300">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-900/20 dark:text-emerald-300">
           <Icon name="check" size={13} className="mr-1 inline-block" /> {t('Recorrido guardado en tu colección.')}
         </div>
       )}

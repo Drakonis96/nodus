@@ -376,8 +376,8 @@ export function ManualIdeaEditor({
             {indexMsg && <p className="mb-2 text-[11px] text-neutral-500">{indexMsg}</p>}
 
             {suggestions.length > 0 && (
-              <div className="mb-3 rounded-md border border-indigo-900/60 bg-indigo-950/20 p-2">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-indigo-300">{t('Sugerencias')}</div>
+              <div className="mb-3 rounded-md border border-indigo-200 bg-indigo-50 p-2 dark:border-indigo-900/60 dark:bg-indigo-950/20">
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-indigo-700 dark:text-indigo-300">{t('Sugerencias')}</div>
                 <ul className="space-y-1">
                   {suggestions.map((s) => (
                     <li key={s.global_id}>

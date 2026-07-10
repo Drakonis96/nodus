@@ -49,6 +49,11 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   copilotToken: '',
   sidebarOrder: [],
   sidebarHidden: [],
+  autoBackupEnabled: false,
+  autoBackupFolder: '',
+  autoBackupIntervalHours: 24,
+  lastAutoBackupAt: null,
+  lastAutoBackupStatus: null,
 };
 
 function readRaw(key: string): string | undefined {

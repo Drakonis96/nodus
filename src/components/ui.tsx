@@ -115,6 +115,7 @@ const ICON_PATHS: Record<string, string> = {
   network: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>',
   scale: '<path d="M12 3v18"/><path d="M7 21h10"/><path d="M5 7h14"/><path d="M6 4l-1 3"/><path d="M18 4l1 3"/><path d="M5 7l-3 6a3 3 0 0 0 6 0z"/><path d="M19 7l-3 6a3 3 0 0 0 6 0z"/>',
   flask: '<path d="M9 3h6"/><path d="M10 3v5.6L4.2 18.7A2.2 2.2 0 0 0 6.1 22h11.8a2.2 2.2 0 0 0 1.9-3.3L14 8.6V3"/><path d="M7.5 16h9"/><path d="M8.8 19h6.4"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
 };
 
 export function Icon({ name, size = 16, className = '' }: { name: keyof typeof ICON_PATHS | string; size?: number; className?: string }) {

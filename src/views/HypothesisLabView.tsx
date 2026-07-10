@@ -197,9 +197,9 @@ export function HypothesisLabView({
         </div>
       </div>
 
-      {error && <div className="mb-4 text-sm text-red-400 border border-red-900/60 bg-red-950/40 rounded-md p-3">{error}</div>}
+      {error && <div className="mb-4 text-sm text-red-700 border border-red-200 bg-red-50 rounded-md p-3 dark:text-red-400 dark:border-red-900/60 dark:bg-red-950/40">{error}</div>}
       {result?.warnings.length ? (
-        <div className="mb-4 flex flex-col gap-1 text-xs text-amber-300 border border-amber-900/60 bg-amber-900/50 rounded-md p-3">
+        <div className="mb-4 flex flex-col gap-1 text-xs text-amber-700 border border-amber-200 bg-amber-50 rounded-md p-3 dark:text-amber-300 dark:border-amber-900/60 dark:bg-amber-900/50">
           {result.warnings.map((warning, index) => (
             <div key={index} className="flex items-start gap-2">
               <Icon name="alert" size={13} className="mt-0.5" />

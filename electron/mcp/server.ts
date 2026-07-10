@@ -101,6 +101,7 @@ function makeMcpServer(): McpServer {
   }, {
     instructions: [
       'Nodus is a local-first academic research workspace. Its graph entities (ideas, themes, edges, debates, gaps and authors) are derived from analysed works and are read-only through MCP.',
+      'A Nodus install can hold several vaults (separate corpora), but every tool reads the one vault that is active in the app. Call nodus_get_capabilities to see the active vault and the list of available ones; if the user means a different vault, ask them to switch it in the Nodus app, as MCP cannot change it.',
       'Use list tools before get tools. IDs returned by list tools are stable identifiers for the corresponding detail and writing tools.',
       'User-created folders, notes, coverage questions and saved writing drafts can be written through the dedicated tools. Writing and coverage tools may consume the AI provider already configured in Nodus.',
       'For writing, build a snapshot first, choose an explicit selection, then generate a draft with save=true if it should appear in Nodus.',
