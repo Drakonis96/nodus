@@ -24,7 +24,9 @@ import type {
   ImmersionSession,
   ImmersionSessionSummary,
   ImmersionStation,
+  DecorativeImageStyle,
 } from '@shared/types';
+import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, Icon, TypeDot } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -50,6 +52,7 @@ import {
   type ImmersionGenerationJob,
 } from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -167,6 +170,8 @@ export function ImmersionView({
   const [topic, setTopic] = useState('');
   const [minutes, setMinutes] = useState(150);
   const [includeQuiz, setIncludeQuiz] = useState(true);
+  const [includeImage, setIncludeImage] = useState(false);
+  const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'en' ? 'en' : 'es');
   const [model, setModel] = useFeatureModel(settings, 'immersionModel');
 
@@ -219,6 +224,8 @@ export function ImmersionView({
       setTopic(request.topic);
       setMinutes(request.minutes);
       setIncludeQuiz(request.includeQuiz);
+      setIncludeImage(request.decorativeImage?.enabled ?? false);
+      setImageStyle(request.decorativeImage?.style ?? settings.imageStyle);
       setLanguage(request.language ?? 'es');
       setModel(request.model ?? null);
     }
@@ -261,7 +268,14 @@ export function ImmersionView({
     setError(null);
     startImmersionGeneration({
       scope,
-      request: { topic: scope.topic, language, minutes, includeQuiz, model },
+      request: {
+        topic: scope.topic,
+        language,
+        minutes,
+        includeQuiz,
+        model,
+        decorativeImage: { enabled: includeImage, style: imageStyle },
+      },
     });
   };
 
@@ -320,6 +334,8 @@ export function ImmersionView({
           topic={topic}
           minutes={minutes}
           includeQuiz={includeQuiz}
+          includeImage={includeImage}
+          imageStyle={imageStyle}
           language={language}
           model={model}
           hasModel={hasModel}
@@ -329,6 +345,8 @@ export function ImmersionView({
           onTopic={setTopic}
           onMinutes={setMinutes}
           onIncludeQuiz={setIncludeQuiz}
+          onIncludeImage={setIncludeImage}
+          onImageStyle={setImageStyle}
           onLanguage={setLanguage}
           onModel={setModel}
           onExplore={() => void exploreScope()}
@@ -404,6 +422,8 @@ function ImmersionHome({
   topic,
   minutes,
   includeQuiz,
+  includeImage,
+  imageStyle,
   language,
   model,
   hasModel,
@@ -413,6 +433,8 @@ function ImmersionHome({
   onTopic,
   onMinutes,
   onIncludeQuiz,
+  onIncludeImage,
+  onImageStyle,
   onLanguage,
   onModel,
   onExplore,
@@ -425,6 +447,8 @@ function ImmersionHome({
   topic: string;
   minutes: number;
   includeQuiz: boolean;
+  includeImage: boolean;
+  imageStyle: DecorativeImageStyle;
   language: 'es' | 'en';
   model: AppSettings['immersionModel'];
   hasModel: boolean;
@@ -434,6 +458,8 @@ function ImmersionHome({
   onTopic: (v: string) => void;
   onMinutes: (v: number) => void;
   onIncludeQuiz: (v: boolean) => void;
+  onIncludeImage: (v: boolean) => void;
+  onImageStyle: (v: DecorativeImageStyle) => void;
   onLanguage: (v: 'es' | 'en') => void;
   onModel: (m: AppSettings['immersionModel']) => void;
   onExplore: () => void;
@@ -510,6 +536,23 @@ function ImmersionHome({
                 <Icon name={includeQuiz ? 'check' : 'minus'} size={12} className="mr-1" />
                 {t('Preguntas de repaso')}
               </button>
+              <button
+                onClick={() => onIncludeImage(!includeImage)}
+                className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                  includeImage
+                    ? 'border-indigo-700/60 bg-indigo-900/30 text-indigo-200'
+                    : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
+                }`}
+                title={t('Se genera una sola vez después de guardar la inmersión')}
+              >
+                <Icon name={includeImage ? 'check' : 'minus'} size={12} className="mr-1" />
+                {t('Imagen decorativa')}
+              </button>
+              {includeImage && (
+                <select className="input !py-1.5 text-xs" value={imageStyle} onChange={(event) => onImageStyle(event.target.value as DecorativeImageStyle)}>
+                  {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
+                </select>
+              )}
               <select className="input !py-1.5 text-xs" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en')}>
                 <option value="es">Español</option>
                 <option value="en">English</option>
@@ -537,7 +580,15 @@ function ImmersionHome({
         )}
         <div className="mt-3 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-lg:grid-cols-1">
           {sessions.map((s) => (
-            <div key={s.id} className="card group relative flex items-center gap-4 p-4 transition-colors hover:border-indigo-700/60">
+            <div key={s.id} className="card group relative flex flex-col gap-3 p-3 transition-colors hover:border-indigo-700/60">
+              <DecorativeImageCard
+                entityKind="immersion"
+                entityId={s.id}
+                image={s.image}
+                defaultStyle={settings.imageStyle}
+                thumbnail
+              />
+              <div className="flex w-full items-center gap-4">
               <ProgressRing pct={s.progressPct} finished={s.finished} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>
@@ -560,6 +611,7 @@ function ImmersionHome({
                 <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={() => onDeleteSession(s)}>
                   <Icon name="trash" size={12} />
                 </button>
+              </div>
               </div>
             </div>
           ))}
@@ -741,7 +793,7 @@ function ImmersionScopeScreen({
                 disabled={!enough || !hasModel || !scope.aiKeyAvailable}
               >
                 <Icon name="play" />
-                {t('Comenzar inmersión')}
+                {t('Generar inmersión')}
               </button>
               {(!enough || !hasModel || !scope.aiKeyAvailable) && (
                 <div className="rounded-md border border-amber-700/60 bg-amber-950/80 px-3 py-1.5 text-xs text-amber-300 backdrop-blur-sm">
@@ -838,14 +890,6 @@ function ImmersionPlayer({
     [session, onSession]
   );
 
-  // First open stamps startedAt so "una tarde" is measurable.
-  const stampedRef = useRef(false);
-  useEffect(() => {
-    if (stampedRef.current || progress.startedAt) return;
-    stampedRef.current = true;
-    persist({ ...progress, startedAt: new Date().toISOString() });
-  }, [progress, persist]);
-
   const goTo = useCallback(
     (index: number, markDone = false) => {
       const clamped = Math.max(0, Math.min(steps.length - 1, index));
@@ -877,6 +921,7 @@ function ImmersionPlayer({
   // ← / → navigate between steps (ignored while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!progress.startedAt) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (e.key === 'ArrowRight') goTo(current + 1, true);
@@ -884,7 +929,7 @@ function ImmersionPlayer({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, goTo]);
+  }, [current, goTo, progress.startedAt]);
 
   const onAnswered = useCallback(
     (record: ImmersionAnswerRecord) => {
@@ -917,6 +962,47 @@ function ImmersionPlayer({
     });
     return groups;
   }, [steps]);
+
+  if (!progress.startedAt) {
+    return (
+      <div className="h-full overflow-y-auto bg-neutral-950">
+        <div className="mx-auto flex min-h-full max-w-4xl flex-col justify-center px-6 py-10">
+          <button className="btn btn-ghost mb-5 w-fit gap-1.5" onClick={onExit}>
+            <Icon name="chevronLeft" /> {t('Volver')}
+          </button>
+          <div className="mb-5 text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-300">{t('Tu inmersión está lista')}</div>
+            <h1 className="mt-2 text-3xl font-semibold text-neutral-100">{session.plan.title}</h1>
+            <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+              {tx('{s} estaciones · {i} ideas · {w} obras · ~{m} minutos', {
+                s: session.plan.stats.stations,
+                i: session.plan.stats.ideas,
+                w: session.plan.stats.works,
+                m: session.minutes,
+              })}
+            </p>
+          </div>
+          <DecorativeImageCard
+            entityKind="immersion"
+            entityId={session.id}
+            image={session.image}
+            defaultStyle={session.image?.style ?? 'antique_book'}
+            interactive
+            onChange={(image) => onSession({ ...session, image })}
+          />
+          <button
+            className="btn btn-primary mx-auto mt-5 gap-2 !px-8 !py-3 text-base"
+            onClick={() => persist({ ...progress, startedAt: new Date().toISOString() })}
+          >
+            <Icon name="play" /> {t('Comenzar inmersión')}
+          </button>
+          {session.image?.status === 'pending' && (
+            <p className="mt-2 text-center text-xs text-neutral-600">{t('Puedes empezar ya: la imagen nunca bloquea el contenido.')}</p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">
@@ -1589,6 +1675,10 @@ function ExamStep({
       targetLength: 'standard',
       sectionLimit: 'auto',
       model: session.model,
+      decorativeImage: {
+        enabled: session.image?.requested ?? false,
+        style: session.image?.style ?? 'antique_book',
+      },
     });
   };
 

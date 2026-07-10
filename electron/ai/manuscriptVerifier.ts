@@ -13,7 +13,6 @@ import {
   classifyClaimLocally,
   extractManuscriptClaims,
   insertCitationIntoDraft,
-  pruneDistantCandidates,
   summarizeChecks,
   tokenizeForMatch,
   type ExtractedManuscriptClaim,

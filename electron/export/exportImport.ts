@@ -64,6 +64,7 @@ interface BackupInventory {
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'imageProvider' | 'imageModel' | 'imageStyle'
   >;
   apiKeyProviders: AiProvider[];
 }
@@ -348,6 +349,7 @@ function modelSettings(
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'imageProvider' | 'imageModel' | 'imageStyle'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -368,6 +370,9 @@ function modelSettings(
     studyModel: settings.studyModel,
     tutorModel: settings.tutorModel,
     hypothesisModel: settings.hypothesisModel,
+    imageProvider: settings.imageProvider,
+    imageModel: settings.imageModel,
+    imageStyle: settings.imageStyle,
   };
 }
 

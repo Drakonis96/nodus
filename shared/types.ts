@@ -254,6 +254,62 @@ export interface ExternalRef {
 
 export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini' | 'xiaomi';
 export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini'>;
+export type ImageProvider = 'google' | 'openai' | 'openrouter';
+export type DecorativeImageEntityKind = 'immersion' | 'deep_research';
+export type DecorativeImageStatus = 'not_requested' | 'pending' | 'ready' | 'failed';
+export type DecorativeImageStyle =
+  | 'antique_book'
+  | 'colored_engraving'
+  | 'classic_scientific'
+  | 'watercolor'
+  | 'historical_collage'
+  | 'modernist_poster'
+  | 'contemporary_editorial';
+
+/** The opt-in choice stored with one generation request. */
+export interface DecorativeImageOption {
+  enabled: boolean;
+  style: DecorativeImageStyle;
+}
+
+/** Metadata only: image bytes stay in the main process and are loaded lazily. */
+export interface DecorativeImage {
+  entityKind: DecorativeImageEntityKind;
+  entityId: string;
+  requested: boolean;
+  status: DecorativeImageStatus;
+  provider: ImageProvider | null;
+  model: string | null;
+  style: DecorativeImageStyle;
+  visualContext: string | null;
+  prompt: string | null;
+  assetRef: string | null;
+  mimeType: string | null;
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImageModelInfo {
+  provider: ImageProvider;
+  id: string;
+  name: string;
+  /** Standard USD prices per one million tokens. Null means not published. */
+  inputPriceUsdPerMillion: number | null;
+  outputPriceUsdPerMillion: number | null;
+  /** Direct per-generation price, only when published; compared within a provider. */
+  imagePriceUsd: number | null;
+  /** Provider-native pricing detail, e.g. resolution/quality or per-image variants. */
+  imagePriceLabel: string | null;
+  sourceUrl: string;
+}
+
+export interface DecorativeImageActionRequest {
+  entityKind: DecorativeImageEntityKind;
+  entityId: string;
+  action: 'generate' | 'retry' | 'regenerate';
+  style?: DecorativeImageStyle;
+}
 export type SyncMode = 'realtime' | 'manual';
 export type ThemeMode = 'dark' | 'light';
 export type DeepContextMode = 'standard' | 'long';
@@ -312,6 +368,10 @@ export interface AppSettings {
   studyModel: ModelRef | null;
   tutorModel: ModelRef | null;
   hypothesisModel: ModelRef | null;
+  /** Provider/model used only for optional decorative image generation. */
+  imageProvider: ImageProvider;
+  imageModel: string;
+  imageStyle: DecorativeImageStyle;
   syncMode: SyncMode;
   readTag: string; // Zotero tag that can be used by the opt-in deep-scan automation.
   // All automatic analysis is opt-in. Manual sync can ingest Zotero metadata without spending tokens.
@@ -1598,6 +1658,17 @@ export interface GlobalSearchResult {
   similarity?: number | null;
 }
 
+/** Common, type-adaptive detail payload used by the global-search modal. */
+export interface SearchResultDetail {
+  kind: SearchResultKind;
+  id: string;
+  title: string;
+  subtitle: string | null;
+  description: string | null;
+  metadata: Array<{ label: string; value: string }>;
+  sections: Array<{ title: string; content: string }>;
+}
+
 export interface GlobalSearchResponse {
   query: string;
   results: GlobalSearchResult[];
@@ -2247,6 +2318,7 @@ export interface WritingWorkshopSavedDraft {
   selection: WritingWorkshopSelection;
   model: ModelRef | null;
   draft: WritingWorkshopDraft;
+  image: DecorativeImage | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2256,6 +2328,8 @@ export interface WritingWorkshopSaveDraftRequest {
   model?: ModelRef | null;
   /** Defaults to the generated draft title when omitted. */
   title?: string;
+  /** Only Deep Research uses this. Undefined keeps ordinary workshop saves unchanged. */
+  decorativeImage?: DecorativeImageOption;
 }
 
 export interface WritingWorkshopStreamHandlers {
@@ -2294,6 +2368,7 @@ export interface DeepResearchRequest {
    */
   sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
+  decorativeImage?: DecorativeImageOption;
 }
 
 /** One live progress event emitted while a report is being orchestrated. */
@@ -2763,6 +2838,7 @@ export interface ImmersionRequest {
   /** Whether stations and the final exam carry retrieval questions (always skippable). */
   includeQuiz: boolean;
   model?: ModelRef | null;
+  decorativeImage?: DecorativeImageOption;
 }
 
 /**
@@ -2941,6 +3017,7 @@ export interface ImmersionSession {
   model: ModelRef | null;
   plan: ImmersionPlan;
   progress: ImmersionProgress;
+  image: DecorativeImage | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2954,6 +3031,7 @@ export interface ImmersionSessionSummary {
   stats: ImmersionPlanStats;
   progressPct: number;
   finished: boolean;
+  image: DecorativeImage | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3017,6 +3095,12 @@ export interface NodusApi {
   // AI model discovery
   listModels(provider: AiProvider): Promise<ModelInfo[]>;
   listEmbeddingModels(provider: EmbeddingProvider): Promise<ModelInfo[]>;
+  listImageModels(): Promise<ImageModelInfo[]>;
+  getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
+  getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;
+  queueDecorativeImage(request: DecorativeImageActionRequest): Promise<DecorativeImage>;
+  deleteDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage>;
+  onDecorativeImageChanged(cb: (image: DecorativeImage) => void): () => void;
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;
@@ -3292,6 +3376,7 @@ export interface NodusApi {
   getCitationPreview(ref: CitationRef): Promise<CitationPreview | null>;
   /** Search across ideas, works, gaps, themes, authors and notes. */
   globalSearch(query: string, limitPerKind?: number): Promise<GlobalSearchResult[]>;
+  getSearchResultDetail(kind: SearchResultKind, id: string): Promise<SearchResultDetail | null>;
   /** Search by meaning over embedded ideas, passages and works. */
   semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResponse>;
   /** Find ideas whose meaning is closest to the given idea ("ideas parecidas a esta"). */

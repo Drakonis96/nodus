@@ -420,7 +420,11 @@ export function App() {
                             collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
                           }`}
                         >
-                          <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={11} />
+                          <Icon
+                            name="chevronRight"
+                            size={11}
+                            className={`transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-90'}`}
+                          />
                           {t(group.label)}
                         </button>
                         {!collapsed && group.items.map((n) => navButton(n))}

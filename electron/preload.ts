@@ -46,6 +46,17 @@ const api: NodusApi = {
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
+  listImageModels: () => ipcRenderer.invoke('ai:listImageModels'),
+  getDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:get', entityKind, entityId),
+  getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
+    ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),
+  queueDecorativeImage: (request) => ipcRenderer.invoke('images:queue', request),
+  deleteDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:delete', entityKind, entityId),
+  onDecorativeImageChanged: (cb) => {
+    const listener = (_e: unknown, image: import('@shared/types').DecorativeImage) => cb(image);
+    ipcRenderer.on('images:changed', listener);
+    return () => ipcRenderer.removeListener('images:changed', listener);
+  },
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
@@ -312,6 +323,7 @@ const api: NodusApi = {
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
   getCitationPreview: (ref) => ipcRenderer.invoke('citations:preview', ref),
   globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
+  getSearchResultDetail: (kind, id) => ipcRenderer.invoke('search:detail', kind, id),
   semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
   findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),
   listSavedSearches: () => ipcRenderer.invoke('search:saved:list'),

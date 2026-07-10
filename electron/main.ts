@@ -11,6 +11,7 @@ import { maybeRunAutoBackup } from './export/autoBackup';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
+import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startMcpServer, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
@@ -385,6 +386,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     stopRealtimeSync();
+    interruptDecorativeImageGenerations();
     closeDb();
     app.quit();
   }
@@ -394,6 +396,7 @@ app.on('before-quit', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
   stopRealtimeSync();
+  interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
   closeDb();
@@ -403,6 +406,7 @@ const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update',
 updateAwareApp.on('before-quit-for-update', () => {
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   stopRealtimeSync();
+  interruptDecorativeImageGenerations();
   void stopMcpServer();
   void stopCopilotServer();
   closeDb();

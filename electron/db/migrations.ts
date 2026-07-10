@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 export const migrations: Migration[] = [
   {
@@ -888,6 +888,37 @@ export const migrations: Migration[] = [
       -- are pruned.
       ALTER TABLE ideas ADD COLUMN orphaned_at TEXT;
       CREATE INDEX idx_ideas_orphaned ON ideas(orphaned_at) WHERE orphaned_at IS NOT NULL;
+    `,
+  },
+  {
+    version: 29,
+    up: /* sql */ `
+      -- Optional decorative images for Inmersión and Deep Research. The image
+      -- and its compact thumbnail live in SQLite so full backups remain
+      -- self-contained. No foreign key is used because the two owner tables
+      -- intentionally have different schemas; their repositories delete the
+      -- associated row explicitly.
+      CREATE TABLE decorative_images (
+        entity_kind    TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id      TEXT NOT NULL,
+        requested      INTEGER NOT NULL DEFAULT 0,
+        status         TEXT NOT NULL DEFAULT 'not_requested'
+                       CHECK (status IN ('not_requested', 'pending', 'ready', 'failed')),
+        provider       TEXT,
+        model          TEXT,
+        style          TEXT NOT NULL DEFAULT 'antique_book',
+        visual_context TEXT,
+        prompt         TEXT,
+        asset_ref      TEXT,
+        mime_type      TEXT,
+        image_blob     BLOB,
+        thumbnail_blob BLOB,
+        error          TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        PRIMARY KEY (entity_kind, entity_id)
+      );
+      CREATE INDEX idx_decorative_images_status ON decorative_images(status, updated_at DESC);
     `,
   },
 ];

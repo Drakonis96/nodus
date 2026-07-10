@@ -180,7 +180,11 @@ export function startDeepResearchGeneration(key: string, request: DeepResearchRe
   return startBackgroundJob(key, request, async (currentRequest, onProgress) => {
     const report = await window.nodus.generateDeepResearchReport(currentRequest, { onProgress });
     try {
-      const savedDraft = await window.nodus.saveWritingWorkshopDraft({ draft: report.draft, model: currentRequest.model });
+      const savedDraft = await window.nodus.saveWritingWorkshopDraft({
+        draft: report.draft,
+        model: currentRequest.model,
+        decorativeImage: currentRequest.decorativeImage,
+      });
       return { report, savedDraft, saveError: null };
     } catch (error) {
       return { report, savedDraft: null, saveError: messageFromError(error) };

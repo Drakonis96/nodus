@@ -64,6 +64,9 @@ import type {
   VaultSummary,
   VaultSwitchOptions,
   VaultSwitchResult,
+  DecorativeImageActionRequest,
+  DecorativeImageEntityKind,
+  SearchResultKind,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -79,6 +82,15 @@ import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKey
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import { listEmbeddingModels, listModels } from './ai/providers';
+import { listImageModels } from './ai/imageModels';
+import {
+  applyDecorativeImageOption,
+  deleteDecorativeImage,
+  interruptDecorativeImageGenerations,
+  invalidateDecorativeImageGeneration,
+  queueDecorativeImageGeneration,
+} from './ai/decorativeImages';
+import { getDecorativeImage, getDecorativeImageData } from './db/decorativeImagesRepo';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
@@ -105,7 +117,7 @@ import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
 import { verifyCitations, previewCitation } from './citations/verifyCitations';
-import { globalSearch } from './db/searchRepo';
+import { getSearchResultDetail, globalSearch } from './db/searchRepo';
 import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
@@ -266,6 +278,7 @@ export function registerIpc(
     stopRealtimeSync();
     await stopMcpServer();
     await stopCopilotServer();
+    interruptDecorativeImageGenerations();
     closeDb();
     setActiveVault(id);
     getDb();
@@ -343,6 +356,7 @@ export function registerIpc(
       stopRealtimeSync();
       await stopMcpServer();
       await stopCopilotServer();
+      interruptDecorativeImageGenerations();
       closeDb();
       const reset = resetVaultDatabase(id);
       getDb();
@@ -381,6 +395,22 @@ export function registerIpc(
   h('ai:listModels', async (_e, provider: AiProvider) => listModels(provider, getApiKey(provider)));
   h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
     listEmbeddingModels(provider, getApiKey(provider))
+  );
+  h('ai:listImageModels', async () => listImageModels());
+  h('images:get', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
+    getDecorativeImage(entityKind, entityId)
+  );
+  h('images:data', async (_e, entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean) => {
+    const data = getDecorativeImageData(entityKind, entityId, thumbnail);
+    return data ? `data:${data.mimeType};base64,${data.bytes.toString('base64')}` : null;
+  });
+  h('images:queue', async (e, request: DecorativeImageActionRequest) =>
+    queueDecorativeImageGeneration(request, (image) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    })
+  );
+  h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
+    deleteDecorativeImage(entityKind, entityId)
   );
 
   // zotero
@@ -667,9 +697,17 @@ export function registerIpc(
 
   // inmersión (guided topic mastery: scope → generate → resume/replay forever)
   h('immersion:scope', async (_e, request: ImmersionScopeRequest) => buildImmersionScope(request));
-  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) =>
-    generateImmersionSession(request, (p) => e.sender.send('immersion:generate:progress', requestId, p))
-  );
+  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) => {
+    const session = await generateImmersionSession(request, (p) =>
+      e.sender.send('immersion:generate:progress', requestId, p)
+    );
+    // Content has already been committed. This only persists/queues the optional
+    // decoration and therefore cannot roll back or delay the immersion.
+    const image = applyDecorativeImageOption('immersion', session.id, request.decorativeImage, (next) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+    });
+    return { ...session, image };
+  });
   h('immersion:list', async () => immersionRepo.listImmersionSessions());
   h('immersion:get', async (_e, id: string) => immersionRepo.getImmersionSession(id));
   h('immersion:progress:set', async (_e, id: string, progress: ImmersionProgress) =>
@@ -677,6 +715,7 @@ export function registerIpc(
   );
   h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
   h('immersion:delete', async (_e, id: string) => {
+    invalidateDecorativeImageGeneration('immersion', id);
     immersionRepo.deleteImmersionSession(id);
   });
 
@@ -773,8 +812,19 @@ export function registerIpc(
   h('writing:draft', async (_e, request: WritingWorkshopDraftRequest) => generateWritingWorkshopDraft(request));
   h('writing:export', async (_e, request: WritingWorkshopExportRequest) => exportWritingWorkshopDraft(request));
   h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
-  h('writing:saved:save', async (_e, request: WritingWorkshopSaveDraftRequest) => writingDrafts.saveWritingWorkshopDraft(request));
-  h('writing:saved:delete', async (_e, id: string) => writingDrafts.deleteWritingWorkshopDraft(id));
+  h('writing:saved:save', async (e, request: WritingWorkshopSaveDraftRequest) => {
+    const saved = writingDrafts.saveWritingWorkshopDraft(request);
+    if (saved.brief.kind !== 'deep_research') return saved;
+    // Like Inmersión, the complete report is durable before image work begins.
+    const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+    });
+    return { ...saved, image };
+  });
+  h('writing:saved:delete', async (_e, id: string) => {
+    invalidateDecorativeImageGeneration('deep_research', id);
+    return writingDrafts.deleteWritingWorkshopDraft(id);
+  });
 
   // deep research (orchestrated, coverage-guided multi-page report)
   h('research:deep', async (e, requestId: string, request: DeepResearchRequest) =>
@@ -881,6 +931,7 @@ export function registerIpc(
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)
   );
+  h('search:detail', async (_e, kind: SearchResultKind, id: string) => getSearchResultDetail(kind, id));
   h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>
     semanticSearch(query ?? '', options ?? {})
   );

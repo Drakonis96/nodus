@@ -31,6 +31,10 @@ interface CallOpts {
   /** Reasoning effort. Defaults to `off` for JSON/scan calls and to the configured
    *  `chatReasoning` for conversational calls. */
   reasoning?: ReasoningEffort;
+  /** Disable SDK/compatibility retries for explicitly single-attempt workflows. */
+  noRetry?: boolean;
+  /** Per-request transport timeout override. */
+  timeoutMs?: number;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
@@ -108,7 +112,11 @@ async function rawComplete(
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey: key });
+    const client = new Anthropic({
+      apiKey: key,
+      ...(opts.noRetry ? { maxRetries: 0 } : {}),
+      ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
+    });
     try {
       const res = await client.messages.create({
         model: model.model,
@@ -130,7 +138,7 @@ async function rawComplete(
   const client = new OpenAI({
     apiKey: key,
     baseURL: baseURL ?? undefined,
-    timeout: 180_000,
+    timeout: opts.timeoutMs ?? 180_000,
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
@@ -151,7 +159,7 @@ async function rawComplete(
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
-      if (isBadRequest(e) && Object.keys(extras).length > 0) {
+      if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
         res = await client.chat.completions.create(baseBody as any);
       } else {
         throw e;

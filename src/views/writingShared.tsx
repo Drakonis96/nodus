@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import type { WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import type { DecorativeImageStyle, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
 
 /** Human labels for every workshop/report kind (deep reports use `deep_research`). */
 export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -169,6 +170,7 @@ export function SavedDraftsPanel({
   onReuse,
   onDelete,
   onRefresh,
+  imageStyle = 'antique_book',
 }: {
   drafts: WritingWorkshopSavedDraft[];
   loading: boolean;
@@ -177,6 +179,7 @@ export function SavedDraftsPanel({
   onReuse: (draft: WritingWorkshopSavedDraft) => void;
   onDelete: (draft: WritingWorkshopSavedDraft) => void;
   onRefresh: () => void;
+  imageStyle?: DecorativeImageStyle;
 }) {
   return (
     <section>
@@ -202,6 +205,16 @@ export function SavedDraftsPanel({
             const isReusing = reusingDraftId === saved.id;
             return (
               <div key={saved.id} className="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+                {saved.brief.kind === 'deep_research' && (
+                  <DecorativeImageCard
+                    entityKind="deep_research"
+                    entityId={saved.id}
+                    image={saved.image}
+                    defaultStyle={imageStyle}
+                    thumbnail
+                    className="mb-3"
+                  />
+                )}
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium leading-5 line-clamp-2">{saved.title}</div>

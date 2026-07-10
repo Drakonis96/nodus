@@ -7,7 +7,10 @@ import type {
   DeepResearchTargetLength,
   WritingWorkshopDraft,
   WritingWorkshopSavedDraft,
+  DecorativeImage,
+  DecorativeImageStyle,
 } from '@shared/types';
+import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
@@ -26,6 +29,7 @@ import {
   type DeepResearchGenerationJob,
 } from '../backgroundJobs';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
 
 const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   adaptive: 'Adaptativo (según corpus)',
@@ -60,6 +64,8 @@ export function DeepResearchView({
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
+  const [includeImage, setIncludeImage] = useState(false);
+  const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>
     getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
   );
@@ -67,6 +73,8 @@ export function DeepResearchView({
   const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
   const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [activeImage, setActiveImage] = useState<DecorativeImage | null>(null);
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
   const [reusingDraftId, setReusingDraftId] = useState<string | null>(null);
@@ -114,11 +122,15 @@ export function DeepResearchView({
       setLanguage(deepJob.request.language ?? 'es');
       setDeepTarget(deepJob.request.targetLength ?? 'adaptive');
       setDeepSectionLimit(deepJob.request.sectionLimit ?? 'auto');
+      setIncludeImage(deepJob.request.decorativeImage?.enabled ?? false);
+      setImageStyle(deepJob.request.decorativeImage?.style ?? settings.imageStyle);
       setSelectedModel(deepJob.request.model ?? null);
       if (deepJob.status === 'running') {
         setDraft(null);
         setDraftSaved(false);
         setDeepMeta(null);
+        setActiveDraftId(null);
+        setActiveImage(null);
         setMessage(null);
       }
     }
@@ -135,6 +147,8 @@ export function DeepResearchView({
       setDraft(report.draft);
       setDeepMeta(report.meta);
       setDraftSaved(!!savedDraft);
+      setActiveDraftId(savedDraft?.id ?? null);
+      setActiveImage(savedDraft?.image ?? null);
       setError(saveError ? tx('Informe generado, pero no se pudo guardar automáticamente: {error}', { error: saveError }) : null);
       setMessage(
         saveError
@@ -161,12 +175,15 @@ export function DeepResearchView({
     setDraft(null);
     setDraftSaved(false);
     setDeepMeta(null);
+    setActiveDraftId(null);
+    setActiveImage(null);
     startDeepResearchGeneration(DEEP_RESEARCH_MAIN_JOB_KEY, {
       objective,
       language,
       targetLength: deepTarget,
       sectionLimit: deepSectionLimit,
       model: selectedModel,
+      decorativeImage: { enabled: includeImage, style: imageStyle },
     });
   };
 
@@ -197,9 +214,15 @@ export function DeepResearchView({
     setMessage(null);
     setSavingDraft(true);
     try {
-      const saved = await window.nodus.saveWritingWorkshopDraft({ draft, model: selectedModel });
+      const saved = await window.nodus.saveWritingWorkshopDraft({
+        draft,
+        model: selectedModel,
+        decorativeImage: { enabled: includeImage, style: imageStyle },
+      });
       setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
       setDraftSaved(true);
+      setActiveDraftId(saved.id);
+      setActiveImage(saved.image);
       setMessage(t('Informe guardado localmente.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -216,6 +239,8 @@ export function DeepResearchView({
     if (saved.brief.language) setLanguage(saved.brief.language);
     setDraft(saved.draft);
     setDraftSaved(true);
+    setActiveDraftId(saved.id);
+    setActiveImage(saved.image);
     setDeepMeta(null);
     if (saved.model) setSelectedModel(saved.model);
   };
@@ -231,6 +256,8 @@ export function DeepResearchView({
     setDraft(null);
     setDraftSaved(false);
     setDeepMeta(null);
+    setActiveDraftId(null);
+    setActiveImage(null);
     setMessage(t('Idea reutilizada: ajusta los parámetros y genera un informe actualizado.'));
     setReusingDraftId(null);
   };
@@ -248,6 +275,10 @@ export function DeepResearchView({
     try {
       await window.nodus.deleteWritingWorkshopDraft(saved.id);
       setSavedDrafts((current) => current.filter((item) => item.id !== saved.id));
+      if (activeDraftId === saved.id) {
+        setActiveDraftId(null);
+        setActiveImage(null);
+      }
       setMessage(t('Informe eliminado.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -351,6 +382,23 @@ export function DeepResearchView({
           <Badge color="green">{t('Cobertura del corpus completo')}</Badge>
           <Badge>{t(DEEP_TARGET_LABELS[deepTarget])}</Badge>
           <Badge>{sectionLimitLabel(deepSectionLimit)}</Badge>
+          <button
+            className={`rounded-full border px-2.5 py-1 text-xs ${
+              includeImage
+                ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
+                : 'border-neutral-700 text-neutral-500'
+            }`}
+            disabled={deepRunning}
+            onClick={() => setIncludeImage((value) => !value)}
+            title={t('La imagen se genera una sola vez después de guardar el informe')}
+          >
+            <Icon name={includeImage ? 'check' : 'minus'} size={11} className="mr-1" /> {t('Imagen decorativa')}
+          </button>
+          {includeImage && (
+            <select className="input !py-1 text-xs" value={imageStyle} disabled={deepRunning} onChange={(event) => setImageStyle(event.target.value as DecorativeImageStyle)}>
+              {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
+            </select>
+          )}
           {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
           <span className="text-neutral-600">{t('Sin selección manual: el informe elige y cita las fuentes por ti.')}</span>
           {deepRunning && (
@@ -391,6 +439,20 @@ export function DeepResearchView({
             </div>
           )}
           {draft && (
+            <div className="space-y-5">
+            {activeDraftId && (
+              <DecorativeImageCard
+                entityKind="deep_research"
+                entityId={activeDraftId}
+                image={activeImage}
+                defaultStyle={imageStyle}
+                interactive
+                onChange={(image) => {
+                  setActiveImage(image);
+                  setSavedDrafts((current) => current.map((saved) => saved.id === activeDraftId ? { ...saved, image } : saved));
+                }}
+              />
+            )}
             <DraftResultMain
               draft={draft}
               exporting={exporting}
@@ -402,6 +464,7 @@ export function DeepResearchView({
               onExport={(format) => void exportDraft(format)}
               onCitation={(c: MarkdownCitation) => setCitation(c)}
             />
+            </div>
           )}
         </main>
 
@@ -414,6 +477,7 @@ export function DeepResearchView({
             onReuse={reuseSavedPrompt}
             onDelete={(saved) => void deleteSavedDraft(saved)}
             onRefresh={() => void refreshSavedDrafts()}
+            imageStyle={settings.imageStyle}
           />
           <div className="my-4 border-t border-neutral-800" />
           <SupportMatrix draft={draft} onCitation={setCitation} />

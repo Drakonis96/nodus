@@ -63,10 +63,16 @@ try {
     hasNodus: typeof window.nodus === 'object' && window.nodus !== null,
     hasGetGraph: typeof window.nodus?.getGraph === 'function',
     hasEdgeFeedback: typeof window.nodus?.setEdgeFeedback === 'function',
+    hasImageModels: typeof window.nodus?.listImageModels === 'function',
+    hasImageQueue: typeof window.nodus?.queueDecorativeImage === 'function',
+    hasSearchDetail: typeof window.nodus?.getSearchResultDetail === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
   assert.equal(bridge.hasEdgeFeedback, true, 'setEdgeFeedback available');
+  assert.equal(bridge.hasImageModels, true, 'image model catalog available');
+  assert.equal(bridge.hasImageQueue, true, 'decorative image queue available');
+  assert.equal(bridge.hasSearchDetail, true, 'search detail modal bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -97,17 +103,60 @@ try {
       chatModel: chat,
       deepResearchModel: model,
       immersionModel: chat,
+      imageProvider: 'google',
+      imageModel: 'gemini-3.1-flash-lite-image',
+      imageStyle: 'antique_book',
     }), { model: smokeModel, chat: chatModel });
   assert.deepEqual(independent.chatModel, chatModel, 'chat model persists independently');
   assert.deepEqual(independent.deepResearchModel, smokeModel, 'Deep Research model persists independently');
   assert.deepEqual(independent.immersionModel, chatModel, 'immersion model persists independently');
+  assert.equal(independent.imageModel, 'gemini-3.1-flash-lite-image', 'image model persists independently');
   await page.reload();
   await page.waitForFunction(() => document.querySelector('header'));
   assert.equal(await page.locator('header select[data-tour="model"]').count(), 0, 'global header model selector removed');
+  await page.locator('[data-tour="nav-settings"]').click();
+  await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
+  console.log('[e2e] image provider settings rendered');
   await page.getByRole('button', { name: 'Asistente', exact: true }).click();
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
+
+  // ── Search result: shared modal first, graph only as secondary action ──────
+  assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('[data-tour="nav-search"]'));
+  await page.locator('[data-tour="nav-search"]').click();
+  const searchInput = page.getByPlaceholder('Busca en notas, ideas, obras, huecos, temas y autores…');
+  await searchInput.fill('recuperación');
+  await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).waitFor({ timeout: 10_000 });
+  await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).click();
+  const detailDialog = page.locator('[role="dialog"]');
+  await detailDialog.waitFor();
+  assert.equal(await detailDialog.getByText('Localizar en el grafo', { exact: true }).count(), 1, 'graph action is secondary inside modal');
+  assert.equal(await searchInput.isVisible(), true, 'search remains the active primary surface');
+  await detailDialog.getByRole('button', { name: 'Cerrar', exact: true }).first().click();
+  console.log('[e2e] search opens shared detail modal without graph navigation');
+
+  // ── Optional-image controls exist and can be toggled without generation ───
+  await page.locator('[data-tour="nav-immersion"]').click();
+  const immersionImageToggle = page.getByRole('button', { name: 'Imagen decorativa', exact: true });
+  await immersionImageToggle.waitFor();
+  assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'immersion style hidden while disabled');
+  await immersionImageToggle.click();
+  assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 1, 'immersion style shown when enabled');
+  await immersionImageToggle.click();
+  assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'immersion image option disables cleanly');
+
+  await page.locator('[data-tour="nav-deepResearch"]').click();
+  const reportImageToggle = page.getByRole('button', { name: 'Imagen decorativa', exact: true });
+  await reportImageToggle.waitFor();
+  await reportImageToggle.click();
+  assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 1, 'Deep Research style shown when enabled');
+  await reportImageToggle.click();
+  assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'Deep Research image option disables cleanly');
+  console.log('[e2e] optional image controls toggle in both owner flows');
 
   // ── Real IPC round-trip: the async graph build (compute worker path) ────────
   const graph = await page.evaluate(() => window.nodus.getGraph('ideas'));
@@ -134,10 +183,12 @@ try {
   const Database = require('better-sqlite3');
   const db = new Database(dbFile, { readonly: true });
   const version = db.pragma('user_version', { simple: true });
+  const imageTable = db.prepare("SELECT 1 AS ok FROM sqlite_master WHERE type = 'table' AND name = 'decorative_images'").get();
   db.close();
   const source = await readFile(path.join(repoRoot, 'electron/db/migrations.ts'), 'utf8');
   const expected = Number(source.match(/export const SCHEMA_VERSION = (\d+);/)?.[1]);
   assert.equal(version, expected, `DB migrated to schema v${expected}`);
+  assert.equal(imageTable?.ok, 1, 'decorative_images table exists');
   console.log(`[e2e] database at schema v${version}`);
 
   console.log('e2e smoke test passed');
