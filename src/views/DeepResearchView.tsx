@@ -19,6 +19,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { TranslationModal } from '../components/TranslationModal';
 import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
@@ -96,12 +97,15 @@ export function DeepResearchView({
   const [sortKey, setSortKey] = useState<SortKey>('recent');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showTutorial, setShowTutorial] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Reader + shared modals.
   const [openDraft, setOpenDraft] = useState<WritingWorkshopSavedDraft | null>(null);
   const [showMatrix, setShowMatrix] = useState(false);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [savingToNotes, setSavingToNotes] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -201,6 +205,39 @@ export function DeepResearchView({
     }
   };
 
+  const exitSelection = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const deleteSelected = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: t('Eliminar informes'),
+      message: tx('¿Eliminar {n} informes guardados? Esta acción no se puede deshacer.', { n: ids.length }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(ids.map((id) => window.nodus.deleteWritingWorkshopDraft(id)));
+      setSavedDrafts((current) => current.filter((item) => !selected.has(item.id)));
+      exitSelection();
+      setMessage(tx('{n} informes eliminados.', { n: ids.length }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const exportDraft = async (format: 'markdown' | 'pdf') => {
     if (!openDraft) return;
     setExporting(true);
@@ -260,6 +297,7 @@ export function DeepResearchView({
           onBack={backToGallery}
           onCopy={() => void copyDraft()}
           onSaveToNotes={() => setSavingToNotes(true)}
+          onTranslate={() => setTranslating(true)}
           onExport={(format) => void exportDraft(format)}
           onCitation={setCitation}
           onImageChange={onImageChange}
@@ -282,6 +320,17 @@ export function DeepResearchView({
             source={{ origin: 'writing', model: openDraft.model, ref: 'deep_research' }}
             allowProjectLink
             onClose={() => setSavingToNotes(false)}
+          />
+        )}
+        {translating && (
+          <TranslationModal
+            entityKind="deep_research"
+            entityId={openDraft.id}
+            sourceTitle={openDraft.draft.title}
+            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            model={openDraft.model}
+            onCitation={setCitation}
+            onClose={() => setTranslating(false)}
           />
         )}
       </>
@@ -358,7 +407,41 @@ export function DeepResearchView({
             <Icon name="list" size={14} />
           </button>
         </div>
+        {savedDrafts.length > 0 && (
+          <button
+            className={`btn btn-ghost !py-1.5 gap-1.5 border text-xs ${selecting ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+            onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+          >
+            <Icon name="check" size={13} /> {selecting ? t('Cancelar') : t('Seleccionar')}
+          </button>
+        )}
       </div>
+
+      {selecting && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-indigo-900/40 bg-indigo-950/20 px-4 py-2 text-xs">
+          <button
+            className="text-indigo-300 hover:underline"
+            onClick={() =>
+              setSelected(
+                visibleDrafts.every((d) => selected.has(d.id)) ? new Set() : new Set(visibleDrafts.map((d) => d.id))
+              )
+            }
+          >
+            {visibleDrafts.length > 0 && visibleDrafts.every((d) => selected.has(d.id))
+              ? t('Deseleccionar todo')
+              : t('Seleccionar todo')}
+          </button>
+          <span className="text-neutral-500">{tx('{n} seleccionados', { n: selected.size })}</span>
+          <div className="flex-1" />
+          <button
+            className="btn btn-ghost !py-1 gap-1 text-xs text-red-400 disabled:text-neutral-600"
+            onClick={() => void deleteSelected()}
+            disabled={selected.size === 0}
+          >
+            <Icon name="trash" size={13} /> {t('Eliminar seleccionados')}
+          </button>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {visibleDrafts.length === 0 ? (
@@ -384,6 +467,9 @@ export function DeepResearchView({
                 key={saved.id}
                 saved={saved}
                 settings={settings}
+                selecting={selecting}
+                selected={selected.has(saved.id)}
+                onToggle={() => toggleSelected(saved.id)}
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
                 onDelete={() => void deleteDraft(saved)}
@@ -397,6 +483,9 @@ export function DeepResearchView({
                 key={saved.id}
                 saved={saved}
                 settings={settings}
+                selecting={selecting}
+                selected={selected.has(saved.id)}
+                onToggle={() => toggleSelected(saved.id)}
                 onOpen={() => openReader(saved)}
                 onReuse={() => reusePrompt(saved)}
                 onDelete={() => void deleteDraft(saved)}
@@ -500,25 +589,48 @@ function QueueStrip({
 // Gallery cards
 // ─────────────────────────────────────────────────────────────────────────────
 
+function SelectCheck({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+        checked ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-neutral-500 bg-neutral-900/70'
+      }`}
+    >
+      {checked && <Icon name="check" size={12} />}
+    </span>
+  );
+}
+
 function DraftGridCard({
   saved,
   settings,
+  selecting,
+  selected,
+  onToggle,
   onOpen,
   onReuse,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: () => void;
   onOpen: () => void;
   onReuse: () => void;
   onDelete: () => void;
 }) {
+  const primary = selecting ? onToggle : onOpen;
   return (
-    <div className="card group flex flex-col overflow-hidden p-0 transition-colors hover:border-indigo-700/60">
+    <div
+      className={`card group flex flex-col overflow-hidden p-0 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
       <button
         className="relative block h-40 w-full overflow-hidden bg-gradient-to-br from-indigo-950/30 to-neutral-900"
-        onClick={onOpen}
-        title={t('Abrir a pantalla completa')}
+        onClick={primary}
+        title={selecting ? t('Seleccionar') : t('Abrir a pantalla completa')}
       >
         <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
           <Icon name="compass" size={30} />
@@ -531,27 +643,34 @@ function DraftGridCard({
           thumbnail
           className="absolute inset-0 !h-full !rounded-none"
         />
+        {selecting && (
+          <span className="absolute left-2 top-2 z-10">
+            <SelectCheck checked={selected} />
+          </span>
+        )}
       </button>
       <div className="flex flex-1 flex-col p-3">
-        <button className="text-left" onClick={onOpen}>
+        <button className="text-left" onClick={primary}>
           <div className="line-clamp-2 text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
         </button>
         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
           {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
         </div>
-        <div className="mt-3 flex items-center gap-1.5">
-          <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
-            <Icon name="book" size={12} /> {t('Leer')}
-          </button>
-          <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
-            <Icon name="refresh" size={12} />
-          </button>
-          <div className="flex-1" />
-          <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
-            <Icon name="trash" size={12} />
-          </button>
-        </div>
+        {!selecting && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
+              <Icon name="book" size={12} /> {t('Leer')}
+            </button>
+            <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
+              <Icon name="refresh" size={12} />
+            </button>
+            <div className="flex-1" />
+            <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
+              <Icon name="trash" size={12} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -560,22 +679,38 @@ function DraftGridCard({
 function DraftListRow({
   saved,
   settings,
+  selecting,
+  selected,
+  onToggle,
   onOpen,
   onReuse,
   onDelete,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: () => void;
   onOpen: () => void;
   onReuse: () => void;
   onDelete: () => void;
 }) {
+  const primary = selecting ? onToggle : onOpen;
   return (
-    <div className="card flex items-center gap-3 p-2.5 transition-colors hover:border-indigo-700/60">
+    <div
+      className={`card flex items-center gap-3 p-2.5 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
       <button
         className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-indigo-950/30 to-neutral-900"
-        onClick={onOpen}
-        title={t('Abrir a pantalla completa')}
+        onClick={primary}
+        title={selecting ? t('Seleccionar') : t('Abrir a pantalla completa')}
       >
         <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
           <Icon name="compass" size={16} />
@@ -589,22 +724,26 @@ function DraftListRow({
           className="absolute inset-0 !h-full !rounded-md"
         />
       </button>
-      <button className="min-w-0 flex-1 text-left" onClick={onOpen}>
+      <button className="min-w-0 flex-1 text-left" onClick={primary}>
         <div className="truncate text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
           <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
           {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
         </div>
       </button>
-      <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
-        <Icon name="book" size={12} /> {t('Leer')}
-      </button>
-      <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
-        <Icon name="refresh" size={12} />
-      </button>
-      <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
-        <Icon name="trash" size={12} />
-      </button>
+      {!selecting && (
+        <>
+          <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
+            <Icon name="book" size={12} /> {t('Leer')}
+          </button>
+          <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
+            <Icon name="refresh" size={12} />
+          </button>
+          <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
+            <Icon name="trash" size={12} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -624,6 +763,7 @@ function ReaderView({
   onBack,
   onCopy,
   onSaveToNotes,
+  onTranslate,
   onExport,
   onCitation,
   onImageChange,
@@ -638,6 +778,7 @@ function ReaderView({
   onBack: () => void;
   onCopy: () => void;
   onSaveToNotes: () => void;
+  onTranslate: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
@@ -662,6 +803,9 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={onTranslate}>
+          <Icon name="languages" size={13} /> {t('Traducir')}
+        </button>
         <button
           className={`btn btn-ghost gap-1.5 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
           onClick={onToggleMatrix}

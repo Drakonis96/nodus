@@ -446,6 +446,79 @@ export interface AudioSegment {
   text: string;
 }
 
+// ── AI translations ─────────────────────────────────────────────────────────
+// A Deep Research report or an immersion can be translated to another language
+// with AI. The source content is assembled to Markdown in the renderer and sent
+// to the main process, which translates it (chunked, preserving structure and
+// citations) and stores the result. Translations reuse the two content kinds and
+// are keyed one-per-language, so regenerating replaces the stored copy.
+export type TranslationEntityKind = AudioEntityKind;
+
+/** One selectable target language for AI translation. `code` is a BCP-47-ish tag
+ *  used as the stable key; `name` (English) guides the model; `nativeName` labels
+ *  the picker. */
+export interface TranslationLanguage {
+  code: string;
+  name: string;
+  nativeName: string;
+}
+
+/** The curated languages offered for AI translation. English name drives the
+ *  prompt; native name labels the dropdown. Kept in shared so main and renderer
+ *  agree on the exact set and codes. */
+export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
+  { code: 'en', name: 'English', nativeName: 'English' },
+  { code: 'es', name: 'Spanish', nativeName: 'Español' },
+  { code: 'fr', name: 'French', nativeName: 'Français' },
+  { code: 'de', name: 'German', nativeName: 'Deutsch' },
+  { code: 'it', name: 'Italian', nativeName: 'Italiano' },
+  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
+  { code: 'pt-BR', name: 'Brazilian Portuguese', nativeName: 'Português (Brasil)' },
+  { code: 'ca', name: 'Catalan', nativeName: 'Català' },
+  { code: 'gl', name: 'Galician', nativeName: 'Galego' },
+  { code: 'eu', name: 'Basque', nativeName: 'Euskara' },
+  { code: 'nl', name: 'Dutch', nativeName: 'Nederlands' },
+  { code: 'pl', name: 'Polish', nativeName: 'Polski' },
+  { code: 'ru', name: 'Russian', nativeName: 'Русский' },
+  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
+  { code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文' },
+  { code: 'ja', name: 'Japanese', nativeName: '日本語' },
+  { code: 'ko', name: 'Korean', nativeName: '한국어' },
+  { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
+];
+
+/** A stored AI translation of a report/immersion, full Markdown body included. */
+export interface ContentTranslation {
+  id: string;
+  entityKind: TranslationEntityKind;
+  entityId: string;
+  /** Target language code (matches a TRANSLATION_LANGUAGES entry). */
+  language: string;
+  /** Native-name label captured at generation time (for display). */
+  languageLabel: string;
+  /** Translated document title. */
+  title: string;
+  /** Full translated document as Markdown. */
+  markdown: string;
+  model: ModelRef | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Translation metadata without the (potentially large) Markdown body. */
+export type ContentTranslationSummary = Omit<ContentTranslation, 'markdown'>;
+
+/** Request to (re)generate a translation. The renderer assembles and passes the
+ *  source so the main process never has to re-derive an entity's Markdown. */
+export interface GenerateTranslationRequest {
+  entityKind: TranslationEntityKind;
+  entityId: string;
+  language: string;
+  sourceTitle: string;
+  sourceMarkdown: string;
+  model?: ModelRef | null;
+}
+
 export interface AppSettings {
   embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
@@ -3244,6 +3317,14 @@ export interface NodusApi {
   getAudioClipDataUrl(clipId: string): Promise<string | null>;
   deleteAudioClip(clipId: string): Promise<void>;
   deleteEntityAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
+  // AI translations of a report/immersion (source Markdown supplied by the renderer).
+  listContentTranslations(
+    entityKind: TranslationEntityKind,
+    entityId: string
+  ): Promise<ContentTranslationSummary[]>;
+  getContentTranslation(id: string): Promise<ContentTranslation | null>;
+  generateContentTranslation(request: GenerateTranslationRequest): Promise<ContentTranslationSummary>;
+  deleteContentTranslation(id: string): Promise<void>;
   // Hume cloud TTS (BYO-key). The key is stored in the main process; the renderer
   // only learns whether one exists, the voice list, and the audio bytes.
   humeStatus(): Promise<{ hasKey: boolean }>;

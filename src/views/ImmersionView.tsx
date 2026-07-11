@@ -33,6 +33,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { TranslationModal } from '../components/TranslationModal';
 import { confirm } from '../components/feedback';
 import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
@@ -168,6 +169,7 @@ export function ImmersionView({
   const [mode, setMode] = useState<'home' | 'scope' | 'player'>('home');
   const [sessions, setSessions] = useState<ImmersionSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const [topic, setTopic] = useState('');
   const [minutes, setMinutes] = useState(150);
@@ -257,6 +259,7 @@ export function ImmersionView({
     try {
       const result = await window.nodus.buildImmersionScope({ topic: topic.trim(), minutes });
       setScope(result);
+      setComposerOpen(false);
       setMode('scope');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -318,6 +321,20 @@ export function ImmersionView({
     void refreshSessions();
   };
 
+  const deleteSessions = async (ids: string[]): Promise<boolean> => {
+    if (ids.length === 0) return false;
+    const ok = await confirm({
+      title: t('Eliminar inmersiones'),
+      message: tx('¿Eliminar {n} inmersiones y todo su progreso? Esta acción no se puede deshacer.', { n: ids.length }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return false;
+    await Promise.all(ids.map((id) => window.nodus.deleteImmersionSession(id)));
+    void refreshSessions();
+    return true;
+  };
+
   const exitPlayer = () => {
     if (generationJob?.status !== 'running') clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob?.id);
     if (session) clearBackgroundJob(immersionDossierJobKey(session.id));
@@ -329,32 +346,46 @@ export function ImmersionView({
   return (
     <div className="h-full flex flex-col min-h-0">
       {mode === 'home' && (
-        <ImmersionHome
-          settings={settings}
-          sessions={sessions}
-          loadingSessions={loadingSessions}
-          topic={topic}
-          minutes={minutes}
-          includeQuiz={includeQuiz}
-          includeImage={includeImage}
-          imageStyle={imageStyle}
-          language={language}
-          model={model}
-          hasModel={hasModel}
-          scoping={scoping}
-          openingId={openingId}
-          error={error}
-          onTopic={setTopic}
-          onMinutes={setMinutes}
-          onIncludeQuiz={setIncludeQuiz}
-          onIncludeImage={setIncludeImage}
-          onImageStyle={setImageStyle}
-          onLanguage={setLanguage}
-          onModel={setModel}
-          onExplore={() => void exploreScope()}
-          onOpenSession={(id) => void openSession(id)}
-          onDeleteSession={(s) => void deleteSession(s)}
-        />
+        <>
+          <ImmersionHome
+            settings={settings}
+            sessions={sessions}
+            loadingSessions={loadingSessions}
+            openingId={openingId}
+            error={error}
+            onNew={() => {
+              setError(null);
+              setComposerOpen(true);
+            }}
+            onOpenSession={(id) => void openSession(id)}
+            onDeleteSession={(s) => void deleteSession(s)}
+            onDeleteSessions={deleteSessions}
+          />
+          {composerOpen && (
+            <ImmersionComposerModal
+              settings={settings}
+              topic={topic}
+              minutes={minutes}
+              includeQuiz={includeQuiz}
+              includeImage={includeImage}
+              imageStyle={imageStyle}
+              language={language}
+              model={model}
+              hasModel={hasModel}
+              scoping={scoping}
+              error={error}
+              onTopic={setTopic}
+              onMinutes={setMinutes}
+              onIncludeQuiz={setIncludeQuiz}
+              onIncludeImage={setIncludeImage}
+              onImageStyle={setImageStyle}
+              onLanguage={setLanguage}
+              onModel={setModel}
+              onExplore={() => void exploreScope()}
+              onClose={() => setComposerOpen(false)}
+            />
+          )}
+        </>
       )}
 
       {mode === 'scope' && scope && (
@@ -416,10 +447,361 @@ export function ImmersionView({
 // Home — hero launcher + saved sessions
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ImmersionSortKey = 'recent' | 'oldest' | 'title';
+
+function formatImmersionDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
+
 function ImmersionHome({
   settings,
   sessions,
   loadingSessions,
+  openingId,
+  error,
+  onNew,
+  onOpenSession,
+  onDeleteSession,
+  onDeleteSessions,
+}: {
+  settings: AppSettings;
+  sessions: ImmersionSessionSummary[];
+  loadingSessions: boolean;
+  openingId: string | null;
+  error: string | null;
+  onNew: () => void;
+  onOpenSession: (id: string) => void;
+  onDeleteSession: (s: ImmersionSessionSummary) => void;
+  onDeleteSessions: (ids: string[]) => Promise<boolean>;
+}) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<ImmersionSortKey>('recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q ? sessions.filter((s) => s.title.toLowerCase().includes(q)) : sessions;
+    const sorted = [...filtered];
+    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return sorted;
+  }, [sessions, search, sortKey]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const exitSelection = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const allVisibleSelected = visible.length > 0 && visible.every((s) => selected.has(s.id));
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((s) => s.id)));
+
+  const bulkDelete = async () => {
+    const ok = await onDeleteSessions([...selected]);
+    if (ok) exitSelection();
+  };
+
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
+          </h1>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {t('Domina un tema de tu corpus: panorama, estaciones con citas literales, contrastes, fronteras y examen final. Todo queda grabado para retomarlo.')}
+          </p>
+        </div>
+        <div className="flex-1" />
+        <button className="btn btn-primary gap-1.5" onClick={onNew}>
+          <Icon name="plus" /> {t('Nueva inmersión')}
+        </button>
+      </header>
+
+      {error && <div className="border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">{error}</div>}
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+        <div className="relative min-w-[14rem] flex-1 max-w-md">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input
+            className="input input-with-leading-icon w-full !py-1.5 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('Buscar entre tus inmersiones…')}
+          />
+        </div>
+        <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as ImmersionSortKey)}>
+          <option value="recent">{t('Más recientes')}</option>
+          <option value="oldest">{t('Más antiguos')}</option>
+          <option value="title">{t('Por título (A–Z)')}</option>
+        </select>
+        <div className="flex overflow-hidden rounded-lg border border-neutral-700">
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'grid' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('grid')}
+            title={t('Vista mosaico')}
+          >
+            <Icon name="grid" size={14} />
+          </button>
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'list' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('list')}
+            title={t('Vista lista')}
+          >
+            <Icon name="list" size={14} />
+          </button>
+        </div>
+        {sessions.length > 0 && (
+          <button
+            className={`btn btn-ghost !py-1.5 gap-1.5 border text-xs ${selecting ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+            onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+          >
+            <Icon name="check" size={13} /> {selecting ? t('Cancelar') : t('Seleccionar')}
+          </button>
+        )}
+      </div>
+
+      {selecting && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-indigo-900/40 bg-indigo-950/20 px-4 py-2 text-xs">
+          <button className="text-indigo-300 hover:underline" onClick={toggleAll}>
+            {allVisibleSelected ? t('Deseleccionar todo') : t('Seleccionar todo')}
+          </button>
+          <span className="text-neutral-500">{tx('{n} seleccionadas', { n: selected.size })}</span>
+          <div className="flex-1" />
+          <button
+            className="btn btn-ghost !py-1 gap-1 text-xs text-red-400 disabled:text-neutral-600"
+            onClick={() => void bulkDelete()}
+            disabled={selected.size === 0}
+          >
+            <Icon name="trash" size={13} /> {t('Eliminar seleccionadas')}
+          </button>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {visible.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <Icon name="target" size={28} className="text-neutral-600" />
+            <div className="max-w-md text-sm text-neutral-500">
+              {loadingSessions
+                ? t('Cargando inmersiones…')
+                : search.trim()
+                  ? t('Ninguna inmersión coincide con tu búsqueda.')
+                  : t('Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso y tus respuestas, lista para retomarla.')}
+            </div>
+            {!search.trim() && !loadingSessions && (
+              <button className="btn btn-primary gap-1.5" onClick={onNew}>
+                <Icon name="plus" /> {t('Nueva inmersión')}
+              </button>
+            )}
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-3 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            {visible.map((s) => (
+              <SessionGridCard
+                key={s.id}
+                session={s}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(s.id)}
+                opening={openingId === s.id}
+                onToggle={() => toggle(s.id)}
+                onOpen={() => onOpenSession(s.id)}
+                onDelete={() => onDeleteSession(s)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visible.map((s) => (
+              <SessionListRow
+                key={s.id}
+                session={s}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(s.id)}
+                opening={openingId === s.id}
+                onToggle={() => toggle(s.id)}
+                onOpen={() => onOpenSession(s.id)}
+                onDelete={() => onDeleteSession(s)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Checkbox shown on gallery cards while in selection mode. */
+function SelectCheck({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+        checked ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-neutral-500 bg-neutral-900/70'
+      }`}
+    >
+      {checked && <Icon name="check" size={12} />}
+    </span>
+  );
+}
+
+function SessionGridCard({
+  session: s,
+  settings,
+  selecting,
+  selected,
+  opening,
+  onToggle,
+  onOpen,
+  onDelete,
+}: {
+  session: ImmersionSessionSummary;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  opening: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card group relative flex flex-col gap-3 p-3 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button className="absolute left-4 top-4 z-10" onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
+      <button className="block w-full text-left" onClick={primary}>
+        <DecorativeImageCard entityKind="immersion" entityId={s.id} image={s.image} defaultStyle={settings.imageStyle} thumbnail />
+      </button>
+      <div className="flex w-full items-center gap-4">
+        <ProgressRing pct={s.progressPct} finished={s.finished} />
+        <button className="min-w-0 flex-1 text-left" onClick={primary}>
+          <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>{s.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
+            <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
+            <span>·</span>
+            <span>{tx('{n} obras', { n: s.stats.works })}</span>
+            <span>·</span>
+            <span>{tx('{n} autores', { n: s.stats.authors })}</span>
+          </div>
+          <div className="mt-1 text-[11px] text-neutral-600">{formatImmersionDate(s.updatedAt)}</div>
+        </button>
+        {!selecting && (
+          <div className="flex flex-col gap-1.5">
+            <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+              <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
+              {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+            </button>
+            <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
+              <Icon name="trash" size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SessionListRow({
+  session: s,
+  settings,
+  selecting,
+  selected,
+  opening,
+  onToggle,
+  onOpen,
+  onDelete,
+}: {
+  session: ImmersionSessionSummary;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  opening: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card flex items-center gap-3 p-2.5 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
+      <button
+        className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-indigo-950/30 to-neutral-900"
+        onClick={primary}
+      >
+        <DecorativeImageCard
+          entityKind="immersion"
+          entityId={s.id}
+          image={s.image}
+          defaultStyle={settings.imageStyle}
+          thumbnail
+          className="absolute inset-0 !h-full !rounded-md"
+        />
+      </button>
+      <ProgressRing pct={s.progressPct} finished={s.finished} size={38} />
+      <button className="min-w-0 flex-1 text-left" onClick={primary}>
+        <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>{s.title}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
+          <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
+          <span>·</span>
+          <span>{tx('{n} obras', { n: s.stats.works })}</span>
+          <span>·</span>
+          <span>{formatImmersionDate(s.updatedAt)}</span>
+        </div>
+      </button>
+      {!selecting && (
+        <>
+          <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+            <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
+            {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+          </button>
+          <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
+            <Icon name="trash" size={12} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composer — the new-immersion form (modal). Mirrors Deep Research: a "+" button
+// opens this; its primary action explores the territory (no AI), which advances to
+// the scope screen where the immersion is actually generated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ImmersionComposerModal({
+  settings,
   topic,
   minutes,
   includeQuiz,
@@ -429,7 +811,6 @@ function ImmersionHome({
   model,
   hasModel,
   scoping,
-  openingId,
   error,
   onTopic,
   onMinutes,
@@ -439,12 +820,9 @@ function ImmersionHome({
   onLanguage,
   onModel,
   onExplore,
-  onOpenSession,
-  onDeleteSession,
+  onClose,
 }: {
   settings: AppSettings;
-  sessions: ImmersionSessionSummary[];
-  loadingSessions: boolean;
   topic: string;
   minutes: number;
   includeQuiz: boolean;
@@ -454,7 +832,6 @@ function ImmersionHome({
   model: AppSettings['immersionModel'];
   hasModel: boolean;
   scoping: boolean;
-  openingId: string | null;
   error: string | null;
   onTopic: (v: string) => void;
   onMinutes: (v: number) => void;
@@ -464,52 +841,50 @@ function ImmersionHome({
   onLanguage: (v: 'es' | 'en') => void;
   onModel: (m: AppSettings['immersionModel']) => void;
   onExplore: () => void;
-  onOpenSession: (id: string) => void;
-  onDeleteSession: (s: ImmersionSessionSummary) => void;
+  onClose: () => void;
 }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !scoping) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, scoping]);
+
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Hero */}
-      <div className="immersion-hero relative overflow-hidden border-b border-neutral-800 px-8 py-12">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-indigo-800/60" />
-        <div className="pointer-events-none absolute -right-10 -top-10 h-52 w-52 rounded-full border border-indigo-700/60" />
-        <div className="pointer-events-none absolute right-6 top-6 h-28 w-28 rounded-full border border-violet-900/70" />
-        <div className="relative max-w-3xl">
-          <div className="flex items-center gap-2 text-indigo-300">
-            <Icon name="target" size={22} />
-            <span className="text-xs font-semibold uppercase tracking-[0.25em]">{t('Inmersión')}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => !scoping && onClose()}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Nueva inmersión')}
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <Icon name="target" className="text-indigo-500 dark:text-indigo-300" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nueva inmersión')}</h2>
+            <p className="text-xs text-neutral-500">{t('Elige el tema y el alcance. Antes de generar verás qué sabe tu corpus (sin IA).')}</p>
           </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">
-            {t('Domina un tema de tu corpus en una tarde.')}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
-            {t(
-              'Una ruta completamente guiada: panorama, estaciones con citas literales del texto completo, contrastes entre autores, fronteras del corpus y examen final. Todo queda grabado para retomarlo cuando quieras.'
-            )}
-          </p>
+          <button className="btn btn-ghost px-2" onClick={onClose} aria-label={t('Cerrar')} disabled={scoping}>
+            <Icon name="x" />
+          </button>
+        </header>
 
-          <div className="mt-6 flex flex-col gap-3">
-            <div className="flex gap-2">
-              <input
-                className="input flex-1 !py-3 text-base"
-                value={topic}
-                onChange={(e) => onTopic(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && topic.trim() && hasModel && !scoping) onExplore();
-                }}
-                placeholder={t('¿De qué quieres hacerte experto? P. ej.: uso franquista de las fiestas y tradiciones')}
-              />
-              <button
-                className="btn btn-primary gap-2 !px-5"
-                onClick={onExplore}
-                disabled={!topic.trim() || scoping || !hasModel}
-                title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
-              >
-                <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
-                {scoping ? t('Cartografiando…') : t('Explorar el territorio')}
-              </button>
-            </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <input
+            className="input w-full !py-3 text-base"
+            value={topic}
+            autoFocus
+            onChange={(e) => onTopic(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && topic.trim() && hasModel && !scoping) onExplore();
+            }}
+            placeholder={t('¿De qué quieres hacerte experto? P. ej.: uso franquista de las fiestas y tradiciones')}
+          />
 
+          <div>
+            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Duración')}</div>
             <div className="flex flex-wrap items-center gap-2">
               {TIME_PRESETS.map((preset) => (
                 <button
@@ -525,99 +900,66 @@ function ImmersionHome({
                   <span className="ml-1.5 opacity-70">{t(preset.hint)}</span>
                 </button>
               ))}
-              <button
-                onClick={() => onIncludeQuiz(!includeQuiz)}
-                className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                  includeQuiz
-                    ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300'
-                    : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
-                }`}
-                title={t('Las preguntas siempre se pueden saltar durante la sesión')}
-              >
-                <Icon name={includeQuiz ? 'check' : 'minus'} size={12} className="mr-1" />
-                {t('Preguntas de repaso')}
-              </button>
-              <button
-                onClick={() => onIncludeImage(!includeImage)}
-                className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                  includeImage
-                    ? 'border-indigo-700/60 bg-indigo-900/30 text-indigo-200'
-                    : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
-                }`}
-                title={t('Se genera una sola vez después de guardar la inmersión')}
-              >
-                <Icon name={includeImage ? 'check' : 'minus'} size={12} className="mr-1" />
-                {t('Imagen decorativa')}
-              </button>
-              {includeImage && (
-                <select className="input !py-1.5 text-xs" value={imageStyle} onChange={(event) => onImageStyle(event.target.value as DecorativeImageStyle)}>
-                  {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
-                </select>
-              )}
-              <select className="input !py-1.5 text-xs" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en')}>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-              </select>
-              <ModelPicker settings={settings} value={model} onChange={onModel} compact />
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onIncludeQuiz(!includeQuiz)}
+              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                includeQuiz
+                  ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300'
+                  : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
+              }`}
+              title={t('Las preguntas siempre se pueden saltar durante la sesión')}
+            >
+              <Icon name={includeQuiz ? 'check' : 'minus'} size={12} className="mr-1" />
+              {t('Preguntas de repaso')}
+            </button>
+            <button
+              onClick={() => onIncludeImage(!includeImage)}
+              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                includeImage
+                  ? 'border-indigo-700/60 bg-indigo-900/30 text-indigo-200'
+                  : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
+              }`}
+              title={t('Se genera una sola vez después de guardar la inmersión')}
+            >
+              <Icon name={includeImage ? 'check' : 'minus'} size={12} className="mr-1" />
+              {t('Imagen decorativa')}
+            </button>
+            {includeImage && (
+              <select className="input !py-1.5 text-xs" value={imageStyle} onChange={(event) => onImageStyle(event.target.value as DecorativeImageStyle)}>
+                {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
+              </select>
+            )}
+            <select className="input !py-1.5 text-xs" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en')}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+            <ModelPicker settings={settings} value={model} onChange={onModel} compact />
+          </div>
+
           {error && (
-            <div className="mt-3 rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
+            <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
           )}
         </div>
-      </div>
 
-      {/* Saved sessions */}
-      <div className="px-8 py-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-neutral-300">{t('Tus inmersiones')}</h2>
-          {loadingSessions && <Icon name="sync" size={13} className="animate-spin text-neutral-600" />}
-        </div>
-        {sessions.length === 0 && !loadingSessions && (
-          <p className="mt-3 text-sm text-neutral-600">
-            {t('Aún no hay inmersiones guardadas. Cada recorrido que generes quedará aquí, con su progreso y tus respuestas, listo para retomarlo.')}
-          </p>
-        )}
-        <div className="mt-3 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-lg:grid-cols-1">
-          {sessions.map((s) => (
-            <div key={s.id} className="card group relative flex flex-col gap-3 p-3 transition-colors hover:border-indigo-700/60">
-              <DecorativeImageCard
-                entityKind="immersion"
-                entityId={s.id}
-                image={s.image}
-                defaultStyle={settings.imageStyle}
-                thumbnail
-              />
-              <div className="flex w-full items-center gap-4">
-              <ProgressRing pct={s.progressPct} finished={s.finished} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>
-                  {s.title}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
-                  <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
-                  <span>·</span>
-                  <span>{tx('{n} obras', { n: s.stats.works })}</span>
-                  <span>·</span>
-                  <span>{tx('{n} autores', { n: s.stats.authors })}</span>
-                </div>
-                <div className="mt-1 text-[11px] text-neutral-600">{new Date(s.updatedAt).toLocaleString()}</div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <button className="btn btn-primary !py-1 text-xs gap-1" onClick={() => onOpenSession(s.id)} disabled={openingId === s.id}>
-                  <Icon name={openingId === s.id ? 'sync' : 'play'} size={12} className={openingId === s.id ? 'animate-spin' : ''} />
-                  {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
-                </button>
-                <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={() => onDeleteSession(s)}>
-                  <Icon name="trash" size={12} />
-                </button>
-              </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose} disabled={scoping}>
+            {t('Cancelar')}
+          </button>
+          <button
+            className="btn btn-primary gap-2 !px-5"
+            onClick={onExplore}
+            disabled={!topic.trim() || scoping || !hasModel}
+            title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
+          >
+            <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
+            {scoping ? t('Cartografiando…') : t('Explorar el territorio')}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -875,6 +1217,7 @@ function ImmersionPlayer({
   onSaveToNotes: () => void;
 }) {
   const steps = useMemo(() => playerSteps(session), [session]);
+  const [translating, setTranslating] = useState(false);
   // Honest total study time from the actual route, not the requested budget:
   // a deep route can hold far more stations than a single afternoon.
   const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
@@ -1042,6 +1385,9 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
+        <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={() => setTranslating(true)}>
+          <Icon name="languages" size={13} /> {t('Traducir')}
+        </button>
         <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={onSaveToNotes}>
           <Icon name="save" size={13} /> {t('Guardar en notas')}
         </button>
@@ -1157,6 +1503,17 @@ function ImmersionPlayer({
         )}
       </footer>
       <FindInPage targetRef={mainRef} />
+      {translating && (
+        <TranslationModal
+          entityKind="immersion"
+          entityId={session.id}
+          sourceTitle={session.plan.title}
+          sourceMarkdown={sessionMarkdown(session)}
+          model={session.model}
+          onCitation={onCitation}
+          onClose={() => setTranslating(false)}
+        />
+      )}
     </div>
   );
 }

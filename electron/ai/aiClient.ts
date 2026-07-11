@@ -400,6 +400,17 @@ export async function completeText(opts: CallOpts, model?: ModelRef | null): Pro
   return rawComplete(resolved, withPromptLanguage(opts), false, reasoning);
 }
 
+/**
+ * Plain-text completion that does NOT apply the output-language directive. Use this
+ * for tasks that must fully control their own output language (e.g. translation),
+ * where forcing English/Spanish would defeat the purpose.
+ */
+export async function completeTextNeutral(opts: CallOpts, model?: ModelRef | null): Promise<string> {
+  const resolved = resolveModel(model);
+  const reasoning = opts.reasoning ?? 'off';
+  return rawComplete(resolved, opts, false, reasoning);
+}
+
 /** Plain-text streaming completion. The returned string is the full accumulated answer. */
 export async function completeTextStream(
   opts: CallOpts,

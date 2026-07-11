@@ -2482,5 +2482,47 @@ export const EN: Record<string, string> = {
     'The server reports no models. Download or load one first.',
   'Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.':
     'Local provider: no key needed. Use the default address; you can change IP and port in Settings → Providers.',
+  // Deep Research / Immersion galleries, AI translations, what's new (v1.7.4)
+  'Traducir': 'Translate',
+  'Traducciones': 'Translations',
+  'Traducciones con IA': 'AI translations',
+  'Traduce este contenido a otro idioma. Cada idioma se guarda y puede regenerarse o eliminarse.':
+    'Translate this content into another language. Each language is saved and can be regenerated or deleted.',
+  'Generar traducción': 'Generate translation',
+  'Traduciendo…': 'Translating…',
+  'Genera la traducción con el modelo de IA configurado': 'Generates the translation with the configured AI model',
+  'La traducción de un texto largo puede tardar. Puedes cerrar esta ventana: se guardará y aparecerá aquí al volver.':
+    'Translating a long text can take a while. You can close this window — it will be saved and appear here when you return.',
+  'Cargando traducciones…': 'Loading translations…',
+  'Aún no hay traducciones. Elige un idioma y genera la primera.': 'No translations yet. Pick a language and generate the first one.',
+  'Regenerar esta traducción': 'Regenerate this translation',
+  'Eliminar traducción': 'Delete translation',
+  '¿Eliminar la traducción a {lang}? Esta acción no se puede deshacer.':
+    'Delete the {lang} translation? This cannot be undone.',
+  'Seleccionar todo': 'Select all',
+  'Deseleccionar todo': 'Deselect all',
+  'Eliminar seleccionados': 'Delete selected',
+  'Eliminar seleccionadas': 'Delete selected',
+  'Eliminar informes': 'Delete reports',
+  '¿Eliminar {n} informes guardados? Esta acción no se puede deshacer.':
+    'Delete {n} saved reports? This cannot be undone.',
+  '{n} informes eliminados.': '{n} reports deleted.',
+  'Eliminar inmersiones': 'Delete immersions',
+  '¿Eliminar {n} inmersiones y todo su progreso? Esta acción no se puede deshacer.':
+    'Delete {n} immersions and all their progress? This cannot be undone.',
+  'Nueva inmersión': 'New immersion',
+  'Domina un tema de tu corpus: panorama, estaciones con citas literales, contrastes, fronteras y examen final. Todo queda grabado para retomarlo.':
+    'Master a topic from your corpus: panorama, stations with literal quotes, contrasts, frontiers and a final exam — all saved to resume later.',
+  'Buscar entre tus inmersiones…': 'Search your immersions…',
+  'Cargando inmersiones…': 'Loading immersions…',
+  'Ninguna inmersión coincide con tu búsqueda.': 'No immersion matches your search.',
+  'Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso y tus respuestas, lista para retomarla.':
+    'No immersions yet. Create your first one and it will stay here, with its progress and your answers, ready to resume.',
+  'Elige el tema y el alcance. Antes de generar verás qué sabe tu corpus (sin IA).':
+    'Choose the topic and scope. Before generating you’ll see what your corpus knows (no AI yet).',
+  'Duración': 'Duration',
+  'Novedades': 'What’s new',
+  'Esto es lo nuevo en esta versión de Nodus.': 'Here’s what’s new in this version of Nodus.',
+  '¡Entendido!': 'Got it',
   // <<END_EN>>
 };

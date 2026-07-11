@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 export const migrations: Migration[] = [
   {
@@ -965,6 +965,31 @@ export const migrations: Migration[] = [
         created_at    TEXT NOT NULL
       );
       CREATE INDEX idx_audio_clips_entity ON audio_clips(entity_kind, entity_id, segment_index);
+    `,
+  },
+  {
+    version: 32,
+    up: /* sql */ `
+      -- AI translations of a Deep Research report or an immersion. The translated
+      -- document is stored as Markdown; one row per (entity, language) so
+      -- regenerating replaces the previous copy. Unlike audio, these are small and
+      -- not regenerable for free (they cost an AI call), so they live in SQLite and
+      -- travel with backups / .nodussync.
+      CREATE TABLE content_translations (
+        id             TEXT PRIMARY KEY,
+        entity_kind    TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id      TEXT NOT NULL,
+        language       TEXT NOT NULL,
+        language_label TEXT NOT NULL DEFAULT '',
+        title          TEXT NOT NULL DEFAULT '',
+        markdown       TEXT NOT NULL DEFAULT '',
+        model_json     TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        UNIQUE (entity_kind, entity_id, language)
+      );
+      CREATE INDEX idx_content_translations_entity
+        ON content_translations(entity_kind, entity_id, updated_at DESC);
     `,
   },
 ];

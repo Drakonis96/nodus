@@ -29,6 +29,7 @@ import { VaultSwitcher } from './components/VaultSwitcher';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
+import { WhatsNewModal } from './components/WhatsNewModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
@@ -597,6 +598,10 @@ export function App() {
             void reloadSettings();
           }}
         />
+      )}
+
+      {settings.onboardingComplete && settings.tourComplete && (
+        <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
       )}
     </div>
   );

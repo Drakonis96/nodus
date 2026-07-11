@@ -58,6 +58,11 @@ try {
   }, { timeout: 30_000 });
   console.log('[e2e] renderer mounted');
 
+  // Suppress the "what's new" modal: a fresh profile has no last-seen version, so it
+  // would otherwise overlay the app and intercept later clicks. localStorage persists
+  // across the reloads below (same origin).
+  await page.evaluate(() => localStorage.setItem('nodus.lastSeenVersion', '9999.0.0'));
+
   // ── Preload bridge ──────────────────────────────────────────────────────────
   const bridge = await page.evaluate(() => ({
     hasNodus: typeof window.nodus === 'object' && window.nodus !== null,
@@ -144,7 +149,9 @@ try {
   console.log('[e2e] search idea result opens the shared idea detail modal');
 
   // ── Optional-image controls exist and can be toggled without generation ───
+  // The immersion image option now lives in the "New immersion" composer modal.
   await page.locator('[data-tour="nav-immersion"]').click();
+  await page.getByRole('button', { name: 'Nueva inmersión', exact: true }).first().click();
   const immersionImageToggle = page.getByRole('button', { name: 'Imagen decorativa', exact: true });
   await immersionImageToggle.waitFor();
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'immersion style hidden while disabled');
@@ -152,6 +159,7 @@ try {
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 1, 'immersion style shown when enabled');
   await immersionImageToggle.click();
   assert.equal(await page.getByRole('option', { name: 'Acuarela', exact: true }).count(), 0, 'immersion image option disables cleanly');
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
 
   await page.locator('[data-tour="nav-deepResearch"]').click();
   // The Deep Research image option now lives in the "New report" composer modal.

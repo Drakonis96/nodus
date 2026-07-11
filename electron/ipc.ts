@@ -32,6 +32,8 @@ import type {
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
   WritingWorkshopSaveDraftRequest,
+  TranslationEntityKind,
+  GenerateTranslationRequest,
   DeepResearchRequest,
   DebateAnalysisRequest,
   RqDecomposeRequest,
@@ -182,6 +184,9 @@ import * as notes from './db/notesRepo';
 import * as manualIdeas from './db/manualIdeasRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
+import * as translationsRepo from './db/translationsRepo';
+import { TRANSLATION_LANGUAGES } from '@shared/types';
+import { translateMarkdown, titleFromMarkdown } from './ai/translate';
 import * as workSummaries from './db/workSummariesRepo';
 import * as projects from './db/projectsRepo';
 import { closeDb, getDb } from './db/database';
@@ -491,6 +496,33 @@ export function registerIpc(
     return new Uint8Array(bytes);
   });
 
+  // AI translations. The renderer assembles an entity's Markdown and passes it in;
+  // the main process translates it (chunked, preserving citations) and stores one
+  // copy per language.
+  h('translations:list', async (_e, entityKind: TranslationEntityKind, entityId: string) =>
+    translationsRepo.listContentTranslations(entityKind, entityId)
+  );
+  h('translations:get', async (_e, id: string) => translationsRepo.getContentTranslation(id));
+  h('translations:generate', async (_e, request: GenerateTranslationRequest) => {
+    const language = TRANSLATION_LANGUAGES.find((l) => l.code === request.language);
+    if (!language) throw new Error(`Idioma de traducción no soportado: ${request.language}`);
+    const source = request.sourceMarkdown.trim();
+    if (!source) throw new Error('No hay contenido para traducir.');
+    const markdown = await translateMarkdown({ markdown: source, language, model: request.model });
+    return translationsRepo.upsertContentTranslation({
+      entityKind: request.entityKind,
+      entityId: request.entityId,
+      language: language.code,
+      languageLabel: language.nativeName,
+      title: titleFromMarkdown(markdown, request.sourceTitle),
+      markdown,
+      model: request.model ?? null,
+    });
+  });
+  h('translations:delete', async (_e, id: string) => {
+    translationsRepo.deleteContentTranslation(id);
+  });
+
   // zotero
   h('zotero:ping', async () => {
     const res = await zotero.ping();
@@ -794,6 +826,7 @@ export function registerIpc(
   h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
   h('immersion:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('immersion', id);
+    translationsRepo.deleteEntityTranslations('immersion', id);
     immersionRepo.deleteImmersionSession(id);
   });
 
@@ -901,6 +934,7 @@ export function registerIpc(
   });
   h('writing:saved:delete', async (_e, id: string) => {
     invalidateDecorativeImageGeneration('deep_research', id);
+    translationsRepo.deleteEntityTranslations('deep_research', id);
     return writingDrafts.deleteWritingWorkshopDraft(id);
   });
 

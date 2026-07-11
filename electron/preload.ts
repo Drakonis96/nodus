@@ -79,6 +79,12 @@ const api: NodusApi = {
   humeSynthesize: (voiceId, provider, text) =>
     ipcRenderer.invoke('audio:humeSynthesize', voiceId, provider, text),
 
+  listContentTranslations: (entityKind, entityId) =>
+    ipcRenderer.invoke('translations:list', entityKind, entityId),
+  getContentTranslation: (id) => ipcRenderer.invoke('translations:get', id),
+  generateContentTranslation: (request) => ipcRenderer.invoke('translations:generate', request),
+  deleteContentTranslation: (id) => ipcRenderer.invoke('translations:delete', id).then(() => undefined),
+
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
   zoteroChildCollections: (parentKey) => ipcRenderer.invoke('zotero:childCollections', parentKey),
