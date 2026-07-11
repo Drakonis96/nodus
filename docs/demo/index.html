@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Nodus — Live demo</title>
+  <meta name="description" content="Interactive demo of Nodus: a free, open-source, local-first desktop app that turns your Zotero library into a navigable graph of ideas."/>
+  <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="demo.css"/>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
+        <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
+      </a>
+      <div class="spacer"></div>
+      <button class="tb-btn" onclick="UI.chat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/></svg>
+        Assistant</button>
+      <button class="tb-btn" onclick="UI.toast('In the app: pick which Zotero collections to monitor.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
+        Collections</button>
+      <button class="tb-btn primary" onclick="UI.toast('In the app: pulls new and changed items from Zotero.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        Refresh</button>
+    </header>
+    <div class="demo-banner">
+      <span><b>Web demo</b> — a static sample corpus, free to explore. Every view is real; the AI, Zotero sync and file analysis run only in the desktop app (100% free &amp; open source).</span>
+      <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">Get the desktop app →</a>
+    </div>
+    <div class="body">
+      <nav class="sidebar" id="nav" aria-label="Sections"></nav>
+      <main class="main" id="main"></main>
+    </div>
+  </div>
+  <div id="chat-root"></div>
+  <div id="modal-root"></div>
+  <div id="bottom-player"></div>
+  <div id="toast" role="status"></div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

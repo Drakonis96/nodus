@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Immersion: a library as a night sky of connected stars">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f0b2e"/>
+      <stop offset="0.6" stop-color="#1e1b4b"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="hills" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#141126"/>
+      <stop offset="1" stop-color="#0a0916"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ede9fe"/>
+      <stop offset="0.5" stop-color="#c4b5fd" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="450" fill="url(#sky)"/>
+  <circle cx="640" cy="95" r="70" fill="url(#moon)"/>
+  <circle cx="640" cy="95" r="26" fill="#ede9fe"/>
+  <g fill="#e0e7ff" opacity="0.75">
+    <circle cx="40" cy="60" r="1.4"/><circle cx="120" cy="140" r="1"/><circle cx="210" cy="40" r="1.7"/>
+    <circle cx="330" cy="110" r="1.2"/><circle cx="450" cy="50" r="1.5"/><circle cx="530" cy="170" r="1"/>
+    <circle cx="720" cy="210" r="1.3"/><circle cx="770" cy="60" r="1.1"/><circle cx="60" cy="230" r="1.2"/>
+    <circle cx="280" cy="220" r="1"/><circle cx="380" cy="180" r="1.4"/><circle cx="490" cy="240" r="1.1"/>
+  </g>
+  <!-- constellation: an open book of ideas -->
+  <g stroke="#a78bfa" stroke-opacity="0.6" stroke-width="1.4" fill="none">
+    <path d="M170 150 L 250 120 L 340 150 L 420 105 L 500 140"/>
+    <path d="M250 120 L 270 210 L 340 150"/>
+    <path d="M420 105 L 440 200 L 500 140"/>
+    <path d="M270 210 L 355 250 L 440 200"/>
+  </g>
+  <g>
+    <circle cx="170" cy="150" r="5" fill="#34d399"/><circle cx="250" cy="120" r="6.5" fill="#f97316"/>
+    <circle cx="340" cy="150" r="5" fill="#818cf8"/><circle cx="420" cy="105" r="6.5" fill="#f97316"/>
+    <circle cx="500" cy="140" r="5" fill="#22d3ee"/><circle cx="270" cy="210" r="4.5" fill="#818cf8"/>
+    <circle cx="440" cy="200" r="4.5" fill="#34d399"/><circle cx="355" cy="250" r="5.5" fill="#f472b6"/>
+  </g>
+  <!-- silhouette hills + reader -->
+  <path d="M0 360 Q 160 300 340 350 T 800 340 L 800 450 L 0 450 Z" fill="url(#hills)"/>
+  <g fill="#08070f">
+    <circle cx="400" cy="352" r="10"/>
+    <path d="M386 396 Q 400 356 414 396 Z"/>
+    <path d="M382 378 L 418 378 L 412 366 L 388 366 Z"/>
+  </g>
+  <path d="M355 250 Q 380 300 398 352" stroke="#f472b6" stroke-opacity="0.45" stroke-width="1.2" fill="none" stroke-dasharray="3 5"/>
+</svg>

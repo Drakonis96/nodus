@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Nodus — Turn your library into a living graph of ideas</title>
+<meta name="description" content="Nodus is a free, open-source, local-first desktop app that turns your Zotero library into a navigable graph of ideas, debates, gaps and cited drafts. Private by design."/>
+<meta property="og:title" content="Nodus — Turn your library into a living graph of ideas"/>
+<meta property="og:description" content="Free &amp; open-source research workspace: graph of ideas, debates, gaps, deep research reports, audio narration and a citation-verified writing workshop."/>
+<link rel="icon" type="image/svg+xml" href="assets/nodus-logo.svg"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #08070d;
+    --bg2: #0e0c17;
+    --card: rgba(255,255,255,0.035);
+    --border: rgba(255,255,255,0.09);
+    --text: #f4f2fb;
+    --text-2: #a7a2bd;
+    --violet: #8b5cf6;
+    --violet-2: #a78bfa;
+    --violet-3: #ddd6fe;
+    --orange: #f97316;
+    --green: #34d399;
+    --cyan: #22d3ee;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --pink: #f472b6;
+    --indigo: #818cf8;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --serif: 'Fraunces', Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
+  a { color: var(--violet-2); text-decoration: none; }
+  ::selection { background: rgba(139,92,246,0.4); }
+  svg.ic { width: 1em; height: 1em; flex-shrink: 0; }
+
+  /* ---------- nav ---------- */
+  .nav {
+    position: fixed; inset: 0 0 auto 0; z-index: 40; display: flex; align-items: center; gap: 22px;
+    padding: 12px 28px; backdrop-filter: blur(14px); background: rgba(8,7,13,0.6);
+    border-bottom: 1px solid transparent; transition: border-color 0.3s;
+  }
+  .nav.scrolled { border-color: var(--border); }
+  .nav .logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--text); }
+  .nav .logo img { width: 26px; height: 26px; }
+  .nav .links { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; font-weight: 500; }
+  .nav .links > a { color: var(--text-2); }
+  .nav .links > a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 22px; border-radius: 12px;
+    font-weight: 600; font-size: 14.5px; border: 1px solid var(--border); color: var(--text);
+    background: var(--card); transition: all 0.2s; cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { border-color: rgba(167,139,250,0.5); transform: translateY(-1px); }
+  .btn.primary {
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6); border-color: transparent;
+    box-shadow: 0 6px 24px rgba(124,58,237,0.35);
+  }
+  .btn.primary, .nav .links a.btn.primary { color: #fff !important; font-weight: 700; }
+  .btn.primary:hover { box-shadow: 0 10px 32px rgba(124,58,237,0.5); }
+  .nav .btn { padding: 8px 16px; font-size: 13.5px; }
+  .gh-badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 12px;
+    border: 1px solid var(--border); background: var(--card); color: var(--text) !important;
+    font-size: 13px; font-weight: 600; transition: all 0.2s;
+  }
+  .gh-badge:hover { border-color: rgba(167,139,250,0.5); }
+  .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
+  .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
+  .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; min-height: 100vh; display: grid; place-items: center; text-align: center; overflow: hidden; }
+  #stars { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero-inner { position: relative; z-index: 2; padding: 110px 24px 80px; max-width: 900px; }
+  .free-badge {
+    display: inline-flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+    color: #6ee7b7; border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.08);
+    margin-bottom: 22px;
+  }
+  .free-badge svg { width: 14px; height: 14px; }
+  .hero .n-mark { width: 140px; height: 140px; margin: 0 auto 4px; cursor: pointer; }
+  .hero h1 {
+    font-family: var(--serif); font-size: clamp(38px, 6vw, 64px); line-height: 1.08;
+    margin: 16px 0 0; font-weight: 700; letter-spacing: -0.01em;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(100deg, var(--violet-3), var(--violet-2) 45%, var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero p.sub { font-size: clamp(16px, 2vw, 19px); color: var(--text-2); max-width: 660px; margin: 22px auto 0; }
+  .hero .ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
+  .hero .meta { margin-top: 24px; font-size: 13.5px; color: var(--text-2); }
+  .hero .meta b { color: #6ee7b7; }
+  .scroll-hint {
+    position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 2;
+    color: var(--text-2); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+    animation: bob 2.2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,8px); } }
+
+  .n-mark .stroke { stroke-dasharray: 130; stroke-dashoffset: 130; animation: draw 1.6s cubic-bezier(0.6,0,0.2,1) 0.35s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .n-mark circle { opacity: 0; transform-origin: center; animation: pop 0.5s cubic-bezier(0.2,1.6,0.4,1) forwards; }
+  .n-mark circle:nth-of-type(1) { animation-delay: 0.25s; }
+  .n-mark circle:nth-of-type(2) { animation-delay: 0.85s; }
+  .n-mark circle:nth-of-type(3) { animation-delay: 1.45s; }
+  .n-mark circle:nth-of-type(4) { animation-delay: 1.95s; }
+  @keyframes pop { 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }
+
+  /* ---------- sections ---------- */
+  section { position: relative; padding: 110px 24px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--violet-2);
+    padding: 6px 14px; border: 1px solid rgba(139,92,246,0.35); border-radius: 999px;
+    background: rgba(139,92,246,0.08);
+  }
+  h2.title { font-family: var(--serif); font-size: clamp(28px, 4vw, 42px); line-height: 1.15; margin: 20px 0 12px; font-weight: 700; }
+  p.lead { color: var(--text-2); font-size: 16.5px; max-width: 680px; margin: 0; }
+
+  /* story steps */
+  .story .step {
+    display: grid; grid-template-columns: 64px 1fr; gap: 26px; align-items: flex-start;
+    padding: 38px 0; border-left: 2px solid rgba(139,92,246,0.18); margin-left: 30px; padding-left: 38px;
+    position: relative; opacity: 0; transform: translateY(26px); transition: all 0.7s cubic-bezier(0.2,0.7,0.3,1);
+  }
+  .story .step.in { opacity: 1; transform: none; }
+  .story .step .num {
+    position: absolute; left: -33px; top: 44px; width: 64px; height: 64px; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 800; font-size: 20px; font-family: var(--serif);
+    background: var(--bg2); border: 2px solid rgba(139,92,246,0.4); color: var(--violet-2);
+    box-shadow: 0 0 30px rgba(124,58,237,0.25);
+  }
+  .story .step h3 { margin: 0 0 8px; font-size: 21px; grid-column: 2; }
+  .story .step p { margin: 0; color: var(--text-2); grid-column: 2; max-width: 640px; }
+  .story .step .views { grid-column: 2; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .vchip {
+    font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--text-2); background: var(--card);
+  }
+  .vchip b { color: var(--violet-3); font-weight: 700; }
+
+  /* ======== animated vignettes (replace screenshots) ======== */
+  .shots { display: grid; gap: 54px; margin-top: 60px; }
+  .shot {
+    display: grid; grid-template-columns: 1fr 1.15fr; gap: 40px; align-items: center;
+    opacity: 0; transform: translateY(34px); transition: all 0.8s cubic-bezier(0.2,0.7,0.3,1);
+  }
+  .shot.in { opacity: 1; transform: none; }
+  .shot:nth-child(even) .shot-txt { order: 2; }
+  .shot h3 { font-size: 20px; margin: 0 0 8px; }
+  .shot p { color: var(--text-2); margin: 0; font-size: 15px; }
+  .shot .tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet-2); }
+  .shot .try { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; font-weight: 600; }
+
+  .vig {
+    border-radius: 16px; border: 1px solid var(--border); overflow: hidden;
+    background: linear-gradient(160deg, #131120, #0c0b14);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,92,246,0.06);
+  }
+  .vig .vbar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .vig .vbar i { width: 10px; height: 10px; border-radius: 50%; background: #2b2838; }
+  .vig .vbar i:nth-child(1) { background: #453f5c; }
+  .vig .vbar span { margin-left: 8px; font-size: 11px; color: var(--text-2); letter-spacing: 0.06em; }
+  .vig .vbody { padding: 18px; min-height: 230px; position: relative; }
+
+  /* generic bits inside vignettes */
+  .vrow {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: rgba(255,255,255,0.025); margin-bottom: 8px;
+    font-size: 12px; color: var(--text-2);
+    opacity: 0; transform: translateX(-14px);
+  }
+  .in .vrow { animation: rowIn 0.5s cubic-bezier(0.2,0.8,0.3,1) forwards; }
+  .in .vrow:nth-child(2) { animation-delay: 0.15s; } .in .vrow:nth-child(3) { animation-delay: 0.3s; }
+  .in .vrow:nth-child(4) { animation-delay: 0.45s; } .in .vrow:nth-child(5) { animation-delay: 0.6s; }
+  @keyframes rowIn { to { opacity: 1; transform: none; } }
+  .vrow b { color: var(--text); font-weight: 600; }
+  .vrow .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-chip {
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid; background: rgba(255,255,255,0.03);
+  }
+  .vbar2 { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; width: 74px; flex-shrink: 0; }
+  .vbar2 > i { display: block; height: 100%; border-radius: 2px; background: var(--violet); width: 0; }
+  .in .vbar2 > i { animation: fillUp 1.2s ease 0.5s forwards; }
+  @keyframes fillUp { to { width: var(--w, 80%); } }
+
+  /* graph vignette */
+  .vig-graph svg { width: 100%; height: 230px; display: block; }
+  .vig-graph .edge { stroke-dasharray: 200; stroke-dashoffset: 200; }
+  .in .vig-graph .edge { animation: edgeDraw 1.1s ease forwards; }
+  .in .vig-graph .edge.e2 { animation-delay: 0.25s; } .in .vig-graph .edge.e3 { animation-delay: 0.45s; }
+  .in .vig-graph .edge.e4 { animation-delay: 0.65s; } .in .vig-graph .edge.e5 { animation-delay: 0.85s; }
+  .in .vig-graph .edge.e6 { animation-delay: 1.05s; }
+  @keyframes edgeDraw { to { stroke-dashoffset: 0; } }
+  .vig-graph .nd { opacity: 0; transform-origin: center; transform-box: fill-box; }
+  .in .vig-graph .nd { animation: pop 0.45s cubic-bezier(0.2,1.6,0.4,1) forwards; }
+  .in .vig-graph .nd.n2 { animation-delay: 0.2s; } .in .vig-graph .nd.n3 { animation-delay: 0.35s; }
+  .in .vig-graph .nd.n4 { animation-delay: 0.5s; } .in .vig-graph .nd.n5 { animation-delay: 0.65s; }
+  .in .vig-graph .nd.n6 { animation-delay: 0.8s; } .in .vig-graph .nd.n7 { animation-delay: 0.95s; }
+  .vig-graph text { font-family: var(--sans); font-size: 8.5px; fill: #b7b3cc; }
+  .vig-graph .theme-label { font-size: 9.5px; font-weight: 700; fill: #e5e2f2; }
+
+  /* debate vignette */
+  .vig-debate .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; position: relative; }
+  .vig-debate .colA, .vig-debate .colB {
+    border-radius: 12px; padding: 12px; font-size: 11.5px; border: 1px solid; opacity: 0;
+  }
+  .vig-debate .colA { border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.05); transform: translateX(-22px); }
+  .vig-debate .colB { border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.05); transform: translateX(22px); }
+  .in .vig-debate .colA, .in .vig-debate .colB { animation: rowIn 0.6s cubic-bezier(0.2,0.8,0.3,1) 0.2s forwards; }
+  .vig-debate .vs {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0); z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--bg2); border: 1px solid var(--border); font-weight: 800; font-size: 10.5px; color: var(--amber);
+  }
+  .in .vig-debate .vs { animation: pop 0.5s cubic-bezier(0.2,1.6,0.4,1) 0.7s forwards; }
+  .vig-debate h5 { margin: 0 0 6px; font-size: 11px; }
+  .vig-debate .ev { padding: 6px 8px; margin-top: 6px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; }
+  .vig-debate .tl { display: flex; gap: 6px; align-items: center; margin-top: 12px; font-size: 10px; color: var(--text-2); }
+  .vig-debate .tl i { flex: 1; height: 2px; background: rgba(139,92,246,0.3); }
+  .vig-debate .tl b { color: var(--violet-2); }
+
+  /* research vignette (typing pages) */
+  .vig-research .ptabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .vig-research .ptab { font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); }
+  .vig-research .ptab.on { background: var(--violet); border-color: transparent; color: #fff; }
+  .vig-research .ln { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.09); margin-bottom: 8px; width: 0; }
+  .in .vig-research .ln { animation: fillUp 0.7s ease forwards; }
+  .in .vig-research .ln:nth-of-type(2) { animation-delay: 0.15s; } .in .vig-research .ln:nth-of-type(3) { animation-delay: 0.3s; }
+  .in .vig-research .ln:nth-of-type(4) { animation-delay: 0.45s; } .in .vig-research .ln:nth-of-type(5) { animation-delay: 0.6s; }
+  .vig-research .cites { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .vig-research .cite { font-size: 10px; padding: 3px 9px; border-radius: 6px; background: rgba(129,140,248,0.15); color: #c7d2fe; opacity: 0; transform: scale(0.6); }
+  .in .vig-research .cite { animation: pop 0.4s cubic-bezier(0.2,1.6,0.4,1) forwards; }
+  .in .vig-research .cite:nth-child(1) { animation-delay: 0.9s; } .in .vig-research .cite:nth-child(2) { animation-delay: 1.05s; }
+  .in .vig-research .cite:nth-child(3) { animation-delay: 1.2s; }
+
+  /* writing vignette (typewriter) */
+  .vig-writing .doc { font-size: 12.5px; line-height: 1.8; color: #d6d3e6; min-height: 120px; }
+  .vig-writing .tw { display: inline; border-right: 2px solid var(--violet-2); white-space: pre-wrap; }
+  .vig-writing .cited { color: #a5b4fc; border-bottom: 1px dotted #6366f1; }
+  .vig-writing .verify {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 10.5px; font-weight: 700;
+    color: var(--green); border: 1px solid rgba(52,211,153,0.4); background: rgba(52,211,153,0.07);
+    padding: 4px 10px; border-radius: 999px; opacity: 0;
+  }
+  .in .vig-writing .verify { animation: rowIn 0.5s ease 2.6s forwards; }
+
+  /* audio vignette */
+  .vig-audio .wave { display: flex; align-items: center; gap: 3px; height: 64px; margin: 14px 0; }
+  .vig-audio .wave i { flex: 1; border-radius: 2px; background: linear-gradient(180deg, var(--violet-2), var(--violet)); height: 12%; }
+  .in .vig-audio .wave i { animation: dance 1.1s ease-in-out infinite alternate; }
+  @keyframes dance { from { height: 12%; } to { height: var(--h, 70%); } }
+  .vig-audio .track { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); font-size: 11.5px; color: var(--text-2); }
+  .vig-audio .pbtn { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg,#7c3aed,#a78bfa); display: grid; place-items: center; flex-shrink: 0; }
+  .vig-audio .pbtn svg { width: 11px; height: 11px; fill: #fff; }
+
+  /* gaps vignette */
+  .vig-gaps svg { width: 100%; height: 190px; display: block; }
+  .vig-gaps .hole { stroke-dasharray: 5 6; opacity: 0; }
+  .in .vig-gaps .hole { animation: holeIn 0.8s ease 0.7s forwards, spin 14s linear 0.7s infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes holeIn { to { opacity: 1; } }
+  @keyframes spin { to { rotate: 360deg; } }
+  .vig-gaps .gq {
+    margin-top: 6px; padding: 9px 12px; border-radius: 10px; font-size: 11px; color: #fcd34d;
+    border: 1px solid rgba(251,191,36,0.35); background: rgba(251,191,36,0.06); opacity: 0;
+  }
+  .in .vig-gaps .gq { animation: rowIn 0.5s ease 1.2s forwards; }
+
+  /* ideas vignette uses .vrow; library too */
+
+  /* media showcase */
+  .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 48px; }
+  .media-card {
+    border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: var(--bg2);
+    opacity: 0; transform: translateY(26px); transition: all 0.7s ease;
+  }
+  .media-card.in { opacity: 1; transform: none; }
+  .media-card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
+  .media-card .pad { padding: 18px 20px 20px; }
+  .media-card h3 { margin: 0 0 6px; font-size: 16.5px; }
+  .media-card p { margin: 0 0 14px; color: var(--text-2); font-size: 13.5px; }
+  .player { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
+  .player .play {
+    width: 38px; height: 38px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa); color: #fff; display: grid; place-items: center;
+  }
+  .player .play svg { width: 16px; height: 16px; }
+  .player .bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.12); cursor: pointer; position: relative; }
+  .player .bar > div { position: absolute; inset: 0 auto 0 0; width: 0%; background: var(--violet-2); border-radius: 2px; }
+  .player .time { font-size: 11.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .player .lbl { font-size: 12px; color: var(--text-2); }
+
+  /* feature grid */
+  .feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-top: 48px; }
+  .feat {
+    padding: 20px; border-radius: 16px; border: 1px solid var(--border); background: var(--card);
+    transition: all 0.25s ease; opacity: 0; transform: translateY(18px);
+  }
+  .feat.in { opacity: 1; transform: none; }
+  .feat:hover { border-color: rgba(167,139,250,0.45); background: rgba(139,92,246,0.06); transform: translateY(-3px); }
+  .feat .fic {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.25); color: var(--violet-2);
+  }
+  .feat .fic svg { width: 17px; height: 17px; }
+  .feat h3 { font-size: 14.5px; margin: 12px 0 5px; }
+  .feat p { font-size: 12.8px; color: var(--text-2); margin: 0; }
+
+  /* privacy band */
+  .band {
+    text-align: center; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(600px 300px at 50% 0%, rgba(124,58,237,0.14), transparent),
+      var(--bg2);
+  }
+  .band .pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 30px; }
+  .band .pill { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text-2); }
+  .band .pill svg { width: 13px; height: 13px; color: var(--green); }
+
+  /* CTA + footer */
+  .final { text-align: center; }
+  .final .n-mark { width: 90px; height: 90px; margin: 0 auto 10px; }
+  footer { padding: 34px 24px 46px; text-align: center; color: var(--text-2); font-size: 13px; border-top: 1px solid var(--border); }
+  footer a { color: var(--text-2); margin: 0 10px; }
+  footer a:hover { color: var(--text); }
+
+  /* download modal */
+  .dl-overlay {
+    position: fixed; inset: 0; z-index: 60; background: rgba(4,3,8,0.7); backdrop-filter: blur(4px);
+    display: none; place-items: center; padding: 24px;
+  }
+  .dl-overlay.open { display: grid; }
+  .dl-modal {
+    width: min(520px, 100%); border-radius: 20px; border: 1px solid var(--border);
+    background: #12101c; padding: 28px; box-shadow: 0 30px 90px rgba(0,0,0,0.6);
+    animation: modalIn 0.25s cubic-bezier(0.2,0.9,0.3,1); text-align: center;
+  }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+  .dl-modal h3 { font-family: var(--serif); font-size: 24px; margin: 4px 0 4px; }
+  .dl-modal .ver { font-size: 12.5px; color: var(--text-2); margin-bottom: 6px; }
+  .dl-modal .freeline { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #6ee7b7; margin-bottom: 20px; }
+  .dl-plat {
+    display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    padding: 15px 18px; border-radius: 14px; border: 1px solid var(--border); background: var(--card);
+    color: var(--text); margin-top: 10px; transition: all 0.2s;
+  }
+  .dl-plat:hover { border-color: rgba(167,139,250,0.55); background: rgba(139,92,246,0.08); transform: translateY(-1px); }
+  .dl-plat svg.os { width: 26px; height: 26px; fill: currentColor; flex-shrink: 0; }
+  .dl-plat b { display: block; font-size: 14.5px; }
+  .dl-plat span { font-size: 12px; color: var(--text-2); }
+  .dl-plat .arr { margin-left: auto; color: var(--violet-2); }
+  .dl-close { margin-top: 18px; background: none; border: none; color: var(--text-2); font-size: 13px; cursor: pointer; font-family: inherit; }
+  .dl-close:hover { color: var(--text); }
+  .dl-all { display: block; margin-top: 14px; font-size: 12.5px; }
+
+  @media (max-width: 820px) {
+    .shot { grid-template-columns: 1fr; gap: 18px; }
+    .shot:nth-child(even) .shot-txt { order: 0; }
+    .story .step { margin-left: 10px; padding-left: 30px; grid-template-columns: 1fr; }
+    .story .step .num { left: -26px; width: 48px; height: 48px; font-size: 16px; top: 40px; }
+    .story .step h3, .story .step p, .story .step .views { grid-column: 1; }
+    .nav .links a.hideS, .gh-badge .lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
+  <div class="links">
+    <a href="#story" class="hideS">How it works</a>
+    <a href="#views" class="hideS">Views</a>
+    <a href="#listen" class="hideS">Listen</a>
+    <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      <span class="lbl">Star</span>
+      <span class="stars"><svg viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count">★</span></span>
+    </a>
+    <a class="btn primary" href="demo/index.html">Try the live demo</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <canvas id="stars"></canvas>
+  <div class="hero-inner">
+    <svg class="n-mark" id="nmark" viewBox="0 0 64 64" aria-label="Nodus logo — click to replay" role="img">
+      <defs>
+        <linearGradient id="ng" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#ddd6fe"/><stop offset="0.45" stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/>
+        </linearGradient>
+      </defs>
+      <path class="stroke" d="M18 48V16L46 48V16" fill="none" stroke="url(#ng)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="18" cy="16" r="6.5" fill="#ddd6fe"/>
+      <circle cx="18" cy="48" r="6.5" fill="#a78bfa"/>
+      <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/>
+      <circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
+    </svg>
+    <div><span class="free-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>
+      100% free · open source · MIT
+    </span></div>
+    <h1>Your library holds a thousand ideas.<br/><span class="grad">Nodus lets you see them think.</span></h1>
+    <p class="sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps — then helps you write with citations you can actually verify.</p>
+    <div class="ctas">
+      <a class="btn primary" href="demo/index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
+        Try the live demo</a>
+      <button class="btn" onclick="openDl()">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+        Download for macOS &amp; Windows</button>
+    </div>
+    <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry — and your corpus never leaves your machine.</p>
+  </div>
+  <div class="scroll-hint">scroll</div>
+</header>
+
+<!-- ---------- story ---------- -->
+<section id="story" class="story">
+  <div class="wrap">
+    <span class="kicker">How it works</span>
+    <h2 class="title">Everything hangs on one thread: the idea.</h2>
+    <p class="lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs — then follows the thread wherever it leads.</p>
+
+    <div style="margin-top:50px">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Sync your library</h3>
+        <p>Point Nodus at your Zotero collections. It reads the attached files directly — no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
+        <div class="views"><span class="vchip"><b>Library</b> · works &amp; collections</span><span class="vchip"><b>Search</b> · semantic + exact</span></div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Extract the ideas</h3>
+        <p>An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks — with verbatim evidence and page references for every single one.</p>
+        <div class="views"><span class="vchip"><b>Ideas</b> · typed &amp; evidenced</span><span class="vchip"><b>Authors</b> · who backs what</span></div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Watch them connect</h3>
+        <p>Ideas link up into a living graph: supports, contradicts, refines, extends. Force-directed, WebGL-fast, and filterable by theme, author or reading status. This is where your corpus starts to look like an argument instead of a pile.</p>
+        <div class="views"><span class="vchip"><b>Graph</b> · the whole corpus</span><span class="vchip"><b>Argument map</b> · thesis vs. objections</span></div>
+      </div>
+      <div class="step">
+        <div class="num">4</div>
+        <h3>Interrogate the corpus</h3>
+        <p>Nodus mines what your library does <em>not</em> say: open contradictions become head-to-head debates with a chronology; missing links become research gaps; your questions get tracked against actual coverage.</p>
+        <div class="views"><span class="vchip"><b>Debates</b></span><span class="vchip"><b>Gaps</b></span><span class="vchip"><b>Coverage</b></span><span class="vchip"><b>Hypotheses</b></span><span class="vchip"><b>Reading path</b></span></div>
+      </div>
+      <div class="step">
+        <div class="num">5</div>
+        <h3>Write with proof</h3>
+        <p>The writing workshop drafts sections grounded in the graph — and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word.</p>
+        <div class="views"><span class="vchip"><b>Writing</b></span><span class="vchip"><b>Deep Research</b></span><span class="vchip"><b>Word add-in</b> · beta</span><span class="vchip"><b>Projects</b></span><span class="vchip"><b>Notes</b></span></div>
+      </div>
+      <div class="step">
+        <div class="num">6</div>
+        <h3>Then listen to it</h3>
+        <p>Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro) — or bring a Hume key for cloud voices.</p>
+        <div class="views"><span class="vchip"><b>Immersion</b> · audio walks</span><span class="vchip"><b>Study</b> · guides &amp; flashcards</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- animated views ---------- -->
+<section id="views" style="background:var(--bg2);border-top:1px solid var(--border)">
+  <div class="wrap">
+    <span class="kicker">The views</span>
+    <h2 class="title">Watch each section come alive.</h2>
+    <p class="lead">Every vignette below mirrors a real view of the app — and each one is fully explorable in the live demo.</p>
+    <div class="shots">
+
+      <!-- Library -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Library</div><h3>Zotero in, ideas out</h3>
+          <p>Sync your collections, keep the read tags, merge duplicates losslessly. Every work carries its analysis state — nothing gets scanned twice.</p>
+          <a class="try" href="demo/index.html#library">Open in the demo →</a></div>
+        <div class="vig"><div class="vbar"><i></i><i></i><i></i><span>LIBRARY · SYNCED FROM ZOTERO</span></div>
+          <div class="vbody">
+            <div class="vrow"><b class="grow">Roediger &amp; Karpicke (2006) — Test-Enhanced Learning</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
+            <div class="vrow"><b class="grow">Karpicke &amp; Blunt (2011) — Retrieval Practice…</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
+            <div class="vrow"><b class="grow">Sweller (1988) — Cognitive Load During Problem Solving</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:88%"></i></span></div>
+            <div class="vrow"><b class="grow">Cepeda et al. (2006) — Distributed Practice…</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:62%"></i></span></div>
+            <div class="vrow"><b class="grow">Van Gog &amp; Sweller (2015) — Not New, but Nearly Forgotten</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:45%"></i></span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Graph -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Graph</div><h3>The corpus as a constellation</h3>
+          <p>Themes, claims, findings and methods with typed edges — supports, contradicts, refines. Presets jump straight to contradictions, gaps or your reading route.</p>
+          <a class="try" href="demo/index.html#graph">Open in the demo →</a></div>
+        <div class="vig vig-graph"><div class="vbar"><i></i><i></i><i></i><span>GRAPH · 12 NODES</span></div>
+          <div class="vbody" style="padding:6px">
+            <svg viewBox="0 0 420 220">
+              <line class="edge e1" x1="110" y1="60" x2="205" y2="115" stroke="#34d399" stroke-width="1.4" opacity="0.8"/>
+              <line class="edge e2" x1="205" y1="115" x2="305" y2="62" stroke="#34d399" stroke-width="1.4" opacity="0.8"/>
+              <line class="edge e3" x1="205" y1="115" x2="330" y2="160" stroke="#ef4444" stroke-width="1.4" opacity="0.85"/>
+              <line class="edge e4" x1="110" y1="60" x2="86" y2="165" stroke="#a78bfa" stroke-width="1.4" opacity="0.8"/>
+              <line class="edge e5" x1="86" y1="165" x2="205" y2="115" stroke="#8b5cf6" stroke-width="1.4" opacity="0.8"/>
+              <line class="edge e6" x1="305" y1="62" x2="330" y2="160" stroke="#fbbf24" stroke-width="1.4" opacity="0.7"/>
+              <g class="nd n1"><circle cx="110" cy="60" r="10" fill="#f97316"/><text x="124" y="56" class="theme-label">RETRIEVAL PRACTICE</text></g>
+              <g class="nd n2"><circle cx="205" cy="115" r="7" fill="#818cf8"/><text x="216" y="112">Active retrieval beats re-reading</text></g>
+              <g class="nd n3"><circle cx="305" cy="62" r="6" fill="#34d399"/><text x="315" y="58">Testing effect at a delay</text></g>
+              <g class="nd n4"><circle cx="330" cy="160" r="6" fill="#34d399"/><text x="252" y="181">Effect fades with complexity</text></g>
+              <g class="nd n5"><circle cx="86" cy="165" r="6" fill="#22d3ee"/><text x="98" y="169">Desirable difficulties</text></g>
+              <g class="nd n6"><circle cx="42" cy="98" r="5" fill="#fbbf24"/><text x="10" y="84">Element interactivity</text></g>
+              <g class="nd n7"><circle cx="378" cy="110" r="8" fill="#f97316"/><text x="304" y="98" class="theme-label">COGNITIVE LOAD</text></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ideas -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Ideas</div><h3>Claims with receipts</h3>
+          <p>Every idea carries verbatim evidence and a page reference. Click one and you get its relations, its author and the exact passage. No orphan assertions, ever.</p>
+          <a class="try" href="demo/index.html#ideas">Open in the demo →</a></div>
+        <div class="vig"><div class="vbar"><i></i><i></i><i></i><span>IDEAS · 12 EXTRACTED</span></div>
+          <div class="vbody">
+            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">finding</span><b class="grow">The testing effect strengthens long-term retention</b><span style="font-size:10px;color:#a5b4fc">p. 251</span></div>
+            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#818cf8;border-color:rgba(129,140,248,0.4)">claim</span><b class="grow">Active retrieval outperforms re-reading</b><span style="font-size:10px;color:#a5b4fc">p. 254</span></div>
+            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">construct</span><b class="grow">Element interactivity</b><span style="font-size:10px;color:#a5b4fc">p. 4</span></div>
+            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#22d3ee;border-color:rgba(34,211,238,0.4)">framework</span><b class="grow">Desirable difficulties</b><span style="font-size:10px;color:#a5b4fc">p. 58</span></div>
+            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#f87171;border-color:rgba(248,113,113,0.4)">method</span><b class="grow">Delayed cued-recall testing paradigm</b><span style="font-size:10px;color:#a5b4fc">p. 250</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debates -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Debates</div><h3>Contradictions, head to head</h3>
+          <p>Two positions, the authors on each side, their evidence, and the chronology of the dispute — built automatically from contradiction edges in the graph.</p>
+          <a class="try" href="demo/index.html#debate">Open in the demo →</a></div>
+        <div class="vig vig-debate"><div class="vbar"><i></i><i></i><i></i><span>DEBATES · 1 OPEN DISPUTE</span></div>
+          <div class="vbody">
+            <div style="font-size:12px;font-weight:700;margin-bottom:10px">Does the testing effect survive complex materials?</div>
+            <div class="cols">
+              <div class="colA"><h5 style="color:#34d399">A · Robust across materials</h5>
+                <div class="ev">Roediger · Karpicke · Blunt</div>
+                <div class="ev">“d = 1.50 even on inference questions”</div></div>
+              <div class="colB"><h5 style="color:#f87171">B · Attenuates under load</h5>
+                <div class="ev">Van Gog · Sweller</div>
+                <div class="ev">“shrinks toward zero at high interactivity”</div></div>
+              <div class="vs">VS</div>
+            </div>
+            <div class="tl"><b>2006</b><i></i><b>2011</b><i></i><b>2015</b></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gaps -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Gaps</div><h3>What nobody has said yet</h3>
+          <p>Missing links between themes become explicit research opportunities — each with a drafted coverage question and one-click source hunting.</p>
+          <a class="try" href="demo/index.html#gaps">Open in the demo →</a></div>
+        <div class="vig vig-gaps"><div class="vbar"><i></i><i></i><i></i><span>GAPS · 4 MINED</span></div>
+          <div class="vbody">
+            <svg viewBox="0 0 420 150">
+              <g opacity="0.9">
+                <circle cx="70" cy="50" r="7" fill="#f97316"/><text x="82" y="54" style="font-size:9px;fill:#b7b3cc;font-family:Inter,sans-serif">RETRIEVAL PRACTICE</text>
+                <circle cx="88" cy="105" r="5" fill="#34d399"/><circle cx="46" cy="96" r="5" fill="#818cf8"/>
+                <circle cx="352" cy="48" r="7" fill="#f97316"/><text x="248" y="36" style="font-size:9px;fill:#b7b3cc;font-family:Inter,sans-serif">COGNITIVE LOAD</text>
+                <circle cx="332" cy="102" r="5" fill="#fbbf24"/><circle cx="378" cy="96" r="5" fill="#22d3ee"/>
+                <line x1="70" y1="50" x2="88" y2="105" stroke="#34d399" stroke-width="1.2" opacity="0.5"/>
+                <line x1="70" y1="50" x2="46" y2="96" stroke="#a78bfa" stroke-width="1.2" opacity="0.5"/>
+                <line x1="352" y1="48" x2="332" y2="102" stroke="#8b5cf6" stroke-width="1.2" opacity="0.5"/>
+                <line x1="352" y1="48" x2="378" y2="96" stroke="#22d3ee" stroke-width="1.2" opacity="0.5"/>
+              </g>
+              <circle class="hole" cx="210" cy="76" r="34" fill="none" stroke="#fbbf24" stroke-width="1.6"/>
+              <text class="holetxt" x="210" y="80" text-anchor="middle" style="font-size:8px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:700;letter-spacing:0.04em">no edges yet</text>
+            </svg>
+            <div class="gq">Suggested question: does scaffolded retrieval preserve the testing effect for complex material in real classrooms?</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deep Research -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Deep Research</div><h3>Reports that cite for real</h3>
+          <p>Multi-page academic reports generated in a queue — every claim resolves to a page in your corpus, with a support matrix and an audio edition.</p>
+          <a class="try" href="demo/index.html#deepResearch">Open in the demo →</a></div>
+        <div class="vig vig-research"><div class="vbar"><i></i><i></i><i></i><span>DEEP RESEARCH · GENERATING…</span></div>
+          <div class="vbody">
+            <div class="ptabs"><span class="ptab on">Page 1</span><span class="ptab">Page 2</span><span class="ptab">Page 3</span></div>
+            <div class="ln" style="--w:96%"></div>
+            <div class="ln" style="--w:88%"></div>
+            <div class="ln" style="--w:92%"></div>
+            <div class="ln" style="--w:70%"></div>
+            <div class="ln" style="--w:83%"></div>
+            <div class="cites">
+              <span class="cite">[1] Roediger &amp; Karpicke 2006, p. 251</span>
+              <span class="cite">[2] Karpicke &amp; Blunt 2011, p. 774</span>
+              <span class="cite">[3] Sweller 1988, p. 262</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Writing -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Writing</div><h3>Drafts with verifiable citations</h3>
+          <p>The workshop composes from the graph and refuses to cite anything that doesn't resolve to a Zotero item. The same copilot runs live inside Microsoft Word.</p>
+          <a class="try" href="demo/index.html#writing">Open in the demo →</a></div>
+        <div class="vig vig-writing"><div class="vbar"><i></i><i></i><i></i><span>WRITING · SECTION 2.1</span></div>
+          <div class="vbody">
+            <div class="doc"><span class="tw" id="typewriter"></span></div>
+            <span class="verify">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="m4 12.5 5 5L20 6.5"/></svg>
+              Verified · 2/2 citations resolve to Zotero items</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Immersion / audio -->
+      <div class="shot">
+        <div class="shot-txt"><div class="tag">Immersion</div><h3>Hear your corpus think</h3>
+          <p>Guided audio walks — panorama, stations with verbatim quotes, contrasts, frontiers and a final exam. Voices are generated locally with Piper and Kokoro.</p>
+          <a class="try" href="demo/index.html#immersion">Open in the demo →</a></div>
+        <div class="vig vig-audio"><div class="vbar"><i></i><i></i><i></i><span>IMMERSION · STATION 2 OF 5</span></div>
+          <div class="vbody">
+            <div class="wave">
+              <i style="--h:55%"></i><i style="--h:80%;animation-delay:0.1s"></i><i style="--h:35%;animation-delay:0.2s"></i><i style="--h:90%;animation-delay:0.05s"></i><i style="--h:60%;animation-delay:0.3s"></i><i style="--h:75%;animation-delay:0.15s"></i><i style="--h:40%;animation-delay:0.25s"></i><i style="--h:85%;animation-delay:0.12s"></i><i style="--h:50%;animation-delay:0.28s"></i><i style="--h:70%;animation-delay:0.08s"></i><i style="--h:45%;animation-delay:0.22s"></i><i style="--h:88%;animation-delay:0.18s"></i><i style="--h:58%;animation-delay:0.02s"></i><i style="--h:78%;animation-delay:0.26s"></i><i style="--h:36%;animation-delay:0.14s"></i><i style="--h:66%;animation-delay:0.06s"></i><i style="--h:82%;animation-delay:0.24s"></i><i style="--h:48%;animation-delay:0.1s"></i>
+            </div>
+            <div class="track"><span class="pbtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7-11-7Z"/></svg></span>
+              <span style="flex:1">Station 2 · Desirable difficulties — “conditions that slow learning…”</span><span>Kokoro · local</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div style="text-align:center;margin-top:56px">
+      <a class="btn primary" href="demo/index.html">Explore all 19 views in the live demo →</a>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- listen ---------- -->
+<section id="listen">
+  <div class="wrap">
+    <span class="kicker">Hear your research</span>
+    <h2 class="title">Reports you can read. Or press play.</h2>
+    <p class="lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro — the same local voice model that ships inside the app.</p>
+    <div class="media-grid">
+      <div class="media-card">
+        <img src="assets/art/deep-research-cover.svg" alt="Deep research report cover"/>
+        <div class="pad">
+          <h3>Deep Research brief</h3>
+          <p>"Retrieval practice: why testing yourself beats re-reading" — 6 works, 12 cited ideas, narrated.</p>
+          <div class="player" data-src="assets/audio/deep-research-sample.m4a">
+            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
+            <div style="flex:1;min-width:0"><div class="lbl">Heart · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
+            <span class="time">0:27</span>
+          </div>
+        </div>
+      </div>
+      <div class="media-card">
+        <img src="assets/art/immersion-night-sky.svg" alt="Immersion artwork: night sky"/>
+        <div class="pad">
+          <h3>Immersion walk</h3>
+          <p>"Your library as a night sky" — a guided audio walk through one constellation of the sample corpus.</p>
+          <div class="player" data-src="assets/audio/immersion-sample.m4a">
+            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
+            <div style="flex:1;min-width:0"><div class="lbl">George · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
+            <span class="time">0:24</span>
+          </div>
+        </div>
+      </div>
+      <div class="media-card">
+        <img src="assets/art/immersion-threads.svg" alt="Immersion artwork: threads between shelves"/>
+        <div class="pad">
+          <h3>Every voice, local by default</h3>
+          <p>Piper and Kokoro synthesize on your machine — nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
+          <div class="player" data-src="assets/audio/deep-research-sample.m4a">
+            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
+            <div style="flex:1;min-width:0"><div class="lbl">Sample narration</div><div class="bar"><div></div></div></div>
+            <span class="time">0:27</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- privacy band ---------- -->
+<section class="band">
+  <div class="wrap">
+    <span class="kicker">Free &amp; local-first, honestly</span>
+    <h2 class="title">Completely free. Completely yours.</h2>
+    <p class="lead" style="margin:0 auto">Nodus is open source under the MIT license — no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
+    <div class="pills">
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Free forever (MIT)</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> 100% local storage</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Offline AI (Ollama · LM Studio)</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Encrypted auto-backups</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Audit ledger</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> MCP server built in</span>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- feature grid ---------- -->
+<section>
+  <div class="wrap">
+    <span class="kicker">Everything inside</span>
+    <h2 class="title">One app. The whole research loop.</h2>
+    <div class="feat-grid" id="featgrid"></div>
+  </div>
+</section>
+
+<!-- ---------- final CTA ---------- -->
+<section class="final" style="padding-bottom:130px">
+  <div class="wrap">
+    <svg class="n-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M18 48V16L46 48V16" fill="none" stroke="url(#ng)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="18" cy="16" r="6.5" fill="#ddd6fe"/><circle cx="18" cy="48" r="6.5" fill="#a78bfa"/>
+      <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/><circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
+    </svg>
+    <h2 class="title">Ready to meet your library?</h2>
+    <p class="lead" style="margin:0 auto 34px">Try the demo right here in your browser, or download the app and point it at your own Zotero. <b style="color:#6ee7b7">Free and open source, forever.</b></p>
+    <div class="ctas" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+      <a class="btn primary" href="demo/index.html">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
+        Try the live demo</a>
+      <button class="btn" onclick="openDl()">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
+        Download the app</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div>
+    <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="https://github.com/Drakonis96/nodus/releases" target="_blank" rel="noopener">Releases</a> ·
+    <a href="demo/index.html">Live demo</a> ·
+    <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
+  </div>
+  <p style="margin-top:12px;opacity:0.7">Nodus — a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
+</footer>
+
+<!-- ---------- download modal ---------- -->
+<div class="dl-overlay" id="dl-overlay" onclick="if(event.target===this)closeDl()">
+  <div class="dl-modal">
+    <h3>Download Nodus</h3>
+    <div class="ver" id="dl-version">Fetching the latest version…</div>
+    <div class="freeline">100% free · open source · no account needed</div>
+    <a class="dl-plat" id="dl-mac" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
+      <svg class="os" viewBox="0 0 24 24"><path d="M17.05 12.54c-.03-2.68 2.19-3.97 2.29-4.03-1.25-1.82-3.19-2.07-3.87-2.1-1.63-.17-3.2.96-4.03.96-.84 0-2.12-.94-3.49-.91-1.79.03-3.45 1.04-4.37 2.65-1.87 3.24-.48 8.03 1.34 10.66.89 1.29 1.95 2.73 3.34 2.68 1.34-.05 1.85-.87 3.47-.87 1.61 0 2.08.87 3.49.84 1.44-.02 2.36-1.31 3.24-2.6 1.02-1.49 1.44-2.94 1.46-3.01-.03-.02-2.8-1.08-2.87-4.27ZM14.4 4.66c.74-.9 1.24-2.14 1.1-3.39-1.07.04-2.36.71-3.12 1.61-.69.79-1.29 2.06-1.13 3.28 1.19.09 2.41-.6 3.15-1.5Z"/></svg>
+      <div><b>macOS</b><span id="dl-mac-sub">Apple Silicon · .dmg</span></div>
+      <span class="arr">→</span>
+    </a>
+    <a class="dl-plat" id="dl-win" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
+      <svg class="os" viewBox="0 0 24 24"><path d="M3 5.1 10.6 4v7.6H3V5.1Zm0 13.8 7.6 1.1v-7.5H3v6.4ZM11.4 3.9 21 2.5v9.1h-9.6V3.9Zm0 16.2 9.6 1.4v-9H11.4v7.6Z"/></svg>
+      <div><b>Windows</b><span id="dl-win-sub">x64 installer · .exe</span></div>
+      <span class="arr">→</span>
+    </a>
+    <a class="dl-all" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">All formats &amp; previous versions →</a>
+    <button class="dl-close" onclick="closeDl()">Close</button>
+  </div>
+</div>
+
+<script>
+// ---------- nav shadow ----------
+const nav = document.getElementById('nav');
+addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 24), { passive: true });
+
+// ---------- hero constellation canvas ----------
+(function () {
+  const cv = document.getElementById('stars');
+  const ctx = cv.getContext('2d');
+  let W, H, pts = [], mouse = { x: -9999, y: -9999 };
+  const COLORS = ['#a78bfa', '#7c3aed', '#f97316', '#34d399', '#22d3ee', '#f472b6'];
+  function resize() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const n = Math.min(90, Math.floor(W * H / 16000));
+    pts = Array.from({ length: n }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25,
+      r: Math.random() * 1.8 + 1,
+      c: COLORS[Math.floor(Math.random() * COLORS.length)],
+    }));
+  }
+  resize(); addEventListener('resize', resize);
+  document.querySelector('.hero').addEventListener('mousemove', (e) => {
+    const r = cv.getBoundingClientRect(); mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+  });
+  (function tick() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of pts) {
+      const dx = mouse.x - p.x, dy = mouse.y - p.y, d = Math.hypot(dx, dy);
+      if (d < 160 && d > 1) { p.vx += (dx / d) * 0.012; p.vy += (dy / d) * 0.012; }
+      p.vx *= 0.99; p.vy *= 0.99;
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+    }
+    ctx.lineWidth = 1;
+    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
+      const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (d < 110) {
+        ctx.strokeStyle = 'rgba(139,92,246,' + (0.16 * (1 - d / 110)).toFixed(3) + ')';
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      }
+    }
+    for (const p of pts) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7);
+      ctx.fillStyle = p.c; ctx.globalAlpha = 0.75; ctx.fill(); ctx.globalAlpha = 1;
+    }
+    requestAnimationFrame(tick);
+  })();
+})();
+
+// ---------- N logo replay on click ----------
+document.getElementById('nmark').addEventListener('click', function () {
+  this.querySelectorAll('.stroke, circle').forEach((n) => {
+    n.style.animation = 'none'; void n.getBoundingClientRect(); n.style.animation = '';
+  });
+});
+
+// ---------- scroll reveals ----------
+const io = new IntersectionObserver((entries) => {
+  entries.forEach((e) => e.isIntersecting && e.target.classList.add('in'));
+}, { threshold: 0.18 });
+document.querySelectorAll('.step, .shot, .media-card, .feat, .vig').forEach((el) => io.observe(el));
+
+// ---------- typewriter for the writing vignette ----------
+(function () {
+  const target = document.getElementById('typewriter');
+  const shot = target.closest('.shot');
+  const parts = [
+    { t: 'Retrieval practice enhances retention ' },
+    { t: '(Roediger & Karpicke, 2006)', cited: true },
+    { t: '. Yet the effect attenuates as element interactivity rises ' },
+    { t: '(Van Gog & Sweller, 2015)', cited: true },
+    { t: '…' },
+  ];
+  let started = false;
+  const obs = new IntersectionObserver((es) => {
+    es.forEach((e) => {
+      if (!e.isIntersecting || started) return;
+      started = true;
+      let pi = 0, ci = 0;
+      (function type() {
+        if (pi >= parts.length) return;
+        const part = parts[pi];
+        if (ci === 0 && part.cited) { target.insertAdjacentHTML('beforeend', '<span class="cited"></span>'); }
+        const sink = part.cited ? target.lastElementChild : target;
+        sink.append(part.t[ci]);
+        ci += 1;
+        if (ci >= part.t.length) { pi += 1; ci = 0; }
+        setTimeout(type, 26);
+      })();
+    });
+  }, { threshold: 0.4 });
+  obs.observe(shot);
+})();
+
+// ---------- feature grid (icons, no emoji) ----------
+(function () {
+  const S = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const FEATS = [
+    ['Home', 'Corpus health and the next recommended step.', S('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>')],
+    ['Search', 'Semantic + exact search over ideas, authors, passages.', S('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')],
+    ['Library', 'Zotero sync with duplicate merging and scan recovery.', S('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>')],
+    ['Graph', 'WebGL force graph of every idea and typed relation.', S('<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>')],
+    ['Argument map', 'Thesis, supports, objections, rebuttals — draggable.', S('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/>')],
+    ['Ideas', 'Claims and findings with verbatim page evidence.', S('<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/>')],
+    ['Authors', 'Author sheets and a synthesis matrix, Zotero-canonical.', S('<path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>')],
+    ['Study', 'Guides, flashcards and Socratic routes from your corpus.', S('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/>')],
+    ['Immersion', 'Narrated audio walks with locally generated voices.', S('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>')],
+    ['Gaps', "What your corpus doesn't say yet — mined automatically.", S('<path d="M4 6h6M14 6h6M4 12h4M12 12h8M4 18h8M16 18h4"/>')],
+    ['Debates', 'Contradictions set head to head with chronology.', S('<path d="M12 3v18M8 21h8"/><path d="m5 7 7-2 7 2"/><path d="M5 7 3 13a3 3 0 0 0 6 0L7 7M19 7l-2 6a3 3 0 0 0 6 0l-2-6"/>')],
+    ['Coverage', 'Your research questions tracked against real evidence.', S('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-1.2 1-1.2 1.8v.5"/><path d="M12 17h.01"/>')],
+    ['Hypotheses', 'Tensions in the graph become testable statements.', S('<path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8 2h8"/>')],
+    ['Reading path', 'A suggested order through read and unread works.', S('<circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/>')],
+    ['Deep Research', 'Multi-page cited reports, exportable and narratable.', S('<circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5 6 17M12 7.5 18 17M7.5 19h9"/>')],
+    ['Writing', 'Citation-verified drafts grounded in the graph.', S('<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z"/>')],
+    ['Word add-in', 'The copilot live inside Microsoft Word (beta).', S('<path d="M6 2h8l5 5v15H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v5h5"/><path d="m8 12 1.5 6L11 13l1.5 5L14 12"/>')],
+    ['Projects & Notes', 'Deliverables, folders and nodus:// deep links.', S('<path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>')],
+    ['MCP server', 'Query your graph from Claude or any MCP client.', S('<path d="M10 14a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 10a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/>')],
+    ['Translations', 'AI content translation that preserves every citation link.', S('<path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1"/><path d="m22 22-5-10-5 10M14 18h6"/>')],
+  ];
+  document.getElementById('featgrid').innerHTML = FEATS.map(([t, d, ic]) =>
+    `<div class="feat"><div class="fic">${ic}</div><h3>${t}</h3><p>${d}</p></div>`).join('');
+  document.querySelectorAll('.feat').forEach((el) => io.observe(el));
+})();
+
+// ---------- audio players ----------
+const players = [];
+document.querySelectorAll('.player').forEach((el) => {
+  const audio = new Audio(el.dataset.src); players.push(audio);
+  const btn = el.querySelector('.play'), fill = el.querySelector('.bar > div'),
+        bar = el.querySelector('.bar'), time = el.querySelector('.time');
+  const PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>';
+  const PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>';
+  const fmt = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  btn.addEventListener('click', () => {
+    if (audio.paused) { players.forEach((a) => a !== audio && a.pause()); audio.play(); }
+    else audio.pause();
+  });
+  audio.addEventListener('play', () => (btn.innerHTML = PAUSE));
+  audio.addEventListener('pause', () => (btn.innerHTML = PLAY));
+  audio.addEventListener('timeupdate', () => {
+    if (audio.duration) fill.style.width = (audio.currentTime / audio.duration * 100) + '%';
+    time.textContent = fmt(audio.currentTime);
+  });
+  audio.addEventListener('ended', () => { fill.style.width = '0'; btn.innerHTML = PLAY; });
+  bar.addEventListener('click', (e) => {
+    const r = bar.getBoundingClientRect();
+    if (audio.duration) audio.currentTime = (e.clientX - r.left) / r.width * audio.duration;
+  });
+});
+
+// ---------- GitHub: stars + latest release assets ----------
+const dlOverlay = document.getElementById('dl-overlay');
+function openDl() { dlOverlay.classList.add('open'); document.body.style.overflow = 'hidden'; }
+function closeDl() { dlOverlay.classList.remove('open'); document.body.style.overflow = ''; }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDl(); });
+
+fetch('https://api.github.com/repos/Drakonis96/nodus')
+  .then((r) => r.ok ? r.json() : null)
+  .then((j) => {
+    if (!j) return;
+    const n = j.stargazers_count;
+    document.getElementById('star-count').textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+  }).catch(() => {});
+
+fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest')
+  .then((r) => r.ok ? r.json() : null)
+  .then((j) => {
+    if (!j || !j.assets) return;
+    document.getElementById('dl-version').textContent = 'Latest version · ' + j.tag_name;
+    const mac = j.assets.find((a) => a.name.endsWith('-mac-arm64.dmg'));
+    const win = j.assets.find((a) => a.name.endsWith('-win-x64.exe'));
+    const mb = (a) => (a.size / 1048576).toFixed(0) + ' MB';
+    if (mac) {
+      const el = document.getElementById('dl-mac');
+      el.href = mac.browser_download_url;
+      document.getElementById('dl-mac-sub').textContent = 'Apple Silicon · .dmg · ' + mb(mac) + ' · ' + j.tag_name;
+    }
+    if (win) {
+      const el = document.getElementById('dl-win');
+      el.href = win.browser_download_url;
+      document.getElementById('dl-win-sub').textContent = 'x64 installer · .exe · ' + mb(win) + ' · ' + j.tag_name;
+    }
+  }).catch(() => {});
+</script>
+</body>
+</html>

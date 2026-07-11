@@ -9,6 +9,10 @@ your sources.
 Everything runs locally. The only external calls are to the AI provider you
 configure. Your data, API keys and embeddings stay on your machine.
 
+> **See it first** — the **[Nodus website](https://drakonis96.github.io/nodus/)** has a
+> cinematic tour and a **[live in-browser demo](https://drakonis96.github.io/nodus/demo/)**
+> of every view, no install needed.
+
 > **New here?** Start with **[Your first day with Nodus](docs/GETTING_STARTED.md)** —
 > a step-by-step walkthrough from install to your first cited report, plus a map of
 > every sidebar section.
