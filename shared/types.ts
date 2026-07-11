@@ -360,6 +360,7 @@ export type DeepContextMode = 'standard' | 'long';
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
 export type AppLanguage = 'es' | 'en';
+export type PromptLanguage = 'es' | 'en' | 'fr' | 'tr';
 
 /** A concrete model selection: which provider + which model id. */
 export interface ModelRef {
@@ -579,7 +580,7 @@ export interface AppSettings {
   // Interface language (localizes all UI text).
   uiLanguage: AppLanguage;
   // Language injected into AI prompts → language of generated ideas/themes/answers.
-  promptLanguage: AppLanguage;
+  promptLanguage: PromptLanguage;
   animationSpeed: number; // 0..1
   concurrency: number;
   // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
@@ -1207,7 +1208,7 @@ export interface HypothesisLabRequest {
   objective: string;
   mode: HypothesisLabMode;
   projectId?: string | null;
-  language?: AppLanguage;
+  language?: PromptLanguage;
   maxCandidates?: number;
   model?: ModelRef | null;
 }
@@ -2339,7 +2340,7 @@ export interface WritingWorkshopBrief {
   objective: string;
   audience?: string;
   tone?: 'academic' | 'synthetic' | 'critical' | 'exploratory';
-  language?: 'es' | 'en' | 'fr';
+  language?: 'es' | 'en' | 'fr' | 'tr';
 }
 
 export interface WritingWorkshopSelection {
@@ -2548,7 +2549,7 @@ export type DeepResearchSectionLimit = 'auto' | number;
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
-  language?: 'es' | 'en' | 'fr';
+  language?: 'es' | 'en' | 'fr' | 'tr';
   audience?: string;
   targetLength?: DeepResearchTargetLength;
   /**
@@ -3279,6 +3280,8 @@ export interface NodusApi {
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */
   installCopilotAddin(): Promise<CopilotInstallResult>;
+  /** Copy the Nodus Copilot macro into LibreOffice's user script directory. */
+  installLibreOfficeCopilot(): Promise<CopilotInstallResult>;
   /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
   onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
   setApiKey(provider: AiProvider, key: string): Promise<void>;

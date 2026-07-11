@@ -83,7 +83,7 @@ import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { ensureCopilotCert } from './copilot/certs';
-import { installCopilotAddin } from './copilot/install';
+import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
@@ -415,6 +415,7 @@ export function registerIpc(
     return result;
   });
   h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath(), app.getVersion()));
+  h('copilot:installLibreOffice', async () => installLibreOfficeCopilot(app.getAppPath()));
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 

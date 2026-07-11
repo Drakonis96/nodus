@@ -8,6 +8,7 @@ import type {
   DeepResearchProgress,
   DeepResearchSectionLimit,
   DeepResearchTargetLength,
+  PromptLanguage,
   WritingWorkshopSavedDraft,
   DecorativeImage,
   DecorativeImageStyle,
@@ -77,7 +78,7 @@ export function DeepResearchView({
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
-  const [language, setLanguage] = useState<'es' | 'en' | 'fr'>('es');
+  const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
@@ -182,7 +183,7 @@ export function DeepResearchView({
 
   const reusePrompt = (saved: WritingWorkshopSavedDraft) => {
     setObjective(saved.brief.objective);
-    if (saved.brief.language) setLanguage(saved.brief.language as 'es' | 'en' | 'fr');
+    if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     if (saved.model) setSelectedModel(saved.model);
     setComposerOpen(true);
   };
@@ -348,6 +349,7 @@ export function DeepResearchView({
             {t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
           </p>
         </div>
+
         <div className="flex-1" />
         <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={() => setShowTutorial((v) => !v)}>
           <Icon name="help" /> {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
@@ -885,7 +887,7 @@ function ComposerModal({
 }: {
   settings: AppSettings;
   objective: string;
-  language: 'es' | 'en' | 'fr';
+  language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
   target: DeepResearchTargetLength;
   sectionLimit: DeepResearchSectionLimit;
@@ -894,7 +896,7 @@ function ComposerModal({
   hasModel: boolean;
   queuedCount: number;
   onObjective: (v: string) => void;
-  onLanguage: (v: 'es' | 'en' | 'fr') => void;
+  onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
   onTarget: (v: DeepResearchTargetLength) => void;
   onSectionLimit: (v: DeepResearchSectionLimit) => void;
@@ -954,10 +956,11 @@ function ComposerModal({
                 <option key={String(option.value)} value={String(option.value)}>{t(option.label)}</option>
               ))}
             </select>
-            <select className="input text-sm" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en' | 'fr')}>
+            <select className="input text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
               <option value="es">Español</option>
               <option value="en">English</option>
               <option value="fr">Français</option>
+              <option value="tr">Türkçe</option>
             </select>
             <ModelPicker settings={settings} value={model} onChange={onModel} compact />
           </div>

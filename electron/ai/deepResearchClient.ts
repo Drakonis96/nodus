@@ -57,7 +57,7 @@ function briefFor(request: DeepResearchRequest): WritingWorkshopBrief {
 export interface DeepResearchBrief {
   mode: 'client';
   objective: string;
-  language: 'es' | 'en' | 'fr';
+  language: 'es' | 'en' | 'fr' | 'tr';
   audience?: string;
   targetPages: { min: number; max: number };
   sections: { target: number; hardCap: number; mode: 'auto' | 'user' };
@@ -107,7 +107,7 @@ export async function buildDeepResearchBrief(
 
 export interface ClientFinalizeInput {
   objective: string;
-  language?: 'es' | 'en' | 'fr';
+  language?: 'es' | 'en' | 'fr' | 'tr';
   audience?: string;
   /** The body the caller's model wrote: `## ` sections only, no Resumen/Referencias. */
   sectionsMarkdown: string;

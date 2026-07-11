@@ -10,7 +10,7 @@ import {
   localContextWindow,
 } from './providers';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
-import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, ReasoningEffort } from '@shared/types';
+import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -110,31 +110,36 @@ interface CallOpts {
 type TextDeltaHandler = (delta: string, kind?: 'content' | 'reasoning') => void;
 
 /**
- * Output-language control. The prompts are written in Spanish; when the user picks
- * English as the prompt language we append a high-priority directive instead of
- * rewriting every prompt, so all generated free-text fields come back in English.
- * `quote`/verbatim evidence always stays in the source language. Applied at the
- * public entry points only (not the internal JSON-repair call, which must not
- * translate existing content).
+ * Output-language control. The prompts are authored in Spanish; when the user picks
+ * a non-Spanish prompt language we APPEND a high-priority directive instead of
+ * rewriting the prompt, so all generated free-text fields come back in that language.
+ * The directive explicitly supersedes the inline "escribe en español" instructions the
+ * base prompts carry — the same override mechanism that has always driven the English
+ * option — which is far safer than a blind find/replace over hand-tuned prompts (that
+ * would also corrupt JSON examples and cases where "español" denotes the source text).
+ * `quote`/verbatim evidence always stays in the source language. Applied at the public
+ * entry points only (not the internal JSON-repair call, which must not translate
+ * existing content).
  */
-const LANGUAGE_DIRECTIVE: Record<string, string> = {
-  en: `
-
-═══ OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
-Write ALL natural-language / free-text output fields in English, regardless of the
-source document's language. This includes label, statement, development, summary,
-rationale, explanation, notes, title, body, reason and any prose you produce. Do NOT
-write them in Spanish. The ONLY exception: any "quote" / verbatim evidence field must
-be copied EXACTLY in the source language — never translate quotes. JSON keys and
-enum values stay exactly as specified.`,
-  es: '',
+const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
+  en: 'INGLÉS (English)',
+  fr: 'FRANCÉS (Français)',
+  tr: 'TURCO (Türkçe)',
 };
 
-function withPromptLanguage<T extends { system: string }>(opts: T): T {
-  const lang = getSettings().promptLanguage === 'en' ? 'en' : 'es';
-  const directive = LANGUAGE_DIRECTIVE[lang];
-  if (!directive) return opts;
-  return { ...opts, system: `${opts.system}${directive}` };
+function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {
+  return `
+
+═══ IDIOMA DE SALIDA — PRIORIDAD MÁXIMA / OUTPUT LANGUAGE — HIGHEST PRIORITY ═══
+Escribe TODOS los campos de salida de texto libre / lenguaje natural en ${OUTPUT_LANGUAGE_NAME[lang]}, independientemente del idioma del documento de origen Y de cualquier instrucción anterior de este prompt que pida escribir "en español". Esto incluye label, statement, development, summary, rationale, explanation, notes, title, body, reason y cualquier prosa que produzcas. La ÚNICA excepción: cualquier campo "quote" / evidencia literal debe copiarse EXACTAMENTE en el idioma original de la fuente (nunca traduzcas las citas). Las claves JSON y los valores enum se mantienen exactamente como se especifican.`;
+}
+
+/** Exported for unit testing: appends the output-language directive per the current
+ *  `promptLanguage` setting without mutating the base prompt. */
+export function withPromptLanguage<T extends { system: string }>(opts: T): T {
+  const lang = getSettings().promptLanguage ?? 'es';
+  if (lang === 'es') return opts;
+  return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}` };
 }
 
 /** Resolve which model to use: explicit override, else the synthesis workload. */

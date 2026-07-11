@@ -67,7 +67,7 @@ export interface DeepResearchPlan {
 
 export interface PlanInput {
   objective: string;
-  language: 'es' | 'en' | 'fr';
+  language: 'es' | 'en' | 'fr' | 'tr';
   audience?: string;
   /** Soft target number of sections the planner should aim for. */
   sectionCount: number;
@@ -91,7 +91,7 @@ export interface CitationMenuItem {
 
 export interface SectionInput {
   objective: string;
-  language: 'es' | 'en' | 'fr';
+  language: 'es' | 'en' | 'fr' | 'tr';
   audience?: string;
   section: DeepResearchPlanSection;
   targetWords: number;
@@ -102,7 +102,7 @@ export interface SectionInput {
 
 export interface FinalizeInput {
   objective: string;
-  language: 'es' | 'en' | 'fr';
+  language: 'es' | 'en' | 'fr' | 'tr';
   planTitle: string;
   sectionTitles: string[];
   ideasCovered: number;
@@ -376,7 +376,7 @@ export async function orchestrateDeepResearch(
 
 function sectionInput(
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr',
+  language: 'es' | 'en' | 'fr' | 'tr',
   section: DeepResearchPlanSection,
   targetWords: number,
   isConclusion: boolean,
@@ -430,7 +430,7 @@ export function resolveSectionPlan(
 
 export function buildPlanInput(
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr',
+  language: 'es' | 'en' | 'fr' | 'tr',
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
@@ -462,7 +462,7 @@ export function buildPlanInput(
 async function planWithFallback(
   deps: DeepResearchDeps,
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr',
+  language: 'es' | 'en' | 'fr' | 'tr',
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
@@ -827,7 +827,7 @@ export function assembleMarkdown(
   written: { section: DeepResearchPlanSection; markdown: string }[],
   references: string[],
   finalize: FinalizeResult,
-  language: 'es' | 'en' | 'fr'
+  language: 'es' | 'en' | 'fr' | 'tr'
 ): string {
   const L = labels(language);
   const parts: string[] = [];
@@ -1030,12 +1030,15 @@ function dedupe(items: string[]): string[] {
   return [...new Set(items.map((i) => i.trim()).filter(Boolean))];
 }
 
-function labels(language: 'es' | 'en' | 'fr') {
+function labels(language: 'es' | 'en' | 'fr' | 'tr') {
   if (language === 'en') {
     return { abstract: 'Abstract', limitations: 'Limitations', references: 'References', noReferences: 'No sources cited.' };
   }
   if (language === 'fr') {
     return { abstract: 'Résumé', limitations: 'Limites', references: 'Références', noReferences: 'Aucune source citée.' };
+  }
+  if (language === 'tr') {
+    return { abstract: 'Özet', limitations: 'Sınırlılıklar', references: 'Kaynakça', noReferences: 'Kaynak belirtilmedi.' };
   }
   return { abstract: 'Resumen', limitations: 'Limitaciones', references: 'Referencias', noReferences: 'Sin fuentes citadas.' };
 }

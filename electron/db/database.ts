@@ -37,9 +37,10 @@ function openDatabase(file: string): Database.Database {
 
 export function getDb(): Database.Database {
   if (!db) {
-    const dir = path.dirname(dbPath());
+    const target = dbPath();
+    const dir = path.dirname(target);
     fs.mkdirSync(dir, { recursive: true });
-    db = openDatabase(dbPath());
+    db = openDatabase(target);
   }
   return db;
 }

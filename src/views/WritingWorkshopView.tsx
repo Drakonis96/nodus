@@ -385,6 +385,7 @@ export function WritingWorkshopView({
           <option value="es">Español</option>
           <option value="en">English</option>
           <option value="fr">Français</option>
+          <option value="tr">Türkçe</option>
         </select>
         <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact />
         <div className="flex-1" />

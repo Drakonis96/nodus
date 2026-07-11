@@ -1,5 +1,5 @@
 import type {
-  AppLanguage,
+  PromptLanguage,
   GapKind,
   HypothesisCandidate,
   HypothesisEvidenceLink,
@@ -322,7 +322,7 @@ function evidenceFor(seed: DraftSeed): HypothesisEvidenceLink[] {
   return out;
 }
 
-function variablesFor(seed: DraftSeed, mode: HypothesisLabMode, lang: AppLanguage, theme: string): HypothesisVariable[] {
+function variablesFor(seed: DraftSeed, mode: HypothesisLabMode, lang: PromptLanguage, theme: string): HypothesisVariable[] {
   const shared: HypothesisVariable[] = [
     {
       name: theme,
@@ -345,7 +345,7 @@ function variablesFor(seed: DraftSeed, mode: HypothesisLabMode, lang: AppLanguag
   return shared;
 }
 
-function hypothesisFor(mode: HypothesisLabMode, lang: AppLanguage, theme: string, gap: string, caseLabel: string): string {
+function hypothesisFor(mode: HypothesisLabMode, lang: PromptLanguage, theme: string, gap: string, caseLabel: string): string {
   if (lang === 'en') {
     switch (mode) {
       case 'causal':
@@ -374,13 +374,13 @@ function hypothesisFor(mode: HypothesisLabMode, lang: AppLanguage, theme: string
   }
 }
 
-function titleFor(seed: DraftSeed, mode: HypothesisLabMode, lang: AppLanguage, index: number): string {
+function titleFor(seed: DraftSeed, mode: HypothesisLabMode, lang: PromptLanguage, index: number): string {
   const core = firstUseful(seed.idea?.themes ?? [], seed.idea?.label ?? seed.work?.title ?? `H${index + 1}`);
   const modeLabel = text(lang, modeTitleEs(mode), modeTitleEn(mode));
   return `${modeLabel}: ${clip(core, 64)}`;
 }
 
-function rationaleFor(seed: DraftSeed, lang: AppLanguage): string {
+function rationaleFor(seed: DraftSeed, lang: PromptLanguage): string {
   const source = seed.work ? sourceLabel(seed.work.authors, seed.work.year, seed.work.title) : text(lang, 'una obra del corpus', 'one corpus work');
   const idea = seed.idea ? seed.idea.label : text(lang, 'una línea conceptual cercana', 'a nearby conceptual line');
   if (lang === 'en') {
@@ -389,7 +389,7 @@ function rationaleFor(seed: DraftSeed, lang: AppLanguage): string {
   return `El candidato parte de un hueco detectado en ${source} y lo conecta con ${idea}. Su valor es convertir un problema abierto en una proposición contrastable mediante casos, pasajes o comparación adicional.`;
 }
 
-function abstractFor(seed: DraftSeed, hypothesis: string, project: HypothesisProjectSource | null, lang: AppLanguage): string {
+function abstractFor(seed: DraftSeed, hypothesis: string, project: HypothesisProjectSource | null, lang: PromptLanguage): string {
   const projectLine = project
     ? text(lang, `La hipótesis puede incorporarse al proyecto "${project.title}" como eje de contribución o apartado de discusión.`, `The hypothesis can be folded into "${project.title}" as a contribution axis or discussion section.`)
     : text(lang, 'La hipótesis puede guardarse como nota y después promoverse a un proyecto o borrador.', 'The hypothesis can be saved as a note and later promoted into a project or draft.');
@@ -401,7 +401,7 @@ function abstractFor(seed: DraftSeed, hypothesis: string, project: HypothesisPro
   return `${hypothesis}\n\n${supportLine} ${projectLine}`;
 }
 
-function methodsFor(mode: HypothesisLabMode, lang: AppLanguage, theme: string): string[] {
+function methodsFor(mode: HypothesisLabMode, lang: PromptLanguage, theme: string): string[] {
   const es: Record<HypothesisLabMode, string[]> = {
     exploratory: ['Revisión focalizada de pasajes indexados', 'Muestreo teórico de obras con huecos similares', `Codificación temática de "${theme}"`],
     causal: ['Modelo causal explícito de mecanismo y resultado', 'Comparación de casos positivos/negativos', 'Búsqueda de contraejemplos en debates'],
@@ -419,7 +419,7 @@ function methodsFor(mode: HypothesisLabMode, lang: AppLanguage, theme: string): 
   return lang === 'en' ? en[mode] : es[mode];
 }
 
-function predictionsFor(seed: DraftSeed, lang: AppLanguage, theme: string): string[] {
+function predictionsFor(seed: DraftSeed, lang: PromptLanguage, theme: string): string[] {
   if (lang === 'en') {
     return [
       `Works with stronger traces of ${theme} should show clearer evidence around the proposed mechanism.`,
@@ -434,7 +434,7 @@ function predictionsFor(seed: DraftSeed, lang: AppLanguage, theme: string): stri
   ];
 }
 
-function counterArgumentsFor(seed: DraftSeed, lang: AppLanguage): string[] {
+function counterArgumentsFor(seed: DraftSeed, lang: PromptLanguage): string[] {
   const debate = seed.debates[0];
   const base = debate
     ? text(lang, `Existe una tensión registrada entre "${debate.fromLabel}" y "${debate.toLabel}".`, `There is a registered tension between "${debate.fromLabel}" and "${debate.toLabel}".`)
@@ -446,7 +446,7 @@ function counterArgumentsFor(seed: DraftSeed, lang: AppLanguage): string[] {
   ];
 }
 
-function nextStepsFor(seed: DraftSeed, mode: HypothesisLabMode, lang: AppLanguage): string[] {
+function nextStepsFor(seed: DraftSeed, mode: HypothesisLabMode, lang: PromptLanguage): string[] {
   return [
     text(lang, 'Abrir el hueco y revisar su evidencia textual original.', 'Open the gap and review its original textual evidence.'),
     seed.idea
@@ -602,6 +602,6 @@ function round(value: number): number {
   return Math.round(clamp(value) * 100) / 100;
 }
 
-function text(lang: AppLanguage | undefined, es: string, en: string): string {
+function text(lang: PromptLanguage | undefined, es: string, en: string): string {
   return lang === 'en' ? en : es;
 }

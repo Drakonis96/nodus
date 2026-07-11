@@ -76,6 +76,8 @@ export function Settings({
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotInstallBusy, setCopilotInstallBusy] = useState(false);
   const [copilotInstallMessage, setCopilotInstallMessage] = useState<string | null>(null);
+  const [libreOfficeInstallBusy, setLibreOfficeInstallBusy] = useState(false);
+  const [libreOfficeInstallMessage, setLibreOfficeInstallMessage] = useState<string | null>(null);
   const [mcpPortInput, setMcpPortInput] = useState(String(settings.mcpPort));
   const [mcpHelpOpen, setMcpHelpOpen] = useState(false);
   const [mcpCopied, setMcpCopied] = useState<'url' | 'token' | null>(null);
@@ -277,6 +279,7 @@ export function Settings({
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
+    visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
     visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña'),
     visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
@@ -417,6 +420,8 @@ export function Settings({
               >
                 <option value="es">Español</option>
                 <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="tr">Türkçe</option>
               </select>
             </Row>
             <p className="text-xs text-neutral-500">
@@ -635,6 +640,38 @@ export function Settings({
             {copilotInstallMessage && <p className="text-xs text-emerald-400">{copilotInstallMessage}</p>}
             <p className="text-xs text-neutral-500">
               {t('Sirve Nodus Copilot en https://localhost, busca ideas del corpus, muestra conexiones y permite insertar una idea con la IA configurada en Nodus.')}
+            </p>
+          </Section>
+      )}
+
+      {visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando') && (
+          <Section title={t('Copiloto de escritura (LibreOffice)')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className="btn btn-primary"
+                disabled={libreOfficeInstallBusy}
+                onClick={async () => {
+                  setLibreOfficeInstallBusy(true);
+                  setLibreOfficeInstallMessage(null);
+                  try {
+                    const result = await window.nodus.installLibreOfficeCopilot();
+                    setLibreOfficeInstallMessage(result.message);
+                    flash(result.message);
+                  } catch (err: any) {
+                    setLibreOfficeInstallMessage(err.message || String(err));
+                    flash(err.message || String(err));
+                  } finally {
+                    setLibreOfficeInstallBusy(false);
+                  }
+                }}
+              >
+                <Icon name={libreOfficeInstallBusy ? 'sync' : 'download'} className={libreOfficeInstallBusy ? 'animate-spin' : ''} />
+                {libreOfficeInstallBusy ? t('Instalando…') : t('Instalar macro en LibreOffice')}
+              </button>
+            </div>
+            {libreOfficeInstallMessage && <p className="text-xs text-emerald-400">{libreOfficeInstallMessage}</p>}
+            <p className="text-xs text-neutral-500">
+              {t('Copia el macro nodus_copilot.py en la carpeta de macros de LibreOffice. Para usarlo en LibreOffice Writer, ve a Herramientas -> Macros -> Ejecutar macro -> Mis macros -> nodus_copilot -> start_nodus_copilot.')}
             </p>
           </Section>
       )}

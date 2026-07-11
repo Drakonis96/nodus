@@ -158,6 +158,10 @@ export function shouldQueueDeepAfterSync(input: {
   return false;
 }
 
+/** Works already requeued once via the text-availability probe this session
+ *  (mirrors scanQueue.degradedRetryScheduled: at most one retry per session). */
+const probeRequeuedThisSession = new Set<string>();
+
 /** Full sync over all monitored collections. */
 export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntry> {
   const settings = getSettings();
@@ -198,12 +202,18 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
       }
       const after = getWorkByZoteroKey(item.key);
       let recoverableText = false;
-      if (after?.deep_status === 'skipped_no_text') {
+      if (after?.deep_status === 'skipped_no_text' && !probeRequeuedThisSession.has(item.key)) {
         const probe = await probeWorkTextAvailability(settings.zoteroUserId, item.key, settings.zoteroStoragePath, {
           preferZoteroFulltext: settings.preferZoteroFulltext,
           itemType: after.item_type,
         });
         recoverableText = probe.available;
+        // A present-but-unextractable file (e.g. a scanned PDF with OCR off) keeps
+        // probing as available while every retry ends in skipped_no_text again. Cap
+        // probe-driven requeues at one per work per session so each sync doesn't
+        // re-parse the same stuck attachments. Real changes (new tag, new file
+        // version) still requeue via isNew/didChange.
+        if (recoverableText) probeRequeuedThisSession.add(item.key);
       }
       const needsDeep =
         !!after &&

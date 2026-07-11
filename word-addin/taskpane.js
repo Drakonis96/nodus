@@ -14,6 +14,9 @@
   var searchTimer = null;
   var autoAnalyze = true;
   var detailCache = {};
+  var isWord = false;
+  var currentParagraphText = '';
+  var currentSelectionText = '';
 
   // The pane follows the Nodus UI language (injected by the copilot server).
   var STR = {
@@ -51,6 +54,7 @@
       connectedWorks: 'Conectado · {n} obras',
       connectedNoEmbeddings: 'Conectado (sin embeddings)',
       notResponding: 'Nodus no responde · abre Nodus con el copiloto activado',
+      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
       wordOnly: 'Este complemento solo funciona en Word.',
       nodusError: 'Error de Nodus',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
@@ -90,6 +94,7 @@
       connectedWorks: 'Connected · {n} works',
       connectedNoEmbeddings: 'Connected (no embeddings)',
       notResponding: 'Nodus is not responding · open Nodus with the copilot enabled',
+      editorNotListening: 'LibreOffice is not listening. Run the start_nodus_copilot macro in Writer.',
       wordOnly: 'This add-in only works in Word.',
       nodusError: 'Nodus error',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
@@ -172,6 +177,7 @@
   }
 
   function getCurrentParagraph() {
+    if (!isWord) return Promise.resolve(currentParagraphText);
     return Word.run(function (context) {
       var range = context.document.getSelection();
       var para = range.paragraphs.getFirst();
@@ -185,6 +191,7 @@
   }
 
   function getSelectionText() {
+    if (!isWord) return Promise.resolve(currentSelectionText);
     return Word.run(function (context) {
       var range = context.document.getSelection();
       range.load('text');
@@ -197,6 +204,18 @@
   }
 
   function insertAtCursor(text) {
+    if (!isWord) {
+      return api('/api/editor/insert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text })
+      }).then(function (result) {
+        // The server accepts the text but only a long-polling macro can place
+        // it in the document; surface the miss instead of a silent no-op.
+        if (result && result.delivered === false) throw new Error(T('editorNotListening'));
+        return result;
+      });
+    }
     return Word.run(function (context) {
       var range = context.document.getSelection();
       var prefix = text.charAt(0) === ' ' ? '' : ' ';
@@ -505,12 +524,28 @@
       .catch(function () { setStatus(T('notResponding'), 'err'); });
   }
 
-  Office.onReady(function (info) {
-    if (info.host !== Office.HostType.Word) {
-      document.body.innerHTML = '<p style="padding:16px"></p>';
-      document.body.firstChild.textContent = T('wordOnly');
-      return;
+  function startStandalonePolling() {
+    function poll() {
+      api('/api/editor/state')
+        .then(function (state) {
+          var changed = (state.paragraphText !== currentParagraphText || state.selectionText !== currentSelectionText);
+          currentParagraphText = state.paragraphText || '';
+          currentSelectionText = state.selectionText || '';
+          if (changed) {
+            onSelectionChanged();
+          }
+        })
+        .catch(function (e) {
+          console.warn('Error polling editor state', e);
+        })
+        .finally(function () {
+          setTimeout(poll, 1500);
+        });
     }
+    poll();
+  }
+
+  function initApp() {
     els.status = document.getElementById('status');
     els.paragraph = document.getElementById('paragraph');
     els.results = document.getElementById('results');
@@ -527,13 +562,23 @@
     els.analyzeBtn.textContent = T('analyze');
     els.empty.textContent = T('emptyInitial');
 
-    applyOfficeTheme();
-    try {
-      if (Office.context.officeTheme && Office.context.officeTheme.addHandlerAsync && Office.EventType.OfficeThemeChanged) {
-        Office.context.officeTheme.addHandlerAsync(Office.EventType.OfficeThemeChanged, applyOfficeTheme);
+    if (!isWord) {
+      var captionEl = document.querySelector('.head .caption');
+      if (captionEl) captionEl.textContent = 'LibreOffice / Editor';
+    }
+
+    if (isWord) {
+      applyOfficeTheme();
+      try {
+        if (Office.context.officeTheme && Office.context.officeTheme.addHandlerAsync && Office.EventType.OfficeThemeChanged) {
+          Office.context.officeTheme.addHandlerAsync(Office.EventType.OfficeThemeChanged, applyOfficeTheme);
+        }
+      } catch (e) {
+        // Older Word webviews do not expose live theme events.
       }
-    } catch (e) {
-      // Older Word webviews do not expose live theme events.
+      Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
+    } else {
+      startStandalonePolling();
     }
 
     els.analyzeBtn.onclick = function () {
@@ -558,9 +603,30 @@
       checkHealth();
       analyze(true);
     };
-
-    Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
     checkHealth();
     analyze(true);
-  });
+  }
+
+  var initialized = false;
+  function initOnce(insideWord) {
+    if (initialized) return;
+    initialized = true;
+    isWord = insideWord;
+    initApp();
+  }
+
+  if (typeof Office !== 'undefined' && Office.onReady) {
+    // Office.onReady fires in every environment once office.js is up: with
+    // host Word inside Word, with a null host in a plain browser. Deciding by
+    // host (not by a short timeout racing Word's startup) is what keeps a slow
+    // Word start from being misdetected as standalone mode.
+    Office.onReady(function (info) {
+      initOnce(Boolean(info && info.host === Office.HostType.Word));
+    });
+    // Safety net for a half-broken office.js that never signals readiness.
+    setTimeout(function () { initOnce(false); }, 8000);
+  } else {
+    // office.js unavailable (e.g. browser without CDN access): standalone now.
+    initOnce(false);
+  }
 })();

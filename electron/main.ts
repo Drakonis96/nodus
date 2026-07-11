@@ -20,6 +20,10 @@ import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
 
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+}
+
 // Vite injects these env vars for the dev server / built output locations.
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
