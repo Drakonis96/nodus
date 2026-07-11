@@ -918,6 +918,55 @@ export function registerTools(server: McpServer): void {
   );
 
   server.registerTool(
+    'nodus_search_passages',
+    {
+      title: 'Search full-text passages semantically',
+      description:
+        'Finds full-text passage chunks ranked by semantic similarity to the query — the direct way to locate where the corpus discusses a topic, with citable work metadata attached to every hit. Optionally scoped to one work (workId accepts a nodus_id or a Zotero key). Returns snippets; use nodus_get_passage for the full text. Complements nodus_search_ideas (derived claims) with retrieval over the underlying source text, and unlike nodus_analyze_passage it performs no AI relation typing. Requires an embedding provider already configured in Nodus. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        limit: z.number().int().min(1).max(50).default(10),
+        minSimilarity: z
+          .number()
+          .min(0)
+          .max(1)
+          .default(0.18)
+          .describe('Umbral de similitud coseno; 0.18 es el mismo que usa el copiloto de escritura de Nodus.'),
+        workId: z.string().trim().min(1).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit, minSimilarity, workId }) =>
+      tool(async () => {
+        const nodusId = workId ? resolveWorkNodusId(workId) : null;
+        if (workId && !nodusId) throw notFound('una obra', workId);
+        const vector = await embed(query);
+        if (!vector) {
+          throw new McpToolError(
+            'ai_unconfigured',
+            'No hay embeddings disponibles. Configura el proveedor y la clave de embeddings en Ajustes de Nodus.'
+          );
+        }
+        const hits = passages.findSimilarPassages(vector, minSimilarity, limit, nodusId ? { nodusIds: [nodusId] } : {});
+        return {
+          passages: hits.map((hit) => ({
+            passage_id: hit.passage_id,
+            nodus_id: hit.nodus_id,
+            similarity: hit.similarity,
+            page_label: hit.page_label,
+            textSnippet: snippet(hit.text, 600),
+            work: {
+              title: hit.title,
+              authors: parseAuthorsJson(hit.authors_json),
+              year: hit.year,
+              zotero_key: hit.zotero_key,
+            },
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
     'nodus_list_themes',
     {
       title: 'List themes',

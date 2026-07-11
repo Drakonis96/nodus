@@ -57,6 +57,7 @@ try {
     'nodus_get_work',
     'nodus_list_work_passages',
     'nodus_get_passage',
+    'nodus_search_passages',
     'nodus_list_themes',
     'nodus_get_theme',
     'nodus_list_tutor_routes',
@@ -248,6 +249,61 @@ try {
   });
   assert.notEqual(silentReport.isError, true);
   assert.equal(silentNotes.length, 0);
+
+  // Semantic passage search: unconfigured provider must fail cleanly…
+  const passageAiError = await callToolRaw(server, 'nodus_search_passages', {
+    query: 'turismo visual',
+    limit: 10,
+    minSimilarity: 0.18,
+  });
+  assert.equal(passageAiError.isError, true);
+  assert.equal(JSON.parse(passageAiError.content[0].text).error.category, 'ai_unconfigured');
+
+  // …and with embeddings in place it must rank by cosine similarity. Stub the
+  // embedder (patching the transpiled CommonJS export) and seed vectors that match
+  // currentEmbeddingConfig(), exactly as the real pipeline stores them.
+  const aiClient = require(path.join(repoRoot, 'electron/ai/aiClient.ts'));
+  const ideasRepo = require(path.join(repoRoot, 'electron/db/ideasRepo.ts'));
+  const embedConfig = ideasRepo.currentEmbeddingConfig();
+  const setEmbedding = getDb().prepare(
+    'UPDATE passages SET embedding = ?, embedding_provider = ?, embedding_model = ?, embedding_dim = ? WHERE passage_id = ?'
+  );
+  setEmbedding.run(ideasRepo.encodeEmbedding([1, 0]), embedConfig.provider, embedConfig.model, 2, 'passage-1');
+  setEmbedding.run(ideasRepo.encodeEmbedding([0, 1]), embedConfig.provider, embedConfig.model, 2, 'passage-2');
+  const originalEmbed = aiClient.embed;
+  aiClient.embed = async () => [1, 0];
+  try {
+    const semantic = await callTool(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0.18,
+    });
+    assert.equal(semantic.passages.length, 1, 'only the similar passage clears the threshold');
+    assert.equal(semantic.passages[0].passage_id, 'passage-1');
+    assert.ok(semantic.passages[0].similarity > 0.9);
+    assert.equal(semantic.passages[0].work.zotero_key, 'ZOT1');
+    assert.match(semantic.passages[0].textSnippet, /turismo visual/);
+    assert.equal('text' in semantic.passages[0], false, 'search returns snippets, not full text');
+
+    const scoped = await callTool(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0,
+      workId: 'ZOT2',
+    });
+    assert.equal(scoped.passages.length, 0, 'work scoping must exclude other works');
+
+    const badScope = await callToolRaw(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0.18,
+      workId: 'ZOT-MISSING',
+    });
+    assert.equal(badScope.isError, true);
+    assert.equal(JSON.parse(badScope.content[0].text).error.category, 'not_found');
+  } finally {
+    aiClient.embed = originalEmbed;
+  }
 
   closeDb();
   console.log('mcp tool contract test passed');
