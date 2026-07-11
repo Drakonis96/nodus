@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nodus — Turn your library into a living graph of ideas</title>
+<title>Nodus: Turn your library into a living graph of ideas</title>
 <meta name="description" content="Nodus is a free, open-source, local-first desktop app that turns your Zotero library into a navigable graph of ideas, debates, gaps and cited drafts. Private by design."/>
-<meta property="og:title" content="Nodus — Turn your library into a living graph of ideas"/>
+<meta property="og:title" content="Nodus: Turn your library into a living graph of ideas"/>
 <meta property="og:description" content="Free &amp; open-source research workspace: graph of ideas, debates, gaps, deep research reports, audio narration and a citation-verified writing workshop."/>
 <link rel="icon" type="image/svg+xml" href="assets/nodus-logo.svg"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -103,11 +103,26 @@
   .hero .meta { margin-top: 24px; font-size: 13.5px; color: var(--text-2); }
   .hero .meta b { color: #6ee7b7; }
   .scroll-hint {
-    position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 2;
+    position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 2;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
     color: var(--text-2); font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
     animation: bob 2.2s ease-in-out infinite;
   }
+  .scroll-hint svg { width: 18px; height: 18px; }
   @keyframes bob { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,8px); } }
+
+  /* floating back-to-top button */
+  #to-top {
+    position: fixed; right: 22px; bottom: 22px; z-index: 45; width: 46px; height: 46px;
+    border-radius: 50%; border: 1px solid var(--border); background: rgba(20,17,32,0.85);
+    color: var(--violet-2); display: grid; place-items: center; cursor: pointer;
+    backdrop-filter: blur(10px); box-shadow: 0 8px 26px rgba(0,0,0,0.5);
+    opacity: 0; visibility: hidden; transform: translateY(12px);
+    transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s, border-color 0.2s, background 0.2s;
+  }
+  #to-top.show { opacity: 1; visibility: visible; transform: none; }
+  #to-top:hover { border-color: rgba(167,139,250,0.6); background: rgba(139,92,246,0.18); transform: translateY(-2px); }
+  #to-top svg { width: 20px; height: 20px; }
 
   .n-mark .stroke { stroke-dasharray: 130; stroke-dashoffset: 130; animation: draw 1.6s cubic-bezier(0.6,0,0.2,1) 0.35s forwards; }
   @keyframes draw { to { stroke-dashoffset: 0; } }
@@ -397,7 +412,7 @@
 <header class="hero">
   <canvas id="stars"></canvas>
   <div class="hero-inner">
-    <svg class="n-mark" id="nmark" viewBox="0 0 64 64" aria-label="Nodus logo — click to replay" role="img">
+    <svg class="n-mark" id="nmark" viewBox="0 0 64 64" aria-label="Nodus logo, click to replay" role="img">
       <defs>
         <linearGradient id="ng" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
           <stop offset="0" stop-color="#ddd6fe"/><stop offset="0.45" stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/>
@@ -409,12 +424,8 @@
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/>
       <circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
-    <div><span class="free-badge">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg>
-      100% free · open source · MIT
-    </span></div>
     <h1>Your library holds a thousand ideas.<br/><span class="grad">Nodus lets you see them think.</span></h1>
-    <p class="sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps — then helps you write with citations you can actually verify.</p>
+    <p class="sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps, then helps you write with citations you can actually verify.</p>
     <div class="ctas">
       <a class="btn primary" href="demo/index.html">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
@@ -423,9 +434,11 @@
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
         Download for macOS &amp; Windows</button>
     </div>
-    <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry — and your corpus never leaves your machine.</p>
+    <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry, and your corpus never leaves your machine.</p>
   </div>
-  <div class="scroll-hint">scroll</div>
+  <div class="scroll-hint"><span>scroll</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+  </div>
 </header>
 
 <!-- ---------- story ---------- -->
@@ -433,19 +446,19 @@
   <div class="wrap">
     <span class="kicker">How it works</span>
     <h2 class="title">Everything hangs on one thread: the idea.</h2>
-    <p class="lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs — then follows the thread wherever it leads.</p>
+    <p class="lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs, then follows the thread wherever it leads.</p>
 
     <div style="margin-top:50px">
       <div class="step">
         <div class="num">1</div>
         <h3>Sync your library</h3>
-        <p>Point Nodus at your Zotero collections. It reads the attached files directly — no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
+        <p>Point Nodus at your Zotero collections. It reads the attached files directly, no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
         <div class="views"><span class="vchip"><b>Library</b> · works &amp; collections</span><span class="vchip"><b>Search</b> · semantic + exact</span></div>
       </div>
       <div class="step">
         <div class="num">2</div>
         <h3>Extract the ideas</h3>
-        <p>An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks — with verbatim evidence and page references for every single one.</p>
+        <p>An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks, with verbatim evidence and page references for every single one.</p>
         <div class="views"><span class="vchip"><b>Ideas</b> · typed &amp; evidenced</span><span class="vchip"><b>Authors</b> · who backs what</span></div>
       </div>
       <div class="step">
@@ -463,13 +476,13 @@
       <div class="step">
         <div class="num">5</div>
         <h3>Write with proof</h3>
-        <p>The writing workshop drafts sections grounded in the graph — and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word.</p>
+        <p>The writing workshop drafts sections grounded in the graph, and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word.</p>
         <div class="views"><span class="vchip"><b>Writing</b></span><span class="vchip"><b>Deep Research</b></span><span class="vchip"><b>Word add-in</b> · beta</span><span class="vchip"><b>Projects</b></span><span class="vchip"><b>Notes</b></span></div>
       </div>
       <div class="step">
         <div class="num">6</div>
         <h3>Then listen to it</h3>
-        <p>Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro) — or bring a Hume key for cloud voices.</p>
+        <p>Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro), or bring a Hume key for cloud voices.</p>
         <div class="views"><span class="vchip"><b>Immersion</b> · audio walks</span><span class="vchip"><b>Study</b> · guides &amp; flashcards</span></div>
       </div>
     </div>
@@ -481,21 +494,21 @@
   <div class="wrap">
     <span class="kicker">The views</span>
     <h2 class="title">Watch each section come alive.</h2>
-    <p class="lead">Every vignette below mirrors a real view of the app — and each one is fully explorable in the live demo.</p>
+    <p class="lead">Every vignette below mirrors a real view of the app, and each one is fully explorable in the live demo.</p>
     <div class="shots">
 
       <!-- Library -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Library</div><h3>Zotero in, ideas out</h3>
-          <p>Sync your collections, keep the read tags, merge duplicates losslessly. Every work carries its analysis state — nothing gets scanned twice.</p>
+          <p>Sync your collections, keep the read tags, merge duplicates losslessly. Every work carries its analysis state, nothing gets scanned twice.</p>
           <a class="try" href="demo/index.html#library">Open in the demo →</a></div>
         <div class="vig"><div class="vbar"><i></i><i></i><i></i><span>LIBRARY · SYNCED FROM ZOTERO</span></div>
           <div class="vbody">
-            <div class="vrow"><b class="grow">Roediger &amp; Karpicke (2006) — Test-Enhanced Learning</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
-            <div class="vrow"><b class="grow">Karpicke &amp; Blunt (2011) — Retrieval Practice…</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
-            <div class="vrow"><b class="grow">Sweller (1988) — Cognitive Load During Problem Solving</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:88%"></i></span></div>
-            <div class="vrow"><b class="grow">Cepeda et al. (2006) — Distributed Practice…</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:62%"></i></span></div>
-            <div class="vrow"><b class="grow">Van Gog &amp; Sweller (2015) — Not New, but Nearly Forgotten</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:45%"></i></span></div>
+            <div class="vrow"><b class="grow">Roediger &amp; Karpicke (2006), Test-Enhanced Learning</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
+            <div class="vrow"><b class="grow">Karpicke &amp; Blunt (2011), Retrieval Practice…</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
+            <div class="vrow"><b class="grow">Sweller (1988), Cognitive Load During Problem Solving</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:88%"></i></span></div>
+            <div class="vrow"><b class="grow">Cepeda et al. (2006), Distributed Practice…</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:62%"></i></span></div>
+            <div class="vrow"><b class="grow">Van Gog &amp; Sweller (2015), Not New, but Nearly Forgotten</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:45%"></i></span></div>
           </div>
         </div>
       </div>
@@ -503,7 +516,7 @@
       <!-- Graph -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Graph</div><h3>The corpus as a constellation</h3>
-          <p>Themes, claims, findings and methods with typed edges — supports, contradicts, refines. Presets jump straight to contradictions, gaps or your reading route.</p>
+          <p>Themes, claims, findings and methods with typed edges like supports, contradicts and refines. Presets jump straight to contradictions, gaps or your reading route.</p>
           <a class="try" href="demo/index.html#graph">Open in the demo →</a></div>
         <div class="vig vig-graph"><div class="vbar"><i></i><i></i><i></i><span>GRAPH · 12 NODES</span></div>
           <div class="vbody" style="padding:6px">
@@ -545,7 +558,7 @@
       <!-- Debates -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Debates</div><h3>Contradictions, head to head</h3>
-          <p>Two positions, the authors on each side, their evidence, and the chronology of the dispute — built automatically from contradiction edges in the graph.</p>
+          <p>Two positions, the authors on each side, their evidence, and the chronology of the dispute, built automatically from contradiction edges in the graph.</p>
           <a class="try" href="demo/index.html#debate">Open in the demo →</a></div>
         <div class="vig vig-debate"><div class="vbar"><i></i><i></i><i></i><span>DEBATES · 1 OPEN DISPUTE</span></div>
           <div class="vbody">
@@ -567,7 +580,7 @@
       <!-- Gaps -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Gaps</div><h3>What nobody has said yet</h3>
-          <p>Missing links between themes become explicit research opportunities — each with a drafted coverage question and one-click source hunting.</p>
+          <p>Missing links between themes become explicit research opportunities, each with a drafted coverage question and one-click source hunting.</p>
           <a class="try" href="demo/index.html#gaps">Open in the demo →</a></div>
         <div class="vig vig-gaps"><div class="vbar"><i></i><i></i><i></i><span>GAPS · 4 MINED</span></div>
           <div class="vbody">
@@ -593,7 +606,7 @@
       <!-- Deep Research -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Deep Research</div><h3>Reports that cite for real</h3>
-          <p>Multi-page academic reports generated in a queue — every claim resolves to a page in your corpus, with a support matrix and an audio edition.</p>
+          <p>Multi-page academic reports generated in a queue, every claim resolves to a page in your corpus, with a support matrix and an audio edition.</p>
           <a class="try" href="demo/index.html#deepResearch">Open in the demo →</a></div>
         <div class="vig vig-research"><div class="vbar"><i></i><i></i><i></i><span>DEEP RESEARCH · GENERATING…</span></div>
           <div class="vbody">
@@ -630,7 +643,7 @@
       <!-- Immersion / audio -->
       <div class="shot">
         <div class="shot-txt"><div class="tag">Immersion</div><h3>Hear your corpus think</h3>
-          <p>Guided audio walks — panorama, stations with verbatim quotes, contrasts, frontiers and a final exam. Voices are generated locally with Piper and Kokoro.</p>
+          <p>Guided audio walks: panorama, stations with verbatim quotes, contrasts, frontiers and a final exam. Voices are generated locally with Piper and Kokoro.</p>
           <a class="try" href="demo/index.html#immersion">Open in the demo →</a></div>
         <div class="vig vig-audio"><div class="vbar"><i></i><i></i><i></i><span>IMMERSION · STATION 2 OF 5</span></div>
           <div class="vbody">
@@ -638,7 +651,7 @@
               <i style="--h:55%"></i><i style="--h:80%;animation-delay:0.1s"></i><i style="--h:35%;animation-delay:0.2s"></i><i style="--h:90%;animation-delay:0.05s"></i><i style="--h:60%;animation-delay:0.3s"></i><i style="--h:75%;animation-delay:0.15s"></i><i style="--h:40%;animation-delay:0.25s"></i><i style="--h:85%;animation-delay:0.12s"></i><i style="--h:50%;animation-delay:0.28s"></i><i style="--h:70%;animation-delay:0.08s"></i><i style="--h:45%;animation-delay:0.22s"></i><i style="--h:88%;animation-delay:0.18s"></i><i style="--h:58%;animation-delay:0.02s"></i><i style="--h:78%;animation-delay:0.26s"></i><i style="--h:36%;animation-delay:0.14s"></i><i style="--h:66%;animation-delay:0.06s"></i><i style="--h:82%;animation-delay:0.24s"></i><i style="--h:48%;animation-delay:0.1s"></i>
             </div>
             <div class="track"><span class="pbtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7-11-7Z"/></svg></span>
-              <span style="flex:1">Station 2 · Desirable difficulties — “conditions that slow learning…”</span><span>Kokoro · local</span></div>
+              <span style="flex:1">Station 2 · Desirable difficulties, “conditions that slow learning…”</span><span>Kokoro · local</span></div>
           </div>
         </div>
       </div>
@@ -655,13 +668,13 @@
   <div class="wrap">
     <span class="kicker">Hear your research</span>
     <h2 class="title">Reports you can read. Or press play.</h2>
-    <p class="lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro — the same local voice model that ships inside the app.</p>
+    <p class="lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro, the same local voice model that ships inside the app.</p>
     <div class="media-grid">
       <div class="media-card">
         <img src="assets/art/deep-research-cover.svg" alt="Deep research report cover"/>
         <div class="pad">
           <h3>Deep Research brief</h3>
-          <p>"Retrieval practice: why testing yourself beats re-reading" — 6 works, 12 cited ideas, narrated.</p>
+          <p>"Retrieval practice: why testing yourself beats re-reading", 6 works, 12 cited ideas, narrated.</p>
           <div class="player" data-src="assets/audio/deep-research-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">Heart · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
@@ -673,7 +686,7 @@
         <img src="assets/art/immersion-night-sky.svg" alt="Immersion artwork: night sky"/>
         <div class="pad">
           <h3>Immersion walk</h3>
-          <p>"Your library as a night sky" — a guided audio walk through one constellation of the sample corpus.</p>
+          <p>"Your library as a night sky", a guided audio walk through one constellation of the sample corpus.</p>
           <div class="player" data-src="assets/audio/immersion-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">George · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
@@ -685,7 +698,7 @@
         <img src="assets/art/immersion-threads.svg" alt="Immersion artwork: threads between shelves"/>
         <div class="pad">
           <h3>Every voice, local by default</h3>
-          <p>Piper and Kokoro synthesize on your machine — nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
+          <p>Piper and Kokoro synthesize on your machine, nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
           <div class="player" data-src="assets/audio/deep-research-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">Sample narration</div><div class="bar"><div></div></div></div>
@@ -702,7 +715,7 @@
   <div class="wrap">
     <span class="kicker">Free &amp; local-first, honestly</span>
     <h2 class="title">Completely free. Completely yours.</h2>
-    <p class="lead" style="margin:0 auto">Nodus is open source under the MIT license — no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
+    <p class="lead" style="margin:0 auto">Nodus is open source under the MIT license, no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
     <div class="pills">
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Free forever (MIT)</span>
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> 100% local storage</span>
@@ -744,6 +757,10 @@
   </div>
 </section>
 
+<button id="to-top" aria-label="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+</button>
+
 <footer>
   <div>
     <a href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener">GitHub</a> ·
@@ -751,7 +768,7 @@
     <a href="demo/index.html">Live demo</a> ·
     <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
   </div>
-  <p style="margin-top:12px;opacity:0.7">Nodus — a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
+  <p style="margin-top:12px;opacity:0.7">Nodus, a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
 </footer>
 
 <!-- ---------- download modal ---------- -->
@@ -778,7 +795,11 @@
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
-addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 24), { passive: true });
+const toTop = document.getElementById('to-top');
+addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', scrollY > 24);
+  toTop.classList.toggle('show', scrollY > 600);
+}, { passive: true });
 
 // ---------- hero constellation canvas ----------
 (function () {
@@ -882,12 +903,12 @@ document.querySelectorAll('.step, .shot, .media-card, .feat, .vig').forEach((el)
     ['Search', 'Semantic + exact search over ideas, authors, passages.', S('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>')],
     ['Library', 'Zotero sync with duplicate merging and scan recovery.', S('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14Z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>')],
     ['Graph', 'WebGL force graph of every idea and typed relation.', S('<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>')],
-    ['Argument map', 'Thesis, supports, objections, rebuttals — draggable.', S('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/>')],
+    ['Argument map', 'Thesis, supports, objections and rebuttals, all draggable.', S('<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z"/><path d="M9 4v14M15 6v14"/>')],
     ['Ideas', 'Claims and findings with verbatim page evidence.', S('<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/>')],
     ['Authors', 'Author sheets and a synthesis matrix, Zotero-canonical.', S('<path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>')],
     ['Study', 'Guides, flashcards and Socratic routes from your corpus.', S('<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/>')],
     ['Immersion', 'Narrated audio walks with locally generated voices.', S('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>')],
-    ['Gaps', "What your corpus doesn't say yet — mined automatically.", S('<path d="M4 6h6M14 6h6M4 12h4M12 12h8M4 18h8M16 18h4"/>')],
+    ['Gaps', "What your corpus doesn't say yet, mined automatically.", S('<path d="M4 6h6M14 6h6M4 12h4M12 12h8M4 18h8M16 18h4"/>')],
     ['Debates', 'Contradictions set head to head with chronology.', S('<path d="M12 3v18M8 21h8"/><path d="m5 7 7-2 7 2"/><path d="M5 7 3 13a3 3 0 0 0 6 0L7 7M19 7l-2 6a3 3 0 0 0 6 0l-2-6"/>')],
     ['Coverage', 'Your research questions tracked against real evidence.', S('<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.7 2.2c-.7.4-1.2 1-1.2 1.8v.5"/><path d="M12 17h.01"/>')],
     ['Hypotheses', 'Tensions in the graph become testable statements.', S('<path d="M10 2v6L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 8V2"/><path d="M8 2h8"/>')],
@@ -946,7 +967,7 @@ fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
 
 // The download modal resolves the newest release live from the GitHub API and
 // matches assets by suffix (…-mac-arm64.dmg / …-win-x64.exe), so a new release
-// is reflected here automatically — no site redeploy needed. cache:no-store
+// is reflected here automatically, no site redeploy needed. cache:no-store
 // avoids ever showing a stale version.
 fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 'no-store' })
   .then((r) => r.ok ? r.json() : null)
