@@ -307,13 +307,15 @@
   .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 48px; }
   .media-card {
     border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: var(--bg2);
+    display: flex; flex-direction: column;
     opacity: 0; transform: translateY(26px); transition: all 0.7s ease;
   }
   .media-card.in { opacity: 1; transform: none; }
   .media-card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
-  .media-card .pad { padding: 18px 20px 20px; }
+  .media-card .pad { flex: 1; display: flex; flex-direction: column; padding: 18px 20px 20px; }
   .media-card h3 { margin: 0 0 6px; font-size: 16.5px; }
   .media-card p { margin: 0 0 14px; color: var(--text-2); font-size: 13.5px; }
+  .media-card .player { margin-top: auto; }
   .player { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
   .player .play {
     width: 38px; height: 38px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
