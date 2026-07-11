@@ -468,7 +468,7 @@
       <div class="chat-tools">
         <button class="btn small" onclick="UI.chatNew()">${ICONS.plus} New conversation</button>
         <button class="btn ghost small${chat.view === 'archive' ? ' primary' : ''}" onclick="UI.chatArchView()">${ICONS.folder} Archived (${archived.length})</button>
-        ${chat.view === 'chat' && convo.messages.length ? `<button class="btn ghost small" style="margin-left:auto" onclick="UI.chatArchive()" title="Archive this conversation">${ICONS.download} Archive conversation</button>` : ''}
+        ${chat.view === 'chat' ? `<button class="btn ghost small" style="margin-left:auto" onclick="UI.chatArchive()" title="Archive this conversation">${ICONS.download} Archive conversation</button>` : ''}
       </div>
       ${body}
     </div></div>`;
@@ -478,6 +478,17 @@
     const inp = $('#chat-inp');
     if (inp) inp.focus();
   }
+
+  // Incremental message helpers — avoid rebuilding the whole modal (no flicker).
+  function msgHTML(m) {
+    return m.who === 'user'
+      ? `<div class="msg user">${esc(m.text)}</div>`
+      : `<div class="msg ai">${esc(m.text)}${m.chips ? `<div class="tag-row">${m.chips.map(chatChip).join('')}</div>` : ''}</div>`;
+  }
+  function chatScroll() { const b = $('#chat-msgs'); if (b) b.scrollTop = b.scrollHeight; }
+  function appendMsg(m) { const b = $('#chat-msgs'); if (!b) return; b.insertAdjacentHTML('beforeend', msgHTML(m)); chatScroll(); }
+  function showTyping() { const b = $('#chat-msgs'); if (!b) return; b.insertAdjacentHTML('beforeend', '<div class="msg ai typing-bubble"><span class="typing"><i></i><i></i><i></i></span></div>'); chatScroll(); }
+  function hideTyping() { const t = $('#chat-msgs .typing-bubble'); if (t) t.remove(); }
 
   // ---------- views ----------
   const VIEWS = {};
@@ -736,7 +747,7 @@
     }).sort((a, b) => b.conns - a.conns);
     return `
     <div class="view-head">
-      <div>${title('map', 'Argument map', 'Every idea ranked by its argumentative connections — supports, contradictions, refinements. Click a route to open the idea.')}</div>
+      <div>${title('map', 'Argument map', 'Every idea ranked by its argumentative connections: supports, contradictions and refinements. Click a route to expand its connected ideas.')}</div>
     </div>
     <div class="toolbar" style="margin-bottom:16px">
       <div class="pills" style="margin:0"><button class="pill active">Automatic</button><button class="pill">AI</button></div>
@@ -745,18 +756,26 @@
       <span class="muted small">Min. connections</span>
       <input class="select" style="width:52px;text-align:center" value="0"/>
     </div>
-    <div style="max-width:820px">
     ${routes.map((r, k) => `
-      <div class="route-row" onclick="UI.idea('${r.i.id}')">
-        <span class="route-num">${k + 1}</span>
-        <div style="flex:1;min-width:0">
-          <div class="list-title"><span class="list-dot" style="background:${window.TYPE_COLORS[r.i.type]}"></span><b>${esc(r.i.label)}</b>${IDEA_IN_DEBATE.has(r.i.id) ? '<span class="chip" style="color:var(--red);border-color:rgba(248,113,113,0.4)">1 debate</span>' : ''}</div>
-          <div class="route-conn"><span><b style="color:var(--text-2)">${r.conns}</b> connection${r.conns !== 1 ? 's' : ''}</span><span>avg conf ${r.avg.toFixed(2)}</span>${Object.entries(r.types).map(([t, n]) => `<span>${t.replace(/_/g, ' ')} ×${n}</span>`).join('')}</div>
-          <div class="route-neigh">↳ ${r.neigh.map((n) => esc(ideaById(n).label)).join(' · ')}</div>
+      <div class="route-block" id="route-${r.i.id}">
+        <div class="route-row" onclick="UI.argToggle('${r.i.id}')">
+          <span class="route-num">${k + 1}</span>
+          <div style="flex:1;min-width:0">
+            <div class="list-title"><span class="list-dot" style="background:${window.TYPE_COLORS[r.i.type]}"></span><b>${esc(r.i.label)}</b>${IDEA_IN_DEBATE.has(r.i.id) ? '<span class="chip" style="color:var(--red);border-color:rgba(248,113,113,0.4)">1 debate</span>' : ''}</div>
+            <div class="route-conn"><span><b style="color:var(--text-2)">${r.conns}</b> connection${r.conns !== 1 ? 's' : ''}</span><span>avg conf ${r.avg.toFixed(2)}</span>${Object.entries(r.types).map(([t, n]) => `<span>${t.replace(/_/g, ' ')} ×${n}</span>`).join('')}</div>
+            <div class="route-neigh">↳ ${r.neigh.map((n) => esc(ideaById(n).label)).join(' · ')}</div>
+          </div>
+          <span class="route-chev">${ICONS.chevronRight}</span>
         </div>
-        <span class="muted">${ICONS.chevronRight || '›'}</span>
-      </div>`).join('')}
-    </div>`;
+        <div class="route-detail">
+          <div class="nav-group-label" style="padding:14px 0 6px">Connected ideas (${r.conns})</div>
+          ${D.edges.filter((e) => e.from === r.i.id || e.to === r.i.id).map((e) => {
+            const other = e.from === r.i.id ? e.to : e.from;
+            const dir = e.from === r.i.id ? '→' : '←';
+            return `<div class="route-conn-row" onclick="event.stopPropagation();UI.idea('${other}')">${edgeChip(e.type)}<span class="muted">${dir}</span><span class="rc-idea">${typeChip(ideaById(other).type)} ${esc(ideaById(other).label)}</span><span class="rc-open muted small">Open ${ICONS.chevronRight}</span></div>`;
+          }).join('')}
+        </div>
+      </div>`).join('')}`;
   };
 
   const ideaState = { filter: 'all', sort: 'name', q: '' };
@@ -877,16 +896,17 @@
     </div>
     <div class="nav-group-label" style="padding-left:0;margin-top:20px">The walk</div>
     ${im.steps.map((s, k) => `
-      <div class="step-item${s.done ? ' done' : ''}">
+      <div class="step-item clickable${s.done ? ' done' : ''}" onclick="UI.station('${id}',${k})">
         <div class="st-ic">${s.done ? ICONS.check : ICONS[stepIcon[s.kind]]}</div>
-        <div style="flex:1">
+        <div style="flex:1;min-width:0">
           <div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline">
             <b>${esc(s.title)}</b><span class="muted small">${s.minutes} min ${s.done ? '· done' : ''}</span>
           </div>
           <p class="muted small" style="margin:3px 0 0">${esc(s.body)}</p>
           ${s.quote ? `<div class="quote-block">${esc(s.quote)}<span class="src">${esc(s.source)}</span></div>` : ''}
-          ${s.kind !== 'exam' ? `<button class="play-inline" style="margin-top:8px" onclick="UI.play('${im.audio}','${esc(im.title)} — ${esc(s.title)}','${im.voice}')">${ICONS.play} ${s.done ? 'Replay' : 'Play'} step</button>` : ''}
+          ${s.kind !== 'exam' ? `<button class="play-inline" style="margin-top:8px" onclick="event.stopPropagation();UI.play('${im.audio}','${esc(im.title)}: ${esc(s.title)}','${im.voice}')">${ICONS.play} ${s.done ? 'Replay' : 'Play'} step</button>` : ''}
         </div>
+        <span class="step-chev">${ICONS.chevronRight}</span>
       </div>`).join('')}
     <div class="card" style="margin-top:18px;border-color:rgba(139,92,246,0.4)">
       <h3 style="display:flex;align-items:center;gap:8px">${ICONS.graduation} Final exam — sample question</h3>
@@ -894,6 +914,33 @@
       ${im.quiz.options.map((o, k) => `<button class="quiz-opt${chosen != null ? (k === im.quiz.answer ? ' correct' : k === chosen ? ' wrong' : '') : ''}" onclick="UI.answer('${id}',${k})">${String.fromCharCode(65 + k)}. ${esc(o)}</button>`).join('')}
       ${chosen != null ? `<p class="small" style="margin:12px 0 0;color:${chosen === im.quiz.answer ? 'var(--green)' : 'var(--amber)'}">${chosen === im.quiz.answer ? 'Correct.' : 'Not quite.'} ${esc(im.quiz.explain)}</p>` : '<p class="muted small" style="margin:10px 0 0">Your answers are saved with the session, like in the app.</p>'}
     </div>`;
+  }
+
+  // Station reader — click a step to open it and navigate prev/next, like the app.
+  const STATION_LABEL = { panorama: 'Panorama', station: 'Station', contrasts: 'Contrasts', frontiers: 'Frontiers', exam: 'Final exam' };
+  function stationModal(imId, idx) {
+    const im = D.immersions.find((x) => x.id === imId);
+    const s = im.steps[idx];
+    const chosen = state.quiz[imId];
+    openModal(`
+      ${modalHead(esc(s.title), `${STATION_LABEL[s.kind]} · step ${idx + 1} of ${im.steps.length} · ${s.minutes} min`)}
+      <div class="station-body">
+        <p>${esc(s.body)}</p>
+        ${s.quote ? `<div class="quote-block">${esc(s.quote)}<span class="src">${esc(s.source)}</span></div>` : ''}
+        ${s.kind === 'exam'
+          ? `<div class="nav-group-label" style="padding-left:0">Sample question</div>
+             <p style="margin:0 0 4px">${esc(im.quiz.q)}</p>
+             ${im.quiz.options.map((o, k) => `<button class="quiz-opt${chosen != null ? (k === im.quiz.answer ? ' correct' : k === chosen ? ' wrong' : '') : ''}" onclick="UI.stationAnswer('${imId}',${idx},${k})">${String.fromCharCode(65 + k)}. ${esc(o)}</button>`).join('')}
+             ${chosen != null ? `<p class="small" style="margin:12px 0 0;color:${chosen === im.quiz.answer ? 'var(--green)' : 'var(--amber)'}">${chosen === im.quiz.answer ? 'Correct.' : 'Not quite.'} ${esc(im.quiz.explain)}</p>` : ''}`
+          : `<button class="play-inline" style="margin-top:6px" onclick="UI.play('${im.audio}','${esc(im.title)}: ${esc(s.title)}','${im.voice}')">${ICONS.play} Play narration · ${im.voice}</button>`}
+      </div>
+      <div class="page-nav" style="margin-top:18px">
+        <button class="btn ghost small" ${idx === 0 ? 'disabled' : `onclick="UI.station('${imId}',${idx - 1})"`}>${ICONS.chevronLeft} Previous</button>
+        <span class="muted small">Step ${idx + 1} of ${im.steps.length}</span>
+        ${idx < im.steps.length - 1
+          ? `<button class="btn primary small" onclick="UI.station('${imId}',${idx + 1})">Next ${ICONS.chevronRight}</button>`
+          : `<button class="btn primary small" onclick="UI.close();UI.toast('Walk complete. In the app your progress and answers are saved to the session.')">Finish ${ICONS.check}</button>`}
+      </div>`, true);
   }
 
   let gapTab = 'mined';
@@ -1152,39 +1199,42 @@
   const sw = (key) => `<button class="switch${state.toggles[key] ? ' on' : ''}" onclick="UI.sw('${key}',this)" role="switch" aria-checked="${!!state.toggles[key]}"></button>`;
   const SET_PANELS = {
     providers: () => `
-      <div class="card"><h3>AI providers</h3>
-        <p class="muted small" style="margin:2px 0 8px">Bring your own key — or run fully offline with a local model. Keys are stored encrypted in your system keychain.</p>
-        ${D.settings.providers.map((p) => `<div class="set-row">
-          <div class="lbl"><b>${p.name}</b><span>${p.desc}${p.key ? ` · <span class="keymask">${p.key}</span>` : ''}</span></div>
+      <div class="card"><h3>${ICONS.key} AI providers</h3>
+        <p class="muted small" style="margin:2px 0 10px">Bring your own key, or run fully offline with a local model. Keys are stored encrypted in your system keychain.</p>
+        ${D.settings.providers.map((p) => { const local = p.desc.includes('offline'); return `<div class="set-row">
+          <div class="set-prov">
+            <span class="prov-badge" style="background:${local ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.16)'};color:${local ? 'var(--green)' : '#a5b4fc'}">${p.name[0]}</span>
+            <div class="lbl"><b>${p.name}</b><span>${p.desc}${p.key ? ` · <span class="keymask">${p.key}</span>` : ''}</span></div>
+          </div>
           ${p.on ? `<span class="chip"><span class="dot" style="background:var(--green)"></span>configured</span>` : `<button class="btn ghost small" onclick="UI.toast('In the app: paste your API key (or base URL for local providers); it is validated and stored in the keychain.')">Configure</button>`}
-        </div>`).join('')}
+        </div>`; }).join('')}
       </div>`,
     models: () => `
-      <div class="card"><h3>Model per task</h3>
-        <p class="muted small" style="margin:2px 0 8px">Each pipeline step can use a different model — mix cloud and local freely. Prompts auto-size to each model's real context window.</p>
+      <div class="card"><h3>${ICONS.wand} Model per task</h3>
+        <p class="muted small" style="margin:2px 0 8px">Each pipeline step can use a different model, mixing cloud and local freely. Prompts auto-size to each model's real context window.</p>
         ${D.settings.models.map(([task, model]) => `<div class="set-row"><div class="lbl"><b>${task}</b></div><select class="select" onchange="UI.toast('Model preference saved (demo).')"><option>${model}</option><option>claude-sonnet-5</option><option>qwen3:8b · Ollama</option><option>gpt-5.2</option><option>gemini-3-flash</option></select></div>`).join('')}
       </div>`,
     library: () => `
-      <div class="card"><h3>Zotero sync</h3>
+      <div class="card"><h3>${ICONS.book} Zotero sync</h3>
         <div class="set-row"><div class="lbl"><b>Monitored collections</b><span>PhD corpus · Methods reading</span></div><button class="btn ghost small" onclick="UI.toast('In the app: a tree of your Zotero collections with per-collection monitoring.')">Choose</button></div>
         <div class="set-row"><div class="lbl"><b>Auto-analyze new works</b><span>Off by default: sync only brings metadata until you opt in.</span></div>${sw('autoAnalyze')}</div>
         <div class="set-row"><div class="lbl"><b>Read tag</b><span>Mark works as read via a Zotero tag ("leído").</span></div>${sw('readTag')}</div>
       </div>`,
     extraction: () => `
-      <div class="card"><h3>Text & OCR</h3>
+      <div class="card"><h3>${ICONS.search} Text & OCR</h3>
         <div class="set-row"><div class="lbl"><b>Read attached files directly</b><span>PDF, EPUB and DOCX are parsed locally — no Zotero full-text index needed.</span></div><span class="chip"><span class="dot" style="background:var(--green)"></span>always on</span></div>
         <div class="set-row"><div class="lbl"><b>OCR for scanned PDFs</b><span>Tesseract, local. Languages: English, Spanish.</span></div>${sw('ocr')}</div>
         <div class="set-row"><div class="lbl"><b>Degraded-scan recovery</b><span>Auto-retry works that only yielded an abstract.</span></div><span class="chip"><span class="dot" style="background:var(--green)"></span>automatic</span></div>
       </div>`,
     interface: () => `
-      <div class="card"><h3>Interface</h3>
+      <div class="card"><h3>${ICONS.palette} Interface</h3>
         <div class="set-row"><div class="lbl"><b>Language</b><span>UI in English or Spanish.</span></div><select class="select"><option>English</option><option>Español</option></select></div>
         <div class="set-row"><div class="lbl"><b>Theme</b></div><select class="select" onchange="UI.toast('The desktop app switches instantly between dark and light.')"><option>Dark</option><option>Light</option></select></div>
         <div class="set-row"><div class="lbl"><b>Animations</b></div>${sw('animations')}</div>
         <div class="set-row"><div class="lbl"><b>Sidebar sections</b><span>Reorder or hide sections. Home stays first, Settings last.</span></div><button class="btn ghost small" onclick="UI.toast('In the app: drag to reorder sections within their group, or hide the ones you never use.')">Customize</button></div>
       </div>`,
     integrations: () => `
-      <div class="card"><h3>MCP server</h3>
+      <div class="card"><h3>${ICONS.link} MCP server</h3>
         <p class="muted small" style="margin:2px 0 8px">Query your graph from Claude or any MCP client — locally.</p>
         <div class="set-row"><div class="lbl"><b>Enable MCP server</b><span>stdio · read tools + writing tools</span></div>${sw('mcp')}</div>
         <div class="set-row"><div class="lbl"><b>Connection</b></div><span class="keymask">npx nodus-mcp --vault "Learning science"</span></div>
@@ -1195,7 +1245,7 @@
         <div class="set-row"><div class="lbl"><b>Install add-in</b></div><button class="btn ghost small" onclick="UI.toast('In the app: one click drops the manifest into Word and opens the pane.')">${ICONS.word} Install in Word</button></div>
       </div>`,
     system: () => `
-      <div class="card"><h3>System</h3>
+      <div class="card"><h3>${ICONS.settings} System</h3>
         <div class="set-row"><div class="lbl"><b>Version</b><span>Nodus 1.7.5 — up to date</span></div><button class="btn ghost small" onclick="UI.toast('Checking… you are on the latest release (demo).')">${ICONS.sync} Check for updates</button></div>
         <div class="set-row"><div class="lbl"><b>Pre-release channel</b></div>${sw('prerelease')}</div>
         <div class="set-row"><div class="lbl"><b>Guided tour</b><span>Replay the onboarding walkthrough.</span></div><button class="btn ghost small" onclick="UI.toast('In the app: replays the interactive tour across every section.')">Replay tour</button></div>
@@ -1293,6 +1343,9 @@
     chatBack() { chat.view = 'chat'; renderChat(); },
     chatArchView() { chat.view = 'archive'; renderChat(); },
     gapTab(t) { gapTab = t; window.go('gaps'); },
+    argToggle(id) { const el = document.getElementById('route-' + id); if (el) el.classList.toggle('open'); },
+    station(imId, idx) { stationModal(imId, idx); },
+    stationAnswer(imId, idx, k) { state.quiz[imId] = k; stationModal(imId, idx); },
     chatNew() {
       const cur = curConvo();
       chat.view = 'chat';
@@ -1327,15 +1380,22 @@
       const v = inp && inp.value.trim();
       if (!v) return;
       const convo = curConvo();
-      convo.messages.push({ who: 'user', text: v });
       if (convo.title === 'New conversation') convo.title = v.slice(0, 42) + (v.length > 42 ? '…' : '');
+      const userMsg = { who: 'user', text: v };
+      convo.messages.push(userMsg);
+      inp.value = '';
+      const hint = $('#chat-msgs .msg.hint'); if (hint) hint.remove();
+      appendMsg(userMsg);              // insert only the new bubble — no full re-render
       chat.waiting = true;
-      renderChat(true);
+      showTyping();
       setTimeout(() => {
+        hideTyping();
         const r = CANNED[chat.replyIdx++ % CANNED.length];
-        convo.messages.push({ who: 'ai', text: r.text, chips: r.chips });
+        const aiMsg = { who: 'ai', text: r.text, chips: r.chips };
+        convo.messages.push(aiMsg);
+        appendMsg(aiMsg);
         chat.waiting = false;
-        renderChat();
+        const i = $('#chat-inp'); if (i) i.focus();
       }, 950);
     },
     compose() {
