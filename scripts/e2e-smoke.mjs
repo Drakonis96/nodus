@@ -123,7 +123,7 @@ try {
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
 
-  // ── Search result: shared modal first, graph only as secondary action ──────
+  // ── Search result: an idea reuses the Ideas section's detail modal ─────────
   assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');
   await page.reload();
   await page.waitForFunction(() => document.querySelector('[data-tour="nav-search"]'));
@@ -134,10 +134,14 @@ try {
   await page.getByText('Práctica de recuperación y retención a largo plazo', { exact: true }).click();
   const detailDialog = page.locator('[role="dialog"]');
   await detailDialog.waitFor();
-  assert.equal(await detailDialog.getByText('Localizar en el grafo', { exact: true }).count(), 1, 'graph action is secondary inside modal');
+  // The idea opens the shared IdeaDetailModal, whose graph jump is the secondary
+  // "Ver en el grafo" action — not an immediate navigation away from Search.
+  const graphAction = detailDialog.getByRole('button', { name: 'Ver en el grafo', exact: true });
+  await graphAction.waitFor({ timeout: 10_000 });
+  assert.equal(await graphAction.count(), 1, 'idea detail modal opened with its secondary graph action');
   assert.equal(await searchInput.isVisible(), true, 'search remains the active primary surface');
-  await detailDialog.getByRole('button', { name: 'Cerrar', exact: true }).first().click();
-  console.log('[e2e] search opens shared detail modal without graph navigation');
+  await detailDialog.locator('button[title="Cerrar"]').first().click();
+  console.log('[e2e] search idea result opens the shared idea detail modal');
 
   // ── Optional-image controls exist and can be toggled without generation ───
   await page.locator('[data-tour="nav-immersion"]').click();

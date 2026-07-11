@@ -487,7 +487,7 @@ export function App() {
             />
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
-          {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}
+          {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'study' && (

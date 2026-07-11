@@ -8,7 +8,7 @@ import type {
   ResearchContextSelection,
   ResearchGraphPartsSelection,
 } from '@shared/types';
-import { Icon, modelLabel } from '../components/ui';
+import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -242,7 +242,7 @@ export function ResearchAssistantModal({
     add(settings.chatModel);
     add(selectedModel);
     for (const model of settings.favorites ?? []) add(model);
-    return models;
+    return sortModelRefs(models);
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel]);
 
   const refreshConversations = useCallback(async () => {

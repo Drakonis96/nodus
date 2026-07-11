@@ -1,5 +1,5 @@
 // Regression coverage for the optional decorative-image pipeline and the
-// shared global-search result modal. No provider request is performed.
+// global-search result wiring/detail mapper. No provider request is performed.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
@@ -49,7 +49,7 @@ try {
     assert.ok(!/\s{2,}/.test(prompt), 'visual context whitespace is compacted');
   }
 
-  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, searchModal, app] = await Promise.all([
+  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, app] = await Promise.all([
     readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
     readFile(path.join(root, 'src/backgroundJobs.ts'), 'utf8'),
@@ -58,7 +58,6 @@ try {
     readFile(path.join(root, 'src/components/DecorativeImageCard.tsx'), 'utf8'),
     readFile(path.join(root, 'src/components/DecorativeImageModal.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/SearchView.tsx'), 'utf8'),
-    readFile(path.join(root, 'src/components/SearchResultModal.tsx'), 'utf8'),
     readFile(path.join(root, 'src/App.tsx'), 'utf8'),
   ]);
 
@@ -203,12 +202,13 @@ try {
   repoDb.close();
   delete globalThis.__nodusDecorativeRepoDb;
 
-  // Every result click opens one common modal; graph navigation lives in its
-  // explicit secondary action. The disclosure arrow only rotates.
-  assert.ok(searchView.includes('onClick={() => setSelectedResult(r)}'));
-  assert.ok(searchView.includes('<SearchResultModal') && searchView.includes('onLocate={locate}'));
-  assert.ok(searchModal.includes('getSearchResultDetail(result.kind, result.id)'));
-  assert.ok(searchModal.includes("t('Localizar en el grafo')"));
+  // A result click reuses the surface that owns it: ideas and works open the
+  // same detail modals as the Ideas and Library sections; other kinds jump to
+  // their home view. The disclosure arrow only rotates.
+  assert.ok(searchView.includes('onClick={() => openResult(r)}'));
+  assert.ok(searchView.includes('<IdeaDetailModal') && searchView.includes('<WorkIdeasModal'));
+  assert.ok(searchView.includes("r.kind === 'idea') return setIdeaModalId(r.id)"));
+  assert.ok(searchView.includes("r.kind === 'work') return setWorkModal("));
   const arrowClass = app.match(/className=\{`transition-transform duration-200[^`]+`\}/)?.[0] ?? '';
   assert.ok(arrowClass.includes('rotate-90') && !arrowClass.includes('translate'), 'search disclosure arrow rotates without translating');
 

@@ -1,4 +1,4 @@
-import type { AiProvider, EmbeddingProvider, LocalProvider } from './types';
+import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef } from './types';
 
 // Single source of truth for provider identity, labels and defaults, shared by
 // the main process (electron/) and the renderer (src/). Adding a provider to
@@ -27,6 +27,22 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   ollama: 'Ollama',
   lmstudio: 'LM Studio',
 };
+
+/** Order two model refs for the pickers: by provider label (A→Z), then model id (A→Z). */
+export function compareModelRefs(a: ModelRef, b: ModelRef): number {
+  const byProvider = (PROVIDER_LABELS[a.provider] ?? a.provider).localeCompare(
+    PROVIDER_LABELS[b.provider] ?? b.provider,
+    undefined,
+    { sensitivity: 'base' }
+  );
+  if (byProvider !== 0) return byProvider;
+  return a.model.localeCompare(b.model, undefined, { sensitivity: 'base' });
+}
+
+/** Sorted copy of `models`: alphabetical by provider label, then by model name. */
+export function sortModelRefs(models: ModelRef[]): ModelRef[] {
+  return [...models].sort(compareModelRefs);
+}
 
 /** Providers whose connection is a user-configured local/LAN server (no API key). */
 export const LOCAL_PROVIDERS: LocalProvider[] = ['ollama', 'lmstudio'];

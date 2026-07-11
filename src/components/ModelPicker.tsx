@@ -1,5 +1,5 @@
 import type { AppSettings, ModelRef } from '@shared/types';
-import { modelLabel, sameModel } from './ui';
+import { modelLabel, sameModel, sortModelRefs } from './ui';
 import { t } from '../i18n';
 
 /**
@@ -21,7 +21,7 @@ export function ModelPicker({
   disabled?: boolean;
   emptyLabel?: string;
 }) {
-  const favorites = settings.favorites ?? [];
+  const favorites = sortModelRefs(settings.favorites ?? []);
   const serialize = (m: ModelRef) => `${m.provider}::${m.model}`;
   const valueIsFavorite = value ? favorites.some((model) => sameModel(model, value)) : false;
 

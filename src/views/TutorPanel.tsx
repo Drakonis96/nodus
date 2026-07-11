@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, ModelRef, TutorMode, TutorPlan, TutorRoute, TutorSavedRoute, TutorStop } from '@shared/types';
-import { Icon, Spinner, modelLabel } from '../components/ui';
+import { Icon, Spinner, modelLabel, sortModelRefs } from '../components/ui';
 import { Markdown } from '../components/Markdown';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useFeatureModel } from '../hooks/useFeatureModel';
@@ -71,7 +71,7 @@ export function TutorPanel({
     add(settings.tutorModel);
     add(selectedModel);
     for (const m of settings.favorites ?? []) add(m);
-    return models;
+    return sortModelRefs(models);
   }, [settings.synthesisModel, settings.tutorModel, settings.favorites, selectedModel]);
 
   const stepKey = (routeId: string, index: number) => `${routeId}:${index}`;

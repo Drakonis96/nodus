@@ -6,6 +6,7 @@ export {
   PROVIDER_LABELS,
   LOCAL_PROVIDERS as LOCAL_AI_PROVIDERS,
   isLocalProvider as isLocalAiProvider,
+  sortModelRefs,
 } from '@shared/providers';
 import { PROVIDER_LABELS } from '@shared/providers';
 

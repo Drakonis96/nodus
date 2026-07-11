@@ -63,7 +63,7 @@ function maxDepth(block: ArgumentBlock, depth = 0): number {
   return Math.max(...block.children.map((c) => maxDepth(c, depth + 1)));
 }
 
-export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; onBack: () => void }) {
+export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>('auto');
@@ -257,13 +257,6 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
     <div className="h-full flex flex-col min-h-0">
       {/* Header / setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
-        <button
-          className="btn btn-ghost text-neutral-400 hover:text-neutral-100 mr-2"
-          title={t('Volver al grafo')}
-          onClick={onBack}
-        >
-          <Icon name="chevronLeft" size={16} />
-        </button>
         <div className="flex rounded-lg overflow-hidden border border-neutral-700">
           <button
             className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}

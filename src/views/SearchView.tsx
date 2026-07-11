@@ -3,7 +3,8 @@ import type { GlobalSearchResult, SavedSearch, SearchMode, SearchResultKind } fr
 import { Icon } from '../components/ui';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
-import { SearchResultModal } from '../components/SearchResultModal';
+import { IdeaDetailModal } from '../components/IdeaDetailModal';
+import { WorkIdeasModal } from './WorkIdeasModal';
 
 // One search box that spans the whole workspace. Two strategies: text (LIKE,
 // matches characters) and semantic (embeddings, matches meaning). Each result
@@ -48,7 +49,8 @@ export function SearchView({
   const [unavailable, setUnavailable] = useState(false);
   const [similar, setSimilar] = useState<SimilarTarget | null>(null);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
-  const [selectedResult, setSelectedResult] = useState<GlobalSearchResult | null>(null);
+  const [ideaModalId, setIdeaModalId] = useState<string | null>(null);
+  const [workModal, setWorkModal] = useState<{ nodus_id: string; title: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -153,7 +155,6 @@ export function SearchView({
   }, [visible, mode]);
 
   const locate = (r: GlobalSearchResult) => {
-    setSelectedResult(null);
     switch (r.kind) {
       case 'idea':
         onOpenGraph({ preset: 'overview', nodeId: r.id, label: `${t('Idea:')} ${r.title}` });
@@ -190,6 +191,15 @@ export function SearchView({
         onOpenNote(r.id);
         break;
     }
+  };
+
+  // Clicking a result reuses the surface that owns it: ideas and works open the
+  // same detail modals as the Ideas and Library sections; everything else jumps
+  // straight to its home view (notes, gaps, themes, authors, passages).
+  const openResult = (r: GlobalSearchResult) => {
+    if (r.kind === 'idea') return setIdeaModalId(r.id);
+    if (r.kind === 'work') return setWorkModal({ nodus_id: r.id, title: r.title });
+    locate(r);
   };
 
   const findSimilar = (r: GlobalSearchResult) => {
@@ -374,7 +384,7 @@ export function SearchView({
                   {items.map((r) => (
                     <li key={`${r.kind}:${r.id}`}>
                       <div className="group flex w-full items-start gap-3 rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2 transition-colors hover:border-neutral-700 hover:bg-neutral-900">
-                        <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => setSelectedResult(r)}>
+                        <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => openResult(r)}>
                           <Icon name={meta.icon} size={15} className="mt-0.5 shrink-0 text-neutral-500" />
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
@@ -409,11 +419,27 @@ export function SearchView({
           })}
         </div>
       </div>
-      {selectedResult && (
-        <SearchResultModal
-          result={selectedResult}
-          onClose={() => setSelectedResult(null)}
-          onLocate={locate}
+      {ideaModalId && (
+        <IdeaDetailModal
+          initialIdeaId={ideaModalId}
+          onClose={() => setIdeaModalId(null)}
+          onOpenGraph={onOpenGraph}
+        />
+      )}
+      {workModal && (
+        <WorkIdeasModal
+          work={workModal}
+          onClose={() => setWorkModal(null)}
+          onOpenGraph={onOpenGraph}
+          onOpenWorkGraph={(w) => {
+            setWorkModal(null);
+            onOpenGraph({
+              preset: 'reading',
+              workId: w.nodus_id,
+              workTitle: w.title,
+              label: `${t('Ideas y conexiones:')} ${w.title}`,
+            });
+          }}
         />
       )}
     </div>

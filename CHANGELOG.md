@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.7.2 — 2026-07-11
+
+### Changed
+
+- **AI model dropdowns are now sorted.** Every model selector (feature pickers,
+  the research assistant, and the tutor) lists models alphabetically by provider
+  and then by model name, so the same option always sits in the same place.
+- **Search results reuse each section's own detail view.** Clicking an idea in
+  global search opens the same idea detail modal as the Ideas section, and
+  clicking a work opens the same modal as the Library; other result kinds jump
+  straight to their home view. The generic preview modal has been removed.
+- The Argument Map header no longer shows the redundant back-to-graph arrow;
+  navigation happens from the sidebar like every other section.
+
+### Notes
+
+- No database migration; the schema stays at v31.
+
 ## 1.7.0 — 2026-07-11
 
 ### Added
