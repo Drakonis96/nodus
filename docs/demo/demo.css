@@ -22,8 +22,8 @@
   --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-html { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
+html, body { height: 100%; margin: 0; background: var(--bg); }
+html { color-scheme: dark; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
 body {
   background: var(--bg); color: var(--text); font-family: var(--sans);
   font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;

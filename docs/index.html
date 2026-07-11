@@ -33,8 +33,11 @@
     --serif: 'Fraunces', Georgia, serif;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
+  html {
+    min-height: 100%; background: var(--bg); color-scheme: dark;
+    scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent;
+  }
+  body { min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
   a { color: var(--violet-2); text-decoration: none; }
   ::selection { background: rgba(139,92,246,0.4); }
   ::-webkit-scrollbar { width: 12px; height: 12px; }
