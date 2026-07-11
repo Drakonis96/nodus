@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { app } from 'electron';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -97,7 +98,7 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
 function makeMcpServer(): McpServer {
   const server = new McpServer({
     name: 'nodus',
-    version: '1.0.0',
+    version: app.getVersion(),
   }, {
     instructions: [
       'Nodus is a local-first academic research workspace. Its graph entities (ideas, themes, edges, debates, gaps and authors) are derived from analysed works and are read-only through MCP.',

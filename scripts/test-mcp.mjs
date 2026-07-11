@@ -86,8 +86,11 @@ try {
   seedMcpDatabase(getDb());
 
   const capabilities = await callTool(server, 'nodus_get_capabilities');
+  assert.equal(capabilities.version, '0.0.0-test', 'capabilities reports the running app version');
   assert.equal(capabilities.counts.works, 3);
   assert.equal(capabilities.counts.notes, 1);
+  assert.equal(capabilities.counts.themes, 1);
+  assert.equal(capabilities.counts.passages, 2);
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);
