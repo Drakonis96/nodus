@@ -32,13 +32,14 @@ body {
 /* framed demo page: nav on top, app inside a macOS-style window */
 body.demo-page {
   overflow-y: auto; overflow-x: hidden;
+  display: grid; grid-template-rows: auto 1fr; min-height: 100vh;
   background:
     radial-gradient(900px 500px at 50% -10%, rgba(124,58,237,0.14), transparent),
     var(--bg);
 }
 .site-nav {
-  display: flex; align-items: center; gap: 20px; padding: 12px 24px;
-  max-width: 1440px; margin: 0 auto;
+  display: flex; align-items: center; gap: 20px; align-self: start;
+  padding: 12px max(24px, calc((100% - 1440px) / 2));
 }
 .site-nav .site-logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--text); text-decoration: none; }
 .site-nav .site-logo img { width: 26px; height: 26px; }
@@ -54,7 +55,8 @@ body.demo-page {
 .site-gh .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 9px; border-left: 1px solid var(--border-soft); color: var(--amber); }
 .site-gh .stars svg { width: 12px; height: 12px; fill: var(--amber); }
 .demo-frame {
-  max-width: 1440px; margin: 4px auto 34px; border: 1px solid var(--border-soft);
+  width: min(1500px, calc(100% - 40px)); justify-self: center; align-self: center;
+  margin: 12px 0; border: 1px solid var(--border-soft);
   border-radius: 14px; overflow: hidden; background: var(--bg);
   box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06);
 }
@@ -68,11 +70,11 @@ body.demo-page {
 .mac-dots i:nth-child(2) { background: #febc2e; }
 .mac-dots i:nth-child(3) { background: #28c840; }
 .mac-title { position: absolute; left: 0; right: 0; text-align: center; font-size: 12.5px; color: var(--text-3); pointer-events: none; }
-.demo-frame .shell { height: min(82vh, 900px); }
+.demo-frame .shell { height: min(87vh, 1040px); }
 @media (max-width: 720px) {
   .site-nav .site-links .hideS { display: none; }
-  .demo-frame { margin: 4px 10px 24px; border-radius: 12px; }
-  .demo-frame .shell { height: 86vh; }
+  .demo-frame { margin: 8px 10px; border-radius: 12px; }
+  .demo-frame .shell { height: 88vh; }
 }
 button { font-family: inherit; cursor: pointer; }
 ::-webkit-scrollbar { width: 11px; height: 11px; }
