@@ -29,6 +29,51 @@ body {
   font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
+/* framed demo page: nav on top, app inside a macOS-style window */
+body.demo-page {
+  overflow-y: auto; overflow-x: hidden;
+  background:
+    radial-gradient(900px 500px at 50% -10%, rgba(124,58,237,0.14), transparent),
+    var(--bg);
+}
+.site-nav {
+  display: flex; align-items: center; gap: 20px; padding: 12px 24px;
+  max-width: 1440px; margin: 0 auto;
+}
+.site-nav .site-logo { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; color: var(--text); text-decoration: none; }
+.site-nav .site-logo img { width: 26px; height: 26px; }
+.site-nav .site-links { margin-left: auto; display: flex; gap: 20px; align-items: center; font-size: 14px; font-weight: 500; }
+.site-nav .site-links > a { color: var(--text-2); text-decoration: none; }
+.site-nav .site-links > a:hover { color: var(--text); }
+.site-gh {
+  display: inline-flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 11px;
+  border: 1px solid var(--border-soft); background: var(--card); color: var(--text) !important; font-size: 13px; font-weight: 600;
+}
+.site-gh:hover { border-color: rgba(167,139,250,0.5); }
+.site-gh svg { width: 15px; height: 15px; fill: currentColor; }
+.site-gh .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 9px; border-left: 1px solid var(--border-soft); color: var(--amber); }
+.site-gh .stars svg { width: 12px; height: 12px; fill: var(--amber); }
+.demo-frame {
+  max-width: 1440px; margin: 4px auto 34px; border: 1px solid var(--border-soft);
+  border-radius: 14px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(139,92,246,0.06);
+}
+.mac-titlebar {
+  display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+  background: #0e0e12; border-bottom: 1px solid var(--border); position: relative;
+}
+.mac-dots { display: inline-flex; gap: 7px; }
+.mac-dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.mac-dots i:nth-child(1) { background: #ff5f57; }
+.mac-dots i:nth-child(2) { background: #febc2e; }
+.mac-dots i:nth-child(3) { background: #28c840; }
+.mac-title { position: absolute; left: 0; right: 0; text-align: center; font-size: 12.5px; color: var(--text-3); pointer-events: none; }
+.demo-frame .shell { height: min(82vh, 900px); }
+@media (max-width: 720px) {
+  .site-nav .site-links .hideS { display: none; }
+  .demo-frame { margin: 4px 10px 24px; border-radius: 12px; }
+  .demo-frame .shell { height: 86vh; }
+}
 button { font-family: inherit; cursor: pointer; }
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 6px; border: 2px solid var(--bg); }

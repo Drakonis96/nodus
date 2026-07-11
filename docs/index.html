@@ -77,6 +77,9 @@
   .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
+  .lang-select { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .lang-select:hover { border-color: rgba(167,139,250,0.5); }
+  .lang-select option { background: #14121f; color: var(--text); }
 
   /* ---------- hero ---------- */
   .hero { position: relative; min-height: 100vh; display: grid; place-items: center; text-align: center; overflow: hidden; }
@@ -397,15 +400,16 @@
 <nav class="nav" id="nav">
   <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
   <div class="links">
-    <a href="#story" class="hideS">How it works</a>
-    <a href="#views" class="hideS">Views</a>
-    <a href="#listen" class="hideS">Listen</a>
+    <a href="#story" class="hideS" data-i18n="nav.how">How it works</a>
+    <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
+    <a href="#listen" class="hideS" data-i18n="nav.listen">Listen</a>
+    <select class="lang-select" id="lang-select" aria-label="Language"></select>
     <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       <span class="lbl">Star</span>
       <span class="stars"><svg viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count">★</span></span>
     </a>
-    <a class="btn primary" href="demo/index.html">Try the live demo</a>
+    <a class="btn primary" href="demo/index.html" data-i18n="nav.demo">Try the live demo</a>
   </div>
 </nav>
 
@@ -424,19 +428,19 @@
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/>
       <circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
-    <h1>Your library holds a thousand ideas.<br/><span class="grad">Nodus lets you see them think.</span></h1>
-    <p class="sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps, then helps you write with citations you can actually verify.</p>
+    <h1 data-i18n="hero.h1">A thousand ideas, scattered like stars.<br/><span class="grad">Nodus connects the constellations.</span></h1>
+    <p class="sub" data-i18n="hero.sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps, then helps you write with citations you can actually verify.</p>
     <div class="ctas">
       <a class="btn primary" href="demo/index.html">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
-        Try the live demo</a>
+        <span data-i18n="hero.demo">Try the live demo</span></a>
       <button class="btn" onclick="openDl()">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
-        Download for macOS &amp; Windows</button>
+        <span data-i18n="hero.download">Download for macOS &amp; Windows</span></button>
     </div>
-    <p class="meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry, and your corpus never leaves your machine.</p>
+    <p class="meta" data-i18n="hero.meta"><b>Completely free and open source.</b> No accounts, no subscriptions, no telemetry, and your corpus never leaves your machine.</p>
   </div>
-  <div class="scroll-hint"><span>scroll</span>
+  <div class="scroll-hint"><span data-i18n="hero.scroll">scroll</span>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
   </div>
 </header>
@@ -444,45 +448,45 @@
 <!-- ---------- story ---------- -->
 <section id="story" class="story">
   <div class="wrap">
-    <span class="kicker">How it works</span>
-    <h2 class="title">Everything hangs on one thread: the idea.</h2>
-    <p class="lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs, then follows the thread wherever it leads.</p>
+    <span class="kicker" data-i18n="story.kicker">How it works</span>
+    <h2 class="title" data-i18n="story.title">Everything hangs on one thread: the idea.</h2>
+    <p class="lead" data-i18n="story.lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs, then follows the thread wherever it leads.</p>
 
     <div style="margin-top:50px">
       <div class="step">
         <div class="num">1</div>
-        <h3>Sync your library</h3>
-        <p>Point Nodus at your Zotero collections. It reads the attached files directly, no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
+        <h3 data-i18n="step1.t">Sync your library</h3>
+        <p data-i18n="step1.b">Point Nodus at your Zotero collections. It reads the attached files directly, no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
         <div class="views"><span class="vchip"><b>Library</b> · works &amp; collections</span><span class="vchip"><b>Search</b> · semantic + exact</span></div>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <h3>Extract the ideas</h3>
-        <p>An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks, with verbatim evidence and page references for every single one.</p>
+        <h3 data-i18n="step2.t">Extract the ideas</h3>
+        <p data-i18n="step2.b">An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks, with verbatim evidence and page references for every single one.</p>
         <div class="views"><span class="vchip"><b>Ideas</b> · typed &amp; evidenced</span><span class="vchip"><b>Authors</b> · who backs what</span></div>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <h3>Watch them connect</h3>
-        <p>Ideas link up into a living graph: supports, contradicts, refines, extends. Force-directed, WebGL-fast, and filterable by theme, author or reading status. This is where your corpus starts to look like an argument instead of a pile.</p>
+        <h3 data-i18n="step3.t">Watch them connect</h3>
+        <p data-i18n="step3.b">Ideas link up into a living graph: supports, contradicts, refines, extends. Force-directed, WebGL-fast, and filterable by theme, author or reading status. This is where your corpus starts to look like an argument instead of a pile.</p>
         <div class="views"><span class="vchip"><b>Graph</b> · the whole corpus</span><span class="vchip"><b>Argument map</b> · thesis vs. objections</span></div>
       </div>
       <div class="step">
         <div class="num">4</div>
-        <h3>Interrogate the corpus</h3>
-        <p>Nodus mines what your library does <em>not</em> say: open contradictions become head-to-head debates with a chronology; missing links become research gaps; your questions get tracked against actual coverage.</p>
+        <h3 data-i18n="step4.t">Interrogate the corpus</h3>
+        <p data-i18n="step4.b">Nodus mines what your library does not say: open contradictions become head-to-head debates with a chronology; missing links become research gaps; your questions get tracked against actual coverage.</p>
         <div class="views"><span class="vchip"><b>Debates</b></span><span class="vchip"><b>Gaps</b></span><span class="vchip"><b>Coverage</b></span><span class="vchip"><b>Hypotheses</b></span><span class="vchip"><b>Reading path</b></span></div>
       </div>
       <div class="step">
         <div class="num">5</div>
-        <h3>Write with proof</h3>
-        <p>The writing workshop drafts sections grounded in the graph, and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word.</p>
+        <h3 data-i18n="step5.t">Write with proof</h3>
+        <p data-i18n="step5.b">The writing workshop drafts sections grounded in the graph, and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word.</p>
         <div class="views"><span class="vchip"><b>Writing</b></span><span class="vchip"><b>Deep Research</b></span><span class="vchip"><b>Word add-in</b> · beta</span><span class="vchip"><b>Projects</b></span><span class="vchip"><b>Notes</b></span></div>
       </div>
       <div class="step">
         <div class="num">6</div>
-        <h3>Then listen to it</h3>
-        <p>Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro), or bring a Hume key for cloud voices.</p>
+        <h3 data-i18n="step6.t">Then listen to it</h3>
+        <p data-i18n="step6.b">Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro), or bring a Hume key for cloud voices.</p>
         <div class="views"><span class="vchip"><b>Immersion</b> · audio walks</span><span class="vchip"><b>Study</b> · guides &amp; flashcards</span></div>
       </div>
     </div>
@@ -492,9 +496,9 @@
 <!-- ---------- animated views ---------- -->
 <section id="views" style="background:var(--bg2);border-top:1px solid var(--border)">
   <div class="wrap">
-    <span class="kicker">The views</span>
-    <h2 class="title">Watch each section come alive.</h2>
-    <p class="lead">Every vignette below mirrors a real view of the app, and each one is fully explorable in the live demo.</p>
+    <span class="kicker" data-i18n="views.kicker">The views</span>
+    <h2 class="title" data-i18n="views.title">Watch each section come alive.</h2>
+    <p class="lead" data-i18n="views.lead">Every vignette below mirrors a real view of the app, and each one is fully explorable in the live demo.</p>
     <div class="shots">
 
       <!-- Library -->
@@ -658,7 +662,7 @@
 
     </div>
     <div style="text-align:center;margin-top:56px">
-      <a class="btn primary" href="demo/index.html">Explore all 19 views in the live demo →</a>
+      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Explore all 19 views in the live demo →</a>
     </div>
   </div>
 </section>
@@ -666,15 +670,15 @@
 <!-- ---------- listen ---------- -->
 <section id="listen">
   <div class="wrap">
-    <span class="kicker">Hear your research</span>
-    <h2 class="title">Reports you can read. Or press play.</h2>
-    <p class="lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro, the same local voice model that ships inside the app.</p>
+    <span class="kicker" data-i18n="listen.kicker">Hear your research</span>
+    <h2 class="title" data-i18n="listen.title">Reports you can read. Or press play.</h2>
+    <p class="lead" data-i18n="listen.lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro, the same local voice model that ships inside the app.</p>
     <div class="media-grid">
       <div class="media-card">
         <img src="assets/art/deep-research-cover.svg" alt="Deep research report cover"/>
         <div class="pad">
-          <h3>Deep Research brief</h3>
-          <p>"Retrieval practice: why testing yourself beats re-reading", 6 works, 12 cited ideas, narrated.</p>
+          <h3 data-i18n="listen.c1.t">Deep Research brief</h3>
+          <p data-i18n="listen.c1.b">"Retrieval practice: why testing yourself beats re-reading", 6 works, 12 cited ideas, narrated.</p>
           <div class="player" data-src="assets/audio/deep-research-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">Heart · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
@@ -685,8 +689,8 @@
       <div class="media-card">
         <img src="assets/art/immersion-night-sky.svg" alt="Immersion artwork: night sky"/>
         <div class="pad">
-          <h3>Immersion walk</h3>
-          <p>"Your library as a night sky", a guided audio walk through one constellation of the sample corpus.</p>
+          <h3 data-i18n="listen.c2.t">Immersion walk</h3>
+          <p data-i18n="listen.c2.b">"Your library as a night sky", a guided audio walk through one constellation of the sample corpus.</p>
           <div class="player" data-src="assets/audio/immersion-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">George · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
@@ -697,8 +701,8 @@
       <div class="media-card">
         <img src="assets/art/immersion-threads.svg" alt="Immersion artwork: threads between shelves"/>
         <div class="pad">
-          <h3>Every voice, local by default</h3>
-          <p>Piper and Kokoro synthesize on your machine, nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
+          <h3 data-i18n="listen.c3.t">Every voice, local by default</h3>
+          <p data-i18n="listen.c3.b">Piper and Kokoro synthesize on your machine, nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
           <div class="player" data-src="assets/audio/deep-research-sample.m4a">
             <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
             <div style="flex:1;min-width:0"><div class="lbl">Sample narration</div><div class="bar"><div></div></div></div>
@@ -713,16 +717,16 @@
 <!-- ---------- privacy band ---------- -->
 <section class="band">
   <div class="wrap">
-    <span class="kicker">Free &amp; local-first, honestly</span>
-    <h2 class="title">Completely free. Completely yours.</h2>
-    <p class="lead" style="margin:0 auto">Nodus is open source under the MIT license, no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
+    <span class="kicker" data-i18n="band.kicker">Free &amp; local-first, honestly</span>
+    <h2 class="title" data-i18n="band.title">Completely free. Completely yours.</h2>
+    <p class="lead" style="margin:0 auto" data-i18n="band.lead">Nodus is open source under the MIT license, no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
     <div class="pills">
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Free forever (MIT)</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> 100% local storage</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Offline AI (Ollama · LM Studio)</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Encrypted auto-backups</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Audit ledger</span>
-      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> MCP server built in</span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill1">Free forever (MIT)</span></span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill2">100% local storage</span></span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill3">Offline AI (Ollama · LM Studio)</span></span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill4">Encrypted auto-backups</span></span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill5">Audit ledger</span></span>
+      <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill6">MCP server built in</span></span>
     </div>
   </div>
 </section>
@@ -730,8 +734,8 @@
 <!-- ---------- feature grid ---------- -->
 <section>
   <div class="wrap">
-    <span class="kicker">Everything inside</span>
-    <h2 class="title">One app. The whole research loop.</h2>
+    <span class="kicker" data-i18n="feat.kicker">Everything inside</span>
+    <h2 class="title" data-i18n="feat.title">One app. The whole research loop.</h2>
     <div class="feat-grid" id="featgrid"></div>
   </div>
 </section>
@@ -744,15 +748,15 @@
       <circle cx="18" cy="16" r="6.5" fill="#ddd6fe"/><circle cx="18" cy="48" r="6.5" fill="#a78bfa"/>
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/><circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
-    <h2 class="title">Ready to meet your library?</h2>
-    <p class="lead" style="margin:0 auto 34px">Try the demo right here in your browser, or download the app and point it at your own Zotero. <b style="color:#6ee7b7">Free and open source, forever.</b></p>
+    <h2 class="title" data-i18n="final.title">Ready to meet your library?</h2>
+    <p class="lead" style="margin:0 auto 34px" data-i18n="final.lead">Try the demo right here in your browser, or download the app and point it at your own Zotero. <b style="color:#6ee7b7">Free and open source, forever.</b></p>
     <div class="ctas" style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
       <a class="btn primary" href="demo/index.html">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
-        Try the live demo</a>
+        <span data-i18n="hero.demo">Try the live demo</span></a>
       <button class="btn" onclick="openDl()">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/></svg>
-        Download the app</button>
+        <span data-i18n="final.download">Download the app</span></button>
     </div>
   </div>
 </section>
@@ -768,15 +772,15 @@
     <a href="demo/index.html">Live demo</a> ·
     <a href="https://github.com/Drakonis96/nodus/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
   </div>
-  <p style="margin-top:12px;opacity:0.7">Nodus, a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
+  <p style="margin-top:12px;opacity:0.7" data-i18n="footer.tag">Nodus, a free, open-source, local-first research workspace. Audio samples generated with the app's local Kokoro voices.</p>
 </footer>
 
 <!-- ---------- download modal ---------- -->
 <div class="dl-overlay" id="dl-overlay" onclick="if(event.target===this)closeDl()">
   <div class="dl-modal">
-    <h3>Download Nodus</h3>
-    <div class="ver" id="dl-version">Fetching the latest version…</div>
-    <div class="freeline">100% free · open source · no account needed</div>
+    <h3 data-i18n="dl.title">Download Nodus</h3>
+    <div class="ver" id="dl-version" data-i18n="dl.fetching">Fetching the latest version…</div>
+    <div class="freeline" data-i18n="dl.free">100% free · open source · no account needed</div>
     <a class="dl-plat" id="dl-mac" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">
       <svg class="os" viewBox="0 0 24 24"><path d="M17.05 12.54c-.03-2.68 2.19-3.97 2.29-4.03-1.25-1.82-3.19-2.07-3.87-2.1-1.63-.17-3.2.96-4.03.96-.84 0-2.12-.94-3.49-.91-1.79.03-3.45 1.04-4.37 2.65-1.87 3.24-.48 8.03 1.34 10.66.89 1.29 1.95 2.73 3.34 2.68 1.34-.05 1.85-.87 3.47-.87 1.61 0 2.08.87 3.49.84 1.44-.02 2.36-1.31 3.24-2.6 1.02-1.49 1.44-2.94 1.46-3.01-.03-.02-2.8-1.08-2.87-4.27ZM14.4 4.66c.74-.9 1.24-2.14 1.1-3.39-1.07.04-2.36.71-3.12 1.61-.69.79-1.29 2.06-1.13 3.28 1.19.09 2.41-.6 3.15-1.5Z"/></svg>
       <div><b>macOS</b><span id="dl-mac-sub">Apple Silicon · .dmg</span></div>
@@ -787,8 +791,8 @@
       <div><b>Windows</b><span id="dl-win-sub">x64 installer · .exe</span></div>
       <span class="arr">→</span>
     </a>
-    <a class="dl-all" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">All formats &amp; previous versions →</a>
-    <button class="dl-close" onclick="closeDl()">Close</button>
+    <a class="dl-all" href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener" data-i18n="dl.all">All formats &amp; previous versions →</a>
+    <button class="dl-close" onclick="closeDl()" data-i18n="dl.close">Close</button>
   </div>
 </div>
 
@@ -920,9 +924,12 @@ document.querySelectorAll('.step, .shot, .media-card, .feat, .vig').forEach((el)
     ['MCP server', 'Query your graph from Claude or any MCP client.', S('<path d="M10 14a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 10a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/>')],
     ['Translations', 'AI content translation that preserves every citation link.', S('<path d="m5 8 6 6M4 14l6-6 2-3M2 5h12M7 2h1"/><path d="m22 22-5-10-5 10M14 18h6"/>')],
   ];
-  document.getElementById('featgrid').innerHTML = FEATS.map(([t, d, ic]) =>
-    `<div class="feat"><div class="fic">${ic}</div><h3>${t}</h3><p>${d}</p></div>`).join('');
-  document.querySelectorAll('.feat').forEach((el) => io.observe(el));
+  window.buildFeatures = function (t) {
+    document.getElementById('featgrid').innerHTML = FEATS.map(([name, d, ic], k) =>
+      `<div class="feat"><div class="fic">${ic}</div><h3>${name}</h3><p>${(t && t['feat.d' + (k + 1)]) || d}</p></div>`).join('');
+    document.querySelectorAll('.feat').forEach((el) => io.observe(el));
+  };
+  window.buildFeatures(null);
 })();
 
 // ---------- audio players ----------
@@ -973,7 +980,8 @@ fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 
   .then((r) => r.ok ? r.json() : null)
   .then((j) => {
     if (!j || !j.assets) return;
-    document.getElementById('dl-version').textContent = 'Latest version · ' + j.tag_name;
+    window._latestTag = j.tag_name;
+    if (window.applyDlVersion) window.applyDlVersion();
     const mac = j.assets.find((a) => a.name.endsWith('-mac-arm64.dmg'));
     const win = j.assets.find((a) => a.name.endsWith('-win-x64.exe'));
     const mb = (a) => (a.size / 1048576).toFixed(0) + ' MB';
@@ -988,6 +996,301 @@ fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 
       document.getElementById('dl-win-sub').textContent = 'x64 installer · .exe · ' + mb(win) + ' · ' + j.tag_name;
     }
   }).catch(() => {});
+
+// ---------- i18n (landing page only) ----------
+const LANGS = [
+  { c: 'de', n: 'Deutsch' }, { c: 'en', n: 'English' }, { c: 'es', n: 'Español' },
+  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'zh', n: '中文' },
+];
+const VIG = ['v.library', 'v.graph', 'v.ideas', 'v.debates', 'v.gaps', 'v.deep', 'v.writing', 'v.immersion'];
+const I18N = {
+  es: {
+    'nav.how': `Cómo funciona`, 'nav.views': `Vistas`, 'nav.listen': `Escuchar`, 'nav.demo': `Probar la demo`,
+    'hero.h1': `Mil ideas, dispersas como estrellas.<br/><span class="grad">Nodus conecta las constelaciones.</span>`,
+    'hero.sub': `Una app de escritorio local que convierte tu biblioteca de Zotero en un grafo navegable de ideas, autores, debates y huecos, y luego te ayuda a escribir con citas que puedes verificar de verdad.`,
+    'hero.demo': `Probar la demo`, 'hero.download': `Descargar para macOS y Windows`,
+    'hero.meta': `<b>Totalmente gratis y de código abierto.</b> Sin cuentas, sin suscripciones, sin telemetría, y tu corpus nunca sale de tu máquina.`,
+    'hero.scroll': `desplázate`,
+    'story.kicker': `Cómo funciona`, 'story.title': `Todo pende de un mismo hilo: la idea.`,
+    'story.lead': `Ni archivos, ni PDFs, ni carpetas. Nodus descompone cada obra de tu biblioteca en sus afirmaciones, hallazgos y constructos reales, y luego sigue el hilo allá donde lleve.`,
+    'step1.t': `Sincroniza tu biblioteca`, 'step1.b': `Apunta Nodus a tus colecciones de Zotero. Lee los archivos adjuntos directamente, sin plugins, sin reindexar, sin subir nada. Los duplicados se detectan y se fusionan sin pérdidas.`,
+    'step2.t': `Extrae las ideas`, 'step2.b': `Un paso de IA (en la nube con tu propia clave, o totalmente sin conexión con Ollama / LM Studio) extrae las afirmaciones, hallazgos, métodos y marcos de cada obra, con evidencia literal y referencia de página para cada uno.`,
+    'step3.t': `Míralas conectarse`, 'step3.b': `Las ideas se enlazan en un grafo vivo: apoya, contradice, matiza, amplía. Dirigido por fuerzas, veloz con WebGL y filtrable por tema, autor o estado de lectura. Aquí tu corpus empieza a parecer un argumento en lugar de un montón.`,
+    'step4.t': `Interroga el corpus`, 'step4.b': `Nodus extrae lo que tu biblioteca no dice: las contradicciones abiertas se convierten en debates cara a cara con cronología; los enlaces que faltan se vuelven huecos de investigación; tus preguntas se rastrean frente a la cobertura real.`,
+    'step5.t': `Escribe con pruebas`, 'step5.b': `El taller de escritura redacta secciones ancladas en el grafo, y se niega a citar nada que no corresponda a un elemento real de Zotero. Deep Research compone informes completos de varias páginas con citas. El mismo copiloto funciona en vivo dentro de Microsoft Word.`,
+    'step6.t': `Y luego, escúchalo`, 'step6.b': `Convierte cualquier informe en audio narrado, o haz un paseo guiado e inmersivo por un rincón de tu corpus. Las voces funcionan en local (Piper, Kokoro), o usa una clave de Hume para voces en la nube.`,
+    'views.kicker': `Las vistas`, 'views.title': `Mira cómo cobra vida cada sección.`, 'views.lead': `Cada viñeta de abajo refleja una vista real de la app, y todas son totalmente explorables en la demo.`,
+    'views.cta': `Explora las 19 vistas en la demo →`, 'v.open': `Abrir en la demo →`,
+    'v.library.t': `Entra Zotero, salen ideas`, 'v.library.b': `Sincroniza tus colecciones, conserva las etiquetas de leído, fusiona duplicados sin pérdidas. Cada obra guarda su estado de análisis, nada se escanea dos veces.`,
+    'v.graph.t': `El corpus como constelación`, 'v.graph.b': `Temas, afirmaciones, hallazgos y métodos con aristas tipadas como apoya, contradice y matiza. Los ajustes preestablecidos saltan directamente a contradicciones, huecos o tu ruta de lectura.`,
+    'v.ideas.t': `Afirmaciones con pruebas`, 'v.ideas.b': `Cada idea lleva evidencia literal y una referencia de página. Haz clic en una y obtienes sus relaciones, su autor y el pasaje exacto. Nunca afirmaciones huérfanas.`,
+    'v.debates.t': `Contradicciones, cara a cara`, 'v.debates.b': `Dos posiciones, los autores de cada lado, su evidencia y la cronología de la disputa, construida automáticamente a partir de las aristas de contradicción del grafo.`,
+    'v.gaps.t': `Lo que nadie ha dicho aún`, 'v.gaps.b': `Los enlaces que faltan entre temas se vuelven oportunidades de investigación explícitas, cada una con una pregunta de cobertura redactada y búsqueda de fuentes con un clic.`,
+    'v.deep.t': `Informes que citan de verdad`, 'v.deep.b': `Informes académicos de varias páginas generados en cola, donde cada afirmación remite a una página de tu corpus, con una matriz de apoyo y una edición en audio.`,
+    'v.writing.t': `Borradores con citas verificables`, 'v.writing.b': `El taller compone desde el grafo y se niega a citar nada que no corresponda a un elemento de Zotero. El mismo copiloto funciona en vivo dentro de Microsoft Word.`,
+    'v.immersion.t': `Escucha pensar a tu corpus`, 'v.immersion.b': `Paseos de audio guiados: panorama, estaciones con citas literales, contrastes, fronteras y un examen final. Las voces se generan en local con Piper y Kokoro.`,
+    'listen.kicker': `Escucha tu investigación`, 'listen.title': `Informes que puedes leer. O pulsar play.`,
+    'listen.lead': `Deep Research escribe informes de varias páginas con citas a partir de tu corpus; Inmersión narra paseos guiados por él. Estas muestras se generaron con Kokoro, el mismo modelo de voz local que viene en la app.`,
+    'listen.c1.t': `Resumen de Deep Research`, 'listen.c1.b': `«La práctica de recuperación: por qué examinarte supera a releer», 6 obras, 12 ideas citadas, narrado.`,
+    'listen.c2.t': `Paseo de inmersión`, 'listen.c2.b': `«Tu biblioteca como un cielo nocturno», un paseo de audio guiado por una constelación del corpus de muestra.`,
+    'listen.c3.t': `Toda voz, local por defecto`, 'listen.c3.b': `Piper y Kokoro sintetizan en tu máquina, no se sube nada. ¿Prefieres voces de estudio en la nube? Usa tu propia clave de Hume.`,
+    'band.kicker': `Gratis y local, de verdad`, 'band.title': `Totalmente gratis. Totalmente tuyo.`,
+    'band.lead': `Nodus es de código abierto bajo licencia MIT, sin cuentas, sin suscripciones, sin telemetría. Un único almacén SQLite en disco. La IA es con tu propia clave o totalmente sin conexión con Ollama y LM Studio. Copias de seguridad automáticas cifradas, un registro de auditoría a prueba de manipulaciones y un servidor MCP para que tus propias herramientas de IA consulten el grafo en local.`,
+    'band.pill1': `Gratis para siempre (MIT)`, 'band.pill2': `100% almacenamiento local`, 'band.pill3': `IA sin conexión (Ollama · LM Studio)`, 'band.pill4': `Copias cifradas automáticas`, 'band.pill5': `Registro de auditoría`, 'band.pill6': `Servidor MCP integrado`,
+    'feat.kicker': `Todo dentro`, 'feat.title': `Una sola app. Todo el ciclo de investigación.`,
+    'feat.d1': `Estado del corpus y el siguiente paso recomendado.`, 'feat.d2': `Búsqueda semántica y exacta sobre ideas, autores y pasajes.`, 'feat.d3': `Sincronización con Zotero con fusión de duplicados y recuperación de escaneos.`, 'feat.d4': `Grafo de fuerzas en WebGL de cada idea y relación tipada.`, 'feat.d5': `Tesis, apoyos, objeciones y réplicas, todo arrastrable.`, 'feat.d6': `Afirmaciones y hallazgos con evidencia literal y página.`, 'feat.d7': `Fichas de autor y una matriz de síntesis, canónicas en Zotero.`, 'feat.d8': `Guías, tarjetas y rutas socráticas a partir de tu corpus.`, 'feat.d9': `Paseos de audio narrados con voces generadas en local.`, 'feat.d10': `Lo que tu corpus aún no dice, extraído automáticamente.`, 'feat.d11': `Contradicciones enfrentadas cara a cara con cronología.`, 'feat.d12': `Tus preguntas de investigación contrastadas con evidencia real.`, 'feat.d13': `Las tensiones del grafo se vuelven hipótesis comprobables.`, 'feat.d14': `Un orden sugerido entre obras leídas y no leídas.`, 'feat.d15': `Informes citados de varias páginas, exportables y narrables.`, 'feat.d16': `Borradores con citas verificadas anclados en el grafo.`, 'feat.d17': `El copiloto en vivo dentro de Microsoft Word (beta).`, 'feat.d18': `Entregables, carpetas y enlaces profundos nodus://.`, 'feat.d19': `Consulta tu grafo desde Claude o cualquier cliente MCP.`, 'feat.d20': `Traducción de contenido por IA que conserva cada enlace de cita.`,
+    'final.title': `¿Listo para conocer tu biblioteca?`, 'final.lead': `Prueba la demo aquí mismo en tu navegador, o descarga la app y apúntala a tu propio Zotero. <b style="color:#6ee7b7">Gratis y de código abierto, para siempre.</b>`, 'final.download': `Descargar la app`,
+    'footer.tag': `Nodus, un espacio de investigación local, gratuito y de código abierto. Muestras de audio generadas con las voces locales Kokoro de la app.`,
+    'dl.title': `Descargar Nodus`, 'dl.fetching': `Obteniendo la última versión…`, 'dl.latest': `Última versión`, 'dl.free': `100% gratis · código abierto · sin cuenta`, 'dl.all': `Todos los formatos y versiones anteriores →`, 'dl.close': `Cerrar`,
+  },
+  fr: {
+    'nav.how': `Comment ça marche`, 'nav.views': `Vues`, 'nav.listen': `Écouter`, 'nav.demo': `Essayer la démo`,
+    'hero.h1': `Mille idées, éparpillées comme des étoiles.<br/><span class="grad">Nodus relie les constellations.</span>`,
+    'hero.sub': `Une application de bureau locale qui transforme votre bibliothèque Zotero en un graphe navigable d'idées, d'auteurs, de débats et de lacunes, puis vous aide à écrire avec des citations réellement vérifiables.`,
+    'hero.demo': `Essayer la démo`, 'hero.download': `Télécharger pour macOS et Windows`,
+    'hero.meta': `<b>Entièrement gratuit et open source.</b> Sans compte, sans abonnement, sans télémétrie, et votre corpus ne quitte jamais votre machine.`,
+    'hero.scroll': `défiler`,
+    'story.kicker': `Comment ça marche`, 'story.title': `Tout tient à un seul fil : l'idée.`,
+    'story.lead': `Ni fichiers, ni PDF, ni dossiers. Nodus décompose chaque ouvrage de votre bibliothèque en ses affirmations, résultats et concepts réels, puis suit le fil où qu'il mène.`,
+    'step1.t': `Synchronisez votre bibliothèque`, 'step1.b': `Pointez Nodus vers vos collections Zotero. Il lit directement les fichiers joints, sans plugins, sans réindexation, sans téléversement. Les doublons sont détectés et fusionnés sans perte.`,
+    'step2.t': `Extrayez les idées`, 'step2.b': `Une passe d'IA (dans le cloud avec votre propre clé, ou entièrement hors ligne avec Ollama / LM Studio) extrait les affirmations, résultats, méthodes et cadres de chaque ouvrage, avec une preuve textuelle et une référence de page pour chacun.`,
+    'step3.t': `Regardez-les se connecter`, 'step3.b': `Les idées se relient en un graphe vivant : soutient, contredit, affine, étend. Dirigé par forces, rapide en WebGL et filtrable par thème, auteur ou statut de lecture. C'est là que votre corpus commence à ressembler à un argument plutôt qu'à un tas.`,
+    'step4.t': `Interrogez le corpus`, 'step4.b': `Nodus extrait ce que votre bibliothèque ne dit pas : les contradictions ouvertes deviennent des débats face à face avec une chronologie ; les liens manquants deviennent des lacunes de recherche ; vos questions sont suivies au regard de la couverture réelle.`,
+    'step5.t': `Écrivez avec des preuves`, 'step5.b': `L'atelier d'écriture rédige des sections ancrées dans le graphe, et refuse de citer tout ce qui ne correspond pas à un véritable élément Zotero. Deep Research compose des rapports complets de plusieurs pages avec citations. Le même copilote fonctionne en direct dans Microsoft Word.`,
+    'step6.t': `Puis écoutez-le`, 'step6.b': `Transformez n'importe quel rapport en audio narré, ou faites une promenade guidée et immersive dans un coin de votre corpus. Les voix fonctionnent en local (Piper, Kokoro), ou utilisez une clé Hume pour des voix cloud.`,
+    'views.kicker': `Les vues`, 'views.title': `Voyez chaque section prendre vie.`, 'views.lead': `Chaque vignette ci-dessous reflète une vraie vue de l'application, et chacune est entièrement explorable dans la démo.`,
+    'views.cta': `Explorez les 19 vues dans la démo →`, 'v.open': `Ouvrir dans la démo →`,
+    'v.library.t': `Zotero entre, les idées sortent`, 'v.library.b': `Synchronisez vos collections, gardez les étiquettes « lu », fusionnez les doublons sans perte. Chaque ouvrage conserve son état d'analyse, rien n'est scanné deux fois.`,
+    'v.graph.t': `Le corpus comme une constellation`, 'v.graph.b': `Thèmes, affirmations, résultats et méthodes avec des liens typés comme soutient, contredit et affine. Les préréglages sautent directement aux contradictions, aux lacunes ou à votre parcours de lecture.`,
+    'v.ideas.t': `Des affirmations avec preuves`, 'v.ideas.b': `Chaque idée porte une preuve textuelle et une référence de page. Cliquez sur l'une d'elles et vous obtenez ses relations, son auteur et le passage exact. Jamais d'affirmations orphelines.`,
+    'v.debates.t': `Contradictions, face à face`, 'v.debates.b': `Deux positions, les auteurs de chaque camp, leurs preuves et la chronologie du différend, construites automatiquement à partir des liens de contradiction du graphe.`,
+    'v.gaps.t': `Ce que personne n'a encore dit`, 'v.gaps.b': `Les liens manquants entre thèmes deviennent des opportunités de recherche explicites, chacune avec une question de couverture rédigée et une recherche de sources en un clic.`,
+    'v.deep.t': `Des rapports qui citent vraiment`, 'v.deep.b': `Des rapports académiques de plusieurs pages générés en file d'attente, où chaque affirmation renvoie à une page de votre corpus, avec une matrice de soutien et une édition audio.`,
+    'v.writing.t': `Des brouillons aux citations vérifiables`, 'v.writing.b': `L'atelier compose à partir du graphe et refuse de citer tout ce qui ne correspond pas à un élément Zotero. Le même copilote fonctionne en direct dans Microsoft Word.`,
+    'v.immersion.t': `Entendez votre corpus penser`, 'v.immersion.b': `Promenades audio guidées : panorama, étapes avec citations textuelles, contrastes, frontières et un examen final. Les voix sont générées en local avec Piper et Kokoro.`,
+    'listen.kicker': `Écoutez votre recherche`, 'listen.title': `Des rapports à lire. Ou à écouter.`,
+    'listen.lead': `Deep Research rédige des rapports cités de plusieurs pages à partir de votre corpus ; Immersion en narre des promenades guidées. Ces échantillons ont été générés avec Kokoro, le même modèle de voix local livré avec l'application.`,
+    'listen.c1.t': `Synthèse Deep Research`, 'listen.c1.b': `« La pratique de récupération : pourquoi s'auto-tester vaut mieux que relire », 6 ouvrages, 12 idées citées, narré.`,
+    'listen.c2.t': `Promenade d'immersion`, 'listen.c2.b': `« Votre bibliothèque comme un ciel étoilé », une promenade audio guidée à travers une constellation du corpus d'exemple.`,
+    'listen.c3.t': `Chaque voix, locale par défaut`, 'listen.c3.b': `Piper et Kokoro synthétisent sur votre machine, rien n'est téléversé. Vous préférez des voix cloud de qualité studio ? Utilisez votre propre clé Hume.`,
+    'band.kicker': `Gratuit et local, honnêtement`, 'band.title': `Entièrement gratuit. Entièrement à vous.`,
+    'band.lead': `Nodus est open source sous licence MIT, sans compte, sans abonnement, sans télémétrie. Un seul coffre SQLite sur le disque. L'IA fonctionne avec votre propre clé ou entièrement hors ligne avec Ollama et LM Studio. Sauvegardes automatiques chiffrées, un journal d'audit inviolable et un serveur MCP pour que vos propres outils d'IA interrogent le graphe en local.`,
+    'band.pill1': `Gratuit à vie (MIT)`, 'band.pill2': `Stockage 100% local`, 'band.pill3': `IA hors ligne (Ollama · LM Studio)`, 'band.pill4': `Sauvegardes chiffrées automatiques`, 'band.pill5': `Journal d'audit`, 'band.pill6': `Serveur MCP intégré`,
+    'feat.kicker': `Tout est inclus`, 'feat.title': `Une seule app. Tout le cycle de recherche.`,
+    'feat.d1': `État du corpus et prochaine étape recommandée.`, 'feat.d2': `Recherche sémantique et exacte sur idées, auteurs et passages.`, 'feat.d3': `Synchronisation Zotero avec fusion des doublons et récupération de scan.`, 'feat.d4': `Graphe de forces WebGL de chaque idée et relation typée.`, 'feat.d5': `Thèse, soutiens, objections et réfutations, tous déplaçables.`, 'feat.d6': `Affirmations et résultats avec preuve textuelle et page.`, 'feat.d7': `Fiches d'auteur et matrice de synthèse, canoniques Zotero.`, 'feat.d8': `Guides, cartes mémoire et parcours socratiques issus de votre corpus.`, 'feat.d9': `Promenades audio narrées avec voix générées en local.`, 'feat.d10': `Ce que votre corpus ne dit pas encore, extrait automatiquement.`, 'feat.d11': `Contradictions mises face à face avec chronologie.`, 'feat.d12': `Vos questions de recherche confrontées à des preuves réelles.`, 'feat.d13': `Les tensions du graphe deviennent des hypothèses testables.`, 'feat.d14': `Un ordre suggéré parmi les ouvrages lus et non lus.`, 'feat.d15': `Rapports cités de plusieurs pages, exportables et narrables.`, 'feat.d16': `Brouillons aux citations vérifiées ancrés dans le graphe.`, 'feat.d17': `Le copilote en direct dans Microsoft Word (bêta).`, 'feat.d18': `Livrables, dossiers et liens profonds nodus://.`, 'feat.d19': `Interrogez votre graphe depuis Claude ou tout client MCP.`, 'feat.d20': `Traduction de contenu par IA qui préserve chaque lien de citation.`,
+    'final.title': `Prêt à rencontrer votre bibliothèque ?`, 'final.lead': `Essayez la démo ici même dans votre navigateur, ou téléchargez l'app et pointez-la vers votre propre Zotero. <b style="color:#6ee7b7">Gratuit et open source, pour toujours.</b>`, 'final.download': `Télécharger l'app`,
+    'footer.tag': `Nodus, un espace de recherche local, gratuit et open source. Échantillons audio générés avec les voix locales Kokoro de l'app.`,
+    'dl.title': `Télécharger Nodus`, 'dl.fetching': `Récupération de la dernière version…`, 'dl.latest': `Dernière version`, 'dl.free': `100% gratuit · open source · sans compte`, 'dl.all': `Tous les formats et versions précédentes →`, 'dl.close': `Fermer`,
+  },
+  it: {
+    'nav.how': `Come funziona`, 'nav.views': `Viste`, 'nav.listen': `Ascolta`, 'nav.demo': `Prova la demo`,
+    'hero.h1': `Mille idee, sparse come stelle.<br/><span class="grad">Nodus collega le costellazioni.</span>`,
+    'hero.sub': `Un'app desktop locale che trasforma la tua libreria Zotero in un grafo navigabile di idee, autori, dibattiti e lacune, e poi ti aiuta a scrivere con citazioni davvero verificabili.`,
+    'hero.demo': `Prova la demo`, 'hero.download': `Scarica per macOS e Windows`,
+    'hero.meta': `<b>Completamente gratuito e open source.</b> Nessun account, nessun abbonamento, nessuna telemetria, e il tuo corpus non lascia mai la tua macchina.`,
+    'hero.scroll': `scorri`,
+    'story.kicker': `Come funziona`, 'story.title': `Tutto dipende da un solo filo: l'idea.`,
+    'story.lead': `Non file, non PDF, non cartelle. Nodus scompone ogni opera della tua libreria nelle sue affermazioni, scoperte e costrutti reali, e poi segue il filo ovunque conduca.`,
+    'step1.t': `Sincronizza la tua libreria`, 'step1.b': `Punta Nodus alle tue raccolte Zotero. Legge direttamente i file allegati, senza plugin, senza reindicizzazione, senza caricamenti. I duplicati vengono rilevati e uniti senza perdite.`,
+    'step2.t': `Estrai le idee`, 'step2.b': `Un passaggio di IA (nel cloud con la tua chiave, o completamente offline con Ollama / LM Studio) estrae affermazioni, scoperte, metodi e framework di ogni opera, con prova testuale e riferimento di pagina per ciascuno.`,
+    'step3.t': `Guardale connettersi`, 'step3.b': `Le idee si collegano in un grafo vivo: sostiene, contraddice, affina, estende. Diretto da forze, veloce in WebGL e filtrabile per tema, autore o stato di lettura. È qui che il tuo corpus inizia a sembrare un argomento invece di un mucchio.`,
+    'step4.t': `Interroga il corpus`, 'step4.b': `Nodus estrae ciò che la tua libreria non dice: le contraddizioni aperte diventano dibattiti faccia a faccia con una cronologia; i collegamenti mancanti diventano lacune di ricerca; le tue domande vengono monitorate rispetto alla copertura reale.`,
+    'step5.t': `Scrivi con prove`, 'step5.b': `Il laboratorio di scrittura redige sezioni ancorate al grafo, e si rifiuta di citare qualsiasi cosa non corrisponda a un vero elemento Zotero. Deep Research compone report completi di più pagine con citazioni. Lo stesso copilota funziona dal vivo dentro Microsoft Word.`,
+    'step6.t': `Poi ascoltalo`, 'step6.b': `Trasforma qualsiasi report in audio narrato, o fai una passeggiata guidata e immersiva in un angolo del tuo corpus. Le voci funzionano in locale (Piper, Kokoro), o usa una chiave Hume per voci nel cloud.`,
+    'views.kicker': `Le viste`, 'views.title': `Guarda ogni sezione prendere vita.`, 'views.lead': `Ogni vignetta qui sotto rispecchia una vista reale dell'app, ed è completamente esplorabile nella demo.`,
+    'views.cta': `Esplora tutte le 19 viste nella demo →`, 'v.open': `Apri nella demo →`,
+    'v.library.t': `Entra Zotero, escono idee`, 'v.library.b': `Sincronizza le tue raccolte, mantieni le etichette di lettura, unisci i duplicati senza perdite. Ogni opera conserva il suo stato di analisi, niente viene scansionato due volte.`,
+    'v.graph.t': `Il corpus come costellazione`, 'v.graph.b': `Temi, affermazioni, scoperte e metodi con archi tipizzati come sostiene, contraddice e affina. I preset saltano direttamente a contraddizioni, lacune o al tuo percorso di lettura.`,
+    'v.ideas.t': `Affermazioni con prove`, 'v.ideas.b': `Ogni idea porta una prova testuale e un riferimento di pagina. Cliccane una e ottieni le sue relazioni, il suo autore e il passaggio esatto. Mai affermazioni orfane.`,
+    'v.debates.t': `Contraddizioni, faccia a faccia`, 'v.debates.b': `Due posizioni, gli autori di ciascuna parte, le loro prove e la cronologia della disputa, costruita automaticamente dagli archi di contraddizione del grafo.`,
+    'v.gaps.t': `Ciò che nessuno ha ancora detto`, 'v.gaps.b': `I collegamenti mancanti tra i temi diventano opportunità di ricerca esplicite, ciascuna con una domanda di copertura redatta e una ricerca di fonti con un clic.`,
+    'v.deep.t': `Report che citano davvero`, 'v.deep.b': `Report accademici di più pagine generati in coda, dove ogni affermazione rimanda a una pagina del tuo corpus, con una matrice di supporto e un'edizione audio.`,
+    'v.writing.t': `Bozze con citazioni verificabili`, 'v.writing.b': `Il laboratorio compone dal grafo e si rifiuta di citare qualsiasi cosa non corrisponda a un elemento Zotero. Lo stesso copilota funziona dal vivo dentro Microsoft Word.`,
+    'v.immersion.t': `Ascolta pensare il tuo corpus`, 'v.immersion.b': `Passeggiate audio guidate: panoramica, tappe con citazioni testuali, contrasti, frontiere e un esame finale. Le voci sono generate in locale con Piper e Kokoro.`,
+    'listen.kicker': `Ascolta la tua ricerca`, 'listen.title': `Report da leggere. O da ascoltare.`,
+    'listen.lead': `Deep Research scrive report citati di più pagine dal tuo corpus; Immersione ne narra passeggiate guidate. Questi campioni sono stati generati con Kokoro, lo stesso modello di voce locale incluso nell'app.`,
+    'listen.c1.t': `Sintesi di Deep Research`, 'listen.c1.b': `« La pratica di recupero: perché mettersi alla prova batte il rileggere », 6 opere, 12 idee citate, narrato.`,
+    'listen.c2.t': `Passeggiata immersiva`, 'listen.c2.b': `« La tua libreria come un cielo notturno », una passeggiata audio guidata attraverso una costellazione del corpus di esempio.`,
+    'listen.c3.t': `Ogni voce, locale per impostazione predefinita`, 'listen.c3.b': `Piper e Kokoro sintetizzano sulla tua macchina, niente viene caricato. Preferisci voci cloud di qualità da studio? Usa la tua chiave Hume.`,
+    'band.kicker': `Gratuito e locale, davvero`, 'band.title': `Completamente gratuito. Completamente tuo.`,
+    'band.lead': `Nodus è open source con licenza MIT, senza account, senza abbonamenti, senza telemetria. Un unico archivio SQLite su disco. L'IA funziona con la tua chiave o completamente offline con Ollama e LM Studio. Backup automatici cifrati, un registro di audit a prova di manomissione e un server MCP perché i tuoi strumenti di IA interroghino il grafo in locale.`,
+    'band.pill1': `Gratis per sempre (MIT)`, 'band.pill2': `Archiviazione 100% locale`, 'band.pill3': `IA offline (Ollama · LM Studio)`, 'band.pill4': `Backup cifrati automatici`, 'band.pill5': `Registro di audit`, 'band.pill6': `Server MCP integrato`,
+    'feat.kicker': `Tutto incluso`, 'feat.title': `Un'unica app. L'intero ciclo di ricerca.`,
+    'feat.d1': `Stato del corpus e prossimo passo consigliato.`, 'feat.d2': `Ricerca semantica ed esatta su idee, autori e passaggi.`, 'feat.d3': `Sincronizzazione Zotero con unione dei duplicati e recupero delle scansioni.`, 'feat.d4': `Grafo a forze WebGL di ogni idea e relazione tipizzata.`, 'feat.d5': `Tesi, sostegni, obiezioni e repliche, tutti trascinabili.`, 'feat.d6': `Affermazioni e scoperte con prova testuale e pagina.`, 'feat.d7': `Schede autore e una matrice di sintesi, canoniche in Zotero.`, 'feat.d8': `Guide, flashcard e percorsi socratici dal tuo corpus.`, 'feat.d9': `Passeggiate audio narrate con voci generate in locale.`, 'feat.d10': `Ciò che il tuo corpus non dice ancora, estratto automaticamente.`, 'feat.d11': `Contraddizioni messe faccia a faccia con cronologia.`, 'feat.d12': `Le tue domande di ricerca confrontate con prove reali.`, 'feat.d13': `Le tensioni nel grafo diventano ipotesi verificabili.`, 'feat.d14': `Un ordine suggerito tra opere lette e non lette.`, 'feat.d15': `Report citati di più pagine, esportabili e narrabili.`, 'feat.d16': `Bozze con citazioni verificate ancorate al grafo.`, 'feat.d17': `Il copilota dal vivo dentro Microsoft Word (beta).`, 'feat.d18': `Deliverable, cartelle e link profondi nodus://.`, 'feat.d19': `Interroga il tuo grafo da Claude o qualsiasi client MCP.`, 'feat.d20': `Traduzione di contenuti tramite IA che preserva ogni link di citazione.`,
+    'final.title': `Pronto a incontrare la tua libreria?`, 'final.lead': `Prova la demo qui nel tuo browser, o scarica l'app e puntala al tuo Zotero. <b style="color:#6ee7b7">Gratuita e open source, per sempre.</b>`, 'final.download': `Scarica l'app`,
+    'footer.tag': `Nodus, uno spazio di ricerca locale, gratuito e open source. Campioni audio generati con le voci locali Kokoro dell'app.`,
+    'dl.title': `Scarica Nodus`, 'dl.fetching': `Recupero dell'ultima versione…`, 'dl.latest': `Ultima versione`, 'dl.free': `100% gratis · open source · nessun account`, 'dl.all': `Tutti i formati e le versioni precedenti →`, 'dl.close': `Chiudi`,
+  },
+  de: {
+    'nav.how': `So funktioniert's`, 'nav.views': `Ansichten`, 'nav.listen': `Anhören`, 'nav.demo': `Live-Demo testen`,
+    'hero.h1': `Tausend Ideen, verstreut wie Sterne.<br/><span class="grad">Nodus verbindet die Sternbilder.</span>`,
+    'hero.sub': `Eine lokale Desktop-App, die deine Zotero-Bibliothek in einen navigierbaren Graphen aus Ideen, Autoren, Debatten und Lücken verwandelt und dir dann hilft, mit wirklich überprüfbaren Belegen zu schreiben.`,
+    'hero.demo': `Live-Demo testen`, 'hero.download': `Für macOS & Windows herunterladen`,
+    'hero.meta': `<b>Völlig kostenlos und quelloffen.</b> Keine Konten, keine Abos, keine Telemetrie, und dein Korpus verlässt nie deinen Rechner.`,
+    'hero.scroll': `scrollen`,
+    'story.kicker': `So funktioniert's`, 'story.title': `Alles hängt an einem Faden: der Idee.`,
+    'story.lead': `Keine Dateien, keine PDFs, keine Ordner. Nodus zerlegt jedes Werk deiner Bibliothek in seine tatsächlichen Aussagen, Befunde und Konzepte und folgt dann dem Faden, wohin er auch führt.`,
+    'step1.t': `Bibliothek synchronisieren`, 'step1.b': `Richte Nodus auf deine Zotero-Sammlungen. Es liest die angehängten Dateien direkt, ohne Plugins, ohne Neuindexierung, ohne Uploads. Duplikate werden erkannt und verlustfrei zusammengeführt.`,
+    'step2.t': `Ideen extrahieren`, 'step2.b': `Ein KI-Durchlauf (in der Cloud mit deinem eigenen Schlüssel oder komplett offline mit Ollama / LM Studio) extrahiert Aussagen, Befunde, Methoden und Modelle jedes Werks, mit wörtlichem Beleg und Seitenangabe für jede einzelne.`,
+    'step3.t': `Sieh zu, wie sie sich verbinden`, 'step3.b': `Ideen verknüpfen sich zu einem lebendigen Graphen: stützt, widerspricht, verfeinert, erweitert. Kräftebasiert, WebGL-schnell und filterbar nach Thema, Autor oder Lesestatus. Hier beginnt dein Korpus, wie ein Argument statt wie ein Haufen auszusehen.`,
+    'step4.t': `Befrage den Korpus`, 'step4.b': `Nodus fördert zutage, was deine Bibliothek nicht sagt: offene Widersprüche werden zu Debatten von Angesicht zu Angesicht mit einer Chronologie; fehlende Verbindungen werden zu Forschungslücken; deine Fragen werden gegen die tatsächliche Abdeckung verfolgt.`,
+    'step5.t': `Schreibe mit Belegen`, 'step5.b': `Die Schreibwerkstatt verfasst Abschnitte, die im Graphen verankert sind, und weigert sich, irgendetwas zu zitieren, das nicht auf ein echtes Zotero-Objekt verweist. Deep Research verfasst vollständige mehrseitige Berichte mit Zitaten. Derselbe Copilot läuft live in Microsoft Word.`,
+    'step6.t': `Und dann hör es dir an`, 'step6.b': `Verwandle jeden Bericht in erzähltes Audio oder mach einen immersiven, geführten Rundgang durch eine Ecke deines Korpus. Die Stimmen laufen lokal (Piper, Kokoro), oder nutze einen Hume-Schlüssel für Cloud-Stimmen.`,
+    'views.kicker': `Die Ansichten`, 'views.title': `Sieh jeden Bereich lebendig werden.`, 'views.lead': `Jede Miniatur unten spiegelt eine echte Ansicht der App wider und ist in der Live-Demo vollständig erkundbar.`,
+    'views.cta': `Erkunde alle 19 Ansichten in der Demo →`, 'v.open': `In der Demo öffnen →`,
+    'v.library.t': `Zotero rein, Ideen raus`, 'v.library.b': `Synchronisiere deine Sammlungen, behalte die Gelesen-Tags, führe Duplikate verlustfrei zusammen. Jedes Werk trägt seinen Analysestatus, nichts wird zweimal gescannt.`,
+    'v.graph.t': `Der Korpus als Sternbild`, 'v.graph.b': `Themen, Aussagen, Befunde und Methoden mit typisierten Kanten wie stützt, widerspricht und verfeinert. Voreinstellungen springen direkt zu Widersprüchen, Lücken oder deiner Leseroute.`,
+    'v.ideas.t': `Aussagen mit Belegen`, 'v.ideas.b': `Jede Idee trägt einen wörtlichen Beleg und eine Seitenangabe. Klick eine an und du erhältst ihre Beziehungen, ihren Autor und die exakte Passage. Niemals verwaiste Behauptungen.`,
+    'v.debates.t': `Widersprüche, Kopf an Kopf`, 'v.debates.b': `Zwei Positionen, die Autoren auf jeder Seite, ihre Belege und die Chronologie des Streits, automatisch aus den Widerspruchskanten des Graphen erstellt.`,
+    'v.gaps.t': `Was noch niemand gesagt hat`, 'v.gaps.b': `Fehlende Verbindungen zwischen Themen werden zu ausdrücklichen Forschungschancen, jede mit einer formulierten Abdeckungsfrage und Quellensuche per Klick.`,
+    'v.deep.t': `Berichte, die wirklich zitieren`, 'v.deep.b': `Mehrseitige akademische Berichte, in einer Warteschlange erzeugt, bei denen jede Aussage auf eine Seite deines Korpus verweist, mit einer Belegmatrix und einer Audioausgabe.`,
+    'v.writing.t': `Entwürfe mit überprüfbaren Zitaten`, 'v.writing.b': `Die Werkstatt verfasst aus dem Graphen und weigert sich, irgendetwas zu zitieren, das nicht auf ein Zotero-Objekt verweist. Derselbe Copilot läuft live in Microsoft Word.`,
+    'v.immersion.t': `Hör deinen Korpus denken`, 'v.immersion.b': `Geführte Audio-Rundgänge: Überblick, Stationen mit wörtlichen Zitaten, Kontraste, Grenzen und eine Abschlussprüfung. Die Stimmen werden lokal mit Piper und Kokoro erzeugt.`,
+    'listen.kicker': `Hör deine Forschung`, 'listen.title': `Berichte zum Lesen. Oder zum Abspielen.`,
+    'listen.lead': `Deep Research schreibt mehrseitige, zitierte Berichte aus deinem Korpus; Immersion erzählt geführte Rundgänge durch ihn. Diese Beispiele wurden mit Kokoro erzeugt, demselben lokalen Sprachmodell, das mit der App geliefert wird.`,
+    'listen.c1.t': `Deep-Research-Kurzbericht`, 'listen.c1.b': `„Abrufübung: warum Selbsttesten das Wiederlesen schlägt", 6 Werke, 12 zitierte Ideen, erzählt.`,
+    'listen.c2.t': `Immersions-Rundgang`, 'listen.c2.b': `„Deine Bibliothek als Nachthimmel", ein geführter Audio-Rundgang durch ein Sternbild des Beispielkorpus.`,
+    'listen.c3.t': `Jede Stimme, standardmäßig lokal`, 'listen.c3.b': `Piper und Kokoro synthetisieren auf deinem Rechner, nichts wird hochgeladen. Lieber Cloud-Stimmen in Studioqualität? Nutze deinen eigenen Hume-Schlüssel.`,
+    'band.kicker': `Kostenlos und lokal, ehrlich`, 'band.title': `Völlig kostenlos. Ganz dir gehörend.`,
+    'band.lead': `Nodus ist quelloffen unter der MIT-Lizenz, ohne Konten, ohne Abos, ohne Telemetrie. Ein einziger SQLite-Tresor auf der Festplatte. Die KI läuft mit deinem eigenen Schlüssel oder komplett offline mit Ollama und LM Studio. Verschlüsselte automatische Backups, ein manipulationssicheres Prüfprotokoll und ein MCP-Server, damit deine eigenen KI-Tools den Graphen lokal abfragen können.`,
+    'band.pill1': `Für immer kostenlos (MIT)`, 'band.pill2': `100% lokaler Speicher`, 'band.pill3': `Offline-KI (Ollama · LM Studio)`, 'band.pill4': `Verschlüsselte Auto-Backups`, 'band.pill5': `Prüfprotokoll`, 'band.pill6': `MCP-Server integriert`,
+    'feat.kicker': `Alles drin`, 'feat.title': `Eine App. Der ganze Forschungszyklus.`,
+    'feat.d1': `Korpus-Zustand und der nächste empfohlene Schritt.`, 'feat.d2': `Semantische und exakte Suche über Ideen, Autoren, Passagen.`, 'feat.d3': `Zotero-Sync mit Duplikat-Zusammenführung und Scan-Wiederherstellung.`, 'feat.d4': `WebGL-Kräftegraph jeder Idee und typisierten Beziehung.`, 'feat.d5': `These, Stützen, Einwände und Erwiderungen, alle verschiebbar.`, 'feat.d6': `Aussagen und Befunde mit wörtlichem Beleg und Seite.`, 'feat.d7': `Autorenprofile und eine Synthesematrix, Zotero-kanonisch.`, 'feat.d8': `Leitfäden, Karteikarten und sokratische Routen aus deinem Korpus.`, 'feat.d9': `Erzählte Audio-Rundgänge mit lokal erzeugten Stimmen.`, 'feat.d10': `Was dein Korpus noch nicht sagt, automatisch erschlossen.`, 'feat.d11': `Widersprüche Kopf an Kopf mit Chronologie.`, 'feat.d12': `Deine Forschungsfragen an echten Belegen gemessen.`, 'feat.d13': `Spannungen im Graphen werden zu testbaren Hypothesen.`, 'feat.d14': `Eine vorgeschlagene Reihenfolge gelesener und ungelesener Werke.`, 'feat.d15': `Mehrseitige zitierte Berichte, exportierbar und erzählbar.`, 'feat.d16': `Zitatgeprüfte Entwürfe, im Graphen verankert.`, 'feat.d17': `Der Copilot live in Microsoft Word (Beta).`, 'feat.d18': `Ergebnisse, Ordner und nodus://-Deeplinks.`, 'feat.d19': `Frag deinen Graphen von Claude oder jedem MCP-Client ab.`, 'feat.d20': `KI-Inhaltsübersetzung, die jeden Zitat-Link bewahrt.`,
+    'final.title': `Bereit, deine Bibliothek kennenzulernen?`, 'final.lead': `Teste die Demo direkt hier im Browser, oder lade die App herunter und richte sie auf dein eigenes Zotero. <b style="color:#6ee7b7">Kostenlos und quelloffen, für immer.</b>`, 'final.download': `App herunterladen`,
+    'footer.tag': `Nodus, ein lokaler, kostenloser und quelloffener Forschungsraum. Audiobeispiele erzeugt mit den lokalen Kokoro-Stimmen der App.`,
+    'dl.title': `Nodus herunterladen`, 'dl.fetching': `Neueste Version wird abgerufen…`, 'dl.latest': `Neueste Version`, 'dl.free': `100% kostenlos · quelloffen · kein Konto`, 'dl.all': `Alle Formate & frühere Versionen →`, 'dl.close': `Schließen`,
+  },
+  pt: {
+    'nav.how': `Como funciona`, 'nav.views': `Vistas`, 'nav.listen': `Ouvir`, 'nav.demo': `Testar a demo`,
+    'hero.h1': `Mil ideias, dispersas como estrelas.<br/><span class="grad">O Nodus liga as constelações.</span>`,
+    'hero.sub': `Um aplicativo de desktop local que transforma a sua biblioteca do Zotero num grafo navegável de ideias, autores, debates e lacunas, e depois ajuda você a escrever com citações que dá para verificar de verdade.`,
+    'hero.demo': `Testar a demo`, 'hero.download': `Baixar para macOS e Windows`,
+    'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e o seu corpus nunca sai da sua máquina.`,
+    'hero.scroll': `rolar`,
+    'story.kicker': `Como funciona`, 'story.title': `Tudo pende de um só fio: a ideia.`,
+    'story.lead': `Nem arquivos, nem PDFs, nem pastas. O Nodus decompõe cada obra da sua biblioteca nas suas afirmações, descobertas e construtos reais, e depois segue o fio para onde quer que leve.`,
+    'step1.t': `Sincronize a sua biblioteca`, 'step1.b': `Aponte o Nodus para as suas coleções do Zotero. Ele lê os arquivos anexados diretamente, sem plugins, sem reindexação, sem uploads. Duplicados são detectados e mesclados sem perdas.`,
+    'step2.t': `Extraia as ideias`, 'step2.b': `Uma passagem de IA (na nuvem com a sua própria chave, ou totalmente offline com Ollama / LM Studio) extrai as afirmações, descobertas, métodos e estruturas de cada obra, com evidência literal e referência de página para cada uma.`,
+    'step3.t': `Veja-as se conectarem`, 'step3.b': `As ideias se ligam num grafo vivo: apoia, contradiz, refina, estende. Dirigido por forças, veloz em WebGL e filtrável por tema, autor ou estado de leitura. É aqui que o seu corpus começa a parecer um argumento em vez de uma pilha.`,
+    'step4.t': `Interrogue o corpus`, 'step4.b': `O Nodus extrai o que a sua biblioteca não diz: contradições em aberto viram debates frente a frente com uma cronologia; ligações que faltam viram lacunas de pesquisa; as suas perguntas são acompanhadas em relação à cobertura real.`,
+    'step5.t': `Escreva com provas`, 'step5.b': `A oficina de escrita redige seções ancoradas no grafo e se recusa a citar qualquer coisa que não corresponda a um item real do Zotero. O Deep Research compõe relatórios completos de várias páginas com citações. O mesmo copiloto funciona ao vivo dentro do Microsoft Word.`,
+    'step6.t': `E depois ouça`, 'step6.b': `Transforme qualquer relatório em áudio narrado, ou faça um passeio guiado e imersivo por um canto do seu corpus. As vozes funcionam localmente (Piper, Kokoro), ou use uma chave Hume para vozes na nuvem.`,
+    'views.kicker': `As vistas`, 'views.title': `Veja cada seção ganhar vida.`, 'views.lead': `Cada vinheta abaixo espelha uma vista real do app, e todas são totalmente exploráveis na demo.`,
+    'views.cta': `Explore todas as 19 vistas na demo →`, 'v.open': `Abrir na demo →`,
+    'v.library.t': `Entra Zotero, saem ideias`, 'v.library.b': `Sincronize as suas coleções, mantenha as etiquetas de lido, mescle duplicados sem perdas. Cada obra guarda o seu estado de análise, nada é escaneado duas vezes.`,
+    'v.graph.t': `O corpus como constelação`, 'v.graph.b': `Temas, afirmações, descobertas e métodos com arestas tipadas como apoia, contradiz e refina. As predefinições saltam direto para contradições, lacunas ou a sua rota de leitura.`,
+    'v.ideas.t': `Afirmações com provas`, 'v.ideas.b': `Cada ideia carrega evidência literal e uma referência de página. Clique numa e você obtém as suas relações, o seu autor e a passagem exata. Nunca afirmações órfãs.`,
+    'v.debates.t': `Contradições, frente a frente`, 'v.debates.b': `Duas posições, os autores de cada lado, as suas provas e a cronologia da disputa, construída automaticamente a partir das arestas de contradição do grafo.`,
+    'v.gaps.t': `O que ninguém disse ainda`, 'v.gaps.b': `As ligações que faltam entre temas viram oportunidades de pesquisa explícitas, cada uma com uma pergunta de cobertura redigida e busca de fontes com um clique.`,
+    'v.deep.t': `Relatórios que citam de verdade`, 'v.deep.b': `Relatórios acadêmicos de várias páginas gerados em fila, onde cada afirmação remete a uma página do seu corpus, com uma matriz de apoio e uma edição em áudio.`,
+    'v.writing.t': `Rascunhos com citações verificáveis`, 'v.writing.b': `A oficina compõe a partir do grafo e se recusa a citar qualquer coisa que não corresponda a um item do Zotero. O mesmo copiloto funciona ao vivo dentro do Microsoft Word.`,
+    'v.immersion.t': `Ouça o seu corpus pensar`, 'v.immersion.b': `Passeios de áudio guiados: panorama, estações com citações literais, contrastes, fronteiras e um exame final. As vozes são geradas localmente com Piper e Kokoro.`,
+    'listen.kicker': `Ouça a sua pesquisa`, 'listen.title': `Relatórios para ler. Ou para ouvir.`,
+    'listen.lead': `O Deep Research escreve relatórios citados de várias páginas a partir do seu corpus; a Imersão narra passeios guiados por ele. Estas amostras foram geradas com Kokoro, o mesmo modelo de voz local que vem no app.`,
+    'listen.c1.t': `Resumo do Deep Research`, 'listen.c1.b': `«Prática de recuperação: por que se testar supera reler», 6 obras, 12 ideias citadas, narrado.`,
+    'listen.c2.t': `Passeio de imersão`, 'listen.c2.b': `«A sua biblioteca como um céu noturno», um passeio de áudio guiado por uma constelação do corpus de exemplo.`,
+    'listen.c3.t': `Cada voz, local por padrão`, 'listen.c3.b': `Piper e Kokoro sintetizam na sua máquina, nada é enviado. Prefere vozes de estúdio na nuvem? Use a sua própria chave Hume.`,
+    'band.kicker': `Gratuito e local, de verdade`, 'band.title': `Totalmente gratuito. Totalmente seu.`,
+    'band.lead': `O Nodus é de código aberto sob a licença MIT, sem contas, sem assinaturas, sem telemetria. Um único cofre SQLite no disco. A IA funciona com a sua própria chave ou totalmente offline com Ollama e LM Studio. Backups automáticos criptografados, um registro de auditoria à prova de adulteração e um servidor MCP para que as suas próprias ferramentas de IA consultem o grafo localmente.`,
+    'band.pill1': `Grátis para sempre (MIT)`, 'band.pill2': `Armazenamento 100% local`, 'band.pill3': `IA offline (Ollama · LM Studio)`, 'band.pill4': `Backups criptografados automáticos`, 'band.pill5': `Registro de auditoria`, 'band.pill6': `Servidor MCP integrado`,
+    'feat.kicker': `Tudo dentro`, 'feat.title': `Um app. Todo o ciclo de pesquisa.`,
+    'feat.d1': `Estado do corpus e o próximo passo recomendado.`, 'feat.d2': `Busca semântica e exata sobre ideias, autores e passagens.`, 'feat.d3': `Sincronização com Zotero com mesclagem de duplicados e recuperação de digitalização.`, 'feat.d4': `Grafo de forças em WebGL de cada ideia e relação tipada.`, 'feat.d5': `Tese, apoios, objeções e réplicas, tudo arrastável.`, 'feat.d6': `Afirmações e descobertas com evidência literal e página.`, 'feat.d7': `Fichas de autor e uma matriz de síntese, canônicas no Zotero.`, 'feat.d8': `Guias, flashcards e rotas socráticas a partir do seu corpus.`, 'feat.d9': `Passeios de áudio narrados com vozes geradas localmente.`, 'feat.d10': `O que o seu corpus ainda não diz, extraído automaticamente.`, 'feat.d11': `Contradições postas frente a frente com cronologia.`, 'feat.d12': `As suas perguntas de pesquisa comparadas com evidência real.`, 'feat.d13': `As tensões no grafo viram hipóteses testáveis.`, 'feat.d14': `Uma ordem sugerida entre obras lidas e não lidas.`, 'feat.d15': `Relatórios citados de várias páginas, exportáveis e narráveis.`, 'feat.d16': `Rascunhos com citações verificadas ancorados no grafo.`, 'feat.d17': `O copiloto ao vivo dentro do Microsoft Word (beta).`, 'feat.d18': `Entregáveis, pastas e links profundos nodus://.`, 'feat.d19': `Consulte o seu grafo a partir do Claude ou qualquer cliente MCP.`, 'feat.d20': `Tradução de conteúdo por IA que preserva cada link de citação.`,
+    'final.title': `Pronto para conhecer a sua biblioteca?`, 'final.lead': `Teste a demo aqui mesmo no seu navegador, ou baixe o app e aponte-o para o seu próprio Zotero. <b style="color:#6ee7b7">Gratuito e de código aberto, para sempre.</b>`, 'final.download': `Baixar o app`,
+    'footer.tag': `Nodus, um espaço de pesquisa local, gratuito e de código aberto. Amostras de áudio geradas com as vozes locais Kokoro do app.`,
+    'dl.title': `Baixar o Nodus`, 'dl.fetching': `Obtendo a versão mais recente…`, 'dl.latest': `Versão mais recente`, 'dl.free': `100% grátis · código aberto · sem conta`, 'dl.all': `Todos os formatos e versões anteriores →`, 'dl.close': `Fechar`,
+  },
+  zh: {
+    'nav.how': `工作原理`, 'nav.views': `视图`, 'nav.listen': `收听`, 'nav.demo': `试用演示`,
+    'hero.h1': `千头万绪，如繁星散落。<br/><span class="grad">Nodus 将星座相连。</span>`,
+    'hero.sub': `一款本地优先的桌面应用，把你的 Zotero 库变成可浏览的想法、作者、争论与空白的图谱，再帮你写出真正可核实的引用。`,
+    'hero.demo': `试用演示`, 'hero.download': `下载 macOS 和 Windows 版`,
+    'hero.meta': `<b>完全免费且开源。</b> 无需账户、无需订阅、无遥测，你的语料永远不会离开你的设备。`,
+    'hero.scroll': `向下滚动`,
+    'story.kicker': `工作原理`, 'story.title': `一切系于一线：想法。`,
+    'story.lead': `不是文件，不是 PDF，也不是文件夹。Nodus 将你库中的每一部作品分解为其真实的论点、发现与概念，然后顺着这条线一路追踪。`,
+    'step1.t': `同步你的库`, 'step1.b': `让 Nodus 指向你的 Zotero 合集。它直接读取附件文件，无需插件、无需重建索引、无需上传。重复项会被检测并无损合并。`,
+    'step2.t': `提取想法`, 'step2.b': `一次 AI 处理（用你自己的密钥在云端，或用 Ollama / LM Studio 完全离线）提取每部作品的论点、发现、方法与框架，每一条都附有原文证据和页码引用。`,
+    'step3.t': `看它们相连`, 'step3.b': `想法连成一张鲜活的图谱：支持、反驳、细化、扩展。力导向布局、WebGL 高速，并可按主题、作者或阅读状态筛选。在这里，你的语料开始像一场论证，而不是一堆资料。`,
+    'step4.t': `质询语料`, 'step4.b': `Nodus 挖掘你的库没有说出的东西：开放的矛盾成为带有时间线的正面交锋；缺失的连接成为研究空白；你的问题会对照真实覆盖度被追踪。`,
+    'step5.t': `有据地写作`, 'step5.b': `写作工坊撰写扎根于图谱的章节，并拒绝引用任何无法对应到真实 Zotero 条目的内容。Deep Research 撰写完整的多页引用报告。同一个副驾也在 Microsoft Word 中实时运行。`,
+    'step6.t': `然后聆听它`, 'step6.b': `把任何报告变成朗读音频，或在你语料的一角来一次沉浸式的引导漫步。语音在本地运行（Piper、Kokoro），或用 Hume 密钥使用云端语音。`,
+    'views.kicker': `各个视图`, 'views.title': `看每个板块活起来。`, 'views.lead': `下面每一幅小画面都映照着应用中真实的视图，每一个都能在演示中完整探索。`,
+    'views.cta': `在演示中探索全部 19 个视图 →`, 'v.open': `在演示中打开 →`,
+    'v.library.t': `输入 Zotero，输出想法`, 'v.library.b': `同步你的合集，保留“已读”标签，无损合并重复项。每部作品都记录其分析状态，绝不重复扫描。`,
+    'v.graph.t': `语料如星座`, 'v.graph.b': `主题、论点、发现与方法之间是有类型的连线，如支持、反驳与细化。预设可直接跳转到矛盾、空白或你的阅读路线。`,
+    'v.ideas.t': `有凭据的论点`, 'v.ideas.b': `每个想法都带有原文证据和页码引用。点开一个，你就能看到它的关系、作者以及确切的段落。绝无无源之言。`,
+    'v.debates.t': `矛盾，正面交锋`, 'v.debates.b': `两种立场、各方的作者、他们的证据以及争论的时间线，全部由图谱中的矛盾连线自动生成。`,
+    'v.gaps.t': `尚无人言及之处`, 'v.gaps.b': `主题之间缺失的连接成为明确的研究机会，每个都配有拟好的覆盖问题，并可一键搜寻来源。`,
+    'v.deep.t': `真正会引用的报告`, 'v.deep.b': `在队列中生成的多页学术报告，每个论断都指向你语料中的某一页，并附有支撑矩阵和音频版。`,
+    'v.writing.t': `引用可核实的草稿`, 'v.writing.b': `工坊依据图谱撰写，并拒绝引用任何无法对应到 Zotero 条目的内容。同一个副驾也在 Microsoft Word 中实时运行。`,
+    'v.immersion.t': `听你的语料思考`, 'v.immersion.b': `引导式音频漫步：概览、带原文引用的站点、对比、边界，以及一场期末测验。语音在本地用 Piper 和 Kokoro 生成。`,
+    'listen.kicker': `聆听你的研究`, 'listen.title': `可读的报告，也可一键播放。`,
+    'listen.lead': `Deep Research 从你的语料撰写多页带引用的报告；沉浸模式则朗读引导式的漫步。这些样例由 Kokoro 生成，正是随应用附带的那一本地语音模型。`,
+    'listen.c1.t': `Deep Research 简报`, 'listen.c1.b': `《提取式练习：为何自测胜过重读》，6 部作品，引用 12 个想法，已朗读。`,
+    'listen.c2.t': `沉浸式漫步`, 'listen.c2.b': `《你的书库如夜空》，一段穿越示例语料某个星座的引导式音频漫步。`,
+    'listen.c3.t': `每一种声音，默认本地`, 'listen.c3.b': `Piper 和 Kokoro 在你的设备上合成，什么都不会上传。想要录音室级的云端语音？用你自己的 Hume 密钥。`,
+    'band.kicker': `免费、本地优先，货真价实`, 'band.title': `完全免费。完全属于你。`,
+    'band.lead': `Nodus 采用 MIT 许可开源，无需账户、无需订阅、无遥测。磁盘上只有一个 SQLite 保险库。AI 使用你自己的密钥，或用 Ollama 和 LM Studio 完全离线。加密的自动备份、防篡改的审计日志，以及一个 MCP 服务器，让你自己的 AI 工具在本地查询图谱。`,
+    'band.pill1': `永久免费（MIT）`, 'band.pill2': `100% 本地存储`, 'band.pill3': `离线 AI（Ollama · LM Studio）`, 'band.pill4': `加密自动备份`, 'band.pill5': `审计日志`, 'band.pill6': `内置 MCP 服务器`,
+    'feat.kicker': `一应俱全`, 'feat.title': `一个应用，覆盖整个研究循环。`,
+    'feat.d1': `语料健康状况与下一步推荐操作。`, 'feat.d2': `对想法、作者、段落的语义与精确搜索。`, 'feat.d3': `Zotero 同步，含重复项合并与扫描恢复。`, 'feat.d4': `每个想法与有类型关系的 WebGL 力导向图谱。`, 'feat.d5': `论点、支持、反对与反驳，全部可拖动。`, 'feat.d6': `带原文证据与页码的论点与发现。`, 'feat.d7': `作者档案与综合矩阵，以 Zotero 为准。`, 'feat.d8': `源自你语料的指南、闪卡与苏格拉底式路线。`, 'feat.d9': `用本地生成语音朗读的音频漫步。`, 'feat.d10': `你的语料尚未言及之处，自动挖掘。`, 'feat.d11': `矛盾正面对峙，附带时间线。`, 'feat.d12': `你的研究问题对照真实证据进行追踪。`, 'feat.d13': `图谱中的张力化为可检验的假设。`, 'feat.d14': `在已读与未读作品之间给出建议顺序。`, 'feat.d15': `多页带引用的报告，可导出、可朗读。`, 'feat.d16': `扎根于图谱、经引用核实的草稿。`, 'feat.d17': `在 Microsoft Word 中实时运行的副驾（测试版）。`, 'feat.d18': `成果、文件夹与 nodus:// 深链接。`, 'feat.d19': `从 Claude 或任意 MCP 客户端查询你的图谱。`, 'feat.d20': `保留每个引用链接的 AI 内容翻译。`,
+    'final.title': `准备好认识你的书库了吗？`, 'final.lead': `就在浏览器里试用演示，或下载应用并指向你自己的 Zotero。<b style="color:#6ee7b7">永久免费且开源。</b>`, 'final.download': `下载应用`,
+    'footer.tag': `Nodus，一个本地优先、免费且开源的研究空间。音频样例由应用内置的本地 Kokoro 语音生成。`,
+    'dl.title': `下载 Nodus`, 'dl.fetching': `正在获取最新版本…`, 'dl.latest': `最新版本`, 'dl.free': `100% 免费 · 开源 · 无需账户`, 'dl.all': `所有格式与历史版本 →`, 'dl.close': `关闭`,
+  },
+};
+
+const _orig = new Map();
+document.querySelectorAll('[data-i18n]').forEach((el) => _orig.set(el, el.innerHTML));
+const _vigOrig = [];
+document.querySelectorAll('.shot-txt').forEach((el, i) => {
+  _vigOrig[i] = {
+    t: el.querySelector('h3') ? el.querySelector('h3').innerHTML : '',
+    b: el.querySelector('p') ? el.querySelector('p').innerHTML : '',
+    o: el.querySelector('.try') ? el.querySelector('.try').innerHTML : '',
+  };
+});
+window._dict = {};
+window.applyDlVersion = function () {
+  const ver = document.getElementById('dl-version');
+  if (!ver) return;
+  const d = window._dict || {};
+  ver.textContent = window._latestTag
+    ? ((d['dl.latest'] || 'Latest version') + ' · ' + window._latestTag)
+    : (d['dl.fetching'] || _orig.get(ver) || 'Fetching…');
+};
+function setLang(lang) {
+  const dict = I18N[lang] || {};
+  window._dict = dict;
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const k = el.getAttribute('data-i18n');
+    el.innerHTML = (dict[k] != null) ? dict[k] : _orig.get(el);
+  });
+  document.querySelectorAll('.shot-txt').forEach((el, i) => {
+    const base = VIG[i]; if (!base) return;
+    const h3 = el.querySelector('h3'), p = el.querySelector('p'), tr = el.querySelector('.try');
+    if (h3) h3.innerHTML = dict[base + '.t'] != null ? dict[base + '.t'] : _vigOrig[i].t;
+    if (p) p.innerHTML = dict[base + '.b'] != null ? dict[base + '.b'] : _vigOrig[i].b;
+    if (tr) tr.innerHTML = dict['v.open'] != null ? dict['v.open'] : _vigOrig[i].o;
+  });
+  if (window.buildFeatures) window.buildFeatures(dict);
+  window.applyDlVersion();
+  document.documentElement.lang = lang;
+  try { localStorage.setItem('nodus.lang', lang); } catch (e) {}
+  const sel = document.getElementById('lang-select'); if (sel) sel.value = lang;
+}
+(function () {
+  const sel = document.getElementById('lang-select');
+  sel.innerHTML = LANGS.map((l) => `<option value="${l.c}">${l.n}</option>`).join('');
+  sel.addEventListener('change', () => setLang(sel.value));
+  let lang = 'en';
+  try {
+    const s = localStorage.getItem('nodus.lang');
+    if (s) lang = s;
+    else { const n = (navigator.language || 'en').slice(0, 2); if (LANGS.some((l) => l.c === n)) lang = n; }
+  } catch (e) {}
+  setLang(lang);
+})();
 </script>
 </body>
 </html>
