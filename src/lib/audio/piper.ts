@@ -6,7 +6,12 @@ import type { AudioEngine, AudioVoice } from './types';
 // in the browser's Origin-Private File System and reused offline.
 
 const VOICES: AudioVoice[] = [
-  { provider: 'piper', id: 'es_ES-sharvard-medium', languageLabel: 'Español (España)', name: 'Sharvard', gender: 'female', quality: 'medium', sizeMb: 63, language: 'es_ES' },
+  // Sharvard is a dual-speaker model (speaker_id_map {"M": 0, "F": 1}), but vits-web
+  // hardcodes speaker id 0, so it always renders the *male* speaker regardless of
+  // what we label it — it was mislabelled 'female'. There is no way to select the
+  // female speaker through vits-web's API, so it is correctly a male voice here; the
+  // female Spanish option is es_MX-claude-high (Mexico).
+  { provider: 'piper', id: 'es_ES-sharvard-medium', languageLabel: 'Español (España)', name: 'Sharvard', gender: 'male', quality: 'medium', sizeMb: 63, language: 'es_ES' },
   { provider: 'piper', id: 'es_ES-davefx-medium', languageLabel: 'Español (España)', name: 'Davefx', gender: 'male', quality: 'medium', sizeMb: 63, language: 'es_ES' },
   { provider: 'piper', id: 'es_ES-carlfm-x_low', languageLabel: 'Español (España)', name: 'Carlfm', gender: 'male', quality: 'x_low', sizeMb: 28, language: 'es_ES' },
   { provider: 'piper', id: 'es_MX-claude-high', languageLabel: 'Español (México)', name: 'Claude', gender: 'female', quality: 'high', sizeMb: 114, language: 'es_MX' },

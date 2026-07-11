@@ -55,6 +55,12 @@ export default defineConfig({
       'kokoro-js': path.resolve(__dirname, 'node_modules/kokoro-js/dist/kokoro.web.js'),
     },
   },
+  // The TTS worker (src/lib/audio/tts.worker.ts) lazy-imports vits-web / kokoro-js,
+  // so its bundle is code-split — which Rollup only allows with the ES output
+  // format. This also matches the `{ type: 'module' }` worker we instantiate.
+  worker: {
+    format: 'es',
+  },
   optimizeDeps: {
     // Pre-bundle the WebGL graph stack (incl. the FA2 worker subpath, which the
     // dep scanner misses) so CJS→ESM interop is handled at optimize time.

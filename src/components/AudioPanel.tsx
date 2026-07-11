@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AudioClip, AudioEntityKind, AudioProvider } from '@shared/types';
 import { findVoice, getEngine } from '../lib/audio';
+import { synthesizeSegment } from '../lib/audio/synth';
 import { useAudioPlayer, type PlayerTrack } from './AudioPlayer';
 import { t, tx } from '../i18n';
 
@@ -82,7 +83,6 @@ export function AudioPanel({
     // Local voices carry static metadata; cloud (Hume) voices are dynamic, so the
     // language is best-effort and defaults to empty.
     const language = findVoice(chosen.provider, chosen.voiceId)?.language ?? '';
-    const engine = getEngine(chosen.provider);
     let segments;
     try {
       segments = await window.nodus.getAudioSegments(entityKind, entityId);
@@ -105,7 +105,7 @@ export function AudioPanel({
       for (const segment of segments) {
         if (cancelRef.current) break;
         setRun({ done: clipsDoneRef.current, total: segments.length, label: segment.label });
-        const bytes = await engine.synthesize(segment.text, chosen.voiceId);
+        const bytes = await synthesizeSegment(chosen.provider, chosen.voiceId, segment.text);
         if (cancelRef.current) break;
         const clip = await window.nodus.saveAudioClip(entityKind, entityId, {
           segmentIndex: segment.index,
