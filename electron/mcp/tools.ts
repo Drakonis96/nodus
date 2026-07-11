@@ -444,23 +444,33 @@ export function registerTools(server: McpServer): void {
     'nodus_list_ideas',
     {
       title: 'List ideas',
-      description: 'Lists derived ideas in the local corpus. Read-only; ideas are created only by Nodus deep scans of works.',
+      description:
+        'Lists derived ideas in the local corpus. Returns compact rows (label plus a statement snippet) by default to keep responses cheap; pass full=true for complete statements, or use nodus_get_idea for one idea with relations. Read-only; ideas are created only by Nodus deep scans of works.',
       inputSchema: {
         limit: z.number().int().min(1).max(200).default(100),
         offset: z.number().int().min(0).default(0),
         type: z.enum(IDEA_TYPES).optional(),
         query: querySchema,
+        full: z
+          .boolean()
+          .default(false)
+          .describe('true devuelve el statement completo de cada idea; por defecto solo un fragmento (statementSnippet).'),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ limit, offset, type, query }) =>
+    ({ limit, offset, type, query, full }) =>
       tool(() => {
         const all = ideas
           .allIdeaCandidates()
           .filter((idea) => !type || idea.type === type)
           .filter((idea) => matchesText(query, [idea.label, idea.statement]))
           .sort((a, b) => a.global_id.localeCompare(b.global_id));
-        return page('ideas', all, limit, offset);
+        const result = page('ideas', all, limit, offset);
+        if (full) return result;
+        return {
+          ...result,
+          ideas: result.ideas.map(({ statement, ...idea }) => ({ ...idea, statementSnippet: snippet(statement, 220) })),
+        };
       })()
   );
 

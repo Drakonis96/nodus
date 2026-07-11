@@ -93,6 +93,13 @@ try {
   assert.equal(ideas.total, 1);
   assert.equal(ideas.hasMore, false);
   assert.equal(ideas.ideas[0].global_id, 'idea-1');
+  // Compact by default: a statement snippet instead of the full statement…
+  assert.equal('statement' in ideas.ideas[0], false);
+  assert.match(ideas.ideas[0].statementSnippet, /memoria visual/);
+  // …and full=true restores the complete rows.
+  const fullIdeas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo', full: true });
+  assert.equal(fullIdeas.ideas[0].statement, 'El turismo reorganiza la memoria visual local.');
+  assert.equal('statementSnippet' in fullIdeas.ideas[0], false);
 
   // query must match text fields only — never JSON keys, enum values or internal ids.
   const enumLeak = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'claim' });
