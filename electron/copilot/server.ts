@@ -2,7 +2,7 @@
 // BOTH the add-in's static task-pane files (/addin/*) and a small JSON API (/api/*)
 // on the same HTTPS origin, so Word's webview talks to it without CORS or
 // mixed-content problems. Mirrors the lifecycle/token/127.0.0.1-bind shape of
-// electron/mcp/server.ts but over TLS (cert from office-addin-dev-certs).
+// electron/mcp/server.ts but over TLS (Nodus-owned local CA, see copilot/certs.ts).
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { loadCopilotCert, certReady } from './certs';
+import { loadCopilotCert, certReady, renewLeafIfNeeded } from './certs';
 import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail, searchCopilotIdeas } from '../ai/liveRelations';
 import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getDb } from '../db/database';
@@ -108,12 +108,14 @@ async function serveAddin(req: IncomingMessage, res: ServerResponse, urlPath: st
   try {
     let body: Buffer | string = await readFile(filePath);
     const ext = path.extname(filePath).toLowerCase();
-    // Inject the current token + port into the task pane so it can call /api.
+    // Inject the current token + port + UI language into the task pane so it
+    // can call /api and speak the same language as the app.
     if (ext === '.html') {
       body = body
         .toString('utf8')
         .replace(/__COPILOT_TOKEN__/g, ensureToken())
-        .replace(/__COPILOT_PORT__/g, String(port));
+        .replace(/__COPILOT_PORT__/g, String(port))
+        .replace(/__COPILOT_LANG__/g, getSettings().uiLanguage === 'en' ? 'en' : 'es');
     }
     res.writeHead(200, { 'Content-Type': STATIC_TYPES[ext] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(body);
@@ -248,6 +250,7 @@ async function start(): Promise<void> {
     status = { running: false, port: null, addinUrl: null, certReady: certReady(), error: null };
     return;
   }
+  await renewLeafIfNeeded();
   const cert = loadCopilotCert();
   if (!cert) {
     status = {

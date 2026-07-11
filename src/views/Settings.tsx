@@ -577,7 +577,10 @@ export function Settings({
       )}
 
       {visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost') && (
-          <Section title={t('Copiloto de escritura (Word)')}>
+          <Section title={`${t('Copiloto de escritura (Word)')} · beta`}>
+            <p className="text-xs text-neutral-500">
+              {t('1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.')}
+            </p>
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-neutral-300">{t('Activar Nodus Copilot para Word')}</label>
               <input type="checkbox" checked={settings.copilotEnabled} onChange={(e) => void patch({ copilotEnabled: e.target.checked })} />

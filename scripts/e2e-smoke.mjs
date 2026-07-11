@@ -24,7 +24,7 @@ const require = createRequire(import.meta.url);
 if (!process.argv.includes('--electron-e2e-smoke')) {
   execFileSync(
     path.join(repoRoot, 'node_modules/.bin/electron'),
-    [path.join(repoRoot, 'scripts/test-e2e-smoke.mjs'), '--electron-e2e-smoke'],
+    [path.join(repoRoot, 'scripts/e2e-smoke.mjs'), '--electron-e2e-smoke'],
     { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' }
   );
   process.exit(0);

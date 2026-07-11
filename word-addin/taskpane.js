@@ -3,6 +3,7 @@
   'use strict';
 
   var TOKEN = (window.NODUS && window.NODUS.token) || '';
+  var LANG = (window.NODUS && window.NODUS.lang) === 'en' ? 'en' : 'es';
   var DEBOUNCE_MS = 700;
   var MIN_CHARS = 12;
 
@@ -14,20 +15,94 @@
   var autoAnalyze = true;
   var detailCache = {};
 
-  var RELATION_LABEL = {
-    supports: 'apoya',
-    contradicts: 'contradice',
-    refines: 'matiza',
-    extends: 'amplía',
-    related: 'relacionada',
+  // The pane follows the Nodus UI language (injected by the copilot server).
+  var STR = {
+    es: {
+      connecting: 'Conectando…',
+      searchPlaceholder: 'Buscar ideas, autores u obras',
+      searchTitle: 'Buscar',
+      analyze: 'Analizar párrafo',
+      emptyInitial: 'Coloca el cursor en un párrafo para ver ideas relacionadas.',
+      untitled: 'Sin título',
+      oneWork: '1 obra',
+      manyWorks: ' obras',
+      searchCopied: 'búsqueda copiada',
+      openedInNodus: 'Abierto en Nodus',
+      connections: 'Conexiones',
+      noConnections: 'Sin conexiones directas.',
+      open: 'Abrir',
+      loadingIdea: 'Cargando idea…',
+      sources: 'Fuentes',
+      noWorks: 'Sin obras asociadas.',
+      ideaLoadError: 'Error al cargar la idea: ',
+      inserting: 'Insertando…',
+      ideaInserted: 'Idea insertada',
+      details: 'Detalles',
+      openInNodus: 'Abrir en Nodus',
+      insertWithAi: 'Insertar con IA',
+      noRelated: 'Sin ideas relacionadas para este párrafo.',
+      noSearchResults: 'Sin ideas para esa búsqueda.',
+      cursorInParagraph: 'Coloca el cursor en un párrafo con texto.',
+      findingRelated: 'Buscando ideas relacionadas…',
+      needEmbeddings: 'Configura embeddings en Nodus para buscar relaciones.',
+      queryError: 'Error al consultar Nodus: ',
+      searching: 'Buscando ideas…',
+      searchError: 'Error al buscar: ',
+      connectedWorks: 'Conectado · {n} obras',
+      connectedNoEmbeddings: 'Conectado (sin embeddings)',
+      notResponding: 'Nodus no responde · abre Nodus con el copiloto activado',
+      wordOnly: 'Este complemento solo funciona en Word.',
+      nodusError: 'Error de Nodus',
+      relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
+      kind: { idea: 'idea', note: 'nota', passage: 'pasaje', work: 'obra' },
+    },
+    en: {
+      connecting: 'Connecting…',
+      searchPlaceholder: 'Search ideas, authors or works',
+      searchTitle: 'Search',
+      analyze: 'Analyze paragraph',
+      emptyInitial: 'Place the cursor in a paragraph to see related ideas.',
+      untitled: 'Untitled',
+      oneWork: '1 work',
+      manyWorks: ' works',
+      searchCopied: 'search copied',
+      openedInNodus: 'Opened in Nodus',
+      connections: 'Connections',
+      noConnections: 'No direct connections.',
+      open: 'Open',
+      loadingIdea: 'Loading idea…',
+      sources: 'Sources',
+      noWorks: 'No linked works.',
+      ideaLoadError: 'Could not load the idea: ',
+      inserting: 'Inserting…',
+      ideaInserted: 'Idea inserted',
+      details: 'Details',
+      openInNodus: 'Open in Nodus',
+      insertWithAi: 'Insert with AI',
+      noRelated: 'No related ideas for this paragraph.',
+      noSearchResults: 'No ideas match that search.',
+      cursorInParagraph: 'Place the cursor in a paragraph with text.',
+      findingRelated: 'Finding related ideas…',
+      needEmbeddings: 'Configure embeddings in Nodus to find relations.',
+      queryError: 'Error querying Nodus: ',
+      searching: 'Searching ideas…',
+      searchError: 'Search error: ',
+      connectedWorks: 'Connected · {n} works',
+      connectedNoEmbeddings: 'Connected (no embeddings)',
+      notResponding: 'Nodus is not responding · open Nodus with the copilot enabled',
+      wordOnly: 'This add-in only works in Word.',
+      nodusError: 'Nodus error',
+      relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
+      kind: { idea: 'idea', note: 'note', passage: 'passage', work: 'work' },
+    },
   };
 
-  var KIND_LABEL = {
-    idea: 'idea',
-    note: 'nota',
-    passage: 'pasaje',
-    work: 'obra',
-  };
+  function T(key) {
+    return STR[LANG][key] !== undefined ? STR[LANG][key] : STR.es[key];
+  }
+
+  var RELATION_LABEL = T('relation');
+  var KIND_LABEL = T('kind');
 
   function api(path, options) {
     options = options || {};
@@ -35,7 +110,7 @@
     return fetch(path, options).then(function (res) {
       return res.text().then(function (raw) {
         var data = raw ? JSON.parse(raw) : {};
-        if (!res.ok) throw new Error(data.error || res.statusText || 'Error de Nodus');
+        if (!res.ok) throw new Error(data.error || res.statusText || T('nodusError'));
         return data;
       });
     });
@@ -143,13 +218,13 @@
   }
 
   function primaryLabel(item) {
-    return item.label || item.targetLabel || item.globalId || item.targetId || 'Sin título';
+    return item.label || item.targetLabel || item.globalId || item.targetId || T('untitled');
   }
 
   function subtitleFor(item) {
     if (item.workCount != null) {
       var parts = [];
-      parts.push(item.workCount === 1 ? '1 obra' : item.workCount + ' obras');
+      parts.push(item.workCount === 1 ? T('oneWork') : item.workCount + T('manyWorks'));
       if (item.authorYear) parts.push(item.authorYear);
       else if (item.sourceLabel) parts.push(item.sourceLabel);
       return parts.join(' · ');
@@ -179,7 +254,7 @@
       }).catch(function () {});
       if (item.searchString && navigator.clipboard) {
         navigator.clipboard.writeText(item.searchString).then(function () {
-          copied.textContent = 'búsqueda copiada';
+          copied.textContent = T('searchCopied');
           setTimeout(function () { copied.textContent = ''; }, 2200);
         });
       }
@@ -193,7 +268,7 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ideaId: ideaId }),
     }).then(function () {
-      setStatus('Abierto en Nodus', 'ok');
+      setStatus(T('openedInNodus'), 'ok');
     }).catch(function (e) {
       setStatus(e.message, 'err');
     });
@@ -201,9 +276,9 @@
 
   function renderConnections(container, detail) {
     var wrap = textEl('div', 'detail-section', '');
-    wrap.appendChild(textEl('div', 'section-title', 'Conexiones'));
+    wrap.appendChild(textEl('div', 'section-title', T('connections')));
     if (!detail.connections || !detail.connections.length) {
-      wrap.appendChild(textEl('p', 'muted', 'Sin conexiones directas.'));
+      wrap.appendChild(textEl('p', 'muted', T('noConnections')));
       container.appendChild(wrap);
       return;
     }
@@ -214,7 +289,7 @@
       head.appendChild(textEl('span', 'connection-title', connection.otherLabel));
       row.appendChild(head);
       if (connection.otherStatement) row.appendChild(textEl('p', 'connection-text', connection.otherStatement));
-      row.appendChild(button('Abrir', 'btn tiny', function () { openInNodus(connection.otherId); }));
+      row.appendChild(button(T('open'), 'btn tiny', function () { openInNodus(connection.otherId); }));
       wrap.appendChild(row);
     });
     container.appendChild(wrap);
@@ -228,7 +303,7 @@
     }
 
     var detail = textEl('div', 'detail', '');
-    detail.appendChild(textEl('div', 'spin', 'Cargando idea…'));
+    detail.appendChild(textEl('div', 'spin', T('loadingIdea')));
     card.appendChild(detail);
 
     function draw(payload) {
@@ -237,9 +312,9 @@
       detail.appendChild(textEl('p', 'statement', idea.idea.statement));
 
       var sourceWrap = textEl('div', 'detail-section', '');
-      sourceWrap.appendChild(textEl('div', 'section-title', 'Fuentes'));
+      sourceWrap.appendChild(textEl('div', 'section-title', T('sources')));
       if (!idea.occurrences.length) {
-        sourceWrap.appendChild(textEl('p', 'muted', 'Sin obras asociadas.'));
+        sourceWrap.appendChild(textEl('p', 'muted', T('noWorks')));
       } else {
         idea.occurrences.slice(0, 6).forEach(function (occurrence) {
           var source = textEl('div', 'source', '');
@@ -266,14 +341,14 @@
       detailCache[ideaId] = payload;
       draw(payload);
     }).catch(function (e) {
-      detail.textContent = 'Error al cargar la idea: ' + e.message;
+      detail.textContent = T('ideaLoadError') + e.message;
     });
   }
 
   function insertIdea(ideaId, btn) {
     var original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = 'Insertando…';
+    btn.textContent = T('inserting');
     Promise.all([getCurrentParagraph(), getSelectionText()])
       .then(function (values) {
         return api('/api/insert', {
@@ -284,7 +359,7 @@
       })
       .then(function (result) {
         return insertAtCursor(result.text).then(function () {
-          setStatus('Idea insertada', 'ok');
+          setStatus(T('ideaInserted'), 'ok');
         });
       })
       .catch(function (e) {
@@ -323,9 +398,9 @@
 
       var actions = textEl('div', 'actions', '');
       if (ideaId) {
-        actions.appendChild(button('Detalles', 'btn small', function () { renderDetail(card, ideaId); }));
-        actions.appendChild(button('Abrir en Nodus', 'btn small', function () { openInNodus(ideaId); }));
-        actions.appendChild(button('Insertar con IA', 'btn small primary', function () { insertIdea(ideaId, this); }));
+        actions.appendChild(button(T('details'), 'btn small', function () { renderDetail(card, ideaId); }));
+        actions.appendChild(button(T('openInNodus'), 'btn small', function () { openInNodus(ideaId); }));
+        actions.appendChild(button(T('insertWithAi'), 'btn small primary', function () { insertIdea(ideaId, this); }));
       }
       appendZoteroAction(actions, item);
       if (actions.childNodes.length) card.appendChild(actions);
@@ -338,11 +413,11 @@
     var sorted = relations.slice().sort(function (a, b) {
       return (b.rankScore || b.confidence || b.similarity || 0) - (a.rankScore || a.confidence || a.similarity || 0);
     });
-    renderItems(sorted, 'Sin ideas relacionadas para este párrafo.');
+    renderItems(sorted, T('noRelated'));
   }
 
   function renderSearch(ideas) {
-    renderItems(ideas, 'Sin ideas para esa búsqueda.');
+    renderItems(ideas, T('noSearchResults'));
   }
 
   function analyze(force) {
@@ -350,7 +425,7 @@
     getCurrentParagraph().then(function (text) {
       els.paragraph.textContent = text ? text.slice(0, 360) : '';
       if (text.length < MIN_CHARS) {
-        renderEmpty('Coloca el cursor en un párrafo con texto.');
+        renderEmpty(T('cursorInParagraph'));
         lastHash = '';
         return;
       }
@@ -360,7 +435,7 @@
 
       var seq = ++requestSeq;
       els.empty.style.display = 'block';
-      els.empty.textContent = 'Buscando ideas relacionadas…';
+      els.empty.textContent = T('findingRelated');
       els.results.innerHTML = '';
 
       api('/api/relations', {
@@ -371,14 +446,14 @@
         .then(function (data) {
           if (seq !== requestSeq) return;
           if (!data.available) {
-            renderEmpty('Configura embeddings en Nodus para buscar relaciones.');
+            renderEmpty(T('needEmbeddings'));
             return;
           }
           renderRelations(data.relations || []);
         })
         .catch(function (e) {
           if (seq !== requestSeq) return;
-          renderEmpty('Error al consultar Nodus: ' + e.message);
+          renderEmpty(T('queryError') + e.message);
         });
     });
   }
@@ -392,7 +467,7 @@
     var seq = ++requestSeq;
     els.paragraph.textContent = '';
     els.empty.style.display = 'block';
-    els.empty.textContent = 'Buscando ideas…';
+    els.empty.textContent = T('searching');
     els.results.innerHTML = '';
 
     api('/api/search', {
@@ -406,7 +481,7 @@
       })
       .catch(function (e) {
         if (seq !== requestSeq) return;
-        renderEmpty('Error al buscar: ' + e.message);
+        renderEmpty(T('searchError') + e.message);
       });
   }
 
@@ -424,15 +499,16 @@
   function checkHealth() {
     api('/api/health')
       .then(function (data) {
-        if (data.embeddingsConfigured) setStatus('Conectado · ' + data.corpusSize + ' obras', 'ok');
-        else setStatus('Conectado (sin embeddings)', 'ok');
+        if (data.embeddingsConfigured) setStatus(T('connectedWorks').replace('{n}', data.corpusSize), 'ok');
+        else setStatus(T('connectedNoEmbeddings'), 'ok');
       })
-      .catch(function () { setStatus('Nodus no responde', 'err'); });
+      .catch(function () { setStatus(T('notResponding'), 'err'); });
   }
 
   Office.onReady(function (info) {
     if (info.host !== Office.HostType.Word) {
-      document.body.innerHTML = '<p style="padding:16px">Este complemento solo funciona en Word.</p>';
+      document.body.innerHTML = '<p style="padding:16px"></p>';
+      document.body.firstChild.textContent = T('wordOnly');
       return;
     }
     els.status = document.getElementById('status');
@@ -443,6 +519,13 @@
     els.autoToggle = document.getElementById('autoToggle');
     els.searchBox = document.getElementById('searchBox');
     els.searchBtn = document.getElementById('searchBtn');
+
+    document.documentElement.lang = LANG;
+    els.status.textContent = T('connecting');
+    els.searchBox.placeholder = T('searchPlaceholder');
+    els.searchBtn.title = T('searchTitle');
+    els.analyzeBtn.textContent = T('analyze');
+    els.empty.textContent = T('emptyInitial');
 
     applyOfficeTheme();
     try {
@@ -467,6 +550,14 @@
       }
     };
     els.autoToggle.onchange = function () { autoAnalyze = els.autoToggle.checked; };
+
+    // The status chip doubles as a retry button when Nodus is unreachable.
+    els.status.style.cursor = 'pointer';
+    els.status.onclick = function () {
+      setStatus(T('connecting'), '');
+      checkHealth();
+      analyze(true);
+    };
 
     Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, onSelectionChanged);
     checkHealth();

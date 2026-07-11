@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.7.0 — 2026-07-11
+
+### Added
+
+- **Word writing copilot, official beta.** The add-in is now installable from
+  the packaged app — no development tooling required. Nodus generates its own
+  local CA (10 years, trusted once per machine via the system dialog) and a
+  localhost certificate (1 year) that is silently re-issued before expiry, with
+  no new trust prompt. Machines that already trusted the old dev certificate
+  keep working unchanged.
+- The task pane follows the Nodus interface language (Spanish/English), and its
+  status chip doubles as a retry button when Nodus is unreachable. The Settings
+  section shows the three setup steps and is labeled as beta.
+
+### Changed
+
+- The test suite now runs under Node's built-in test runner: `npm test`
+  discovers `scripts/test-*.mjs` and runs the 32 scripts in parallel (seconds
+  instead of a serial chain), with unified reporting. Each script remains
+  runnable on its own (`node scripts/test-<name>.mjs`); the e2e smoke stays a
+  separate `npm run test:e2e`.
+- Dependency swap: `office-addin-dev-certs` (CLI, unusable from a packaged app)
+  replaced by `mkcert` (pure JS, bundled into the main process).
+
+### Notes
+
+- No database migration; the schema stays at v31.
+
 ## 1.6.0 — 2026-07-11
 
 Consolidation release: no new features. Provider configuration that had been

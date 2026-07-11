@@ -49,7 +49,7 @@ science-of-learning sample — no real library required).
 | **Read** | Two-level scanning: light (title + abstract, cheap) and deep (full text, ideas + evidence + relations). Automatic or manual, your choice. |
 | **Understand** | Idea graph (Cytoscape.js), author graph, debate view (contradictions as two-sided face-offs), Tutor mode (AI-guided step-by-step walkthrough). |
 | **Orient** | Research gap mining, reading path planner, research coverage map (decompose a thesis question, map which sub-questions your corpus covers). |
-| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. |
+| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. A Word add-in (beta) shows, live while you type, how the current paragraph relates to your library — installable from Settings → Integrations (see [word-addin/README.md](word-addin/README.md)). |
 | **Converse** | Research assistant chat grounded in your corpus (ideas, passages, contradictions, gaps, author graph — you pick the context). |
 
 ### Demo mode

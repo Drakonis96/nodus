@@ -301,6 +301,8 @@ export const EN: Record<string, string> = {
   'Servidor MCP': 'MCP server',
   'Activar servidor MCP': 'Enable MCP server',
   'Copiloto de escritura (Word)': 'Writing copilot (Word)',
+  '1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.':
+    '1) Generate the local certificate · 2) Enable the copilot · 3) Install it in Word and open it from the Nodus tab.',
   'Activar copiloto para Word': 'Enable Word copilot',
   'Activar Nodus Copilot para Word': 'Enable Nodus Copilot for Word',
   'Generar certificado': 'Generate certificate',

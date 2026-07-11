@@ -405,7 +405,7 @@ export function registerIpc(
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
-    const result = await ensureCopilotCert(app.getAppPath());
+    const result = await ensureCopilotCert();
     if (result.ok && getSettings().copilotEnabled) await restartCopilotServer();
     return result;
   });
