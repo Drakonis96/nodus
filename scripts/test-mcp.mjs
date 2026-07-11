@@ -93,6 +93,16 @@ try {
   assert.equal(ideas.hasMore, false);
   assert.equal(ideas.ideas[0].global_id, 'idea-1');
 
+  // query must match text fields only — never JSON keys, enum values or internal ids.
+  const enumLeak = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'claim' });
+  assert.equal(enumLeak.total, 0, 'query must not match the type enum');
+  const idLeak = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'idea-1' });
+  assert.equal(idLeak.total, 0, 'query must not match internal ids');
+  const statementHit = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'memoria visual' });
+  assert.equal(statementHit.total, 1, 'query must match the statement text');
+  const noteKindLeak = await callTool(server, 'nodus_search_notes', { query: 'markdown', limit: 10, offset: 0 });
+  assert.equal(noteKindLeak.total, 0, 'note query must not match the kind enum');
+
   const gaps = await callTool(server, 'nodus_list_gaps', { limit: 10, offset: 0, kind: 'open_question' });
   assert.equal(gaps.total, 1);
   assert.equal(gaps.gaps[0].gapIds[0], 'gap-1');

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import type {
   AiProvider,
+  Debate,
   LightStatus,
   DeepStatus,
   ModelRef,
@@ -160,7 +161,13 @@ const paginationSchema = {
   offset: z.number().int().min(0).default(0),
 };
 const compactLimitSchema = z.number().int().min(1).max(100).default(25);
-const querySchema = z.string().trim().min(1).max(1_000).optional();
+const querySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1_000)
+  .optional()
+  .describe('Case-insensitive substring matched against the main text fields of each entity (title/label, statement/content…), never against ids or enum values.');
 
 class McpToolError extends Error {
   constructor(
@@ -249,9 +256,25 @@ function page<T, K extends string>(key: K, rows: T[], limit: number, offset: num
   } as Record<K, T[]> & { total: number; limit: number; offset: number; hasMore: boolean };
 }
 
-function matchesQuery(value: unknown, query?: string): boolean {
+/** Case-insensitive substring match over an entity's human-readable text fields only,
+ *  so a query never matches JSON keys, enum values or internal ids. */
+function matchesText(query: string | undefined, fields: (string | null | undefined)[]): boolean {
   if (!query?.trim()) return true;
-  return (JSON.stringify(value) ?? '').toLowerCase().includes(query.trim().toLowerCase());
+  const q = query.trim().toLowerCase();
+  return fields.some((field) => !!field && field.toLowerCase().includes(q));
+}
+
+function debateSearchFields(debate: Debate): string[] {
+  return [
+    debate.tension,
+    ...debate.sharedThemes,
+    ...[debate.sideA, debate.sideB].flatMap((side) => [
+      side.label,
+      side.statement,
+      ...side.authors,
+      ...side.works.map((work) => work.title),
+    ]),
+  ];
 }
 
 function snippet(text: string | null | undefined, max = 360): string {
@@ -435,7 +458,7 @@ export function registerTools(server: McpServer): void {
         const all = ideas
           .allIdeaCandidates()
           .filter((idea) => !type || idea.type === type)
-          .filter((idea) => matchesQuery(idea, query))
+          .filter((idea) => matchesText(query, [idea.label, idea.statement]))
           .sort((a, b) => a.global_id.localeCompare(b.global_id));
         return page('ideas', all, limit, offset);
       })()
@@ -564,7 +587,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ limit, offset, query }) =>
       tool(() => {
-        const all = getDebates().filter((debate) => matchesQuery(debate, query));
+        const all = getDebates().filter((debate) => matchesText(query, debateSearchFields(debate)));
         return page('debates', all, limit, offset);
       })()
   );
@@ -595,7 +618,9 @@ export function registerTools(server: McpServer): void {
     },
     ({ limit, offset, query, kind }) =>
       tool(() => {
-        const all = gaps.aggregateGaps().filter((gap) => (!kind || gap.kind === kind) && matchesQuery(gap, query));
+        const all = gaps
+          .aggregateGaps()
+          .filter((gap) => (!kind || gap.kind === kind) && matchesText(query, [gap.statement, ...gap.works.map((work) => work.title)]));
         return page('gaps', all, limit, offset);
       })()
   );
@@ -909,7 +934,7 @@ export function registerTools(server: McpServer): void {
         const all = themes
           .listManagedThemes()
           .filter((theme) => pinned === undefined || theme.pinned === pinned)
-          .filter((theme) => matchesQuery(theme, query));
+          .filter((theme) => matchesText(query, [theme.label]));
         return page('themes', all, limit, offset);
       })()
   );
@@ -970,7 +995,15 @@ export function registerTools(server: McpServer): void {
           .listTutorRoutes()
           .filter((route) => !mode || route.mode === mode)
           .filter((route) => minRating === undefined || (route.rating ?? 0) >= minRating)
-          .filter((route) => matchesQuery(route, query))
+          .filter((route) =>
+            matchesText(query, [
+              route.prompt,
+              route.overview,
+              route.route.title,
+              route.route.description,
+              ...route.route.stops.flatMap((stop) => [stop.title, stop.focus]),
+            ])
+          )
           .map(compactTutorRoute);
         return page('routes', all, limit, offset);
       })()
@@ -1011,7 +1044,7 @@ export function registerTools(server: McpServer): void {
           .listProjects()
           .filter((project) => !kind || project.kind === (kind as ProjectKind))
           .filter((project) => !status || project.status === (status as ProjectStatus))
-          .filter((project) => matchesQuery(project, query));
+          .filter((project) => matchesText(query, [project.title, project.brief]));
         return page('projects', all, limit, offset);
       })()
   );
@@ -1057,7 +1090,7 @@ export function registerTools(server: McpServer): void {
         const all = tree.notes
           .filter((note) => !kind || note.kind === kind)
           .filter((note) => folderId === undefined || note.folderId === folderId)
-          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .filter((note) => matchesText(query, [note.title, note.content]))
           .map((note) => ({
             id: note.id,
             folderId: note.folderId,
@@ -1088,7 +1121,7 @@ export function registerTools(server: McpServer): void {
         const filteredNotes = tree.notes
           .filter((note) => !kind || note.kind === kind)
           .filter((note) => folderId === undefined || note.folderId === folderId)
-          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .filter((note) => matchesText(query, [note.title, note.content]))
           .map(({ content: _content, ...note }) => ({ ...note, contentSnippet: snippet(_content, 220) }));
         return { folders: tree.folders, ...page('notes', filteredNotes, limit, offset) };
       })()
