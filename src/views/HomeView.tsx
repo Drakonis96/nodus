@@ -311,15 +311,16 @@ export function HomeView({
 
         <StatusCard
           title={t('Configuración IA')}
-          icon={settings.defaultModel ? 'check' : 'alert'}
-          tone={settings.defaultModel ? 'green' : 'red'}
-          metric={settings.defaultModel ? t('lista') : t('pendiente')}
-          metricLabel={t('modelo predeterminado')}
+          icon={settings.extractionModel && settings.synthesisModel ? 'check' : 'alert'}
+          tone={settings.extractionModel && settings.synthesisModel ? 'green' : 'red'}
+          metric={settings.extractionModel && settings.synthesisModel ? t('lista') : t('pendiente')}
+          metricLabel={t('modelos por tarea')}
           action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
           <ProgressLine label={t('embeddings')} value={stats.embeddedIdeas} total={stats.totalEmbeddableIdeas} />
           <div className="flex flex-wrap gap-1.5 mt-3">
-            {settings.defaultModel && <Badge color="green">{settings.defaultModel.provider}</Badge>}
+            {settings.extractionModel && <Badge color="green">{tx('Extracción: {provider}', { provider: settings.extractionModel.provider })}</Badge>}
+            {settings.synthesisModel && <Badge color="indigo">{tx('Síntesis: {provider}', { provider: settings.synthesisModel.provider })}</Badge>}
             {stats.embeddingIncompleteWorks > 0 && <Badge color="amber">{tx('{n} obras por indexar', { n: stats.embeddingIncompleteWorks })}</Badge>}
             {!settings.zoteroStoragePath && <Badge color="amber">{t('storage no configurado')}</Badge>}
           </div>
@@ -439,7 +440,7 @@ function renderPrimaryAction(
     case 'assistant':
       return (
         <button className="btn btn-primary gap-1.5" onClick={handlers.onOpenAssistant}>
-          <Icon name="wand" /> {action.label}
+          <Icon name="chat" /> {action.label}
         </button>
       );
     case 'view':
@@ -452,10 +453,10 @@ function renderPrimaryAction(
 }
 
 function getRecommendation(settings: AppSettings, stats: ReturnType<typeof buildStats>): Recommendation {
-  if (!settings.defaultModel) {
+  if (!settings.extractionModel || !settings.synthesisModel) {
     return {
-      title: t('Configura un modelo de IA'),
-      body: t('La sincronización puede funcionar, pero Nodus necesita un modelo predeterminado para extraer temas, ideas y evidencias.'),
+      title: t('Configura los modelos de IA'),
+      body: t('La sincronización puede funcionar, pero Nodus necesita modelos separados de extracción y síntesis para analizar el corpus.'),
       action: { kind: 'view', target: 'settings', icon: 'settings', label: t('Configurar IA') },
     };
   }

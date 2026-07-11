@@ -1,15 +1,25 @@
-import type { AiProvider, EmbeddingProvider, ModelInfo } from '@shared/types';
+import type {
+  AiProvider,
+  EmbeddingProvider,
+  LocalProvider,
+  LocalProviderTestResult,
+  ModelInfo,
+} from '@shared/types';
+import { getSettings } from '../db/settingsRepo';
+import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
 
-export const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
+export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 
-export const PROVIDER_LABELS: Record<AiProvider, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  deepseek: 'DeepSeek',
-  gemini: 'Google Gemini',
-  xiaomi: 'Xiaomi MiMo',
-};
+/** The configured base URL for a local provider, without a trailing slash. */
+export function localBaseUrl(provider: LocalProvider): string {
+  const configured = getSettings().localProviders?.[provider]?.baseUrl?.trim();
+  return (configured || DEFAULT_LOCAL_BASE_URLS[provider]).replace(/\/+$/, '');
+}
+
+/** Optional bearer header when a local instance is secured with a token. */
+function localHeaders(key: string | null): Record<string, string> {
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
 
 /**
  * OpenAI-compatible chat base URL for a provider, or null for providers with a
@@ -29,6 +39,10 @@ export function openAiCompatBase(provider: AiProvider): string | null {
     case 'xiaomi':
       // Xiaomi MiMo's official API is OpenAI-compatible and accepts Bearer auth.
       return 'https://api.xiaomimimo.com/v1';
+    case 'ollama':
+    case 'lmstudio':
+      // Local servers expose an OpenAI-compatible surface under {baseUrl}/v1.
+      return `${localBaseUrl(provider)}/v1`;
     case 'anthropic':
       return null;
   }
@@ -47,7 +61,11 @@ export function supportsJsonMode(provider: AiProvider): boolean {
     provider === 'deepseek' ||
     provider === 'openrouter' ||
     provider === 'gemini' ||
-    provider === 'xiaomi'
+    provider === 'xiaomi' ||
+    // Ollama and LM Studio both accept OpenAI's response_format on their compat
+    // surface. A small model that ignores it is caught by the caller's 400 retry.
+    provider === 'ollama' ||
+    provider === 'lmstudio'
   );
 }
 
@@ -81,6 +99,11 @@ export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Re
       // Xiaomi MiMo is likewise a reasoning model with a thinking toggle (default ON).
       // Disable it for scans; leave the model's default for explicit efforts.
       return effort === 'off' ? { thinking: { type: 'disabled' } } : {};
+    case 'ollama':
+    case 'lmstudio':
+      // Local reasoning toggles vary per model (deepseek-r1, gpt-oss, qwen…) and
+      // have no consistent OpenAI-compat knob. Send none and let the model decide.
+      return {};
     case 'anthropic':
       // Anthropic uses its own SDK path, not this OpenAI-compat reasoning knob.
       return {};
@@ -120,6 +143,10 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listGemini(key);
     case 'xiaomi':
       return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false);
+    case 'ollama':
+      return listOllama(key);
+    case 'lmstudio':
+      return listLmStudio(key, false);
   }
 }
 
@@ -132,6 +159,10 @@ export async function listEmbeddingModels(provider: EmbeddingProvider, key: stri
       return listOpenRouterEmbeddingModels(key);
     case 'gemini':
       return listGeminiEmbeddingModels(key);
+    case 'ollama':
+      return listOllamaEmbeddingModels(key);
+    case 'lmstudio':
+      return listLmStudio(key, true);
   }
 }
 
@@ -231,4 +262,207 @@ async function listGeminiEmbeddingModels(key: string | null): Promise<ModelInfo[
     { id: 'gemini-embedding-001', name: 'Gemini Embedding 001' },
     { id: 'gemini-embedding-2-preview', name: 'Gemini Embedding 2 Preview' },
   ];
+}
+
+// ── Local providers: Ollama & LM Studio ──────────────────────────────────────
+// Chat + embeddings inference goes through the OpenAI-compatible surface (see
+// openAiCompatBase + aiClient). Model *listing* uses each server's native
+// endpoint because it carries richer metadata (size, quantization, state) than
+// the OpenAI-compat /v1/models list.
+
+/** fetch() against a local server with a short timeout so an unreachable host
+ *  fails fast instead of hanging the Settings "Load models" button. */
+async function localFetch(url: string, key: string | null, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { headers: localHeaders(key), signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function localError(provider: LocalProvider, base: string, detail: string): Error {
+  const label = provider === 'ollama' ? 'Ollama' : 'LM Studio';
+  return new Error(`No se pudo conectar con ${label} en ${base}. ${detail}`);
+}
+
+interface OllamaTag {
+  name?: string;
+  model?: string;
+  size?: number;
+  details?: { parameter_size?: string; quantization_level?: string };
+}
+
+/** GET {base}/api/tags — the models pulled locally into Ollama. */
+async function listOllama(key: string | null): Promise<ModelInfo[]> {
+  const base = localBaseUrl('ollama');
+  let res: Response;
+  try {
+    res = await localFetch(`${base}/api/tags`, key);
+  } catch (e) {
+    throw localError('ollama', base, e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) throw localError('ollama', base, `HTTP ${res.status}. ¿Está Ollama en marcha?`);
+  const data = (await res.json()) as { models?: OllamaTag[] };
+  return (data.models ?? [])
+    .map((m) => {
+      const id = m.model ?? m.name ?? '';
+      return {
+        id,
+        sizeBytes: typeof m.size === 'number' ? m.size : undefined,
+        paramSize: m.details?.parameter_size,
+        quantization: m.details?.quantization_level,
+      } as ModelInfo;
+    })
+    .filter((m) => m.id)
+    .sort(byId);
+}
+
+/** Ollama exposes no model "kind", so embedding models are matched by name. When
+ *  nothing matches (unusual names), the full list is returned so the user can still pick. */
+async function listOllamaEmbeddingModels(key: string | null): Promise<ModelInfo[]> {
+  const all = await listOllama(key);
+  const embeds = all.filter((m) => /embed|nomic|mxbai|bge|minilm|e5|gte|snowflake|arctic/i.test(m.id));
+  return embeds.length > 0 ? embeds : all;
+}
+
+interface LmStudioModel {
+  id?: string;
+  type?: string;
+  arch?: string;
+  quantization?: string;
+  state?: string;
+  max_context_length?: number;
+  /** The context window the model is currently loaded with (the real n_ctx). Only
+   *  present while `state === 'loaded'`; often far smaller than max_context_length. */
+  loaded_context_length?: number;
+  publisher?: string;
+}
+
+/** GET {base}/api/v0/models — LM Studio's native list with loaded state + metadata.
+ *  `embeddingsOnly` keeps only type "embeddings"; otherwise chat/vision models. */
+async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promise<ModelInfo[]> {
+  const base = localBaseUrl('lmstudio');
+  let res: Response;
+  try {
+    res = await localFetch(`${base}/api/v0/models`, key);
+  } catch (e) {
+    throw localError('lmstudio', base, e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) throw localError('lmstudio', base, `HTTP ${res.status}. Activa el servidor local en LM Studio.`);
+  const data = (await res.json()) as { data?: LmStudioModel[] };
+  const mapped = (data.data ?? [])
+    .map((m) => {
+      const type = m.type;
+      const kind: ModelInfo['kind'] =
+        type === 'embeddings' ? 'embeddings' : type === 'vlm' ? 'vlm' : type === 'llm' ? 'llm' : 'other';
+      return {
+        id: m.id ?? '',
+        name: m.publisher ? `${m.arch ?? m.id} · ${m.publisher}` : m.arch,
+        quantization: m.quantization,
+        contextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
+        loaded: m.state === 'loaded',
+        kind,
+      } as ModelInfo;
+    })
+    .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));
+  // Loaded models first (they answer instantly), then alphabetical.
+  return mapped.sort((a, b) => Number(b.loaded) - Number(a.loaded) || a.id.localeCompare(b.id));
+}
+
+// ── Context-window detection for local models ────────────────────────────────
+// Local servers load a model with a fixed context window (n_ctx) that is usually
+// far smaller than a cloud model's — LM Studio commonly defaults to 4096. Nodus
+// builds large prompts, so aiClient uses this to size max_tokens to the real window
+// and to fail with an actionable message instead of a cryptic llama.cpp
+// "n_keep >= n_ctx". Detection is best-effort and cached briefly: inference must
+// never break because a probe failed or the server is momentarily busy.
+
+interface ContextCacheEntry {
+  value: number | null;
+  expires: number;
+}
+const contextCache = new Map<string, ContextCacheEntry>();
+const CONTEXT_TTL_MS = 60_000;
+
+/**
+ * The effective context window (in tokens) a local model is loaded with, or null
+ * when it can't be determined. LM Studio reports the real loaded window; Ollama's
+ * API only exposes the model's trained maximum — a ceiling, since the runtime
+ * `num_ctx` can be smaller — so treat Ollama's value as best-effort. Never throws.
+ */
+export async function localContextWindow(
+  provider: LocalProvider,
+  modelId: string,
+  key: string | null
+): Promise<number | null> {
+  const base = localBaseUrl(provider);
+  const cacheKey = `${provider}::${base}::${modelId}`;
+  const hit = contextCache.get(cacheKey);
+  if (hit && hit.expires > Date.now()) return hit.value;
+  let value: number | null = null;
+  try {
+    value =
+      provider === 'lmstudio'
+        ? await lmStudioContextWindow(base, modelId, key)
+        : await ollamaContextWindow(base, modelId, key);
+  } catch {
+    value = null;
+  }
+  contextCache.set(cacheKey, { value, expires: Date.now() + CONTEXT_TTL_MS });
+  return value;
+}
+
+/** LM Studio's /api/v0/models carries the loaded window per model (the real n_ctx),
+ *  falling back to the model's trained maximum when it is not currently loaded. */
+async function lmStudioContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+  const res = await localFetch(`${base}/api/v0/models`, key, 4000);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { data?: LmStudioModel[] };
+  const model = (data.data ?? []).find((m) => m.id === modelId);
+  if (!model) return null;
+  return model.loaded_context_length ?? model.max_context_length ?? null;
+}
+
+/** Ollama's /api/show exposes only the trained context length (e.g. "llama.context_length");
+ *  the arch prefix varies, so match any *.context_length key. This is a ceiling, not the
+ *  runtime num_ctx (which Ollama silently truncates to), hence best-effort. */
+async function ollamaContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(`${base}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...localHeaders(key) },
+      body: JSON.stringify({ name: modelId }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { model_info?: Record<string, unknown> };
+    const info = data.model_info ?? {};
+    const ctxKey = Object.keys(info).find((k) => k.endsWith('.context_length'));
+    const val = ctxKey ? info[ctxKey] : undefined;
+    return typeof val === 'number' ? val : null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Ping a local provider so Settings can confirm the base URL before loading models. */
+export async function testLocalProvider(provider: LocalProvider, key: string | null): Promise<LocalProviderTestResult> {
+  const base = localBaseUrl(provider);
+  try {
+    if (provider === 'ollama') {
+      const versionRes = await localFetch(`${base}/api/version`, key, 5000);
+      if (!versionRes.ok) return { ok: false, message: `HTTP ${versionRes.status} en ${base}` };
+      const version = ((await versionRes.json()) as { version?: string }).version;
+      const models = await listOllama(key);
+      return { ok: true, version, modelCount: models.length };
+    }
+    const models = await listLmStudio(key, false);
+    return { ok: true, modelCount: models.length };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
 }

@@ -1,6 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
+import { app } from 'electron';
 import { z } from 'zod';
+import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import type {
+  AiProvider,
+  Debate,
   LightStatus,
   DeepStatus,
   ModelRef,
@@ -59,7 +65,9 @@ const GAP_KINDS = ['future_work', 'limitation', 'open_question', 'unresolved_con
 const LIGHT_STATUSES = ['all', 'none', 'pending', 'done', 'failed'] as const;
 const DEEP_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
 const SUMMARY_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
-const AI_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'] as const;
+// The canonical provider list had drifted here (xiaomi and the local providers
+// were missing), silently rejecting valid model overrides from MCP clients.
+const AI_PROVIDERS = SHARED_AI_PROVIDERS as [AiProvider, ...AiProvider[]];
 const NOTE_KINDS = ['markdown', 'assistant', 'writing', 'debate', 'idea'] as const;
 const PROJECT_KINDS = ['thesis', 'article', 'chapter', 'literature_review', 'theoretical_framework', 'other'] as const;
 const PROJECT_STATUSES = ['active', 'paused', 'done'] as const;
@@ -78,7 +86,7 @@ const modelSchema = z
     provider: z.enum(AI_PROVIDERS),
     model: z.string().trim().min(1).max(300),
   })
-  .describe('Modelo de Nodus. Si se omite, se usa el modelo configurado en Ajustes.');
+  .describe('Nodus model override. If omitted, the model configured in Nodus Settings is used.');
 
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
@@ -101,11 +109,11 @@ const writingSelectionSchema = z.object({
 const deepResearchTargetLengthSchema = z
   .enum(['adaptive', 'concise', 'standard', 'exhaustive'])
   .default('adaptive')
-  .describe('Extensión objetivo. adaptive: la decide el corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
+  .describe('Target length. adaptive: sized by the corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
 const deepResearchSectionLimitSchema = z
   .union([z.literal('auto'), z.number().int().min(1).max(20)])
   .default('auto')
-  .describe("Tope de secciones. 'auto' lo dimensiona por el corpus; un número lo fija (con una sección de gracia).");
+  .describe("Section cap. 'auto' sizes it by the corpus; a number fixes it (with one grace section).");
 
 const writingDraftSchema = z.object({
   generatedAt: z.string().min(1),
@@ -154,7 +162,13 @@ const paginationSchema = {
   offset: z.number().int().min(0).default(0),
 };
 const compactLimitSchema = z.number().int().min(1).max(100).default(25);
-const querySchema = z.string().trim().min(1).max(1_000).optional();
+const querySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1_000)
+  .optional()
+  .describe('Case-insensitive substring matched against the main text fields of each entity (title/label, statement/content…), never against ids or enum values.');
 
 class McpToolError extends Error {
   constructor(
@@ -166,11 +180,19 @@ class McpToolError extends Error {
 }
 
 function notFound(kind: string, id: string): McpToolError {
-  return new McpToolError('not_found', `No existe ${kind} con id "${id}".`);
+  return new McpToolError('not_found', `No ${kind} exists with id "${id}".`);
 }
 
 function json(value: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
+  const content = [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }];
+  // Modern MCP clients prefer structuredContent over re-parsing the text block. We
+  // mirror object results there (the spec's structuredContent must be an object, not
+  // an array or primitive) while still sending the text for older clients. No
+  // outputSchema is declared, so the SDK forwards it without per-tool validation.
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return { content, structuredContent: value as Record<string, unknown> };
+  }
+  return { content };
 }
 
 function errorResult(error: unknown) {
@@ -192,7 +214,7 @@ function errorResult(error: unknown) {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify({ error: { category: 'internal', message: 'La operación no se pudo completar en Nodus.' } }),
+        text: JSON.stringify({ error: { category: 'internal', message: 'The operation could not be completed in Nodus.' } }),
       },
     ],
     isError: true,
@@ -206,6 +228,24 @@ function tool<T>(fn: () => T | Promise<T>) {
     } catch (error) {
       return errorResult(error);
     }
+  };
+}
+
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+
+/** Bridges a Nodus onProgress callback to MCP notifications/progress so clients can
+ *  keep long tool calls alive. No-op when the client sent no progressToken. */
+function progressNotifier(extra: ToolExtra | undefined): (message: string) => void {
+  const progressToken = extra?._meta?.progressToken;
+  if (extra === undefined || progressToken === undefined) return () => {};
+  let step = 0;
+  return (message) => {
+    step += 1;
+    void extra
+      .sendNotification({ method: 'notifications/progress', params: { progressToken, progress: step, message } })
+      .catch(() => {
+        /* progress is best-effort; a dropped notification must never abort the tool */
+      });
   };
 }
 
@@ -225,9 +265,25 @@ function page<T, K extends string>(key: K, rows: T[], limit: number, offset: num
   } as Record<K, T[]> & { total: number; limit: number; offset: number; hasMore: boolean };
 }
 
-function matchesQuery(value: unknown, query?: string): boolean {
+/** Case-insensitive substring match over an entity's human-readable text fields only,
+ *  so a query never matches JSON keys, enum values or internal ids. */
+function matchesText(query: string | undefined, fields: (string | null | undefined)[]): boolean {
   if (!query?.trim()) return true;
-  return (JSON.stringify(value) ?? '').toLowerCase().includes(query.trim().toLowerCase());
+  const q = query.trim().toLowerCase();
+  return fields.some((field) => !!field && field.toLowerCase().includes(q));
+}
+
+function debateSearchFields(debate: Debate): string[] {
+  return [
+    debate.tension,
+    ...debate.sharedThemes,
+    ...[debate.sideA, debate.sideB].flatMap((side) => [
+      side.label,
+      side.statement,
+      ...side.authors,
+      ...side.works.map((work) => work.title),
+    ]),
+  ];
 }
 
 function snippet(text: string | null | undefined, max = 360): string {
@@ -245,7 +301,7 @@ function parseAuthorsJson(value: string): string[] {
   }
 }
 
-function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes'): number {
+function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes' | 'themes' | 'passages'): number {
   return (getDb().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
 }
 
@@ -334,13 +390,13 @@ function resolveAuthor(value: string): AuthorSummary {
 
   const matches = authors.filter((author) => authorMatchesQuery(author, value));
   if (matches.length === 1) return matches[0];
-  if (matches.length === 0) throw notFound('un autor', value);
+  if (matches.length === 0) throw notFound('author', value);
   throw new McpToolError(
     'invalid_input',
-    `La búsqueda "${value}" coincide con varios autores: ${matches
+    `The search "${value}" matches several authors: ${matches
       .slice(0, 6)
       .map((author) => `${author.fullName || author.name} (${author.author_id})`)
-      .join('; ')}. Usa el author_id.`
+      .join('; ')}. Use the author_id.`
   );
 }
 
@@ -375,18 +431,21 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Nodus corpus capabilities',
       description:
-        'Returns the current size and vocabulary of this local Nodus corpus, plus which vault it belongs to. Ideas, themes, edges, debates, gaps and authors are generated by analysing works and are read-only through MCP. All tools read the active vault (`vault.active`); if the user seems to mean a different one from `vault.available`, tell them to switch it in the Nodus app — MCP cannot change the active vault.',
+        'Returns the running Nodus version, the current size and vocabulary of this local corpus, and which vault it belongs to. Ideas, themes, edges, debates, gaps and authors are generated by analysing works and are read-only through MCP. All tools read the active vault (`vault.active`); if the user seems to mean a different one from `vault.available`, tell them to switch it in the Nodus app — MCP cannot change the active vault.',
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     tool(() => ({
+      version: app.getVersion(),
       vault: vaultContext(),
       counts: {
         ideas: count('ideas'),
         works: count('works'),
+        themes: count('themes'),
         debates: getDebates().length,
         gaps: count('gaps'),
         authors: count('authors'),
+        passages: count('passages'),
         notes: count('notes'),
       },
       enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS },
@@ -397,23 +456,33 @@ export function registerTools(server: McpServer): void {
     'nodus_list_ideas',
     {
       title: 'List ideas',
-      description: 'Lists derived ideas in the local corpus. Read-only; ideas are created only by Nodus deep scans of works.',
+      description:
+        'Lists derived ideas in the local corpus. Returns compact rows (label plus a statement snippet) by default to keep responses cheap; pass full=true for complete statements, or use nodus_get_idea for one idea with relations. Read-only; ideas are created only by Nodus deep scans of works.',
       inputSchema: {
         limit: z.number().int().min(1).max(200).default(100),
         offset: z.number().int().min(0).default(0),
         type: z.enum(IDEA_TYPES).optional(),
         query: querySchema,
+        full: z
+          .boolean()
+          .default(false)
+          .describe('true returns each idea\'s full statement; by default only a snippet (statementSnippet) is returned.'),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ limit, offset, type, query }) =>
+    ({ limit, offset, type, query, full }) =>
       tool(() => {
         const all = ideas
           .allIdeaCandidates()
           .filter((idea) => !type || idea.type === type)
-          .filter((idea) => matchesQuery(idea, query))
+          .filter((idea) => matchesText(query, [idea.label, idea.statement]))
           .sort((a, b) => a.global_id.localeCompare(b.global_id));
-        return page('ideas', all, limit, offset);
+        const result = page('ideas', all, limit, offset);
+        if (full) return result;
+        return {
+          ...result,
+          ideas: result.ideas.map(({ statement, ...idea }) => ({ ...idea, statementSnippet: snippet(statement, 220) })),
+        };
       })()
   );
 
@@ -428,7 +497,7 @@ export function registerTools(server: McpServer): void {
     ({ ideaId }) =>
       tool(() => {
         const detail = ideas.getIdeaDetail(ideaId);
-        if (!detail) throw notFound('una idea', ideaId);
+        if (!detail) throw notFound('idea', ideaId);
         return { ...detail, relations: ideas.getIdeaEdges(ideaId) };
       })()
   );
@@ -471,7 +540,7 @@ export function registerTools(server: McpServer): void {
         if (!vector) {
           throw new McpToolError(
             'ai_unconfigured',
-            'No hay embeddings disponibles. Configura el proveedor y la clave de embeddings en Ajustes de Nodus.'
+            'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
         return { ideas: ideas.findSimilarIdeas(vector, -1, limit) };
@@ -505,7 +574,7 @@ export function registerTools(server: McpServer): void {
     ({ ideaId }) =>
       tool(() => {
         const detail = getCopilotIdeaDetail(ideaId);
-        if (!detail) throw notFound('una idea', ideaId);
+        if (!detail) throw notFound('idea', ideaId);
         return detail;
       })()
   );
@@ -525,7 +594,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ ideaId, paragraphText, selectionText }) =>
       tool(() => {
-        if (!getCopilotIdeaDetail(ideaId)) throw notFound('una idea', ideaId);
+        if (!getCopilotIdeaDetail(ideaId)) throw notFound('idea', ideaId);
         return composeCopilotIdeaInsertion({ ideaId, paragraphText, selectionText });
       })()
   );
@@ -540,7 +609,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ limit, offset, query }) =>
       tool(() => {
-        const all = getDebates().filter((debate) => matchesQuery(debate, query));
+        const all = getDebates().filter((debate) => matchesText(query, debateSearchFields(debate)));
         return page('debates', all, limit, offset);
       })()
   );
@@ -556,7 +625,7 @@ export function registerTools(server: McpServer): void {
     ({ edgeId }) =>
       tool(() => {
         const debate = getDebate(edgeId);
-        if (!debate) throw notFound('un debate', edgeId);
+        if (!debate) throw notFound('debate', edgeId);
         return debate;
       })()
   );
@@ -571,7 +640,9 @@ export function registerTools(server: McpServer): void {
     },
     ({ limit, offset, query, kind }) =>
       tool(() => {
-        const all = gaps.aggregateGaps().filter((gap) => (!kind || gap.kind === kind) && matchesQuery(gap, query));
+        const all = gaps
+          .aggregateGaps()
+          .filter((gap) => (!kind || gap.kind === kind) && matchesText(query, [gap.statement, ...gap.works.map((work) => work.title)]));
         return page('gaps', all, limit, offset);
       })()
   );
@@ -587,7 +658,7 @@ export function registerTools(server: McpServer): void {
     ({ gapId }) =>
       tool(() => {
         const detail = gaps.getGapDetail(gapId);
-        if (!detail) throw notFound('un hueco', gapId);
+        if (!detail) throw notFound('research gap', gapId);
         return detail;
       })()
   );
@@ -605,7 +676,7 @@ export function registerTools(server: McpServer): void {
         const graph = buildAuthorGraph();
         if (!author) return graph;
         const root = graph.nodes.find((node) => node.id === author || node.label === author);
-        if (!root) throw notFound('un autor', author);
+        if (!root) throw notFound('author', author);
         const edges = graph.edges.filter((edge) => edge.source === root.id || edge.target === root.id);
         const nodeIds = new Set([root.id, ...edges.flatMap((edge) => [edge.source, edge.target])]);
         return { nodes: graph.nodes.filter((node) => nodeIds.has(node.id)), edges };
@@ -617,7 +688,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Search authors',
       description:
-        'Busca autores del corpus local por id, nombre, afiliación o temas principales. Devuelve el footprint de cada autor y si ya tiene síntesis de ficha generada.',
+        'Searches authors in the local corpus by id, name, affiliation or top themes. Returns each author footprint and whether a dossier synthesis has already been generated. Read-only.',
       inputSchema: {
         ...paginationSchema,
         query: querySchema,
@@ -639,7 +710,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get or generate author synthesis',
       description:
-        'Resuelve un autor por author_id o nombre. Si ya existe una síntesis de ficha, la devuelve; si no existe y generateIfMissing=true, la genera y la guarda usando el modelo de síntesis configurado o el modelo indicado. Use refresh=true para regenerar aunque exista.',
+        'Resolves an author by author_id or name. If a dossier synthesis already exists it is returned; if it does not and generateIfMissing=true, it is generated and saved using the configured synthesis model or the given model. Pass refresh=true to regenerate even when one exists. May consume provider tokens when it generates.',
       inputSchema: {
         author: z.string().trim().min(1).max(500),
         generateIfMissing: z.boolean().default(true),
@@ -652,7 +723,7 @@ export function registerTools(server: McpServer): void {
       tool(async () => {
         const resolved = resolveAuthor(author);
         const dossier = buildAuthorDossier(resolved.author_id);
-        if (!dossier) throw notFound('un autor', author);
+        if (!dossier) throw notFound('author', author);
 
         if (!refresh && dossier.synthesis) {
           return {
@@ -773,9 +844,9 @@ export function registerTools(server: McpServer): void {
     ({ workId }) =>
       tool(() => {
         const nodusId = resolveWorkNodusId(workId);
-        if (!nodusId) throw notFound('una obra', workId);
+        if (!nodusId) throw notFound('work', workId);
         const work = getWork(nodusId);
-        if (!work) throw notFound('una obra', workId);
+        if (!work) throw notFound('work', workId);
         return {
           work,
           summary: workSummaries.getWorkSummary(nodusId),
@@ -801,7 +872,7 @@ export function registerTools(server: McpServer): void {
     ({ limit, offset, workId, query }) =>
       tool(() => {
         const nodusId = workId ? resolveWorkNodusId(workId) : null;
-        if (workId && !nodusId) throw notFound('una obra', workId);
+        if (workId && !nodusId) throw notFound('work', workId);
         const params: unknown[] = [];
         const clauses: string[] = ['w.archived = 0'];
         if (nodusId) {
@@ -863,8 +934,57 @@ export function registerTools(server: McpServer): void {
     ({ passageId }) =>
       tool(() => {
         const detail = passages.getPassageDetail(passageId);
-        if (!detail) throw notFound('un pasaje', passageId);
+        if (!detail) throw notFound('passage', passageId);
         return detail;
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_passages',
+    {
+      title: 'Search full-text passages semantically',
+      description:
+        'Finds full-text passage chunks ranked by semantic similarity to the query — the direct way to locate where the corpus discusses a topic, with citable work metadata attached to every hit. Optionally scoped to one work (workId accepts a nodus_id or a Zotero key). Returns snippets; use nodus_get_passage for the full text. Complements nodus_search_ideas (derived claims) with retrieval over the underlying source text, and unlike nodus_analyze_passage it performs no AI relation typing. Requires an embedding provider already configured in Nodus. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        limit: z.number().int().min(1).max(50).default(10),
+        minSimilarity: z
+          .number()
+          .min(0)
+          .max(1)
+          .default(0.18)
+          .describe('Cosine similarity threshold; 0.18 is the same value the Nodus writing copilot uses.'),
+        workId: z.string().trim().min(1).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit, minSimilarity, workId }) =>
+      tool(async () => {
+        const nodusId = workId ? resolveWorkNodusId(workId) : null;
+        if (workId && !nodusId) throw notFound('work', workId);
+        const vector = await embed(query);
+        if (!vector) {
+          throw new McpToolError(
+            'ai_unconfigured',
+            'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
+          );
+        }
+        const hits = passages.findSimilarPassages(vector, minSimilarity, limit, nodusId ? { nodusIds: [nodusId] } : {});
+        return {
+          passages: hits.map((hit) => ({
+            passage_id: hit.passage_id,
+            nodus_id: hit.nodus_id,
+            similarity: hit.similarity,
+            page_label: hit.page_label,
+            textSnippet: snippet(hit.text, 600),
+            work: {
+              title: hit.title,
+              authors: parseAuthorsJson(hit.authors_json),
+              year: hit.year,
+              zotero_key: hit.zotero_key,
+            },
+          })),
+        };
       })()
   );
 
@@ -885,7 +1005,7 @@ export function registerTools(server: McpServer): void {
         const all = themes
           .listManagedThemes()
           .filter((theme) => pinned === undefined || theme.pinned === pinned)
-          .filter((theme) => matchesQuery(theme, query));
+          .filter((theme) => matchesText(query, [theme.label]));
         return page('themes', all, limit, offset);
       })()
   );
@@ -908,7 +1028,7 @@ export function registerTools(server: McpServer): void {
     ({ theme, worksLimit, worksOffset, ideasLimit, ideasOffset }) =>
       tool(() => {
         const resolved = resolveTheme(theme);
-        if (!resolved) throw notFound('un tema', theme);
+        if (!resolved) throw notFound('theme', theme);
         const linkedWorks = listWorks({ theme: resolved.label });
         const ideaRows = getDb()
           .prepare(
@@ -946,7 +1066,15 @@ export function registerTools(server: McpServer): void {
           .listTutorRoutes()
           .filter((route) => !mode || route.mode === mode)
           .filter((route) => minRating === undefined || (route.rating ?? 0) >= minRating)
-          .filter((route) => matchesQuery(route, query))
+          .filter((route) =>
+            matchesText(query, [
+              route.prompt,
+              route.overview,
+              route.route.title,
+              route.route.description,
+              ...route.route.stops.flatMap((stop) => [stop.title, stop.focus]),
+            ])
+          )
           .map(compactTutorRoute);
         return page('routes', all, limit, offset);
       })()
@@ -963,7 +1091,7 @@ export function registerTools(server: McpServer): void {
     ({ routeId }) =>
       tool(() => {
         const route = tutorRoutes.getTutorRoute(routeId);
-        if (!route) throw notFound('una ruta de Tutor', routeId);
+        if (!route) throw notFound('tutor route', routeId);
         return route;
       })()
   );
@@ -987,7 +1115,7 @@ export function registerTools(server: McpServer): void {
           .listProjects()
           .filter((project) => !kind || project.kind === (kind as ProjectKind))
           .filter((project) => !status || project.status === (status as ProjectStatus))
-          .filter((project) => matchesQuery(project, query));
+          .filter((project) => matchesText(query, [project.title, project.brief]));
         return page('projects', all, limit, offset);
       })()
   );
@@ -1004,7 +1132,7 @@ export function registerTools(server: McpServer): void {
     ({ projectId, includeChapterText }) =>
       tool(() => {
         const detail = projects.getProjectDetail(projectId);
-        if (!detail) throw notFound('un proyecto', projectId);
+        if (!detail) throw notFound('project', projectId);
         return {
           ...detail,
           chapters: detail.chapters.map((chapter) => compactProjectChapter(chapter, includeChapterText)),
@@ -1033,7 +1161,7 @@ export function registerTools(server: McpServer): void {
         const all = tree.notes
           .filter((note) => !kind || note.kind === kind)
           .filter((note) => folderId === undefined || note.folderId === folderId)
-          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .filter((note) => matchesText(query, [note.title, note.content]))
           .map((note) => ({
             id: note.id,
             folderId: note.folderId,
@@ -1064,7 +1192,7 @@ export function registerTools(server: McpServer): void {
         const filteredNotes = tree.notes
           .filter((note) => !kind || note.kind === kind)
           .filter((note) => folderId === undefined || note.folderId === folderId)
-          .filter((note) => matchesQuery({ title: note.title, kind: note.kind, content: note.content, source: note.source }, query))
+          .filter((note) => matchesText(query, [note.title, note.content]))
           .map(({ content: _content, ...note }) => ({ ...note, contentSnippet: snippet(_content, 220) }));
         return { folders: tree.folders, ...page('notes', filteredNotes, limit, offset) };
       })()
@@ -1081,7 +1209,7 @@ export function registerTools(server: McpServer): void {
     ({ noteId }) =>
       tool(() => {
         const note = notes.getNote(noteId);
-        if (!note) throw notFound('una nota', noteId);
+        if (!note) throw notFound('note', noteId);
         return note;
       })()
   );
@@ -1108,7 +1236,7 @@ export function registerTools(server: McpServer): void {
     ({ id }) =>
       tool(() => {
         const detail = researchQuestions.getResearchQuestionDetail(id);
-        if (!detail) throw notFound('una pregunta de cobertura', id);
+        if (!detail) throw notFound('coverage question', id);
         return detail;
       })()
   );
@@ -1117,7 +1245,8 @@ export function registerTools(server: McpServer): void {
     'nodus_ask_coverage_question',
     {
       title: 'Ask and map a coverage question',
-      description: 'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens.',
+      description:
+        'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens. Sends MCP progress notifications while mapping when the request carries a progressToken.',
       inputSchema: {
         question: z.string().trim().min(1).max(8_000),
         notes: z.string().trim().max(8_000).optional(),
@@ -1125,12 +1254,14 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ question, notes: questionNotes, model }) =>
+    ({ question, notes: questionNotes, model }, extra) =>
       tool(async () => {
+        const notify = progressNotifier(extra);
         const created = researchQuestions.createResearchQuestion(question, questionNotes);
         const request = { rqId: created.rq.id, model: asModel(model) };
+        notify('Decomposing the question into sub-questions…');
         await decomposeQuestion(request);
-        return mapCoverage(request);
+        return mapCoverage(request, (p) => notify(`Mapping coverage ${p.index}/${p.total}: ${p.subQuestion}`));
       })()
   );
 
@@ -1196,7 +1327,7 @@ export function registerTools(server: McpServer): void {
       description:
         'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus (5–20 pp). Two writers via `writer`: ' +
         '"nodus" (default) — Nodus\'s own configured model plans and writes the whole report and returns it (save=true also stores it as a draft). ' +
-        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens.',
+        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         language: z.enum(['es', 'en', 'fr']).optional(),
@@ -1206,19 +1337,28 @@ export function registerTools(server: McpServer): void {
         writer: z
           .enum(['nodus', 'client'])
           .default('nodus')
-          .describe('"nodus": el modelo configurado en Nodus redacta el informe. "client": el modelo que llama al MCP lo redacta a partir del kit devuelto.'),
+          .describe('"nodus": the model configured in Nodus writes the report. "client": the model calling this MCP writes it from the returned kit.'),
         model: modelSchema.optional(),
         save: z.boolean().default(false),
         title: z.string().trim().min(1).max(2_000).optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }) =>
+    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }, extra) =>
       tool(async () => {
         if (writer === 'client') {
           return buildDeepResearchBrief({ objective, language, audience, targetLength, sectionLimit });
         }
-        const report = await generateDeepResearchReport({ objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null });
+        const notify = progressNotifier(extra);
+        const report = await generateDeepResearchReport(
+          { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+          (p) =>
+            notify(
+              p.phase === 'section' && p.sectionIndex
+                ? `[section ${p.sectionIndex}${p.sectionTotal ? `/${p.sectionTotal}` : ''}] ${p.message}`
+                : p.message
+            )
+        );
         const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: asModel(model), title }) : null;
         return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
       })()
@@ -1274,7 +1414,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ name, parentId, summary }) =>
       tool(() => {
-        if (parentId && !notes.getNoteFolder(parentId)) throw notFound('una carpeta', parentId);
+        if (parentId && !notes.getNoteFolder(parentId)) throw notFound('folder', parentId);
         const folder = notes.createNoteFolder({ name, parentId });
         if (summary && summary.trim()) return notes.updateNoteFolderSummary(folder.id, summary) ?? folder;
         return folder;
@@ -1293,7 +1433,7 @@ export function registerTools(server: McpServer): void {
     ({ id, summary }) =>
       tool(() => {
         const folder = notes.updateNoteFolderSummary(id, summary);
-        if (!folder) throw notFound('una carpeta', id);
+        if (!folder) throw notFound('folder', id);
         return folder;
       })()
   );
@@ -1317,7 +1457,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ title, content, kind, folderId, source }) =>
       tool(() => {
-        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('una carpeta', folderId);
+        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('folder', folderId);
         return notes.createNote({ title, content, kind, folderId, source: source as NoteSource | null | undefined });
       })()
   );
@@ -1337,9 +1477,9 @@ export function registerTools(server: McpServer): void {
     },
     ({ id, title, content, folderId }) =>
       tool(() => {
-        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('una carpeta', folderId);
+        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('folder', folderId);
         const note = notes.updateNote({ id, title, content, folderId });
-        if (!note) throw notFound('una nota', id);
+        if (!note) throw notFound('note', id);
         return note;
       })()
   );

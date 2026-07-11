@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import type { WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
+import type { DecorativeImageStyle, WritingWorkshopBrief, WritingWorkshopDraft, WritingWorkshopSavedDraft } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
 
 /** Human labels for every workshop/report kind (deep reports use `deep_research`). */
 export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -17,11 +18,50 @@ export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
   deep_research: 'Deep Research',
 };
 
+/** The copy/save/export action row. Reusable so the Deep Research reader can host
+ *  it in its header instead of above the text. */
+export function DraftActionBar({
+  exporting,
+  savingDraft,
+  draftSaved = false,
+  onCopy,
+  onSaveDraft,
+  onSaveToNotes,
+  onExport,
+}: {
+  exporting: boolean;
+  savingDraft: boolean;
+  draftSaved?: boolean;
+  onCopy: () => void;
+  onSaveDraft: () => void;
+  onSaveToNotes: () => void;
+  onExport: (format: 'markdown' | 'pdf') => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onCopy}>
+        <Icon name="check" /> {t('Copiar')}
+      </button>
+      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft || draftSaved}>
+        <Icon name={savingDraft ? 'sync' : draftSaved ? 'check' : 'save'} className={savingDraft ? 'animate-spin' : ''} />{' '}
+        {savingDraft ? t('Guardando…') : draftSaved ? t('Guardado') : t('Guardar borrador')}
+      </button>
+      <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveToNotes}>
+        <Icon name="notebook" /> {t('Guardar en notas')}
+      </button>
+      <ExportMenu exporting={exporting} onExport={onExport} />
+    </div>
+  );
+}
+
 /** Main draft/report display: title, actions (copy/save/export) and rendered markdown. */
 export function DraftResultMain({
   draft,
   exporting,
   savingDraft,
+  draftSaved = false,
+  hideActions = false,
+  justify = false,
   onCopy,
   onSaveDraft,
   onSaveToNotes,
@@ -31,6 +71,12 @@ export function DraftResultMain({
   draft: WritingWorkshopDraft;
   exporting: boolean;
   savingDraft: boolean;
+  /** Deep Research auto-saves completed background reports. */
+  draftSaved?: boolean;
+  /** The reader hosts the action bar in its header, so it hides the inline one. */
+  hideActions?: boolean;
+  /** Justify the rendered report body. */
+  justify?: boolean;
   onCopy: () => void;
   onSaveDraft: () => void;
   onSaveToNotes: () => void;
@@ -42,20 +88,19 @@ export function DraftResultMain({
       <div className="space-y-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold break-words">{draft.title}</h2>
-          {draft.abstract && <p className="text-sm text-neutral-400 mt-1">{draft.abstract}</p>}
+          {draft.abstract && <p className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>{draft.abstract}</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onCopy}>
-            <Icon name="check" /> {t('Copiar')}
-          </button>
-          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveDraft} disabled={savingDraft}>
-            <Icon name={savingDraft ? 'sync' : 'save'} className={savingDraft ? 'animate-spin' : ''} /> {savingDraft ? t('Guardando…') : t('Guardar borrador')}
-          </button>
-          <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onSaveToNotes}>
-            <Icon name="notebook" /> {t('Guardar en notas')}
-          </button>
-          <ExportMenu exporting={exporting} onExport={onExport} />
-        </div>
+        {!hideActions && (
+          <DraftActionBar
+            exporting={exporting}
+            savingDraft={savingDraft}
+            draftSaved={draftSaved}
+            onCopy={onCopy}
+            onSaveDraft={onSaveDraft}
+            onSaveToNotes={onSaveToNotes}
+            onExport={onExport}
+          />
+        )}
       </div>
       <section className="card p-4">
         <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
@@ -75,7 +120,7 @@ export function DraftResultMain({
           ))}
         </div>
       </section>
-      <section className="card p-4">
+      <section className={`card p-4 ${justify ? 'text-justify hyphens-auto' : ''}`}>
         <Markdown content={draft.draftMarkdown} onCitation={onCitation} />
       </section>
     </div>
@@ -165,6 +210,7 @@ export function SavedDraftsPanel({
   onReuse,
   onDelete,
   onRefresh,
+  imageStyle = 'antique_book',
 }: {
   drafts: WritingWorkshopSavedDraft[];
   loading: boolean;
@@ -173,6 +219,7 @@ export function SavedDraftsPanel({
   onReuse: (draft: WritingWorkshopSavedDraft) => void;
   onDelete: (draft: WritingWorkshopSavedDraft) => void;
   onRefresh: () => void;
+  imageStyle?: DecorativeImageStyle;
 }) {
   return (
     <section>
@@ -198,6 +245,16 @@ export function SavedDraftsPanel({
             const isReusing = reusingDraftId === saved.id;
             return (
               <div key={saved.id} className="rounded-md border border-neutral-800 bg-neutral-950 p-3">
+                {saved.brief.kind === 'deep_research' && (
+                  <DecorativeImageCard
+                    entityKind="deep_research"
+                    entityId={saved.id}
+                    image={saved.image}
+                    defaultStyle={imageStyle}
+                    thumbnail
+                    className="mb-3"
+                  />
+                )}
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium leading-5 line-clamp-2">{saved.title}</div>

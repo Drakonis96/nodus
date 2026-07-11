@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
 import type { AiProvider, AppSettings } from '@shared/types';
+import { AI_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { clearApiKey, getApiKey, setApiKey } from '../secrets/secretStore';
@@ -14,8 +15,6 @@ import {
   sha256Hex,
   type BackupCipherMetadata,
 } from './backupCrypto';
-
-const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 interface ExportManifestBase {
   schemaVersion: number;
@@ -60,7 +59,11 @@ interface BackupInventory {
   };
   modelSettings: Pick<
     AppSettings,
-    'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'imageProvider' | 'imageModel' | 'imageStyle'
   >;
   apiKeyProviders: AiProvider[];
 }
@@ -341,7 +344,11 @@ function settingsMatchInventory(
 function modelSettings(
   settings: Pick<
     AppSettings,
-    'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
+    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'imageProvider' | 'imageModel' | 'imageStyle'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -353,6 +360,18 @@ function modelSettings(
     synthesisModel: settings.synthesisModel,
     summaryModel: settings.summaryModel,
     fusionModel: settings.fusionModel,
+    chatModel: settings.chatModel,
+    deepResearchModel: settings.deepResearchModel,
+    immersionModel: settings.immersionModel,
+    writingModel: settings.writingModel,
+    argumentMapModel: settings.argumentMapModel,
+    authorModel: settings.authorModel,
+    studyModel: settings.studyModel,
+    tutorModel: settings.tutorModel,
+    hypothesisModel: settings.hypothesisModel,
+    imageProvider: settings.imageProvider,
+    imageModel: settings.imageModel,
+    imageStyle: settings.imageStyle,
   };
 }
 

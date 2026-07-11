@@ -23,6 +23,13 @@ const mainExternals = [
   'tesseract.js',
   '@napi-rs/canvas',
   '@anthropic-ai/sdk',
+  '@google/genai',
+  // ws (pulled in by the SDKs above) optionally requires these native addons via
+  // try/catch; keep them external so that fallback works instead of the bundler
+  // hard-failing to resolve an uninstalled optional dependency.
+  'ws',
+  'bufferutil',
+  'utf-8-validate',
   '@modelcontextprotocol/sdk',
   '@modelcontextprotocol/sdk/server/mcp.js',
   '@modelcontextprotocol/sdk/server/streamableHttp.js',
@@ -40,7 +47,19 @@ export default defineConfig({
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),
       events: eventsPolyfill,
+      // Use kokoro-js's self-contained browser bundle for local TTS. Its default
+      // entry pulls in @huggingface/transformers, which vite-plugin-electron-
+      // renderer resolves to a Node build that `require('path')` — unsupported in
+      // the sandboxed renderer. The web bundle inlines the WASM transformers build
+      // and has no node-builtin requires.
+      'kokoro-js': path.resolve(__dirname, 'node_modules/kokoro-js/dist/kokoro.web.js'),
     },
+  },
+  // The TTS worker (src/lib/audio/tts.worker.ts) lazy-imports vits-web / kokoro-js,
+  // so its bundle is code-split — which Rollup only allows with the ES output
+  // format. This also matches the `{ type: 'module' }` worker we instantiate.
+  worker: {
+    format: 'es',
   },
   optimizeDeps: {
     // Pre-bundle the WebGL graph stack (incl. the FA2 worker subpath, which the

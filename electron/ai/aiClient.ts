@@ -6,8 +6,11 @@ import {
   reasoningBody,
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
+  isLocalProvider,
+  localContextWindow,
 } from './providers';
-import type { EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
+import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -22,6 +25,71 @@ export class AiError extends Error {
   }
 }
 
+/** Stored key for a provider, or a harmless placeholder for local providers
+ *  (Ollama / LM Studio need no key; the OpenAI SDK still requires a non-empty
+ *  string). A user-supplied token for a secured local instance takes precedence. */
+function resolveProviderKey(provider: AiProvider): string | null {
+  const stored = getApiKey(provider);
+  if (stored) return stored;
+  return isLocalProvider(provider) ? 'local' : null;
+}
+
+// ── Local model context budgeting ────────────────────────────────────────────
+// Cloud models expose huge context windows and manage the prompt server-side, so
+// Nodus's large prompts (a scan can be tens of thousands of tokens) fit fine. Local
+// servers load a model with a small, fixed window (LM Studio defaults to 4096), so
+// the same prompt overflows with a cryptic "n_keep >= n_ctx". These helpers size
+// max_tokens to the real window and refuse up front with an actionable message.
+
+/** Smallest generation budget worth attempting; below this the window has no room. */
+const MIN_LOCAL_GENERATION_TOKENS = 512;
+
+/** Rough token estimate (~4 chars/token) for sizing local-model requests. */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/** Match llama.cpp's "prompt doesn't fit the context window" runtime error (LM Studio
+ *  surfaces it mid-stream or as a 400) — and cloud providers' equivalent — so it can be
+ *  reworded into something the user can act on. */
+function isContextOverflow(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /n_ctx|n_keep|tokens to keep|context length|context window|maximum context/i.test(message);
+}
+
+/** Actionable message for a prompt that overflows a model's context window. */
+function contextOverflowMessage(provider: AiProvider, model: string, ctx: number | null, promptTokens: number | null): string {
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  const knob = provider === 'ollama' ? 'num_ctx' : 'Context Length';
+  const need = promptTokens ? `~${promptTokens.toLocaleString('es')} tokens` : 'más tokens de los que caben';
+  const has = ctx ? ` (ventana actual: ${ctx.toLocaleString('es')} tokens)` : '';
+  return `El modelo local «${model}» no tiene suficiente contexto para esta tarea: necesita ${need}${has}. Aumenta el contexto del modelo en ${label} (${knob}), elige un modelo con más contexto, reduce el tamaño de la tarea (menos texto por lote) o usa un proveedor en la nube para tareas grandes.`;
+}
+
+/** Neutral variant when the provider/model aren't at hand (error-translation fallback). */
+function genericContextOverflowMessage(): string {
+  return 'El modelo no tiene suficiente contexto para esta petición. Reduce el tamaño de la tarea, aumenta el contexto del modelo (Context Length / num_ctx si es local) o usa un modelo con más contexto.';
+}
+
+/**
+ * Size max_tokens to a local model's real context window, refusing up front when the
+ * prompt itself won't fit. Returns the max_tokens to use; throws an actionable AiError
+ * (config → the scan queue pauses once instead of failing every item) when there is no
+ * room to generate. No-ops (returns the requested value) when the window can't be
+ * detected — the runtime-error translation is the safety net for that case.
+ */
+async function localMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): Promise<number> {
+  const ctx = await localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
+  if (!ctx) return requestedMax;
+  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const reserve = Math.max(256, Math.round(ctx * 0.05));
+  const available = ctx - promptTokens - reserve;
+  if (available < MIN_LOCAL_GENERATION_TOKENS) {
+    throw new AiError(contextOverflowMessage(model.provider, model.model, ctx, promptTokens), false, true);
+  }
+  return Math.min(requestedMax, available);
+}
+
 interface CallOpts {
   system: string;
   user: string;
@@ -31,6 +99,10 @@ interface CallOpts {
   /** Reasoning effort. Defaults to `off` for JSON/scan calls and to the configured
    *  `chatReasoning` for conversational calls. */
   reasoning?: ReasoningEffort;
+  /** Disable SDK/compatibility retries for explicitly single-attempt workflows. */
+  noRetry?: boolean;
+  /** Per-request transport timeout override. */
+  timeoutMs?: number;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
@@ -93,14 +165,32 @@ function withPromptLanguage<T extends { system: string }>(opts: T): T {
   return { ...opts, system: `${prefix}${system}${directive}` };
 }
 
-/** Resolve which model to use: explicit override, else the configured default. */
+/** Resolve which model to use: explicit override, else the synthesis workload. */
 function resolveModel(override?: ModelRef | null): ModelRef {
   if (override?.provider && override.model) return override;
-  const def = getSettings().defaultModel;
+  const def = getSettings().synthesisModel;
   if (!def?.provider || !def.model) {
     throw new AiError('No hay un modelo de IA configurado. Elige uno en Ajustes.', false, true);
   }
   return def;
+}
+
+/** Public wrapper so prompt-assembly code (e.g. the research chat) can resolve the same
+ *  effective model the completion calls will use, to size its payload accordingly. */
+export function resolveModelRef(override?: ModelRef | null): ModelRef {
+  return resolveModel(override);
+}
+
+/**
+ * The loaded context window (in tokens) of a model, or null when it is a cloud model or
+ * the window can't be detected. Only local servers (LM Studio / Ollama) load a small,
+ * fixed window; cloud models manage context server-side, so they return null and callers
+ * keep their cloud-sized budget. Lets large-prompt callers fit the payload to what a local
+ * model can actually hold instead of overflowing.
+ */
+export async function localModelContextWindow(model: ModelRef): Promise<number | null> {
+  if (!isLocalProvider(model.provider)) return null;
+  return localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
 }
 
 /**
@@ -131,12 +221,16 @@ async function rawComplete(
   jsonMode = true,
   reasoning: ReasoningEffort = 'off'
 ): Promise<string> {
-  const key = getApiKey(model.provider);
+  const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey: key });
+    const client = new Anthropic({
+      apiKey: key,
+      ...(opts.noRetry ? { maxRetries: 0 } : {}),
+      ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
+    });
     try {
       const res = await client.messages.create({
         model: model.model,
@@ -152,20 +246,24 @@ async function rawComplete(
     }
   }
 
-  // OpenAI-compatible providers: openai, openrouter, deepseek, gemini.
+  // OpenAI-compatible providers: openai, openrouter, deepseek, gemini, local servers.
   const baseURL = openAiCompatBase(model.provider);
+  // Local models load a small, fixed context window; size the request to it (and bail
+  // early with an actionable error) instead of overflowing with a cryptic llama.cpp error.
+  const requestedMax = opts.maxTokens ?? 8000;
+  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
     baseURL: baseURL ?? undefined,
-    timeout: 180_000,
+    timeout: opts.timeoutMs ?? 180_000,
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: opts.maxTokens ?? 8000,
+    max_tokens: maxTokens,
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.user },
@@ -179,7 +277,7 @@ async function rawComplete(
     } catch (e: any) {
       // The optional reasoning/JSON/routing params may be unsupported by this model.
       // Retry once as a plain request before surfacing the error.
-      if (isBadRequest(e) && Object.keys(extras).length > 0) {
+      if (!opts.noRetry && isBadRequest(e) && Object.keys(extras).length > 0) {
         res = await client.chat.completions.create(baseBody as any);
       } else {
         throw e;
@@ -199,6 +297,12 @@ async function rawComplete(
 
 function wrapProviderError(e: any): AiError {
   const status = e?.status ?? e?.response?.status;
+  // A prompt that overflows the model's context window can arrive at various statuses
+  // (400 from local servers, 400/413 from cloud). Reword it before status-based mapping
+  // so the user gets an actionable message instead of a raw "n_keep >= n_ctx".
+  if (isContextOverflow(e?.error?.message ?? e?.message)) {
+    return new AiError(genericContextOverflowMessage(), false, true);
+  }
   if (e?.name?.includes('Timeout') || /timeout|timed out/i.test(e?.message ?? '')) {
     return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false);
   }
@@ -292,7 +396,7 @@ async function parseOrRepair<T>(
  * JSON completion that retries (lower temperature, then no JSON mode) only when text
  * came back but failed to parse. A provider/transport failure (timeout, empty, etc.)
  * aborts on the first attempt so a hung provider can't stall for minutes.
- * Uses the given model override or the configured default model.
+ * Uses the given model override or the configured synthesis model.
  */
 export async function completeJson<T>(
   opts: CallOpts,
@@ -342,6 +446,17 @@ export async function completeText(opts: CallOpts, model?: ModelRef | null): Pro
   return rawComplete(resolved, withPromptLanguage(opts), false, reasoning);
 }
 
+/**
+ * Plain-text completion that does NOT apply the output-language directive. Use this
+ * for tasks that must fully control their own output language (e.g. translation),
+ * where forcing English/Spanish would defeat the purpose.
+ */
+export async function completeTextNeutral(opts: CallOpts, model?: ModelRef | null): Promise<string> {
+  const resolved = resolveModel(model);
+  const reasoning = opts.reasoning ?? 'off';
+  return rawComplete(resolved, opts, false, reasoning);
+}
+
 /** Plain-text streaming completion. The returned string is the full accumulated answer. */
 export async function completeTextStream(
   opts: CallOpts,
@@ -361,7 +476,7 @@ async function rawCompleteStream(
   reasoning: ReasoningEffort = 'off',
   signal?: AbortSignal
 ): Promise<string> {
-  const key = getApiKey(model.provider);
+  const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
   let full = '';
@@ -408,6 +523,9 @@ async function rawCompleteStream(
   }
 
   const baseURL = openAiCompatBase(model.provider);
+  // See rawComplete: fit the request to a local model's real context window.
+  const requestedMax = opts.maxTokens ?? 8000;
+  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -419,7 +537,7 @@ async function rawCompleteStream(
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: opts.maxTokens ?? 8000,
+    max_tokens: maxTokens,
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
@@ -441,7 +559,12 @@ async function rawCompleteStream(
     }
     for await (const chunk of stream as any) {
       if (chunk?.error) {
-        throw new AiError(chunk.error.message ?? 'Error del proveedor durante el streaming.', false);
+        const msg = chunk.error.message ?? 'Error del proveedor durante el streaming.';
+        // LM Studio/llama.cpp report a too-large prompt mid-stream; reword it actionably.
+        if (isLocalProvider(model.provider) && isContextOverflow(msg)) {
+          throw new AiError(contextOverflowMessage(model.provider, model.model, null, null), false, true);
+        }
+        throw new AiError(msg, false);
       }
       const delta = chunk?.choices?.[0]?.delta;
       // Reasoning trace: OpenRouter exposes `reasoning`, DeepSeek `reasoning_content`.
@@ -458,27 +581,12 @@ async function rawCompleteStream(
   return full;
 }
 
-const EMBED_MODELS: Record<EmbeddingProvider, string> = {
-  openai: 'text-embedding-3-small',
-  openrouter: 'baai/bge-m3',
-  gemini: 'gemini-embedding-001',
-};
-
-function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
-  const trimmed = modelId.trim() || EMBED_MODELS[provider];
-  if (provider === 'openrouter' && !trimmed.includes('/') && trimmed.includes(':')) {
-    const [author, slug] = trimmed.split(':', 2);
-    if (author && slug) return `${author.toLowerCase()}/${slug}`;
-  }
-  return trimmed;
-}
-
 function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   const settings = getSettings();
   const provider = settings.embeddingProvider ?? 'openai';
   return {
     provider,
-    modelId: normalizeEmbeddingModel(provider, settings.embeddingModel || EMBED_MODELS[provider]),
+    modelId: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBEDDING_MODELS[provider]),
   };
 }
 
@@ -509,7 +617,7 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
  */
 export async function embed(text: string): Promise<number[] | null> {
   const { provider, modelId } = embeddingConfig();
-  const key = getApiKey(provider);
+  const key = resolveProviderKey(provider);
   if (!key) return null;
   try {
     const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
@@ -523,7 +631,7 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
   const { provider, modelId } = embeddingConfig();
-  const key = getApiKey(provider);
+  const key = resolveProviderKey(provider);
   if (!key) return texts.map(() => null);
 
   // Gemini Embedding 2's native API aggregates multiple inputs; the OpenAI

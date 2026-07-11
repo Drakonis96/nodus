@@ -1,5 +1,6 @@
 import type { DeepResearchProgress, DeepResearchReport, DeepResearchRequest, ModelRef } from '@shared/types';
 import { completeJson, completeText } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
 import {
   orchestrateDeepResearch,
@@ -22,7 +23,9 @@ export async function generateDeepResearchReport(
   request: DeepResearchRequest,
   onProgress?: (p: DeepResearchProgress) => void
 ): Promise<DeepResearchReport> {
-  return orchestrateDeepResearch(request, realDeps(request.model ?? null), onProgress);
+  const settings = getSettings();
+  const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
+  return orchestrateDeepResearch({ ...request, model }, realDeps(model), onProgress);
 }
 
 function realDeps(model: ModelRef | null): DeepResearchDeps {

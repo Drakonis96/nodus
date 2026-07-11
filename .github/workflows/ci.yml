@@ -1,10 +1,11 @@
 name: CI
 
 # Runs the full quality gate on every branch push and PR: typecheck + renderer
-# and main builds, the 25-script unit/integration suite (Electron-as-Node, so
-# better-sqlite3 matches the app ABI), and the e2e smoke that boots the real
-# app. macOS runner: same platform as development, and Electron can open real
-# windows there without xvfb.
+# and main builds, the unit/integration suite (node --test discovers
+# scripts/test-*.mjs and runs them in parallel; scripts that need better-sqlite3
+# re-exec themselves under Electron-as-Node to match the app ABI), and the e2e
+# smoke that boots the real app. macOS runner: same platform as development,
+# and Electron can open real windows there without xvfb.
 
 on:
   push:

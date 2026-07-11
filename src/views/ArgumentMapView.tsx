@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType, ModelRef } from '@shared/types';
+import type { AppSettings, ArgumentBlock, ArgumentMap, ArgumentRouteSuggestion, EdgeDetail, EdgeType, GraphData, IdeaDetail, IdeaType } from '@shared/types';
 import { EDGE_LABELS, NODE_COLORS, NODE_LABELS, Icon, Spinner } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import {
@@ -17,6 +17,7 @@ import {
   type DetailLoading,
 } from '../components/NodeDetailPanel';
 import { useDismissableLayer } from '../hooks';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t, tx } from '../i18n';
 
 const RELATION_LABELS: Record<string, string> = {
@@ -62,7 +63,7 @@ function maxDepth(block: ArgumentBlock, depth = 0): number {
   return Math.max(...block.children.map((c) => maxDepth(c, depth + 1)));
 }
 
-export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; onBack: () => void }) {
+export function ArgumentMapView({ settings }: { settings: AppSettings }) {
   const [graph, setGraph] = useState<GraphData>({ nodes: [], edges: [] });
   const [graphLoaded, setGraphLoaded] = useState(false);
   const [mode, setMode] = useState<'auto' | 'ai'>('auto');
@@ -73,7 +74,7 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
   const [seedSearchOpen, setSeedSearchOpen] = useState(false);
   const [suggestionSearch, setSuggestionSearch] = useState('');
   const [minConnections, setMinConnections] = useState(0);
-  const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'argumentMapModel');
   const [map, setMap] = useState<ArgumentMap | null>(null);
   const [building, setBuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -249,20 +250,13 @@ export function ArgumentMapView({ settings, onBack }: { settings: AppSettings; o
     setDetailFontSize((v) => Math.min(DETAIL_MAX_FONT, Math.max(DETAIL_MIN_FONT, v + delta)));
   };
 
-  const hasModel = !!(settings.defaultModel || model);
+  const hasModel = !!model;
   const isAuto = mode === 'auto';
 
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Header / setup */}
       <div className="border-b border-neutral-800 p-3 flex flex-wrap gap-2 items-end text-xs">
-        <button
-          className="btn btn-ghost text-neutral-400 hover:text-neutral-100 mr-2"
-          title={t('Volver al grafo')}
-          onClick={onBack}
-        >
-          <Icon name="chevronLeft" size={16} />
-        </button>
         <div className="flex rounded-lg overflow-hidden border border-neutral-700">
           <button
             className={`px-3 py-1.5 ${isAuto ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}

@@ -158,7 +158,10 @@ export async function reprocessConnections(
   onProgress?: (p: ReprocessProgress) => void
 ): Promise<ReprocessConnectionsResult> {
   const db = getDb();
-  const locked = getSettings().themesLocked;
+  const settings = getSettings();
+  const locked = settings.themesLocked;
+  const themeModel = model ?? settings.extractionModel ?? null;
+  const relationModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
 
   const ideas = db
     .prepare(
@@ -254,7 +257,7 @@ export async function reprocessConnections(
     const result = await completeJson<ThemeAssignmentResult>(
       { system, user: JSON.stringify(input), temperature: 0.1 },
       isThemeAssignmentResult,
-      model
+      themeModel
     );
     // Checkpoint this batch result.
     saveCheckpoint('reprocess', contentHash, 'reproc_theme_batch', bi, result);
@@ -318,7 +321,7 @@ export async function reprocessConnections(
 
   let relationsAdded = 0;
   if (options.relations) {
-    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, model, contentHash, onProgress);
+    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, relationModel, contentHash, onProgress);
   }
 
   return {

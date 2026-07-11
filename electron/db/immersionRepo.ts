@@ -10,6 +10,7 @@ import type {
 } from '@shared/types';
 import { getDb } from './database';
 import { normalizeBareCitations } from '../ai/immersionCore';
+import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
 
 interface SessionRow {
   id: string;
@@ -101,6 +102,7 @@ function toSession(row: SessionRow): ImmersionSession | null {
     model: parseJson<ModelRef | null>(row.model_json, null),
     plan,
     progress: normalizeProgress(parseJson<unknown>(row.progress_json, null)),
+    image: getDecorativeImage('immersion', row.id),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -127,6 +129,7 @@ function toSummary(row: SessionRow): ImmersionSessionSummary {
     stats,
     progressPct: pct,
     finished: progress.finishedAt != null,
+    image: getDecorativeImage('immersion', row.id),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -154,7 +157,7 @@ export function saveImmersionSession(plan: ImmersionPlan, model: ModelRef | null
     now,
     now
   );
-  return { id, topic: plan.topic, language: plan.language, minutes: plan.minutes, model, plan, progress, createdAt: now, updatedAt: now };
+  return { id, topic: plan.topic, language: plan.language, minutes: plan.minutes, model, plan, progress, image: null, createdAt: now, updatedAt: now };
 }
 
 export function listImmersionSessions(): ImmersionSessionSummary[] {
@@ -191,5 +194,6 @@ export function recordImmersionAnswer(id: string, record: ImmersionAnswerRecord)
 }
 
 export function deleteImmersionSession(id: string): void {
+  deleteDecorativeImageRow('immersion', id);
   getDb().prepare('DELETE FROM immersion_sessions WHERE id = ?').run(id);
 }

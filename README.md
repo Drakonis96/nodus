@@ -9,11 +9,20 @@ your sources.
 Everything runs locally. The only external calls are to the AI provider you
 configure. Your data, API keys and embeddings stay on your machine.
 
-> **New in v0.7.x** — the writing copilot is now available over MCP: select a
-> passage and get its typed relations (supports / contradicts / refines …) with
-> the Zotero item to cite. The demo corpus is bilingual (English / Spanish) and
-> follows the app language. Plus demo mode (explore with sample data, no Zotero
-> or API key needed), expanded tutorial coverage, and global search.
+> **See it first** — the **[Nodus website](https://drakonis96.github.io/nodus/)** has a
+> cinematic tour and a **[live in-browser demo](https://drakonis96.github.io/nodus/demo/)**
+> of every view, no install needed.
+
+> **New here?** Start with **[Your first day with Nodus](docs/GETTING_STARTED.md)** —
+> a step-by-step walkthrough from install to your first cited report, plus a map of
+> every sidebar section.
+
+> **New in v1.7** — the Word writing copilot graduates to an official **beta**,
+> installable straight from the app (Settings → Integrations): while you write, a
+> side panel shows how the current paragraph relates to your library, backed by an
+> auto-renewing local certificate and a Spanish/English pane. Local models via
+> **Ollama and LM Studio** are now first-class providers everywhere a cloud model
+> is, with prompts sized to each model's real context window.
 
 ---
 
@@ -49,7 +58,7 @@ science-of-learning sample — no real library required).
 | **Read** | Two-level scanning: light (title + abstract, cheap) and deep (full text, ideas + evidence + relations). Automatic or manual, your choice. |
 | **Understand** | Idea graph (Cytoscape.js), author graph, debate view (contradictions as two-sided face-offs), Tutor mode (AI-guided step-by-step walkthrough). |
 | **Orient** | Research gap mining, reading path planner, research coverage map (decompose a thesis question, map which sub-questions your corpus covers). |
-| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. |
+| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. A Word add-in (beta) shows, live while you type, how the current paragraph relates to your library — installable from Settings → Integrations (see [word-addin/README.md](word-addin/README.md)). |
 | **Converse** | Research assistant chat grounded in your corpus (ideas, passages, contradictions, gaps, author graph — you pick the context). |
 
 ### Demo mode
@@ -110,6 +119,9 @@ preload script.
   DeepSeek, or Gemini). Embeddings currently require OpenAI, OpenRouter, or
   Gemini; with Anthropic only, fusion falls back to a conservative "new idea"
   policy.
+- Optional decorative images require a Google/Gemini, OpenAI, or OpenRouter key.
+  They reuse the provider keys stored in Settings; no new environment variable
+  is required.
 - Node.js 20+.
 
 Or skip all of the above: launch the app, click **Load demo**, and explore.
@@ -202,6 +214,29 @@ degrades gracefully if the model fails on a section. Length is adaptive by
 default or pinned (concise / standard / exhaustive). The report reuses the
 workshop's viewer, export, local-save and clickable-citation stack.
 
+### Decorative images
+
+Inmersión and Deep Research can optionally request one landscape illustration.
+The text model first produces a compact visual scene; Nodus combines it with a
+centralized style template that forbids visible text, letters, logos, and watermarks.
+The default is a powerful, richly colored antique-book illustration, with
+hand-colored engraving, classic scientific plate, watercolor, historical collage,
+modernist poster, and contemporary editorial alternatives.
+
+Image generation starts only after the immersion or report is stored. It has a
+separate status and a two-minute provider timeout: failure never rolls back,
+blocks, or hides the main content. There are no automatic retries. Users can
+retry a failed image, delete it, or confirm a potentially billable regeneration.
+The optimized full image and a small list thumbnail are stored once in SQLite
+and included in encrypted full backups.
+
+Provider/model selection lives in **Settings → AI providers and models → Image
+generation**. The model browser shows published input, output, and direct
+per-image prices where the provider exposes them, explicitly marks unavailable
+metrics, supports live search, and keeps price sorting within each provider when
+published units or sizes are not comparable. See
+[image provider details and limitations](docs/IMAGE_GENERATION.md).
+
 ### Notes workspace
 
 Folders and subfolders with a Markdown editor. Capture content from the research
@@ -218,8 +253,10 @@ model needed). Surfaces debate hubs and connectivity-ranked seed candidates.
 
 ### Global search
 
-Keyword search across ideas, works, gaps, themes, authors and notes. Results
-link directly to the relevant detail in each view.
+Keyword and semantic search across notes, ideas, works, passages, gaps, themes,
+and authors. Selecting any result opens the same type-adaptive detail modal with
+all locally available metadata and content. Opening/locating the item in the
+graph or its owning view is an explicit secondary action, never automatic.
 
 ### Research assistant
 

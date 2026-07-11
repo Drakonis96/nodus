@@ -318,9 +318,7 @@ class ScanQueue {
     if (this.reprocessing) return;
     this.reprocessing = true;
     try {
-      const settings = getSettings();
-      const model = settings.synthesisModel ?? settings.defaultModel ?? null;
-      await reprocessConnections({ relations: true }, model);
+      await reprocessConnections({ relations: true });
     } catch (e) {
       console.error('[scanQueue] reprocess automático falló:', e instanceof Error ? e.message : String(e));
     } finally {
@@ -359,7 +357,7 @@ class ScanQueue {
   private maybeEnqueueBridge(): void {
     if (!this.embeddingConfigured()) return;
     const settings = getSettings();
-    this.enqueueBridge(settings.synthesisModel ?? settings.defaultModel ?? null);
+    this.enqueueBridge(settings.synthesisModel ?? null);
   }
 
   private async process(item: QueueItem): Promise<void> {

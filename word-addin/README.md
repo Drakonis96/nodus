@@ -1,4 +1,8 @@
-# Nodus Copilot — complemento de escritura para Word
+# Nodus Copilot — complemento de escritura para Word (beta)
+
+> **Beta oficial desde v1.7.0**: se instala directamente desde la app empaquetada
+> (Ajustes → Integraciones), sin herramientas de desarrollo. El panel sigue el
+> idioma de la interfaz de Nodus (español/inglés).
 
 Un complemento (task pane) de Microsoft Word que, mientras escribes, muestra en el
 panel lateral cómo el **párrafo actual** se relaciona con tu biblioteca de Nodus,
@@ -24,8 +28,12 @@ complemento y una pequeña API JSON **en el mismo origen HTTPS local**
 
 ## Puesta en marcha (una vez)
 1. **Certificado**: en Nodus → Ajustes → "Copiloto de escritura (Word)" pulsa
-   *Generar certificado* (usa `office-addin-dev-certs`, confía un CA local para
-   `https://localhost`). Solo una vez por equipo.
+   *Generar certificado*. Nodus genera su propia CA local (10 años) y un
+   certificado hoja para `https://localhost` (1 año, renovado en silencio antes
+   de caducar), y confía la CA para tu usuario con un diálogo del sistema
+   (`security` en macOS, `Import-Certificate` en Windows). Solo una vez por
+   equipo; si ya tenías el certificado de `office-addin-dev-certs` de una
+   instalación de desarrollo, se reutiliza tal cual.
 2. **Activa** el toggle "Activar copiloto para Word". Verás `Activo:
    https://localhost:4320/addin/taskpane.html`.
 3. Pulsa **Instalar/actualizar en Word**. Nodus copia un manifiesto con el puerto

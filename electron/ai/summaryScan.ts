@@ -35,7 +35,7 @@ export function summaryContentHash(
   const scanModel = model ?? settings.summaryModel ?? settings.synthesisModel ?? null;
   return crypto
     .createHash('sha1')
-    .update(`${work.deep_hash ?? ''}|${work.light_hash ?? ''}|${modelId(scanModel ?? settings.defaultModel)}|summary-v1`)
+    .update(`${work.deep_hash ?? ''}|${work.light_hash ?? ''}|${modelId(scanModel)}|summary-v1`)
     .digest('hex');
 }
 
@@ -157,7 +157,7 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null): Promi
       nodusId: work.nodus_id,
       summary,
       sourceLevel: work.deep_status === 'done' ? 'deep' : 'light',
-      model: scanModel ?? settings.defaultModel,
+      model: scanModel,
       contentHash: hash,
     });
     setSummaryResult(work.nodus_id, 'done', hash);

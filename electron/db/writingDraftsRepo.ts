@@ -8,6 +8,7 @@ import type {
   WritingWorkshopSelection,
 } from '@shared/types';
 import { getDb } from './database';
+import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
 
 interface SavedWritingDraftRow {
   id: string;
@@ -29,6 +30,7 @@ function toSavedDraft(row: SavedWritingDraftRow): WritingWorkshopSavedDraft | nu
       selection: JSON.parse(row.selection_json) as WritingWorkshopSelection,
       model: row.model_json ? (JSON.parse(row.model_json) as ModelRef) : null,
       draft: JSON.parse(row.draft_json) as WritingWorkshopDraft,
+      image: getDecorativeImage('deep_research', row.id),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -76,5 +78,6 @@ export function getWritingWorkshopDraft(id: string): WritingWorkshopSavedDraft |
 }
 
 export function deleteWritingWorkshopDraft(id: string): boolean {
+  deleteDecorativeImageRow('deep_research', id);
   return getDb().prepare('DELETE FROM writing_saved_drafts WHERE id = ?').run(id).changes > 0;
 }

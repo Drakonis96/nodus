@@ -344,7 +344,8 @@ export async function buildImmersionMaterial(topic: string): Promise<ImmersionMa
 export async function buildImmersionScope(request: ImmersionScopeRequest): Promise<ImmersionScope> {
   const material = await buildImmersionMaterial(request.topic);
   const warnings: string[] = [];
-  const plannedModel = getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const plannedModel = settings.immersionModel ?? settings.synthesisModel ?? null;
   const aiKeyAvailable = plannedModel != null && getApiKey(plannedModel.provider) != null;
   if (!aiKeyAvailable) {
     warnings.push(
@@ -392,7 +393,7 @@ export async function buildImmersionScope(request: ImmersionScopeRequest): Promi
     gapCount: material.gaps.length,
     passageCount: material.passages.length,
     graph: material.graph,
-    estimatedStations: resolveStationCount(150, material.ideas.length),
+    estimatedStations: resolveStationCount(request.minutes ?? 150, material.ideas.length),
     warnings,
   };
 }
@@ -401,7 +402,8 @@ export async function generateImmersionSession(
   request: ImmersionRequest,
   onProgress?: (p: ImmersionBuildProgress) => void
 ): Promise<ImmersionSession> {
-  const model = request.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+  const settings = getSettings();
+  const model = request.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
   const plan = await orchestrateImmersion({ ...request, model }, realDeps(model), onProgress);
   return saveImmersionSession(plan, model);
 }
@@ -470,7 +472,8 @@ export async function evaluateImmersionAnswer(request: ImmersionAnswerRequest): 
       answeredAt: new Date().toISOString(),
     };
   } else {
-    const model = request.model ?? session.model ?? getSettings().synthesisModel ?? getSettings().defaultModel ?? null;
+    const settings = getSettings();
+    const model = request.model ?? session.model ?? settings.immersionModel ?? settings.synthesisModel ?? null;
     let assessment: ImmersionAssessment;
     if (!model) {
       assessment = heuristicAssessment(question, request.answer, session);
@@ -540,19 +543,23 @@ function isCurriculum(v: unknown): v is CurriculumResult {
 
 async function aiPlanCurriculum(input: CurriculumInput, model: ModelRef | null): Promise<CurriculumResult> {
   const system = [
-    'Eres el diseñador del modo Inmersión de Nodus: conviertes un tema de investigación en una ruta guiada de estaciones para dominar ese tema en una tarde.',
-    `Diseña EXACTAMENTE ${input.stationCount} estaciones. Cada estación responde UNA sub-pregunta concreta del tema, con las ideas y pasajes del corpus que la sostienen.`,
-    'Las sub-preguntas deben cubrir el tema con progresión pedagógica: de lo fundacional a lo específico, y dejar las tensiones/debates para estaciones tardías.',
-    'Usa EXCLUSIVAMENTE los identificadores de ideas y pasajes que se te dan. No inventes ids.',
-    'Reparte las ideas entre estaciones sin repetirlas; asigna a cada estación los pasajes de sus mismas obras cuando existan.',
-    `Escribe títulos y preguntas en ${input.language === 'en' ? 'inglés' : 'español'}.`,
-    'Devuelve SOLO JSON válido: {"title":"título breve de la inmersión","stations":[{"id":"st-1","title":"...","question":"...","ideaIds":["..."],"passageIds":["..."]}]}',
+    'Eres el diseñador del modo Inmersión de Nodus: conviertes un tema de investigación en una RUTA de estaciones guiadas para dominarlo a fondo, de principio a fin.',
+    'Tu trabajo aquí es la PLANIFICACIÓN de la ruta: defines la secuencia de estaciones y, para cada una, la sub-pregunta que responde y las ideas y pasajes del corpus que la sostienen. No redactas todavía el contenido.',
+    `Apunta a unas ${input.stationCount} estaciones. Es un OBJETIVO, no una cuota: usa algunas menos si el material no da para más, o algunas más si el tema lo merece. Prioriza SIEMPRE una secuencia coherente, progresiva y sin relleno por encima de alcanzar un número exacto.`,
+    'ARCO PEDAGÓGICO del conjunto: abre por lo fundacional (qué está en juego, marco y conceptos base), avanza hacia los mecanismos, la evidencia y los casos, reserva las tensiones, debates y contra-lecturas para el tramo medio-final, y cierra con síntesis, límites o implicaciones. La ruta debe leerse como un curso que progresa, no como una lista de temas sueltos.',
+    'PROFUNDIDAD POR CONTINUACIÓN: cuando un aspecto es rico, dedícale VARIAS estaciones CONSECUTIVAS que avancen de lo general a lo particular (p. ej. «X: panorama» → «X: mecanismos» → «X: evidencia y casos» → «X: consecuencias y tensiones»), en lugar de comprimirlo en una sola parada. Encadena las continuaciones para que cada una presuponga la anterior.',
+    'Cada estación responde UNA sub-pregunta concreta y distinta, con su propio foco. No repartas la misma idea entre varias estaciones salvo que una continuación la retome deliberadamente desde un ángulo nuevo.',
+    'COBERTURA: en conjunto, las estaciones deben abordar las ideas más fuertes del material y las voces y debates principales; no dejes fuera lo central del tema.',
+    'Asigna a cada estación los pasajes de las mismas obras que sus ideas cuando existan, para que haya lectura literal donde corresponde.',
+    'Usa EXCLUSIVAMENTE los identificadores (ideaIds, passageIds) que se te dan en el material. No inventes ids ni cites nada que no esté en la lista.',
+    `Escribe los títulos y las preguntas en ${input.language === 'en' ? 'inglés' : 'español'}: títulos breves y evocadores; preguntas concretas y respondibles con este material.`,
+    'Devuelve SOLO JSON válido, sin texto alrededor: {"title":"título breve de la inmersión","stations":[{"id":"st-1","title":"...","question":"...","ideaIds":["..."],"passageIds":["..."]}]}',
   ].join('\n');
   const user = JSON.stringify(
     {
       tema: input.topic,
       idioma: input.language,
-      estaciones: input.stationCount,
+      estaciones_objetivo: input.stationCount,
       ideas: input.ideas,
       pasajes: input.passages,
       autores: input.authors,
@@ -561,7 +568,7 @@ async function aiPlanCurriculum(input: CurriculumInput, model: ModelRef | null):
     null,
     2
   );
-  return completeJson<CurriculumResult>({ system, user, temperature: 0.2, maxTokens: 4500 }, isCurriculum, model);
+  return completeJson<CurriculumResult>({ system, user, temperature: 0.2, maxTokens: 9000 }, isCurriculum, model);
 }
 
 function isPanorama(v: unknown): v is PanoramaResult {

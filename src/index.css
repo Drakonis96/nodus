@@ -493,6 +493,9 @@ body {
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
 }
+/* `.input` is declared after `@tailwind utilities`, so its `px-3` wins over a
+   plain `pl-*` utility (same specificity, later in source). For an input with a
+   leading icon, use this class instead of `pl-*` — its two-class selector wins. */
 .input.input-with-leading-icon {
   padding-left: 2rem;
 }
@@ -1012,4 +1015,14 @@ body {
 }
 .light .stroke-neutral-800 {
   stroke: #e5e7eb;
+}
+
+/* In-page find (Cmd/Ctrl+F): the CSS Custom Highlight API paints over the layout
+   without touching the DOM, so it never conflicts with React-rendered content. */
+::highlight(nodus-find) {
+  background-color: rgba(250, 204, 21, 0.32);
+}
+::highlight(nodus-find-current) {
+  background-color: #facc15;
+  color: #111827;
 }

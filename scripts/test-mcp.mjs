@@ -57,6 +57,7 @@ try {
     'nodus_get_work',
     'nodus_list_work_passages',
     'nodus_get_passage',
+    'nodus_search_passages',
     'nodus_list_themes',
     'nodus_get_theme',
     'nodus_list_tutor_routes',
@@ -84,14 +85,43 @@ try {
 
   seedMcpDatabase(getDb());
 
-  const capabilities = await callTool(server, 'nodus_get_capabilities');
+  const capabilitiesRaw = await callToolRaw(server, 'nodus_get_capabilities');
+  // Object results mirror into structuredContent (no outputSchema declared) while
+  // still carrying the text block for older clients.
+  assert.ok(capabilitiesRaw.structuredContent, 'object results expose structuredContent');
+  assert.deepEqual(
+    capabilitiesRaw.structuredContent,
+    JSON.parse(capabilitiesRaw.content[0].text),
+    'structuredContent mirrors the text block'
+  );
+  const capabilities = capabilitiesRaw.structuredContent;
+  assert.equal(capabilities.version, '0.0.0-test', 'capabilities reports the running app version');
   assert.equal(capabilities.counts.works, 3);
   assert.equal(capabilities.counts.notes, 1);
+  assert.equal(capabilities.counts.themes, 1);
+  assert.equal(capabilities.counts.passages, 2);
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);
   assert.equal(ideas.hasMore, false);
   assert.equal(ideas.ideas[0].global_id, 'idea-1');
+  // Compact by default: a statement snippet instead of the full statement…
+  assert.equal('statement' in ideas.ideas[0], false);
+  assert.match(ideas.ideas[0].statementSnippet, /memoria visual/);
+  // …and full=true restores the complete rows.
+  const fullIdeas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo', full: true });
+  assert.equal(fullIdeas.ideas[0].statement, 'El turismo reorganiza la memoria visual local.');
+  assert.equal('statementSnippet' in fullIdeas.ideas[0], false);
+
+  // query must match text fields only — never JSON keys, enum values or internal ids.
+  const enumLeak = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'claim' });
+  assert.equal(enumLeak.total, 0, 'query must not match the type enum');
+  const idLeak = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'idea-1' });
+  assert.equal(idLeak.total, 0, 'query must not match internal ids');
+  const statementHit = await callTool(server, 'nodus_list_ideas', { limit: 10, offset: 0, query: 'memoria visual' });
+  assert.equal(statementHit.total, 1, 'query must match the statement text');
+  const noteKindLeak = await callTool(server, 'nodus_search_notes', { query: 'markdown', limit: 10, offset: 0 });
+  assert.equal(noteKindLeak.total, 0, 'note query must not match the kind enum');
 
   const gaps = await callTool(server, 'nodus_list_gaps', { limit: 10, offset: 0, kind: 'open_question' });
   assert.equal(gaps.total, 1);
@@ -204,6 +234,96 @@ try {
   assert.equal(aiError.isError, true);
   assert.equal(JSON.parse(aiError.content[0].text).error.category, 'ai_unconfigured');
 
+  // Progress bridge: with a progressToken, long tools stream notifications/progress.
+  // The deep-research pipeline degrades gracefully without an AI provider (fallback
+  // plan + sections), so it walks every phase and the bridge must fire throughout.
+  const deepArgs = {
+    objective: 'Estado del turismo visual en el corpus',
+    targetLength: 'adaptive',
+    sectionLimit: 'auto',
+    writer: 'nodus',
+    save: false,
+  };
+  const progressNotes = [];
+  const deepReport = await callToolRaw(server, 'nodus_generate_deep_research', deepArgs, {
+    _meta: { progressToken: 'tok-1' },
+    sendNotification: async (n) => progressNotes.push(n),
+  });
+  assert.notEqual(deepReport.isError, true, `deep research failed: ${deepReport.content?.[0]?.text}`);
+  assert.ok(progressNotes.length >= 3, `expected several MCP progress notifications, got ${progressNotes.length}`);
+  assert.equal(progressNotes[0].method, 'notifications/progress');
+  assert.equal(progressNotes[0].params.progressToken, 'tok-1');
+  assert.match(progressNotes[0].params.message, /corpus/i);
+  assert.ok(
+    progressNotes.some((note) => /\[section \d+/.test(note.params.message)),
+    'expected per-section progress messages'
+  );
+  progressNotes.forEach((note, index) => assert.equal(note.params.progress, index + 1, 'progress must increase monotonically'));
+
+  // Without a progressToken the bridge must stay silent (and never crash the tool).
+  const silentNotes = [];
+  const silentReport = await callToolRaw(server, 'nodus_generate_deep_research', deepArgs, {
+    _meta: {},
+    sendNotification: async (n) => silentNotes.push(n),
+  });
+  assert.notEqual(silentReport.isError, true);
+  assert.equal(silentNotes.length, 0);
+
+  // Semantic passage search: unconfigured provider must fail cleanly…
+  const passageAiError = await callToolRaw(server, 'nodus_search_passages', {
+    query: 'turismo visual',
+    limit: 10,
+    minSimilarity: 0.18,
+  });
+  assert.equal(passageAiError.isError, true);
+  assert.equal(JSON.parse(passageAiError.content[0].text).error.category, 'ai_unconfigured');
+
+  // …and with embeddings in place it must rank by cosine similarity. Stub the
+  // embedder (patching the transpiled CommonJS export) and seed vectors that match
+  // currentEmbeddingConfig(), exactly as the real pipeline stores them.
+  const aiClient = require(path.join(repoRoot, 'electron/ai/aiClient.ts'));
+  const ideasRepo = require(path.join(repoRoot, 'electron/db/ideasRepo.ts'));
+  const embedConfig = ideasRepo.currentEmbeddingConfig();
+  const setEmbedding = getDb().prepare(
+    'UPDATE passages SET embedding = ?, embedding_provider = ?, embedding_model = ?, embedding_dim = ? WHERE passage_id = ?'
+  );
+  setEmbedding.run(ideasRepo.encodeEmbedding([1, 0]), embedConfig.provider, embedConfig.model, 2, 'passage-1');
+  setEmbedding.run(ideasRepo.encodeEmbedding([0, 1]), embedConfig.provider, embedConfig.model, 2, 'passage-2');
+  const originalEmbed = aiClient.embed;
+  aiClient.embed = async () => [1, 0];
+  try {
+    const semantic = await callTool(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0.18,
+    });
+    assert.equal(semantic.passages.length, 1, 'only the similar passage clears the threshold');
+    assert.equal(semantic.passages[0].passage_id, 'passage-1');
+    assert.ok(semantic.passages[0].similarity > 0.9);
+    assert.equal(semantic.passages[0].work.zotero_key, 'ZOT1');
+    assert.match(semantic.passages[0].textSnippet, /turismo visual/);
+    assert.equal('text' in semantic.passages[0], false, 'search returns snippets, not full text');
+
+    const scoped = await callTool(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0,
+      workId: 'ZOT2',
+    });
+    assert.equal(scoped.passages.length, 0, 'work scoping must exclude other works');
+
+    const badScope = await callToolRaw(server, 'nodus_search_passages', {
+      query: 'turismo visual',
+      limit: 10,
+      minSimilarity: 0.18,
+      workId: 'ZOT-MISSING',
+    });
+    assert.equal(badScope.isError, true);
+    assert.equal(JSON.parse(badScope.content[0].text).error.category, 'not_found');
+  } finally {
+    aiClient.embed = originalEmbed;
+  }
+
   closeDb();
   console.log('mcp tool contract test passed');
 } finally {
@@ -216,10 +336,10 @@ async function callTool(server, name, args = {}) {
   return JSON.parse(result.content[0].text);
 }
 
-async function callToolRaw(server, name, args = {}) {
+async function callToolRaw(server, name, args = {}, extra = undefined) {
   const entry = server.tools.get(name);
   assert.ok(entry, `missing MCP tool ${name}`);
-  return entry.handler(args);
+  return entry.handler(args, extra);
 }
 
 function installRuntimeHooks(userDataPath) {

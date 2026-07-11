@@ -246,6 +246,17 @@ export const EN: Record<string, string> = {
   Interfaz: 'Interface',
   Integraciones: 'Integrations',
   Sistema: 'System',
+  'Buscar proyectos…': 'Search projects…',
+  'Ningún proyecto coincide con la búsqueda.': 'No project matches your search.',
+  'Ver en modo lectura': 'Reading view',
+  'Editar el texto': 'Edit the text',
+  'Vista de lectura a todo el ancho.': 'Full-width reading view.',
+  'Buscar voces…': 'Search voices…',
+  'Todos los idiomas': 'All languages',
+  'Todas las voces': 'All voices',
+  'Biblioteca de Hume': 'Hume library',
+  'Mis voces': 'My voices',
+  'Ninguna voz coincide con los filtros.': 'No voice matches the filters.',
   '1 sección encontrada': '1 section found',
   'secciones encontradas': 'sections found',
   'No hay ajustes que coincidan con la búsqueda.': 'No settings match the search.',
@@ -290,6 +301,8 @@ export const EN: Record<string, string> = {
   'Servidor MCP': 'MCP server',
   'Activar servidor MCP': 'Enable MCP server',
   'Copiloto de escritura (Word)': 'Writing copilot (Word)',
+  '1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.':
+    '1) Generate the local certificate · 2) Enable the copilot · 3) Install it in Word and open it from the Nodus tab.',
   'Activar copiloto para Word': 'Enable Word copilot',
   'Activar Nodus Copilot para Word': 'Enable Nodus Copilot for Word',
   'Generar certificado': 'Generate certificate',
@@ -1321,6 +1334,46 @@ export const EN: Record<string, string> = {
   'Del grafo a un borrador con fuentes verificables.': 'From the graph to a draft with verifiable sources.',
   // Deep Research
   'Deep Research': 'Deep Research',
+  // ── Deep Research gallery + queue + reader ───────────────────────────────
+  'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.':
+    'Your library of academic reports, generated in a queue and citing the whole corpus.',
+  'Nuevo informe': 'New report',
+  'Buscar entre tus informes…': 'Search your reports…',
+  'Buscar en la página…': 'Search the page…',
+  '0 resultados': 'No results',
+  'Más antiguos': 'Oldest',
+  'Por título (A–Z)': 'By title (A–Z)',
+  'Vista mosaico': 'Grid view',
+  'Vista lista': 'List view',
+  'Cargando informes…': 'Loading reports…',
+  'Ningún informe coincide con tu búsqueda.': 'No report matches your search.',
+  'Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.':
+    'No reports yet. Create the first one and it will live here, ready to read full-screen.',
+  'Cola de generación · {n} en curso': 'Generation queue · {n} in progress',
+  'Limpiar fallidos': 'Clear failed',
+  'pág.': 'pp.',
+  'Quitar de la cola': 'Remove from queue',
+  'Falló': 'Failed',
+  'Abrir a pantalla completa': 'Open full-screen',
+  'Leer': 'Read',
+  'Reutilizar la idea para un informe nuevo': 'Reuse the idea for a new report',
+  'Volver a la galería': 'Back to gallery',
+  'El informe desarrolla tu idea por completo, citando todo el corpus.':
+    'The report develops your idea in full, citing the whole corpus.',
+  'Se añadirá a la cola ({n} en curso) y se generará cuando termine el anterior.':
+    'It will be added to the queue ({n} in progress) and generated once the previous one finishes.',
+  'Se genera en segundo plano: puedes cerrar esto y seguir trabajando.':
+    'It generates in the background: you can close this and keep working.',
+  'Añadir a la cola': 'Add to queue',
+  'Informe añadido a la cola. Se generará en segundo plano.': 'Report added to the queue. It will generate in the background.',
+  'Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.':
+    'Press “New report” and write the question or idea. The report turns it into a multi-page text, not a short answer.',
+  '2. Encola los que quieras': '2. Queue as many as you want',
+  'Añade varios informes a la cola: se generan en cadena, uno tras otro, mientras sigues trabajando.':
+    'Add several reports to the queue: they generate one after another while you keep working.',
+  '4. Lee a pantalla completa': '4. Read full-screen',
+  'Abre cualquier informe de la galería para leerlo a pantalla completa, revisar sus citas y exportarlo a Markdown o PDF.':
+    'Open any report in the gallery to read it full-screen, review its citations and export it to Markdown or PDF.',
   'Taller': 'Workshop',
   'Informe guardado localmente.': 'Report saved locally.',
   'Informe guardado abierto. Puedes exportarlo o reutilizar su idea para regenerarlo.':
@@ -1366,14 +1419,22 @@ export const EN: Record<string, string> = {
   'Sin proyecto': 'No project',
   'Generar informe': 'Generate report',
   'Generando informe…': 'Generating report…',
+  'No se pudo generar el informe.': 'The report could not be generated.',
   'Escribe la idea de investigación antes de generar el informe.': 'Write the research idea before generating the report.',
   'Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.':
     'Write the research idea or question. The report will develop it fully, citing every work in the corpus.',
   'Cobertura del corpus completo': 'Full-corpus coverage',
   'Sin selección manual: el informe elige y cita las fuentes por ti.':
     'No manual selection: the report picks and cites the sources for you.',
+  'Puedes cambiar de sección: el informe seguirá en segundo plano y recuperarás este progreso al volver.':
+    'You can switch sections: the report will continue in the background and this progress will return when you come back.',
   'Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.':
     'Report generated: {s} sections · ~{p} pages · {i} ideas cited.',
+  'Informe generado y guardado: {s} secciones · ~{p} páginas · {i} ideas citadas.':
+    'Report generated and saved: {s} sections · ~{p} pages · {i} ideas cited.',
+  'Informe generado, pero no se pudo guardar automáticamente: {error}':
+    'The report was generated but could not be saved automatically: {error}',
+  'El informe está listo y puedes guardarlo manualmente.': 'The report is ready and you can save it manually.',
   'El informe aparecerá aquí. Escribe tu idea de investigación y pulsa «Generar informe».':
     'The report will appear here. Write your research idea and press “Generate report”.',
   'Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.':
@@ -2153,6 +2214,9 @@ export const EN: Record<string, string> = {
   Exprés: 'Express',
   'Una tarde': 'One afternoon',
   Profunda: 'Deep',
+  '~6 paradas': '~6 stops',
+  '~12 paradas': '~12 stops',
+  '~20 paradas': '~20 stops',
   'Cartografiando…': 'Mapping…',
   'Explorar el territorio': 'Explore the territory',
   'Las preguntas siempre se pueden saltar durante la sesión': 'Questions can always be skipped during the session',
@@ -2172,8 +2236,8 @@ export const EN: Record<string, string> = {
   obras: 'works',
   autores: 'authors',
   debates: 'debates',
-  'Plan para {min} min: ~{n} estaciones guiadas, con panorama, contrastes, fronteras y examen final{quiz}.':
-    'Plan for {min} min: ~{n} guided stations, with panorama, contrasts, frontiers and a final exam{quiz}.',
+  'Ruta de ~{n} estaciones guiadas: panorama, contrastes, fronteras y examen final{quiz}. La IA ajusta el número según lo que el tema pida.':
+    'A route of ~{n} guided stations: panorama, contrasts, frontiers and a final exam{quiz}. The AI adjusts the number to what the topic needs.',
   '(sin preguntas)': '(no questions)',
   'Voces principales': 'Leading voices',
   '{n} ideas relevantes': '{n} relevant ideas',
@@ -2183,6 +2247,9 @@ export const EN: Record<string, string> = {
   'Generando tu inmersión…': 'Generating your immersion…',
   'Cada respuesta de la IA se guarda: este recorrido será tuyo para siempre y podrás retomarlo sin regenerar nada.':
     'Every AI answer is saved: this route is yours forever and you can resume it without regenerating anything.',
+  'Puedes cambiar de sección: la generación seguirá en segundo plano y este progreso reaparecerá cuando vuelvas.':
+    'You can switch sections: generation will continue in the background and this progress will reappear when you return.',
+  'No se pudo generar la inmersión.': 'The immersion could not be generated.',
   'Cartografiando el territorio': 'Mapping the territory',
   'Diseñando la ruta': 'Designing the route',
   'Redactando el panorama': 'Writing the panorama',
@@ -2277,8 +2344,193 @@ export const EN: Record<string, string> = {
   'Profundiza: informe Deep Research del tema': 'Go deeper: Deep Research report on the topic',
   'Ahora que dominas el tema, genera el informe académico de varias páginas con todas las fuentes citadas. Se guarda en Deep Research y podrás exportarlo o citarlo en tu escritura.':
     'Now that you master the topic, generate the multi-page academic report with every source cited. It is saved in Deep Research so you can export it or cite it in your writing.',
+  'Puedes cambiar de sección: el informe seguirá generándose y mostrará el progreso al volver.':
+    'You can switch sections: the report will keep generating and show its progress when you return.',
   'Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.':
     'Dossier saved: “{t}” · {s} sections · ~{p} pages. Find it in Deep Research → saved reports.',
   'Generar de nuevo': 'Generate again',
+  'Seleccionar modelo': 'Select model',
+  'Usar modelo de síntesis': 'Use synthesis model',
+  'Modelo inicial para las tareas de IA ({n} disponibles)': 'Initial model for AI tasks ({n} available)',
+  'Modelos favoritos para los selectores independientes': 'Favorite models for independent selectors',
+  'Los modelos de análisis se configuran en Ajustes.': 'Analysis models are configured in Settings.',
+  'Modelos de análisis: Ajustes': 'Analysis models: Settings',
+  'coge las ideas ya extraídas (afirmaciones, hallazgos…) y las vuelve a agrupar bajo estos temas con los modelos configurados en Ajustes, sin volver a leer los documentos ni re-extraer ideas.':
+    'takes the already extracted ideas (claims, findings…) and groups them again under these themes using the models configured in Settings, without rereading documents or re-extracting ideas.',
+  'Cada tarea usa su propio modelo. Los escaneos, resúmenes, fusión y embeddings obedecen estos ajustes; Chat, Deep Research, Inmersión y las demás herramientas conservan el modelo elegido dentro de su propia sección.':
+    'Each task uses its own model. Scans, summaries, fusion and embeddings follow these settings; Chat, Deep Research, Immersion and the other tools retain the model chosen inside their own section.',
+  'Modelo de síntesis general (fallback inicial para herramientas con selector propio)':
+    'General synthesis model (initial fallback for tools with their own selector)',
+  'modelos por tarea': 'models by task',
+  'Extracción: {provider}': 'Extraction: {provider}',
+  'Síntesis: {provider}': 'Synthesis: {provider}',
+  'Configura los modelos de IA': 'Configure AI models',
+  'La sincronización puede funcionar, pero Nodus necesita modelos separados de extracción y síntesis para analizar el corpus.':
+    'Sync can work, but Nodus needs separate extraction and synthesis models to analyze the corpus.',
+
+  // ── Decorative images · image providers ─────────────────────────────────
+  'Generación de imágenes': 'Image generation',
+  'Configuración independiente para las imágenes decorativas opcionales. OpenAI usa su API oficial de imágenes y reutiliza la clave de OpenAI; Google reutiliza la clave de Gemini.':
+    'Independent settings for optional decorative images. OpenAI uses its official Images API and reuses the OpenAI key; Google reuses the Gemini key.',
+  'Actualizar modelos': 'Refresh models',
+  'Estilo predeterminado': 'Default style',
+  'Selección actual': 'Current selection',
+  'Buscar por proveedor, nombre o identificador…': 'Search by provider, name, or identifier…',
+  'Proveedor y nombre': 'Provider and name',
+  'Orden alfabético': 'Alphabetical order',
+  'Precio por imagen: menor a mayor (por proveedor)': 'Image price: low to high (per provider)',
+  'Precio por imagen: mayor a menor (por proveedor)': 'Image price: high to low (per provider)',
+  'Como los proveedores publican tamaños y métricas diferentes, la ordenación por precio se aplica por separado dentro de cada proveedor. Los modelos sin precio directo quedan al final; no se estiman costes.':
+    'Because providers publish different sizes and metrics, price sorting is applied separately within each provider. Models without a direct price appear last; costs are never estimated.',
+  'Consultando catálogos oficiales…': 'Loading official catalogs…',
+  Entrada: 'Input',
+  Salida: 'Output',
+  Imagen: 'Image',
+  'No hay modelos compatibles que coincidan.': 'No matching compatible models.',
+  'Ver catálogo de OpenRouter': 'View OpenRouter catalog',
+  '{n} modelos compatibles con salida de imagen': '{n} image-output compatible models',
+  'Ilustración antigua de libro': 'Antique book illustration',
+  'Grabado coloreado': 'Hand-colored engraving',
+  'Ilustración científica clásica': 'Classic scientific illustration',
+  Acuarela: 'Watercolor',
+  'Collage histórico': 'Historical collage',
+  'Cartel modernista': 'Modernist poster',
+  'Ilustración editorial contemporánea': 'Contemporary editorial illustration',
+  'Fotografía realista': 'Realistic photograph',
+  'Fotografía histórica': 'Vintage photograph',
+  'Blanco y negro': 'Black & white',
+  Cinematográfico: 'Cinematic',
+  'Pintura al óleo': 'Oil painting',
+  'Imagen decorativa': 'Decorative image',
+  'Se genera una sola vez después de guardar la inmersión': 'Generated once after the immersion has been saved',
+  'La imagen se genera una sola vez después de guardar el informe': 'Generated once after the report has been saved',
+  Estilo: 'Style',
+  'Generar imagen': 'Generate image',
+  'Generando imagen decorativa en segundo plano…': 'Generating the decorative image in the background…',
+  'La imagen no pudo generarse. El contenido está guardado y funciona con normalidad.':
+    'The image could not be generated. The content is saved and works normally.',
+  'Regenerar imagen': 'Regenerate image',
+  'Se realizará una nueva generación y puede producir un coste adicional. ¿Continuar?':
+    'A new generation will be requested and may incur an additional cost. Continue?',
+  'Eliminar imagen': 'Delete image',
+  'La imagen se eliminará del almacenamiento local. El contenido principal no cambiará.':
+    'The image will be deleted from local storage. The main content will not change.',
+  'Generar inmersión': 'Generate immersion',
+  'Tu inmersión está lista': 'Your immersion is ready',
+  'Puedes empezar ya: la imagen nunca bloquea el contenido.': 'You can start now: the image never blocks the content.',
+  Diseño: 'Design',
+  'Diseño de la imagen': 'Image design',
+  'Ajusta el estilo y la escena. Se genera una imagen nueva.': 'Adjust the style and scene. A new image is generated.',
+  'Descripción de la escena': 'Scene description',
+  'Describe la escena que quieres ver. Si lo dejas vacío, se deduce del contenido.':
+    'Describe the scene you want. If left empty, it is inferred from the content.',
+  'El estilo y las protecciones de «sin texto» se aplican automáticamente al generar.':
+    'The style and the “no text” safeguards are applied automatically on generation.',
+  'La imagen aparecerá aquí una vez generada.': 'The image will appear here once generated.',
+  'Añadir imagen decorativa': 'Add decorative image',
+  'La imagen no pudo generarse.': 'The image could not be generated.',
+  'Al generar se solicita una imagen nueva, que puede tener un coste adicional.':
+    'Generating requests a new image, which may incur an additional cost.',
+  'Subir mi imagen': 'Upload my image',
+  'Volver a la imagen anterior': 'Back to previous image',
+  'Tu imagen se comprime automáticamente para no sobrecargar el almacenamiento.':
+    'Your image is compressed automatically to avoid overloading storage.',
+  'No se pudo leer el archivo de imagen.': 'The image file could not be read.',
+  'No se pudo procesar la imagen.': 'The image could not be processed.',
+  'No se pudo comprimir la imagen.': 'The image could not be compressed.',
+  'El archivo de imagen está vacío.': 'The image file is empty.',
+
+  // ── Shared search result detail modal ────────────────────────────────────
+  'El elemento ya no está disponible.': 'This item is no longer available.',
+  'Abrir nota': 'Open note',
+  'Abrir en Huecos': 'Open in Gaps',
+  'Localizar en el grafo': 'Locate in graph',
+  'Cargando detalle…': 'Loading details…',
+  note: 'Note',
+  work: 'Work',
+  gap: 'Gap',
+  theme: 'Theme',
+  author: 'Author',
+  passage: 'Passage',
+  Autoría: 'Authorship',
+  'Tipo de obra': 'Work type',
+  'Clave de Zotero': 'Zotero key',
+  'Fuente de texto': 'Text source',
+  Evidencias: 'Evidence items',
+  Creada: 'Created',
+  Página: 'Page',
+  Fragmento: 'Chunk',
+  Caracteres: 'Characters',
+  Indexado: 'Indexed',
+  Confianza: 'Confidence',
+  Fijado: 'Pinned',
+  Creado: 'Created',
+  Afiliación: 'Affiliation',
+  'Identidad canónica': 'Canonical identity',
+  Actualizada: 'Updated',
+  // ── Local AI providers (Ollama / LM Studio) ──────────────────────────────
+  '(local)': '(local)',
+  'Cargado en memoria': 'Loaded in memory',
+  'Ollama debe estar en marcha y los modelos descargados con "ollama pull". No requiere clave.':
+    'Ollama must be running and models pulled with "ollama pull". No key required.',
+  'Activa el servidor local en LM Studio (Developer → Start Server) y carga al menos un modelo. No requiere clave.':
+    'Start the local server in LM Studio (Developer → Start Server) and load at least one model. No key required.',
+  'Dirección del servidor (IP y puerto)': 'Server address (IP and port)',
+  'Probando…': 'Testing…',
+  'Probar conexión': 'Test connection',
+  'Conectado{version} · {n} modelos disponibles': 'Connected{version} · {n} models available',
+  'Sin conexión: {msg}': 'Not connected: {msg}',
+  '•••••••• token guardado (opcional)': '•••••••• token saved (optional)',
+  'token de acceso (opcional)': 'access token (optional)',
+  'El servidor no reporta modelos. Descarga o carga uno primero.':
+    'The server reports no models. Download or load one first.',
+  'Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.':
+    'Local provider: no key needed. Use the default address; you can change IP and port in Settings → Providers.',
+  // Deep Research / Immersion galleries, AI translations, what's new (v1.7.4)
+  'Traducir': 'Translate',
+  'Traducciones': 'Translations',
+  'Traducciones con IA': 'AI translations',
+  'Traduce este contenido a otro idioma. Cada idioma se guarda y puede regenerarse o eliminarse.':
+    'Translate this content into another language. Each language is saved and can be regenerated or deleted.',
+  'Generar traducción': 'Generate translation',
+  'Traduciendo…': 'Translating…',
+  'Genera la traducción con el modelo de IA configurado': 'Generates the translation with the configured AI model',
+  'La traducción de un texto largo puede tardar. Puedes cerrar esta ventana: se guardará y aparecerá aquí al volver.':
+    'Translating a long text can take a while. You can close this window — it will be saved and appear here when you return.',
+  'Cargando traducciones…': 'Loading translations…',
+  'Aún no hay traducciones. Elige un idioma y genera la primera.': 'No translations yet. Pick a language and generate the first one.',
+  'Regenerar esta traducción': 'Regenerate this translation',
+  'Eliminar traducción': 'Delete translation',
+  '¿Eliminar la traducción a {lang}? Esta acción no se puede deshacer.':
+    'Delete the {lang} translation? This cannot be undone.',
+  'Seleccionar todo': 'Select all',
+  'Deseleccionar todo': 'Deselect all',
+  'Eliminar seleccionados': 'Delete selected',
+  'Eliminar seleccionadas': 'Delete selected',
+  'Eliminar informes': 'Delete reports',
+  '¿Eliminar {n} informes guardados? Esta acción no se puede deshacer.':
+    'Delete {n} saved reports? This cannot be undone.',
+  '{n} informes eliminados.': '{n} reports deleted.',
+  'Eliminar inmersiones': 'Delete immersions',
+  '¿Eliminar {n} inmersiones y todo su progreso? Esta acción no se puede deshacer.':
+    'Delete {n} immersions and all their progress? This cannot be undone.',
+  'Nueva inmersión': 'New immersion',
+  'Domina un tema de tu corpus: panorama, estaciones con citas literales, contrastes, fronteras y examen final. Todo queda grabado para retomarlo.':
+    'Master a topic from your corpus: panorama, stations with literal quotes, contrasts, frontiers and a final exam — all saved to resume later.',
+  'Buscar entre tus inmersiones…': 'Search your immersions…',
+  'Cargando inmersiones…': 'Loading immersions…',
+  'Ninguna inmersión coincide con tu búsqueda.': 'No immersion matches your search.',
+  'Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso y tus respuestas, lista para retomarla.':
+    'No immersions yet. Create your first one and it will stay here, with its progress and your answers, ready to resume.',
+  'Elige el tema y el alcance. Antes de generar verás qué sabe tu corpus (sin IA).':
+    'Choose the topic and scope. Before generating you’ll see what your corpus knows (no AI yet).',
+  'Duración': 'Duration',
+  'Novedades': 'What’s new',
+  'Esto es lo nuevo en esta versión de Nodus.': 'Here’s what’s new in this version of Nodus.',
+  '¡Entendido!': 'Got it',
+  'Plegar': 'Collapse',
+  'Desplegar': 'Expand',
+  'Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
+    'Choose the collections to monitor. Expand any collection to pick specific subcollections if one is too large. Metadata is imported; analyses run manually unless you enable automation in Settings.',
   // <<END_EN>>
 };

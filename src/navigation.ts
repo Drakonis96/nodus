@@ -35,14 +35,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
 // collapsed to icons.
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Inicio', icon: 'home' },
-  // Explorar — recorrer el corpus y el grafo.
+  // Explorar — recorrer el corpus, el grafo y sus ideas/autores.
   { id: 'search', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'library', label: 'Biblioteca', icon: 'book', group: 'explore' },
   { id: 'graph', label: 'Grafo', icon: 'layers', group: 'explore' },
   { id: 'argument', label: 'Mapa de argumentos', icon: 'map', group: 'explore' },
-  // Analizar — superficies derivadas del grafo.
-  { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'analyze' },
-  { id: 'authors', label: 'Autores', icon: 'graduation', group: 'analyze' },
+  { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'explore' },
+  { id: 'authors', label: 'Autores', icon: 'graduation', group: 'explore' },
+  // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
@@ -50,9 +50,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'research', label: 'Cobertura', icon: 'help', group: 'analyze' },
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
+  { id: 'deepResearch', label: 'Deep Research', icon: 'network', group: 'analyze' },
   // Escribir — producir salidas con citas.
   { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
-  { id: 'deepResearch', label: 'Deep Research', icon: 'network', group: 'create' },
   { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
   { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },

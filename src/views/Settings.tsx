@@ -15,14 +15,7 @@ import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
-
-const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
-
-const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
-  openai: 'text-embedding-3-small',
-  gemini: 'gemini-embedding-001',
-  openrouter: 'baai/bge-m3',
-};
+import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
 
@@ -307,7 +300,7 @@ export function Settings({
         <label className="relative w-full sm:w-80">
           <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
           <input
-            className="input w-full pl-9"
+            className="input input-with-leading-icon w-full"
             value={settingsQuery}
             onChange={(e) => setSettingsQuery(e.target.value)}
             placeholder={t('Buscar en ajustes…')}
@@ -441,6 +434,7 @@ export function Settings({
           <Section title={t('Apariencia')}>
             <Row label={t('Tema')}>
               <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
+                <option value="system">{t('Sistema')}</option>
                 <option value="dark">{t('Oscuro')}</option>
                 <option value="light">{t('Claro')}</option>
               </select>
@@ -588,7 +582,10 @@ export function Settings({
       )}
 
       {visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost') && (
-          <Section title={t('Copiloto de escritura (Word)')}>
+          <Section title={`${t('Copiloto de escritura (Word)')} · beta`}>
+            <p className="text-xs text-neutral-500">
+              {t('1) Genera el certificado local · 2) Activa el copiloto · 3) Instálalo en Word y ábrelo desde la pestaña Nodus.')}
+            </p>
             <div className="flex items-center justify-between gap-4">
               <label className="text-sm text-neutral-300">{t('Activar Nodus Copilot para Word')}</label>
               <input type="checkbox" checked={settings.copilotEnabled} onChange={(e) => void patch({ copilotEnabled: e.target.checked })} />
@@ -874,17 +871,20 @@ export function Settings({
 
       {visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia') && (
           <Section title={t('IA avanzada')}>
+            <p className="mb-4 text-sm leading-6 text-neutral-400">
+              {t('Cada tarea usa su propio modelo. Los escaneos, resúmenes, fusión y embeddings obedecen estos ajustes; Chat, Deep Research, Inmersión y las demás herramientas conservan el modelo elegido dentro de su propia sección.')}
+            </p>
             <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
             </Row>
-            <Row label={t('Modelo de síntesis/tutor (asistente de investigación y narrativa del tutor)')}>
+            <Row label={t('Modelo de síntesis general (fallback inicial para herramientas con selector propio)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
             </Row>
             <Row label={t('Modelo de resúmenes (orientación por obra; no genera evidencia citable)')}>
-              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} />
+              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} emptyLabel="Usar modelo de síntesis" />
             </Row>
             <Row label={t('Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)')}>
-              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} />
+              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} emptyLabel="Usar modelo de síntesis" />
             </Row>
             <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
               <EmbeddingModelControl settings={settings} onPatch={patch} />
@@ -1430,7 +1430,7 @@ function EmbeddingModelControl({
   const setProvider = (next: EmbeddingProvider) => {
     setModels(null);
     setError(null);
-    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODEL[next] });
+    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODELS[next] });
   };
 
   const loadModels = async () => {
@@ -1461,7 +1461,7 @@ function EmbeddingModelControl({
           className="input w-full min-w-0"
           value={settings.embeddingModel}
           onChange={(e) => onPatch({ embeddingModel: e.target.value })}
-          placeholder={DEFAULT_EMBEDDING_MODEL[provider]}
+          placeholder={DEFAULT_EMBEDDING_MODELS[provider]}
         />
         <button className="btn btn-ghost justify-center border border-neutral-700" onClick={loadModels} disabled={loading}>
           {loading ? t('Cargando…') : t('Cargar modelos')}

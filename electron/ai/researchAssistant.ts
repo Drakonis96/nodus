@@ -18,8 +18,9 @@ import { getSettings } from '../db/settingsRepo';
 import { buildAuthorGraph, buildIdeaGraph, buildReadingPath, getContradictions } from '../graph/graphService';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
-import { completeText, completeTextStream } from './aiClient';
+import { completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
 import { embed } from './aiClient';
+import { enforceContextBudget, humanizeCitationLabels } from './researchContextFit';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { findSimilarPassages } from '../db/passagesRepo';
 import { findSimilarIdeas } from '../db/ideasRepo';
@@ -65,18 +66,29 @@ const MAX_GRAPH_EDGES = 100;
 // trimming the least query-relevant sections first if the caps above still
 // leave the payload too large.
 const MAX_TOTAL_CONTEXT_CHARS = 600_000;
-const CONTEXT_DROP_ORDER = [
-  'grafo',
-  'documentos_relacionados',
-  'rutas_de_lectura',
-  'autores',
-  'documentos_resumidos',
-  'temas_principales',
-  'huecos_de_investigacion',
-  'contradicciones',
-  'ideas_generadas',
-  'pasajes_relevantes',
-];
+
+// ── Local-model context fitting ──────────────────────────────────────────────
+// Cloud models have huge windows and manage context server-side, so the assembled
+// payload is capped only by the backstop above. Local servers (LM Studio / Ollama)
+// load a small, FIXED window shared by prompt + output — LM Studio defaults to 4096.
+// When the chat targets one, we size the whole payload to that window and prune the
+// least query-relevant material until it fits, so even a 4096-token model answers
+// instead of overflowing. Everything below applies to local providers only; cloud
+// keeps the behaviour unchanged (window === null → no fitting).
+//
+// Conservative chars/token for Spanish prose inside JSON (accents + punctuation +
+// ids tokenize worse than English's ~4). Under-estimating chars-per-token leaves
+// headroom so the real request fits even when the tokenizer is denser than we guess.
+const LOCAL_CHARS_PER_TOKEN = 3.2;
+// At or below this window, use the terse system prompt and a shorter history so the
+// corpus context keeps as much room as possible.
+const LOCAL_COMPACT_WINDOW = 8192;
+// Never shrink the corpus context below this (a handful of the most relevant items);
+// below it there is nothing useful left to ground an answer on.
+const LOCAL_MIN_CONTEXT_CHARS = 1_500;
+// Cap generation on small windows so the prompt keeps room; the real max_tokens is
+// still re-clamped to the live window by aiClient.localMaxTokens.
+const LOCAL_MAX_OUTPUT_TOKENS = 1_200;
 
 type SectionPayload = Record<string, unknown>;
 
@@ -119,21 +131,25 @@ interface PromptBuild {
   system: string;
   user: string;
   stats: ResearchContextStats;
+  /** Generation budget, sized down to the model's window for local providers. */
+  maxTokens: number;
+  /** Whether the effective model is a local server (enables citation-label repair). */
+  local: boolean;
 }
 
 export async function answerResearchChat(request: ResearchChatRequest): Promise<ResearchChatResponse> {
-  const { system, user, stats } = await buildResearchChatPrompt(request);
+  const { system, user, stats, maxTokens, local } = await buildResearchChatPrompt(request);
   const answer = await completeText(
     {
       system,
       user,
       temperature: 0.2,
-      maxTokens: 6000,
+      maxTokens,
     },
     request.model
   );
 
-  return { answer: answer.trim(), stats };
+  return { answer: finalizeAnswer(answer, local), stats };
 }
 
 export async function streamResearchChat(
@@ -141,20 +157,20 @@ export async function streamResearchChat(
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal
 ): Promise<ResearchChatResponse> {
-  const { system, user, stats } = await buildResearchChatPrompt(request);
+  const { system, user, stats, maxTokens, local } = await buildResearchChatPrompt(request);
   const answer = await completeTextStream(
     {
       system,
       user,
       temperature: 0.2,
-      maxTokens: 6000,
+      maxTokens,
     },
     onDelta,
     request.model,
     signal
   );
 
-  return { answer: answer.trim(), stats };
+  return { answer: finalizeAnswer(answer, local), stats };
 }
 
 /**
@@ -190,6 +206,85 @@ export async function generateChatTitle(messages: ChatMessageRecord[], model?: M
   }
 }
 
+/** Trim, and for local models repair citation labels/links the model got wrong,
+ *  resolving each id to its "Autor, Año" against the corpus. */
+function finalizeAnswer(answer: string, local: boolean): string {
+  const trimmed = answer.trim();
+  return local ? humanizeCitationLabels(trimmed, citationDisplayLabel) : trimmed;
+}
+
+function citationDisplayLabel(kind: string, id: string): string | null {
+  switch (kind) {
+    case 'idea':
+      return ideaCiteLabel(id);
+    case 'work':
+      return workCiteLabel(id);
+    case 'passage':
+      return passageCiteLabel(id);
+    case 'gap':
+      return 'hueco';
+    case 'contradiction':
+      return 'contradiccion';
+    default:
+      return null;
+  }
+}
+
+function ideaCiteLabel(globalId: string): string | null {
+  const row = getDb()
+    .prepare(
+      `SELECT w.authors_json, w.year
+         FROM idea_occurrences io
+         JOIN works w ON w.nodus_id = io.nodus_id
+        WHERE io.global_id = ?
+        ORDER BY w.year DESC
+        LIMIT 1`
+    )
+    .get(globalId) as { authors_json: string; year: number | null } | undefined;
+  const label = row ? authorYearLabel(row.authors_json, row.year) : null;
+  if (label) return label;
+  // No linked work — fall back to the idea's own short label rather than leave the id.
+  const idea = getDb().prepare('SELECT label FROM ideas WHERE global_id = ?').get(globalId) as { label: string } | undefined;
+  return idea?.label?.trim() || null;
+}
+
+function workCiteLabel(nodusId: string): string | null {
+  const row = getDb().prepare('SELECT authors_json, year FROM works WHERE nodus_id = ?').get(nodusId) as
+    | { authors_json: string; year: number | null }
+    | undefined;
+  return row ? authorYearLabel(row.authors_json, row.year) : null;
+}
+
+function passageCiteLabel(passageId: string): string | null {
+  const row = getDb()
+    .prepare(
+      `SELECT w.authors_json, w.year, p.page_label
+         FROM passages p
+         JOIN works w ON w.nodus_id = p.nodus_id
+        WHERE p.passage_id = ?`
+    )
+    .get(passageId) as { authors_json: string; year: number | null; page_label: string | null } | undefined;
+  if (!row) return null;
+  const base = authorYearLabel(row.authors_json, row.year);
+  if (!base) return null;
+  return row.page_label ? `${base}, p. ${row.page_label}` : base;
+}
+
+/** "Apellido, Año" from a work's stored author list, or null when neither is known. */
+function authorYearLabel(authorsJson: string, year: number | null): string | null {
+  const surname = firstAuthorSurname(parseAuthors(authorsJson)[0]);
+  if (!surname) return year != null ? String(year) : null;
+  return year != null ? `${surname}, ${year}` : surname;
+}
+
+function firstAuthorSurname(name?: string): string {
+  const clean = (name ?? '').trim();
+  if (!clean) return '';
+  if (clean.includes(',')) return clean.split(',')[0].trim();
+  const parts = clean.split(/\s+/);
+  return parts[parts.length - 1];
+}
+
 function truncateTitle(text: string): string {
   const clean = text
     .replace(/^["'`]+|["'`]+$/g, '')
@@ -203,36 +298,43 @@ function truncateTitle(text: string): string {
 }
 
 async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<PromptBuild> {
-  const messages = request.messages
+  // Resolve the effective model up front so a local target can size the whole payload
+  // (context + history + output) to its real, small window instead of overflowing.
+  const model = resolveModelRef(request.model);
+  const window = await localModelContextWindow(model); // tokens for local models, else null
+  const local = window != null;
+  const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
+
+  let messages = request.messages
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim())
     .slice(-MAX_HISTORY_MESSAGES);
 
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     throw new Error('El chat necesita una pregunta del usuario.');
   }
+  // On tiny windows keep only the most recent turns so the corpus context has room.
+  if (compact) messages = messages.slice(-4);
 
   const question = messages[messages.length - 1].content;
-  const { context, stats } = await buildResearchContext(request.selection, question);
-  const system = [
-    'Eres el asistente de investigacion avanzado de Nodus.',
-    'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
-    'Si el contexto seleccionado no contiene la seccion necesaria, dilo de forma concreta y explica que seccion convendria activar.',
-    'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
-    'No inventes contenido de documentos que no aparezca en el contexto.',
-    '',
-    'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
-    '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
-    '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
-    '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
-    '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
-    '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
-    '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
-    '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
-    '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
-    '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
-    '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
-    '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
-  ].join('\n');
+  const system = buildChatSystemPrompt(compact);
+
+  // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
+  // and the default generation budget; local shrinks both to fit the loaded window.
+  let maxTokens = 6000;
+  let contextBudget = MAX_TOTAL_CONTEXT_CHARS;
+  if (window != null) {
+    const margin = Math.max(96, Math.round(window * 0.05));
+    maxTokens = Math.min(6000, Math.max(320, Math.floor((window - margin) * 0.3)));
+    if (compact) maxTokens = Math.min(maxTokens, LOCAL_MAX_OUTPUT_TOKENS);
+    // Chars the whole prompt (system + history + context + JSON scaffolding) may use.
+    const promptChars = Math.max(0, window - maxTokens - margin) * LOCAL_CHARS_PER_TOKEN;
+    // Reserve what system + history + the JSON wrapper already consume; the rest is the
+    // corpus context's budget. Never below the floor — the shrinker then guarantees fit.
+    const reserved = system.length + JSON.stringify(messages).length + 400;
+    contextBudget = Math.max(LOCAL_MIN_CONTEXT_CHARS, Math.floor(promptChars - reserved));
+  }
+
+  const { context, stats } = await buildResearchContext(request.selection, question, contextBudget);
 
   const user = JSON.stringify(
     {
@@ -243,7 +345,48 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     2
   );
 
-  return { system, user, stats };
+  return { system, user, stats, maxTokens, local };
+}
+
+/**
+ * System prompt for the research chat. The full version carries the complete
+ * NotebookLM-style citation rulebook; the compact version keeps only the essentials so a
+ * small local window (≤ LOCAL_COMPACT_WINDOW) spends its scarce tokens on corpus context
+ * rather than instructions. Both forbid using the raw id as the visible link text — and
+ * finalizeAnswer repairs it deterministically for weaker local models regardless.
+ */
+function buildChatSystemPrompt(compact: boolean): string {
+  if (compact) {
+    return [
+      'Eres el asistente de investigacion de Nodus. Responde en espanol, con rigor y usando SOLO el contexto que recibes.',
+      'Se conciso y directo: prioriza terminar la respuesta antes que extenderte, porque el espacio es limitado.',
+      'Si el contexto no basta para responder, dilo con claridad; no inventes.',
+      'CITAS: tras mencionar una idea/afirmacion del contexto, añade un enlace markdown [Autor, Año](nodus://idea/<id>) con el `id` EXACTO del campo "id".',
+      'Documentos: [Autor, Año](nodus://work/<nodus_id>). Pasajes: [Autor, Año, p. N](nodus://passage/<id>) con el campo `citation` exacto.',
+      'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
+    ].join('\n');
+  }
+  return [
+    'Eres el asistente de investigacion avanzado de Nodus.',
+    'Responde en espanol, con rigor academico y usando solo el contexto modular que recibes.',
+    'Si el contexto seleccionado no contiene la seccion necesaria, dilo de forma concreta y explica que seccion convendria activar.',
+    'Conserva las relaciones entre autores, documentos e ideas cuando esten presentes en el contexto.',
+    'No inventes contenido de documentos que no aparezca en el contexto.',
+    '',
+    'CITAS DE FUENTES (obligatorio, estilo NotebookLM):',
+    '- Cada vez que te refieras a una idea concreta (afirmacion, hallazgo, constructo, metodo o marco) presente en el contexto, DEBES citar su fuente inmediatamente despues de la mencion.',
+    '- La cita es un enlace markdown con el formato `[Autor, Año](nodus://idea/<id>)`, donde `<id>` es el campo `id` exacto de la idea en el contexto y `Autor, Año` provienen de la obra que la desarrolla (usa el apellido del primer autor y el año). Ejemplo: `la memoria de trabajo es limitada ([Baddeley, 1992](nodus://idea/abc-123))`.',
+    '- El texto visible del enlace es SIEMPRE «Autor, Año»; NUNCA uses el id como texto visible.',
+    '- Si la idea aparece en varias obras, cita la principal; si citas dos, repite el enlace con cada autor.',
+    '- Para citar un documento concreto sin idea asociada, usa `[Autor, Año](nodus://work/<nodus_id>)` con el `nodus_id` exacto del documento.',
+    '- Para citar una contradiccion o refutacion concreta de la seccion `contradicciones`, usa `[contradiccion](nodus://contradiction/<id>)` con el `id` exacto de esa relacion.',
+    '- Para citar un hueco concreto de la seccion `huecos_de_investigacion`, usa `[hueco](nodus://gap/<id>)` con el `id` exacto de ese hueco.',
+    '- La sección `pasajes_relevantes` contiene texto literal de las obras. Cuando sostengas una afirmación con uno de esos pasajes, cítalo inmediatamente como `[Autor, Año, p. N](nodus://passage/<id>)` usando el campo `citation` exacto del pasaje. No atribuyas al pasaje más de lo que dice literalmente.',
+    '- Si una conclusion se apoya en una idea y tambien en una contradiccion o hueco, incluye ambas citas junto a la frase relevante.',
+    '- Usa SIEMPRE el id exacto que aparece en el contexto. Nunca inventes ni abrevies los ids.',
+    '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
+    '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
+  ].join('\n');
 }
 
 /**
@@ -323,29 +466,11 @@ function resolveIdeaIds(scope: RelevanceScope, limit: number): string[] {
   return rows.map((row) => row.global_id);
 }
 
-/**
- * Final safety net: even after per-section caps, drop the least query-relevant
- * sections until the serialized context fits the token budget. This should rarely
- * fire given the top-K caps, but guarantees the request never overflows.
- */
-function enforceContextBudget(context: SectionPayload): { truncated: boolean } {
-  const dropped: string[] = [];
-  for (const key of CONTEXT_DROP_ORDER) {
-    if (JSON.stringify(context).length <= MAX_TOTAL_CONTEXT_CHARS) break;
-    if (context[key] == null) continue;
-    delete context[key];
-    dropped.push(key);
-  }
-  if (dropped.length) {
-    context.contexto_recortado = {
-      motivo: 'El contexto superaba el presupuesto de tokens; se omitieron las secciones menos relevantes a la consulta.',
-      secciones_omitidas: dropped,
-    };
-  }
-  return { truncated: dropped.length > 0 };
-}
-
-async function buildResearchContext(selection: ResearchContextSelection, question = ''): Promise<BuildResult> {
+async function buildResearchContext(
+  selection: ResearchContextSelection,
+  question = '',
+  maxContextChars = MAX_TOTAL_CONTEXT_CHARS
+): Promise<BuildResult> {
   const context: SectionPayload = {
     generated_at: new Date().toISOString(),
     note: 'Este objeto contiene exclusivamente las secciones marcadas por el usuario, acotadas a lo relevante para la consulta.',
@@ -397,8 +522,12 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
 
   const passageScopeWorkIds = new Set(linkedWorkIds);
 
+  // The full-text sections dominate the payload; on a small local budget, cap how much
+  // text they pull so we neither do wasted IO nor build a giant payload just to prune it.
+  const heavyCap = Math.min(maxContextChars, MAX_TOTAL_CONTEXT_CHARS);
+
   if (selection.documents) {
-    const documentContext = await listDocuments(linkedWorkIds, scope.queryEmbedding);
+    const documentContext = await listDocuments(linkedWorkIds, scope.queryEmbedding, heavyCap);
     context.documentos_relacionados = documentContext.documents;
     context.documentos_resumidos = documentContext.summaries;
     if (documentContext.omitted > 0) {
@@ -411,12 +540,12 @@ async function buildResearchContext(selection: ResearchContextSelection, questio
   // Default to enabled for historic saved selections created before the passage
   // toggle existed. Explicit false still gives the reader full control.
   if (selection.passages !== false) {
-    const passages = listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds);
+    const passages = listRelevantPassages(scope.queryEmbedding, passageScopeWorkIds, heavyCap);
     context.pasajes_relevantes = passages;
     sections.push('Pasajes de texto completo');
   }
 
-  const budget = enforceContextBudget(context);
+  const budget = enforceContextBudget(context, maxContextChars);
   truncated = truncated || budget.truncated;
 
   const contextChars = JSON.stringify(context).length;
@@ -839,8 +968,13 @@ async function listGraph(selection: ResearchContextSelection, linkedWorkIds: Set
 
 async function listDocuments(
   linkedWorkIds: Set<string>,
-  queryEmbedding: number[] | null
+  queryEmbedding: number[] | null,
+  budget = MAX_TOTAL_CONTEXT_CHARS
 ): Promise<{ documents: unknown[]; summaries: unknown[]; omitted: number; truncated: boolean }> {
+  // On a small local budget, cap the total full text pulled — otherwise we do heavy IO
+  // (file reads, OCR) for documents that would just be pruned to fit the window.
+  const docTotal = Math.min(MAX_DOCUMENT_TOTAL_CHARS, Math.max(0, budget));
+  const perDoc = Math.min(MAX_DOCUMENT_CHARS, docTotal || MAX_DOCUMENT_CHARS);
   const candidateWorks = selectDocumentWorks(linkedWorkIds, queryEmbedding);
   const works = candidateWorks.slice(0, MAX_DOCUMENTS);
   const omitted = Math.max(0, candidateWorks.length - works.length);
@@ -849,9 +983,13 @@ async function listDocuments(
   const documents: unknown[] = [];
   let totalChars = 0;
   let truncated = omitted > 0;
-  const summaries = listDocumentSummaries(candidateWorks);
+  const summaries = listDocumentSummaries(candidateWorks, budget);
 
   for (const work of works) {
+    if (totalChars >= docTotal) {
+      truncated = true;
+      break;
+    }
     linkedWorkIds.add(work.nodus_id);
     const item = await getItem(userId, work.zotero_key).catch(() => null);
     const doc = await resolveWorkText(userId, work.zotero_key, settings.zoteroStoragePath, item?.abstract ?? null, work.doi, {
@@ -867,8 +1005,8 @@ async function listDocuments(
       sourceType: work.source_type ?? 'none',
       notes: e instanceof Error ? e.message : String(e),
     }));
-    const remaining = Math.max(0, MAX_DOCUMENT_TOTAL_CHARS - totalChars);
-    const clipped = clipText(doc.text, Math.min(MAX_DOCUMENT_CHARS, remaining));
+    const remaining = Math.max(0, docTotal - totalChars);
+    const clipped = clipText(doc.text, Math.min(perDoc, remaining));
     totalChars += clipped.text.length;
     truncated = truncated || clipped.truncated;
     documents.push({
@@ -879,10 +1017,6 @@ async function listDocuments(
       truncated: clipped.truncated,
       original_chars: doc.text.length,
     });
-    if (totalChars >= MAX_DOCUMENT_TOTAL_CHARS) {
-      truncated = true;
-      break;
-    }
   }
 
   return { documents, summaries, omitted, truncated };
@@ -915,8 +1049,13 @@ function selectDocumentWorks(linkedWorkIds: Set<string>, queryEmbedding: number[
   });
 }
 
-function listRelevantPassages(queryEmbedding: number[] | null, linkedWorkIds: Set<string>): unknown[] {
+function listRelevantPassages(
+  queryEmbedding: number[] | null,
+  linkedWorkIds: Set<string>,
+  budget = MAX_TOTAL_CONTEXT_CHARS
+): unknown[] {
   if (!queryEmbedding) return [];
+  const passageTotal = Math.min(MAX_PASSAGE_CONTEXT_CHARS, Math.max(0, budget));
   const scoped = linkedWorkIds.size
     ? findSimilarPassages(queryEmbedding, PASSAGE_SIM_THRESHOLD, TOP_K_SCOPED_PASSAGES, {
         nodusIds: [...linkedWorkIds],
@@ -931,7 +1070,7 @@ function listRelevantPassages(queryEmbedding: number[] | null, linkedWorkIds: Se
   let chars = 0;
   const passages: unknown[] = [];
   for (const passage of unique.values()) {
-    const remaining = MAX_PASSAGE_CONTEXT_CHARS - chars;
+    const remaining = passageTotal - chars;
     if (remaining <= 0) break;
     const clipped = clipText(passage.text, remaining);
     if (!clipped.text) continue;
@@ -954,9 +1093,10 @@ function listRelevantPassages(queryEmbedding: number[] | null, linkedWorkIds: Se
   return passages;
 }
 
-function listDocumentSummaries(candidateWorks: WorkRow[]): unknown[] {
+function listDocumentSummaries(candidateWorks: WorkRow[], budget = MAX_TOTAL_CONTEXT_CHARS): unknown[] {
   const ids = candidateWorks.map((work) => work.nodus_id);
   if (ids.length === 0) return [];
+  const summaryTotal = Math.min(MAX_SUMMARY_TOTAL_CHARS, Math.max(0, budget));
   const placeholders = ids.map(() => '?').join(',');
   const rows = getDb()
     .prepare(
@@ -973,7 +1113,7 @@ function listDocumentSummaries(candidateWorks: WorkRow[]): unknown[] {
   for (const work of candidateWorks) {
     const row = byWork.get(work.nodus_id);
     if (!row || summaries.length >= MAX_SUMMARIES) continue;
-    const remaining = Math.max(0, MAX_SUMMARY_TOTAL_CHARS - chars);
+    const remaining = Math.max(0, summaryTotal - chars);
     if (remaining === 0) break;
     const clipped = clipText(row.summary, Math.min(MAX_SUMMARY_CHARS, remaining));
     chars += clipped.text.length;

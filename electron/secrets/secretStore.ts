@@ -2,12 +2,13 @@ import { safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
+import { AI_PROVIDERS as PROVIDERS } from '@shared/providers';
 import { activeVaultDir, vaultDir } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
-
-const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
+// Local providers (ollama, lmstudio) are included so an optional access token for
+// a secured instance is stored/cleared through the same encrypted-at-rest path.
 
 function keyFileInDir(dir: string, provider: AiProvider): string {
   return path.join(dir, `ai_key_${provider}.bin`);
@@ -54,6 +55,43 @@ export function hasApiKey(provider: AiProvider): boolean {
 
 export function clearApiKey(provider: AiProvider): void {
   const file = keyFile(provider);
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+// ── Cloud audio-provider keys ────────────────────────────────────────────────
+// Keys for cloud text-to-speech providers (e.g. Hume) live alongside the AI keys,
+// encrypted-at-rest via safeStorage, per vault, and never cross IPC to the UI
+// (the renderer only learns whether a key exists).
+
+function audioKeyFile(name: string): string {
+  return path.join(activeVaultDir(), `audio_key_${name}.bin`);
+}
+
+export function setAudioKey(name: string, key: string): void {
+  const clean = key.trim();
+  if (!clean) {
+    clearAudioKey(name);
+    return;
+  }
+  const file = audioKeyFile(name);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`));
+    return;
+  }
+  fs.writeFileSync(file, safeStorage.encryptString(clean));
+}
+
+export function getAudioKey(name: string): string | null {
+  return readKeyFile(audioKeyFile(name));
+}
+
+export function hasAudioKey(name: string): boolean {
+  return getAudioKey(name) !== null;
+}
+
+export function clearAudioKey(name: string): void {
+  const file = audioKeyFile(name);
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 

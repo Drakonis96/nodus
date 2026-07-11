@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 32;
 
 export const migrations: Migration[] = [
   {
@@ -888,6 +888,108 @@ export const migrations: Migration[] = [
       -- are pruned.
       ALTER TABLE ideas ADD COLUMN orphaned_at TEXT;
       CREATE INDEX idx_ideas_orphaned ON ideas(orphaned_at) WHERE orphaned_at IS NOT NULL;
+    `,
+  },
+  {
+    version: 29,
+    up: /* sql */ `
+      -- Optional decorative images for Inmersión and Deep Research. The image
+      -- and its compact thumbnail live in SQLite so full backups remain
+      -- self-contained. No foreign key is used because the two owner tables
+      -- intentionally have different schemas; their repositories delete the
+      -- associated row explicitly.
+      CREATE TABLE decorative_images (
+        entity_kind    TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id      TEXT NOT NULL,
+        requested      INTEGER NOT NULL DEFAULT 0,
+        status         TEXT NOT NULL DEFAULT 'not_requested'
+                       CHECK (status IN ('not_requested', 'pending', 'ready', 'failed')),
+        provider       TEXT,
+        model          TEXT,
+        style          TEXT NOT NULL DEFAULT 'antique_book',
+        visual_context TEXT,
+        prompt         TEXT,
+        asset_ref      TEXT,
+        mime_type      TEXT,
+        image_blob     BLOB,
+        thumbnail_blob BLOB,
+        error          TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        PRIMARY KEY (entity_kind, entity_id)
+      );
+      CREATE INDEX idx_decorative_images_status ON decorative_images(status, updated_at DESC);
+    `,
+  },
+  {
+    version: 30,
+    up: /* sql */ `
+      -- Track how the current image was produced ('ai' | 'custom'), and keep a
+      -- single-level snapshot of the previous ready image so a regeneration or a
+      -- user upload can be undone. The snapshot columns mirror the live ones and
+      -- live in SQLite too, so backups stay self-contained.
+      ALTER TABLE decorative_images ADD COLUMN source TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_image_blob BLOB;
+      ALTER TABLE decorative_images ADD COLUMN prev_thumbnail_blob BLOB;
+      ALTER TABLE decorative_images ADD COLUMN prev_mime_type TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_style TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_visual_context TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_prompt TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_provider TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_model TEXT;
+      ALTER TABLE decorative_images ADD COLUMN prev_source TEXT;
+    `,
+  },
+  {
+    version: 31,
+    up: /* sql */ `
+      -- Metadata for locally generated narration (text-to-speech) clips. The audio
+      -- files themselves live on disk under the vault's audio/ directory, NOT in
+      -- SQLite: they are large and fully regenerable, so they are deliberately kept
+      -- out of backups and .nodussync (which carry only the database). A restored or
+      -- synced database therefore keeps the metadata but the repository flags any row
+      -- whose file is absent as "missing" so the UI can offer to regenerate it.
+      CREATE TABLE audio_clips (
+        id            TEXT PRIMARY KEY,
+        entity_kind   TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id     TEXT NOT NULL,
+        segment_index INTEGER NOT NULL,
+        segment_label TEXT NOT NULL DEFAULT '',
+        provider      TEXT NOT NULL DEFAULT 'piper',
+        voice         TEXT NOT NULL DEFAULT '',
+        language      TEXT NOT NULL DEFAULT '',
+        file_name     TEXT NOT NULL,
+        bytes         INTEGER NOT NULL DEFAULT 0,
+        duration_sec  REAL NOT NULL DEFAULT 0,
+        sample_rate   INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_audio_clips_entity ON audio_clips(entity_kind, entity_id, segment_index);
+    `,
+  },
+  {
+    version: 32,
+    up: /* sql */ `
+      -- AI translations of a Deep Research report or an immersion. The translated
+      -- document is stored as Markdown; one row per (entity, language) so
+      -- regenerating replaces the previous copy. Unlike audio, these are small and
+      -- not regenerable for free (they cost an AI call), so they live in SQLite and
+      -- travel with backups / .nodussync.
+      CREATE TABLE content_translations (
+        id             TEXT PRIMARY KEY,
+        entity_kind    TEXT NOT NULL CHECK (entity_kind IN ('immersion', 'deep_research')),
+        entity_id      TEXT NOT NULL,
+        language       TEXT NOT NULL,
+        language_label TEXT NOT NULL DEFAULT '',
+        title          TEXT NOT NULL DEFAULT '',
+        markdown       TEXT NOT NULL DEFAULT '',
+        model_json     TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        UNIQUE (entity_kind, entity_id, language)
+      );
+      CREATE INDEX idx_content_translations_entity
+        ON content_translations(entity_kind, entity_id, updated_at DESC);
     `,
   },
 ];

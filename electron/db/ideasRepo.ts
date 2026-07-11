@@ -16,6 +16,7 @@ import type {
   ModelRef,
   EmbeddingProvider,
 } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import { getWorksByIds } from './worksRepo';
 import { getSettings } from './settingsRepo';
 import { getEdgeFeedback } from './edgeFeedbackRepo';
@@ -36,12 +37,6 @@ const EDGE_TYPES = new Set<EdgeType>([
 
 const SYMMETRIC_EDGE_TYPES = new Set<EdgeType>(['contradicts', 'shares_method', 'measures_same', 'variant_of']);
 
-const DEFAULT_EMBED_MODELS: Record<EmbeddingProvider, string> = {
-  openai: 'text-embedding-3-small',
-  openrouter: 'baai/bge-m3',
-  gemini: 'gemini-embedding-001',
-};
-
 export function normalizeEdgeType(type: string | null | undefined): EdgeType | null {
   const raw = (type ?? '').trim().toLowerCase();
   if (EDGE_TYPES.has(raw as EdgeType)) return raw as EdgeType;
@@ -58,21 +53,12 @@ function clampConfidence(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
-  const trimmed = modelId.trim() || DEFAULT_EMBED_MODELS[provider];
-  if (provider === 'openrouter' && !trimmed.includes('/') && trimmed.includes(':')) {
-    const [author, slug] = trimmed.split(':', 2);
-    if (author && slug) return `${author.toLowerCase()}/${slug}`;
-  }
-  return trimmed;
-}
-
 export function currentEmbeddingConfig(): { provider: EmbeddingProvider; model: string } {
   const settings = getSettings();
   const provider = settings.embeddingProvider ?? 'openai';
   return {
     provider,
-    model: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBED_MODELS[provider]),
+    model: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBEDDING_MODELS[provider]),
   };
 }
 

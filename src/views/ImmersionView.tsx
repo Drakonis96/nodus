@@ -24,18 +24,38 @@ import type {
   ImmersionSession,
   ImmersionSessionSummary,
   ImmersionStation,
+  DecorativeImageStyle,
 } from '@shared/types';
+import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { Badge, Icon, TypeDot } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
+import { TranslationModal } from '../components/TranslationModal';
 import { confirm } from '../components/feedback';
 import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import { GRAPH_NODE_TYPES, EDGE_TYPE_COLORS, type GraphFilters } from './graph/model';
 import { t, tx } from '../i18n';
+import {
+  IMMERSION_GENERATION_JOB_KEY,
+  IMMERSION_DOSSIER_JOB_PREFIX,
+  clearBackgroundJob,
+  findLatestBackgroundJob,
+  getBackgroundJob,
+  immersionDossierJobKey,
+  startDeepResearchGeneration,
+  startImmersionGeneration,
+  subscribeBackgroundJob,
+  type DeepResearchGenerationJob,
+  type ImmersionGenerationJob,
+} from '../backgroundJobs';
+import { useFeatureModel } from '../hooks/useFeatureModel';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { AudioPanel } from '../components/AudioPanel';
+import { FindInPage } from '../components/FindInPage';
 
 // Wide-open filters: visibility is controlled by the data subset we feed in.
 const OPEN_FILTERS: GraphFilters = {
@@ -53,9 +73,9 @@ const OPEN_FILTERS: GraphFilters = {
 };
 
 const TIME_PRESETS: { minutes: number; label: string; hint: string }[] = [
-  { minutes: 90, label: 'Exprés', hint: '~90 min' },
-  { minutes: 150, label: 'Una tarde', hint: '~2,5 h' },
-  { minutes: 240, label: 'Profunda', hint: '~4 h' },
+  { minutes: 90, label: 'Exprés', hint: '~6 paradas' },
+  { minutes: 150, label: 'Una tarde', hint: '~12 paradas' },
+  { minutes: 240, label: 'Profunda', hint: '~20 paradas' },
 ];
 
 const STEP_MINUTES = { panorama: 15, station: 28, contrasts: 15, frontiers: 8, exam: 18 } as const;
@@ -149,17 +169,22 @@ export function ImmersionView({
   const [mode, setMode] = useState<'home' | 'scope' | 'player'>('home');
   const [sessions, setSessions] = useState<ImmersionSessionSummary[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const [topic, setTopic] = useState('');
   const [minutes, setMinutes] = useState(150);
   const [includeQuiz, setIncludeQuiz] = useState(true);
+  const [includeImage, setIncludeImage] = useState(false);
+  const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'en' ? 'en' : 'es');
-  const [model, setModel] = useState(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'immersionModel');
 
   const [scope, setScope] = useState<ImmersionScope | null>(null);
   const [scoping, setScoping] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState<ImmersionBuildProgress | null>(null);
+  const [generationJob, setGenerationJob] = useState<ImmersionGenerationJob | null>(() =>
+    getBackgroundJob(IMMERSION_GENERATION_JOB_KEY)
+  );
+  const appliedGenerationRef = useRef<string | null>(null);
 
   const [session, setSession] = useState<ImmersionSession | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -168,6 +193,13 @@ export function ImmersionView({
   const [error, setError] = useState<string | null>(null);
 
   const hasModel = !!model;
+  const generating = generationJob?.status === 'running';
+  const genProgress = generationJob?.progress ?? null;
+
+  useEffect(
+    () => subscribeBackgroundJob(IMMERSION_GENERATION_JOB_KEY, setGenerationJob),
+    []
+  );
 
   const refreshSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -184,14 +216,50 @@ export function ImmersionView({
     void refreshSessions();
   }, [refreshSessions]);
 
+  useEffect(() => {
+    if (!generationJob) {
+      appliedGenerationRef.current = null;
+      return;
+    }
+    if (appliedGenerationRef.current !== generationJob.id) {
+      const { request, scope: savedScope } = generationJob.request;
+      appliedGenerationRef.current = generationJob.id;
+      setScope(savedScope);
+      setTopic(request.topic);
+      setMinutes(request.minutes);
+      setIncludeQuiz(request.includeQuiz);
+      setIncludeImage(request.decorativeImage?.enabled ?? false);
+      setImageStyle(request.decorativeImage?.style ?? settings.imageStyle);
+      setLanguage(request.language ?? 'es');
+      setModel(request.model ?? null);
+    }
+    if (generationJob.status === 'running') {
+      setError(null);
+      setMode('scope');
+      return;
+    }
+    if (generationJob.status === 'failed') {
+      setError(generationJob.error ?? t('No se pudo generar la inmersión.'));
+      setMode('scope');
+      return;
+    }
+    if (generationJob.result) {
+      setError(null);
+      setSession(generationJob.result);
+      setMode('player');
+      void refreshSessions();
+    }
+  }, [generationJob, refreshSessions]);
+
   const exploreScope = async () => {
     if (!topic.trim()) return;
     setError(null);
     setScoping(true);
     setScope(null);
     try {
-      const result = await window.nodus.buildImmersionScope({ topic: topic.trim() });
+      const result = await window.nodus.buildImmersionScope({ topic: topic.trim(), minutes });
       setScope(result);
+      setComposerOpen(false);
       setMode('scope');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -200,24 +268,20 @@ export function ImmersionView({
     }
   };
 
-  const startImmersion = async () => {
+  const startImmersion = () => {
     if (!scope) return;
     setError(null);
-    setGenerating(true);
-    setGenProgress(null);
-    try {
-      const created = await window.nodus.generateImmersionSession(
-        { topic: scope.topic, language, minutes, includeQuiz, model },
-        { onProgress: (p) => setGenProgress(p) }
-      );
-      setSession(created);
-      setMode('player');
-      void refreshSessions();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setGenerating(false);
-    }
+    startImmersionGeneration({
+      scope,
+      request: {
+        topic: scope.topic,
+        language,
+        minutes,
+        includeQuiz,
+        model,
+        decorativeImage: { enabled: includeImage, style: imageStyle },
+      },
+    });
   };
 
   const openSession = async (id: string) => {
@@ -236,6 +300,15 @@ export function ImmersionView({
     }
   };
 
+  useEffect(() => {
+    const dossier = findLatestBackgroundJob<unknown, unknown, unknown>(IMMERSION_DOSSIER_JOB_PREFIX);
+    if (!dossier) return;
+    const sessionId = dossier.key.slice(IMMERSION_DOSSIER_JOB_PREFIX.length);
+    if (sessionId) void openSession(sessionId);
+    // Reconnect only when this view is mounted. The session itself persists its
+    // current player step, so opening it returns directly to the report card.
+  }, []);
+
   const deleteSession = async (summary: ImmersionSessionSummary) => {
     const ok = await confirm({
       title: t('Eliminar inmersión'),
@@ -248,7 +321,23 @@ export function ImmersionView({
     void refreshSessions();
   };
 
+  const deleteSessions = async (ids: string[]): Promise<boolean> => {
+    if (ids.length === 0) return false;
+    const ok = await confirm({
+      title: t('Eliminar inmersiones'),
+      message: tx('¿Eliminar {n} inmersiones y todo su progreso? Esta acción no se puede deshacer.', { n: ids.length }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return false;
+    await Promise.all(ids.map((id) => window.nodus.deleteImmersionSession(id)));
+    void refreshSessions();
+    return true;
+  };
+
   const exitPlayer = () => {
+    if (generationJob?.status !== 'running') clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob?.id);
+    if (session) clearBackgroundJob(immersionDossierJobKey(session.id));
     setSession(null);
     setMode('home');
     void refreshSessions();
@@ -257,41 +346,61 @@ export function ImmersionView({
   return (
     <div className="h-full flex flex-col min-h-0">
       {mode === 'home' && (
-        <ImmersionHome
-          settings={settings}
-          sessions={sessions}
-          loadingSessions={loadingSessions}
-          topic={topic}
-          minutes={minutes}
-          includeQuiz={includeQuiz}
-          language={language}
-          model={model}
-          hasModel={hasModel}
-          scoping={scoping}
-          openingId={openingId}
-          error={error}
-          onTopic={setTopic}
-          onMinutes={setMinutes}
-          onIncludeQuiz={setIncludeQuiz}
-          onLanguage={setLanguage}
-          onModel={setModel}
-          onExplore={() => void exploreScope()}
-          onOpenSession={(id) => void openSession(id)}
-          onDeleteSession={(s) => void deleteSession(s)}
-        />
+        <>
+          <ImmersionHome
+            settings={settings}
+            sessions={sessions}
+            loadingSessions={loadingSessions}
+            openingId={openingId}
+            error={error}
+            onNew={() => {
+              setError(null);
+              setComposerOpen(true);
+            }}
+            onOpenSession={(id) => void openSession(id)}
+            onDeleteSession={(s) => void deleteSession(s)}
+            onDeleteSessions={deleteSessions}
+          />
+          {composerOpen && (
+            <ImmersionComposerModal
+              settings={settings}
+              topic={topic}
+              minutes={minutes}
+              includeQuiz={includeQuiz}
+              includeImage={includeImage}
+              imageStyle={imageStyle}
+              language={language}
+              model={model}
+              hasModel={hasModel}
+              scoping={scoping}
+              error={error}
+              onTopic={setTopic}
+              onMinutes={setMinutes}
+              onIncludeQuiz={setIncludeQuiz}
+              onIncludeImage={setIncludeImage}
+              onImageStyle={setImageStyle}
+              onLanguage={setLanguage}
+              onModel={setModel}
+              onExplore={() => void exploreScope()}
+              onClose={() => setComposerOpen(false)}
+            />
+          )}
+        </>
       )}
 
       {mode === 'scope' && scope && (
         <ImmersionScopeScreen
           scope={scope}
-          minutes={minutes}
           includeQuiz={includeQuiz}
           generating={generating}
           genProgress={genProgress}
           error={error}
           hasModel={hasModel}
           onBack={() => {
-            if (!generating) setMode('home');
+            if (!generating) {
+              if (generationJob) clearBackgroundJob(IMMERSION_GENERATION_JOB_KEY, generationJob.id);
+              setMode('home');
+            }
           }}
           onStart={() => void startImmersion()}
           onCitation={setCitation}
@@ -338,92 +447,444 @@ export function ImmersionView({
 // Home — hero launcher + saved sessions
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ImmersionSortKey = 'recent' | 'oldest' | 'title';
+
+function formatImmersionDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
+
 function ImmersionHome({
   settings,
   sessions,
   loadingSessions,
-  topic,
-  minutes,
-  includeQuiz,
-  language,
-  model,
-  hasModel,
-  scoping,
   openingId,
   error,
-  onTopic,
-  onMinutes,
-  onIncludeQuiz,
-  onLanguage,
-  onModel,
-  onExplore,
+  onNew,
   onOpenSession,
   onDeleteSession,
+  onDeleteSessions,
 }: {
   settings: AppSettings;
   sessions: ImmersionSessionSummary[];
   loadingSessions: boolean;
+  openingId: string | null;
+  error: string | null;
+  onNew: () => void;
+  onOpenSession: (id: string) => void;
+  onDeleteSession: (s: ImmersionSessionSummary) => void;
+  onDeleteSessions: (ids: string[]) => Promise<boolean>;
+}) {
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<ImmersionSortKey>('recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q ? sessions.filter((s) => s.title.toLowerCase().includes(q)) : sessions;
+    const sorted = [...filtered];
+    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return sorted;
+  }, [sessions, search, sortKey]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const exitSelection = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const allVisibleSelected = visible.length > 0 && visible.every((s) => selected.has(s.id));
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((s) => s.id)));
+
+  const bulkDelete = async () => {
+    const ok = await onDeleteSessions([...selected]);
+    if (ok) exitSelection();
+  };
+
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
+          </h1>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {t('Domina un tema de tu corpus: panorama, estaciones con citas literales, contrastes, fronteras y examen final. Todo queda grabado para retomarlo.')}
+          </p>
+        </div>
+        <div className="flex-1" />
+        <button className="btn btn-primary gap-1.5" onClick={onNew}>
+          <Icon name="plus" /> {t('Nueva inmersión')}
+        </button>
+      </header>
+
+      {error && <div className="border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-300">{error}</div>}
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+        <div className="relative min-w-[14rem] flex-1 max-w-md">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input
+            className="input input-with-leading-icon w-full !py-1.5 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('Buscar entre tus inmersiones…')}
+          />
+        </div>
+        <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as ImmersionSortKey)}>
+          <option value="recent">{t('Más recientes')}</option>
+          <option value="oldest">{t('Más antiguos')}</option>
+          <option value="title">{t('Por título (A–Z)')}</option>
+        </select>
+        <div className="flex overflow-hidden rounded-lg border border-neutral-700">
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'grid' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('grid')}
+            title={t('Vista mosaico')}
+          >
+            <Icon name="grid" size={14} />
+          </button>
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'list' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('list')}
+            title={t('Vista lista')}
+          >
+            <Icon name="list" size={14} />
+          </button>
+        </div>
+        {sessions.length > 0 && (
+          <button
+            className={`btn btn-ghost !py-1.5 gap-1.5 border text-xs ${selecting ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+            onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+          >
+            <Icon name="check" size={13} /> {selecting ? t('Cancelar') : t('Seleccionar')}
+          </button>
+        )}
+      </div>
+
+      {selecting && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-indigo-900/40 bg-indigo-950/20 px-4 py-2 text-xs">
+          <button className="text-indigo-300 hover:underline" onClick={toggleAll}>
+            {allVisibleSelected ? t('Deseleccionar todo') : t('Seleccionar todo')}
+          </button>
+          <span className="text-neutral-500">{tx('{n} seleccionadas', { n: selected.size })}</span>
+          <div className="flex-1" />
+          <button
+            className="btn btn-ghost !py-1 gap-1 text-xs text-red-400 disabled:text-neutral-600"
+            onClick={() => void bulkDelete()}
+            disabled={selected.size === 0}
+          >
+            <Icon name="trash" size={13} /> {t('Eliminar seleccionadas')}
+          </button>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {visible.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <Icon name="target" size={28} className="text-neutral-600" />
+            <div className="max-w-md text-sm text-neutral-500">
+              {loadingSessions
+                ? t('Cargando inmersiones…')
+                : search.trim()
+                  ? t('Ninguna inmersión coincide con tu búsqueda.')
+                  : t('Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso y tus respuestas, lista para retomarla.')}
+            </div>
+            {!search.trim() && !loadingSessions && (
+              <button className="btn btn-primary gap-1.5" onClick={onNew}>
+                <Icon name="plus" /> {t('Nueva inmersión')}
+              </button>
+            )}
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-3 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            {visible.map((s) => (
+              <SessionGridCard
+                key={s.id}
+                session={s}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(s.id)}
+                opening={openingId === s.id}
+                onToggle={() => toggle(s.id)}
+                onOpen={() => onOpenSession(s.id)}
+                onDelete={() => onDeleteSession(s)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visible.map((s) => (
+              <SessionListRow
+                key={s.id}
+                session={s}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(s.id)}
+                opening={openingId === s.id}
+                onToggle={() => toggle(s.id)}
+                onOpen={() => onOpenSession(s.id)}
+                onDelete={() => onDeleteSession(s)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Checkbox shown on gallery cards while in selection mode. */
+function SelectCheck({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+        checked ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-neutral-500 bg-neutral-900/70'
+      }`}
+    >
+      {checked && <Icon name="check" size={12} />}
+    </span>
+  );
+}
+
+function SessionGridCard({
+  session: s,
+  settings,
+  selecting,
+  selected,
+  opening,
+  onToggle,
+  onOpen,
+  onDelete,
+}: {
+  session: ImmersionSessionSummary;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  opening: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card group relative flex flex-col gap-3 p-3 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button className="absolute left-4 top-4 z-10" onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
+      <button className="block w-full text-left" onClick={primary}>
+        <DecorativeImageCard entityKind="immersion" entityId={s.id} image={s.image} defaultStyle={settings.imageStyle} thumbnail />
+      </button>
+      <div className="flex w-full items-center gap-4">
+        <ProgressRing pct={s.progressPct} finished={s.finished} />
+        <button className="min-w-0 flex-1 text-left" onClick={primary}>
+          <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>{s.title}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
+            <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
+            <span>·</span>
+            <span>{tx('{n} obras', { n: s.stats.works })}</span>
+            <span>·</span>
+            <span>{tx('{n} autores', { n: s.stats.authors })}</span>
+          </div>
+          <div className="mt-1 text-[11px] text-neutral-600">{formatImmersionDate(s.updatedAt)}</div>
+        </button>
+        {!selecting && (
+          <div className="flex flex-col gap-1.5">
+            <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+              <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
+              {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+            </button>
+            <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
+              <Icon name="trash" size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SessionListRow({
+  session: s,
+  settings,
+  selecting,
+  selected,
+  opening,
+  onToggle,
+  onOpen,
+  onDelete,
+}: {
+  session: ImmersionSessionSummary;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  opening: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card flex items-center gap-3 p-2.5 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
+      <button
+        className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-indigo-950/30 to-neutral-900"
+        onClick={primary}
+      >
+        <DecorativeImageCard
+          entityKind="immersion"
+          entityId={s.id}
+          image={s.image}
+          defaultStyle={settings.imageStyle}
+          thumbnail
+          className="absolute inset-0 !h-full !rounded-md"
+        />
+      </button>
+      <ProgressRing pct={s.progressPct} finished={s.finished} size={38} />
+      <button className="min-w-0 flex-1 text-left" onClick={primary}>
+        <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>{s.title}</div>
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
+          <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
+          <span>·</span>
+          <span>{tx('{n} obras', { n: s.stats.works })}</span>
+          <span>·</span>
+          <span>{formatImmersionDate(s.updatedAt)}</span>
+        </div>
+      </button>
+      {!selecting && (
+        <>
+          <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+            <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
+            {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+          </button>
+          <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
+            <Icon name="trash" size={12} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composer — the new-immersion form (modal). Mirrors Deep Research: a "+" button
+// opens this; its primary action explores the territory (no AI), which advances to
+// the scope screen where the immersion is actually generated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ImmersionComposerModal({
+  settings,
+  topic,
+  minutes,
+  includeQuiz,
+  includeImage,
+  imageStyle,
+  language,
+  model,
+  hasModel,
+  scoping,
+  error,
+  onTopic,
+  onMinutes,
+  onIncludeQuiz,
+  onIncludeImage,
+  onImageStyle,
+  onLanguage,
+  onModel,
+  onExplore,
+  onClose,
+}: {
+  settings: AppSettings;
   topic: string;
   minutes: number;
   includeQuiz: boolean;
+  includeImage: boolean;
+  imageStyle: DecorativeImageStyle;
   language: 'es' | 'en';
-  model: AppSettings['defaultModel'];
+  model: AppSettings['immersionModel'];
   hasModel: boolean;
   scoping: boolean;
-  openingId: string | null;
   error: string | null;
   onTopic: (v: string) => void;
   onMinutes: (v: number) => void;
   onIncludeQuiz: (v: boolean) => void;
+  onIncludeImage: (v: boolean) => void;
+  onImageStyle: (v: DecorativeImageStyle) => void;
   onLanguage: (v: 'es' | 'en') => void;
-  onModel: (m: AppSettings['defaultModel']) => void;
+  onModel: (m: AppSettings['immersionModel']) => void;
   onExplore: () => void;
-  onOpenSession: (id: string) => void;
-  onDeleteSession: (s: ImmersionSessionSummary) => void;
+  onClose: () => void;
 }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !scoping) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, scoping]);
+
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Hero */}
-      <div className="immersion-hero relative overflow-hidden border-b border-neutral-800 px-8 py-12">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-indigo-800/60" />
-        <div className="pointer-events-none absolute -right-10 -top-10 h-52 w-52 rounded-full border border-indigo-700/60" />
-        <div className="pointer-events-none absolute right-6 top-6 h-28 w-28 rounded-full border border-violet-900/70" />
-        <div className="relative max-w-3xl">
-          <div className="flex items-center gap-2 text-indigo-300">
-            <Icon name="target" size={22} />
-            <span className="text-xs font-semibold uppercase tracking-[0.25em]">{t('Inmersión')}</span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => !scoping && onClose()}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Nueva inmersión')}
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <Icon name="target" className="text-indigo-500 dark:text-indigo-300" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nueva inmersión')}</h2>
+            <p className="text-xs text-neutral-500">{t('Elige el tema y el alcance. Antes de generar verás qué sabe tu corpus (sin IA).')}</p>
           </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">
-            {t('Domina un tema de tu corpus en una tarde.')}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
-            {t(
-              'Una ruta completamente guiada: panorama, estaciones con citas literales del texto completo, contrastes entre autores, fronteras del corpus y examen final. Todo queda grabado para retomarlo cuando quieras.'
-            )}
-          </p>
+          <button className="btn btn-ghost px-2" onClick={onClose} aria-label={t('Cerrar')} disabled={scoping}>
+            <Icon name="x" />
+          </button>
+        </header>
 
-          <div className="mt-6 flex flex-col gap-3">
-            <div className="flex gap-2">
-              <input
-                className="input flex-1 !py-3 text-base"
-                value={topic}
-                onChange={(e) => onTopic(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && topic.trim() && hasModel && !scoping) onExplore();
-                }}
-                placeholder={t('¿De qué quieres hacerte experto? P. ej.: uso franquista de las fiestas y tradiciones')}
-              />
-              <button
-                className="btn btn-primary gap-2 !px-5"
-                onClick={onExplore}
-                disabled={!topic.trim() || scoping || !hasModel}
-                title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
-              >
-                <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
-                {scoping ? t('Cartografiando…') : t('Explorar el territorio')}
-              </button>
-            </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <input
+            className="input w-full !py-3 text-base"
+            value={topic}
+            autoFocus
+            onChange={(e) => onTopic(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && topic.trim() && hasModel && !scoping) onExplore();
+            }}
+            placeholder={t('¿De qué quieres hacerte experto? P. ej.: uso franquista de las fiestas y tradiciones')}
+          />
 
+          <div>
+            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Duración')}</div>
             <div className="flex flex-wrap items-center gap-2">
               {TIME_PRESETS.map((preset) => (
                 <button
@@ -436,76 +897,69 @@ function ImmersionHome({
                   }`}
                 >
                   <span className="font-medium">{t(preset.label)}</span>
-                  <span className="ml-1.5 opacity-70">{preset.hint}</span>
+                  <span className="ml-1.5 opacity-70">{t(preset.hint)}</span>
                 </button>
               ))}
-              <button
-                onClick={() => onIncludeQuiz(!includeQuiz)}
-                className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-                  includeQuiz
-                    ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300'
-                    : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
-                }`}
-                title={t('Las preguntas siempre se pueden saltar durante la sesión')}
-              >
-                <Icon name={includeQuiz ? 'check' : 'minus'} size={12} className="mr-1" />
-                {t('Preguntas de repaso')}
-              </button>
-              <select className="input !py-1.5 text-xs" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en')}>
-                <option value="es">Español</option>
-                <option value="en">English</option>
-              </select>
-              <ModelPicker settings={settings} value={model} onChange={onModel} compact />
             </div>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => onIncludeQuiz(!includeQuiz)}
+              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                includeQuiz
+                  ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300'
+                  : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
+              }`}
+              title={t('Las preguntas siempre se pueden saltar durante la sesión')}
+            >
+              <Icon name={includeQuiz ? 'check' : 'minus'} size={12} className="mr-1" />
+              {t('Preguntas de repaso')}
+            </button>
+            <button
+              onClick={() => onIncludeImage(!includeImage)}
+              className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                includeImage
+                  ? 'border-indigo-700/60 bg-indigo-900/30 text-indigo-200'
+                  : 'border-neutral-700 text-neutral-500 hover:border-neutral-500'
+              }`}
+              title={t('Se genera una sola vez después de guardar la inmersión')}
+            >
+              <Icon name={includeImage ? 'check' : 'minus'} size={12} className="mr-1" />
+              {t('Imagen decorativa')}
+            </button>
+            {includeImage && (
+              <select className="input !py-1.5 text-xs" value={imageStyle} onChange={(event) => onImageStyle(event.target.value as DecorativeImageStyle)}>
+                {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
+              </select>
+            )}
+            <select className="input !py-1.5 text-xs" value={language} onChange={(e) => onLanguage(e.target.value as 'es' | 'en')}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+            </select>
+            <ModelPicker settings={settings} value={model} onChange={onModel} compact />
+          </div>
+
           {error && (
-            <div className="mt-3 rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
+            <div className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-300">{error}</div>
           )}
         </div>
-      </div>
 
-      {/* Saved sessions */}
-      <div className="px-8 py-6">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-neutral-300">{t('Tus inmersiones')}</h2>
-          {loadingSessions && <Icon name="sync" size={13} className="animate-spin text-neutral-600" />}
-        </div>
-        {sessions.length === 0 && !loadingSessions && (
-          <p className="mt-3 text-sm text-neutral-600">
-            {t('Aún no hay inmersiones guardadas. Cada recorrido que generes quedará aquí, con su progreso y tus respuestas, listo para retomarlo.')}
-          </p>
-        )}
-        <div className="mt-3 grid grid-cols-3 gap-3 max-2xl:grid-cols-2 max-lg:grid-cols-1">
-          {sessions.map((s) => (
-            <div key={s.id} className="card group relative flex items-center gap-4 p-4 transition-colors hover:border-indigo-700/60">
-              <ProgressRing pct={s.progressPct} finished={s.finished} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-neutral-200" title={s.title}>
-                  {s.title}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-500">
-                  <span>{tx('{n} estaciones', { n: s.stats.stations })}</span>
-                  <span>·</span>
-                  <span>{tx('{n} obras', { n: s.stats.works })}</span>
-                  <span>·</span>
-                  <span>{tx('{n} autores', { n: s.stats.authors })}</span>
-                </div>
-                <div className="mt-1 text-[11px] text-neutral-600">{new Date(s.updatedAt).toLocaleString()}</div>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <button className="btn btn-primary !py-1 text-xs gap-1" onClick={() => onOpenSession(s.id)} disabled={openingId === s.id}>
-                  <Icon name={openingId === s.id ? 'sync' : 'play'} size={12} className={openingId === s.id ? 'animate-spin' : ''} />
-                  {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
-                </button>
-                <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={() => onDeleteSession(s)}>
-                  <Icon name="trash" size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose} disabled={scoping}>
+            {t('Cancelar')}
+          </button>
+          <button
+            className="btn btn-primary gap-2 !px-5"
+            onClick={onExplore}
+            disabled={!topic.trim() || scoping || !hasModel}
+            title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
+          >
+            <Icon name={scoping ? 'sync' : 'search'} className={scoping ? 'animate-spin' : ''} />
+            {scoping ? t('Cartografiando…') : t('Explorar el territorio')}
+          </button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -557,7 +1011,6 @@ const GEN_PHASE_LABELS: Record<ImmersionBuildProgress['phase'], string> = {
 
 function ImmersionScopeScreen({
   scope,
-  minutes,
   includeQuiz,
   generating,
   genProgress,
@@ -568,7 +1021,6 @@ function ImmersionScopeScreen({
   onCitation,
 }: {
   scope: ImmersionScope;
-  minutes: number;
   includeQuiz: boolean;
   generating: boolean;
   genProgress: ImmersionBuildProgress | null;
@@ -609,8 +1061,7 @@ function ImmersionScopeScreen({
           </div>
 
           <div className="mt-4 rounded-lg border border-indigo-800/60 bg-indigo-950/25 p-3 text-xs text-indigo-200">
-            {tx('Plan para {min} min: ~{n} estaciones guiadas, con panorama, contrastes, fronteras y examen final{quiz}.', {
-              min: minutes,
+            {tx('Ruta de ~{n} estaciones guiadas: panorama, contrastes, fronteras y examen final{quiz}. La IA ajusta el número según lo que el tema pida.', {
               n: scope.estimatedStations,
               quiz: includeQuiz ? '' : ` ${t('(sin preguntas)')}`,
             })}
@@ -682,7 +1133,7 @@ function ImmersionScopeScreen({
                 disabled={!enough || !hasModel || !scope.aiKeyAvailable}
               >
                 <Icon name="play" />
-                {t('Comenzar inmersión')}
+                {t('Generar inmersión')}
               </button>
               {(!enough || !hasModel || !scope.aiKeyAvailable) && (
                 <div className="rounded-md border border-amber-700/60 bg-amber-950/80 px-3 py-1.5 text-xs text-amber-300 backdrop-blur-sm">
@@ -704,6 +1155,9 @@ function ImmersionScopeScreen({
                 </h3>
                 <p className="mt-1 text-xs text-neutral-500">
                   {t('Cada respuesta de la IA se guarda: este recorrido será tuyo para siempre y podrás retomarlo sin regenerar nada.')}
+                </p>
+                <p className="mt-2 text-xs text-indigo-300">
+                  {t('Puedes cambiar de sección: la generación seguirá en segundo plano y este progreso reaparecerá cuando vuelvas.')}
                 </p>
                 <ol className="mt-4 space-y-1.5">
                   {GEN_PHASES.map((phase) => {
@@ -763,6 +1217,10 @@ function ImmersionPlayer({
   onSaveToNotes: () => void;
 }) {
   const steps = useMemo(() => playerSteps(session), [session]);
+  const [translating, setTranslating] = useState(false);
+  // Honest total study time from the actual route, not the requested budget:
+  // a deep route can hold far more stations than a single afternoon.
+  const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
   const progress = session.progress;
   const current = Math.min(progress.currentStep, steps.length - 1);
   const [direction, setDirection] = useState(1);
@@ -775,14 +1233,6 @@ function ImmersionPlayer({
     },
     [session, onSession]
   );
-
-  // First open stamps startedAt so "una tarde" is measurable.
-  const stampedRef = useRef(false);
-  useEffect(() => {
-    if (stampedRef.current || progress.startedAt) return;
-    stampedRef.current = true;
-    persist({ ...progress, startedAt: new Date().toISOString() });
-  }, [progress, persist]);
 
   const goTo = useCallback(
     (index: number, markDone = false) => {
@@ -815,6 +1265,7 @@ function ImmersionPlayer({
   // ← / → navigate between steps (ignored while typing).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (!progress.startedAt) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
       if (e.key === 'ArrowRight') goTo(current + 1, true);
@@ -822,7 +1273,7 @@ function ImmersionPlayer({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, goTo]);
+  }, [current, goTo, progress.startedAt]);
 
   const onAnswered = useCallback(
     (record: ImmersionAnswerRecord) => {
@@ -856,6 +1307,62 @@ function ImmersionPlayer({
     return groups;
   }, [steps]);
 
+  if (!progress.startedAt) {
+    return (
+      <div className="h-full flex flex-col min-h-0">
+        <header className="flex items-center gap-3 border-b border-neutral-800 px-4 py-3">
+          <button className="btn btn-ghost gap-1.5" onClick={onExit}>
+            <Icon name="chevronLeft" /> {t('Volver')}
+          </button>
+          <div className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+            <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
+          </div>
+          <div className="flex-1" />
+        </header>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-6 py-10">
+            <div className="text-center">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-500 dark:text-indigo-300">{t('Tu inmersión está lista')}</div>
+              <h1 className="mt-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{session.plan.title}</h1>
+              <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+                {tx('{s} estaciones · {i} ideas · {w} obras · ~{m} minutos', {
+                  s: session.plan.stats.stations,
+                  i: session.plan.stats.ideas,
+                  w: session.plan.stats.works,
+                  m: totalMinutes,
+                })}
+              </p>
+            </div>
+            <div className="mt-7">
+              <DecorativeImageCard
+                entityKind="immersion"
+                entityId={session.id}
+                image={session.image}
+                defaultStyle={session.image?.style ?? 'antique_book'}
+                interactive
+                onChange={(image) => onSession({ ...session, image })}
+              />
+            </div>
+            <div className="mt-5">
+              <AudioPanel entityKind="immersion" entityId={session.id} />
+            </div>
+            <div className="mt-7 flex flex-col items-center">
+              <button
+                className="btn btn-primary gap-2 !px-8 !py-3 text-base"
+                onClick={() => persist({ ...progress, startedAt: new Date().toISOString() })}
+              >
+                <Icon name="play" /> {t('Comenzar inmersión')}
+              </button>
+              {session.image?.status === 'pending' && (
+                <p className="mt-2 text-center text-xs text-neutral-500">{t('Puedes empezar ya: la imagen nunca bloquea el contenido.')}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full flex flex-col min-h-0">
       {/* Top bar */}
@@ -878,6 +1385,9 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
+        <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={() => setTranslating(true)}>
+          <Icon name="languages" size={13} /> {t('Traducir')}
+        </button>
         <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={onSaveToNotes}>
           <Icon name="save" size={13} /> {t('Guardar en notas')}
         </button>
@@ -951,7 +1461,7 @@ function ImmersionPlayer({
             >
               <div className="min-w-0 max-w-[56rem] flex-1">
                 {step.kind === 'panorama' && (
-                  <PanoramaStep session={session} onCitation={onCitation} onJump={(i) => goTo(i)} />
+                  <PanoramaStep session={session} onCitation={onCitation} onJump={(i) => goTo(i)} onSession={onSession} />
                 )}
                 {step.kind === 'station' && (
                   <StationStep
@@ -992,6 +1502,18 @@ function ImmersionPlayer({
           <div className="w-20" />
         )}
       </footer>
+      <FindInPage targetRef={mainRef} />
+      {translating && (
+        <TranslationModal
+          entityKind="immersion"
+          entityId={session.id}
+          sourceTitle={session.plan.title}
+          sourceMarkdown={sessionMarkdown(session)}
+          model={session.model}
+          onCitation={onCitation}
+          onClose={() => setTranslating(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1146,14 +1668,28 @@ function PanoramaStep({
   session,
   onCitation,
   onJump,
+  onSession,
 }: {
   session: ImmersionSession;
   onCitation: (c: CitationTarget) => void;
   onJump: (stepIndex: number) => void;
+  onSession: (s: ImmersionSession) => void;
 }) {
   const plan = session.plan;
   return (
     <div>
+      {(session.image?.status === 'ready' || session.image?.status === 'pending') && (
+        <div className="mb-6">
+          <DecorativeImageCard
+            entityKind="immersion"
+            entityId={session.id}
+            image={session.image}
+            defaultStyle={session.image?.style ?? 'antique_book'}
+            interactive
+            onChange={(image) => onSession({ ...session, image })}
+          />
+        </div>
+      )}
       <StepHeading
         kicker={t('Panorama')}
         title={plan.title}
@@ -1502,38 +2038,36 @@ function ExamStep({
 
   // Deepen after mastering: hand the topic to the Deep Research engine and keep
   // the resulting multi-page cited report among the saved Deep Research drafts.
-  const [dossierBusy, setDossierBusy] = useState(false);
-  const [dossierMsg, setDossierMsg] = useState<string | null>(null);
-  const [dossierDone, setDossierDone] = useState(false);
-  const generateDossier = async () => {
-    setDossierBusy(true);
-    setDossierDone(false);
-    setDossierMsg(null);
-    try {
-      const report = await window.nodus.generateDeepResearchReport(
-        {
-          objective: session.plan.topic,
-          language: session.plan.language,
-          targetLength: 'standard',
-          sectionLimit: 'auto',
-          model: session.model,
-        },
-        { onProgress: (p) => setDossierMsg(p.message) }
-      );
-      await window.nodus.saveWritingWorkshopDraft({ draft: report.draft, model: session.model });
-      setDossierDone(true);
-      setDossierMsg(
-        tx('Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.', {
+  const dossierKey = immersionDossierJobKey(session.id);
+  const [dossierJob, setDossierJob] = useState<DeepResearchGenerationJob | null>(() => getBackgroundJob(dossierKey));
+  useEffect(() => subscribeBackgroundJob(dossierKey, setDossierJob), [dossierKey]);
+  const dossierBusy = dossierJob?.status === 'running';
+  const dossierDone = dossierJob?.status === 'completed' && !!dossierJob.result?.savedDraft;
+  let dossierMsg: string | null = null;
+  if (dossierJob?.status === 'running') dossierMsg = dossierJob.progress?.message ?? t('Generando informe…');
+  if (dossierJob?.status === 'failed') dossierMsg = dossierJob.error;
+  if (dossierJob?.status === 'completed' && dossierJob.result) {
+    const { report, saveError } = dossierJob.result;
+    dossierMsg = saveError
+      ? tx('Informe generado, pero no se pudo guardar automáticamente: {error}', { error: saveError })
+      : tx('Dossier guardado: «{t}» · {s} secciones · ~{p} páginas. Lo tienes en Deep Research → informes guardados.', {
           t: report.draft.title,
           s: report.meta.sections,
           p: report.meta.pages,
-        })
-      );
-    } catch (e) {
-      setDossierMsg(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDossierBusy(false);
-    }
+        });
+  }
+  const generateDossier = () => {
+    startDeepResearchGeneration(dossierKey, {
+      objective: session.plan.topic,
+      language: session.plan.language,
+      targetLength: 'standard',
+      sectionLimit: 'auto',
+      model: session.model,
+      decorativeImage: {
+        enabled: session.image?.requested ?? false,
+        style: session.image?.style ?? 'antique_book',
+      },
+    });
   };
 
   return (
@@ -1584,6 +2118,11 @@ function ExamStep({
               <p className="mt-1 text-xs leading-5 text-neutral-500">
                 {t('Ahora que dominas el tema, genera el informe académico de varias páginas con todas las fuentes citadas. Se guarda en Deep Research y podrás exportarlo o citarlo en tu escritura.')}
               </p>
+              {dossierBusy && (
+                <p className="mt-1 text-xs text-indigo-300">
+                  {t('Puedes cambiar de sección: el informe seguirá generándose y mostrará el progreso al volver.')}
+                </p>
+              )}
               {dossierMsg && (
                 <div className={`mt-2 rounded-md border px-3 py-2 text-xs ${dossierDone ? 'border-emerald-700/60 bg-emerald-900/20 text-emerald-300' : 'border-neutral-800 bg-neutral-950/60 text-neutral-400'}`}>
                   {dossierMsg}

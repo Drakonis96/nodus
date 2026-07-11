@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
   AppSettings,
+  AudioEntityKind,
+  AudioProvider,
   AddProjectLinkInput,
   ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
@@ -11,6 +13,7 @@ import type {
   QueueKind,
   WorkFilter,
   AiProvider,
+  LocalProvider,
   ModelRef,
   ZoteroItem,
   ResearchChatRequest,
@@ -29,6 +32,8 @@ import type {
   WritingWorkshopDraftRequest,
   WritingWorkshopExportRequest,
   WritingWorkshopSaveDraftRequest,
+  TranslationEntityKind,
+  GenerateTranslationRequest,
   DeepResearchRequest,
   DebateAnalysisRequest,
   RqDecomposeRequest,
@@ -64,6 +69,10 @@ import type {
   VaultSummary,
   VaultSwitchOptions,
   VaultSwitchResult,
+  DecorativeImageActionRequest,
+  DecorativeImageEntityKind,
+  DecorativeImageStyle,
+  SearchResultKind,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -78,7 +87,34 @@ import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/instal
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
-import { listEmbeddingModels, listModels } from './ai/providers';
+import { listEmbeddingModels, listModels, testLocalProvider } from './ai/providers';
+import { listImageModels } from './ai/imageModels';
+import {
+  applyDecorativeImageOption,
+  deleteDecorativeImage,
+  interruptDecorativeImageGenerations,
+  invalidateDecorativeImageGeneration,
+  queueDecorativeImageGeneration,
+  revertDecorativeImage,
+  saveCustomDecorativeImage,
+} from './ai/decorativeImages';
+import { getDecorativeImage, getDecorativeImageData } from './db/decorativeImagesRepo';
+import {
+  clearEntityClips,
+  deleteClip as deleteAudioClip,
+  deleteEntityClips,
+  getEntitySegments,
+  listEntityClips,
+  readClipBytes,
+  saveClip,
+} from './audio/audioService';
+import {
+  clearHumeKey,
+  humeHasKey,
+  listHumeVoices,
+  setHumeKey,
+  synthesizeHume,
+} from './audio/hume';
 import * as zotero from './zotero/zoteroClient';
 import * as works from './db/worksRepo';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
@@ -105,7 +141,7 @@ import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
 import { verifyCitations, previewCitation } from './citations/verifyCitations';
-import { globalSearch } from './db/searchRepo';
+import { getSearchResultDetail, globalSearch } from './db/searchRepo';
 import { semanticSearch, findSimilarToIdea } from './ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from './db/savedSearchesRepo';
 import { getCorpusHealth } from './db/corpusHealthRepo';
@@ -148,6 +184,9 @@ import * as notes from './db/notesRepo';
 import * as manualIdeas from './db/manualIdeasRepo';
 import * as tutorRoutes from './db/tutorRepo';
 import * as writingDrafts from './db/writingDraftsRepo';
+import * as translationsRepo from './db/translationsRepo';
+import { TRANSLATION_LANGUAGES } from '@shared/types';
+import { translateMarkdown, titleFromMarkdown } from './ai/translate';
 import * as workSummaries from './db/workSummariesRepo';
 import * as projects from './db/projectsRepo';
 import { closeDb, getDb } from './db/database';
@@ -266,6 +305,7 @@ export function registerIpc(
     stopRealtimeSync();
     await stopMcpServer();
     await stopCopilotServer();
+    interruptDecorativeImageGenerations();
     closeDb();
     setActiveVault(id);
     getDb();
@@ -343,6 +383,7 @@ export function registerIpc(
       stopRealtimeSync();
       await stopMcpServer();
       await stopCopilotServer();
+      interruptDecorativeImageGenerations();
       closeDb();
       const reset = resetVaultDatabase(id);
       getDb();
@@ -369,7 +410,7 @@ export function registerIpc(
   h('copilot:status', async () => getCopilotStatus());
   h('copilot:regenerateToken', async () => regenerateCopilotToken());
   h('copilot:ensureCert', async () => {
-    const result = await ensureCopilotCert(app.getAppPath());
+    const result = await ensureCopilotCert();
     if (result.ok && getSettings().copilotEnabled) await restartCopilotServer();
     return result;
   });
@@ -383,6 +424,105 @@ export function registerIpc(
   h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
     listEmbeddingModels(provider, getApiKey(provider))
   );
+  h('ai:testLocalProvider', async (_e, provider: LocalProvider) => testLocalProvider(provider, getApiKey(provider)));
+  h('ai:listImageModels', async () => listImageModels());
+  h('images:get', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
+    getDecorativeImage(entityKind, entityId)
+  );
+  h('images:data', async (_e, entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean) => {
+    const data = getDecorativeImageData(entityKind, entityId, thumbnail);
+    return data ? `data:${data.mimeType};base64,${data.bytes.toString('base64')}` : null;
+  });
+  h('images:queue', async (e, request: DecorativeImageActionRequest) =>
+    queueDecorativeImageGeneration(request, (image) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    })
+  );
+  h('images:upload', async (e, entityKind: DecorativeImageEntityKind, entityId: string, bytes: Uint8Array, style?: DecorativeImageStyle) => {
+    const image = await saveCustomDecorativeImage(entityKind, entityId, Buffer.from(bytes), style);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    return image;
+  });
+  h('images:revert', async (e, entityKind: DecorativeImageEntityKind, entityId: string) => {
+    const image = revertDecorativeImage(entityKind, entityId);
+    if (!e.sender.isDestroyed()) e.sender.send('images:changed', image);
+    return image;
+  });
+  h('images:delete', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
+    deleteDecorativeImage(entityKind, entityId)
+  );
+
+  // audio / text-to-speech. Synthesis runs in the renderer (Piper via WebAssembly);
+  // the main process supplies the speakable segments and persists the resulting WAVs.
+  h('audio:segments', async (_e, entityKind: AudioEntityKind, entityId: string) =>
+    getEntitySegments(entityKind, entityId)
+  );
+  h('audio:listClips', async (_e, entityKind: AudioEntityKind, entityId: string) =>
+    listEntityClips(entityKind, entityId)
+  );
+  h('audio:clearClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
+    clearEntityClips(entityKind, entityId);
+  });
+  h('audio:saveClip', async (
+    _e,
+    entityKind: AudioEntityKind,
+    entityId: string,
+    input: { segmentIndex: number; segmentLabel: string; provider: AudioProvider; voice: string; language: string; bytes: Uint8Array }
+  ) => saveClip(entityKind, entityId, { ...input, bytes: input.bytes }));
+  h('audio:clipData', async (_e, clipId: string) => {
+    const data = readClipBytes(clipId);
+    return data ? `data:${data.mime};base64,${data.bytes.toString('base64')}` : null;
+  });
+  h('audio:deleteClip', async (_e, clipId: string) => {
+    deleteAudioClip(clipId);
+  });
+  h('audio:deleteEntityClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
+    deleteEntityClips(entityKind, entityId);
+  });
+
+  // Hume (cloud TTS): key stays in the main process; the renderer only sees
+  // whether a key exists, the voice list, and the resulting audio bytes.
+  h('audio:humeStatus', async () => ({ hasKey: humeHasKey() }));
+  h('audio:humeSetKey', async (_e, key: string) => {
+    setHumeKey(key);
+    return { hasKey: humeHasKey() };
+  });
+  h('audio:humeClearKey', async () => {
+    clearHumeKey();
+    return { hasKey: humeHasKey() };
+  });
+  h('audio:humeVoices', async (_e, language?: string) => listHumeVoices(language));
+  h('audio:humeSynthesize', async (_e, voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string) => {
+    const bytes = await synthesizeHume(voiceId, provider, text);
+    return new Uint8Array(bytes);
+  });
+
+  // AI translations. The renderer assembles an entity's Markdown and passes it in;
+  // the main process translates it (chunked, preserving citations) and stores one
+  // copy per language.
+  h('translations:list', async (_e, entityKind: TranslationEntityKind, entityId: string) =>
+    translationsRepo.listContentTranslations(entityKind, entityId)
+  );
+  h('translations:get', async (_e, id: string) => translationsRepo.getContentTranslation(id));
+  h('translations:generate', async (_e, request: GenerateTranslationRequest) => {
+    const language = TRANSLATION_LANGUAGES.find((l) => l.code === request.language);
+    if (!language) throw new Error(`Idioma de traducción no soportado: ${request.language}`);
+    const source = request.sourceMarkdown.trim();
+    if (!source) throw new Error('No hay contenido para traducir.');
+    const markdown = await translateMarkdown({ markdown: source, language, model: request.model });
+    return translationsRepo.upsertContentTranslation({
+      entityKind: request.entityKind,
+      entityId: request.entityId,
+      language: language.code,
+      languageLabel: language.nativeName,
+      title: titleFromMarkdown(markdown, request.sourceTitle),
+      markdown,
+      model: request.model ?? null,
+    });
+  });
+  h('translations:delete', async (_e, id: string) => {
+    translationsRepo.deleteContentTranslation(id);
+  });
 
   // zotero
   h('zotero:ping', async () => {
@@ -668,9 +808,17 @@ export function registerIpc(
 
   // inmersión (guided topic mastery: scope → generate → resume/replay forever)
   h('immersion:scope', async (_e, request: ImmersionScopeRequest) => buildImmersionScope(request));
-  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) =>
-    generateImmersionSession(request, (p) => e.sender.send('immersion:generate:progress', requestId, p))
-  );
+  h('immersion:generate', async (e, requestId: string, request: ImmersionRequest) => {
+    const session = await generateImmersionSession(request, (p) =>
+      e.sender.send('immersion:generate:progress', requestId, p)
+    );
+    // Content has already been committed. This only persists/queues the optional
+    // decoration and therefore cannot roll back or delay the immersion.
+    const image = applyDecorativeImageOption('immersion', session.id, request.decorativeImage, (next) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+    });
+    return { ...session, image };
+  });
   h('immersion:list', async () => immersionRepo.listImmersionSessions());
   h('immersion:get', async (_e, id: string) => immersionRepo.getImmersionSession(id));
   h('immersion:progress:set', async (_e, id: string, progress: ImmersionProgress) =>
@@ -678,6 +826,8 @@ export function registerIpc(
   );
   h('immersion:answer', async (_e, request: ImmersionAnswerRequest) => evaluateImmersionAnswer(request));
   h('immersion:delete', async (_e, id: string) => {
+    invalidateDecorativeImageGeneration('immersion', id);
+    translationsRepo.deleteEntityTranslations('immersion', id);
     immersionRepo.deleteImmersionSession(id);
   });
 
@@ -774,8 +924,20 @@ export function registerIpc(
   h('writing:draft', async (_e, request: WritingWorkshopDraftRequest) => generateWritingWorkshopDraft(request));
   h('writing:export', async (_e, request: WritingWorkshopExportRequest) => exportWritingWorkshopDraft(request));
   h('writing:saved:list', async () => writingDrafts.listWritingWorkshopDrafts());
-  h('writing:saved:save', async (_e, request: WritingWorkshopSaveDraftRequest) => writingDrafts.saveWritingWorkshopDraft(request));
-  h('writing:saved:delete', async (_e, id: string) => writingDrafts.deleteWritingWorkshopDraft(id));
+  h('writing:saved:save', async (e, request: WritingWorkshopSaveDraftRequest) => {
+    const saved = writingDrafts.saveWritingWorkshopDraft(request);
+    if (saved.brief.kind !== 'deep_research') return saved;
+    // Like Inmersión, the complete report is durable before image work begins.
+    const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
+      if (!e.sender.isDestroyed()) e.sender.send('images:changed', next);
+    });
+    return { ...saved, image };
+  });
+  h('writing:saved:delete', async (_e, id: string) => {
+    invalidateDecorativeImageGeneration('deep_research', id);
+    translationsRepo.deleteEntityTranslations('deep_research', id);
+    return writingDrafts.deleteWritingWorkshopDraft(id);
+  });
 
   // deep research (orchestrated, coverage-guided multi-page report)
   h('research:deep', async (e, requestId: string, request: DeepResearchRequest) =>
@@ -882,6 +1044,7 @@ export function registerIpc(
   h('search:global', async (_e, query: string, limitPerKind?: number) =>
     globalSearch(query ?? '', limitPerKind ?? 8)
   );
+  h('search:detail', async (_e, kind: SearchResultKind, id: string) => getSearchResultDetail(kind, id));
   h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>
     semanticSearch(query ?? '', options ?? {})
   );

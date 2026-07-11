@@ -47,6 +47,44 @@ const api: NodusApi = {
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
+  testLocalProvider: (provider) => ipcRenderer.invoke('ai:testLocalProvider', provider),
+  listImageModels: () => ipcRenderer.invoke('ai:listImageModels'),
+  getDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:get', entityKind, entityId),
+  getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
+    ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),
+  queueDecorativeImage: (request) => ipcRenderer.invoke('images:queue', request),
+  uploadDecorativeImage: (entityKind, entityId, bytes, style) =>
+    ipcRenderer.invoke('images:upload', entityKind, entityId, bytes, style),
+  revertDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:revert', entityKind, entityId),
+  deleteDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:delete', entityKind, entityId),
+  onDecorativeImageChanged: (cb) => {
+    const listener = (_e: unknown, image: import('@shared/types').DecorativeImage) => cb(image);
+    ipcRenderer.on('images:changed', listener);
+    return () => ipcRenderer.removeListener('images:changed', listener);
+  },
+
+  // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
+  getAudioSegments: (entityKind, entityId) => ipcRenderer.invoke('audio:segments', entityKind, entityId),
+  listAudioClips: (entityKind, entityId) => ipcRenderer.invoke('audio:listClips', entityKind, entityId),
+  clearAudioClips: (entityKind, entityId) =>
+    ipcRenderer.invoke('audio:clearClips', entityKind, entityId).then(() => undefined),
+  saveAudioClip: (entityKind, entityId, input) => ipcRenderer.invoke('audio:saveClip', entityKind, entityId, input),
+  getAudioClipDataUrl: (clipId) => ipcRenderer.invoke('audio:clipData', clipId),
+  deleteAudioClip: (clipId) => ipcRenderer.invoke('audio:deleteClip', clipId).then(() => undefined),
+  deleteEntityAudioClips: (entityKind, entityId) =>
+    ipcRenderer.invoke('audio:deleteEntityClips', entityKind, entityId).then(() => undefined),
+  humeStatus: () => ipcRenderer.invoke('audio:humeStatus'),
+  humeSetKey: (key) => ipcRenderer.invoke('audio:humeSetKey', key),
+  humeClearKey: () => ipcRenderer.invoke('audio:humeClearKey'),
+  humeVoices: (language) => ipcRenderer.invoke('audio:humeVoices', language),
+  humeSynthesize: (voiceId, provider, text) =>
+    ipcRenderer.invoke('audio:humeSynthesize', voiceId, provider, text),
+
+  listContentTranslations: (entityKind, entityId) =>
+    ipcRenderer.invoke('translations:list', entityKind, entityId),
+  getContentTranslation: (id) => ipcRenderer.invoke('translations:get', id),
+  generateContentTranslation: (request) => ipcRenderer.invoke('translations:generate', request),
+  deleteContentTranslation: (id) => ipcRenderer.invoke('translations:delete', id).then(() => undefined),
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
   zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
@@ -313,6 +351,7 @@ const api: NodusApi = {
   verifyCitations: (refs) => ipcRenderer.invoke('citations:verify', refs),
   getCitationPreview: (ref) => ipcRenderer.invoke('citations:preview', ref),
   globalSearch: (query, limitPerKind) => ipcRenderer.invoke('search:global', query, limitPerKind),
+  getSearchResultDetail: (kind, id) => ipcRenderer.invoke('search:detail', kind, id),
   semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
   findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),
   listSavedSearches: () => ipcRenderer.invoke('search:saved:list'),

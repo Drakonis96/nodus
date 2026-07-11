@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { app } from 'electron';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
@@ -9,14 +10,21 @@ import { registerTools } from './tools';
 
 const MCP_PATH = '/mcp';
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+// Stateful sessions live only in memory. A client that dies without sending the
+// DELETE (or an SSE stream that just goes quiet) would otherwise leak its session
+// until the app restarts, so a periodic sweep closes sessions left idle too long.
+const SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+let sessionIdleTtlMs = 30 * 60 * 1000;
 
 interface McpSession {
   server: McpServer;
   transport: StreamableHTTPServerTransport;
+  lastActivity: number;
 }
 
 let httpServer: Server | null = null;
 const sessions = new Map<string, McpSession>();
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
 let status: McpServerStatus = { running: false, port: null, url: null, error: null };
 let lifecycle = Promise.resolve();
 
@@ -82,22 +90,22 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req) {
     const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += data.length;
-    if (size > MAX_REQUEST_BYTES) throw new HttpRequestError(413, 'La solicitud MCP supera el tamaño máximo permitido.');
+    if (size > MAX_REQUEST_BYTES) throw new HttpRequestError(413, 'The MCP request exceeds the maximum allowed size.');
     chunks.push(data);
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
-  if (!raw) throw new HttpRequestError(400, 'La solicitud MCP debe incluir un cuerpo JSON.');
+  if (!raw) throw new HttpRequestError(400, 'The MCP request must include a JSON body.');
   try {
     return JSON.parse(raw);
   } catch {
-    throw new HttpRequestError(400, 'El cuerpo de la solicitud MCP no es JSON válido.');
+    throw new HttpRequestError(400, 'The MCP request body is not valid JSON.');
   }
 }
 
 function makeMcpServer(): McpServer {
   const server = new McpServer({
     name: 'nodus',
-    version: '1.0.0',
+    version: app.getVersion(),
   }, {
     instructions: [
       'Nodus is a local-first academic research workspace. Its graph entities (ideas, themes, edges, debates, gaps and authors) are derived from analysed works and are read-only through MCP.',
@@ -106,6 +114,7 @@ function makeMcpServer(): McpServer {
       'User-created folders, notes, coverage questions and saved writing drafts can be written through the dedicated tools. Writing and coverage tools may consume the AI provider already configured in Nodus.',
       'For writing, build a snapshot first, choose an explicit selection, then generate a draft with save=true if it should appear in Nodus.',
       'To situate a draft passage in the corpus, nodus_analyze_passage returns its typed relations (supports/contradicts/refines/…) with citable Zotero items; nodus_get_copilot_idea expands one idea with its citation, and nodus_compose_insertion drafts a cited sentence to insert.',
+      'To locate where the corpus discusses a topic, nodus_search_passages returns citable full-text passages ranked by semantic similarity; nodus_search_ideas does the same over derived ideas.',
       'All data remains on this machine. Do not claim a relation, evidence or source that is not returned by a Nodus tool.',
     ].join('\n'),
   });
@@ -121,14 +130,14 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
   }
 
   if (!isLocalRequest(req, port)) {
-    sendJsonRpcError(res, 403, 'Origen u Host no autorizado para el servidor MCP local.');
+    sendJsonRpcError(res, 403, 'Origin or Host not authorized for the local MCP server.');
     return;
   }
 
   const token = getSettings().mcpToken;
   if (!token || !hasValidToken(req, token)) {
     res.setHeader('WWW-Authenticate', 'Bearer realm="Nodus MCP"');
-    sendJsonRpcError(res, 401, 'Se requiere un bearer token válido para el servidor MCP de Nodus.');
+    sendJsonRpcError(res, 401, 'A valid bearer token is required for the Nodus MCP server.');
     return;
   }
 
@@ -139,6 +148,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
     const existing = sessionId ? sessions.get(sessionId) : undefined;
 
     if (existing) {
+      existing.lastActivity = Date.now();
       await existing.transport.handleRequest(req, res, parsedBody);
       return;
     }
@@ -150,12 +160,12 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
     // with a new InitializeRequest. Answering 400 instead leaves clients like
     // mcp-remote stuck retrying the dead session until they are restarted by hand.
     if (sessionId) {
-      sendJsonRpcError(res, 404, 'La sesión MCP ya no existe. Inicia una nueva sesión MCP.');
+      sendJsonRpcError(res, 404, 'The MCP session no longer exists. Start a new MCP session.');
       return;
     }
 
     if (req.method !== 'POST' || !isInitializeRequest(parsedBody)) {
-      sendJsonRpcError(res, 400, 'Se requiere una inicialización MCP sin sesión o una sesión MCP válida.');
+      sendJsonRpcError(res, 400, 'A sessionless MCP initialization or a valid MCP session is required.');
       return;
     }
 
@@ -170,7 +180,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
       },
     });
     const server = makeMcpServer();
-    session = { server, transport };
+    session = { server, transport, lastActivity: Date.now() };
     transport.onclose = () => {
       const activeId = transport.sessionId;
       if (activeId) sessions.delete(activeId);
@@ -185,7 +195,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
       return;
     }
     console.error('[mcp] request failed', error);
-    sendJsonRpcError(res, 500, 'Error interno del servidor MCP de Nodus.');
+    sendJsonRpcError(res, 500, 'Internal error in the Nodus MCP server.');
   }
 }
 
@@ -193,6 +203,30 @@ async function closeSessions(): Promise<void> {
   const active = [...sessions.values()];
   sessions.clear();
   await Promise.allSettled(active.map((session) => session.server.close()));
+}
+
+/** Closes every session left idle beyond the TTL. Exported so tests can drive it
+ *  deterministically instead of waiting for the interval. Closing a session's server
+ *  fires transport.onclose, which removes it from the map. */
+export function sweepIdleSessions(now = Date.now()): void {
+  for (const [id, session] of sessions) {
+    if (now - session.lastActivity <= sessionIdleTtlMs) continue;
+    sessions.delete(id);
+    console.log(`[mcp] closing idle session ${id}`);
+    void session.server.close().catch(() => {
+      /* a session already tearing down is fine — it is gone either way */
+    });
+  }
+}
+
+/** Test-only override of the idle TTL (ms). Never called in production. */
+export function __setSessionIdleTtlForTest(ms: number): void {
+  sessionIdleTtlMs = ms;
+}
+
+/** Test-only count of live in-memory sessions. */
+export function __sessionCountForTest(): number {
+  return sessions.size;
 }
 
 async function closeHttpServer(server: Server): Promise<void> {
@@ -237,6 +271,8 @@ async function start(): Promise<void> {
       candidate.listen(port, '127.0.0.1');
     });
     httpServer = candidate;
+    sweepTimer = setInterval(() => sweepIdleSessions(), SESSION_SWEEP_INTERVAL_MS);
+    sweepTimer.unref?.();
     status = { running: true, port, url: endpoint(port), error: null };
     console.log(`[mcp] listening on ${endpoint(port)}`);
   } catch (error) {
@@ -249,6 +285,10 @@ async function start(): Promise<void> {
 async function stop(): Promise<void> {
   const active = httpServer;
   httpServer = null;
+  if (sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
   await closeSessions();
   if (active) await closeHttpServer(active);
   status = { running: false, port: null, url: null, error: null };

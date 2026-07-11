@@ -1,16 +1,38 @@
 import { getDb } from './database';
-import type { AppSettings, EmbeddingProvider } from '@shared/types';
+import type { AppSettings } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { providerKeyMap } from '../secrets/secretStore';
+
+const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
+  ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama },
+  lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio },
+};
 
 const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
+  embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
+  localProviders: DEFAULT_LOCAL_PROVIDERS,
   favorites: [],
   defaultModel: null,
   extractionModel: null,
   synthesisModel: null,
   summaryModel: null,
   fusionModel: null,
+  chatModel: null,
+  deepResearchModel: null,
+  immersionModel: null,
+  writingModel: null,
+  argumentMapModel: null,
+  authorModel: null,
+  studyModel: null,
+  tutorModel: null,
+  hypothesisModel: null,
+  imageProvider: 'google',
+  imageModel: 'gemini-3.1-flash-lite-image',
+  imageStyle: 'antique_book',
+  audioProvider: 'piper',
+  audioVoice: '',
+  audioSpeed: 1,
   syncMode: 'manual',
   readTag: 'leído',
   autoLightScan: false,
@@ -78,8 +100,26 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  // Deep-merge local-provider config so a stored partial (or a newly added
+  // provider absent from an older settings blob) keeps its default base URL.
+  merged.localProviders = {
+    ollama: { ...DEFAULT_LOCAL_PROVIDERS.ollama, ...parsed.localProviders?.ollama },
+    lmstudio: { ...DEFAULT_LOCAL_PROVIDERS.lmstudio, ...parsed.localProviders?.lmstudio },
+  };
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
-  if (!merged.embeddingModel?.trim()) merged.embeddingModel = defaultEmbeddingModel(merged.embeddingProvider);
+  if (!merged.embeddingModel?.trim()) merged.embeddingModel = DEFAULT_EMBEDDING_MODELS[merged.embeddingProvider];
+  // v1.4.0 and older exposed one global header selector. Preserve that user's
+  // choice once by seeding the workload settings, then retire the global value
+  // so future selectors cannot affect one another through a hidden fallback.
+  const legacyDefault = (parsed as Partial<AppSettings>).defaultModel;
+  if (legacyDefault) {
+    merged.extractionModel ??= legacyDefault;
+    merged.synthesisModel ??= legacyDefault;
+    merged.summaryModel ??= legacyDefault;
+    merged.fusionModel ??= legacyDefault;
+    merged.defaultModel = null;
+    writeRaw('app', JSON.stringify(merged));
+  }
   return { ...merged, providerKeys: providerKeyMap() };
 }
 
@@ -91,17 +131,3 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   return getSettings();
 }
 
-function normalizeEmbeddingProvider(provider: unknown): EmbeddingProvider {
-  return provider === 'openai' || provider === 'openrouter' || provider === 'gemini' ? provider : 'openai';
-}
-
-function defaultEmbeddingModel(provider: EmbeddingProvider): string {
-  switch (provider) {
-    case 'openrouter':
-      return 'baai/bge-m3';
-    case 'gemini':
-      return 'gemini-embedding-001';
-    case 'openai':
-      return 'text-embedding-3-small';
-  }
-}

@@ -14,6 +14,7 @@ import { IdeaDetailModal } from '../components/IdeaDetailModal';
 import { ModelPicker } from '../components/ModelPicker';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { useDataRefresh, useScanComplete } from '../hooks';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 
@@ -62,7 +63,7 @@ export function AuthorsView({
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
   const [tab, setTab] = useState<Tab>('dossier');
-  const [model, setModel] = useState<ModelRef | null>(settings.synthesisModel ?? settings.defaultModel);
+  const [model, setModel] = useFeatureModel(settings, 'authorModel');
 
   return (
     <div className="h-full flex flex-col min-h-0 p-6">

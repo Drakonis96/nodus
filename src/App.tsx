@@ -29,6 +29,7 @@ import { VaultSwitcher } from './components/VaultSwitcher';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
+import { WhatsNewModal } from './components/WhatsNewModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
@@ -46,6 +47,17 @@ import nodusLogo from './assets/nodus-logo.svg';
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
+
+/** Apply the light/dark root classes for a theme mode. 'system' resolves to the
+ *  OS preference at call time; the App re-invokes this when that preference
+ *  changes so the "system" mode tracks the OS live. */
+function applyThemeClasses(theme: import('@shared/types').ThemeMode): void {
+  const dark = theme === 'system'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : theme === 'dark';
+  document.documentElement.classList.toggle('light', !dark);
+  document.documentElement.classList.toggle('dark', dark);
+}
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -98,8 +110,7 @@ export function App() {
       setSettings(s);
       setActiveLang(s.uiLanguage);
       document.documentElement.lang = s.uiLanguage;
-      document.documentElement.classList.toggle('light', s.theme === 'light');
-      document.documentElement.classList.toggle('dark', s.theme === 'dark');
+      applyThemeClasses(s.theme);
       return s;
     } catch (e) {
       setLoadError(tx('No se pudieron cargar los ajustes: {msg}', { msg: (e as Error).message }));
@@ -110,6 +121,15 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  // In "system" theme mode, follow the OS light/dark preference as it changes.
+  useEffect(() => {
+    if (settings?.theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyThemeClasses('system');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [settings?.theme]);
 
   const reloadVaults = useCallback(async () => {
     if (!window.nodus) return [];
@@ -230,14 +250,14 @@ export function App() {
 
   const openAssistant = useCallback(
     (target?: PendingAssistantNavigationTarget) => {
-      if (!settings?.defaultModel) {
+      if (!(settings?.chatModel ?? settings?.synthesisModel)) {
         setView('settings');
         return;
       }
       setAssistantTarget(target ? { ...target, nonce: Date.now() } : null);
       setResearchOpen(true);
     },
-    [settings?.defaultModel]
+    [settings?.chatModel, settings?.synthesisModel]
   );
 
   const openGraphFromAssistant = useCallback(
@@ -280,7 +300,7 @@ export function App() {
     }));
     const actions: Command[] = [
       { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
-      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'wand', keywords: 'assistant chat', run: () => openAssistant() },
+      { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
     ];
     return [...navCommands, ...actions];
@@ -312,6 +332,7 @@ export function App() {
         vaults={vaults}
         activeVault={activeVault}
         onVaultsChanged={reloadVaults}
+        onLanguageChosen={reloadSettings}
         onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
       />
     );
@@ -353,38 +374,17 @@ export function App() {
             {lastSync.summary}
           </span>
         )}
-        {settings.favorites.length > 0 && (
-          <select
-            data-tour="model"
-            className="input text-xs py-1"
-            title={t('Modelo predeterminado para escaneos')}
-            value={settings.defaultModel ? `${settings.defaultModel.provider}::${settings.defaultModel.model}` : ''}
-            onChange={async (e) => {
-              if (!e.target.value) return;
-              const [provider, model] = e.target.value.split('::');
-              await window.nodus.updateSettings({ defaultModel: { provider: provider as any, model } });
-              void reloadSettings();
-            }}
-          >
-            {!settings.defaultModel && <option value="">{t('Modelo: sin configurar')}</option>}
-            {settings.favorites.map((m) => (
-              <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>
-                {m.provider} · {m.model}
-              </option>
-            ))}
-          </select>
-        )}
-        {!settings.defaultModel && (
+        {(!settings.extractionModel || !settings.synthesisModel) && (
           <button data-tour="model" className="btn btn-ghost text-amber-400 gap-1.5" onClick={() => setView('settings')}>
             <Icon name="alert" /> {t('Configura un modelo de IA')}
           </button>
         )}
         <button
           className="btn btn-ghost gap-1.5"
-          title={settings.defaultModel ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
+          title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
           onClick={() => openAssistant()}
         >
-          <Icon name="wand" /> {t('Asistente')}
+          <Icon name="chat" /> {t('Asistente')}
         </button>
         <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
           <Icon name="folder" /> {t('Colecciones')}
@@ -441,7 +441,11 @@ export function App() {
                             collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
                           }`}
                         >
-                          <Icon name={collapsed ? 'chevronRight' : 'chevronDown'} size={11} />
+                          <Icon
+                            name="chevronRight"
+                            size={11}
+                            className={`transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-90'}`}
+                          />
                           {t(group.label)}
                         </button>
                         {!collapsed && group.items.map((n) => navButton(n))}
@@ -477,7 +481,6 @@ export function App() {
           )}
           {view === 'library' && (
             <Library
-              settings={settings}
               target={libraryTarget}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}
@@ -485,7 +488,7 @@ export function App() {
             />
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
-          {view === 'argument' && <ArgumentMapView settings={settings} onBack={() => setView('graph')} />}
+          {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'study' && (
@@ -595,6 +598,10 @@ export function App() {
             void reloadSettings();
           }}
         />
+      )}
+
+      {settings.onboardingComplete && settings.tourComplete && (
+        <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
       )}
     </div>
   );

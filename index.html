@@ -3,9 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Local text-to-speech (Piper via onnxruntime-web) runs in the renderer:
+      'wasm-unsafe-eval' lets the WASM runtime compile, and the onnxruntime-web
+      runtime + the Piper voice models are fetched on demand from their CDNs /
+      Hugging Face (voices are then cached locally in OPFS and reused offline).
+      media-src blob: lets generated clips play back from object URLs.
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'self' https://huggingface.co https://*.hf.co https://cdn.jsdelivr.net https://cdnjs.cloudflare.com"
     />
     <title>Nodus</title>
   </head>

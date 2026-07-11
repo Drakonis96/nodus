@@ -1,23 +1,44 @@
-import { useCallback, useEffect, useState } from 'react';
+// Deep Research — a gallery of saved reports (grid/list, search, sort), a
+// chained generation queue, and an immersive reader that expands one report to
+// full width with a back button to the gallery. The heavy lifting (generation,
+// saving, citations) is shared with the Writing workshop via writingShared.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AppSettings,
-  DeepResearchMeta,
   DeepResearchProgress,
   DeepResearchSectionLimit,
   DeepResearchTargetLength,
   PromptLanguage,
-  WritingWorkshopDraft,
   WritingWorkshopSavedDraft,
+  DecorativeImage,
+  DecorativeImageStyle,
 } from '@shared/types';
+import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
-import { Badge, Icon, modelLabel } from '../components/ui';
+import { Icon, modelLabel } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
-import type { MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { DraftResultMain, Metric, SavedDraftsPanel, SupportMatrix } from './writingShared';
+import { TranslationModal } from '../components/TranslationModal';
+import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
+import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { AudioPanel } from '../components/AudioPanel';
+import { FindInPage } from '../components/FindInPage';
 import { t, tx } from '../i18n';
+import {
+  DEEP_RESEARCH_MAIN_JOB_KEY,
+  clearFinishedDeepResearch,
+  enqueueDeepResearch,
+  getBackgroundJob,
+  getDeepResearchQueue,
+  removeQueuedDeepResearch,
+  subscribeBackgroundJob,
+  subscribeDeepResearchQueue,
+  type DeepResearchGenerationJob,
+  type DeepResearchQueueItem,
+} from '../backgroundJobs';
+import { useFeatureModel } from '../hooks/useFeatureModel';
 
 const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   adaptive: 'Adaptativo (según corpus)',
@@ -26,7 +47,6 @@ const DEEP_TARGET_LABELS: Record<DeepResearchTargetLength, string> = {
   exhaustive: 'Exhaustivo (15–20 pág.)',
 };
 
-/** Options for the "max sections" selector. `'auto'` lets the model decide; numbers cap it. */
 const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[] = [
   { value: 'auto', label: 'Secciones: Auto (IA decide)' },
   { value: 4, label: 'Máx. 4 secciones' },
@@ -36,8 +56,14 @@ const DEEP_SECTION_OPTIONS: { value: DeepResearchSectionLimit; label: string }[]
   { value: 10, label: 'Máx. 10 secciones' },
 ];
 
-function sectionLimitLabel(limit: DeepResearchSectionLimit): string {
-  return limit === 'auto' ? t('Secciones: Auto') : tx('Máx. {n} secciones', { n: limit });
+type SortKey = 'recent' | 'oldest' | 'title';
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  } catch {
+    return iso;
+  }
 }
 
 export function DeepResearchView({
@@ -47,27 +73,50 @@ export function DeepResearchView({
   settings: AppSettings;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
+  const [mode, setMode] = useState<'gallery' | 'reader'>('gallery');
+
+  // Composer (new report) state.
+  const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
   const [language, setLanguage] = useState<PromptLanguage>('es');
-  const [selectedModel, setSelectedModel] = useState(settings.synthesisModel ?? settings.defaultModel);
+  const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
   const [deepTarget, setDeepTarget] = useState<DeepResearchTargetLength>('adaptive');
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
-  const [deepRunning, setDeepRunning] = useState(false);
-  const [deepProgress, setDeepProgress] = useState<DeepResearchProgress | null>(null);
-  const [deepMeta, setDeepMeta] = useState<DeepResearchMeta | null>(null);
-  const [draft, setDraft] = useState<WritingWorkshopDraft | null>(null);
+  const [includeImage, setIncludeImage] = useState(false);
+  const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
+
+  // Data.
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
   const [loadingSavedDrafts, setLoadingSavedDrafts] = useState(false);
-  const [reusingDraftId, setReusingDraftId] = useState<string | null>(null);
+  const [queue, setQueue] = useState<DeepResearchQueueItem[]>(() => getDeepResearchQueue());
+  const [deepJob, setDeepJob] = useState<DeepResearchGenerationJob | null>(() =>
+    getBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY)
+  );
+
+  // Gallery controls.
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('recent');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Reader + shared modals.
+  const [openDraft, setOpenDraft] = useState<WritingWorkshopSavedDraft | null>(null);
+  const [showMatrix, setShowMatrix] = useState(false);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [savingToNotes, setSavingToNotes] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const hasModel = !!selectedModel;
+  const deepRunning = deepJob?.status === 'running';
+  const deepProgress = deepJob?.progress ?? null;
+
+  useEffect(() => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob), []);
+  useEffect(() => subscribeDeepResearchQueue(setQueue), []);
 
   const refreshSavedDrafts = useCallback(async () => {
     setLoadingSavedDrafts(true);
@@ -85,51 +134,118 @@ export function DeepResearchView({
     void refreshSavedDrafts();
   }, [refreshSavedDrafts]);
 
-  const runDeepResearch = async () => {
+  // Surface each finished report in the gallery as soon as it lands.
+  const lastCompletedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (deepJob?.status !== 'completed' || deepJob.id === lastCompletedRef.current) return;
+    lastCompletedRef.current = deepJob.id;
+    const saved = deepJob.result?.savedDraft ?? null;
+    if (saved) {
+      setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
+      setOpenDraft((current) => (current?.id === saved.id ? saved : current));
+    } else {
+      void refreshSavedDrafts();
+    }
+  }, [deepJob, refreshSavedDrafts]);
+
+  const submitComposer = () => {
     if (!objective.trim()) {
       setError(t('Escribe la idea de investigación antes de generar el informe.'));
       return;
     }
+    enqueueDeepResearch({
+      objective: objective.trim(),
+      language,
+      targetLength: deepTarget,
+      sectionLimit: deepSectionLimit,
+      model: selectedModel,
+      decorativeImage: { enabled: includeImage, style: imageStyle },
+    });
+    setComposerOpen(false);
+    setObjective('');
+    setError(null);
+    setMessage(t('Informe añadido a la cola. Se generará en segundo plano.'));
+  };
+
+  const openReader = (saved: WritingWorkshopSavedDraft) => {
+    setOpenDraft(saved);
+    setMode('reader');
+    setShowMatrix(false);
     setError(null);
     setMessage(null);
-    setDraft(null);
-    setDeepMeta(null);
-    setDeepProgress(null);
-    setDeepRunning(true);
+  };
+
+  const backToGallery = () => {
+    setMode('gallery');
+    setOpenDraft(null);
+    void refreshSavedDrafts();
+  };
+
+  const reusePrompt = (saved: WritingWorkshopSavedDraft) => {
+    setObjective(saved.brief.objective);
+    if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
+    if (saved.model) setSelectedModel(saved.model);
+    setComposerOpen(true);
+  };
+
+  const deleteDraft = async (saved: WritingWorkshopSavedDraft) => {
+    const ok = await confirm({
+      title: t('Eliminar informe'),
+      message: t('¿Eliminar este informe guardado? Esta acción no se puede deshacer.'),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
     try {
-      const report = await window.nodus.generateDeepResearchReport(
-        {
-          objective,
-          language,
-          targetLength: deepTarget,
-          sectionLimit: deepSectionLimit,
-          model: selectedModel,
-        },
-        { onProgress: (p) => setDeepProgress(p) }
-      );
-      setDraft(report.draft);
-      setDeepMeta(report.meta);
-      setMessage(
-        tx('Informe generado: {s} secciones · ~{p} páginas · {i} ideas citadas.', {
-          s: report.meta.sections,
-          p: report.meta.pages,
-          i: report.meta.ideasCovered,
-        })
-      );
+      await window.nodus.deleteWritingWorkshopDraft(saved.id);
+      setSavedDrafts((current) => current.filter((item) => item.id !== saved.id));
+      if (openDraft?.id === saved.id) backToGallery();
+      setMessage(t('Informe eliminado.'));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setDeepRunning(false);
+    }
+  };
+
+  const exitSelection = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const deleteSelected = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const ok = await confirm({
+      title: t('Eliminar informes'),
+      message: tx('¿Eliminar {n} informes guardados? Esta acción no se puede deshacer.', { n: ids.length }),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(ids.map((id) => window.nodus.deleteWritingWorkshopDraft(id)));
+      setSavedDrafts((current) => current.filter((item) => !selected.has(item.id)));
+      exitSelection();
+      setMessage(tx('{n} informes eliminados.', { n: ids.length }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   };
 
   const exportDraft = async (format: 'markdown' | 'pdf') => {
-    if (!draft) return;
+    if (!openDraft) return;
     setExporting(true);
     setError(null);
     setMessage(null);
     try {
-      const result = await window.nodus.exportWritingWorkshopDraft({ draft, format });
+      const result = await window.nodus.exportWritingWorkshopDraft({ draft: openDraft.draft, format });
       if (result) setMessage(`${t('Exportado')}: ${result.path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -139,144 +255,109 @@ export function DeepResearchView({
   };
 
   const copyDraft = async () => {
-    if (!draft) return;
-    await navigator.clipboard.writeText(draft.draftMarkdown);
+    if (!openDraft) return;
+    await navigator.clipboard.writeText(openDraft.draft.draftMarkdown);
     setMessage(t('Borrador copiado.'));
   };
 
-  const saveDraft = async () => {
-    if (!draft || savingDraft) return;
-    setError(null);
-    setMessage(null);
-    setSavingDraft(true);
-    try {
-      const saved = await window.nodus.saveWritingWorkshopDraft({ draft, model: selectedModel });
-      setSavedDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-      setMessage(t('Informe guardado localmente.'));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSavingDraft(false);
-    }
+  const onImageChange = (image: DecorativeImage) => {
+    if (!openDraft) return;
+    const next = { ...openDraft, image };
+    setOpenDraft(next);
+    setSavedDrafts((current) => current.map((item) => (item.id === next.id ? next : item)));
   };
 
-  const openSavedDraft = (saved: WritingWorkshopSavedDraft) => {
-    setError(null);
-    setMessage(t('Informe guardado abierto. Puedes exportarlo o reutilizar su idea para regenerarlo.'));
-    setObjective(saved.brief.objective);
-    if (saved.brief.language) setLanguage(saved.brief.language);
-    setDraft(saved.draft);
-    setDeepMeta(null);
-    if (saved.model) setSelectedModel(saved.model);
-  };
+  const visibleDrafts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? savedDrafts.filter(
+          (d) => d.title.toLowerCase().includes(q) || d.brief.objective.toLowerCase().includes(q)
+        )
+      : savedDrafts;
+    const sorted = [...filtered];
+    if (sortKey === 'title') sorted.sort((a, b) => a.title.localeCompare(b.title));
+    else if (sortKey === 'oldest') sorted.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+    else sorted.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return sorted;
+  }, [savedDrafts, search, sortKey]);
 
-  const reuseSavedPrompt = (saved: WritingWorkshopSavedDraft) => {
-    if (reusingDraftId) return;
-    setReusingDraftId(saved.id);
-    setError(null);
-    setObjective(saved.brief.objective);
-    if (saved.brief.language) setLanguage(saved.brief.language);
-    if (saved.model) setSelectedModel(saved.model);
-    setDraft(null);
-    setDeepMeta(null);
-    setMessage(t('Idea reutilizada: ajusta los parámetros y genera un informe actualizado.'));
-    setReusingDraftId(null);
-  };
+  const activeQueue = queue.filter((item) => item.status === 'queued' || item.status === 'running');
+  const finishedQueue = queue.filter((item) => item.status === 'failed');
 
-  const deleteSavedDraft = async (saved: WritingWorkshopSavedDraft) => {
-    const ok = await confirm({
-      title: t('Eliminar informe'),
-      message: t('¿Eliminar este informe guardado? Esta acción no se puede deshacer.'),
-      confirmLabel: t('Eliminar'),
-      danger: true,
-    });
-    if (!ok) return;
-    setError(null);
-    setMessage(null);
-    try {
-      await window.nodus.deleteWritingWorkshopDraft(saved.id);
-      setSavedDrafts((current) => current.filter((item) => item.id !== saved.id));
-      setMessage(t('Informe eliminado.'));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  if (mode === 'reader' && openDraft) {
+    return (
+      <>
+        <ReaderView
+          saved={openDraft}
+          settings={settings}
+          showMatrix={showMatrix}
+          exporting={exporting}
+          message={message}
+          error={error}
+          onToggleMatrix={() => setShowMatrix((v) => !v)}
+          onBack={backToGallery}
+          onCopy={() => void copyDraft()}
+          onSaveToNotes={() => setSavingToNotes(true)}
+          onTranslate={() => setTranslating(true)}
+          onExport={(format) => void exportDraft(format)}
+          onCitation={setCitation}
+          onImageChange={onImageChange}
+        />
+        {citation && (
+          <SourceCitationModal
+            target={citation}
+            onClose={() => setCitation(null)}
+            onOpenGraph={(target) => {
+              setCitation(null);
+              onOpenGraph(target);
+            }}
+          />
+        )}
+        {savingToNotes && (
+          <SaveToNotesModal
+            content={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            defaultTitle={openDraft.draft.title}
+            kind="writing"
+            source={{ origin: 'writing', model: openDraft.model, ref: 'deep_research' }}
+            allowProjectLink
+            onClose={() => setSavingToNotes(false)}
+          />
+        )}
+        {translating && (
+          <TranslationModal
+            entityKind="deep_research"
+            entityId={openDraft.id}
+            sourceTitle={openDraft.draft.title}
+            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
+            model={openDraft.model}
+            onCitation={setCitation}
+            onClose={() => setTranslating(false)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <header className="border-b border-neutral-800 p-4 flex flex-wrap items-end gap-3">
-        <div className="min-w-[16rem]">
-          <h1 className="text-xl font-semibold flex items-center gap-2">
+      <header className="flex flex-wrap items-center gap-3 border-b border-neutral-800 px-4 py-3">
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
             <Icon name="compass" className="text-indigo-300" /> {t('Deep Research')}
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">
-            {t('Informe académico de varias páginas, guiado por cobertura y con todas las fuentes citadas.')}
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
           </p>
         </div>
-        <select
-          className="input"
-          value={deepTarget}
-          onChange={(e) => setDeepTarget(e.target.value as DeepResearchTargetLength)}
-          title={t('Extensión objetivo del informe')}
-        >
-          {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
-            <option key={id} value={id}>
-              {t(label)}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={String(deepSectionLimit)}
-          onChange={(e) =>
-            setDeepSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))
-          }
-          title={t('Número máximo de secciones (menos secciones = mayor profundidad)')}
-        >
-          {DEEP_SECTION_OPTIONS.map((option) => (
-            <option key={String(option.value)} value={String(option.value)}>
-              {t(option.label)}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={language} onChange={(e) => setLanguage(e.target.value as PromptLanguage)}>
-          <option value="es">Español</option>
-          <option value="en">English</option>
-          <option value="fr">Français</option>
-          <option value="tr">Türkçe</option>
-        </select>
-        <ModelPicker settings={settings} value={selectedModel} onChange={setSelectedModel} compact />
+
         <div className="flex-1" />
-        <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => setShowTutorial((value) => !value)}>
-          <Icon name="help" />
-          {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
+        <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={() => setShowTutorial((v) => !v)}>
+          <Icon name="help" /> {showTutorial ? t('Ocultar tutorial') : t('Tutorial')}
         </button>
-        <button
-          className="btn btn-primary gap-1.5"
-          onClick={runDeepResearch}
-          disabled={!hasModel || deepRunning || !objective.trim()}
-          title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
-        >
-          <Icon name={deepRunning ? 'sync' : 'compass'} className={deepRunning ? 'animate-spin' : ''} />
-          {deepRunning ? t('Generando informe…') : t('Generar informe')}
+        <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
+          <Icon name="plus" /> {t('Nuevo informe')}
         </button>
       </header>
-
-      <div className="border-b border-neutral-800 p-3">
-        <textarea
-          className="input w-full min-h-20 resize-y"
-          value={objective}
-          onChange={(e) => setObjective(e.target.value)}
-          placeholder={t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')}
-        />
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-          <Badge color="green">{t('Cobertura del corpus completo')}</Badge>
-          <Badge>{t(DEEP_TARGET_LABELS[deepTarget])}</Badge>
-          <Badge>{sectionLimitLabel(deepSectionLimit)}</Badge>
-          {selectedModel && <span>{t('Modelo:')} {modelLabel(selectedModel)}</span>}
-          <span className="text-neutral-600">{t('Sin selección manual: el informe elige y cita las fuentes por ti.')}</span>
-        </div>
-      </div>
 
       {showTutorial && <DeepResearchTutorial />}
 
@@ -286,80 +367,643 @@ export function DeepResearchView({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 grid grid-cols-[18rem_minmax(0,1fr)_20rem] max-xl:grid-cols-1">
-        <aside className="border-r border-neutral-800 min-h-0 flex flex-col max-xl:border-r-0 max-xl:border-b">
-          <DeepResearchPanel
-            running={deepRunning}
-            progress={deepProgress}
-            meta={deepMeta}
-            target={deepTarget}
-            sectionLimit={deepSectionLimit}
-          />
-        </aside>
-
-        <main className="min-h-0 overflow-y-auto p-5">
-          {!draft && (
-            <div className="h-full flex items-center justify-center">
-              <div className="max-w-md text-center text-neutral-500 text-sm">
-                {deepRunning
-                  ? deepProgress?.message ?? t('Generando informe…')
-                  : t('El informe aparecerá aquí. Escribe tu idea de investigación y pulsa «Generar informe».')}
-              </div>
-            </div>
-          )}
-          {draft && (
-            <DraftResultMain
-              draft={draft}
-              exporting={exporting}
-              savingDraft={savingDraft}
-              onCopy={copyDraft}
-              onSaveDraft={saveDraft}
-              onSaveToNotes={() => setSavingToNotes(true)}
-              onExport={(format) => void exportDraft(format)}
-              onCitation={(c: MarkdownCitation) => setCitation(c)}
-            />
-          )}
-        </main>
-
-        <aside className="border-l border-neutral-800 min-h-0 overflow-y-auto p-4 max-xl:border-l-0 max-xl:border-t">
-          <SavedDraftsPanel
-            drafts={savedDrafts}
-            loading={loadingSavedDrafts}
-            reusingDraftId={reusingDraftId}
-            onOpen={openSavedDraft}
-            onReuse={reuseSavedPrompt}
-            onDelete={(saved) => void deleteSavedDraft(saved)}
-            onRefresh={() => void refreshSavedDrafts()}
-          />
-          <div className="my-4 border-t border-neutral-800" />
-          <SupportMatrix draft={draft} onCitation={setCitation} />
-        </aside>
-      </div>
-
-      {citation && (
-        <SourceCitationModal
-          target={citation}
-          onClose={() => setCitation(null)}
-          onOpenGraph={(target) => {
-            setCitation(null);
-            onOpenGraph(target);
-          }}
+      {(activeQueue.length > 0 || finishedQueue.length > 0) && (
+        <QueueStrip
+          active={activeQueue}
+          failed={finishedQueue}
+          progress={deepProgress}
+          running={deepRunning}
+          onRemove={(id) => removeQueuedDeepResearch(id)}
+          onClearFinished={() => clearFinishedDeepResearch()}
         />
       )}
 
-      {savingToNotes && draft && (
-        <SaveToNotesModal
-          content={`# ${draft.title}\n\n${draft.abstract ? `${draft.abstract}\n\n` : ''}${draft.draftMarkdown}`}
-          defaultTitle={draft.title}
-          kind="writing"
-          source={{ origin: 'writing', model: selectedModel, ref: draft.brief.kind }}
-          allowProjectLink
-          onClose={() => setSavingToNotes(false)}
+      <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+        <div className="relative min-w-[14rem] flex-1 max-w-md">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+          <input
+            className="input input-with-leading-icon w-full !py-1.5 text-sm"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('Buscar entre tus informes…')}
+          />
+        </div>
+        <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+          <option value="recent">{t('Más recientes')}</option>
+          <option value="oldest">{t('Más antiguos')}</option>
+          <option value="title">{t('Por título (A–Z)')}</option>
+        </select>
+        <div className="flex overflow-hidden rounded-lg border border-neutral-700">
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'grid' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('grid')}
+            title={t('Vista mosaico')}
+          >
+            <Icon name="grid" size={14} />
+          </button>
+          <button
+            className={`px-2.5 py-1.5 text-xs ${viewMode === 'list' ? 'bg-indigo-900/40 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-900'}`}
+            onClick={() => setViewMode('list')}
+            title={t('Vista lista')}
+          >
+            <Icon name="list" size={14} />
+          </button>
+        </div>
+        {savedDrafts.length > 0 && (
+          <button
+            className={`btn btn-ghost !py-1.5 gap-1.5 border text-xs ${selecting ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+            onClick={() => (selecting ? exitSelection() : setSelecting(true))}
+          >
+            <Icon name="check" size={13} /> {selecting ? t('Cancelar') : t('Seleccionar')}
+          </button>
+        )}
+      </div>
+
+      {selecting && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-indigo-900/40 bg-indigo-950/20 px-4 py-2 text-xs">
+          <button
+            className="text-indigo-300 hover:underline"
+            onClick={() =>
+              setSelected(
+                visibleDrafts.every((d) => selected.has(d.id)) ? new Set() : new Set(visibleDrafts.map((d) => d.id))
+              )
+            }
+          >
+            {visibleDrafts.length > 0 && visibleDrafts.every((d) => selected.has(d.id))
+              ? t('Deseleccionar todo')
+              : t('Seleccionar todo')}
+          </button>
+          <span className="text-neutral-500">{tx('{n} seleccionados', { n: selected.size })}</span>
+          <div className="flex-1" />
+          <button
+            className="btn btn-ghost !py-1 gap-1 text-xs text-red-400 disabled:text-neutral-600"
+            onClick={() => void deleteSelected()}
+            disabled={selected.size === 0}
+          >
+            <Icon name="trash" size={13} /> {t('Eliminar seleccionados')}
+          </button>
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {visibleDrafts.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <Icon name="compass" size={28} className="text-neutral-600" />
+            <div className="max-w-md text-sm text-neutral-500">
+              {loadingSavedDrafts
+                ? t('Cargando informes…')
+                : search.trim()
+                  ? t('Ningún informe coincide con tu búsqueda.')
+                  : t('Aún no hay informes. Crea el primero y quedará aquí, listo para leerse a pantalla completa.')}
+            </div>
+            {!search.trim() && !loadingSavedDrafts && (
+              <button className="btn btn-primary gap-1.5" onClick={() => setComposerOpen(true)}>
+                <Icon name="plus" /> {t('Nuevo informe')}
+              </button>
+            )}
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-3 gap-4 max-2xl:grid-cols-2 max-lg:grid-cols-1">
+            {visibleDrafts.map((saved) => (
+              <DraftGridCard
+                key={saved.id}
+                saved={saved}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(saved.id)}
+                onToggle={() => toggleSelected(saved.id)}
+                onOpen={() => openReader(saved)}
+                onReuse={() => reusePrompt(saved)}
+                onDelete={() => void deleteDraft(saved)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {visibleDrafts.map((saved) => (
+              <DraftListRow
+                key={saved.id}
+                saved={saved}
+                settings={settings}
+                selecting={selecting}
+                selected={selected.has(saved.id)}
+                onToggle={() => toggleSelected(saved.id)}
+                onOpen={() => openReader(saved)}
+                onReuse={() => reusePrompt(saved)}
+                onDelete={() => void deleteDraft(saved)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {composerOpen && (
+        <ComposerModal
+          settings={settings}
+          objective={objective}
+          language={language}
+          model={selectedModel}
+          target={deepTarget}
+          sectionLimit={deepSectionLimit}
+          includeImage={includeImage}
+          imageStyle={imageStyle}
+          hasModel={hasModel}
+          queuedCount={activeQueue.length}
+          onObjective={setObjective}
+          onLanguage={setLanguage}
+          onModel={setSelectedModel}
+          onTarget={setDeepTarget}
+          onSectionLimit={setDeepSectionLimit}
+          onIncludeImage={setIncludeImage}
+          onImageStyle={setImageStyle}
+          onSubmit={submitComposer}
+          onClose={() => setComposerOpen(false)}
         />
       )}
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Queue strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+function QueueStrip({
+  active,
+  failed,
+  progress,
+  running,
+  onRemove,
+  onClearFinished,
+}: {
+  active: DeepResearchQueueItem[];
+  failed: DeepResearchQueueItem[];
+  progress: DeepResearchProgress | null;
+  running: boolean;
+  onRemove: (id: string) => void;
+  onClearFinished: () => void;
+}) {
+  return (
+    <div className="border-b border-neutral-800 bg-indigo-950/15 px-4 py-2.5">
+      <div className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-indigo-300">
+        <Icon name={running ? 'sync' : 'layers'} size={12} className={running ? 'animate-spin' : ''} />
+        {tx('Cola de generación · {n} en curso', { n: active.length })}
+        {failed.length > 0 && (
+          <button className="ml-auto text-[11px] font-medium text-neutral-500 hover:text-neutral-300" onClick={onClearFinished}>
+            {t('Limpiar fallidos')}
+          </button>
+        )}
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {active.map((item) => (
+          <div key={item.id} className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-950/40 px-2.5 py-1.5 text-xs">
+            <Icon
+              name={item.status === 'running' ? 'sync' : 'clock'}
+              size={12}
+              className={item.status === 'running' ? 'animate-spin text-indigo-300' : 'text-neutral-500'}
+            />
+            <span className="min-w-0 flex-1 truncate text-neutral-300" title={item.title}>{item.title}</span>
+            {item.status === 'running' ? (
+              <span className="shrink-0 text-[11px] text-indigo-300">
+                {progress?.message ?? t('Generando…')}
+                {progress?.pagesSoFar != null && ` · ~${progress.pagesSoFar} ${t('pág.')}`}
+              </span>
+            ) : (
+              <button className="shrink-0 text-neutral-500 hover:text-red-400" onClick={() => onRemove(item.id)} title={t('Quitar de la cola')}>
+                <Icon name="x" size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+        {failed.map((item) => (
+          <div key={item.id} className="flex items-center gap-2 rounded-md border border-red-900/50 bg-red-950/20 px-2.5 py-1.5 text-xs">
+            <Icon name="alert" size={12} className="text-red-400" />
+            <span className="min-w-0 flex-1 truncate text-red-300" title={item.error ?? item.title}>{item.title}</span>
+            <span className="shrink-0 text-[11px] text-red-400/80">{t('Falló')}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gallery cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SelectCheck({ checked }: { checked: boolean }) {
+  return (
+    <span
+      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+        checked ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-neutral-500 bg-neutral-900/70'
+      }`}
+    >
+      {checked && <Icon name="check" size={12} />}
+    </span>
+  );
+}
+
+function DraftGridCard({
+  saved,
+  settings,
+  selecting,
+  selected,
+  onToggle,
+  onOpen,
+  onReuse,
+  onDelete,
+}: {
+  saved: WritingWorkshopSavedDraft;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onReuse: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card group flex flex-col overflow-hidden p-0 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      <button
+        className="relative block h-40 w-full overflow-hidden bg-gradient-to-br from-indigo-950/30 to-neutral-900"
+        onClick={primary}
+        title={selecting ? t('Seleccionar') : t('Abrir a pantalla completa')}
+      >
+        <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
+          <Icon name="compass" size={30} />
+        </div>
+        <DecorativeImageCard
+          entityKind="deep_research"
+          entityId={saved.id}
+          image={saved.image}
+          defaultStyle={settings.imageStyle}
+          thumbnail
+          className="absolute inset-0 !h-full !rounded-none"
+        />
+        {selecting && (
+          <span className="absolute left-2 top-2 z-10">
+            <SelectCheck checked={selected} />
+          </span>
+        )}
+      </button>
+      <div className="flex flex-1 flex-col p-3">
+        <button className="text-left" onClick={primary}>
+          <div className="line-clamp-2 text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
+        </button>
+        <div className="mt-1 flex items-center gap-1.5 text-[11px] text-neutral-500">
+          <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
+          {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
+        </div>
+        {!selecting && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
+              <Icon name="book" size={12} /> {t('Leer')}
+            </button>
+            <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
+              <Icon name="refresh" size={12} />
+            </button>
+            <div className="flex-1" />
+            <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
+              <Icon name="trash" size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DraftListRow({
+  saved,
+  settings,
+  selecting,
+  selected,
+  onToggle,
+  onOpen,
+  onReuse,
+  onDelete,
+}: {
+  saved: WritingWorkshopSavedDraft;
+  settings: AppSettings;
+  selecting: boolean;
+  selected: boolean;
+  onToggle: () => void;
+  onOpen: () => void;
+  onReuse: () => void;
+  onDelete: () => void;
+}) {
+  const primary = selecting ? onToggle : onOpen;
+  return (
+    <div
+      className={`card flex items-center gap-3 p-2.5 transition-colors ${
+        selected ? 'border-indigo-600/70 ring-1 ring-indigo-600/40' : 'hover:border-indigo-700/60'
+      }`}
+    >
+      {selecting && (
+        <button onClick={onToggle} aria-label={t('Seleccionar')}>
+          <SelectCheck checked={selected} />
+        </button>
+      )}
+      <button
+        className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-gradient-to-br from-indigo-950/30 to-neutral-900"
+        onClick={primary}
+        title={selecting ? t('Seleccionar') : t('Abrir a pantalla completa')}
+      >
+        <div className="absolute inset-0 flex items-center justify-center text-neutral-700">
+          <Icon name="compass" size={16} />
+        </div>
+        <DecorativeImageCard
+          entityKind="deep_research"
+          entityId={saved.id}
+          image={saved.image}
+          defaultStyle={settings.imageStyle}
+          thumbnail
+          className="absolute inset-0 !h-full !rounded-md"
+        />
+      </button>
+      <button className="min-w-0 flex-1 text-left" onClick={primary}>
+        <div className="truncate text-sm font-medium text-neutral-200" title={saved.title}>{saved.title}</div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-neutral-500">
+          <Icon name="clock" size={11} /> {formatDate(saved.updatedAt)}
+          {saved.model && <><span>·</span><span className="truncate">{modelLabel(saved.model)}</span></>}
+        </div>
+      </button>
+      {!selecting && (
+        <>
+          <button className="btn btn-primary !py-1 gap-1 text-xs" onClick={onOpen}>
+            <Icon name="book" size={12} /> {t('Leer')}
+          </button>
+          <button className="btn btn-ghost !py-1 gap-1 border border-neutral-700 text-xs" onClick={onReuse} title={t('Reutilizar la idea para un informe nuevo')}>
+            <Icon name="refresh" size={12} />
+          </button>
+          <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete} title={t('Eliminar informe')}>
+            <Icon name="trash" size={12} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reader — immersive full-report view
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReaderView({
+  saved,
+  settings,
+  showMatrix,
+  exporting,
+  message,
+  error,
+  onToggleMatrix,
+  onBack,
+  onCopy,
+  onSaveToNotes,
+  onTranslate,
+  onExport,
+  onCitation,
+  onImageChange,
+}: {
+  saved: WritingWorkshopSavedDraft;
+  settings: AppSettings;
+  showMatrix: boolean;
+  exporting: boolean;
+  message: string | null;
+  error: string | null;
+  onToggleMatrix: () => void;
+  onBack: () => void;
+  onCopy: () => void;
+  onSaveToNotes: () => void;
+  onTranslate: () => void;
+  onExport: (format: 'markdown' | 'pdf') => void;
+  onCitation: (target: CitationTarget) => void;
+  onImageChange: (image: DecorativeImage) => void;
+}) {
+  const mainRef = useRef<HTMLElement | null>(null);
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <header className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-4 py-2.5">
+        <button className="btn btn-ghost gap-1.5" onClick={onBack}>
+          <Icon name="chevronLeft" /> {t('Volver a la galería')}
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-neutral-100" title={saved.title}>{saved.title}</div>
+          <div className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</div>
+        </div>
+        <DraftActionBar
+          exporting={exporting}
+          savingDraft={false}
+          draftSaved
+          onCopy={onCopy}
+          onSaveDraft={() => undefined}
+          onSaveToNotes={onSaveToNotes}
+          onExport={onExport}
+        />
+        <button className="btn btn-ghost gap-1.5 border border-neutral-700" onClick={onTranslate}>
+          <Icon name="languages" size={13} /> {t('Traducir')}
+        </button>
+        <button
+          className={`btn btn-ghost gap-1.5 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
+          onClick={onToggleMatrix}
+        >
+          <Icon name="layers" size={13} /> {t('Matriz de apoyo')}
+        </button>
+      </header>
+
+      {(message || error) && (
+        <div className={`px-4 py-2 text-sm border-b ${error ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200' : 'border-neutral-200 text-neutral-500 dark:border-neutral-800 dark:text-neutral-400'}`}>
+          {error ?? message}
+        </div>
+      )}
+
+      <div className="min-h-0 flex-1 flex">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-y-auto px-6 py-6 max-md:px-4">
+          <div className="mx-auto max-w-3xl space-y-6">
+            <DecorativeImageCard
+              entityKind="deep_research"
+              entityId={saved.id}
+              image={saved.image}
+              defaultStyle={settings.imageStyle}
+              interactive
+              onChange={onImageChange}
+            />
+            <AudioPanel entityKind="deep_research" entityId={saved.id} />
+            <DraftResultMain
+              draft={saved.draft}
+              exporting={exporting}
+              savingDraft={false}
+              draftSaved
+              hideActions
+              justify
+              onCopy={onCopy}
+              onSaveDraft={() => undefined}
+              onSaveToNotes={onSaveToNotes}
+              onExport={onExport}
+              onCitation={onCitation}
+            />
+          </div>
+        </main>
+        {showMatrix && (
+          <aside className="w-80 shrink-0 overflow-y-auto border-l border-neutral-800 p-4 max-lg:hidden">
+            <SupportMatrix draft={saved.draft} onCitation={onCitation} />
+          </aside>
+        )}
+      </div>
+      <FindInPage targetRef={mainRef} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Composer — the new-report form (modal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ComposerModal({
+  settings,
+  objective,
+  language,
+  model,
+  target,
+  sectionLimit,
+  includeImage,
+  imageStyle,
+  hasModel,
+  queuedCount,
+  onObjective,
+  onLanguage,
+  onModel,
+  onTarget,
+  onSectionLimit,
+  onIncludeImage,
+  onImageStyle,
+  onSubmit,
+  onClose,
+}: {
+  settings: AppSettings;
+  objective: string;
+  language: PromptLanguage;
+  model: AppSettings['deepResearchModel'];
+  target: DeepResearchTargetLength;
+  sectionLimit: DeepResearchSectionLimit;
+  includeImage: boolean;
+  imageStyle: DecorativeImageStyle;
+  hasModel: boolean;
+  queuedCount: number;
+  onObjective: (v: string) => void;
+  onLanguage: (v: PromptLanguage) => void;
+  onModel: (m: AppSettings['deepResearchModel']) => void;
+  onTarget: (v: DeepResearchTargetLength) => void;
+  onSectionLimit: (v: DeepResearchSectionLimit) => void;
+  onIncludeImage: (v: boolean) => void;
+  onImageStyle: (v: DecorativeImageStyle) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={onClose}>
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Nuevo informe')}
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-neutral-700 bg-white shadow-2xl dark:bg-neutral-950"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center gap-3 border-b border-neutral-200 px-5 py-4 dark:border-neutral-800">
+          <Icon name="compass" className="text-indigo-500 dark:text-indigo-300" />
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nuevo informe')}</h2>
+            <p className="text-xs text-neutral-500">{t('El informe desarrolla tu idea por completo, citando todo el corpus.')}</p>
+          </div>
+          <button className="btn btn-ghost px-2" onClick={onClose} aria-label={t('Cerrar')}>
+            <Icon name="x" />
+          </button>
+        </header>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <textarea
+            className="input min-h-28 w-full resize-y"
+            value={objective}
+            autoFocus
+            onChange={(e) => onObjective(e.target.value)}
+            placeholder={t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')}
+          />
+          <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
+            <select className="input text-sm" value={target} onChange={(e) => onTarget(e.target.value as DeepResearchTargetLength)}>
+              {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>{t(label)}</option>
+              ))}
+            </select>
+            <select
+              className="input text-sm"
+              value={String(sectionLimit)}
+              onChange={(e) => onSectionLimit(e.target.value === 'auto' ? 'auto' : (Number(e.target.value) as DeepResearchSectionLimit))}
+            >
+              {DEEP_SECTION_OPTIONS.map((option) => (
+                <option key={String(option.value)} value={String(option.value)}>{t(option.label)}</option>
+              ))}
+            </select>
+            <select className="input text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+              <option value="tr">Türkçe</option>
+            </select>
+            <ModelPicker settings={settings} value={model} onChange={onModel} compact />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className={`rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
+              onClick={() => onIncludeImage(!includeImage)}
+              title={t('La imagen se genera una sola vez después de guardar el informe')}
+            >
+              <Icon name={includeImage ? 'check' : 'minus'} size={11} className="mr-1" /> {t('Imagen decorativa')}
+            </button>
+            {includeImage && (
+              <select className="input !py-1 text-xs" value={imageStyle} onChange={(e) => onImageStyle(e.target.value as DecorativeImageStyle)}>
+                {DECORATIVE_IMAGE_STYLES.map((style) => <option key={style.id} value={style.id}>{t(style.label)}</option>)}
+              </select>
+            )}
+          </div>
+          <p className="text-[11px] text-neutral-500">
+            {queuedCount > 0
+              ? tx('Se añadirá a la cola ({n} en curso) y se generará cuando termine el anterior.', { n: queuedCount })
+              : t('Se genera en segundo plano: puedes cerrar esto y seguir trabajando.')}
+          </p>
+        </div>
+
+        <footer className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-3 dark:border-neutral-800">
+          <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose}>{t('Cancelar')}</button>
+          <button
+            className="btn btn-primary gap-1.5"
+            onClick={onSubmit}
+            disabled={!hasModel || !objective.trim()}
+            title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
+          >
+            <Icon name="plus" /> {t('Añadir a la cola')}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tutorial
+// ─────────────────────────────────────────────────────────────────────────────
 
 function DeepResearchTutorial() {
   return (
@@ -368,22 +1012,22 @@ function DeepResearchTutorial() {
         <TutorialStep
           icon="edit"
           title={t('1. Plantea la idea')}
-          body={t('Escribe la pregunta o idea de investigación que quieres desarrollar. El informe la convierte en un texto de varias páginas, no en una respuesta corta.')}
-        />
-        <TutorialStep
-          icon="compass"
-          title={t('2. Ajusta el alcance')}
-          body={t('Elige la extensión objetivo y el número máximo de secciones. Menos secciones producen un texto más profundo; más secciones, uno más panorámico.')}
+          body={t('Pulsa «Nuevo informe» y escribe la pregunta o idea. El informe la convierte en un texto de varias páginas, no en una respuesta corta.')}
         />
         <TutorialStep
           icon="layers"
+          title={t('2. Encola los que quieras')}
+          body={t('Añade varios informes a la cola: se generan en cadena, uno tras otro, mientras sigues trabajando.')}
+        />
+        <TutorialStep
+          icon="compass"
           title={t('3. Cobertura del corpus')}
           body={t('Nodus recorre todo el corpus indexado, planifica las secciones y redacta guiado por la cobertura, citando cada obra sin que tengas que seleccionarla.')}
         />
         <TutorialStep
-          icon="download"
-          title={t('4. Revisa y exporta')}
-          body={t('Abre las citas para comprobar cada fuente, guarda el informe para retomarlo y expórtalo a Markdown o PDF cuando esté listo.')}
+          icon="book"
+          title={t('4. Lee a pantalla completa')}
+          body={t('Abre cualquier informe de la galería para leerlo a pantalla completa, revisar sus citas y exportarlo a Markdown o PDF.')}
         />
       </div>
     </section>
@@ -398,108 +1042,6 @@ function TutorialStep({ icon, title, body }: { icon: string; title: string; body
         {title}
       </div>
       <p className="mt-1 text-xs leading-5 text-neutral-500">{body}</p>
-    </div>
-  );
-}
-
-const DEEP_PHASE_LABELS: Record<DeepResearchProgress['phase'], string> = {
-  snapshot: 'Reuniendo el corpus',
-  planning: 'Planificando secciones',
-  section: 'Redactando secciones',
-  coverage: 'Ampliando cobertura',
-  assembling: 'Ensamblando y referenciando',
-  done: 'Informe listo',
-};
-
-const DEEP_STEP_ORDER: DeepResearchProgress['phase'][] = ['snapshot', 'planning', 'section', 'coverage', 'assembling', 'done'];
-
-function DeepResearchPanel({
-  running,
-  progress,
-  meta,
-  target,
-  sectionLimit,
-}: {
-  running: boolean;
-  progress: DeepResearchProgress | null;
-  meta: DeepResearchMeta | null;
-  target: DeepResearchTargetLength;
-  sectionLimit: DeepResearchSectionLimit;
-}) {
-  const currentPhaseIndex = progress ? DEEP_STEP_ORDER.indexOf(progress.phase) : -1;
-  return (
-    <div className="p-4 space-y-4 overflow-y-auto min-h-0">
-      <div>
-        <h2 className="font-semibold text-sm flex items-center gap-2">
-          <Icon name="compass" className="text-indigo-300" size={16} /> {t('Deep Research')}
-        </h2>
-        <p className="text-xs text-neutral-500 mt-1">
-          {t('Planifica, redacta sección a sección guiado por la cobertura del corpus y ensambla un informe académico de 5–20 páginas con todas las fuentes citadas.')}
-        </p>
-      </div>
-
-      <div className="text-xs text-neutral-500 space-y-1">
-        <div>
-          <span className="text-neutral-400">{t('Extensión:')}</span> {t(DEEP_TARGET_LABELS[target])}
-        </div>
-        <div>
-          <span className="text-neutral-400">{t('Secciones:')}</span> {sectionLimitLabel(sectionLimit)}
-        </div>
-      </div>
-
-      {(running || progress) && (
-        <ol className="space-y-1.5">
-          {DEEP_STEP_ORDER.filter((p) => p !== 'done').map((phase) => {
-            const index = DEEP_STEP_ORDER.indexOf(phase);
-            const state = currentPhaseIndex > index ? 'done' : currentPhaseIndex === index ? 'active' : 'todo';
-            return (
-              <li key={phase} className="flex items-center gap-2 text-xs">
-                <Icon
-                  name={state === 'done' ? 'check' : state === 'active' ? 'sync' : 'minus'}
-                  size={13}
-                  className={state === 'done' ? 'text-green-400' : state === 'active' ? 'text-indigo-300 animate-spin' : 'text-neutral-600'}
-                />
-                <span className={state === 'todo' ? 'text-neutral-600' : 'text-neutral-300'}>{t(DEEP_PHASE_LABELS[phase])}</span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      {progress && (
-        <div className="rounded-md border border-neutral-800 p-2 text-xs text-neutral-400 space-y-1">
-          <div className="text-neutral-300">{progress.message}</div>
-          {progress.sectionIndex != null && progress.sectionTitle && (
-            <div className="text-neutral-500">
-              {tx('Sección {n}: {title}', { n: progress.sectionIndex, title: progress.sectionTitle })}
-            </div>
-          )}
-          {progress.wordsSoFar != null && (
-            <div className="text-neutral-600">
-              {tx('~{p} páginas · {w} palabras', { p: progress.pagesSoFar ?? 0, w: progress.wordsSoFar })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {meta && !running && (
-        <div className="grid grid-cols-2 gap-2">
-          <Metric label={t('Secciones')} value={meta.sections} />
-          <Metric label={t('Páginas')} value={`~${meta.pages}`} />
-          <Metric label={t('Ideas citadas')} value={`${meta.ideasCovered}/${meta.ideasConsidered}`} />
-          <Metric label={t('Obras citadas')} value={meta.worksCited} />
-        </div>
-      )}
-
-      {meta?.stoppedReason && !running && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">{meta.stoppedReason}</div>
-      )}
-
-      {!running && !progress && (
-        <div className="text-xs text-neutral-600">
-          {t('Consejo: cuanto más profundo sea el análisis del corpus, más completo será el informe.')}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings, ModelRef } from '@shared/types';
+import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
-import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import { t, tx } from '../i18n';
 
@@ -121,7 +120,6 @@ export function CollectionsModal({
   const [loadingItems, setLoadingItems] = useState(false);
   const [worksByKey, setWorksByKey] = useState<Map<string, WorkView>>(new Map());
   const [recursive, setRecursive] = useState(true);
-  const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [monitoringKeys, setMonitoringKeys] = useState<string[]>(settings.monitoredCollections ?? []);
   const [knownCollections, setKnownCollections] = useState<Map<string, string>>(new Map());
   const monitoredKeys = useMemo(() => new Set(monitoringKeys), [monitoringKeys]);
@@ -251,21 +249,21 @@ export function CollectionsModal({
   const analyzeFiltered = async () => {
     const nextWorks = await ensureWorks(filtered);
     const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
-    if (ids.length) await window.nodus.setManualDeepBulk(ids, true, scanModel);
+    if (ids.length) await window.nodus.setManualDeepBulk(ids, true);
     await refreshWorks();
   };
 
   const analyzeFilteredBoth = async () => {
     const nextWorks = await ensureWorks(filtered);
     const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
-    if (ids.length) await window.nodus.analyzeBothBulk(ids, scanModel);
+    if (ids.length) await window.nodus.analyzeBothBulk(ids);
     await refreshWorks();
   };
 
   const summarizeFiltered = async () => {
     const nextWorks = await ensureWorks(filtered);
     const ids = filtered.map((it) => nextWorks.get(it.key)?.nodus_id).filter((x): x is string => !!x);
-    if (ids.length) await window.nodus.summarizeBulk(ids, scanModel);
+    if (ids.length) await window.nodus.summarizeBulk(ids);
     await refreshWorks();
   };
 
@@ -279,7 +277,7 @@ export function CollectionsModal({
     const nextWorks = worksByKey.has(it.key) ? worksByKey : await ensureWorks([it]);
     const w = nextWorks.get(it.key);
     if (!w) return;
-    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep, scanModel);
+    await window.nodus.setManualDeep(w.nodus_id, !w.manual_deep);
     await refreshWorks();
   };
 
@@ -287,7 +285,7 @@ export function CollectionsModal({
     const nextWorks = worksByKey.has(it.key) ? worksByKey : await ensureWorks([it]);
     const work = nextWorks.get(it.key);
     if (!work) return;
-    await window.nodus.summarizeWork(work.nodus_id, scanModel);
+    await window.nodus.summarizeWork(work.nodus_id);
     await refreshWorks();
   };
 
@@ -390,8 +388,7 @@ export function CollectionsModal({
                 <label className="text-xs flex items-center gap-1 text-neutral-400" title={t('Incluir ítems de subcolecciones')}>
                   <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} /> {t('subcolecciones')}
                 </label>
-                <span className="text-xs text-neutral-500">{t('Escanear con:')}</span>
-                <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
+                <span className="text-xs text-neutral-500">{t('Modelos de análisis: Ajustes')}</span>
               </div>
               <div className="flex gap-1 flex-wrap">
                 {ITEM_TYPES.map((t) => (

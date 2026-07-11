@@ -6,8 +6,6 @@ import type {
   DeepStatus,
   LightStatus,
   SummaryStatus,
-  AppSettings,
-  ModelRef,
   WorkEmbeddingStatus,
   WorkPassageStatus,
   VaultAnalysisReuseKind,
@@ -21,7 +19,6 @@ import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
 import { DuplicatesModal } from './DuplicatesModal';
-import { ModelPicker } from '../components/ModelPicker';
 import { VirtualList } from '../components/VirtualList';
 import { useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import {
@@ -337,13 +334,11 @@ function SortHeader({
 }
 
 export function Library({
-  settings,
   target,
   onOpenCollections,
   onOpenGraph,
   onOpenAssistant,
 }: {
-  settings: AppSettings;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
   onOpenCollections: () => void;
@@ -362,7 +357,6 @@ export function Library({
   const [collectionFilterOpen, setCollectionFilterOpen] = useState(false);
   const [collectionSearch, setCollectionSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [scanModel, setScanModel] = useState<ModelRef | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
@@ -485,32 +479,32 @@ export function Library({
   };
 
   const analyzeThemes = async (w: WorkView) => {
-    await window.nodus.rescan(w.nodus_id, 'light', scanModel);
+    await window.nodus.rescan(w.nodus_id, 'light');
     await load();
   };
 
   const analyzeIdeas = async (w: WorkView) => {
     if (w.deep_status === 'done') {
-      await window.nodus.rescan(w.nodus_id, 'deep', scanModel);
+      await window.nodus.rescan(w.nodus_id, 'deep');
     } else {
-      await window.nodus.setManualDeep(w.nodus_id, true, scanModel);
+      await window.nodus.setManualDeep(w.nodus_id, true);
     }
     await load();
   };
 
   const analyzeBoth = async (w: WorkView) => {
-    await window.nodus.analyzeBoth(w.nodus_id, scanModel);
+    await window.nodus.analyzeBoth(w.nodus_id);
     await load();
   };
 
   // Full chain for a single work: themes → ideas → summary → index → relationships.
   const processFullWork = async (w: WorkView) => {
-    await window.nodus.processFull(w.nodus_id, scanModel);
+    await window.nodus.processFull(w.nodus_id);
     await load();
   };
 
   const summarizeWork = async (w: WorkView) => {
-    await window.nodus.summarizeWork(w.nodus_id, scanModel);
+    await window.nodus.summarizeWork(w.nodus_id);
     await load();
   };
 
@@ -519,7 +513,7 @@ export function Library({
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['themes']);
     for (const id of pending) {
-      await window.nodus.rescan(id, 'light', scanModel);
+      await window.nodus.rescan(id, 'light');
     }
     setSelected(new Set());
     await load();
@@ -529,7 +523,7 @@ export function Library({
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.setManualDeepBulk(pending, true, scanModel);
+    if (pending.length > 0) await window.nodus.setManualDeepBulk(pending, true);
     setSelected(new Set());
     await load();
   };
@@ -538,7 +532,7 @@ export function Library({
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.analyzeBothBulk(pending, scanModel);
+    if (pending.length > 0) await window.nodus.analyzeBothBulk(pending);
     setSelected(new Set());
     await load();
   };
@@ -548,7 +542,7 @@ export function Library({
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.processFullBulk(pending, scanModel);
+    if (pending.length > 0) await window.nodus.processFullBulk(pending);
     setSelected(new Set());
     await load();
   };
@@ -565,7 +559,7 @@ export function Library({
       confirmLabel: t('Continuar'),
     });
     if (!ok) return;
-    await window.nodus.processFullBulk(ids, scanModel);
+    await window.nodus.processFullBulk(ids);
     setSelected(new Set());
     await load();
     toast(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
@@ -575,13 +569,13 @@ export function Library({
     const ids = selectedVisibleIds;
     if (ids.length === 0) return;
     const pending = await reuseSelectedAnalysis(ids, ['summary']);
-    if (pending.length > 0) await window.nodus.summarizeBulk(pending, scanModel);
+    if (pending.length > 0) await window.nodus.summarizeBulk(pending);
     setSelected(new Set());
     await load();
   };
 
   const summarizeMissing = async () => {
-    await window.nodus.summarizeAll(scanModel);
+    await window.nodus.summarizeAll();
     await load();
   };
 
@@ -592,7 +586,7 @@ export function Library({
       confirmLabel: t('Continuar'),
     });
     if (!ok) return;
-    const n = await window.nodus.reassignThemes(scanModel);
+    const n = await window.nodus.reassignThemes();
     await load();
     toast(tx('Reasignación de temas en cola para {n} obra(s). Verás el progreso en la cola.', { n }));
   };
@@ -604,7 +598,7 @@ export function Library({
       confirmLabel: t('Continuar'),
     });
     if (!ok) return;
-    const n = await window.nodus.rescanDegraded(scanModel);
+    const n = await window.nodus.rescanDegraded();
     await load();
     if (n === 0) toast(t('No hay obras «solo abstract» para reanalizar.'), { tone: 'info' });
     else toast(tx('Reanálisis en cola para {n} obra(s) «solo abstract». Verás el progreso en la cola.', { n }));
@@ -664,7 +658,7 @@ export function Library({
     passageStatuses.get(w.nodus_id)?.status !== 'complete';
 
   const discoverBridges = async () => {
-    await window.nodus.enqueueBridgeDiscovery(scanModel);
+    await window.nodus.enqueueBridgeDiscovery();
   };
 
   const toggleSelected = (id: string, checked: boolean) => {
@@ -1071,8 +1065,7 @@ export function Library({
             </button>
           )}
           <div className="flex-1" />
-          <span className="text-xs text-neutral-500">{t('Modelo para análisis')}</span>
-          <ModelPicker settings={settings} value={scanModel} onChange={setScanModel} compact />
+          <span className="text-xs text-neutral-500">{t('Los modelos de análisis se configuran en Ajustes.')}</span>
         </div>
         <div className="flex flex-wrap gap-2 mt-3">
           <SummaryPill label={t('temas hechos')} value={summary.themesDone} />
@@ -1472,7 +1465,7 @@ export function Library({
                     />
                     <RowIconButton
                       title={t('Preguntar al asistente sobre esta obra')}
-                      icon="wand"
+                      icon="chat"
                       tone="violet"
                       onClick={() =>
                         onOpenAssistant({
