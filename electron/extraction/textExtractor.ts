@@ -449,6 +449,9 @@ function attachmentSourceType(att: ZoteroAttachment): SourceType {
   return 'upload';
 }
 
+/** Extensions Nodus can extract text from directly (mirrors extractFromPath). */
+const TEXT_FILE_EXT_RE = /\.(pdf|epub|txt|md|markdown|docx)$/i;
+
 /** Only document-like attachments are legitimate full-text sources. HTML snapshots and images are excluded. */
 export function isTextAttachment(att: ZoteroAttachment): boolean {
   const ct = att.contentType ?? '';
@@ -459,7 +462,7 @@ export function isTextAttachment(att: ZoteroAttachment): boolean {
   if (ct.startsWith('image/')) return false;
   if (att.linkMode === 'imported_url') return false;
   const fn = att.filename ?? '';
-  return /\.(pdf|epub|txt|md|markdown|docx)$/i.test(fn);
+  return TEXT_FILE_EXT_RE.test(fn);
 }
 
 export interface ResolveOptions {
@@ -513,7 +516,7 @@ export async function probeWorkTextAvailability(
   for (const att of textAttachments) {
     if (!att.filename) continue;
     const filePath = path.join(effectiveStorage, att.key, att.filename);
-    if (fs.existsSync(filePath) && /\.(pdf|epub|txt|md|markdown|docx)$/i.test(att.filename)) {
+    if (fs.existsSync(filePath) && TEXT_FILE_EXT_RE.test(att.filename)) {
       return { available: true, sourceType: attachmentSourceType(att), reason: 'local_file' };
     }
   }
