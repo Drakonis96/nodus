@@ -33,8 +33,11 @@
     --serif: 'Fraunces', Georgia, serif;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
-  body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
+  html {
+    min-height: 100%; background: var(--bg); color-scheme: dark;
+    scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent;
+  }
+  body { min-height: 100vh; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
   a { color: var(--violet-2); text-decoration: none; }
   ::selection { background: rgba(139,92,246,0.4); }
   ::-webkit-scrollbar { width: 12px; height: 12px; }
@@ -77,7 +80,7 @@
   .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
-  .lang-select { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .lang-select { appearance: none; -webkit-appearance: none; background-color: var(--card); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a7a2bd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 28px 7px 11px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
   .lang-select:hover { border-color: rgba(167,139,250,0.5); }
   .lang-select option { background: #14121f; color: var(--text); }
 
@@ -304,13 +307,15 @@
   .media-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; margin-top: 48px; }
   .media-card {
     border: 1px solid var(--border); border-radius: 18px; overflow: hidden; background: var(--bg2);
+    display: flex; flex-direction: column;
     opacity: 0; transform: translateY(26px); transition: all 0.7s ease;
   }
   .media-card.in { opacity: 1; transform: none; }
   .media-card img { width: 100%; display: block; aspect-ratio: 16/9; object-fit: cover; }
-  .media-card .pad { padding: 18px 20px 20px; }
+  .media-card .pad { flex: 1; display: flex; flex-direction: column; padding: 18px 20px 20px; }
   .media-card h3 { margin: 0 0 6px; font-size: 16.5px; }
   .media-card p { margin: 0 0 14px; color: var(--text-2); font-size: 13.5px; }
+  .media-card .player { margin-top: auto; }
   .player { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); }
   .player .play {
     width: 38px; height: 38px; border-radius: 50%; border: none; flex-shrink: 0; cursor: pointer;
@@ -337,6 +342,71 @@
   .feat .fic svg { width: 17px; height: 17px; }
   .feat h3 { font-size: 14.5px; margin: 12px 0 5px; }
   .feat p { font-size: 12.8px; color: var(--text-2); margin: 0; }
+
+  /* FAQ */
+  .faq-section {
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    background: radial-gradient(900px 520px at 50% 0%, rgba(124,58,237,0.12), transparent 70%), var(--bg2);
+  }
+  .faq-head { text-align: center; }
+  .faq-head .lead { margin: 0 auto; }
+  .faq-tools { max-width: 820px; margin: 34px auto 0; }
+  .faq-search-wrap { position: relative; }
+  .faq-search-wrap svg {
+    position: absolute; left: 17px; top: 50%; width: 18px; height: 18px;
+    transform: translateY(-50%); color: var(--text-2); pointer-events: none;
+  }
+  .faq-search {
+    width: 100%; padding: 15px 50px 15px 48px; border-radius: 14px;
+    border: 1px solid var(--border); background: rgba(8,7,13,0.82); color: var(--text);
+    font: inherit; font-size: 14px; outline: none; box-shadow: 0 14px 40px rgba(0,0,0,0.22);
+  }
+  .faq-search:focus { border-color: rgba(167,139,250,0.65); box-shadow: 0 0 0 3px rgba(139,92,246,0.12); }
+  .faq-search::placeholder { color: #77718d; }
+  .faq-clear {
+    position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border: 0; border-radius: 9px; background: transparent;
+    color: var(--text-2); cursor: pointer; font-size: 18px;
+  }
+  .faq-clear:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .faq-cats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+  .faq-cat {
+    border: 1px solid var(--border); border-radius: 999px; padding: 7px 13px;
+    background: rgba(255,255,255,0.025); color: var(--text-2); font: inherit;
+    font-size: 12px; font-weight: 650; cursor: pointer; transition: all 0.18s ease;
+  }
+  .faq-cat:hover { color: var(--text); border-color: rgba(167,139,250,0.42); }
+  .faq-cat[aria-pressed="true"] { color: #ede9fe; background: rgba(124,58,237,0.2); border-color: rgba(167,139,250,0.55); }
+  .faq-meta { max-width: 820px; margin: 16px auto 9px; color: var(--text-2); font-size: 12px; }
+  .faq-list { max-width: 820px; margin: 0 auto; display: grid; gap: 10px; }
+  .faq-item { border: 1px solid var(--border); border-radius: 14px; background: rgba(8,7,13,0.62); overflow: hidden; }
+  .faq-item[open] { border-color: rgba(167,139,250,0.42); background: rgba(12,10,20,0.9); }
+  .faq-item summary {
+    position: relative; display: flex; align-items: center; gap: 12px; padding: 17px 52px 17px 18px;
+    list-style: none; cursor: pointer; color: var(--text); font-size: 14px; font-weight: 700;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after {
+    content: '+'; position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
+    width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%;
+    border: 1px solid var(--border); color: var(--violet-2); font-size: 18px; font-weight: 500;
+    line-height: 1; text-align: center;
+  }
+  .faq-item[open] summary::after { content: '−'; background: rgba(139,92,246,0.13); }
+  .faq-item summary:focus-visible { outline: 2px solid var(--violet-2); outline-offset: -3px; border-radius: 12px; }
+  .faq-tag { flex-shrink: 0; color: var(--violet-2); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .faq-answer { padding: 0 20px 20px; color: var(--text-2); font-size: 13.5px; line-height: 1.72; }
+  .faq-answer p { margin: 0 0 11px; }
+  .faq-answer p:last-child, .faq-answer ul:last-child, .faq-answer ol:last-child { margin-bottom: 0; }
+  .faq-answer ul, .faq-answer ol { margin: 8px 0 14px; padding-left: 22px; }
+  .faq-answer li { margin: 5px 0; }
+  .faq-answer strong { color: var(--text); }
+  .faq-answer code { padding: 2px 6px; border-radius: 6px; background: rgba(139,92,246,0.12); color: #ddd6fe; font-size: 0.92em; }
+  .faq-answer a { color: #c4b5fd; text-decoration: underline; text-decoration-color: rgba(196,181,253,0.35); text-underline-offset: 3px; }
+  .faq-answer a:hover { text-decoration-color: currentColor; }
+  .faq-answer .faq-callout { padding: 11px 13px; border-left: 3px solid var(--amber); border-radius: 0 9px 9px 0; background: rgba(251,191,36,0.06); color: #d8d3e5; }
+  .faq-empty { max-width: 820px; margin: 0 auto; padding: 28px; text-align: center; color: var(--text-2); border: 1px dashed var(--border); border-radius: 14px; }
+  .faq-empty[hidden], .faq-clear[hidden] { display: none; }
 
   /* privacy band */
   .band {
@@ -397,7 +467,9 @@
     .nav { padding: 12px 16px; gap: 12px; }
     .nav .links { gap: 12px; }
     .nav .links a.btn.primary { display: none; }
-    .lang-select { padding: 7px 8px; }
+    .lang-select { padding: 7px 26px 7px 9px; }
+    .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
+    .faq-answer { padding-left: 16px; padding-right: 16px; }
   }
 </style>
 </head>
@@ -409,11 +481,12 @@
     <a href="#story" class="hideS" data-i18n="nav.how">How it works</a>
     <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
     <a href="#listen" class="hideS" data-i18n="nav.listen">Listen</a>
+    <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
     <select class="lang-select" id="lang-select" aria-label="Language"></select>
     <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       <span class="lbl">Star</span>
-      <span class="stars"><svg viewBox="0 0 16 16"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count">★</span></span>
+      <span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="star-count" aria-label="6 stars on GitHub">6</span></span>
     </a>
     <a class="btn primary" href="demo/index.html" data-i18n="nav.demo">Try the live demo</a>
   </div>
@@ -746,6 +819,28 @@
   </div>
 </section>
 
+<!-- ---------- FAQ ---------- -->
+<section class="faq-section" id="faq">
+  <div class="wrap">
+    <div class="faq-head">
+      <span class="kicker" id="faq-kicker">Questions before you begin</span>
+      <h2 class="title" id="faq-title">Nodus, AI and academic rigor: the essentials.</h2>
+      <p class="lead" id="faq-lead">Clear answers for getting started safely, choosing an AI setup and understanding what the app can and cannot do.</p>
+    </div>
+    <div class="faq-tools">
+      <div class="faq-search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+        <input class="faq-search" id="faq-search" type="search" autocomplete="off" placeholder="Search the FAQ…" aria-label="Search the FAQ" aria-controls="faq-list"/>
+        <button class="faq-clear" id="faq-clear" type="button" aria-label="Clear search" hidden>×</button>
+      </div>
+      <div class="faq-cats" id="faq-cats" role="toolbar" aria-label="FAQ categories"></div>
+    </div>
+    <div class="faq-meta" id="faq-meta" role="status" aria-live="polite"></div>
+    <div class="faq-list" id="faq-list"></div>
+    <div class="faq-empty" id="faq-empty" hidden></div>
+  </div>
+</section>
+
 <!-- ---------- final CTA ---------- -->
 <section class="final" style="padding-bottom:130px">
   <div class="wrap">
@@ -802,6 +897,7 @@
   </div>
 </div>
 
+<script src="faq.js?v=20260711-tr"></script>
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
@@ -970,12 +1066,18 @@ function openDl() { dlOverlay.classList.add('open'); document.body.style.overflo
 function closeDl() { dlOverlay.classList.remove('open'); document.body.style.overflow = ''; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDl(); });
 
-fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
+// Shields caches the public GitHub count and avoids the very small anonymous
+// GitHub API quota. Keep the current count in the HTML as a first-paint and
+// offline fallback, then refresh it here.
+fetch('https://img.shields.io/github/stars/Drakonis96/nodus.json')
   .then((r) => r.ok ? r.json() : null)
   .then((j) => {
     if (!j) return;
-    const n = j.stargazers_count;
-    document.getElementById('star-count').textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+    const n = Number(j.value);
+    if (!Number.isFinite(n)) return;
+    const count = document.getElementById('star-count');
+    count.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
+    count.setAttribute('aria-label', `${n} stars on GitHub`);
   }).catch(() => {});
 
 // The download modal resolves the newest release live from the GitHub API and
@@ -1006,7 +1108,7 @@ fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 
 // ---------- i18n (landing page only) ----------
 const LANGS = [
   { c: 'de', n: 'Deutsch' }, { c: 'en', n: 'English' }, { c: 'es', n: 'Español' },
-  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'zh', n: '中文' },
+  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'tr', n: 'Türkçe' }, { c: 'zh', n: '中文' },
 ];
 const VIG = ['v.library', 'v.graph', 'v.ideas', 'v.debates', 'v.gaps', 'v.deep', 'v.writing', 'v.immersion'];
 const I18N = {
@@ -1205,6 +1307,45 @@ const I18N = {
     'footer.tag': `Nodus, um espaço de pesquisa local, gratuito e de código aberto. Amostras de áudio geradas com as vozes locais Kokoro do app.`,
     'dl.title': `Baixar o Nodus`, 'dl.fetching': `Obtendo a versão mais recente…`, 'dl.latest': `Versão mais recente`, 'dl.free': `100% grátis · código aberto · sem conta`, 'dl.all': `Todos os formatos e versões anteriores →`, 'dl.close': `Fechar`,
   },
+  tr: {
+    'nav.how': `Nasıl çalışır`, 'nav.views': `Görünümler`, 'nav.listen': `Dinle`, 'nav.demo': `Demoyu dene`,
+    'hero.h1': `Yıldızlar gibi dağılmış bin fikir.<br/><span class="grad">Nodus takımyıldızları birbirine bağlar.</span>`,
+    'hero.sub': `Zotero kitaplığınızı fikirler, yazarlar, tartışmalar ve araştırma boşluklarından oluşan gezilebilir bir grafa dönüştüren; ardından gerçekten doğrulayabileceğiniz atıflarla yazmanıza yardımcı olan yerel öncelikli bir masaüstü uygulaması.`,
+    'hero.demo': `Demoyu dene`, 'hero.download': `macOS ve Windows için indir`,
+    'hero.meta': `<b>Tamamen ücretsiz ve açık kaynaklı.</b> Hesap yok, abonelik yok, telemetri yok; derleminiz makinenizden ayrılmaz.`,
+    'hero.scroll': `aşağı kaydır`,
+    'story.kicker': `Nasıl çalışır`, 'story.title': `Her şey tek bir ipe bağlıdır: fikir.`,
+    'story.lead': `Dosyalar, PDF'ler ya da klasörler değil. Nodus, kitaplığınızdaki her eseri gerçek iddialarına, bulgularına ve kavramlarına ayırır; ardından bu ipin götürdüğü yere kadar izini sürer.`,
+    'step1.t': `Kitaplığınızı eşitleyin`, 'step1.b': `Nodus'u Zotero koleksiyonlarınıza yönlendirin. Ekli dosyaları doğrudan okur; eklenti, yeniden dizinleme ya da yükleme gerekmez. Yinelenen kayıtlar kayıpsız biçimde tespit edilir ve birleştirilir.`,
+    'step2.t': `Fikirleri çıkarın`, 'step2.b': `Bir yapay zekâ geçişi (kendi anahtarınızla bulutta veya Ollama / LM Studio ile tamamen çevrimdışı) her eserin iddialarını, bulgularını, yöntemlerini ve çerçevelerini çıkarır; her biri için birebir kanıt ve sayfa bilgisi sunar.`,
+    'step3.t': `Bağlantılarını görün`, 'step3.b': `Fikirler yaşayan bir grafta bağlanır: destekler, çelişir, inceltir, genişletir. Kuvvet yönelimli, WebGL ile hızlı ve tema, yazar ya da okuma durumuna göre filtrelenebilir. Derleminiz burada bir yığın olmaktan çıkıp bir argümana benzemeye başlar.`,
+    'step4.t': `Derlemi sorgulayın`, 'step4.b': `Nodus, kitaplığınızın söylemediklerini açığa çıkarır: açık çelişkiler zaman çizelgeli karşılıklı tartışmalara, eksik bağlantılar araştırma boşluklarına dönüşür; sorularınız gerçek kapsamla karşılaştırılır.`,
+    'step5.t': `Kanıtla yazın`, 'step5.b': `Yazma Atölyesi grafta temellenen bölümler taslaklar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Deep Research, atıflı ve çok sayfalı tam raporlar oluşturur. Aynı yardımcı Microsoft Word içinde canlı çalışır.`,
+    'step6.t': `Sonra dinleyin`, 'step6.b': `Herhangi bir raporu sesli anlatıma dönüştürün veya derleminizin bir köşesinde rehberli, sürükleyici bir yolculuğa çıkın. Sesler yerel olarak çalışır (Piper, Kokoro); bulut sesleri için kendi Hume anahtarınızı da kullanabilirsiniz.`,
+    'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük sahne uygulamadaki gerçek bir görünümü yansıtır ve hepsi canlı demoda bütünüyle keşfedilebilir.`,
+    'views.cta': `Demodaki 19 görünümün tamamını keşfedin →`, 'v.open': `Demoda aç →`,
+    'v.library.t': `Zotero girer, fikirler çıkar`, 'v.library.b': `Koleksiyonlarınızı eşitleyin, okundu etiketlerini koruyun ve yinelenenleri kayıpsız birleştirin. Her eser analiz durumunu saklar; hiçbir şey iki kez taranmaz.`,
+    'v.graph.t': `Bir takımyıldız olarak derlem`, 'v.graph.b': `Temalar, iddialar, bulgular ve yöntemler; destekler, çelişir ve inceltir gibi türlendirilmiş kenarlarla bağlanır. Hazır görünümler sizi doğrudan çelişkilere, boşluklara veya okuma rotanıza götürür.`,
+    'v.ideas.t': `Kanıtlı iddialar`, 'v.ideas.b': `Her fikir birebir kanıt ve sayfa bilgisi taşır. Birine tıklayın; ilişkilerini, yazarını ve tam pasajı görün. Kaynaksız iddia yok.`,
+    'v.debates.t': `Çelişkiler karşı karşıya`, 'v.debates.b': `İki konum, her iki taraftaki yazarlar, kanıtları ve anlaşmazlığın zaman çizelgesi; grafın çelişki kenarlarından otomatik olarak oluşturulur.`,
+    'v.gaps.t': `Henüz kimsenin söylemediği`, 'v.gaps.b': `Temalar arasındaki eksik bağlantılar açık araştırma fırsatlarına dönüşür; her biri taslak bir kapsam sorusu ve tek tıklamayla kaynak araması içerir.`,
+    'v.deep.t': `Gerçekten kaynak gösteren raporlar`, 'v.deep.b': `Kuyrukta oluşturulan çok sayfalı akademik raporlarda her iddia derleminizdeki bir sayfaya bağlanır; destek matrisi ve sesli sürüm de sunulur.`,
+    'v.writing.t': `Doğrulanabilir atıflı taslaklar`, 'v.writing.b': `Atölye graftan yazar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Aynı yardımcı Microsoft Word içinde canlı çalışır.`,
+    'v.immersion.t': `Derleminizin düşünüşünü dinleyin`, 'v.immersion.b': `Rehberli ses yolculukları: panorama, birebir alıntılı duraklar, karşılaştırmalar, sınırlar ve final sınavı. Sesler Piper ve Kokoro ile yerel olarak üretilir.`,
+    'listen.kicker': `Araştırmanızı dinleyin`, 'listen.title': `Okuyabileceğiniz raporlar. Ya da oynat tuşuna basın.`,
+    'listen.lead': `Deep Research derleminizden çok sayfalı, atıflı raporlar yazar; Daldırma ise bunun içinden rehberli yolculuklar anlatır. Bu örnekler, uygulamayla birlikte gelen yerel ses modeli Kokoro ile üretildi.`,
+    'listen.c1.t': `Deep Research özeti`, 'listen.c1.b': `“Geri getirme alıştırması: kendini sınamak neden yeniden okumayı geçer?”, 6 eser, 12 atıflı fikir, seslendirilmiş.`,
+    'listen.c2.t': `Daldırma yolculuğu`, 'listen.c2.b': `“Bir gece göğü olarak kitaplığınız”, örnek derlemin bir takımyıldızı boyunca rehberli bir ses yolculuğu.`,
+    'listen.c3.t': `Her ses varsayılan olarak yerel`, 'listen.c3.b': `Piper ve Kokoro makinenizde sentezler; hiçbir şey yüklenmez. Stüdyo kalitesinde bulut sesleri mi istiyorsunuz? Kendi Hume anahtarınızı kullanın.`,
+    'band.kicker': `Gerçekten ücretsiz ve yerel`, 'band.title': `Tamamen ücretsiz. Tamamen sizin.`,
+    'band.lead': `Nodus MIT lisanslı açık kaynaklıdır; hesap, abonelik ve telemetri içermez. Diskte tek bir SQLite kasası kullanır. Yapay zekâ kendi anahtarınızla veya Ollama ve LM Studio üzerinden tamamen çevrimdışı çalışabilir. Şifreli otomatik yedeklemeler, kurcalamaya dayanıklı denetim günlüğü ve kendi yapay zekâ araçlarınızın grafı yerel olarak sorgulaması için yerleşik bir MCP sunucusu içerir.`,
+    'band.pill1': `Sonsuza kadar ücretsiz (MIT)`, 'band.pill2': `%100 yerel depolama`, 'band.pill3': `Çevrimdışı yapay zekâ (Ollama · LM Studio)`, 'band.pill4': `Şifreli otomatik yedekler`, 'band.pill5': `Denetim günlüğü`, 'band.pill6': `Yerleşik MCP sunucusu`,
+    'feat.kicker': `Her şey içinde`, 'feat.title': `Tek uygulama. Tüm araştırma döngüsü.`,
+    'feat.d1': `Derlem sağlığı ve önerilen bir sonraki adım.`, 'feat.d2': `Fikirler, yazarlar ve pasajlar arasında anlamsal ve tam arama.`, 'feat.d3': `Yinelenenleri birleştirme ve tarama kurtarma özellikli Zotero eşitlemesi.`, 'feat.d4': `Her fikir ve türlendirilmiş ilişki için WebGL kuvvet grafı.`, 'feat.d5': `Tez, destekler, itirazlar ve yanıtlar; tümü sürüklenebilir.`, 'feat.d6': `Birebir sayfa kanıtı taşıyan iddialar ve bulgular.`, 'feat.d7': `Zotero'yu esas alan yazar dosyaları ve sentez matrisi.`, 'feat.d8': `Derleminizden kılavuzlar, bilgi kartları ve Sokratik rotalar.`, 'feat.d9': `Yerel üretilen seslerle anlatılan ses yolculukları.`, 'feat.d10': `Derleminizin henüz söylemedikleri, otomatik olarak çıkarılır.`, 'feat.d11': `Zaman çizelgesiyle karşı karşıya getirilen çelişkiler.`, 'feat.d12': `Araştırma sorularınız gerçek kanıtlarla karşılaştırılır.`, 'feat.d13': `Graftaki gerilimler sınanabilir hipotezlere dönüşür.`, 'feat.d14': `Okunmuş ve okunmamış eserler arasında önerilen sıra.`, 'feat.d15': `Dışa aktarılabilir ve seslendirilebilir çok sayfalı atıflı raporlar.`, 'feat.d16': `Grafta temellenen, atıfları doğrulanmış taslaklar.`, 'feat.d17': `Microsoft Word içinde canlı yardımcı (beta).`, 'feat.d18': `Çıktılar, klasörler ve nodus:// derin bağlantıları.`, 'feat.d19': `Grafınızı Claude veya herhangi bir MCP istemcisinden sorgulayın.`, 'feat.d20': `Her atıf bağlantısını koruyan yapay zekâ içerik çevirisi.`,
+    'final.title': `Kitaplığınızla tanışmaya hazır mısınız?`, 'final.lead': `Demoyu doğrudan tarayıcınızda deneyin veya uygulamayı indirip kendi Zotero'nuza yönlendirin. <b style="color:#6ee7b7">Sonsuza kadar ücretsiz ve açık kaynaklı.</b>`, 'final.download': `Uygulamayı indir`,
+    'footer.tag': `Nodus; yerel, ücretsiz ve açık kaynaklı bir araştırma alanı. Ses örnekleri uygulamanın yerel Kokoro sesleriyle üretildi.`,
+    'dl.title': `Nodus'u indir`, 'dl.fetching': `En son sürüm alınıyor…`, 'dl.latest': `En son sürüm`, 'dl.free': `%100 ücretsiz · açık kaynaklı · hesap gerekmez`, 'dl.all': `Tüm biçimler ve önceki sürümler →`, 'dl.close': `Kapat`,
+  },
   zh: {
     'nav.how': `工作原理`, 'nav.views': `视图`, 'nav.listen': `收听`, 'nav.demo': `试用演示`,
     'hero.h1': `千头万绪，如繁星散落。<br/><span class="grad">Nodus 将星座相连。</span>`,
@@ -1280,6 +1421,7 @@ function setLang(lang) {
     if (tr) tr.innerHTML = dict['v.open'] != null ? dict['v.open'] : _vigOrig[i].o;
   });
   if (window.buildFeatures) window.buildFeatures(dict);
+  if (window.renderFaq) window.renderFaq(lang);
   window.applyDlVersion();
   document.documentElement.lang = lang;
   try { localStorage.setItem('nodus.lang', lang); } catch (e) {}
