@@ -1,8 +1,10 @@
 name: Release
 
-# Builds the macOS .dmg and Windows .exe (NSIS) and attaches them to the GitHub
-# Release for the pushed tag. Native modules (better-sqlite3, @napi-rs/canvas) are
-# compiled on each OS runner — this is why a dmg cannot be built on Linux.
+# Builds the macOS .dmg, Windows .exe (NSIS) and Linux .deb/.AppImage and attaches
+# them to the GitHub Release for the pushed tag. Native modules (better-sqlite3,
+# @napi-rs/canvas) are compiled on each OS runner — this is why each installer must
+# be built on its own OS. Linux ships deb + AppImage only: snap/flatpak need extra
+# tooling (snapcraft, flatpak-builder + runtimes) that a bare ubuntu runner lacks.
 
 on:
   push:

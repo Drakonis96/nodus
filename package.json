@@ -125,12 +125,10 @@
     "linux": {
       "target": [
         "deb",
-        "AppImage",
-        "snap",
-        "flatpak"
+        "AppImage"
       ],
       "category": "Office",
-      "maintainer": "Oğuz Karayemiş <oguzkarayemis@gmail.com>"
+      "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
     },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
   }
