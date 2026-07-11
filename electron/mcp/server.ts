@@ -82,15 +82,15 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   for await (const chunk of req) {
     const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     size += data.length;
-    if (size > MAX_REQUEST_BYTES) throw new HttpRequestError(413, 'La solicitud MCP supera el tamaño máximo permitido.');
+    if (size > MAX_REQUEST_BYTES) throw new HttpRequestError(413, 'The MCP request exceeds the maximum allowed size.');
     chunks.push(data);
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
-  if (!raw) throw new HttpRequestError(400, 'La solicitud MCP debe incluir un cuerpo JSON.');
+  if (!raw) throw new HttpRequestError(400, 'The MCP request must include a JSON body.');
   try {
     return JSON.parse(raw);
   } catch {
-    throw new HttpRequestError(400, 'El cuerpo de la solicitud MCP no es JSON válido.');
+    throw new HttpRequestError(400, 'The MCP request body is not valid JSON.');
   }
 }
 
@@ -122,14 +122,14 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
   }
 
   if (!isLocalRequest(req, port)) {
-    sendJsonRpcError(res, 403, 'Origen u Host no autorizado para el servidor MCP local.');
+    sendJsonRpcError(res, 403, 'Origin or Host not authorized for the local MCP server.');
     return;
   }
 
   const token = getSettings().mcpToken;
   if (!token || !hasValidToken(req, token)) {
     res.setHeader('WWW-Authenticate', 'Bearer realm="Nodus MCP"');
-    sendJsonRpcError(res, 401, 'Se requiere un bearer token válido para el servidor MCP de Nodus.');
+    sendJsonRpcError(res, 401, 'A valid bearer token is required for the Nodus MCP server.');
     return;
   }
 
@@ -151,12 +151,12 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
     // with a new InitializeRequest. Answering 400 instead leaves clients like
     // mcp-remote stuck retrying the dead session until they are restarted by hand.
     if (sessionId) {
-      sendJsonRpcError(res, 404, 'La sesión MCP ya no existe. Inicia una nueva sesión MCP.');
+      sendJsonRpcError(res, 404, 'The MCP session no longer exists. Start a new MCP session.');
       return;
     }
 
     if (req.method !== 'POST' || !isInitializeRequest(parsedBody)) {
-      sendJsonRpcError(res, 400, 'Se requiere una inicialización MCP sin sesión o una sesión MCP válida.');
+      sendJsonRpcError(res, 400, 'A sessionless MCP initialization or a valid MCP session is required.');
       return;
     }
 
@@ -186,7 +186,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
       return;
     }
     console.error('[mcp] request failed', error);
-    sendJsonRpcError(res, 500, 'Error interno del servidor MCP de Nodus.');
+    sendJsonRpcError(res, 500, 'Internal error in the Nodus MCP server.');
   }
 }
 

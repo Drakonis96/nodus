@@ -85,7 +85,7 @@ const modelSchema = z
     provider: z.enum(AI_PROVIDERS),
     model: z.string().trim().min(1).max(300),
   })
-  .describe('Modelo de Nodus. Si se omite, se usa el modelo configurado en Ajustes.');
+  .describe('Nodus model override. If omitted, the model configured in Nodus Settings is used.');
 
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
@@ -108,11 +108,11 @@ const writingSelectionSchema = z.object({
 const deepResearchTargetLengthSchema = z
   .enum(['adaptive', 'concise', 'standard', 'exhaustive'])
   .default('adaptive')
-  .describe('Extensión objetivo. adaptive: la decide el corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
+  .describe('Target length. adaptive: sized by the corpus; concise ~5-8 pp; standard ~9-14 pp; exhaustive ~15-20 pp.');
 const deepResearchSectionLimitSchema = z
   .union([z.literal('auto'), z.number().int().min(1).max(20)])
   .default('auto')
-  .describe("Tope de secciones. 'auto' lo dimensiona por el corpus; un número lo fija (con una sección de gracia).");
+  .describe("Section cap. 'auto' sizes it by the corpus; a number fixes it (with one grace section).");
 
 const writingDraftSchema = z.object({
   generatedAt: z.string().min(1),
@@ -179,7 +179,7 @@ class McpToolError extends Error {
 }
 
 function notFound(kind: string, id: string): McpToolError {
-  return new McpToolError('not_found', `No existe ${kind} con id "${id}".`);
+  return new McpToolError('not_found', `No ${kind} exists with id "${id}".`);
 }
 
 function json(value: unknown) {
@@ -205,7 +205,7 @@ function errorResult(error: unknown) {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify({ error: { category: 'internal', message: 'La operación no se pudo completar en Nodus.' } }),
+        text: JSON.stringify({ error: { category: 'internal', message: 'The operation could not be completed in Nodus.' } }),
       },
     ],
     isError: true,
@@ -381,13 +381,13 @@ function resolveAuthor(value: string): AuthorSummary {
 
   const matches = authors.filter((author) => authorMatchesQuery(author, value));
   if (matches.length === 1) return matches[0];
-  if (matches.length === 0) throw notFound('un autor', value);
+  if (matches.length === 0) throw notFound('author', value);
   throw new McpToolError(
     'invalid_input',
-    `La búsqueda "${value}" coincide con varios autores: ${matches
+    `The search "${value}" matches several authors: ${matches
       .slice(0, 6)
       .map((author) => `${author.fullName || author.name} (${author.author_id})`)
-      .join('; ')}. Usa el author_id.`
+      .join('; ')}. Use the author_id.`
   );
 }
 
@@ -454,7 +454,7 @@ export function registerTools(server: McpServer): void {
         full: z
           .boolean()
           .default(false)
-          .describe('true devuelve el statement completo de cada idea; por defecto solo un fragmento (statementSnippet).'),
+          .describe('true returns each idea\'s full statement; by default only a snippet (statementSnippet) is returned.'),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -485,7 +485,7 @@ export function registerTools(server: McpServer): void {
     ({ ideaId }) =>
       tool(() => {
         const detail = ideas.getIdeaDetail(ideaId);
-        if (!detail) throw notFound('una idea', ideaId);
+        if (!detail) throw notFound('idea', ideaId);
         return { ...detail, relations: ideas.getIdeaEdges(ideaId) };
       })()
   );
@@ -528,7 +528,7 @@ export function registerTools(server: McpServer): void {
         if (!vector) {
           throw new McpToolError(
             'ai_unconfigured',
-            'No hay embeddings disponibles. Configura el proveedor y la clave de embeddings en Ajustes de Nodus.'
+            'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
         return { ideas: ideas.findSimilarIdeas(vector, -1, limit) };
@@ -562,7 +562,7 @@ export function registerTools(server: McpServer): void {
     ({ ideaId }) =>
       tool(() => {
         const detail = getCopilotIdeaDetail(ideaId);
-        if (!detail) throw notFound('una idea', ideaId);
+        if (!detail) throw notFound('idea', ideaId);
         return detail;
       })()
   );
@@ -582,7 +582,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ ideaId, paragraphText, selectionText }) =>
       tool(() => {
-        if (!getCopilotIdeaDetail(ideaId)) throw notFound('una idea', ideaId);
+        if (!getCopilotIdeaDetail(ideaId)) throw notFound('idea', ideaId);
         return composeCopilotIdeaInsertion({ ideaId, paragraphText, selectionText });
       })()
   );
@@ -613,7 +613,7 @@ export function registerTools(server: McpServer): void {
     ({ edgeId }) =>
       tool(() => {
         const debate = getDebate(edgeId);
-        if (!debate) throw notFound('un debate', edgeId);
+        if (!debate) throw notFound('debate', edgeId);
         return debate;
       })()
   );
@@ -646,7 +646,7 @@ export function registerTools(server: McpServer): void {
     ({ gapId }) =>
       tool(() => {
         const detail = gaps.getGapDetail(gapId);
-        if (!detail) throw notFound('un hueco', gapId);
+        if (!detail) throw notFound('research gap', gapId);
         return detail;
       })()
   );
@@ -664,7 +664,7 @@ export function registerTools(server: McpServer): void {
         const graph = buildAuthorGraph();
         if (!author) return graph;
         const root = graph.nodes.find((node) => node.id === author || node.label === author);
-        if (!root) throw notFound('un autor', author);
+        if (!root) throw notFound('author', author);
         const edges = graph.edges.filter((edge) => edge.source === root.id || edge.target === root.id);
         const nodeIds = new Set([root.id, ...edges.flatMap((edge) => [edge.source, edge.target])]);
         return { nodes: graph.nodes.filter((node) => nodeIds.has(node.id)), edges };
@@ -676,7 +676,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Search authors',
       description:
-        'Busca autores del corpus local por id, nombre, afiliación o temas principales. Devuelve el footprint de cada autor y si ya tiene síntesis de ficha generada.',
+        'Searches authors in the local corpus by id, name, affiliation or top themes. Returns each author footprint and whether a dossier synthesis has already been generated. Read-only.',
       inputSchema: {
         ...paginationSchema,
         query: querySchema,
@@ -698,7 +698,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get or generate author synthesis',
       description:
-        'Resuelve un autor por author_id o nombre. Si ya existe una síntesis de ficha, la devuelve; si no existe y generateIfMissing=true, la genera y la guarda usando el modelo de síntesis configurado o el modelo indicado. Use refresh=true para regenerar aunque exista.',
+        'Resolves an author by author_id or name. If a dossier synthesis already exists it is returned; if it does not and generateIfMissing=true, it is generated and saved using the configured synthesis model or the given model. Pass refresh=true to regenerate even when one exists. May consume provider tokens when it generates.',
       inputSchema: {
         author: z.string().trim().min(1).max(500),
         generateIfMissing: z.boolean().default(true),
@@ -711,7 +711,7 @@ export function registerTools(server: McpServer): void {
       tool(async () => {
         const resolved = resolveAuthor(author);
         const dossier = buildAuthorDossier(resolved.author_id);
-        if (!dossier) throw notFound('un autor', author);
+        if (!dossier) throw notFound('author', author);
 
         if (!refresh && dossier.synthesis) {
           return {
@@ -832,9 +832,9 @@ export function registerTools(server: McpServer): void {
     ({ workId }) =>
       tool(() => {
         const nodusId = resolveWorkNodusId(workId);
-        if (!nodusId) throw notFound('una obra', workId);
+        if (!nodusId) throw notFound('work', workId);
         const work = getWork(nodusId);
-        if (!work) throw notFound('una obra', workId);
+        if (!work) throw notFound('work', workId);
         return {
           work,
           summary: workSummaries.getWorkSummary(nodusId),
@@ -860,7 +860,7 @@ export function registerTools(server: McpServer): void {
     ({ limit, offset, workId, query }) =>
       tool(() => {
         const nodusId = workId ? resolveWorkNodusId(workId) : null;
-        if (workId && !nodusId) throw notFound('una obra', workId);
+        if (workId && !nodusId) throw notFound('work', workId);
         const params: unknown[] = [];
         const clauses: string[] = ['w.archived = 0'];
         if (nodusId) {
@@ -922,7 +922,7 @@ export function registerTools(server: McpServer): void {
     ({ passageId }) =>
       tool(() => {
         const detail = passages.getPassageDetail(passageId);
-        if (!detail) throw notFound('un pasaje', passageId);
+        if (!detail) throw notFound('passage', passageId);
         return detail;
       })()
   );
@@ -941,7 +941,7 @@ export function registerTools(server: McpServer): void {
           .min(0)
           .max(1)
           .default(0.18)
-          .describe('Umbral de similitud coseno; 0.18 es el mismo que usa el copiloto de escritura de Nodus.'),
+          .describe('Cosine similarity threshold; 0.18 is the same value the Nodus writing copilot uses.'),
         workId: z.string().trim().min(1).optional(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -949,12 +949,12 @@ export function registerTools(server: McpServer): void {
     ({ query, limit, minSimilarity, workId }) =>
       tool(async () => {
         const nodusId = workId ? resolveWorkNodusId(workId) : null;
-        if (workId && !nodusId) throw notFound('una obra', workId);
+        if (workId && !nodusId) throw notFound('work', workId);
         const vector = await embed(query);
         if (!vector) {
           throw new McpToolError(
             'ai_unconfigured',
-            'No hay embeddings disponibles. Configura el proveedor y la clave de embeddings en Ajustes de Nodus.'
+            'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
         const hits = passages.findSimilarPassages(vector, minSimilarity, limit, nodusId ? { nodusIds: [nodusId] } : {});
@@ -1016,7 +1016,7 @@ export function registerTools(server: McpServer): void {
     ({ theme, worksLimit, worksOffset, ideasLimit, ideasOffset }) =>
       tool(() => {
         const resolved = resolveTheme(theme);
-        if (!resolved) throw notFound('un tema', theme);
+        if (!resolved) throw notFound('theme', theme);
         const linkedWorks = listWorks({ theme: resolved.label });
         const ideaRows = getDb()
           .prepare(
@@ -1079,7 +1079,7 @@ export function registerTools(server: McpServer): void {
     ({ routeId }) =>
       tool(() => {
         const route = tutorRoutes.getTutorRoute(routeId);
-        if (!route) throw notFound('una ruta de Tutor', routeId);
+        if (!route) throw notFound('tutor route', routeId);
         return route;
       })()
   );
@@ -1120,7 +1120,7 @@ export function registerTools(server: McpServer): void {
     ({ projectId, includeChapterText }) =>
       tool(() => {
         const detail = projects.getProjectDetail(projectId);
-        if (!detail) throw notFound('un proyecto', projectId);
+        if (!detail) throw notFound('project', projectId);
         return {
           ...detail,
           chapters: detail.chapters.map((chapter) => compactProjectChapter(chapter, includeChapterText)),
@@ -1197,7 +1197,7 @@ export function registerTools(server: McpServer): void {
     ({ noteId }) =>
       tool(() => {
         const note = notes.getNote(noteId);
-        if (!note) throw notFound('una nota', noteId);
+        if (!note) throw notFound('note', noteId);
         return note;
       })()
   );
@@ -1224,7 +1224,7 @@ export function registerTools(server: McpServer): void {
     ({ id }) =>
       tool(() => {
         const detail = researchQuestions.getResearchQuestionDetail(id);
-        if (!detail) throw notFound('una pregunta de cobertura', id);
+        if (!detail) throw notFound('coverage question', id);
         return detail;
       })()
   );
@@ -1247,9 +1247,9 @@ export function registerTools(server: McpServer): void {
         const notify = progressNotifier(extra);
         const created = researchQuestions.createResearchQuestion(question, questionNotes);
         const request = { rqId: created.rq.id, model: asModel(model) };
-        notify('Descomponiendo la pregunta en subpreguntas…');
+        notify('Decomposing the question into sub-questions…');
         await decomposeQuestion(request);
-        return mapCoverage(request, (p) => notify(`Mapeando cobertura ${p.index}/${p.total}: ${p.subQuestion}`));
+        return mapCoverage(request, (p) => notify(`Mapping coverage ${p.index}/${p.total}: ${p.subQuestion}`));
       })()
   );
 
@@ -1325,7 +1325,7 @@ export function registerTools(server: McpServer): void {
         writer: z
           .enum(['nodus', 'client'])
           .default('nodus')
-          .describe('"nodus": el modelo configurado en Nodus redacta el informe. "client": el modelo que llama al MCP lo redacta a partir del kit devuelto.'),
+          .describe('"nodus": the model configured in Nodus writes the report. "client": the model calling this MCP writes it from the returned kit.'),
         model: modelSchema.optional(),
         save: z.boolean().default(false),
         title: z.string().trim().min(1).max(2_000).optional(),
@@ -1343,7 +1343,7 @@ export function registerTools(server: McpServer): void {
           (p) =>
             notify(
               p.phase === 'section' && p.sectionIndex
-                ? `[sección ${p.sectionIndex}${p.sectionTotal ? `/${p.sectionTotal}` : ''}] ${p.message}`
+                ? `[section ${p.sectionIndex}${p.sectionTotal ? `/${p.sectionTotal}` : ''}] ${p.message}`
                 : p.message
             )
         );
@@ -1402,7 +1402,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ name, parentId, summary }) =>
       tool(() => {
-        if (parentId && !notes.getNoteFolder(parentId)) throw notFound('una carpeta', parentId);
+        if (parentId && !notes.getNoteFolder(parentId)) throw notFound('folder', parentId);
         const folder = notes.createNoteFolder({ name, parentId });
         if (summary && summary.trim()) return notes.updateNoteFolderSummary(folder.id, summary) ?? folder;
         return folder;
@@ -1421,7 +1421,7 @@ export function registerTools(server: McpServer): void {
     ({ id, summary }) =>
       tool(() => {
         const folder = notes.updateNoteFolderSummary(id, summary);
-        if (!folder) throw notFound('una carpeta', id);
+        if (!folder) throw notFound('folder', id);
         return folder;
       })()
   );
@@ -1445,7 +1445,7 @@ export function registerTools(server: McpServer): void {
     },
     ({ title, content, kind, folderId, source }) =>
       tool(() => {
-        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('una carpeta', folderId);
+        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('folder', folderId);
         return notes.createNote({ title, content, kind, folderId, source: source as NoteSource | null | undefined });
       })()
   );
@@ -1465,9 +1465,9 @@ export function registerTools(server: McpServer): void {
     },
     ({ id, title, content, folderId }) =>
       tool(() => {
-        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('una carpeta', folderId);
+        if (folderId && !notes.getNoteFolder(folderId)) throw notFound('folder', folderId);
         const note = notes.updateNote({ id, title, content, folderId });
-        if (!note) throw notFound('una nota', id);
+        if (!note) throw notFound('note', id);
         return note;
       })()
   );

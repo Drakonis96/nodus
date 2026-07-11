@@ -243,7 +243,7 @@ try {
   assert.equal(progressNotes[0].params.progressToken, 'tok-1');
   assert.match(progressNotes[0].params.message, /corpus/i);
   assert.ok(
-    progressNotes.some((note) => /\[sección \d+/.test(note.params.message)),
+    progressNotes.some((note) => /\[section \d+/.test(note.params.message)),
     'expected per-section progress messages'
   );
   progressNotes.forEach((note, index) => assert.equal(note.params.progress, index + 1, 'progress must increase monotonically'));
