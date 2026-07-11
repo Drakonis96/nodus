@@ -33,10 +33,14 @@
     --serif: 'Fraunces', Georgia, serif;
   }
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
   body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.6; overflow-x: hidden; }
   a { color: var(--violet-2); text-decoration: none; }
   ::selection { background: rgba(139,92,246,0.4); }
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 8px; border: 3px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.6); }
   svg.ic { width: 1em; height: 1em; flex-shrink: 0; }
 
   /* ---------- nav ---------- */
@@ -932,7 +936,7 @@ function openDl() { dlOverlay.classList.add('open'); document.body.style.overflo
 function closeDl() { dlOverlay.classList.remove('open'); document.body.style.overflow = ''; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDl(); });
 
-fetch('https://api.github.com/repos/Drakonis96/nodus')
+fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
   .then((r) => r.ok ? r.json() : null)
   .then((j) => {
     if (!j) return;
@@ -940,7 +944,11 @@ fetch('https://api.github.com/repos/Drakonis96/nodus')
     document.getElementById('star-count').textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
   }).catch(() => {});
 
-fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest')
+// The download modal resolves the newest release live from the GitHub API and
+// matches assets by suffix (…-mac-arm64.dmg / …-win-x64.exe), so a new release
+// is reflected here automatically — no site redeploy needed. cache:no-store
+// avoids ever showing a stale version.
+fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 'no-store' })
   .then((r) => r.ok ? r.json() : null)
   .then((j) => {
     if (!j || !j.assets) return;

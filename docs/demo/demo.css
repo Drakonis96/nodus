@@ -23,14 +23,16 @@
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
+html { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,0.45) transparent; }
 body {
   background: var(--bg); color: var(--text); font-family: var(--sans);
   font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 button { font-family: inherit; cursor: pointer; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 6px; border: 2px solid var(--bg); }
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.35); border-radius: 6px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: rgba(167,139,250,0.6); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* ---------- shell ---------- */
