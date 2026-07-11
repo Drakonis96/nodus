@@ -147,6 +147,24 @@ function resolveModel(override?: ModelRef | null): ModelRef {
   return def;
 }
 
+/** Public wrapper so prompt-assembly code (e.g. the research chat) can resolve the same
+ *  effective model the completion calls will use, to size its payload accordingly. */
+export function resolveModelRef(override?: ModelRef | null): ModelRef {
+  return resolveModel(override);
+}
+
+/**
+ * The loaded context window (in tokens) of a model, or null when it is a cloud model or
+ * the window can't be detected. Only local servers (LM Studio / Ollama) load a small,
+ * fixed window; cloud models manage context server-side, so they return null and callers
+ * keep their cloud-sized budget. Lets large-prompt callers fit the payload to what a local
+ * model can actually hold instead of overflowing.
+ */
+export async function localModelContextWindow(model: ModelRef): Promise<number | null> {
+  if (!isLocalProvider(model.provider)) return null;
+  return localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
+}
+
 /**
  * Optional, model-specific request-body fields layered onto an OpenAI-compatible
  * call: JSON mode, reasoning control, and OpenRouter throughput routing. These can
