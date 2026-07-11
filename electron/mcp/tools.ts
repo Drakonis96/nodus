@@ -184,7 +184,15 @@ function notFound(kind: string, id: string): McpToolError {
 }
 
 function json(value: unknown) {
-  return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
+  const content = [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }];
+  // Modern MCP clients prefer structuredContent over re-parsing the text block. We
+  // mirror object results there (the spec's structuredContent must be an object, not
+  // an array or primitive) while still sending the text for older clients. No
+  // outputSchema is declared, so the SDK forwards it without per-tool validation.
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return { content, structuredContent: value as Record<string, unknown> };
+  }
+  return { content };
 }
 
 function errorResult(error: unknown) {

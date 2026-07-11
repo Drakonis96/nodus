@@ -85,7 +85,16 @@ try {
 
   seedMcpDatabase(getDb());
 
-  const capabilities = await callTool(server, 'nodus_get_capabilities');
+  const capabilitiesRaw = await callToolRaw(server, 'nodus_get_capabilities');
+  // Object results mirror into structuredContent (no outputSchema declared) while
+  // still carrying the text block for older clients.
+  assert.ok(capabilitiesRaw.structuredContent, 'object results expose structuredContent');
+  assert.deepEqual(
+    capabilitiesRaw.structuredContent,
+    JSON.parse(capabilitiesRaw.content[0].text),
+    'structuredContent mirrors the text block'
+  );
+  const capabilities = capabilitiesRaw.structuredContent;
   assert.equal(capabilities.version, '0.0.0-test', 'capabilities reports the running app version');
   assert.equal(capabilities.counts.works, 3);
   assert.equal(capabilities.counts.notes, 1);

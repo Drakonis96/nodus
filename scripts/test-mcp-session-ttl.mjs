@@ -57,6 +57,12 @@ try {
   assert.ok(tools.tools.some((t) => t.name === 'nodus_get_capabilities'), 'tools/list works over HTTP');
   assert.equal(server.__sessionCountForTest(), 1, 'one live session after connect');
 
+  // The real McpServer must forward structuredContent end-to-end (not just the
+  // FakeServer used by the contract test).
+  const caps = await client.callTool({ name: 'nodus_get_capabilities', arguments: {} });
+  assert.ok(caps.structuredContent, 'structuredContent reaches the client over HTTP');
+  assert.equal(typeof caps.structuredContent.version, 'string', 'structured capabilities carry the version');
+
   // A fresh session is under the default TTL, so the sweep must not touch it.
   server.sweepIdleSessions();
   assert.equal(server.__sessionCountForTest(), 1, 'fresh session survives the sweep');
