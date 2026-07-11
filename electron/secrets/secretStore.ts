@@ -2,14 +2,13 @@ import { safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
+import { AI_PROVIDERS as PROVIDERS } from '@shared/providers';
 import { activeVaultDir, vaultDir } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
-
 // Local providers (ollama, lmstudio) are included so an optional access token for
 // a secured instance is stored/cleared through the same encrypted-at-rest path.
-const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi', 'ollama', 'lmstudio'];
 
 function keyFileInDir(dir: string, provider: AiProvider): string {
   return path.join(dir, `ai_key_${provider}.bin`);

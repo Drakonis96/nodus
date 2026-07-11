@@ -1,34 +1,13 @@
 import React from 'react';
-import type { EdgeType, AiProvider, ModelRef, GraphNodeType } from '@shared/types';
+import type { EdgeType, ModelRef, GraphNodeType } from '@shared/types';
 
-export const AI_PROVIDERS: AiProvider[] = [
-  'anthropic',
-  'openai',
-  'openrouter',
-  'deepseek',
-  'gemini',
-  'xiaomi',
-  'ollama',
-  'lmstudio',
-];
-
-export const PROVIDER_LABELS: Record<AiProvider, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  deepseek: 'DeepSeek',
-  gemini: 'Google Gemini',
-  xiaomi: 'Xiaomi MiMo',
-  ollama: 'Ollama',
-  lmstudio: 'LM Studio',
-};
-
-/** Providers whose connection is a user-configured local/LAN server (no API key). */
-export const LOCAL_AI_PROVIDERS: AiProvider[] = ['ollama', 'lmstudio'];
-
-export function isLocalAiProvider(provider: AiProvider): boolean {
-  return provider === 'ollama' || provider === 'lmstudio';
-}
+export {
+  AI_PROVIDERS,
+  PROVIDER_LABELS,
+  LOCAL_PROVIDERS as LOCAL_AI_PROVIDERS,
+  isLocalProvider as isLocalAiProvider,
+} from '@shared/providers';
+import { PROVIDER_LABELS } from '@shared/providers';
 
 export function modelLabel(m: ModelRef): string {
   return `${PROVIDER_LABELS[m.provider]} · ${m.model}`;

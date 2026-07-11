@@ -8,6 +8,7 @@ import {
   OPENROUTER_HEADERS,
   isLocalProvider,
 } from './providers';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import type { AiProvider, EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
@@ -448,29 +449,12 @@ async function rawCompleteStream(
   return full;
 }
 
-const EMBED_MODELS: Record<EmbeddingProvider, string> = {
-  openai: 'text-embedding-3-small',
-  openrouter: 'baai/bge-m3',
-  gemini: 'gemini-embedding-001',
-  ollama: 'nomic-embed-text',
-  lmstudio: 'text-embedding-nomic-embed-text-v1.5',
-};
-
-function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
-  const trimmed = modelId.trim() || EMBED_MODELS[provider];
-  if (provider === 'openrouter' && !trimmed.includes('/') && trimmed.includes(':')) {
-    const [author, slug] = trimmed.split(':', 2);
-    if (author && slug) return `${author.toLowerCase()}/${slug}`;
-  }
-  return trimmed;
-}
-
 function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   const settings = getSettings();
   const provider = settings.embeddingProvider ?? 'openai';
   return {
     provider,
-    modelId: normalizeEmbeddingModel(provider, settings.embeddingModel || EMBED_MODELS[provider]),
+    modelId: normalizeEmbeddingModel(provider, settings.embeddingModel || DEFAULT_EMBEDDING_MODELS[provider]),
   };
 }
 

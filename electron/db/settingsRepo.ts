@@ -1,15 +1,16 @@
 import { getDb } from './database';
-import type { AppSettings, EmbeddingProvider } from '@shared/types';
+import type { AppSettings } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { providerKeyMap } from '../secrets/secretStore';
 
 const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
-  ollama: { baseUrl: 'http://localhost:11434' },
-  lmstudio: { baseUrl: 'http://localhost:1234' },
+  ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama },
+  lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio },
 };
 
 const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
+  embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   localProviders: DEFAULT_LOCAL_PROVIDERS,
   favorites: [],
   defaultModel: null,
@@ -106,7 +107,7 @@ export function getSettings(): AppSettings {
     lmstudio: { ...DEFAULT_LOCAL_PROVIDERS.lmstudio, ...parsed.localProviders?.lmstudio },
   };
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
-  if (!merged.embeddingModel?.trim()) merged.embeddingModel = defaultEmbeddingModel(merged.embeddingProvider);
+  if (!merged.embeddingModel?.trim()) merged.embeddingModel = DEFAULT_EMBEDDING_MODELS[merged.embeddingProvider];
   // v1.4.0 and older exposed one global header selector. Preserve that user's
   // choice once by seeding the workload settings, then retire the global value
   // so future selectors cannot affect one another through a hidden fallback.
@@ -130,27 +131,3 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   return getSettings();
 }
 
-function normalizeEmbeddingProvider(provider: unknown): EmbeddingProvider {
-  return provider === 'openai' ||
-    provider === 'openrouter' ||
-    provider === 'gemini' ||
-    provider === 'ollama' ||
-    provider === 'lmstudio'
-    ? provider
-    : 'openai';
-}
-
-function defaultEmbeddingModel(provider: EmbeddingProvider): string {
-  switch (provider) {
-    case 'openrouter':
-      return 'baai/bge-m3';
-    case 'gemini':
-      return 'gemini-embedding-001';
-    case 'openai':
-      return 'text-embedding-3-small';
-    case 'ollama':
-      return 'nomic-embed-text';
-    case 'lmstudio':
-      return 'text-embedding-nomic-embed-text-v1.5';
-  }
-}

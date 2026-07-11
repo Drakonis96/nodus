@@ -6,41 +6,14 @@ import type {
   ModelInfo,
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
+import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
 
-export const PROVIDERS: AiProvider[] = [
-  'anthropic',
-  'openai',
-  'openrouter',
-  'deepseek',
-  'gemini',
-  'xiaomi',
-  'ollama',
-  'lmstudio',
-];
-
-export const PROVIDER_LABELS: Record<AiProvider, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  deepseek: 'DeepSeek',
-  gemini: 'Google Gemini',
-  xiaomi: 'Xiaomi MiMo',
-  ollama: 'Ollama',
-  lmstudio: 'LM Studio',
-};
-
-/** Providers that talk to a user-configured local (or LAN) server. */
-export const LOCAL_PROVIDERS: LocalProvider[] = ['ollama', 'lmstudio'];
-
-export function isLocalProvider(provider: AiProvider): provider is LocalProvider {
-  return provider === 'ollama' || provider === 'lmstudio';
-}
+export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 
 /** The configured base URL for a local provider, without a trailing slash. */
 export function localBaseUrl(provider: LocalProvider): string {
   const configured = getSettings().localProviders?.[provider]?.baseUrl?.trim();
-  const fallback = provider === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234';
-  return (configured || fallback).replace(/\/+$/, '');
+  return (configured || DEFAULT_LOCAL_BASE_URLS[provider]).replace(/\/+$/, '');
 }
 
 /** Optional bearer header when a local instance is secured with a token. */

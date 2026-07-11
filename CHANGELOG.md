@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.6.0 — 2026-07-11
+
+Consolidation release: no new features. Provider configuration that had been
+copied across the app now lives in one shared registry, and two real bugs that
+drift had already caused are fixed.
+
+### Fixed
+
+- Encrypted exports created with "include secrets" now also carry the optional
+  access tokens for local providers (Ollama, LM Studio). They were silently
+  skipped on export and left untouched on restore, because the export code kept
+  its own — outdated — provider list.
+- The MCP model override now accepts every provider the app supports. Xiaomi
+  MiMo, Ollama and LM Studio were rejected by an out-of-date provider list in
+  the MCP tool schema, so MCP clients could not route writing or deep-research
+  jobs through those providers.
+
+### Changed
+
+- Provider identity, display labels, local-server base URLs, the embedding
+  provider list and the default embedding model per provider are now defined
+  once in a shared registry used by both the main process and the renderer.
+  Six independently maintained copies were removed; adding a provider now
+  requires touching one file (plus the type union, which enforces the rest at
+  compile time).
+
+### Notes
+
+- No database migration; the schema stays at v31. Settings and stored keys are
+  untouched.
+
 ## 1.5.3 — 2026-07-11
 
 ### Added

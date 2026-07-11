@@ -10,6 +10,7 @@ import type {
   VaultSummary,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
+import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
 import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
@@ -392,13 +393,12 @@ function LocalProviderRow({
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const hasToken = settings.providerKeys?.[provider];
-  const defaultPort = provider === 'ollama' ? '11434' : '1234';
 
   // Keep the URL field in sync if the saved value changes elsewhere (e.g. vault switch).
   useEffect(() => setUrlInput(savedUrl), [savedUrl]);
 
   const persistUrl = async () => {
-    const next = urlInput.trim() || (provider === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234');
+    const next = urlInput.trim() || DEFAULT_LOCAL_BASE_URLS[provider];
     if (next !== savedUrl) {
       await window.nodus.updateSettings({
         localProviders: { ...settings.localProviders, [provider]: { baseUrl: next } },
@@ -472,7 +472,7 @@ function LocalProviderRow({
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 onBlur={() => void persistUrl()}
-                placeholder={`http://localhost:${defaultPort}`}
+                placeholder={DEFAULT_LOCAL_BASE_URLS[provider]}
                 spellCheck={false}
               />
               <button className="btn btn-ghost border border-neutral-700" onClick={() => void runTest()} disabled={testing}>

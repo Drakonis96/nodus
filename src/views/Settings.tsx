@@ -15,16 +15,7 @@ import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
-
-const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio'];
-
-const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
-  openai: 'text-embedding-3-small',
-  gemini: 'gemini-embedding-001',
-  openrouter: 'baai/bge-m3',
-  ollama: 'nomic-embed-text',
-  lmstudio: 'text-embedding-nomic-embed-text-v1.5',
-};
+import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
 
@@ -1399,7 +1390,7 @@ function EmbeddingModelControl({
   const setProvider = (next: EmbeddingProvider) => {
     setModels(null);
     setError(null);
-    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODEL[next] });
+    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODELS[next] });
   };
 
   const loadModels = async () => {
@@ -1430,7 +1421,7 @@ function EmbeddingModelControl({
           className="input w-full min-w-0"
           value={settings.embeddingModel}
           onChange={(e) => onPatch({ embeddingModel: e.target.value })}
-          placeholder={DEFAULT_EMBEDDING_MODEL[provider]}
+          placeholder={DEFAULT_EMBEDDING_MODELS[provider]}
         />
         <button className="btn btn-ghost justify-center border border-neutral-700" onClick={loadModels} disabled={loading}>
           {loading ? t('Cargando…') : t('Cargar modelos')}

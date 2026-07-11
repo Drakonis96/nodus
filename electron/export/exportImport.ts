@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
 import type { AiProvider, AppSettings } from '@shared/types';
+import { AI_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { clearApiKey, getApiKey, setApiKey } from '../secrets/secretStore';
@@ -14,8 +15,6 @@ import {
   sha256Hex,
   type BackupCipherMetadata,
 } from './backupCrypto';
-
-const AI_PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
 
 interface ExportManifestBase {
   schemaVersion: number;

@@ -483,7 +483,7 @@ export interface AppSettings {
   imageProvider: ImageProvider;
   imageModel: string;
   imageStyle: DecorativeImageStyle;
-  /** Audio narration backend. Only 'piper' (local) for now; extensible later. */
+  /** Audio narration backend: 'piper' / 'kokoro' (local WASM) or 'hume' (cloud, BYO key). */
   audioProvider: AudioProvider;
   /** Selected Piper voice id (e.g. "es_ES-sharvard-medium"). Empty until chosen. */
   audioVoice: string;

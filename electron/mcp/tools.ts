@@ -1,6 +1,8 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import type {
+  AiProvider,
   LightStatus,
   DeepStatus,
   ModelRef,
@@ -59,7 +61,9 @@ const GAP_KINDS = ['future_work', 'limitation', 'open_question', 'unresolved_con
 const LIGHT_STATUSES = ['all', 'none', 'pending', 'done', 'failed'] as const;
 const DEEP_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
 const SUMMARY_STATUSES = ['all', 'none', 'pending', 'done', 'failed', 'skipped_no_text'] as const;
-const AI_PROVIDERS = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini'] as const;
+// The canonical provider list had drifted here (xiaomi and the local providers
+// were missing), silently rejecting valid model overrides from MCP clients.
+const AI_PROVIDERS = SHARED_AI_PROVIDERS as [AiProvider, ...AiProvider[]];
 const NOTE_KINDS = ['markdown', 'assistant', 'writing', 'debate', 'idea'] as const;
 const PROJECT_KINDS = ['thesis', 'article', 'chapter', 'literature_review', 'theoretical_framework', 'other'] as const;
 const PROJECT_STATUSES = ['active', 'paused', 'done'] as const;
