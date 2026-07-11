@@ -1,4 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
 import type {
@@ -210,6 +212,24 @@ function tool<T>(fn: () => T | Promise<T>) {
     } catch (error) {
       return errorResult(error);
     }
+  };
+}
+
+type ToolExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
+
+/** Bridges a Nodus onProgress callback to MCP notifications/progress so clients can
+ *  keep long tool calls alive. No-op when the client sent no progressToken. */
+function progressNotifier(extra: ToolExtra | undefined): (message: string) => void {
+  const progressToken = extra?._meta?.progressToken;
+  if (extra === undefined || progressToken === undefined) return () => {};
+  let step = 0;
+  return (message) => {
+    step += 1;
+    void extra
+      .sendNotification({ method: 'notifications/progress', params: { progressToken, progress: step, message } })
+      .catch(() => {
+        /* progress is best-effort; a dropped notification must never abort the tool */
+      });
   };
 }
 
@@ -1121,7 +1141,8 @@ export function registerTools(server: McpServer): void {
     'nodus_ask_coverage_question',
     {
       title: 'Ask and map a coverage question',
-      description: 'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens.',
+      description:
+        'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens. Sends MCP progress notifications while mapping when the request carries a progressToken.',
       inputSchema: {
         question: z.string().trim().min(1).max(8_000),
         notes: z.string().trim().max(8_000).optional(),
@@ -1129,12 +1150,14 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ question, notes: questionNotes, model }) =>
+    ({ question, notes: questionNotes, model }, extra) =>
       tool(async () => {
+        const notify = progressNotifier(extra);
         const created = researchQuestions.createResearchQuestion(question, questionNotes);
         const request = { rqId: created.rq.id, model: asModel(model) };
+        notify('Descomponiendo la pregunta en subpreguntas…');
         await decomposeQuestion(request);
-        return mapCoverage(request);
+        return mapCoverage(request, (p) => notify(`Mapeando cobertura ${p.index}/${p.total}: ${p.subQuestion}`));
       })()
   );
 
@@ -1200,7 +1223,7 @@ export function registerTools(server: McpServer): void {
       description:
         'Runs the orchestrated, coverage-guided, fully-cited Deep Research pipeline over the whole corpus (5–20 pp). Two writers via `writer`: ' +
         '"nodus" (default) — Nodus\'s own configured model plans and writes the whole report and returns it (save=true also stores it as a draft). ' +
-        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens.',
+        '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
         language: z.enum(['es', 'en', 'fr']).optional(),
@@ -1217,12 +1240,21 @@ export function registerTools(server: McpServer): void {
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },
-    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }) =>
+    ({ objective, language, audience, targetLength, sectionLimit, writer, model, save, title }, extra) =>
       tool(async () => {
         if (writer === 'client') {
           return buildDeepResearchBrief({ objective, language, audience, targetLength, sectionLimit });
         }
-        const report = await generateDeepResearchReport({ objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null });
+        const notify = progressNotifier(extra);
+        const report = await generateDeepResearchReport(
+          { objective, language, audience, targetLength, sectionLimit, model: asModel(model) ?? null },
+          (p) =>
+            notify(
+              p.phase === 'section' && p.sectionIndex
+                ? `[sección ${p.sectionIndex}${p.sectionTotal ? `/${p.sectionTotal}` : ''}] ${p.message}`
+                : p.message
+            )
+        );
         const saved = save ? writingDrafts.saveWritingWorkshopDraft({ draft: report.draft, model: asModel(model), title }) : null;
         return { report, savedDraftId: saved?.id ?? null, savedDraft: saved };
       })()

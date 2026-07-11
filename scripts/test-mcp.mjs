@@ -204,6 +204,41 @@ try {
   assert.equal(aiError.isError, true);
   assert.equal(JSON.parse(aiError.content[0].text).error.category, 'ai_unconfigured');
 
+  // Progress bridge: with a progressToken, long tools stream notifications/progress.
+  // The deep-research pipeline degrades gracefully without an AI provider (fallback
+  // plan + sections), so it walks every phase and the bridge must fire throughout.
+  const deepArgs = {
+    objective: 'Estado del turismo visual en el corpus',
+    targetLength: 'adaptive',
+    sectionLimit: 'auto',
+    writer: 'nodus',
+    save: false,
+  };
+  const progressNotes = [];
+  const deepReport = await callToolRaw(server, 'nodus_generate_deep_research', deepArgs, {
+    _meta: { progressToken: 'tok-1' },
+    sendNotification: async (n) => progressNotes.push(n),
+  });
+  assert.notEqual(deepReport.isError, true, `deep research failed: ${deepReport.content?.[0]?.text}`);
+  assert.ok(progressNotes.length >= 3, `expected several MCP progress notifications, got ${progressNotes.length}`);
+  assert.equal(progressNotes[0].method, 'notifications/progress');
+  assert.equal(progressNotes[0].params.progressToken, 'tok-1');
+  assert.match(progressNotes[0].params.message, /corpus/i);
+  assert.ok(
+    progressNotes.some((note) => /\[sección \d+/.test(note.params.message)),
+    'expected per-section progress messages'
+  );
+  progressNotes.forEach((note, index) => assert.equal(note.params.progress, index + 1, 'progress must increase monotonically'));
+
+  // Without a progressToken the bridge must stay silent (and never crash the tool).
+  const silentNotes = [];
+  const silentReport = await callToolRaw(server, 'nodus_generate_deep_research', deepArgs, {
+    _meta: {},
+    sendNotification: async (n) => silentNotes.push(n),
+  });
+  assert.notEqual(silentReport.isError, true);
+  assert.equal(silentNotes.length, 0);
+
   closeDb();
   console.log('mcp tool contract test passed');
 } finally {
@@ -216,10 +251,10 @@ async function callTool(server, name, args = {}) {
   return JSON.parse(result.content[0].text);
 }
 
-async function callToolRaw(server, name, args = {}) {
+async function callToolRaw(server, name, args = {}, extra = undefined) {
   const entry = server.tools.get(name);
   assert.ok(entry, `missing MCP tool ${name}`);
-  return entry.handler(args);
+  return entry.handler(args, extra);
 }
 
 function installRuntimeHooks(userDataPath) {
