@@ -252,9 +252,37 @@ export interface ExternalRef {
 // Settings
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type AiProvider = 'anthropic' | 'openai' | 'openrouter' | 'deepseek' | 'gemini' | 'xiaomi';
-export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini'>;
+export type AiProvider =
+  | 'anthropic'
+  | 'openai'
+  | 'openrouter'
+  | 'deepseek'
+  | 'gemini'
+  | 'xiaomi'
+  | 'ollama'
+  | 'lmstudio';
+/** Providers that run on the user's machine (or LAN) via a configurable base URL.
+ *  They need no API key (an optional token is supported for secured instances). */
+export type LocalProvider = Extract<AiProvider, 'ollama' | 'lmstudio'>;
+export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini' | 'ollama' | 'lmstudio'>;
 export type ImageProvider = 'google' | 'openai' | 'openrouter';
+
+/** User-editable connection settings for a local provider. The base URL includes
+ *  scheme, host and port (e.g. "http://localhost:11434"); no trailing "/v1". */
+export interface LocalProviderConfig {
+  baseUrl: string;
+}
+
+/** Result of pinging a local provider from Settings ("Test connection"). */
+export interface LocalProviderTestResult {
+  ok: boolean;
+  /** Server version when the provider exposes it (Ollama). */
+  version?: string;
+  /** How many models the server currently reports. */
+  modelCount?: number;
+  /** Human-readable error when `ok` is false. */
+  message?: string;
+}
 export type DecorativeImageEntityKind = 'immersion' | 'deep_research';
 export type DecorativeImageStatus = 'not_requested' | 'pending' | 'ready' | 'failed';
 export type DecorativeImageStyle =
@@ -347,6 +375,20 @@ export interface ModelInfo {
   group?: string;
   /** For OpenRouter: true when the model is a reasoning model (slower for scans). */
   reasoning?: boolean;
+  // ── Local-provider metadata (Ollama / LM Studio). All optional; other
+  //    providers omit them and the UI only renders what is present. ────────────
+  /** On-disk size in bytes (Ollama). */
+  sizeBytes?: number;
+  /** Parameter count label, e.g. "8B" (Ollama). */
+  paramSize?: string;
+  /** Quantization label, e.g. "Q4_K_M" (Ollama / LM Studio). */
+  quantization?: string;
+  /** Max context length in tokens (LM Studio). */
+  contextLength?: number;
+  /** Whether the model is currently loaded into memory (LM Studio). */
+  loaded?: boolean;
+  /** Model kind reported by LM Studio: chat/vision vs embeddings. */
+  kind?: 'llm' | 'vlm' | 'embeddings' | 'other';
 }
 
 /** How hard a model should "think" before answering. `off` skips the chain-of-thought
@@ -409,6 +451,9 @@ export interface AppSettings {
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).
   providerKeys: Record<AiProvider, boolean>;
+  // Connection settings for local providers (Ollama, LM Studio). The base URL is
+  // user-editable; an optional access token, when set, is stored like an API key.
+  localProviders: Record<LocalProvider, LocalProviderConfig>;
   // Favorite models the user pinned. Workload and feature selectors below are
   // deliberately independent: changing one must never retarget another flow.
   favorites: ModelRef[];
@@ -3170,6 +3215,8 @@ export interface NodusApi {
   listModels(provider: AiProvider): Promise<ModelInfo[]>;
   listEmbeddingModels(provider: EmbeddingProvider): Promise<ModelInfo[]>;
   listImageModels(): Promise<ImageModelInfo[]>;
+  /** Ping a local provider (Ollama / LM Studio) to verify its base URL is reachable. */
+  testLocalProvider(provider: LocalProvider): Promise<LocalProviderTestResult>;
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
   getDecorativeImageDataUrl(entityKind: DecorativeImageEntityKind, entityId: string, thumbnail?: boolean): Promise<string | null>;
   queueDecorativeImage(request: DecorativeImageActionRequest): Promise<DecorativeImage>;

@@ -2462,5 +2462,23 @@ export const EN: Record<string, string> = {
   Afiliación: 'Affiliation',
   'Identidad canónica': 'Canonical identity',
   Actualizada: 'Updated',
+  // ── Local AI providers (Ollama / LM Studio) ──────────────────────────────
+  '(local)': '(local)',
+  'Cargado en memoria': 'Loaded in memory',
+  'Ollama debe estar en marcha y los modelos descargados con "ollama pull". No requiere clave.':
+    'Ollama must be running and models pulled with "ollama pull". No key required.',
+  'Activa el servidor local en LM Studio (Developer → Start Server) y carga al menos un modelo. No requiere clave.':
+    'Start the local server in LM Studio (Developer → Start Server) and load at least one model. No key required.',
+  'Dirección del servidor (IP y puerto)': 'Server address (IP and port)',
+  'Probando…': 'Testing…',
+  'Probar conexión': 'Test connection',
+  'Conectado{version} · {n} modelos disponibles': 'Connected{version} · {n} models available',
+  'Sin conexión: {msg}': 'Not connected: {msg}',
+  '•••••••• token guardado (opcional)': '•••••••• token saved (optional)',
+  'token de acceso (opcional)': 'access token (optional)',
+  'El servidor no reporta modelos. Descarga o carga uno primero.':
+    'The server reports no models. Download or load one first.',
+  'Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.':
+    'Local provider: no key needed. Use the default address; you can change IP and port in Settings → Providers.',
   // <<END_EN>>
 };

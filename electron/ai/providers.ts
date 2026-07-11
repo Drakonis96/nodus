@@ -1,6 +1,22 @@
-import type { AiProvider, EmbeddingProvider, ModelInfo } from '@shared/types';
+import type {
+  AiProvider,
+  EmbeddingProvider,
+  LocalProvider,
+  LocalProviderTestResult,
+  ModelInfo,
+} from '@shared/types';
+import { getSettings } from '../db/settingsRepo';
 
-export const PROVIDERS: AiProvider[] = ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'xiaomi'];
+export const PROVIDERS: AiProvider[] = [
+  'anthropic',
+  'openai',
+  'openrouter',
+  'deepseek',
+  'gemini',
+  'xiaomi',
+  'ollama',
+  'lmstudio',
+];
 
 export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
@@ -9,7 +25,28 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
   xiaomi: 'Xiaomi MiMo',
+  ollama: 'Ollama',
+  lmstudio: 'LM Studio',
 };
+
+/** Providers that talk to a user-configured local (or LAN) server. */
+export const LOCAL_PROVIDERS: LocalProvider[] = ['ollama', 'lmstudio'];
+
+export function isLocalProvider(provider: AiProvider): provider is LocalProvider {
+  return provider === 'ollama' || provider === 'lmstudio';
+}
+
+/** The configured base URL for a local provider, without a trailing slash. */
+export function localBaseUrl(provider: LocalProvider): string {
+  const configured = getSettings().localProviders?.[provider]?.baseUrl?.trim();
+  const fallback = provider === 'ollama' ? 'http://localhost:11434' : 'http://localhost:1234';
+  return (configured || fallback).replace(/\/+$/, '');
+}
+
+/** Optional bearer header when a local instance is secured with a token. */
+function localHeaders(key: string | null): Record<string, string> {
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
 
 /**
  * OpenAI-compatible chat base URL for a provider, or null for providers with a
@@ -29,6 +66,10 @@ export function openAiCompatBase(provider: AiProvider): string | null {
     case 'xiaomi':
       // Xiaomi MiMo's official API is OpenAI-compatible and accepts Bearer auth.
       return 'https://api.xiaomimimo.com/v1';
+    case 'ollama':
+    case 'lmstudio':
+      // Local servers expose an OpenAI-compatible surface under {baseUrl}/v1.
+      return `${localBaseUrl(provider)}/v1`;
     case 'anthropic':
       return null;
   }
@@ -47,7 +88,11 @@ export function supportsJsonMode(provider: AiProvider): boolean {
     provider === 'deepseek' ||
     provider === 'openrouter' ||
     provider === 'gemini' ||
-    provider === 'xiaomi'
+    provider === 'xiaomi' ||
+    // Ollama and LM Studio both accept OpenAI's response_format on their compat
+    // surface. A small model that ignores it is caught by the caller's 400 retry.
+    provider === 'ollama' ||
+    provider === 'lmstudio'
   );
 }
 
@@ -81,6 +126,11 @@ export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Re
       // Xiaomi MiMo is likewise a reasoning model with a thinking toggle (default ON).
       // Disable it for scans; leave the model's default for explicit efforts.
       return effort === 'off' ? { thinking: { type: 'disabled' } } : {};
+    case 'ollama':
+    case 'lmstudio':
+      // Local reasoning toggles vary per model (deepseek-r1, gpt-oss, qwen…) and
+      // have no consistent OpenAI-compat knob. Send none and let the model decide.
+      return {};
     case 'anthropic':
       // Anthropic uses its own SDK path, not this OpenAI-compat reasoning knob.
       return {};
@@ -120,6 +170,10 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listGemini(key);
     case 'xiaomi':
       return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false);
+    case 'ollama':
+      return listOllama(key);
+    case 'lmstudio':
+      return listLmStudio(key, false);
   }
 }
 
@@ -132,6 +186,10 @@ export async function listEmbeddingModels(provider: EmbeddingProvider, key: stri
       return listOpenRouterEmbeddingModels(key);
     case 'gemini':
       return listGeminiEmbeddingModels(key);
+    case 'ollama':
+      return listOllamaEmbeddingModels(key);
+    case 'lmstudio':
+      return listLmStudio(key, true);
   }
 }
 
@@ -231,4 +289,126 @@ async function listGeminiEmbeddingModels(key: string | null): Promise<ModelInfo[
     { id: 'gemini-embedding-001', name: 'Gemini Embedding 001' },
     { id: 'gemini-embedding-2-preview', name: 'Gemini Embedding 2 Preview' },
   ];
+}
+
+// ── Local providers: Ollama & LM Studio ──────────────────────────────────────
+// Chat + embeddings inference goes through the OpenAI-compatible surface (see
+// openAiCompatBase + aiClient). Model *listing* uses each server's native
+// endpoint because it carries richer metadata (size, quantization, state) than
+// the OpenAI-compat /v1/models list.
+
+/** fetch() against a local server with a short timeout so an unreachable host
+ *  fails fast instead of hanging the Settings "Load models" button. */
+async function localFetch(url: string, key: string | null, timeoutMs = 8000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { headers: localHeaders(key), signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function localError(provider: LocalProvider, base: string, detail: string): Error {
+  const label = provider === 'ollama' ? 'Ollama' : 'LM Studio';
+  return new Error(`No se pudo conectar con ${label} en ${base}. ${detail}`);
+}
+
+interface OllamaTag {
+  name?: string;
+  model?: string;
+  size?: number;
+  details?: { parameter_size?: string; quantization_level?: string };
+}
+
+/** GET {base}/api/tags — the models pulled locally into Ollama. */
+async function listOllama(key: string | null): Promise<ModelInfo[]> {
+  const base = localBaseUrl('ollama');
+  let res: Response;
+  try {
+    res = await localFetch(`${base}/api/tags`, key);
+  } catch (e) {
+    throw localError('ollama', base, e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) throw localError('ollama', base, `HTTP ${res.status}. ¿Está Ollama en marcha?`);
+  const data = (await res.json()) as { models?: OllamaTag[] };
+  return (data.models ?? [])
+    .map((m) => {
+      const id = m.model ?? m.name ?? '';
+      return {
+        id,
+        sizeBytes: typeof m.size === 'number' ? m.size : undefined,
+        paramSize: m.details?.parameter_size,
+        quantization: m.details?.quantization_level,
+      } as ModelInfo;
+    })
+    .filter((m) => m.id)
+    .sort(byId);
+}
+
+/** Ollama exposes no model "kind", so embedding models are matched by name. When
+ *  nothing matches (unusual names), the full list is returned so the user can still pick. */
+async function listOllamaEmbeddingModels(key: string | null): Promise<ModelInfo[]> {
+  const all = await listOllama(key);
+  const embeds = all.filter((m) => /embed|nomic|mxbai|bge|minilm|e5|gte|snowflake|arctic/i.test(m.id));
+  return embeds.length > 0 ? embeds : all;
+}
+
+interface LmStudioModel {
+  id?: string;
+  type?: string;
+  arch?: string;
+  quantization?: string;
+  state?: string;
+  max_context_length?: number;
+  publisher?: string;
+}
+
+/** GET {base}/api/v0/models — LM Studio's native list with loaded state + metadata.
+ *  `embeddingsOnly` keeps only type "embeddings"; otherwise chat/vision models. */
+async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promise<ModelInfo[]> {
+  const base = localBaseUrl('lmstudio');
+  let res: Response;
+  try {
+    res = await localFetch(`${base}/api/v0/models`, key);
+  } catch (e) {
+    throw localError('lmstudio', base, e instanceof Error ? e.message : String(e));
+  }
+  if (!res.ok) throw localError('lmstudio', base, `HTTP ${res.status}. Activa el servidor local en LM Studio.`);
+  const data = (await res.json()) as { data?: LmStudioModel[] };
+  const mapped = (data.data ?? [])
+    .map((m) => {
+      const type = m.type;
+      const kind: ModelInfo['kind'] =
+        type === 'embeddings' ? 'embeddings' : type === 'vlm' ? 'vlm' : type === 'llm' ? 'llm' : 'other';
+      return {
+        id: m.id ?? '',
+        name: m.publisher ? `${m.arch ?? m.id} · ${m.publisher}` : m.arch,
+        quantization: m.quantization,
+        contextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
+        loaded: m.state === 'loaded',
+        kind,
+      } as ModelInfo;
+    })
+    .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));
+  // Loaded models first (they answer instantly), then alphabetical.
+  return mapped.sort((a, b) => Number(b.loaded) - Number(a.loaded) || a.id.localeCompare(b.id));
+}
+
+/** Ping a local provider so Settings can confirm the base URL before loading models. */
+export async function testLocalProvider(provider: LocalProvider, key: string | null): Promise<LocalProviderTestResult> {
+  const base = localBaseUrl(provider);
+  try {
+    if (provider === 'ollama') {
+      const versionRes = await localFetch(`${base}/api/version`, key, 5000);
+      if (!versionRes.ok) return { ok: false, message: `HTTP ${versionRes.status} en ${base}` };
+      const version = ((await versionRes.json()) as { version?: string }).version;
+      const models = await listOllama(key);
+      return { ok: true, version, modelCount: models.length };
+    }
+    const models = await listLmStudio(key, false);
+    return { ok: true, modelCount: models.length };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
 }

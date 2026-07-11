@@ -46,6 +46,7 @@ const api: NodusApi = {
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
+  testLocalProvider: (provider) => ipcRenderer.invoke('ai:testLocalProvider', provider),
   listImageModels: () => ipcRenderer.invoke('ai:listImageModels'),
   getDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:get', entityKind, entityId),
   getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>

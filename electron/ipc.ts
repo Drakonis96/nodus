@@ -13,6 +13,7 @@ import type {
   QueueKind,
   WorkFilter,
   AiProvider,
+  LocalProvider,
   ModelRef,
   ZoteroItem,
   ResearchChatRequest,
@@ -84,7 +85,7 @@ import { installCopilotAddin } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
-import { listEmbeddingModels, listModels } from './ai/providers';
+import { listEmbeddingModels, listModels, testLocalProvider } from './ai/providers';
 import { listImageModels } from './ai/imageModels';
 import {
   applyDecorativeImageOption,
@@ -417,6 +418,7 @@ export function registerIpc(
   h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
     listEmbeddingModels(provider, getApiKey(provider))
   );
+  h('ai:testLocalProvider', async (_e, provider: LocalProvider) => testLocalProvider(provider, getApiKey(provider)));
   h('ai:listImageModels', async () => listImageModels());
   h('images:get', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     getDecorativeImage(entityKind, entityId)

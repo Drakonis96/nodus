@@ -6,8 +6,9 @@ import {
   reasoningBody,
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
+  isLocalProvider,
 } from './providers';
-import type { EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
+import type { AiProvider, EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -20,6 +21,15 @@ export class AiError extends Error {
   constructor(message: string, public retriable = false, public config = false) {
     super(message);
   }
+}
+
+/** Stored key for a provider, or a harmless placeholder for local providers
+ *  (Ollama / LM Studio need no key; the OpenAI SDK still requires a non-empty
+ *  string). A user-supplied token for a secured local instance takes precedence. */
+function resolveProviderKey(provider: AiProvider): string | null {
+  const stored = getApiKey(provider);
+  if (stored) return stored;
+  return isLocalProvider(provider) ? 'local' : null;
 }
 
 interface CallOpts {
@@ -107,7 +117,7 @@ async function rawComplete(
   jsonMode = true,
   reasoning: ReasoningEffort = 'off'
 ): Promise<string> {
-  const key = getApiKey(model.provider);
+  const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
   if (model.provider === 'anthropic') {
@@ -341,7 +351,7 @@ async function rawCompleteStream(
   reasoning: ReasoningEffort = 'off',
   signal?: AbortSignal
 ): Promise<string> {
-  const key = getApiKey(model.provider);
+  const key = resolveProviderKey(model.provider);
   if (!key) throw new AiError(`Falta la clave de IA para ${model.provider}. Configúrala en Ajustes.`, false, true);
 
   let full = '';
@@ -442,6 +452,8 @@ const EMBED_MODELS: Record<EmbeddingProvider, string> = {
   openai: 'text-embedding-3-small',
   openrouter: 'baai/bge-m3',
   gemini: 'gemini-embedding-001',
+  ollama: 'nomic-embed-text',
+  lmstudio: 'text-embedding-nomic-embed-text-v1.5',
 };
 
 function normalizeEmbeddingModel(provider: EmbeddingProvider, modelId: string): string {
@@ -489,7 +501,7 @@ async function requestEmbeddings(provider: EmbeddingProvider, key: string, model
  */
 export async function embed(text: string): Promise<number[] | null> {
   const { provider, modelId } = embeddingConfig();
-  const key = getApiKey(provider);
+  const key = resolveProviderKey(provider);
   if (!key) return null;
   try {
     const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000));
@@ -503,7 +515,7 @@ export async function embedMany(texts: string[]): Promise<(number[] | null)[]> {
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
   const { provider, modelId } = embeddingConfig();
-  const key = getApiKey(provider);
+  const key = resolveProviderKey(provider);
   if (!key) return texts.map(() => null);
 
   // Gemini Embedding 2's native API aggregates multiple inputs; the OpenAI

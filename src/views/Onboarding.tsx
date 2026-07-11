@@ -245,18 +245,24 @@ export function Onboarding({
                 ))}
               </select>
             </label>
-            <label className="block text-sm">
-              {t('Clave de IA (se guarda cifrada, nunca se exporta)')}
-              {provider === 'openrouter' && (
-                <span className="text-neutral-500"> {t('— opcional para listar, necesaria para escanear')}</span>
-              )}
-              <input
-                type="password"
-                className="input w-full mt-1"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-            </label>
+            {provider === 'ollama' || provider === 'lmstudio' ? (
+              <p className="text-sm text-neutral-500">
+                {t('Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.')}
+              </p>
+            ) : (
+              <label className="block text-sm">
+                {t('Clave de IA (se guarda cifrada, nunca se exporta)')}
+                {provider === 'openrouter' && (
+                  <span className="text-neutral-500"> {t('— opcional para listar, necesaria para escanear')}</span>
+                )}
+                <input
+                  type="password"
+                  className="input w-full mt-1"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </label>
+            )}
             <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loadingModels}>
               {loadingModels ? t('Cargando modelos…') : t('Cargar modelos')}
             </button>

@@ -2,9 +2,15 @@ import { getDb } from './database';
 import type { AppSettings, EmbeddingProvider } from '@shared/types';
 import { providerKeyMap } from '../secrets/secretStore';
 
+const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
+  ollama: { baseUrl: 'http://localhost:11434' },
+  lmstudio: { baseUrl: 'http://localhost:1234' },
+};
+
 const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   embeddingProvider: 'openai',
   embeddingModel: 'text-embedding-3-small',
+  localProviders: DEFAULT_LOCAL_PROVIDERS,
   favorites: [],
   defaultModel: null,
   extractionModel: null,
@@ -93,6 +99,12 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  // Deep-merge local-provider config so a stored partial (or a newly added
+  // provider absent from an older settings blob) keeps its default base URL.
+  merged.localProviders = {
+    ollama: { ...DEFAULT_LOCAL_PROVIDERS.ollama, ...parsed.localProviders?.ollama },
+    lmstudio: { ...DEFAULT_LOCAL_PROVIDERS.lmstudio, ...parsed.localProviders?.lmstudio },
+  };
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
   if (!merged.embeddingModel?.trim()) merged.embeddingModel = defaultEmbeddingModel(merged.embeddingProvider);
   // v1.4.0 and older exposed one global header selector. Preserve that user's
@@ -119,7 +131,13 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
 }
 
 function normalizeEmbeddingProvider(provider: unknown): EmbeddingProvider {
-  return provider === 'openai' || provider === 'openrouter' || provider === 'gemini' ? provider : 'openai';
+  return provider === 'openai' ||
+    provider === 'openrouter' ||
+    provider === 'gemini' ||
+    provider === 'ollama' ||
+    provider === 'lmstudio'
+    ? provider
+    : 'openai';
 }
 
 function defaultEmbeddingModel(provider: EmbeddingProvider): string {
@@ -130,5 +148,9 @@ function defaultEmbeddingModel(provider: EmbeddingProvider): string {
       return 'gemini-embedding-001';
     case 'openai':
       return 'text-embedding-3-small';
+    case 'ollama':
+      return 'nomic-embed-text';
+    case 'lmstudio':
+      return 'text-embedding-nomic-embed-text-v1.5';
   }
 }

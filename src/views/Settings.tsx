@@ -16,12 +16,14 @@ import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 
-const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter'];
+const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio'];
 
 const DEFAULT_EMBEDDING_MODEL: Record<EmbeddingProvider, string> = {
   openai: 'text-embedding-3-small',
   gemini: 'gemini-embedding-001',
   openrouter: 'baai/bge-m3',
+  ollama: 'nomic-embed-text',
+  lmstudio: 'text-embedding-nomic-embed-text-v1.5',
 };
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';

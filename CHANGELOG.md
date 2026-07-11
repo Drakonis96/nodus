@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.5.3 — 2026-07-11
+
+### Added
+
+- Local AI providers: Ollama and LM Studio can now be configured in Settings →
+  Providers, alongside the cloud providers. Set the server address (IP and port),
+  test the connection, and load the models installed on your machine.
+- Loaded models list their metadata inline — parameter size, quantization,
+  context length and on-disk size — and LM Studio marks which models are already
+  loaded in memory.
+- An optional access token per local provider, for instances secured behind one,
+  stored encrypted at rest like every other key. Neither provider requires a key
+  by default.
+- Local models can be starred as favorites and used anywhere a cloud model can be
+  used — chat, summaries, deep research, immersion, writing, and more — once
+  marked. They also appear as an embeddings provider (e.g. Ollama's
+  `nomic-embed-text`); switching embedding model re-embeds the corpus offline.
+
+### Notes
+
+- Ollama runs on `http://localhost:11434` and LM Studio on `http://localhost:1234`
+  by default; both addresses are editable, including a LAN IP for a remote host.
+- Small local models may produce lower-quality structured output during deep
+  scans; Nodus already repairs and retries, so scans degrade gracefully.
+
 ## 1.5.2 — 2026-07-11
 
 ### Added

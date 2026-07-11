@@ -40,6 +40,8 @@ const DEFAULT_EMBED_MODELS: Record<EmbeddingProvider, string> = {
   openai: 'text-embedding-3-small',
   openrouter: 'baai/bge-m3',
   gemini: 'gemini-embedding-001',
+  ollama: 'nomic-embed-text',
+  lmstudio: 'text-embedding-nomic-embed-text-v1.5',
 };
 
 export function normalizeEdgeType(type: string | null | undefined): EdgeType | null {
