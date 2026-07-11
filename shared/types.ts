@@ -325,7 +325,8 @@ export interface DecorativeImageActionRequest {
   visualContext?: string;
 }
 export type SyncMode = 'realtime' | 'manual';
-export type ThemeMode = 'dark' | 'light';
+/** 'system' follows the OS light/dark preference and reacts to changes at runtime. */
+export type ThemeMode = 'dark' | 'light' | 'system';
 export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content

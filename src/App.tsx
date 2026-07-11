@@ -47,6 +47,17 @@ import nodusLogo from './assets/nodus-logo.svg';
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
 const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
 
+/** Apply the light/dark root classes for a theme mode. 'system' resolves to the
+ *  OS preference at call time; the App re-invokes this when that preference
+ *  changes so the "system" mode tracks the OS live. */
+function applyThemeClasses(theme: import('@shared/types').ThemeMode): void {
+  const dark = theme === 'system'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : theme === 'dark';
+  document.documentElement.classList.toggle('light', !dark);
+  document.documentElement.classList.toggle('dark', dark);
+}
+
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
@@ -98,8 +109,7 @@ export function App() {
       setSettings(s);
       setActiveLang(s.uiLanguage);
       document.documentElement.lang = s.uiLanguage;
-      document.documentElement.classList.toggle('light', s.theme === 'light');
-      document.documentElement.classList.toggle('dark', s.theme === 'dark');
+      applyThemeClasses(s.theme);
       return s;
     } catch (e) {
       setLoadError(tx('No se pudieron cargar los ajustes: {msg}', { msg: (e as Error).message }));
@@ -110,6 +120,15 @@ export function App() {
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
+
+  // In "system" theme mode, follow the OS light/dark preference as it changes.
+  useEffect(() => {
+    if (settings?.theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyThemeClasses('system');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [settings?.theme]);
 
   const reloadVaults = useCallback(async () => {
     if (!window.nodus) return [];
@@ -312,6 +331,7 @@ export function App() {
         vaults={vaults}
         activeVault={activeVault}
         onVaultsChanged={reloadVaults}
+        onLanguageChosen={reloadSettings}
         onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
       />
     );

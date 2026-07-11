@@ -436,6 +436,7 @@ export function Settings({
           <Section title={t('Apariencia')}>
             <Row label={t('Tema')}>
               <select className="input" value={settings.theme} onChange={(e) => patch({ theme: e.target.value as any })}>
+                <option value="system">{t('Sistema')}</option>
                 <option value="dark">{t('Oscuro')}</option>
                 <option value="light">{t('Claro')}</option>
               </select>

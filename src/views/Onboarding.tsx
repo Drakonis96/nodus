@@ -11,13 +11,20 @@ export function Onboarding({
   vaults,
   activeVault,
   onVaultsChanged,
+  onLanguageChosen,
   onDone,
 }: {
   vaults: VaultSummary[];
   activeVault: VaultSummary | null;
   onVaultsChanged: () => Promise<unknown>;
+  /** Reload settings so the interface language switches once the user picks it. */
+  onLanguageChosen: () => Promise<unknown>;
   onDone: (view?: OnboardingExit) => void;
 }) {
+  // The very first thing a new user does is pick the interface language. Until
+  // then the wizard is shown in English (this screen is intentionally not
+  // translated); afterwards the rest of the wizard follows the chosen language.
+  const [langChosen, setLangChosen] = useState(false);
   const [step, setStep] = useState(0);
   const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
@@ -96,6 +103,36 @@ export function Onboarding({
       setFinishing(false);
     }
   };
+
+  const chooseLanguage = async (lang: 'en' | 'es') => {
+    await window.nodus.updateSettings({ uiLanguage: lang, promptLanguage: lang });
+    await onLanguageChosen();
+    setLangChosen(true);
+  };
+
+  if (!langChosen) {
+    return (
+      <div className="h-full flex items-center justify-center p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="card w-full max-w-md p-8 text-center"
+        >
+          <div className="text-2xl font-semibold mb-1">Welcome to Nodus</div>
+          <p className="text-neutral-400 text-sm mb-6">Choose your language to get started.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="btn btn-primary !py-3 text-base" onClick={() => void chooseLanguage('en')}>
+              English
+            </button>
+            <button className="btn btn-primary !py-3 text-base" onClick={() => void chooseLanguage('es')}>
+              Español
+            </button>
+          </div>
+          <p className="mt-5 text-xs text-neutral-500">You can change this later in Settings.</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   const steps = [t('Conectar Zotero'), t('Colecciones'), t('Lecturas'), t('Proveedor de IA'), t('Primer resultado')];
 

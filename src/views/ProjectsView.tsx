@@ -66,6 +66,16 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
+  const [search, setSearch] = useState('');
+  const [showNewProject, setShowNewProject] = useState(false);
+  // Chapter text view: false shows the rendered reader full-width, true swaps in
+  // the editor. A single-pane toggle (instead of a split) maximises writing space.
+  const [showEditor, setShowEditor] = useState(false);
+
+  const filteredProjects = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? projects.filter((p) => p.title.toLowerCase().includes(q)) : projects;
+  }, [projects, search]);
 
   const selectedChapter = useMemo(
     () => detail?.chapters.find((chapter) => chapter.id === selectedChapterId) ?? detail?.chapters[0] ?? null,
@@ -167,6 +177,7 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       });
       setNewTitle('');
       setNewBrief('');
+      setShowNewProject(false);
       setActiveId(created.project.id);
       setMessage(t('Proyecto creado con carpeta y secciones en Notas.'));
       notifyDataChanged();
@@ -508,12 +519,38 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
       <aside className="w-72 shrink-0 border-r border-neutral-200 p-3 flex flex-col gap-3 overflow-y-auto dark:border-neutral-800">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{t('Proyectos')}</h2>
-          <button className="btn btn-ghost text-xs gap-1.5" onClick={() => void loadProjects()}>
-            <Icon name="sync" size={14} /> {t('Actualizar')}
+          <button className="btn btn-ghost text-xs gap-1.5" onClick={() => void loadProjects()} title={t('Actualizar')}>
+            <Icon name="sync" size={14} />
           </button>
         </div>
+
+        {/* Selected project's stats, right under the list title. */}
+        {detail && (
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label={t('Secciones')} value={detail.stats.sections} />
+            <Stat label={t('Materiales')} value={detail.stats.links} />
+            <Stat label={t('Caps.')} value={detail.stats.chapters} />
+          </div>
+        )}
+
+        <button className="btn btn-primary w-full gap-1.5 text-sm" onClick={() => setShowNewProject(true)}>
+          <Icon name="plus" size={14} /> {t('Nuevo proyecto')}
+        </button>
+
+        {/* Search. Use input-with-leading-icon (two-class selector beats .input's
+            px-3) so the icon never overlaps the placeholder. */}
+        <div className="relative">
+          <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            className="input input-with-leading-icon w-full text-sm"
+            placeholder={t('Buscar proyectos…')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
         <div className="space-y-2">
-          {projects.map((project) => (
+          {filteredProjects.map((project) => (
             <button
               key={project.id}
               className={`w-full text-left border rounded-lg p-3 transition-colors ${
@@ -530,30 +567,44 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
               {t('Aún no hay proyectos. Crea uno para vincular notas, materiales y capítulos.')}
             </div>
           )}
+          {projects.length > 0 && filteredProjects.length === 0 && (
+            <div className="text-sm text-neutral-500 p-2">{t('Ningún proyecto coincide con la búsqueda.')}</div>
+          )}
         </div>
-        <div className="border border-neutral-200 rounded-lg p-3 space-y-2 dark:border-neutral-800">
-          <div className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{t('Nuevo proyecto')}</div>
-          <input
-            className="input w-full text-sm"
-            placeholder={t('Título')}
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-          />
-          <select className="input w-full text-sm" value={newKind} onChange={(e) => setNewKind(e.target.value as ProjectKind)}>
-            {PROJECT_KIND_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{t(option.label)}</option>
-            ))}
-          </select>
-          <textarea
-            className="input w-full text-sm min-h-24"
-            placeholder={t('Brief, objetivo o pregunta principal')}
-            value={newBrief}
-            onChange={(e) => setNewBrief(e.target.value)}
-          />
-          <button className="btn btn-primary w-full gap-1.5" onClick={createProject} disabled={busy === 'create' || !newTitle.trim()}>
-            <Icon name={busy === 'create' ? 'sync' : 'folder'} className={busy === 'create' ? 'animate-spin' : ''} /> {t('Crear proyecto')}
-          </button>
-        </div>
+
+        {/* Chapters of the selected project (sections list removed to widen writing). */}
+        {detail && (
+          <div className="border-t border-neutral-200 pt-3 dark:border-neutral-800">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold">{t('Capítulos')}</h3>
+              <button className="btn btn-primary text-xs gap-1.5" onClick={importChapter} disabled={busy === 'import'} title={t('Subir capítulo')}>
+                <Icon name={busy === 'import' ? 'sync' : 'upload'} size={13} className={busy === 'import' ? 'animate-spin' : ''} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {detail.chapters.map((chapter) => (
+                <button
+                  key={chapter.id}
+                  className={`w-full text-left border rounded-lg p-3 ${
+                    selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
+                  }`}
+                  onClick={() => {
+                    setSelectedChapterId(chapter.id);
+                    setTab('texto');
+                  }}
+                >
+                  <div className="text-sm font-medium truncate text-neutral-900 dark:text-neutral-100">{chapter.title}</div>
+                  <div className="text-xs text-neutral-500">{chapter.wordCount} {t('palabras')} · {chapter.sourceFormat}</div>
+                </button>
+              ))}
+              {detail.chapters.length === 0 && (
+                <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
+                  {t('Sube un capítulo para empezar a trabajar sobre el manuscrito.')}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -618,53 +669,8 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
               />
             )}
 
-            <div className="grid grid-cols-[minmax(220px,300px)_1fr] gap-0 flex-1 min-h-0">
-              <section className="border-r border-neutral-200 p-4 overflow-y-auto dark:border-neutral-800">
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  <Stat label={t('Secciones')} value={detail.stats.sections} />
-                  <Stat label={t('Materiales')} value={detail.stats.links} />
-                  <Stat label={t('Caps.')} value={detail.stats.chapters} />
-                </div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold">{t('Secciones')}</h3>
-                  <button className="btn btn-primary text-xs gap-1.5" onClick={importChapter} disabled={busy === 'import'}>
-                    <Icon name={busy === 'import' ? 'sync' : 'upload'} className={busy === 'import' ? 'animate-spin' : ''} /> {t('Subir capítulo')}
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {detail.sections.map((section) => (
-                    <div key={section.id} className="border border-neutral-200 rounded-lg p-3 dark:border-neutral-800">
-                      <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{section.title}</div>
-                      <div className="text-xs text-neutral-500">{section.role} · {section.status}</div>
-                    </div>
-                  ))}
-                </div>
-                <h3 className="text-sm font-semibold mt-5 mb-2">{t('Capítulos')}</h3>
-                <div className="space-y-2">
-                  {detail.chapters.map((chapter) => (
-                    <button
-                      key={chapter.id}
-                      className={`w-full text-left border rounded-lg p-3 ${
-                        selectedChapter?.id === chapter.id ? 'border-indigo-500 bg-indigo-500/10' : 'border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-900'
-                      }`}
-                      onClick={() => {
-                        setSelectedChapterId(chapter.id);
-                        setTab('texto');
-                      }}
-                    >
-                      <div className="text-sm font-medium truncate text-neutral-900 dark:text-neutral-100">{chapter.title}</div>
-                      <div className="text-xs text-neutral-500">{chapter.wordCount} {t('palabras')} · {chapter.sourceFormat}</div>
-                    </button>
-                  ))}
-                  {detail.chapters.length === 0 && (
-                    <div className="text-sm text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 dark:border-neutral-800">
-                      {t('Sube un capítulo para empezar a trabajar sobre el manuscrito.')}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              <section className="min-w-0 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col">
+              <section className="min-w-0 min-h-0 flex flex-col flex-1">
                 {!selectedChapter ? (
                   <div className="h-full flex items-center justify-center text-neutral-500">{t('No hay capítulo seleccionado.')}</div>
                 ) : (
@@ -686,23 +692,37 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
                     </div>
 
                     {tab === 'texto' && (
-                      <div className="flex-1 min-h-0 grid grid-cols-2">
-                        <div className="border-r border-neutral-200 min-h-0 flex flex-col dark:border-neutral-800">
-                          <div className="p-3 border-b border-neutral-200 flex items-center gap-2 dark:border-neutral-800">
-                            <button className="btn btn-primary gap-1.5" onClick={saveChapter} disabled={busy === 'save-chapter'}>
-                              <Icon name={busy === 'save-chapter' ? 'sync' : 'check'} className={busy === 'save-chapter' ? 'animate-spin' : ''} /> {t('Guardar')}
+                      <div className="flex-1 min-h-0 flex flex-col">
+                        <div className="p-3 border-b border-neutral-200 flex items-center gap-2 dark:border-neutral-800">
+                          <button
+                            className={`btn text-xs gap-1.5 ${showEditor ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`}
+                            onClick={() => setShowEditor((v) => !v)}
+                            title={showEditor ? t('Ver en modo lectura') : t('Editar el texto')}
+                          >
+                            <Icon name={showEditor ? 'eye' : 'edit'} size={13} /> {showEditor ? t('Lectura') : t('Editar')}
+                          </button>
+                          {showEditor && (
+                            <button className="btn btn-primary gap-1.5 text-xs" onClick={saveChapter} disabled={busy === 'save-chapter'}>
+                              <Icon name={busy === 'save-chapter' ? 'sync' : 'check'} size={13} className={busy === 'save-chapter' ? 'animate-spin' : ''} /> {t('Guardar')}
                             </button>
-                            <div className="text-xs text-neutral-500">{t('Editable. Cada guardado crea versión previa.')}</div>
+                          )}
+                          <div className="text-xs text-neutral-500">
+                            {showEditor ? t('Editable. Cada guardado crea versión previa.') : t('Vista de lectura a todo el ancho.')}
                           </div>
+                        </div>
+                        {showEditor ? (
                           <textarea
-                            className="flex-1 min-h-0 bg-white text-neutral-900 p-4 outline-none resize-none font-mono text-sm leading-relaxed dark:bg-neutral-950 dark:text-neutral-100"
+                            className="flex-1 min-h-0 bg-white text-neutral-900 p-5 outline-none resize-none font-mono text-sm leading-relaxed dark:bg-neutral-950 dark:text-neutral-100"
                             value={chapterMarkdown}
                             onChange={(e) => setChapterMarkdown(e.target.value)}
                           />
-                        </div>
-                        <div className="min-h-0 overflow-y-auto p-5">
-                          <Markdown content={chapterMarkdown} onCitation={(c: MarkdownCitation) => setCitation(c)} />
-                        </div>
+                        ) : (
+                          <div className="flex-1 min-h-0 overflow-y-auto p-6">
+                            <div className="mx-auto max-w-3xl">
+                              <Markdown content={chapterMarkdown} onCitation={(c: MarkdownCitation) => setCitation(c)} />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -883,6 +903,50 @@ export function ProjectsView({ settings }: { settings: AppSettings }) {
           </>
         )}
       </main>
+
+      {showNewProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowNewProject(false)}>
+          <div
+            className="w-full max-w-lg rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-800 dark:bg-neutral-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">{t('Nuevo proyecto')}</h3>
+              <button className="text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200" onClick={() => setShowNewProject(false)} title={t('Cerrar')}>
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <input
+                className="input w-full text-sm"
+                placeholder={t('Título')}
+                autoFocus
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+              <select className="input w-full text-sm" value={newKind} onChange={(e) => setNewKind(e.target.value as ProjectKind)}>
+                {PROJECT_KIND_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{t(option.label)}</option>
+                ))}
+              </select>
+              <textarea
+                className="input w-full text-sm min-h-24"
+                placeholder={t('Brief, objetivo o pregunta principal')}
+                value={newBrief}
+                onChange={(e) => setNewBrief(e.target.value)}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={() => setShowNewProject(false)}>
+                {t('Cancelar')}
+              </button>
+              <button className="btn btn-primary gap-1.5" onClick={createProject} disabled={busy === 'create' || !newTitle.trim()}>
+                <Icon name={busy === 'create' ? 'sync' : 'folder'} className={busy === 'create' ? 'animate-spin' : ''} /> {t('Crear proyecto')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {citation && <SourceCitationModal target={citation} onClose={() => setCitation(null)} />}
     </div>

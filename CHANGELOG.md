@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.1 — 2026-07-11
+
+### Changed
+
+- Sidebar: Ideas and Autores now live under "Explorar"; Deep Research moved to
+  "Analizar".
+- Projects view redesigned to give the writing area more room: the project stats
+  and the chapter list moved into the left sidebar (with a project search box),
+  the new-project form is now a modal opened from a button, and the chapter text
+  no longer splits editor/preview side by side — a single full-width view with an
+  icon toggle switches between reading and editing.
+
+### Added
+
+- First run: the setup wizard opens in English and its first step is choosing the
+  interface language (English or Spanish).
+- Interface theme: a new "System" option follows the operating system's light/dark
+  preference and updates live when it changes.
+
 ## 1.5.0 — 2026-07-11
 
 ### Added
