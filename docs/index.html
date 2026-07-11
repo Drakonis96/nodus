@@ -80,7 +80,7 @@
   .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
-  .lang-select { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 9px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .lang-select { appearance: none; -webkit-appearance: none; background-color: var(--card); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a7a2bd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 28px 7px 11px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
   .lang-select:hover { border-color: rgba(167,139,250,0.5); }
   .lang-select option { background: #14121f; color: var(--text); }
 
@@ -390,6 +390,7 @@
     content: '+'; position: absolute; right: 18px; top: 50%; transform: translateY(-50%);
     width: 25px; height: 25px; display: grid; place-items: center; border-radius: 50%;
     border: 1px solid var(--border); color: var(--violet-2); font-size: 18px; font-weight: 500;
+    line-height: 1; text-align: center;
   }
   .faq-item[open] summary::after { content: '−'; background: rgba(139,92,246,0.13); }
   .faq-item summary:focus-visible { outline: 2px solid var(--violet-2); outline-offset: -3px; border-radius: 12px; }
@@ -466,7 +467,7 @@
     .nav { padding: 12px 16px; gap: 12px; }
     .nav .links { gap: 12px; }
     .nav .links a.btn.primary { display: none; }
-    .lang-select { padding: 7px 8px; }
+    .lang-select { padding: 7px 26px 7px 9px; }
     .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
     .faq-answer { padding-left: 16px; padding-right: 16px; }
   }
