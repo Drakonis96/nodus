@@ -13,11 +13,12 @@ configure. Your data, API keys and embeddings stay on your machine.
 > a step-by-step walkthrough from install to your first cited report, plus a map of
 > every sidebar section.
 
-> **New in v1.4.2** — Inmersión and Deep Research can generate one optional,
-> reusable decorative image after the main content is safely stored. Google,
-> the official OpenAI Images API, and image-output OpenRouter models are
-> supported. Global search results now open a common full-detail modal instead
-> of navigating to the graph automatically.
+> **New in v1.7** — the Word writing copilot graduates to an official **beta**,
+> installable straight from the app (Settings → Integrations): while you write, a
+> side panel shows how the current paragraph relates to your library, backed by an
+> auto-renewing local certificate and a Spanish/English pane. Local models via
+> **Ollama and LM Studio** are now first-class providers everywhere a cloud model
+> is, with prompts sized to each model's real context window.
 
 ---
 
