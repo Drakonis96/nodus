@@ -7,9 +7,10 @@ import {
   openRouterRoutingBody,
   OPENROUTER_HEADERS,
   isLocalProvider,
+  localContextWindow,
 } from './providers';
-import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
-import type { AiProvider, EmbeddingProvider, ModelRef, ReasoningEffort } from '@shared/types';
+import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
+import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, ReasoningEffort } from '@shared/types';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -31,6 +32,62 @@ function resolveProviderKey(provider: AiProvider): string | null {
   const stored = getApiKey(provider);
   if (stored) return stored;
   return isLocalProvider(provider) ? 'local' : null;
+}
+
+// ── Local model context budgeting ────────────────────────────────────────────
+// Cloud models expose huge context windows and manage the prompt server-side, so
+// Nodus's large prompts (a scan can be tens of thousands of tokens) fit fine. Local
+// servers load a model with a small, fixed window (LM Studio defaults to 4096), so
+// the same prompt overflows with a cryptic "n_keep >= n_ctx". These helpers size
+// max_tokens to the real window and refuse up front with an actionable message.
+
+/** Smallest generation budget worth attempting; below this the window has no room. */
+const MIN_LOCAL_GENERATION_TOKENS = 512;
+
+/** Rough token estimate (~4 chars/token) for sizing local-model requests. */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+/** Match llama.cpp's "prompt doesn't fit the context window" runtime error (LM Studio
+ *  surfaces it mid-stream or as a 400) — and cloud providers' equivalent — so it can be
+ *  reworded into something the user can act on. */
+function isContextOverflow(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /n_ctx|n_keep|tokens to keep|context length|context window|maximum context/i.test(message);
+}
+
+/** Actionable message for a prompt that overflows a model's context window. */
+function contextOverflowMessage(provider: AiProvider, model: string, ctx: number | null, promptTokens: number | null): string {
+  const label = PROVIDER_LABELS[provider] ?? provider;
+  const knob = provider === 'ollama' ? 'num_ctx' : 'Context Length';
+  const need = promptTokens ? `~${promptTokens.toLocaleString('es')} tokens` : 'más tokens de los que caben';
+  const has = ctx ? ` (ventana actual: ${ctx.toLocaleString('es')} tokens)` : '';
+  return `El modelo local «${model}» no tiene suficiente contexto para esta tarea: necesita ${need}${has}. Aumenta el contexto del modelo en ${label} (${knob}), elige un modelo con más contexto, reduce el tamaño de la tarea (menos texto por lote) o usa un proveedor en la nube para tareas grandes.`;
+}
+
+/** Neutral variant when the provider/model aren't at hand (error-translation fallback). */
+function genericContextOverflowMessage(): string {
+  return 'El modelo no tiene suficiente contexto para esta petición. Reduce el tamaño de la tarea, aumenta el contexto del modelo (Context Length / num_ctx si es local) o usa un modelo con más contexto.';
+}
+
+/**
+ * Size max_tokens to a local model's real context window, refusing up front when the
+ * prompt itself won't fit. Returns the max_tokens to use; throws an actionable AiError
+ * (config → the scan queue pauses once instead of failing every item) when there is no
+ * room to generate. No-ops (returns the requested value) when the window can't be
+ * detected — the runtime-error translation is the safety net for that case.
+ */
+async function localMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): Promise<number> {
+  const ctx = await localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
+  if (!ctx) return requestedMax;
+  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const reserve = Math.max(256, Math.round(ctx * 0.05));
+  const available = ctx - promptTokens - reserve;
+  if (available < MIN_LOCAL_GENERATION_TOKENS) {
+    throw new AiError(contextOverflowMessage(model.provider, model.model, ctx, promptTokens), false, true);
+  }
+  return Math.min(requestedMax, available);
 }
 
 interface CallOpts {
@@ -143,8 +200,12 @@ async function rawComplete(
     }
   }
 
-  // OpenAI-compatible providers: openai, openrouter, deepseek, gemini.
+  // OpenAI-compatible providers: openai, openrouter, deepseek, gemini, local servers.
   const baseURL = openAiCompatBase(model.provider);
+  // Local models load a small, fixed context window; size the request to it (and bail
+  // early with an actionable error) instead of overflowing with a cryptic llama.cpp error.
+  const requestedMax = opts.maxTokens ?? 8000;
+  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -156,7 +217,7 @@ async function rawComplete(
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: opts.maxTokens ?? 8000,
+    max_tokens: maxTokens,
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.user },
@@ -190,6 +251,12 @@ async function rawComplete(
 
 function wrapProviderError(e: any): AiError {
   const status = e?.status ?? e?.response?.status;
+  // A prompt that overflows the model's context window can arrive at various statuses
+  // (400 from local servers, 400/413 from cloud). Reword it before status-based mapping
+  // so the user gets an actionable message instead of a raw "n_keep >= n_ctx".
+  if (isContextOverflow(e?.error?.message ?? e?.message)) {
+    return new AiError(genericContextOverflowMessage(), false, true);
+  }
   if (e?.name?.includes('Timeout') || /timeout|timed out/i.test(e?.message ?? '')) {
     return new AiError('Tiempo agotado esperando al proveedor de IA. Prueba con un modelo más rápido o un fragmento menor.', false);
   }
@@ -399,6 +466,9 @@ async function rawCompleteStream(
   }
 
   const baseURL = openAiCompatBase(model.provider);
+  // See rawComplete: fit the request to a local model's real context window.
+  const requestedMax = opts.maxTokens ?? 8000;
+  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -410,7 +480,7 @@ async function rawCompleteStream(
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: opts.maxTokens ?? 8000,
+    max_tokens: maxTokens,
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
@@ -432,7 +502,12 @@ async function rawCompleteStream(
     }
     for await (const chunk of stream as any) {
       if (chunk?.error) {
-        throw new AiError(chunk.error.message ?? 'Error del proveedor durante el streaming.', false);
+        const msg = chunk.error.message ?? 'Error del proveedor durante el streaming.';
+        // LM Studio/llama.cpp report a too-large prompt mid-stream; reword it actionably.
+        if (isLocalProvider(model.provider) && isContextOverflow(msg)) {
+          throw new AiError(contextOverflowMessage(model.provider, model.model, null, null), false, true);
+        }
+        throw new AiError(msg, false);
       }
       const delta = chunk?.choices?.[0]?.delta;
       // Reasoning trace: OpenRouter exposes `reasoning`, DeepSeek `reasoning_content`.

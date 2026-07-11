@@ -334,6 +334,9 @@ interface LmStudioModel {
   quantization?: string;
   state?: string;
   max_context_length?: number;
+  /** The context window the model is currently loaded with (the real n_ctx). Only
+   *  present while `state === 'loaded'`; often far smaller than max_context_length. */
+  loaded_context_length?: number;
   publisher?: string;
 }
 
@@ -366,6 +369,84 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
     .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));
   // Loaded models first (they answer instantly), then alphabetical.
   return mapped.sort((a, b) => Number(b.loaded) - Number(a.loaded) || a.id.localeCompare(b.id));
+}
+
+// ── Context-window detection for local models ────────────────────────────────
+// Local servers load a model with a fixed context window (n_ctx) that is usually
+// far smaller than a cloud model's — LM Studio commonly defaults to 4096. Nodus
+// builds large prompts, so aiClient uses this to size max_tokens to the real window
+// and to fail with an actionable message instead of a cryptic llama.cpp
+// "n_keep >= n_ctx". Detection is best-effort and cached briefly: inference must
+// never break because a probe failed or the server is momentarily busy.
+
+interface ContextCacheEntry {
+  value: number | null;
+  expires: number;
+}
+const contextCache = new Map<string, ContextCacheEntry>();
+const CONTEXT_TTL_MS = 60_000;
+
+/**
+ * The effective context window (in tokens) a local model is loaded with, or null
+ * when it can't be determined. LM Studio reports the real loaded window; Ollama's
+ * API only exposes the model's trained maximum — a ceiling, since the runtime
+ * `num_ctx` can be smaller — so treat Ollama's value as best-effort. Never throws.
+ */
+export async function localContextWindow(
+  provider: LocalProvider,
+  modelId: string,
+  key: string | null
+): Promise<number | null> {
+  const base = localBaseUrl(provider);
+  const cacheKey = `${provider}::${base}::${modelId}`;
+  const hit = contextCache.get(cacheKey);
+  if (hit && hit.expires > Date.now()) return hit.value;
+  let value: number | null = null;
+  try {
+    value =
+      provider === 'lmstudio'
+        ? await lmStudioContextWindow(base, modelId, key)
+        : await ollamaContextWindow(base, modelId, key);
+  } catch {
+    value = null;
+  }
+  contextCache.set(cacheKey, { value, expires: Date.now() + CONTEXT_TTL_MS });
+  return value;
+}
+
+/** LM Studio's /api/v0/models carries the loaded window per model (the real n_ctx),
+ *  falling back to the model's trained maximum when it is not currently loaded. */
+async function lmStudioContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+  const res = await localFetch(`${base}/api/v0/models`, key, 4000);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { data?: LmStudioModel[] };
+  const model = (data.data ?? []).find((m) => m.id === modelId);
+  if (!model) return null;
+  return model.loaded_context_length ?? model.max_context_length ?? null;
+}
+
+/** Ollama's /api/show exposes only the trained context length (e.g. "llama.context_length");
+ *  the arch prefix varies, so match any *.context_length key. This is a ceiling, not the
+ *  runtime num_ctx (which Ollama silently truncates to), hence best-effort. */
+async function ollamaContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const res = await fetch(`${base}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...localHeaders(key) },
+      body: JSON.stringify({ name: modelId }),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { model_info?: Record<string, unknown> };
+    const info = data.model_info ?? {};
+    const ctxKey = Object.keys(info).find((k) => k.endsWith('.context_length'));
+    const val = ctxKey ? info[ctxKey] : undefined;
+    return typeof val === 'number' ? val : null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Ping a local provider so Settings can confirm the base URL before loading models. */
