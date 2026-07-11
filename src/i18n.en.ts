@@ -2524,5 +2524,9 @@ export const EN: Record<string, string> = {
   'Novedades': 'What’s new',
   'Esto es lo nuevo en esta versión de Nodus.': 'Here’s what’s new in this version of Nodus.',
   '¡Entendido!': 'Got it',
+  'Plegar': 'Collapse',
+  'Desplegar': 'Expand',
+  'Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
+    'Choose the collections to monitor. Expand any collection to pick specific subcollections if one is too large. Metadata is imported; analyses run manually unless you enable automation in Settings.',
   // <<END_EN>>
 };

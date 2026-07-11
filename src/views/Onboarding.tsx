@@ -55,6 +55,15 @@ export function Onboarding({
     void checkZotero();
   }, []);
 
+  const toggleCollection = (key: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const loadModels = async () => {
     setLoadingModels(true);
     setModelError(null);
@@ -180,26 +189,14 @@ export function Onboarding({
         {step === 1 && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-400">
-              {t('Elige las colecciones a monitorizar. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
+              {t('Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
             </p>
-            <div className="max-h-64 overflow-y-auto space-y-1">
+            {selected.size > 0 && (
+              <p className="text-xs text-emerald-400">{tx('{n} seleccionadas', { n: selected.size })}</p>
+            )}
+            <div className="max-h-64 overflow-y-auto pr-1">
               {collections.map((c) => (
-                <label key={c.key} className="flex items-center gap-2 text-sm py-1">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(c.key)}
-                    onChange={(e) => {
-                      const next = new Set(selected);
-                      if (e.target.checked) next.add(c.key);
-                      else next.delete(c.key);
-                      setSelected(next);
-                    }}
-                  />
-                  {c.name}{' '}
-                  <span className="text-neutral-600">
-                    ({c.itemCount} {t('ítems')}{c.subCount ? `, ${c.subCount} ${t('subcol.')}` : ''})
-                  </span>
-                </label>
+                <OnboardingCollectionNode key={c.key} col={c} depth={0} selected={selected} onToggle={toggleCollection} />
               ))}
               {collections.length === 0 && <div className="text-neutral-500 text-sm">{t('No hay colecciones cargadas.')}</div>}
             </div>
@@ -357,6 +354,67 @@ export function Onboarding({
           )}
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+/**
+ * One row of the collection tree in the wizard: a checkbox to monitor this
+ * collection plus an expander that lazily loads its subcollections (via
+ * zoteroChildCollections) so a user can drill into a large collection and pick a
+ * specific subcollection instead. Selection is independent per node — checking a
+ * parent does not auto-check its children.
+ */
+function OnboardingCollectionNode({
+  col,
+  depth,
+  selected,
+  onToggle,
+}: {
+  col: ZoteroCollection;
+  depth: number;
+  selected: Set<string>;
+  onToggle: (key: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [children, setChildren] = useState<ZoteroCollection[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const hasChildren = (col.subCount ?? 0) > 0;
+
+  const expand = async () => {
+    if (!open && children === null && hasChildren) {
+      setLoading(true);
+      const loaded = await window.nodus.zoteroChildCollections(col.key).catch(() => []);
+      setChildren(loaded);
+      setLoading(false);
+    }
+    setOpen((o) => !o);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 py-1 text-sm" style={{ paddingLeft: depth * 16 }}>
+        <button
+          type="button"
+          className={`w-4 shrink-0 text-neutral-500 ${hasChildren ? 'hover:text-neutral-300' : 'invisible'}`}
+          onClick={expand}
+          aria-label={open ? t('Plegar') : t('Desplegar')}
+          title={open ? t('Plegar') : t('Desplegar')}
+        >
+          {loading ? '…' : open ? '▾' : '▸'}
+        </button>
+        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+          <input type="checkbox" className="shrink-0" checked={selected.has(col.key)} onChange={() => onToggle(col.key)} />
+          <span className="truncate">{col.name}</span>
+          <span className="shrink-0 text-neutral-600">
+            ({col.itemCount} {t('ítems')}{col.subCount ? `, ${col.subCount} ${t('subcol.')}` : ''})
+          </span>
+        </label>
+      </div>
+      {open &&
+        children?.map((c) => (
+          <OnboardingCollectionNode key={c.key} col={c} depth={depth + 1} selected={selected} onToggle={onToggle} />
+        ))}
     </div>
   );
 }
