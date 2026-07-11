@@ -24,6 +24,8 @@ export interface AudioVoice {
   sizeMb?: number;
   /** Cloud (Hume) only: which Hume library the voice belongs to. */
   humeProvider?: 'HUME_AI' | 'CUSTOM_VOICE';
+  /** Cloud (Hume) only: compatible model versions (e.g. ["octave-2"]). */
+  models?: string[];
 }
 
 export interface AudioEngine {
@@ -53,8 +55,11 @@ export interface AudioEngine {
   synthesize(text: string, voiceId: string): Promise<Uint8Array>;
 
   // ── Cloud-only surface (present when modelStyle === 'cloud') ────────────────
-  /** Fetch the currently available voices from the provider (requires a key). */
-  listVoices?(): Promise<AudioVoice[]>;
+  /** Fetch the available voices from the provider (requires a key), optionally
+   *  filtered by language (applied server-side where the provider supports it). */
+  listVoices?(opts?: { language?: string }): Promise<AudioVoice[]>;
+  /** Languages the provider can filter by, for the settings language dropdown. */
+  languages?: string[];
   /** Whether an API key is stored for this provider. */
   keyStatus?(): Promise<boolean>;
   setKey?(key: string): Promise<void>;

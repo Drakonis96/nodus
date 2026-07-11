@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, AudioProvider } from '@shared/types';
 import { AUDIO_ENGINES, getEngine, type AudioVoice } from '../lib/audio';
+import { Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 
 const GENDER_LABEL: Record<AudioVoice['gender'], string> = {
@@ -29,6 +30,10 @@ export function AudioGenerationSettings({
   const [keyInput, setKeyInput] = useState('');
   const [cloudVoices, setCloudVoices] = useState<AudioVoice[]>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
+  // Search + filters
+  const [query, setQuery] = useState('');
+  const [langFilter, setLangFilter] = useState('');
+  const [humeLibrary, setHumeLibrary] = useState<'all' | 'HUME_AI' | 'CUSTOM_VOICE'>('all');
   const mounted = useRef(true);
 
   const refresh = async () => {
@@ -36,7 +41,8 @@ export function AudioGenerationSettings({
     if (mounted.current) setReady(r);
   };
 
-  const loadCloud = async () => {
+  // For Hume, language is filtered server-side, so `language` triggers a refetch.
+  const loadCloud = async (language?: string) => {
     const keyed = engine.keyStatus ? await engine.keyStatus() : false;
     if (!mounted.current) return;
     setHasKey(keyed);
@@ -45,7 +51,7 @@ export function AudioGenerationSettings({
       setLoadingVoices(true);
       setError(null);
       try {
-        const voices = await engine.listVoices();
+        const voices = await engine.listVoices(language ? { language } : undefined);
         if (mounted.current) setCloudVoices(voices);
         await refresh();
       } catch (e) {
@@ -60,6 +66,9 @@ export function AudioGenerationSettings({
     mounted.current = true;
     setError(null);
     setKeyInput('');
+    setQuery('');
+    setLangFilter('');
+    setHumeLibrary('all');
     if (isCloud) void loadCloud();
     else void refresh();
     return () => {
@@ -68,7 +77,26 @@ export function AudioGenerationSettings({
     // eslint-disable-next-line
   }, [provider]);
 
-  const voices = isCloud ? cloudVoices : engine.voices;
+  const baseVoices = isCloud ? cloudVoices : engine.voices;
+
+  // Language options for the dropdown: the provider's own list (Hume, filtered
+  // server-side) or the distinct language labels of the local voices.
+  const languageOptions = useMemo(() => {
+    if (engine.languages?.length) return engine.languages;
+    return [...new Set(engine.voices.map((v) => v.languageLabel))];
+  }, [engine]);
+
+  const voices = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return baseVoices.filter((v) => {
+      if (q && !v.name.toLowerCase().includes(q)) return false;
+      // Local providers filter language client-side (Hume did it server-side).
+      if (!isCloud && langFilter && v.languageLabel !== langFilter) return false;
+      if (isCloud && humeLibrary !== 'all' && v.humeProvider !== humeLibrary) return false;
+      return true;
+    });
+  }, [baseVoices, query, langFilter, humeLibrary, isCloud]);
+
   const grouped = useMemo(() => {
     const map = new Map<string, AudioVoice[]>();
     for (const v of voices) {
@@ -128,6 +156,12 @@ export function AudioGenerationSettings({
   const selectVoice = async (id: string) => {
     await window.nodus.updateSettings({ audioVoice: id });
     await onChange();
+  };
+
+  const onLanguageChange = (value: string) => {
+    setLangFilter(value);
+    // Hume filters language server-side, so a change re-queries the voice list.
+    if (isCloud) void loadCloud(value || undefined);
   };
 
   const setSpeed = async (speed: number) => {
@@ -275,9 +309,40 @@ export function AudioGenerationSettings({
         </div>
       )}
 
+      {/* Search + filters. Shown for local providers always, and for Hume once a
+          key is set (its voices come from the API). */}
+      {(!isCloud || hasKey) && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
+            <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+            <input
+              className="input input-with-leading-icon w-full text-sm"
+              placeholder={t('Buscar voces…')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <select className="input text-sm" value={langFilter} onChange={(e) => onLanguageChange(e.target.value)}>
+            <option value="">{t('Todos los idiomas')}</option>
+            {languageOptions.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+          {isCloud && (
+            <select className="input text-sm" value={humeLibrary} onChange={(e) => setHumeLibrary(e.target.value as 'all' | 'HUME_AI' | 'CUSTOM_VOICE')}>
+              <option value="all">{t('Todas las voces')}</option>
+              <option value="HUME_AI">{t('Biblioteca de Hume')}</option>
+              <option value="CUSTOM_VOICE">{t('Mis voces')}</option>
+            </select>
+          )}
+        </div>
+      )}
+
       {/* Cloud empty state */}
       {isCloud && hasKey && !loadingVoices && voices.length === 0 && (
-        <div className="mt-4 text-xs text-neutral-500">{t('No se encontraron voces para esta clave.')}</div>
+        <div className="mt-4 text-xs text-neutral-500">
+          {query || langFilter || humeLibrary !== 'all' ? t('Ninguna voz coincide con los filtros.') : t('No se encontraron voces para esta clave.')}
+        </div>
       )}
 
       {/* Voice list */}
@@ -341,6 +406,9 @@ export function AudioGenerationSettings({
             </div>
           </div>
         ))}
+        {!isCloud && voices.length === 0 && (query || langFilter) && (
+          <div className="text-xs text-neutral-500">{t('Ninguna voz coincide con los filtros.')}</div>
+        )}
       </div>
     </section>
   );

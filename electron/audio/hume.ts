@@ -15,6 +15,8 @@ export interface HumeVoice {
   name: string;
   /** Which Hume library the voice belongs to (needed to synthesize with it). */
   humeProvider: HumeSubProvider;
+  /** Octave model versions the voice is compatible with (e.g. ["octave-2"]). */
+  models: string[];
 }
 
 export function humeHasKey(): boolean {
@@ -35,31 +37,37 @@ function requireKey(): string {
   return key;
 }
 
-async function listForProvider(provider: HumeSubProvider, key: string): Promise<HumeVoice[]> {
+async function listForProvider(provider: HumeSubProvider, key: string, language?: string): Promise<HumeVoice[]> {
   const out: HumeVoice[] = [];
+  // Language isn't part of the voice response, so it can only be filtered
+  // server-side via the documented filter_tag param (TAG:TAG_VALUE).
+  const langParam = language ? `&filter_tag=${encodeURIComponent(`LANGUAGE:${language}`)}` : '';
   for (let page = 0; page < 20; page++) {
-    const url = `${API_BASE}/voices?provider=${provider}&page_number=${page}&page_size=100`;
+    const url = `${API_BASE}/voices?provider=${provider}&page_number=${page}&page_size=100${langParam}`;
     const res = await fetch(url, { headers: { 'X-Hume-Api-Key': key } });
     if (res.status === 401 || res.status === 403) throw new Error('La clave de Hume no es válida.');
     if (!res.ok) throw new Error(`Hume: no se pudieron listar las voces (HTTP ${res.status}).`);
     const data = (await res.json()) as {
       total_pages?: number;
-      voices_page?: Array<{ id: string; name: string }>;
+      voices_page?: Array<{ id: string; name: string; compatible_octave_models?: string[] }>;
     };
     for (const v of data.voices_page ?? []) {
-      if (v.id && v.name) out.push({ id: v.id, name: v.name, humeProvider: provider });
+      if (v.id && v.name) {
+        out.push({ id: v.id, name: v.name, humeProvider: provider, models: v.compatible_octave_models ?? [] });
+      }
     }
     if (!data.total_pages || page + 1 >= data.total_pages) break;
   }
   return out;
 }
 
-/** All voices available to this key: Hume's shared library plus the user's own. */
-export async function listHumeVoices(): Promise<HumeVoice[]> {
+/** All voices available to this key: Hume's shared library plus the user's own,
+ *  optionally filtered by language (Hume tag) server-side. */
+export async function listHumeVoices(language?: string): Promise<HumeVoice[]> {
   const key = requireKey();
   const [library, custom] = await Promise.all([
-    listForProvider('HUME_AI', key),
-    listForProvider('CUSTOM_VOICE', key).catch(() => [] as HumeVoice[]),
+    listForProvider('HUME_AI', key, language),
+    listForProvider('CUSTOM_VOICE', key, language).catch(() => [] as HumeVoice[]),
   ]);
   return [...library, ...custom];
 }

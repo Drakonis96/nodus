@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.2 — 2026-07-11
+
+### Added
+
+- Audio voices (Settings → AI → "Audio y voz"): a search box and filters to find a
+  voice quickly. Filter by language for every provider, and — for Hume — also by
+  library (Hume's voices vs. your own). Hume language filtering is applied on the
+  server via the voices API, and each Hume voice shows its Octave model version.
+
 ## 1.5.1 — 2026-07-11
 
 ### Changed

@@ -74,7 +74,7 @@ const api: NodusApi = {
   humeStatus: () => ipcRenderer.invoke('audio:humeStatus'),
   humeSetKey: (key) => ipcRenderer.invoke('audio:humeSetKey', key),
   humeClearKey: () => ipcRenderer.invoke('audio:humeClearKey'),
-  humeVoices: () => ipcRenderer.invoke('audio:humeVoices'),
+  humeVoices: (language) => ipcRenderer.invoke('audio:humeVoices', language),
   humeSynthesize: (voiceId, provider, text) =>
     ipcRenderer.invoke('audio:humeSynthesize', voiceId, provider, text),
 

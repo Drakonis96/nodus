@@ -483,7 +483,7 @@ export function registerIpc(
     clearHumeKey();
     return { hasKey: humeHasKey() };
   });
-  h('audio:humeVoices', async () => listHumeVoices());
+  h('audio:humeVoices', async (_e, language?: string) => listHumeVoices(language));
   h('audio:humeSynthesize', async (_e, voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string) => {
     const bytes = await synthesizeHume(voiceId, provider, text);
     return new Uint8Array(bytes);

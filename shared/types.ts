@@ -370,6 +370,8 @@ export interface HumeVoiceInfo {
   id: string;
   name: string;
   humeProvider: 'HUME_AI' | 'CUSTOM_VOICE';
+  /** Octave model versions the voice supports (e.g. ["octave-2"]). */
+  models: string[];
 }
 
 /** One generated audio file for a segment (stage/section) of a report or immersion. */
@@ -3200,7 +3202,7 @@ export interface NodusApi {
   humeStatus(): Promise<{ hasKey: boolean }>;
   humeSetKey(key: string): Promise<{ hasKey: boolean }>;
   humeClearKey(): Promise<{ hasKey: boolean }>;
-  humeVoices(): Promise<HumeVoiceInfo[]>;
+  humeVoices(language?: string): Promise<HumeVoiceInfo[]>;
   humeSynthesize(voiceId: string, provider: 'HUME_AI' | 'CUSTOM_VOICE', text: string): Promise<Uint8Array>;
 
   // zotero
