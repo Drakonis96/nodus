@@ -896,7 +896,7 @@
   </div>
 </div>
 
-<script src="faq.js?v=20260711-1"></script>
+<script src="faq.js?v=20260711-tr"></script>
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
@@ -1107,7 +1107,7 @@ fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 
 // ---------- i18n (landing page only) ----------
 const LANGS = [
   { c: 'de', n: 'Deutsch' }, { c: 'en', n: 'English' }, { c: 'es', n: 'Español' },
-  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'zh', n: '中文' },
+  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'tr', n: 'Türkçe' }, { c: 'zh', n: '中文' },
 ];
 const VIG = ['v.library', 'v.graph', 'v.ideas', 'v.debates', 'v.gaps', 'v.deep', 'v.writing', 'v.immersion'];
 const I18N = {
@@ -1305,6 +1305,45 @@ const I18N = {
     'final.title': `Pronto para conhecer a sua biblioteca?`, 'final.lead': `Teste a demo aqui mesmo no seu navegador, ou baixe o app e aponte-o para o seu próprio Zotero. <b style="color:#6ee7b7">Gratuito e de código aberto, para sempre.</b>`, 'final.download': `Baixar o app`,
     'footer.tag': `Nodus, um espaço de pesquisa local, gratuito e de código aberto. Amostras de áudio geradas com as vozes locais Kokoro do app.`,
     'dl.title': `Baixar o Nodus`, 'dl.fetching': `Obtendo a versão mais recente…`, 'dl.latest': `Versão mais recente`, 'dl.free': `100% grátis · código aberto · sem conta`, 'dl.all': `Todos os formatos e versões anteriores →`, 'dl.close': `Fechar`,
+  },
+  tr: {
+    'nav.how': `Nasıl çalışır`, 'nav.views': `Görünümler`, 'nav.listen': `Dinle`, 'nav.demo': `Demoyu dene`,
+    'hero.h1': `Yıldızlar gibi dağılmış bin fikir.<br/><span class="grad">Nodus takımyıldızları birbirine bağlar.</span>`,
+    'hero.sub': `Zotero kitaplığınızı fikirler, yazarlar, tartışmalar ve araştırma boşluklarından oluşan gezilebilir bir grafa dönüştüren; ardından gerçekten doğrulayabileceğiniz atıflarla yazmanıza yardımcı olan yerel öncelikli bir masaüstü uygulaması.`,
+    'hero.demo': `Demoyu dene`, 'hero.download': `macOS ve Windows için indir`,
+    'hero.meta': `<b>Tamamen ücretsiz ve açık kaynaklı.</b> Hesap yok, abonelik yok, telemetri yok; derleminiz makinenizden ayrılmaz.`,
+    'hero.scroll': `aşağı kaydır`,
+    'story.kicker': `Nasıl çalışır`, 'story.title': `Her şey tek bir ipe bağlıdır: fikir.`,
+    'story.lead': `Dosyalar, PDF'ler ya da klasörler değil. Nodus, kitaplığınızdaki her eseri gerçek iddialarına, bulgularına ve kavramlarına ayırır; ardından bu ipin götürdüğü yere kadar izini sürer.`,
+    'step1.t': `Kitaplığınızı eşitleyin`, 'step1.b': `Nodus'u Zotero koleksiyonlarınıza yönlendirin. Ekli dosyaları doğrudan okur; eklenti, yeniden dizinleme ya da yükleme gerekmez. Yinelenen kayıtlar kayıpsız biçimde tespit edilir ve birleştirilir.`,
+    'step2.t': `Fikirleri çıkarın`, 'step2.b': `Bir yapay zekâ geçişi (kendi anahtarınızla bulutta veya Ollama / LM Studio ile tamamen çevrimdışı) her eserin iddialarını, bulgularını, yöntemlerini ve çerçevelerini çıkarır; her biri için birebir kanıt ve sayfa bilgisi sunar.`,
+    'step3.t': `Bağlantılarını görün`, 'step3.b': `Fikirler yaşayan bir grafta bağlanır: destekler, çelişir, inceltir, genişletir. Kuvvet yönelimli, WebGL ile hızlı ve tema, yazar ya da okuma durumuna göre filtrelenebilir. Derleminiz burada bir yığın olmaktan çıkıp bir argümana benzemeye başlar.`,
+    'step4.t': `Derlemi sorgulayın`, 'step4.b': `Nodus, kitaplığınızın söylemediklerini açığa çıkarır: açık çelişkiler zaman çizelgeli karşılıklı tartışmalara, eksik bağlantılar araştırma boşluklarına dönüşür; sorularınız gerçek kapsamla karşılaştırılır.`,
+    'step5.t': `Kanıtla yazın`, 'step5.b': `Yazma Atölyesi grafta temellenen bölümler taslaklar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Deep Research, atıflı ve çok sayfalı tam raporlar oluşturur. Aynı yardımcı Microsoft Word içinde canlı çalışır.`,
+    'step6.t': `Sonra dinleyin`, 'step6.b': `Herhangi bir raporu sesli anlatıma dönüştürün veya derleminizin bir köşesinde rehberli, sürükleyici bir yolculuğa çıkın. Sesler yerel olarak çalışır (Piper, Kokoro); bulut sesleri için kendi Hume anahtarınızı da kullanabilirsiniz.`,
+    'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük sahne uygulamadaki gerçek bir görünümü yansıtır ve hepsi canlı demoda bütünüyle keşfedilebilir.`,
+    'views.cta': `Demodaki 19 görünümün tamamını keşfedin →`, 'v.open': `Demoda aç →`,
+    'v.library.t': `Zotero girer, fikirler çıkar`, 'v.library.b': `Koleksiyonlarınızı eşitleyin, okundu etiketlerini koruyun ve yinelenenleri kayıpsız birleştirin. Her eser analiz durumunu saklar; hiçbir şey iki kez taranmaz.`,
+    'v.graph.t': `Bir takımyıldız olarak derlem`, 'v.graph.b': `Temalar, iddialar, bulgular ve yöntemler; destekler, çelişir ve inceltir gibi türlendirilmiş kenarlarla bağlanır. Hazır görünümler sizi doğrudan çelişkilere, boşluklara veya okuma rotanıza götürür.`,
+    'v.ideas.t': `Kanıtlı iddialar`, 'v.ideas.b': `Her fikir birebir kanıt ve sayfa bilgisi taşır. Birine tıklayın; ilişkilerini, yazarını ve tam pasajı görün. Kaynaksız iddia yok.`,
+    'v.debates.t': `Çelişkiler karşı karşıya`, 'v.debates.b': `İki konum, her iki taraftaki yazarlar, kanıtları ve anlaşmazlığın zaman çizelgesi; grafın çelişki kenarlarından otomatik olarak oluşturulur.`,
+    'v.gaps.t': `Henüz kimsenin söylemediği`, 'v.gaps.b': `Temalar arasındaki eksik bağlantılar açık araştırma fırsatlarına dönüşür; her biri taslak bir kapsam sorusu ve tek tıklamayla kaynak araması içerir.`,
+    'v.deep.t': `Gerçekten kaynak gösteren raporlar`, 'v.deep.b': `Kuyrukta oluşturulan çok sayfalı akademik raporlarda her iddia derleminizdeki bir sayfaya bağlanır; destek matrisi ve sesli sürüm de sunulur.`,
+    'v.writing.t': `Doğrulanabilir atıflı taslaklar`, 'v.writing.b': `Atölye graftan yazar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Aynı yardımcı Microsoft Word içinde canlı çalışır.`,
+    'v.immersion.t': `Derleminizin düşünüşünü dinleyin`, 'v.immersion.b': `Rehberli ses yolculukları: panorama, birebir alıntılı duraklar, karşılaştırmalar, sınırlar ve final sınavı. Sesler Piper ve Kokoro ile yerel olarak üretilir.`,
+    'listen.kicker': `Araştırmanızı dinleyin`, 'listen.title': `Okuyabileceğiniz raporlar. Ya da oynat tuşuna basın.`,
+    'listen.lead': `Deep Research derleminizden çok sayfalı, atıflı raporlar yazar; Daldırma ise bunun içinden rehberli yolculuklar anlatır. Bu örnekler, uygulamayla birlikte gelen yerel ses modeli Kokoro ile üretildi.`,
+    'listen.c1.t': `Deep Research özeti`, 'listen.c1.b': `“Geri getirme alıştırması: kendini sınamak neden yeniden okumayı geçer?”, 6 eser, 12 atıflı fikir, seslendirilmiş.`,
+    'listen.c2.t': `Daldırma yolculuğu`, 'listen.c2.b': `“Bir gece göğü olarak kitaplığınız”, örnek derlemin bir takımyıldızı boyunca rehberli bir ses yolculuğu.`,
+    'listen.c3.t': `Her ses varsayılan olarak yerel`, 'listen.c3.b': `Piper ve Kokoro makinenizde sentezler; hiçbir şey yüklenmez. Stüdyo kalitesinde bulut sesleri mi istiyorsunuz? Kendi Hume anahtarınızı kullanın.`,
+    'band.kicker': `Gerçekten ücretsiz ve yerel`, 'band.title': `Tamamen ücretsiz. Tamamen sizin.`,
+    'band.lead': `Nodus MIT lisanslı açık kaynaklıdır; hesap, abonelik ve telemetri içermez. Diskte tek bir SQLite kasası kullanır. Yapay zekâ kendi anahtarınızla veya Ollama ve LM Studio üzerinden tamamen çevrimdışı çalışabilir. Şifreli otomatik yedeklemeler, kurcalamaya dayanıklı denetim günlüğü ve kendi yapay zekâ araçlarınızın grafı yerel olarak sorgulaması için yerleşik bir MCP sunucusu içerir.`,
+    'band.pill1': `Sonsuza kadar ücretsiz (MIT)`, 'band.pill2': `%100 yerel depolama`, 'band.pill3': `Çevrimdışı yapay zekâ (Ollama · LM Studio)`, 'band.pill4': `Şifreli otomatik yedekler`, 'band.pill5': `Denetim günlüğü`, 'band.pill6': `Yerleşik MCP sunucusu`,
+    'feat.kicker': `Her şey içinde`, 'feat.title': `Tek uygulama. Tüm araştırma döngüsü.`,
+    'feat.d1': `Derlem sağlığı ve önerilen bir sonraki adım.`, 'feat.d2': `Fikirler, yazarlar ve pasajlar arasında anlamsal ve tam arama.`, 'feat.d3': `Yinelenenleri birleştirme ve tarama kurtarma özellikli Zotero eşitlemesi.`, 'feat.d4': `Her fikir ve türlendirilmiş ilişki için WebGL kuvvet grafı.`, 'feat.d5': `Tez, destekler, itirazlar ve yanıtlar; tümü sürüklenebilir.`, 'feat.d6': `Birebir sayfa kanıtı taşıyan iddialar ve bulgular.`, 'feat.d7': `Zotero'yu esas alan yazar dosyaları ve sentez matrisi.`, 'feat.d8': `Derleminizden kılavuzlar, bilgi kartları ve Sokratik rotalar.`, 'feat.d9': `Yerel üretilen seslerle anlatılan ses yolculukları.`, 'feat.d10': `Derleminizin henüz söylemedikleri, otomatik olarak çıkarılır.`, 'feat.d11': `Zaman çizelgesiyle karşı karşıya getirilen çelişkiler.`, 'feat.d12': `Araştırma sorularınız gerçek kanıtlarla karşılaştırılır.`, 'feat.d13': `Graftaki gerilimler sınanabilir hipotezlere dönüşür.`, 'feat.d14': `Okunmuş ve okunmamış eserler arasında önerilen sıra.`, 'feat.d15': `Dışa aktarılabilir ve seslendirilebilir çok sayfalı atıflı raporlar.`, 'feat.d16': `Grafta temellenen, atıfları doğrulanmış taslaklar.`, 'feat.d17': `Microsoft Word içinde canlı yardımcı (beta).`, 'feat.d18': `Çıktılar, klasörler ve nodus:// derin bağlantıları.`, 'feat.d19': `Grafınızı Claude veya herhangi bir MCP istemcisinden sorgulayın.`, 'feat.d20': `Her atıf bağlantısını koruyan yapay zekâ içerik çevirisi.`,
+    'final.title': `Kitaplığınızla tanışmaya hazır mısınız?`, 'final.lead': `Demoyu doğrudan tarayıcınızda deneyin veya uygulamayı indirip kendi Zotero'nuza yönlendirin. <b style="color:#6ee7b7">Sonsuza kadar ücretsiz ve açık kaynaklı.</b>`, 'final.download': `Uygulamayı indir`,
+    'footer.tag': `Nodus; yerel, ücretsiz ve açık kaynaklı bir araştırma alanı. Ses örnekleri uygulamanın yerel Kokoro sesleriyle üretildi.`,
+    'dl.title': `Nodus'u indir`, 'dl.fetching': `En son sürüm alınıyor…`, 'dl.latest': `En son sürüm`, 'dl.free': `%100 ücretsiz · açık kaynaklı · hesap gerekmez`, 'dl.all': `Tüm biçimler ve önceki sürümler →`, 'dl.close': `Kapat`,
   },
   zh: {
     'nav.how': `工作原理`, 'nav.views': `视图`, 'nav.listen': `收听`, 'nav.demo': `试用演示`,
