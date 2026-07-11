@@ -10,14 +10,21 @@ import { registerTools } from './tools';
 
 const MCP_PATH = '/mcp';
 const MAX_REQUEST_BYTES = 2 * 1024 * 1024;
+// Stateful sessions live only in memory. A client that dies without sending the
+// DELETE (or an SSE stream that just goes quiet) would otherwise leak its session
+// until the app restarts, so a periodic sweep closes sessions left idle too long.
+const SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+let sessionIdleTtlMs = 30 * 60 * 1000;
 
 interface McpSession {
   server: McpServer;
   transport: StreamableHTTPServerTransport;
+  lastActivity: number;
 }
 
 let httpServer: Server | null = null;
 const sessions = new Map<string, McpSession>();
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
 let status: McpServerStatus = { running: false, port: null, url: null, error: null };
 let lifecycle = Promise.resolve();
 
@@ -141,6 +148,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
     const existing = sessionId ? sessions.get(sessionId) : undefined;
 
     if (existing) {
+      existing.lastActivity = Date.now();
       await existing.transport.handleRequest(req, res, parsedBody);
       return;
     }
@@ -172,7 +180,7 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse, port:
       },
     });
     const server = makeMcpServer();
-    session = { server, transport };
+    session = { server, transport, lastActivity: Date.now() };
     transport.onclose = () => {
       const activeId = transport.sessionId;
       if (activeId) sessions.delete(activeId);
@@ -195,6 +203,30 @@ async function closeSessions(): Promise<void> {
   const active = [...sessions.values()];
   sessions.clear();
   await Promise.allSettled(active.map((session) => session.server.close()));
+}
+
+/** Closes every session left idle beyond the TTL. Exported so tests can drive it
+ *  deterministically instead of waiting for the interval. Closing a session's server
+ *  fires transport.onclose, which removes it from the map. */
+export function sweepIdleSessions(now = Date.now()): void {
+  for (const [id, session] of sessions) {
+    if (now - session.lastActivity <= sessionIdleTtlMs) continue;
+    sessions.delete(id);
+    console.log(`[mcp] closing idle session ${id}`);
+    void session.server.close().catch(() => {
+      /* a session already tearing down is fine — it is gone either way */
+    });
+  }
+}
+
+/** Test-only override of the idle TTL (ms). Never called in production. */
+export function __setSessionIdleTtlForTest(ms: number): void {
+  sessionIdleTtlMs = ms;
+}
+
+/** Test-only count of live in-memory sessions. */
+export function __sessionCountForTest(): number {
+  return sessions.size;
 }
 
 async function closeHttpServer(server: Server): Promise<void> {
@@ -239,6 +271,8 @@ async function start(): Promise<void> {
       candidate.listen(port, '127.0.0.1');
     });
     httpServer = candidate;
+    sweepTimer = setInterval(() => sweepIdleSessions(), SESSION_SWEEP_INTERVAL_MS);
+    sweepTimer.unref?.();
     status = { running: true, port, url: endpoint(port), error: null };
     console.log(`[mcp] listening on ${endpoint(port)}`);
   } catch (error) {
@@ -251,6 +285,10 @@ async function start(): Promise<void> {
 async function stop(): Promise<void> {
   const active = httpServer;
   httpServer = null;
+  if (sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
   await closeSessions();
   if (active) await closeHttpServer(active);
   status = { running: false, port: null, url: null, error: null };
