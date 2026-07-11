@@ -146,26 +146,44 @@ export async function installCopilotAddin(appRoot: string, appVersion = '0.1.0')
   }
 }
 
+/** LibreOffice per-user Python scripts directory, or null on unsupported platforms. */
+function libreOfficeScriptsDirectory(): string | null {
+  if (process.platform === 'linux') {
+    return path.join(homedir(), '.config', 'libreoffice', '4', 'user', 'Scripts', 'python');
+  }
+  if (process.platform === 'darwin') {
+    return path.join(homedir(), 'Library', 'Application Support', 'LibreOffice', '4', 'user', 'Scripts', 'python');
+  }
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA;
+    return appData ? path.join(appData, 'LibreOffice', '4', 'user', 'Scripts', 'python') : null;
+  }
+  return null;
+}
+
 export async function installLibreOfficeCopilot(appRoot: string): Promise<CopilotInstallResult> {
-  if (process.platform !== 'linux') {
+  const targetDir = libreOfficeScriptsDirectory();
+  if (!targetDir) {
     return {
       ok: false,
       manifestPath: null,
-      message: 'La instalación automática del macro de LibreOffice solo está soportada en sistemas Linux.',
+      message: 'La instalación automática del macro de LibreOffice no está soportada en esta plataforma.',
     };
   }
 
-  const targetDir = path.join(homedir(), '.config', 'libreoffice', '4', 'user', 'Scripts', 'python');
   const targetPath = path.join(targetDir, 'nodus_copilot.py');
   const sourcePath = path.join(appRoot, 'scripts', 'nodus_copilot.py');
 
   try {
+    // readFile + writeFile (not copyFile): the source lives inside app.asar in the
+    // packaged app, where Electron's fs patching reliably covers reads.
+    const macro = await fs.readFile(sourcePath, 'utf8');
     await fs.mkdir(targetDir, { recursive: true });
-    await fs.copyFile(sourcePath, targetPath);
+    await fs.writeFile(targetPath, macro, 'utf8');
     return {
       ok: true,
       manifestPath: targetPath,
-      message: `Macro de LibreOffice copiado con éxito en: ${targetPath}. Reinicia LibreOffice Writer si lo tenías abierto.`,
+      message: `Macro de LibreOffice instalado en: ${targetPath}. En LibreOffice Writer, ejecútalo desde Herramientas → Macros → Ejecutar macro → Mis macros → nodus_copilot → start_nodus_copilot.`,
     };
   } catch (error) {
     return {

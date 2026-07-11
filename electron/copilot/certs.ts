@@ -23,6 +23,13 @@ const execFileAsync = promisify(execFile);
 const OFFICE_CERT_DIR = path.join(homedir(), '.office-addin-dev-certs');
 const NODUS_CERT_DIR = path.join(homedir(), '.nodus-copilot-certs');
 
+/** Fixed, vault-independent copilot state directory (certs + bridge file). External
+ *  bridges (the LibreOffice macro) read connection info from here, so it must not
+ *  depend on userData/productName or on which vault is active. */
+export function copilotStateDir(): string {
+  return NODUS_CERT_DIR;
+}
+
 const CA_NAME = 'Nodus Copilot Local CA';
 const CA_VALIDITY_DAYS = 3650;
 const LEAF_VALIDITY_DAYS = 365;
@@ -102,6 +109,19 @@ export function certReady(): boolean {
 /** Load the localhost cert+key, or null when not generated/trusted yet. */
 export function loadCopilotCert(): CopilotCert | null {
   return loadOfficeCert() ?? loadNodusCert();
+}
+
+/** PEM of the CA that signed the leaf the server is currently presenting, or null
+ *  when unavailable. Must mirror loadCopilotCert()'s source priority so external
+ *  bridges (LibreOffice macro) can verify TLS against the right CA. */
+export function loadCopilotCa(): string | null {
+  const source = loadOfficeCert() !== null ? OFFICE_CERT_DIR : loadNodusCert() !== null ? NODUS_CERT_DIR : null;
+  if (!source) return null;
+  try {
+    return readFileSync(path.join(source, 'ca.crt'), 'utf8');
+  } catch {
+    return null;
+  }
 }
 
 /** The inline system command that trusts the CA for the current user, or null

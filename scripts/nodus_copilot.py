@@ -1,232 +1,317 @@
 # -*- coding: utf-8 -*-
 """
-Nodus Copilot — LibreOffice Writer Entegrasyon Köprüsü
-Bu script, LibreOffice Writer ile yerel Nodus uygulaması arasında çift yönlü iletişim sağlar.
+Nodus Copilot — puente para LibreOffice Writer / LibreOffice Writer bridge.
 
-Kurulum:
-1. Bu dosyayı ~/.config/libreoffice/4/user/Scripts/python/nodus_copilot.py olarak kaydedin.
-2. (Klasörler yoksa oluşturun: mkdir -p ~/.config/libreoffice/4/user/Scripts/python/)
-3. LibreOffice Writer'ı açın.
-4. Araçlar -> Makrolar -> Makroyu Çalıştır -> Makrolarım -> nodus_copilot -> start_nodus_copilot makrosunu çalıştırın.
+Two-way bridge between LibreOffice Writer and the local Nodus copilot server:
+it pushes the current paragraph/selection to Nodus (so the copilot pane can
+analyze it) and long-polls for AI-generated texts to insert at the cursor.
+
+Instalación / Install:
+1. En Nodus: Ajustes → Copiloto de escritura (LibreOffice) → "Instalar macro"
+   (copia este archivo a la carpeta de scripts Python de LibreOffice), o cópialo
+   a mano a:
+     - Linux:   ~/.config/libreoffice/4/user/Scripts/python/
+     - macOS:   ~/Library/Application Support/LibreOffice/4/user/Scripts/python/
+     - Windows: %APPDATA%/LibreOffice/4/user/Scripts/python/
+2. En LibreOffice Writer: Herramientas → Macros → Ejecutar macro →
+   Mis macros → nodus_copilot → start_nodus_copilot.
+3. Para detenerlo: la misma ruta → stop_nodus_copilot.
+
+Connection info (port, token, CA) is read from the bridge file Nodus writes on
+copilot-server start: ~/.nodus-copilot-certs/bridge.json — a fixed per-user
+path independent of the Nodus data directory and of which vault is active.
 """
 
-import uno
-import unohelper
 import json
-import urllib.request
-import urllib.error
+import os
+import queue
 import ssl
 import threading
 import time
-import os
-import sqlite3
-import socket
+import urllib.error
+import urllib.request
 
-# Varsayılan Konfigürasyon (SQLite okunamadığında kullanılır)
-DEFAULT_PORT = 4320
-DEFAULT_TOKEN = ""
+import uno  # noqa: F401  (provided by LibreOffice's embedded Python)
+import unohelper
 
-# Global durum değişkenleri
+# Overridable for tests/custom setups; defaults to the file the Nodus copilot
+# server refreshes on every start.
+BRIDGE_FILE = os.environ.get("NODUS_COPILOT_BRIDGE") or os.path.expanduser(
+    "~/.nodus-copilot-certs/bridge.json"
+)
+
+UPDATE_TIMEOUT_S = 5
+# Must exceed the server's 30s long-poll window so the server, not the socket,
+# ends each empty poll.
+POLL_TIMEOUT_S = 40
+
+# Global session state. Threading contract: UNO document calls happen ONLY on
+# LibreOffice's main thread (the selection listener, and insertions marshaled
+# through com.sun.star.awt.AsyncCallback); network happens ONLY on background
+# threads. Mutating a document from a Python thread deadlocks against the
+# solar mutex — verified empirically.
 listener_instance = None
 polling_thread = None
+sender_thread = None
 running = False
+# Latest (paragraph, selection) captured by the listener, pending upload.
+_send_queue = queue.Queue(maxsize=16)
+# Set after a TLS verification failure so the session keeps working (localhost
+# only) instead of dying when the CA in the bridge file can't verify the leaf.
+_tls_fallback_insecure = False
 
-def load_nodus_settings():
-    """Nodus SQLite veritabanından güncel port ve token bilgilerini okur."""
-    db_path = os.path.expanduser("~/.config/nodus/nodus.sqlite")
-    if not os.path.exists(db_path):
-        return None
+
+def load_bridge_info():
+    """Return (port, token, ca_pem) from the bridge file, or None when absent/unreadable."""
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM settings WHERE key = 'app'")
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return json.loads(row[0])
-    except Exception as e:
-        print(f"[Nodus] Ayarlar okunurken hata oluştu: {e}")
-    return None
+        with open(BRIDGE_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return None
+    port = data.get("port")
+    token = data.get("token")
+    if not isinstance(port, int) or not token:
+        return None
+    return port, str(token), data.get("caCert") or None
 
-def get_connection_info():
-    """Bağlantı parametrelerini döner."""
-    settings = load_nodus_settings()
-    port = DEFAULT_PORT
-    token = DEFAULT_TOKEN
-    
-    if settings:
-        port = settings.get("copilotPort", DEFAULT_PORT)
-        token = settings.get("copilotToken", DEFAULT_TOKEN)
-        
-    return port, token
+
+def _ssl_context(ca_pem):
+    """Verified context against the Nodus CA when available; otherwise (or after a
+    verification failure) an unverified localhost-only context."""
+    if ca_pem and not _tls_fallback_insecure:
+        try:
+            ctx = ssl.create_default_context(cadata=ca_pem)
+            # Keep real chain+hostname verification but drop the STRICT extras
+            # (Python 3.13 default): locally generated leaves (mkcert /
+            # office-addin-dev-certs) may lack the AKI/SKI extensions it demands.
+            ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+            return ctx
+        except Exception:
+            pass
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+def _request(method, api_path, body=None, timeout=UPDATE_TIMEOUT_S):
+    """One HTTPS call to the copilot server; returns parsed JSON or None."""
+    global _tls_fallback_insecure
+    info = load_bridge_info()
+    if not info:
+        return None
+    port, token, ca_pem = info
+    url = "https://localhost:%d%s" % (port, api_path)
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": "Bearer " + token,
+            "Content-Type": "application/json",
+        },
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(req, context=_ssl_context(ca_pem), timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except ssl.SSLError:
+        if not _tls_fallback_insecure:
+            _tls_fallback_insecure = True
+            print("[Nodus] Aviso: no se pudo verificar el certificado local; se continúa sin verificación (solo localhost).")
+            return _request(method, api_path, body=body, timeout=timeout)
+        return None
+
 
 class SelectionListener(unohelper.Base, uno.getClass("com.sun.star.view.XSelectionChangeListener")):
     def __init__(self, doc):
         self.doc = doc
-        self.last_text = ""
+        self.last_sent = ("", "")
 
     def selectionChanged(self, event):
-        global running
         if not running:
             return
-        
         try:
             controller = self.doc.getCurrentController()
-            if not controller:
-                return
-            view_cursor = controller.getViewCursor()
+            view_cursor = controller.getViewCursor() if controller else None
             if not view_cursor:
                 return
 
-            # Seçilen metni al
             selection_text = view_cursor.getString() or ""
 
-            # Görsel seçimi bozmamak için görünmez bir TextCursor oluştur
-            text = self.doc.getText()
-            text_cursor = text.createTextCursorByRange(view_cursor.getStart())
-            
-            # XParagraphCursor arayüzünü sorgula ve paragraf metnini çek
-            from com.sun.star.text.XParagraphCursor import XParagraphCursor
-            para_cursor = uno.queryInterface(XParagraphCursor, text_cursor)
-            if para_cursor:
-                para_cursor.gotoStartOfParagraph(False)
-                para_cursor.gotoEndOfParagraph(True)
-                paragraph_text = para_cursor.getString() or ""
-            else:
-                paragraph_text = ""
+            # Walk the enclosing text (works inside tables/frames too) with an
+            # invisible cursor so the visual selection is untouched. Writer text
+            # cursors implement XParagraphCursor directly — pyuno proxies expose
+            # every interface, no queryInterface needed (pyuno has none).
+            text = view_cursor.getText()
+            para_cursor = text.createTextCursorByRange(view_cursor.getStart())
+            para_cursor.gotoStartOfParagraph(False)
+            para_cursor.gotoEndOfParagraph(True)
+            paragraph_text = para_cursor.getString() or ""
 
-            # Aynı metin için mükerrer istek atmayı engelle
-            if paragraph_text == self.last_text:
+            snapshot = (paragraph_text, selection_text)
+            if snapshot == self.last_sent:
                 return
-            self.last_text = paragraph_text
+            self.last_sent = snapshot
 
-            # Sunucuya gönder
-            port, token = get_connection_info()
-            if not token:
-                return
-
-            url = f"https://localhost:{port}/api/editor/update-text"
-            data = json.dumps({
-                "paragraphText": paragraph_text,
-                "selectionText": selection_text
-            }).encode("utf-8")
-
-            # Localhost sertifikasını doğrulama (self-signed cert bypass)
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json"
-                },
-                method="POST"
-            )
-            with urllib.request.urlopen(req, context=ctx, timeout=3) as response:
-                pass
+            # Never do network on this (main/UI) thread: hand off to the sender.
+            try:
+                _send_queue.put_nowait(snapshot)
+            except queue.Full:
+                pass  # the sender drains to the freshest snapshot anyway
         except Exception as e:
-            # Hata günlüklemesini basitleştirmek için terminale yazdırır
-            print(f"[Nodus] Metin senkronizasyon hatası: {e}")
+            print("[Nodus] Error al sincronizar la selección: %s" % e)
 
     def disposing(self, event):
         pass
 
-def poll_insertions(doc):
-    """Nodus'tan gelen metin/atıf ekleme isteklerini uzun-anketleme (long-poll) ile dinler."""
-    global running
-    
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
 
+def _insert_at_cursor(doc, text_to_insert):
+    """Insert after the current selection (matching the Word pane: never replaces
+    the selected text) and leave the cursor at the end of the insertion.
+    Main-thread only."""
+    controller = doc.getCurrentController()
+    view_cursor = controller.getViewCursor() if controller else None
+    if not view_cursor:
+        return
+    if text_to_insert and not text_to_insert[0].isspace():
+        text_to_insert = " " + text_to_insert
+    text = view_cursor.getText()
+    text.insertString(view_cursor.getEnd(), text_to_insert, False)
+    view_cursor.collapseToEnd()
+
+
+class _InsertCallback(unohelper.Base, uno.getClass("com.sun.star.awt.XCallback")):
+    """Runs one insertion on the main thread (posted via AsyncCallback)."""
+
+    def __init__(self, doc, text_to_insert):
+        self.doc = doc
+        self.text_to_insert = text_to_insert
+
+    def notify(self, data):
+        try:
+            _insert_at_cursor(self.doc, self.text_to_insert)
+        except Exception as e:
+            print("[Nodus] Error al insertar el texto: %s" % e)
+
+
+def _schedule_insert(doc, text_to_insert):
+    """Marshal a document mutation from a worker thread onto the main thread."""
+    try:
+        ctx = uno.getComponentContext()
+        async_cb = ctx.ServiceManager.createInstanceWithContext("com.sun.star.awt.AsyncCallback", ctx)
+        async_cb.addCallback(_InsertCallback(doc, text_to_insert), None)
+    except Exception as e:
+        print("[Nodus] Error al programar la inserción: %s" % e)
+
+
+def send_updates():
+    """Upload selection snapshots from the queue (network thread)."""
     while running:
         try:
-            port, token = get_connection_info()
-            if not token:
-                time.sleep(2)
-                continue
-
-            url = f"https://localhost:{port}/api/editor/poll-insertion"
-            req = urllib.request.Request(
-                url,
-                headers={"Authorization": f"Bearer {token}"},
-                method="GET"
-            )
-
-            # 35 saniyelik timeout ile uzun anketleme yap
-            with urllib.request.urlopen(req, context=ctx, timeout=35) as response:
-                res_data = json.loads(response.read().decode("utf-8"))
-                if res_data and res_data.get("text") and running:
-                    # Metni ana imleç konumuna yerleştir
-                    text_to_insert = res_data["text"]
-                    
-                    # Ana thread üzerinde imleç konumunu güncelle
-                    controller = doc.getCurrentController()
-                    view_cursor = controller.getViewCursor()
-                    if view_cursor:
-                        # Seçili metin varsa üzerine yazar, yoksa imlecin olduğu yere ekler
-                        view_cursor.setString(text_to_insert)
-                        # İmleci eklenen metnin sonuna taşı
-                        view_cursor.collapseToEnd()
-        except urllib.error.URLError as e:
-            # Sunucu kapalı veya erişilemez durumdaysa bekle ve tekrar dene
-            time.sleep(5)
-        except socket.timeout:
-            # Zaman aşımı normaldir (Long poll bitimi), döngü devam eder
+            snapshot = _send_queue.get(timeout=1)
+        except queue.Empty:
+            continue
+        # Drain to the freshest snapshot; intermediate states are obsolete.
+        try:
+            while True:
+                snapshot = _send_queue.get_nowait()
+        except queue.Empty:
             pass
+        try:
+            _request(
+                "POST",
+                "/api/editor/update-text",
+                {"paragraphText": snapshot[0], "selectionText": snapshot[1]},
+            )
         except Exception as e:
+            print("[Nodus] Error al enviar la selección: %s" % e)
+
+
+def poll_insertions(doc):
+    """Long-poll the server for texts to insert until stop_nodus_copilot()."""
+    while running:
+        try:
+            if load_bridge_info() is None:
+                # Nodus not started yet (or copilot disabled): retry quietly.
+                time.sleep(3)
+                continue
+            result = _request("GET", "/api/editor/poll-insertion", timeout=POLL_TIMEOUT_S)
+            if result and result.get("text") and running:
+                _schedule_insert(doc, result["text"])
+        except urllib.error.URLError:
+            time.sleep(5)  # server down/unreachable; back off and retry
+        except Exception as e:
+            print("[Nodus] Error en el bucle de inserción: %s" % e)
             time.sleep(2)
 
-def start_nodus_copilot(*args):
-    """Nodus Copilot dinleyicisini ve arka plan ekleme servisini başlatır."""
-    global listener_instance, polling_thread, running
-    if running:
-        print("[Nodus] Dinleyici zaten aktif.")
-        return
 
+def _find_writer_doc(desktop):
+    """The focused component when it is a Writer doc; otherwise the first open
+    Writer doc (covers focus on the Basic IDE, dialogs, or headless use)."""
+    doc = desktop.getCurrentComponent()
+    if doc is not None and hasattr(doc, "getText") and doc.getCurrentController():
+        return doc
     try:
-        desktop = XSCRIPTCONTEXT.getDesktop()
-        doc = desktop.getCurrentComponent()
-        controller = doc.getCurrentController()
+        components = desktop.getComponents().createEnumeration()
+        while components.hasMoreElements():
+            candidate = components.nextElement()
+            if hasattr(candidate, "getText") and candidate.getCurrentController():
+                return candidate
+    except Exception:
+        pass
+    return None
+
+
+def start_nodus_copilot(*args):
+    """Arranca el puente: sincroniza la selección y escucha inserciones de Nodus."""
+    global listener_instance, polling_thread, sender_thread, running
+    if running:
+        print("[Nodus] El puente ya está activo.")
+        return
+    try:
+        desktop = XSCRIPTCONTEXT.getDesktop()  # noqa: F821 (injected by the script provider)
+        doc = _find_writer_doc(desktop)
+        controller = doc.getCurrentController() if doc else None
         if not controller:
-            print("[Nodus] Döküman kontrolcüsü bulunamadı.")
+            print("[Nodus] Abre un documento de Writer antes de iniciar el puente.")
             return
 
-        # Seçim dinleyicisini ata
         listener_instance = SelectionListener(doc)
         controller.addSelectionChangeListener(listener_instance)
 
-        # Arka plan poll servisini başlat
         running = True
+        sender_thread = threading.Thread(target=send_updates, daemon=True)
+        sender_thread.start()
         polling_thread = threading.Thread(target=poll_insertions, args=(doc,), daemon=True)
         polling_thread.start()
-        
-        print("[Nodus] LibreOffice Writer Copilot Köprüsü başarıyla başlatıldı.")
+
+        if load_bridge_info() is None:
+            print("[Nodus] Puente iniciado, pero no se encontró %s. Abre Nodus con el copiloto activado." % BRIDGE_FILE)
+        else:
+            print("[Nodus] Puente LibreOffice Writer ↔ Nodus iniciado.")
     except Exception as e:
-        print(f"[Nodus] Başlatma hatası: {e}")
+        print("[Nodus] Error al iniciar el puente: %s" % e)
+
 
 def stop_nodus_copilot(*args):
-    """Nodus Copilot dinleyicisini ve arka plan servisini durdurur."""
+    """Detiene el puente y retira el listener de selección."""
     global listener_instance, running
     if not running:
         return
-
     try:
         running = False
-        desktop = XSCRIPTCONTEXT.getDesktop()
-        doc = desktop.getCurrentComponent()
-        controller = doc.getCurrentController()
-        
-        if controller and listener_instance:
-            controller.removeSelectionChangeListener(listener_instance)
-        
+        # Detach from the document the listener was registered on (the user may
+        # have switched to another document since start).
+        if listener_instance:
+            controller = listener_instance.doc.getCurrentController()
+            if controller:
+                controller.removeSelectionChangeListener(listener_instance)
         listener_instance = None
-        print("[Nodus] LibreOffice Writer Copilot Köprüsü durduruldu.")
+        print("[Nodus] Puente detenido.")
     except Exception as e:
-        print(f"[Nodus] Durdurma hatası: {e}")
+        print("[Nodus] Error al detener el puente: %s" % e)
 
-# Makro menüsünde görünecek fonksiyonlar
-g_exportedTemplates = (start_nodus_copilot, stop_nodus_copilot)
+
+# Functions exposed in LibreOffice's macro selector.
+g_exportedScripts = (start_nodus_copilot, stop_nodus_copilot)

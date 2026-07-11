@@ -6,12 +6,12 @@
 import { createServer, type Server } from 'node:https';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { app, BrowserWindow, shell } from 'electron';
 import type { CopilotServerStatus } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { loadCopilotCert, certReady, renewLeafIfNeeded } from './certs';
+import { loadCopilotCert, loadCopilotCa, certReady, copilotStateDir, renewLeafIfNeeded } from './certs';
 import { analyzeText, composeCopilotIdeaInsertion, getCopilotIdeaDetail, searchCopilotIdeas } from '../ai/liveRelations';
 import { embeddedIdeaCount } from '../db/ideasRepo';
 import { getDb } from '../db/database';
@@ -28,12 +28,36 @@ interface EditorState {
   selectionText: string;
 }
 
+// Bridge state for external editors (LibreOffice Writer): the macro pushes the
+// current paragraph/selection here and long-polls for texts to insert, while the
+// standalone task pane reads the state and posts insertions. Single-slot state is
+// enough: this is a local, single-user bridge.
 const editorState: EditorState = { paragraphText: '', selectionText: '' };
 let pendingInsertionResolvers: ((text: string) => void)[] = [];
-
+const EDITOR_POLL_TIMEOUT_MS = 30_000;
 
 function addinUrl(port: number): string {
   return `https://localhost:${port}/addin/taskpane.html`;
+}
+
+/**
+ * Connection info for external bridges that cannot receive the token via an
+ * injected page (the LibreOffice macro). Written next to the copilot certs —
+ * a fixed per-user path independent of userData/vaults — with owner-only
+ * permissions (the token is equally readable in the settings DB). Includes the
+ * active CA PEM so the macro can verify TLS instead of disabling verification.
+ */
+export async function writeCopilotBridgeFile(port: number, dir: string = copilotStateDir()): Promise<string> {
+  const bridgePath = path.join(dir, 'bridge.json');
+  const payload = {
+    port,
+    token: ensureToken(),
+    caCert: loadCopilotCa(),
+    updatedAt: new Date().toISOString(),
+  };
+  await mkdir(dir, { recursive: true });
+  await writeFile(bridgePath, JSON.stringify(payload, null, 2), { encoding: 'utf8', mode: 0o600 });
+  return bridgePath;
 }
 
 function describeError(error: unknown): string {
@@ -259,31 +283,41 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, p
       const body = (await readJsonBody(req)) as { text?: string };
       const text = String(body.text ?? '');
       const resolver = pendingInsertionResolvers.shift();
-      if (resolver) {
-        resolver(text);
-      }
-      sendJson(res, 200, { ok: true });
+      if (resolver) resolver(text);
+      // delivered:false tells the pane no editor bridge is long-polling right now,
+      // so it can surface "run the macro in Writer" instead of a silent no-op.
+      sendJson(res, 200, { ok: true, delivered: Boolean(resolver) });
       return;
     }
     if (urlPath === '/api/editor/poll-insertion' && req.method === 'GET') {
       await new Promise<void>((resolve) => {
-        let resolved = false;
-        const timeout = setTimeout(() => {
-          if (resolved) return;
-          resolved = true;
-          pendingInsertionResolvers = pendingInsertionResolvers.filter((r) => r !== resolver);
-          sendJson(res, 200, { text: null });
-          resolve();
-        }, 30000); // 30s timeout
-
-        const resolver = (text: string) => {
-          if (resolved) return;
-          resolved = true;
+        let settled = false;
+        // Writing to a response whose socket died (client gone, server stopping)
+        // throws outside handleRequest's try/catch — from a timer — so every
+        // late send must be guarded to protect the main process.
+        const safeSend = (body: unknown) => {
+          try {
+            if (!res.writableEnded && !res.destroyed) sendJson(res, 200, body);
+          } catch {
+            /* client already gone */
+          }
+        };
+        const settle = (body: unknown | null) => {
+          if (settled) return;
+          settled = true;
           clearTimeout(timeout);
-          sendJson(res, 200, { text });
+          pendingInsertionResolvers = pendingInsertionResolvers.filter((r) => r !== resolver);
+          if (body !== null) safeSend(body);
           resolve();
         };
-
+        const timeout = setTimeout(() => settle({ text: null }), EDITOR_POLL_TIMEOUT_MS);
+        const resolver = (text: string) => settle({ text });
+        // A dead poller must leave the queue immediately: otherwise a later
+        // insert would be handed to it and the text silently lost. res 'close'
+        // fires on premature termination (and, harmlessly for the idempotent
+        // settle, after a normal send); req 'close' would fire on request
+        // completion, far too early for a bodyless GET.
+        res.on('close', () => settle(null));
         pendingInsertionResolvers.push(resolver);
       });
       return;
@@ -319,7 +353,17 @@ async function start(): Promise<void> {
   try {
     ensureToken();
     const candidate = createServer({ cert: cert.cert, key: cert.key }, (req, res) => {
-      void handleRequest(req, res, port);
+      // A rejection escaping here (e.g. a throw outside handleRequest's inner
+      // try, like /api/health hitting a closing DB) must not become an
+      // unhandled rejection that kills the main process.
+      handleRequest(req, res, port).catch((error) => {
+        console.warn('[copilot] request failed', error);
+        try {
+          if (!res.headersSent) sendJson(res, 500, { error: 'Error interno del copiloto.' });
+        } catch {
+          /* client already gone */
+        }
+      });
     });
     await new Promise<void>((resolve, reject) => {
       const onError = (error: Error) => {
@@ -337,6 +381,14 @@ async function start(): Promise<void> {
     httpServer = candidate;
     status = { running: true, port, addinUrl: addinUrl(port), certReady: true, error: null };
     console.log(`[copilot] listening on ${addinUrl(port)}`);
+    // Refresh the discovery file for external bridges (LibreOffice macro) on every
+    // start, so port/token/CA changes propagate. Best-effort: a write failure
+    // must not take the server down.
+    try {
+      await writeCopilotBridgeFile(port);
+    } catch (error) {
+      console.warn('[copilot] failed to write bridge file', error);
+    }
   } catch (error) {
     status = { running: false, port: null, addinUrl: null, certReady: certReady(), error: describeError(error) };
     console.warn('[copilot] failed to start', error);

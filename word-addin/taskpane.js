@@ -54,6 +54,7 @@
       connectedWorks: 'Conectado · {n} obras',
       connectedNoEmbeddings: 'Conectado (sin embeddings)',
       notResponding: 'Nodus no responde · abre Nodus con el copiloto activado',
+      editorNotListening: 'LibreOffice no está escuchando. Ejecuta la macro start_nodus_copilot en Writer.',
       wordOnly: 'Este complemento solo funciona en Word.',
       nodusError: 'Error de Nodus',
       relation: { supports: 'apoya', contradicts: 'contradice', refines: 'matiza', extends: 'amplía', related: 'relacionada' },
@@ -93,6 +94,7 @@
       connectedWorks: 'Connected · {n} works',
       connectedNoEmbeddings: 'Connected (no embeddings)',
       notResponding: 'Nodus is not responding · open Nodus with the copilot enabled',
+      editorNotListening: 'LibreOffice is not listening. Run the start_nodus_copilot macro in Writer.',
       wordOnly: 'This add-in only works in Word.',
       nodusError: 'Nodus error',
       relation: { supports: 'supports', contradicts: 'contradicts', refines: 'refines', extends: 'extends', related: 'related' },
@@ -207,6 +209,11 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: text })
+      }).then(function (result) {
+        // The server accepts the text but only a long-polling macro can place
+        // it in the document; surface the miss instead of a silent no-op.
+        if (result && result.delivered === false) throw new Error(T('editorNotListening'));
+        return result;
       });
     }
     return Word.run(function (context) {
@@ -601,19 +608,25 @@
   }
 
   var initialized = false;
-  Office.onReady(function (info) {
+  function initOnce(insideWord) {
     if (initialized) return;
-    if (info && info.host === Office.HostType.Word) {
-      isWord = true;
-    }
     initialized = true;
+    isWord = insideWord;
     initApp();
-  });
+  }
 
-  setTimeout(function () {
-    if (!initialized) {
-      initialized = true;
-      initApp();
-    }
-  }, 1000);
+  if (typeof Office !== 'undefined' && Office.onReady) {
+    // Office.onReady fires in every environment once office.js is up: with
+    // host Word inside Word, with a null host in a plain browser. Deciding by
+    // host (not by a short timeout racing Word's startup) is what keeps a slow
+    // Word start from being misdetected as standalone mode.
+    Office.onReady(function (info) {
+      initOnce(Boolean(info && info.host === Office.HostType.Word));
+    });
+    // Safety net for a half-broken office.js that never signals readiness.
+    setTimeout(function () { initOnce(false); }, 8000);
+  } else {
+    // office.js unavailable (e.g. browser without CDN access): standalone now.
+    initOnce(false);
+  }
 })();
