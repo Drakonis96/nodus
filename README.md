@@ -9,6 +9,10 @@ your sources.
 Everything runs locally. The only external calls are to the AI provider you
 configure. Your data, API keys and embeddings stay on your machine.
 
+> **New here?** Start with **[Your first day with Nodus](docs/GETTING_STARTED.md)** —
+> a step-by-step walkthrough from install to your first cited report, plus a map of
+> every sidebar section.
+
 > **New in v1.4.2** — Inmersión and Deep Research can generate one optional,
 > reusable decorative image after the main content is safely stored. Google,
 > the official OpenAI Images API, and image-output OpenRouter models are
