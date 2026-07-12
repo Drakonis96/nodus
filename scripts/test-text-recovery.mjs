@@ -67,6 +67,23 @@ try {
   assert.match(doc.text, /Espana & turismo/);
   assert.match(doc.text, /Segundo bloque/);
 
+  // CSV → linearised records (phase A: primary-source / genealogy ingestion).
+  const csvPath = path.join(root, 'census.csv');
+  fs.writeFileSync(csvPath, 'Nombre,Anio,Lugar\nJuan Perez,1850,Sevilla\n');
+  const csvDoc = await extractFromPath(csvPath);
+  assert.equal(csvDoc.sourceType, 'upload');
+  assert.match(csvDoc.text, /Campos: Nombre . Anio . Lugar/);
+  assert.match(csvDoc.text, /Nombre: Juan Perez/);
+
+  // Image with OCR disabled → no text, but recorded with a note (tesseract is never
+  // invoked, so the file content is irrelevant here).
+  const imgPath = path.join(root, 'record.png');
+  fs.writeFileSync(imgPath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  const imgDoc = await extractFromPath(imgPath, { ocr: { enabled: false, languages: 'spa+eng', maxPages: 0 } });
+  assert.equal(imgDoc.text, '');
+  assert.equal(imgDoc.sourceType, 'upload');
+  assert.match(imgDoc.notes ?? '', /OCR desactivado/);
+
   assert.equal(isTextAttachment({ key: 'A', contentType: 'application/epub+zip', linkMode: 'imported_file', filename: 'book.epub' }), true);
   assert.equal(isTextAttachment({ key: 'B', contentType: 'text/html', linkMode: 'imported_url', filename: 'snapshot.html' }), false);
 
