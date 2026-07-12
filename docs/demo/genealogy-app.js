@@ -1,7 +1,8 @@
-/* Nodus web demo — GENEALOGY mode. A static, faithful replica of the app's
-   genealogy vault: persons, family tree, timeline, evidence archive, map, social
-   relations and a family-history Deep Research report. Same shell and conventions
-   as app.js, on the sample family in genealogy-data.js. */
+/* Nodus web demo — GENEALOGY mode. A faithful, static replica of the app's
+   genealogy vault on the Serrano-family sample corpus: the SVG family tree with
+   framed portraits, the two-pane People view, the timeline, the evidence archive
+   (folder tree + table), the real Leaflet map with migration paths, and the
+   social-relations node graph. Same shell + conventions as app.js. */
 (function () {
   const G = window.GEN;
   const $ = (sel, el) => (el || document).querySelector(sel);
@@ -10,52 +11,128 @@
 
   // ---------- lookups ----------
   const personById = (id) => G.persons.find((p) => p.id === id);
+  const placeById = (id) => G.places.find((p) => p.id === id);
   const contactById = (id) => G.contacts.find((c) => c.id === id);
   const archiveById = (id) => G.archive.find((a) => a.id === id);
-  const eventById = (id) => G.events.find((e) => e.id === id);
-  const placeById = (id) => G.places.find((p) => p.id === id);
   const nameOf = (id) => (personById(id) || contactById(id) || { name: id }).name;
-  const parentsOf = (id) => G.filiation.filter((f) => f.child === id).map((f) => f.parent);
-  const childrenOf = (id) => G.filiation.filter((f) => f.parent === id).map((f) => f.child);
-  const unionOf = (id) => G.unions.find((u) => u.a === id || u.b === id);
+  const yearOf = (s) => { const m = String(s || '').match(/\d{4}/); return m ? +m[0] : null; };
+  const datesOf = (p) => (p.birth && p.death) ? `${p.birth} – ${p.death}` : p.birth ? `n. ${p.birth}` : p.death ? `† ${p.death}` : '';
   const eventsForPerson = (id) => G.events.filter((e) => e.persons.includes(id));
-  const relationsForPerson = (id) => G.relations.filter((r) => r.from === id);
+  const sortedEvents = () => G.events.slice().sort((a, b) => (a.year - b.year) || 0);
+
+  const EVC = window.GEN_EVENT_COLORS;
+  const EVENT_LABEL = { birth: 'Birth', baptism: 'Baptism', marriage: 'Marriage', death: 'Death', burial: 'Burial', census: 'Census', migration: 'Migration', residence: 'Residence' };
 
   function toast(msg) {
-    const t = $('#toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    clearTimeout(t._h);
-    t._h = setTimeout(() => t.classList.remove('show'), 3200);
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3200);
   }
 
-  function lifespan(p) {
-    const b = p.birth && p.birth.date ? p.birth.date : '?';
-    const d = p.death && p.death.date && p.death.date !== '—' ? p.death.date : (p.death && p.death.date === '—' ? '' : '');
-    return d ? `${b} – ${d}` : `b. ${b}`;
-  }
-  function initials(name) {
-    const parts = String(name).replace(/[¿?]/g, '').trim().split(/\s+/);
-    return ((parts[0] || '')[0] || '') + ((parts[1] || '')[0] || '');
-  }
-  function portrait(p, size) {
-    const s = size || 56;
-    const warm = p.sex === 'F' ? ['#5b4038', '#8a5c4a'] : ['#463a2c', '#7a6249'];
-    const rid = 'g' + p.id + s;
-    const faded = p.conf === 'hypothesis';
-    return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" class="gp-portrait${faded ? ' faded' : ''}" aria-hidden="true">
-      <defs><linearGradient id="${rid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${warm[1]}"/><stop offset="1" stop-color="${warm[0]}"/></linearGradient></defs>
-      <rect x="1" y="1" width="${s - 2}" height="${s - 2}" rx="${s * 0.16}" fill="url(#${rid})" stroke="rgba(0,0,0,0.35)"/>
-      <text x="50%" y="50%" dy="0.35em" text-anchor="middle" font-size="${s * 0.4}" font-weight="600" fill="#f5e9d8" font-family="Inter,sans-serif">${esc(initials(p.name))}</text>
-    </svg>`;
-  }
-  const EVC = window.GEN_EVENT_COLORS;
-  const EVENT_LABEL = { birth: 'Birth', baptism: 'Baptism', marriage: 'Marriage', death: 'Death', census: 'Census', military: 'Military levy', migration: 'Emigration' };
-  function eventChip(type) {
-    return `<span class="chip"><span class="dot" style="background:${EVC[type] || '#999'}"></span>${EVENT_LABEL[type] || type}</span>`;
+  // ---------- family-tree layout (ported from shared/treeLayout.ts) ----------
+  function computeTreeLayout(input) {
+    const opts = Object.assign({ nodeWidth: 128, nodeHeight: 158, hGap: 28, vGap: 52 }, input);
+    if (!input.focusId) return { nodes: [], edges: [], width: 0, height: 0 };
+    const sexOf = new Map(), birthOf = new Map();
+    (input.persons || []).forEach((p) => { sexOf.set(p.id, p.sex || 'unknown'); birthOf.set(p.id, p.birthYear ?? null); });
+    const parentsOf = new Map(), childrenOf = new Map();
+    input.parentEdges.forEach(({ parent, child }) => {
+      (childrenOf.get(parent) || childrenOf.set(parent, []).get(parent)).push(child);
+      (parentsOf.get(child) || parentsOf.set(child, []).get(child)).push(parent);
+    });
+    const spousesOf = new Map();
+    input.spouseEdges.forEach(({ a, b }) => {
+      (spousesOf.get(a) || spousesOf.set(a, []).get(a)).push(b);
+      (spousesOf.get(b) || spousesOf.set(b, []).get(b)).push(a);
+    });
+    const gen = new Map(); gen.set(input.focusId, 0);
+    const q = [input.focusId];
+    while (q.length) {
+      const id = q.shift(); const g = gen.get(id);
+      (parentsOf.get(id) || []).forEach((p) => { if (!gen.has(p)) { gen.set(p, g - 1); q.push(p); } });
+      (childrenOf.get(id) || []).forEach((c) => { if (!gen.has(c)) { gen.set(c, g + 1); q.push(c); } });
+      (spousesOf.get(id) || []).forEach((s) => { if (!gen.has(s)) { gen.set(s, g); q.push(s); } });
+    }
+    const present = new Set(gen.keys());
+    const pairKey = (a, b) => a < b ? `${a}|${b}` : `${b}|${a}`;
+    const partners = new Map();
+    const link = (a, b) => {
+      if (a === b || !present.has(a) || !present.has(b) || gen.get(a) !== gen.get(b)) return;
+      (partners.get(a) || partners.set(a, new Set()).get(a)).add(b);
+      (partners.get(b) || partners.set(b, new Set()).get(b)).add(a);
+    };
+    input.spouseEdges.forEach(({ a, b }) => link(a, b));
+    parentsOf.forEach((ps) => { for (let i = 0; i < ps.length; i++) for (let j = i + 1; j < ps.length; j++) link(ps[i], ps[j]); });
+    const byGen = new Map();
+    gen.forEach((g, id) => (byGen.get(g) || byGen.set(g, []).get(g)).push(id));
+    const gens = [...byGen.keys()].sort((a, b) => a - b);
+    const orderPair = (x, y) => {
+      const sx = sexOf.get(x), sy = sexOf.get(y);
+      if (sx === 'male' && sy === 'female') return [x, y];
+      if (sx === 'female' && sy === 'male') return [y, x];
+      const bx = birthOf.get(x), by = birthOf.get(y);
+      if (bx != null && by != null && bx !== by) return bx < by ? [x, y] : [y, x];
+      return x < y ? [x, y] : [y, x];
+    };
+    const orderComponent = (members) => {
+      if (members.length <= 1) return members;
+      if (members.length === 2) return orderPair(members[0], members[1]);
+      const set = new Set(members);
+      const start = members.find((m) => [...(partners.get(m) || [])].filter((p) => set.has(p)).length === 1) || members[0];
+      const seq = [], seen = new Set(); let cur = start;
+      while (cur) { seq.push(cur); seen.add(cur); cur = [...(partners.get(cur) || [])].find((p) => set.has(p) && !seen.has(p)); }
+      members.forEach((m) => { if (!seen.has(m)) seq.push(m); });
+      return seq;
+    };
+    const order = new Map();
+    const orderGeneration = (g, neigh) => {
+      const ids = byGen.get(g);
+      const parent = new Map(); const find = (x) => { let r = x; while (parent.get(r) !== r) r = parent.get(r); return r; };
+      ids.forEach((id) => parent.set(id, id));
+      ids.forEach((id) => (partners.get(id) || []).forEach((p) => { if (gen.get(p) === g) parent.set(find(id), find(p)); }));
+      const comps = new Map();
+      ids.forEach((id) => (comps.get(find(id)) || comps.set(find(id), []).get(find(id))).push(id));
+      const bary = (id) => {
+        if (neigh === null) return Number.MAX_SAFE_INTEGER;
+        const rel = g < 0 ? (childrenOf.get(id) || []) : (parentsOf.get(id) || []);
+        const placed = rel.filter((n) => gen.get(n) === neigh && order.has(n)).map((n) => order.get(n));
+        return placed.length ? placed.reduce((s, v) => s + v, 0) / placed.length : Number.MAX_SAFE_INTEGER;
+      };
+      const ordered = [...comps.values()].map((members) => {
+        const seq = orderComponent(members);
+        const bs = members.map(bary).filter((b) => b < Number.MAX_SAFE_INTEGER);
+        return { seq, b: bs.length ? bs.reduce((s, v) => s + v, 0) / bs.length : Number.MAX_SAFE_INTEGER };
+      }).sort((a, b) => a.b - b.b);
+      let i = 0; ordered.forEach((comp) => comp.seq.forEach((id) => order.set(id, i++)));
+    };
+    orderGeneration(0, null);
+    [...gens].sort((a, b) => Math.abs(a) - Math.abs(b)).forEach((g) => { if (g !== 0) orderGeneration(g, g < 0 ? g + 1 : g - 1); });
+    const minGen = gens[0] ?? 0;
+    const rowStep = opts.nodeHeight + opts.vGap, colStep = opts.nodeWidth + opts.hGap;
+    const nodes = [], nodesById = new Map(); let maxCols = 0;
+    gens.forEach((g) => {
+      const ids = byGen.get(g).slice().sort((a, b) => (order.get(a) || 0) - (order.get(b) || 0));
+      maxCols = Math.max(maxCols, ids.length);
+      ids.forEach((id, col) => { const n = { personId: id, generation: g, x: col * colStep, y: (g - minGen) * rowStep, coupleSide: 'none' }; nodes.push(n); nodesById.set(id, n); });
+    });
+    nodes.forEach((node) => {
+      const ps = [...(partners.get(node.personId) || [])].map((p) => nodesById.get(p)).filter(Boolean);
+      if (!ps.length) return;
+      const near = ps.reduce((a, b) => Math.abs(b.x - node.x) < Math.abs(a.x - node.x) ? b : a);
+      node.coupleSide = node.x < near.x ? 'left' : 'right';
+    });
+    const edges = [];
+    input.parentEdges.forEach(({ parent, child }) => { if (present.has(parent) && present.has(child)) edges.push({ from: parent, to: child, kind: 'parent' }); });
+    input.spouseEdges.forEach(({ a, b }) => { if (present.has(a) && present.has(b)) edges.push({ from: a, to: b, kind: 'spouse' }); });
+    return { nodes, edges, width: Math.max(0, maxCols * colStep - opts.hGap), height: Math.max(0, gens.length * rowStep - opts.vGap) };
   }
 
-  // ---------- icons (subset, stroke style like the app) ----------
+  // A default silhouette (man faces right, woman left; mirror to face inward).
+  function portraitImg(p, mirror) {
+    const src = p.sex === 'female' ? 'assets/woman-portrait.webp' : 'assets/man-portrait.webp';
+    return `<div style="width:100%;height:100%;overflow:hidden;background:#2b2b30"><img src="${src}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%;${mirror ? 'transform:scaleX(-1)' : ''}"/></div>`;
+  }
+
+  // ---------- icons ----------
   const I = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
   const ICONS = {
     home: I('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>'),
@@ -70,40 +147,44 @@
     report: I('<path d="M6 2h8l5 5v15H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v5h5M9 13h6M9 17h4"/>'),
     notebook: I('<path d="M6 2h12a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z"/><path d="M8 2v20M13 7h4M13 11h4"/>'),
     settings: I('<circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/>'),
-    plus: I('<path d="M12 5v14M5 12h14"/>'),
-    x: I('<path d="m5 5 14 14M19 5 5 19"/>'),
-    check: I('<path d="m4 12.5 5 5L20 6.5"/>'),
+    plus: I('<path d="M12 5v14M5 12h14"/>'), minus: I('<path d="M5 12h14"/>'),
+    x: I('<path d="m5 5 14 14M19 5 5 19"/>'), check: I('<path d="m4 12.5 5 5L20 6.5"/>'),
     edit: I('<path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z"/>'),
-    trash: I('<path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/>'),
     external: I('<path d="M14 4h6v6M20 4 10 14"/><path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"/>'),
-    wand: I('<path d="m14 6 4 4L7 21l-4-4L14 6Z"/><path d="M15 3h.01M20 8h.01M18 2l.5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5.5-2Z"/>'),
+    wand: I('<path d="m14 6 4 4L7 21l-4-4L14 6Z"/><path d="M15 3h.01M20 8h.01"/>'),
     bulb: I('<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.7.5 1 1.4 1 2.3h6c0-.9.3-1.8 1-2.3A7 7 0 0 0 12 2Z"/>'),
-    sync: I('<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/>'),
-    pin: I('<path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11Z"/><circle cx="12" cy="10" r="2.6"/>'),
-    alert: I('<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>'),
-    heart: I('<path d="M12 20s-7-4.5-9.2-9C1.3 7.7 3 4.5 6.2 4.5c1.9 0 3.1 1 3.8 2 .7-1 1.9-2 3.8-2 3.2 0 4.9 3.2 3.4 6.5C19 15.5 12 20 12 20Z"/>'),
+    upload: I('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M4 21h16"/>'), download: I('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 21h16"/>'),
+    folder: I('<path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/>'),
+    layers: I('<path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/>'),
+    target: I('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>',
+    refresh: I('<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/>'),
+    grid: I('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
     link: I('<path d="M10 14a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 10a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/>'),
+    alert: I('<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>'),
+    file: I('<path d="M6 2h8l5 5v15H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v5h5"/>'),
   };
 
   const NAV = [
     { id: 'home', label: 'Home', icon: 'home' },
-    { group: 'Records' },
-    { id: 'people', label: 'People', icon: 'people' },
-    { id: 'tree', label: 'Family tree', icon: 'tree' },
-    { id: 'timeline', label: 'Timeline', icon: 'clock' },
-    { id: 'archive', label: 'Archive', icon: 'archive' },
-    { id: 'map', label: 'Map', icon: 'map' },
-    { id: 'relations', label: 'Relations', icon: 'network' },
-    { group: 'Research' },
+    { group: 'Explore' },
     { id: 'search', label: 'Search', icon: 'search' },
     { id: 'library', label: 'Library', icon: 'book' },
+    { id: 'people', label: 'People', icon: 'people' },
+    { id: 'timeline', label: 'Timeline', icon: 'clock' },
+    { id: 'tree', label: 'Family tree', icon: 'tree' },
+    { id: 'relations', label: 'Social relations', icon: 'network' },
+    { id: 'map', label: 'Map', icon: 'map' },
+    { id: 'archive', label: 'Archive', icon: 'archive' },
+    { group: 'Analyze' },
     { id: 'deepResearch', label: 'Deep Research', icon: 'report' },
+    { group: 'Write' },
     { id: 'notes', label: 'Notes', icon: 'notebook' },
     { group: '' },
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  const state = { view: 'home', report: 'dr1', note: 'nn1', settingsTab: 'providers', toggles: { autoAnalyze: true, ocr: true, mcp: true, autoBackup: true } };
+  const state = { view: 'home', focus: 'p9', zoom: 1, person: null, note: 'n1', archiveFolder: 'all', settingsTab: 'providers' };
 
   // ---------- modal ----------
   function openModal(html, wide) {
@@ -115,371 +196,385 @@
   function closeModal() { $('#modal-root').innerHTML = ''; }
   const modalHead = (title, sub) => `<div class="modal-head"><div><h3>${title}</h3>${sub ? `<p class="muted small" style="margin:3px 0 0">${sub}</p>` : ''}</div><button class="modal-x" onclick="GUI.close()">${ICONS.x}</button></div>`;
 
+  // ---------- family tree ----------
+  const NODE_W = 128, NODE_H = 158, FRAME_W = 100, FRAME_H = 116, PAD = 40;
+  function frameDefs() {
+    return `<defs><linearGradient id="frame-oak" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c8934a"/><stop offset="35%" stop-color="#b67c39"/><stop offset="55%" stop-color="#a0692e"/><stop offset="78%" stop-color="#b67c39"/><stop offset="100%" stop-color="#845528"/></linearGradient></defs>`;
+  }
+  function treeFrame(x, y, w, h, sex, portrait) {
+    const female = sex === 'female';
+    const border = female ? 11 : 12, rx = female ? 12 : 4, innerRx = Math.max(0, rx - 3);
+    const ix = x + border, iy = y + border, iw = w - 2 * border, ih = h - 2 * border;
+    return `<g>
+      <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}" fill="url(#frame-oak)" stroke="#000" stroke-opacity="0.35"/>
+      <rect x="${ix - 2}" y="${iy - 2}" width="${iw + 4}" height="${ih + 4}" rx="${innerRx + 1}" fill="#000" fill-opacity="0.28"/>
+      <foreignObject x="${ix}" y="${iy}" width="${iw}" height="${ih}"><div xmlns="http://www.w3.org/1999/xhtml" style="width:100%;height:100%;border-radius:${innerRx}px;overflow:hidden">${portrait}</div></foreignObject>
+      <rect x="${x + 1.5}" y="${y + 1.5}" width="${w - 3}" height="${h - 3}" rx="${rx}" fill="none" stroke="#fff" stroke-opacity="0.18"/>
+      <rect x="${ix - 1}" y="${iy - 1}" width="${iw + 2}" height="${ih + 2}" rx="${innerRx}" fill="none" stroke="#000" stroke-opacity="0.45" stroke-width="1.5"/>
+    </g>`;
+  }
+  function treeSVG() {
+    const layout = computeTreeLayout({
+      focusId: state.focus,
+      persons: G.persons.map((p) => ({ id: p.id, sex: p.sex, birthYear: yearOf(p.birth) })),
+      parentEdges: G.relationships.filter((r) => r.type === 'parent').map((r) => ({ parent: r.from, child: r.to })),
+      spouseEdges: G.relationships.filter((r) => r.type === 'spouse').map((r) => ({ a: r.from, b: r.to })),
+    });
+    const pos = new Map(layout.nodes.map((n) => [n.personId, n]));
+    const cx = (id) => (pos.get(id).x + PAD + NODE_W / 2), cy = (id) => (pos.get(id).y + PAD + NODE_H / 2);
+    const fTop = (id) => ({ x: pos.get(id).x + PAD + NODE_W / 2, y: pos.get(id).y + PAD });
+    const fBot = (id) => ({ x: pos.get(id).x + PAD + NODE_W / 2, y: pos.get(id).y + PAD + FRAME_H });
+    const svgW = layout.width + PAD * 2, svgH = layout.height + PAD * 2, z = state.zoom;
+    const edges = layout.edges.map((e) => {
+      if (e.kind === 'spouse') return `<line x1="${cx(e.from)}" y1="${cy(e.from)}" x2="${cx(e.to)}" y2="${cy(e.to)}" stroke="#8a5a2b" stroke-width="2.5" stroke-dasharray="2 4" stroke-linecap="round"/>`;
+      const a = fBot(e.from), b = fTop(e.to), midY = (a.y + b.y) / 2;
+      return `<path d="M ${a.x} ${a.y} V ${midY} H ${b.x} V ${b.y}" fill="none" stroke="#4b5563" stroke-width="1.5"/>`;
+    }).join('');
+    const nodes = layout.nodes.map((n) => {
+      const p = personById(n.personId); if (!p) return '';
+      const x = n.x + PAD, y = n.y + PAD, frameX = x + (NODE_W - FRAME_W) / 2;
+      const isFocus = n.personId === state.focus;
+      const mirror = (p.sex === 'male' && n.coupleSide === 'left') || (p.sex === 'female' && n.coupleSide === 'right');
+      const nm = p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name;
+      return `<g class="gp-tnode" onclick="GUI.person('${n.personId}')" ondblclick="GUI.focusTree('${n.personId}')">
+        ${isFocus ? `<rect x="${frameX - 4}" y="${y - 4}" width="${FRAME_W + 8}" height="${FRAME_H + 8}" rx="16" fill="none" stroke="#818cf8" stroke-width="2.5"/>` : ''}
+        ${treeFrame(frameX, y, FRAME_W, FRAME_H, p.sex, portraitImg(p, mirror))}
+        <text x="${x + NODE_W / 2}" y="${y + FRAME_H + 18}" text-anchor="middle" fill="#e4e4e7" font-size="13" font-weight="600">${esc(nm)}</text>
+        <text x="${x + NODE_W / 2}" y="${y + FRAME_H + 34}" text-anchor="middle" fill="#a1a1aa" font-size="11">${esc(datesOf(p))}</text>
+      </g>`;
+    }).join('');
+    return `<svg width="${svgW * z}" height="${svgH * z}" viewBox="0 0 ${svgW} ${svgH}" style="min-width:100%">${frameDefs()}${edges}${nodes}</svg>`;
+  }
+
   // ---------- person dossier ----------
   function personModal(id) {
-    const p = personById(id);
-    if (!p) return;
-    const evs = eventsForPerson(id).slice().sort((a, b) => a.date.localeCompare(b.date));
-    const rels = relationsForPerson(id);
-    const kids = childrenOf(id).map(personById).filter(Boolean);
-    const pars = parentsOf(id).map(personById).filter(Boolean);
-    const u = unionOf(id);
-    const spouseId = u ? (u.a === id ? u.b : u.a) : null;
-    const conf = G.conflicts.filter((c) => c.person === id);
+    const p = personById(id); if (!p) return;
+    const evs = eventsForPerson(id).slice().sort((a, b) => a.year - b.year);
+    const rels = G.social.filter((r) => r.from === id);
+    const par = G.relationships.filter((r) => r.type === 'parent' && r.to === id).map((r) => r.from);
+    const kids = G.relationships.filter((r) => r.type === 'parent' && r.from === id).map((r) => r.to);
+    const sp = G.relationships.filter((r) => r.type === 'spouse' && (r.from === id || r.to === id)).map((r) => r.from === id ? r.to : r.from);
+    const vs = G.variants[id] || [];
     openModal(`
-      ${modalHead(esc(p.name), `${p.sex === 'F' ? 'Female' : 'Male'} · ${esc(lifespan(p))}${p.conf === 'hypothesis' ? ' · <span style="color:var(--amber)">identity unconfirmed</span>' : ''}`)}
-      <div style="display:flex;gap:16px;align-items:flex-start;margin:6px 0 4px">
-        ${portrait(p, 76)}
+      ${modalHead(esc(p.name), `${p.sex === 'female' ? 'Female' : 'Male'} · ${esc(datesOf(p))}`)}
+      <div style="display:flex;gap:16px;align-items:flex-start;margin:6px 0 8px">
+        <div class="gp-ficha-portrait">${treeFichaSVG(p)}</div>
         <div style="min-width:0;flex:1">
-          <div class="tag-row" style="margin-bottom:8px">
-            <span class="chip">${esc(p.occupation || '—')}</span>
-            ${pars.length ? `<span class="chip">child of ${pars.map((x) => esc(x.name.split(' ')[0])).join(' & ')}</span>` : ''}
-            ${spouseId ? `<span class="chip">${ICONS.heart} ${esc(nameOf(spouseId).split(' ').slice(0, 2).join(' '))}</span>` : ''}
-          </div>
-          <p class="muted small" style="margin:0">${esc(p.bio)}</p>
+          <div class="tag-row" style="margin-bottom:6px"><span class="chip">${esc(p.occupation || '—')}</span></div>
+          <div class="muted small">${par.length ? `Child of ${par.map((x) => esc(nameOf(x))).join(' & ')}` : ''}${sp.length ? `<br>Spouse: ${sp.map((x) => esc(nameOf(x))).join(', ')}` : ''}${kids.length ? `<br>Children: ${kids.map((x) => esc(nameOf(x))).join(', ')}` : ''}</div>
+          ${vs.length ? `<div class="muted small" style="margin-top:6px">Also recorded as: ${vs.map(esc).join(' · ')}</div>` : ''}
         </div>
       </div>
-      ${conf.length ? conf.map((c) => `<div class="gp-conflict">${ICONS.alert}<span>${esc(c.text)}</span></div>`).join('') : ''}
       <div class="nav-group-label" style="padding-left:0">Life events (${evs.length})</div>
-      ${evs.map((e) => `
-        <div class="gp-event" onclick="GUI.archive('${e.source}')">
-          <span class="gp-event-dot" style="background:${EVC[e.type]}"></span>
-          <div style="flex:1;min-width:0">
-            <div class="list-title"><b>${EVENT_LABEL[e.type] || e.type}</b> <span class="muted small">· ${esc(e.date)} · ${esc(e.place)}</span></div>
-            <div class="list-desc" style="margin:2px 0 0">${esc(e.summary)}</div>
-          </div>
-          <span class="gp-src">${ICONS.archive}</span>
-        </div>`).join('') || '<p class="muted small">No events recorded.</p>'}
+      ${evs.map((e) => `<div class="gp-event" ${e.source ? `onclick="GUI.archive('${e.source}')"` : ''}>
+        <span class="gp-event-dot" style="background:${EVC[e.type]}"></span>
+        <div style="flex:1;min-width:0"><div class="list-title"><b>${EVENT_LABEL[e.type] || e.type}</b> <span class="muted small">· ${esc(e.date)} · ${esc((placeById(e.placeId) || {}).name || '')}</span></div></div>
+        ${e.source ? `<span class="gp-src">${ICONS.archive}</span>` : ''}
+      </div>`).join('') || '<p class="muted small">No events recorded.</p>'}
       ${rels.length ? `<div class="nav-group-label" style="padding-left:0">Social relations (${rels.length})</div>
-        ${rels.map((r) => `<div class="arg-item plain" style="display:flex;gap:8px;align-items:center"><span class="chip"><span class="dot" style="background:var(--cyan)"></span>${esc(r.role)}</span> ${esc(nameOf(r.to))}<span class="muted small" style="margin-left:auto">${esc(r.notes)}</span></div>`).join('')}` : ''}
+        ${rels.map((r) => `<div class="arg-item plain" style="display:flex;gap:8px;align-items:center"><span class="chip"><span class="dot" style="background:var(--cyan)"></span>${esc(r.role)}</span> ${esc(nameOf(r.to))}</div>`).join('')}` : ''}
       <div class="tag-row" style="margin-top:16px">
         <button class="btn primary" onclick="GUI.toast('In the app: writes an evidence-based biography from the linked records.')">${ICONS.wand} Generate biography</button>
-        <button class="btn" onclick="GUI.close();window.go('tree')">${ICONS.tree} Show in tree</button>
-        <button class="btn ghost" onclick="GUI.toast('In the app: opens the person’s ficha to edit facts, portrait and kinship.')">${ICONS.edit} Edit ficha</button>
+        <button class="btn" onclick="GUI.close();GUI.focusTree('${id}')">${ICONS.tree} Center the tree here</button>
       </div>`, true);
+  }
+  function treeFichaSVG(p) {
+    return `<svg class="gp-fr" viewBox="0 0 100 116" width="88" height="102">${frameDefs()}${treeFrame(0, 0, 100, 116, p.sex, portraitImg(p, false))}</svg>`;
   }
 
   // ---------- archive record ----------
   function archiveModal(id) {
-    const a = archiveById(id);
-    if (!a) return;
+    const a = archiveById(id); if (!a) return;
     openModal(`
-      ${modalHead(esc(a.title), `<span class="chip"><span class="dot" style="background:${EVC[({ 'Baptism record': 'baptism', 'Marriage record': 'marriage', 'Death record': 'death', 'Civil death register': 'death', 'Census (padrón)': 'census', 'Military levy': 'military', 'Passenger manifest': 'migration' })[a.kind]] || '#a78bfa'}"></span>${esc(a.kind)}</span> ${esc(a.date)} · ${esc(a.place)}`)}
-      <p class="muted small gp-repo" style="margin:2px 0 12px">${ICONS.archive} ${esc(a.repository)}</p>
-      <div class="nav-group-label" style="padding-left:0">Transcription</div>
-      <div class="quote-block" style="font-style:normal">${esc(a.transcript)}</div>
-      <div class="nav-group-label" style="padding-left:0">Extracted facts</div>
-      ${a.facts.map((f) => `<div class="gp-fact">${/⚠/.test(f) ? ICONS.alert : ICONS.check}<span${/⚠/.test(f) ? ' style="color:var(--amber)"' : ''}>${esc(f.replace('⚠ ', ''))}</span></div>`).join('')}
-      <div class="nav-group-label" style="padding-left:0">People named (${a.persons.length})</div>
+      ${modalHead(esc(a.title), `<span class="chip">${esc(a.docType)}</span> ${esc(a.date)} · ${esc(a.place)}`)}
+      ${a.source ? `<div class="nav-group-label" style="padding-left:0">${ICONS.link} Source</div><p class="gp-source">${esc(a.source)}</p>` : ''}
+      ${a.description ? `<div class="nav-group-label" style="padding-left:0">Visual description</div><p class="muted small">${esc(a.description)}</p>` : ''}
+      <div class="nav-group-label" style="padding-left:0">Detected text</div>
+      <div class="quote-block" style="font-style:normal;white-space:pre-wrap">${esc(a.text)}</div>
+      <div class="nav-group-label" style="padding-left:0">Metadata</div>
+      ${Object.entries(a.metadata).map(([k, v]) => `<div class="gp-meta"><span class="gp-meta-k">${esc(k)}</span><span>${esc(v)}</span></div>`).join('')}
+      <div class="nav-group-label" style="padding-left:0">People (${a.persons.length})</div>
       <div class="tag-row">${a.persons.map((pid) => `<span class="chip link" onclick="GUI.person('${pid}')">${esc(nameOf(pid))}</span>`).join('')}</div>
-      <div class="tag-row" style="margin-top:16px">
-        <button class="btn" onclick="GUI.toast('In the app: re-runs analysis of the scanned document and updates facts losslessly.')">${ICONS.sync} Re-analyze</button>
-        <button class="btn ghost" onclick="GUI.toast('In the app: opens the source image / PDF page.')">${ICONS.external} Open source</button>
-      </div>`, true);
+    `, true);
   }
 
-  function placeModal(id) {
-    const pl = placeById(id);
-    const evs = G.events.filter((e) => e.place === pl.name);
-    openModal(`
-      ${modalHead(esc(pl.name), `${esc(pl.region)} · ${pl.count} event${pl.count === 1 ? '' : 's'}`)}
-      <p class="muted small">${esc(pl.note)}</p>
-      <div class="nav-group-label" style="padding-left:0">Events here (${evs.length})</div>
-      ${evs.map((e) => `<div class="arg-item plain" style="display:flex;gap:8px;align-items:center;cursor:pointer" onclick="GUI.archive('${e.source}')">${eventChip(e.type)} <span class="muted small">${esc(e.date)}</span> ${esc(e.summary)}</div>`).join('')}`);
-  }
-
-  // ---------- VIEWS ----------
-  const viewHead = (icon, title, sub) => `<div class="view-head"><div><h1 class="view-title">${ICONS[icon]} ${title}</h1><p class="view-sub">${sub}</p></div></div>`;
+  // ---------- views ----------
+  const viewHead = (icon, title, sub, right) => `<div class="view-head"><div><h1 class="view-title">${ICONS[icon]} ${title}</h1>${sub ? `<p class="view-sub">${sub}</p>` : ''}</div>${right || ''}</div>`;
 
   const VIEWS = {
     home() {
-      const conf = G.conflicts.length, kin = G.kinSuggestions.length;
+      const links = G.relationships.length, places = 4, evc = G.events.length, docs = G.archive.length, sug = G.suggestions.length;
+      const card = (icon, title, big, unit, body, btn, extra) => `<div class="card"><div class="list-title" style="justify-content:space-between"><b style="display:flex;align-items:center;gap:8px;font-size:14.5px">${ICONS[icon]} ${title}</b><button class="btn ghost small" onclick="${btn[1]}">${btn[0]}</button></div><div class="stat" style="margin-top:8px">${big} <span class="muted" style="font-size:13px;font-weight:400">${unit}</span></div>${extra || ''}<p class="muted small" style="margin-top:8px">${body}</p></div>`;
       return `
-        ${viewHead('home', 'Herrera–Sotomayor', 'A genealogy vault — reconstructing a family from primary sources. This corpus spans Ronda and Málaga, 1841–1931, with an emigration thread to Buenos Aires.')}
-        <div class="grid cols-3" style="margin-bottom:16px">
-          ${[['People', G.persons.length, 'people'], ['Life events', G.events.length, 'clock'], ['Archive sources', G.archive.length, 'archive'], ['Places', G.places.length, 'map'], ['Generations', 3, 'tree'], ['Open questions', kin + conf, 'bulb']]
-          .map(([l, n, ic]) => `<div class="card click" onclick="window.go('${ic === 'people' ? 'people' : ic === 'clock' ? 'timeline' : ic === 'archive' ? 'archive' : ic === 'map' ? 'map' : ic === 'tree' ? 'tree' : 'home'}')"><div class="stat">${n}</div><div class="muted small gp-statlabel">${ICONS[ic]} ${l}</div></div>`).join('')}
+        <h1 class="view-title" style="font-size:22px">Home</h1>
+        <p class="view-sub">Your family history: people, tree, timeline and evidence archive.</p>
+        <div class="card gp-next" style="margin-bottom:16px">
+          <div class="list-title" style="justify-content:space-between;align-items:flex-start">
+            <div><div class="nav-group-label" style="padding:0">Recommended next step</div><b style="font-size:16px">Review ${sug} suggested relationship(s)</b></div>
+            <div class="tag-row"><button class="btn" onclick="GUI.chat()">Assistant</button><button class="btn" onclick="window.go('tree')">${ICONS.tree} View tree</button><button class="btn primary" onclick="GUI.suggestions()">${ICONS.tree} Review relationships</button></div>
+          </div>
+          <p class="muted small" style="margin-top:8px">The AI has proposed kinship links from the evidence in your sources. Confirm or dismiss them: nothing enters the tree without your approval.</p>
         </div>
-        <div class="grid cols-2">
-          <div class="card">
-            <h3>${ICONS.wand} Recommended next step</h3>
-            <p class="muted small">The 1874 Vega baptism would confirm the earliest Herrera–Vega tie (a godparent relation, not the 1897 marriage). It is the highest-value missing record.</p>
-            <div class="tag-row" style="margin-top:10px"><button class="btn primary" onclick="GUI.toast('In the app: the assistant drafts a research plan and where to look.')">${ICONS.search} Plan the search</button></div>
-          </div>
-          <div class="card">
-            <h3>${ICONS.alert} Conflicts &amp; open questions</h3>
-            ${G.conflicts.map((c) => `<div class="gp-conflict" style="margin:6px 0"><span>${ICONS.alert}</span><span>${esc(c.text)}</span></div>`).join('')}
-            ${G.kinSuggestions.map((k) => `<div class="gp-kin"><div class="list-title"><b>${esc(k.question)}</b> <span class="gp-strength ${k.strength}">${k.strength} signal</span></div><div class="tag-row" style="margin-top:8px"><button class="btn ghost small" onclick="GUI.kin('${k.id}')">${ICONS.bulb} Review evidence</button></div></div>`).join('')}
-          </div>
+        <div class="grid cols-3">
+          ${card('people', 'People', G.persons.length, 'people', 'Each person gathers their kinship, events, documents and the evidence behind them.', ['Open', "window.go('people')"], `<div class="gp-mini"><span><b>${links}</b> links</span><span><b>${places}</b> places</span></div>`)}
+          ${card('tree', 'Family tree', links, 'kinship links', 'Import or export GEDCOM to move between Gramps or Ancestry.', ['View tree', "window.go('tree')"], `<div class="tag-row" style="margin-top:6px"><span class="chip">${G.persons.length} people</span><span class="chip gp-amber">${sug} suggested relationships</span></div>`)}
+          ${card('bulb', 'Suggested relationships', sug, 'to review', 'The AI proposes links from the evidence; you confirm or dismiss. Nothing is added on its own.', ['Review', 'GUI.suggestions()'])}
+          ${card('clock', 'Timeline', evc, 'events', 'Every dated event in the family, in order and on the map.', ['Open', "window.go('timeline')"], `<div class="gp-mini"><span><b>${places}</b> places</span><span><b>${G.persons.length}</b> people</span></div>`)}
+          ${card('archive', 'Archive', docs, 'documents', 'Your primary sources (records, censuses, letters, photos) linked to people.', ['Open', "window.go('archive')"], `<div class="progress" style="margin-top:8px"><div style="width:0%"></div></div><div class="tag-row" style="margin-top:6px"><span class="chip">1 folder</span></div>`)}
+          ${card('alert', 'AI configuration', 'pending', 'extraction model', 'The AI extracts people and events from your documents, suggests relationships, writes biographies and generates portraits. Configure the models in Settings.', ['Settings', "window.go('settings')"])}
         </div>`;
     },
 
     people() {
-      const gens = [0, 1, 2];
-      return `
-        ${viewHead('people', 'People', 'Every individual the records name, confirmed or hypothetical. Click a ficha to see their life events, sources and relations.')}
-        ${gens.map((g) => {
-          const ps = G.persons.filter((p) => p.gen === g);
-          if (!ps.length) return '';
-          return `<div class="nav-group-label" style="padding-left:0">${g === 0 ? 'Generation I' : g === 1 ? 'Generation II' : 'Generation III'}</div>
-          <div class="grid cols-3">
-            ${ps.map((p) => `<div class="card click gp-person" onclick="GUI.person('${p.id}')">
-              ${portrait(p, 48)}
-              <div style="min-width:0">
-                <b class="gp-name">${esc(p.name)}${p.conf === 'hypothesis' ? ' <span class="gp-q">?</span>' : ''}</b>
-                <div class="muted small">${esc(lifespan(p))}</div>
-                <div class="muted small" style="color:var(--text-3)">${esc(p.occupation || '—')}</div>
-              </div>
-            </div>`).join('')}
-          </div>`;
-        }).join('')}`;
+      const sorted = G.persons.slice().sort((a, b) => a.name.localeCompare(b.name));
+      const cur = state.person ? personById(state.person) : null;
+      return `<div class="gp-people">
+        <div class="gp-people-list">
+          <div class="view-head" style="padding:0 0 10px"><h1 class="view-title" style="font-size:20px">${ICONS.people} People <span class="muted" style="font-size:13px;font-weight:400">${G.persons.length}</span></h1></div>
+          <input class="search-input" style="padding:9px 12px" placeholder="Search by name or variant…" oninput="GUI.peopleFilter(this.value)"/>
+          <button class="btn primary" style="width:100%;justify-content:center;margin-top:8px" onclick="GUI.toast('In the app: add a new person to the tree.')">${ICONS.plus} Add person</button>
+          <div class="nav-group-label" style="padding-left:0;margin-top:8px">GEDCOM</div>
+          <div class="tag-row"><button class="btn ghost" style="flex:1;border:1px solid var(--border-soft)" onclick="GUI.toast('In the app: import a GEDCOM from Gramps or Ancestry.')">${ICONS.upload} Import</button><button class="btn ghost" style="flex:1;border:1px solid var(--border-soft)" onclick="GUI.toast('In the app: export your tree as GEDCOM.')">${ICONS.download} Export</button></div>
+          <button class="btn ghost" style="width:100%;border:1px solid var(--border-soft);margin-top:8px" onclick="GUI.toast('In the app: review identity matches (name variants).')">${ICONS.people} Review matches</button>
+          <button class="btn ghost" style="width:100%;border:1px solid var(--border-soft);margin-top:8px;justify-content:space-between" onclick="GUI.suggestions()">${ICONS.tree} Suggested relationships <span class="chip gp-amber">${G.suggestions.length}</span></button>
+          <div class="gp-plist" id="gp-plist">
+            ${sorted.map((p) => `<div class="gp-prow ${state.person === p.id ? 'active' : ''}" data-name="${esc(p.name.toLowerCase())}" onclick="GUI.selectPerson('${p.id}')"><b>${esc(p.name)}</b><span class="muted small">${esc(datesOf(p))}</span></div>`).join('')}
+          </div>
+        </div>
+        <div class="gp-people-detail">${cur ? personDetail(cur) : `<div class="gp-empty">Select a person to see their record, their events and the evidence behind them.</div>`}</div>
+      </div>`;
     },
 
     tree() {
-      return `
-        ${viewHead('tree', 'Family tree', 'Three generations, drawn from the confirmed filiation and marriage records. Couples are joined horizontally; a dashed node is an unconfirmed identity.')}
-        <div class="gp-tree-wrap">${treeSVG()}</div>
-        <div class="tag-row" style="margin-top:12px">
-          <span class="chip"><span class="dot" style="background:#7a6249"></span>male</span>
-          <span class="chip"><span class="dot" style="background:#8a5c4a"></span>female</span>
-          <span class="chip"><span class="dot" style="background:var(--amber)"></span>unconfirmed</span>
-          <span class="muted small" style="align-self:center">Click any person to open their ficha.</span>
-        </div>`;
+      return `<div class="gp-tree-head">
+          <h1 class="view-title" style="font-size:18px;margin:0">${ICONS.tree} Family tree</h1>
+          <select class="select" style="max-width:16rem" onchange="GUI.focusTree(this.value)">
+            ${G.persons.slice().sort((a, b) => a.name.localeCompare(b.name)).map((p) => `<option value="${p.id}" ${p.id === state.focus ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}
+          </select>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:4px">
+            <button class="btn ghost" style="padding:6px 9px" onclick="GUI.zoom(-1)">${ICONS.minus}</button>
+            <span class="muted small" style="width:44px;text-align:center">${Math.round(state.zoom * 100)}%</span>
+            <button class="btn ghost" style="padding:6px 9px" onclick="GUI.zoom(1)">${ICONS.plus}</button>
+          </div>
+        </div>
+        <div class="gp-tree-canvas">${treeSVG()}</div>
+        <p class="muted small" style="padding:8px 16px 0">Click a person to open their ficha; double-click to center the tree on them.</p>`;
     },
 
     timeline() {
-      const evs = G.events.slice().sort((a, b) => a.date.localeCompare(b.date));
-      return `
-        ${viewHead('clock', 'Timeline', 'Every dated event across the family, in order. Each item links to the primary source it was extracted from.')}
+      const evs = sortedEvents();
+      return `${viewHead('clock', 'Timeline', '', `<span class="muted small">${evs.length} events</span>`)}
+        <div class="tag-row" style="margin-bottom:14px"><span class="select gp-fakeselect">All people ▾</span><span class="select gp-fakeselect">All types ▾</span></div>
         <div class="gp-timeline">
-          ${evs.map((e) => `<div class="gp-tl-item" onclick="GUI.archive('${e.source}')">
-            <span class="gp-tl-dot" style="background:${EVC[e.type]}"></span>
-            <div class="gp-tl-year">${esc((e.date.match(/\d{4}/) || [e.date])[0])}</div>
+          ${evs.map((e) => `<div class="gp-tl-item" ${e.source ? `onclick="GUI.archive('${e.source}')"` : ''}>
+            <span class="gp-tl-dot"></span>
+            <div class="gp-tl-year">${esc(e.date)}</div>
             <div style="flex:1;min-width:0">
-              <div class="list-title">${eventChip(e.type)} <b>${esc(e.persons.map(nameOf).map((n) => n.split(' ').slice(0, 2).join(' ')).join(', '))}</b></div>
-              <div class="list-desc" style="margin:3px 0 0">${esc(e.summary)} <span class="muted">· ${esc(e.place)}</span></div>
+              <div class="list-title"><b>${EVENT_LABEL[e.type] || e.type}</b> <span class="muted small">· ${esc((placeById(e.placeId) || {}).name || '')}</span></div>
+              <div class="list-desc" style="margin:3px 0 0">${esc(e.persons.map(nameOf).join(', '))}</div>
             </div>
           </div>`).join('')}
         </div>`;
     },
 
     archive() {
-      return `
-        ${viewHead('archive', 'Archive', 'The evidence: primary sources transcribed and indexed. Nodus reads these directly and extracts people, dates and facts — nothing is invented.')}
-        ${G.archive.map((a) => `<div class="list-row" onclick="GUI.archive('${a.id}')">
-          <span class="gp-doc">${ICONS.archive}</span>
-          <div class="list-main">
-            <div class="list-title"><b>${esc(a.title)}</b> <span class="chip">${esc(a.kind)}</span></div>
-            <div class="list-desc">${esc(a.transcript.slice(0, 130))}…</div>
-            <div class="list-meta"><span>${ICONS.clock} ${esc(a.date)}</span><span>${ICONS.pin} ${esc(a.place)}</span><span><b>${a.facts.length}</b> facts</span><span><b>${a.persons.length}</b> people</span></div>
-          </div>
-        </div>`).join('')}`;
+      return `<div class="gp-archive">
+        <div class="gp-arch-folders">
+          <div class="view-head" style="padding:0 0 8px"><h1 class="view-title" style="font-size:16px">${ICONS.archive} Archive</h1></div>
+          <div class="gp-folder ${state.archiveFolder === 'all' ? 'active' : ''}" onclick="GUI.setFolder('all')">${ICONS.layers} All</div>
+          <div class="gp-folder ${state.archiveFolder === 'serrano' ? 'active' : ''}" onclick="GUI.setFolder('serrano')">${ICONS.folder} ${esc(G.archiveFolder)}</div>
+          <div class="gp-folder" onclick="GUI.toast('No folder')">${ICONS.folder} No folder</div>
+        </div>
+        <div class="gp-arch-main">
+          <div class="toolbar" style="margin-bottom:8px"><input class="search-input" placeholder="Search titles, text and metadata…"/><span class="select gp-fakeselect">Document type ▾</span><button class="btn primary" onclick="GUI.toast('In the app: add a scan, PDF, CSV or photo to the archive.')">${ICONS.upload} Add file</button></div>
+          <p class="muted small" style="margin:0 0 8px">The Archive holds primary sources (documents, records, photographs). Academic bibliography (books, articles, theses) is managed in the Library by importing from Zotero.</p>
+          <div class="tag-row" style="margin-bottom:10px">${['Document type', 'Format', 'Tags', 'People', 'Year'].map((f) => `<span class="pill">${f} ▾</span>`).join('')}</div>
+          <p class="muted small">${G.archive.length} documents</p>
+          <table class="tbl gp-arch-tbl"><thead><tr><th>Name</th><th>Type</th><th>People</th><th>Detected text</th></tr></thead><tbody>
+            ${G.archive.map((a) => `<tr class="rowlink" onclick="GUI.archive('${a.id}')">
+              <td><div style="display:flex;gap:8px;align-items:center"><span class="gp-doc-i">${a.kind === 'csv' || a.kind === 'xlsx' ? ICONS.grid : a.kind === 'image' ? ICONS.file : a.kind === 'text' ? ICONS.notebook : ICONS.book}</span><b>${esc(a.title)}</b></div></td>
+              <td><span class="chip gp-amber">${esc(a.docType)}</span></td>
+              <td><div class="tag-row">${a.persons.slice(0, 3).map((pid) => `<span class="chip">${esc(nameOf(pid))}</span>`).join('')}${a.persons.length > 3 ? `<span class="chip">+${a.persons.length - 3}</span>` : ''}</div></td>
+              <td><span class="muted small" style="display:block;max-width:20rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.text.replace(/\n/g, ' '))}</span></td>
+            </tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>`;
     },
 
     map() {
-      return `
-        ${viewHead('map', 'Map', 'Where the family lived and moved. Places are drawn from the records; click a pin to see the events anchored there.')}
-        <div class="gp-map">
-          <div class="gp-map-frame">
-            ${G.places.map((pl) => `<button class="gp-pin ${pl.kind}" style="left:${pl.x}%;top:${pl.y}%" onclick="GUI.place('${pl.id}')" title="${esc(pl.name)}">
-              ${ICONS.pin}<span class="gp-pin-label">${esc(pl.name)}<b>${pl.count}</b></span></button>`).join('')}
-            <svg class="gp-map-lines" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="30,62 44,74 33,92" /></svg>
-          </div>
-          <div class="gp-map-side">
-            ${G.places.map((pl) => `<div class="card click" style="margin-bottom:10px" onclick="GUI.place('${pl.id}')"><div class="list-title"><b>${esc(pl.name)}</b> <span class="chip">${esc(pl.kind)}</span></div><div class="muted small">${esc(pl.region)} · ${pl.count} event${pl.count === 1 ? '' : 's'}</div></div>`).join('')}
-          </div>
-        </div>`;
+      return `${viewHead('map', 'Map', '', `<span class="muted small">${G.personPlaces.length} locations</span>`)}
+        <div class="tag-row" style="margin-bottom:12px"><span class="select gp-fakeselect">${ICONS.people} All people ▾</span><span class="select gp-fakeselect">${ICONS.play}</span><span class="muted small" style="align-self:center">Play the migrations over time</span></div>
+        <div id="gp-map" class="gp-leaflet"></div>`;
     },
 
     relations() {
-      const withRels = G.persons.filter((p) => relationsForPerson(p.id).length);
-      return `
-        ${viewHead('network', 'Relations', 'A second network, independent of kinship: godparents, employers, officiants and in-laws — the social fabric a prosopographical historian works with.')}
-        ${withRels.map((p) => `<div class="card" style="margin-bottom:12px">
-          <div class="list-title" style="margin-bottom:6px"><b class="chip link" onclick="GUI.person('${p.id}')">${esc(p.name)}</b></div>
-          ${relationsForPerson(p.id).map((r) => `<div class="gp-rel">
-            <span class="chip"><span class="dot" style="background:var(--cyan)"></span>${esc(r.role)}</span>
-            <b>${esc(nameOf(r.to))}</b>
-            <span class="muted small">${esc(r.notes)}</span>
-            <div style="margin-left:auto;display:flex;gap:2px;flex-shrink:0">
-              <button class="gp-icon-btn" title="Edit" onclick="GUI.toast('In the app: edit the role and notes of this relation.')">${ICONS.edit}</button>
-              <button class="gp-icon-btn danger" title="Delete" onclick="GUI.toast('In the app: removes this relation (with confirmation).')">${ICONS.trash}</button>
-            </div>
-          </div>`).join('')}
-        </div>`).join('')}`;
+      const persons = new Set(G.social.flatMap((r) => [r.from, r.to].filter((x) => personById(x))));
+      return `${viewHead('network', 'Social relations', '', `<span class="muted small">${persons.size} people · ${G.contacts.length} contacts · ${G.social.length} relations</span>`)}
+        <div class="tag-row" style="margin-bottom:8px"><input class="search-input" style="max-width:16rem" placeholder="Search the network…"/><button class="btn ghost" style="border:1px solid var(--border-soft)" onclick="GUI.relayout()">${ICONS.refresh} Re-arrange</button>
+          <span class="muted small" style="align-self:center;margin-left:auto"><span class="gp-leg" style="background:#818cf8"></span>family member <span class="gp-leg" style="background:#fbbf24;margin-left:10px"></span>contact</span></div>
+        <div class="gp-relwrap"><canvas id="gp-relcanvas"></canvas></div>`;
+    },
+
+    deepResearch() {
+      const r = G.deepResearch;
+      return `<div class="report">
+        <button class="back-btn" onclick="window.go('home')">${ICONS.x} Close reader</button>
+        <div class="report-title"><h2>${esc(r.title)}</h2><p class="muted small">${esc(r.meta)}</p></div>
+        <div class="report-body">${r.sections.map((s) => `<h2>${esc(s.title)}</h2>${s.paras.map((p) => `<p>${esc(p.text)}</p>${p.cites && p.cites.length ? `<div class="cite-row">${p.cites.map((c) => `<span class="cite" onclick="GUI.archive('${c[1]}')">${esc(c[0])}</span>`).join('')}</div>` : ''}`).join('')}`).join('')}</div>
+        <div class="page-nav"><span class="muted small">${ICONS.report} Generated over the archive</span><button class="btn ghost" onclick="GUI.toast('In the app: export to Word / PDF or generate an audio edition.')">${ICONS.external} Export</button></div>
+      </div>`;
+    },
+
+    notes() {
+      const cur = G.notes.find((n) => n.id === state.note) || G.notes[0];
+      const folders = [...new Set(G.notes.map((n) => n.folder))];
+      return `${viewHead('notebook', 'Notes', 'Your own working notes, with links back to the people and records they mention.')}
+        <div class="notes-grid">
+          <div>${folders.map((f) => `<div class="nav-group-label" style="padding-left:6px">${esc(f)}</div>${G.notes.filter((n) => n.folder === f).map((n) => `<div class="note-item ${n.id === cur.id ? 'active' : ''}" onclick="GUI.note('${n.id}')">${ICONS.notebook}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)}</span></div>`).join('')}`).join('')}</div>
+          <div class="card"><div class="list-title" style="margin-bottom:8px"><b style="font-size:15px">${esc(cur.title)}</b> <span class="muted small">· ${esc(cur.updated)}</span></div>
+            <div class="note-body">${cur.body.split(/(\[[^\]]+\])/).map((seg) => /^\[/.test(seg) ? `<span class="note-link">${ICONS.link}${esc(seg.replace(/^\[|\]$/g, ''))}</span>` : esc(seg)).join('')}</div></div>
+        </div>`;
     },
 
     search() {
-      return `
-        ${viewHead('search', 'Search', 'One box over the whole vault — people, events and the full text of every transcribed source.')}
-        <input class="search-input" id="gp-search" placeholder="Try “Vega”, “baptism”, “Buenos Aires”, “widower”…" autocomplete="off"/>
+      return `${viewHead('search', 'Search', 'One box over the whole vault — people, events and the full text of every transcribed source.')}
+        <input class="search-input" id="gp-search" placeholder="Try “Vidal”, “baptism”, “Sevilla”, “gripe”…" autocomplete="off"/>
         <div id="gp-search-results" style="margin-top:16px"></div>`;
     },
 
     library() {
-      return `
-        ${viewHead('book', 'Library', 'Secondary literature that frames the reconstruction — synced from Zotero, the same as an academic vault. Primary sources live in the Archive.')}
-        ${G.library.map((w) => `<div class="list-row" style="cursor:default">
-          <span class="gp-doc">${ICONS.book}</span>
-          <div class="list-main">
-            <div class="list-title"><b>${esc(w.title)}</b> <span class="chip">${esc(w.type)}</span></div>
-            <div class="list-desc">${esc(w.author)} (${w.year}) — ${esc(w.note)}</div>
-          </div>
-        </div>`).join('')}`;
-    },
-
-    deepResearch() {
-      const r = G.deepResearch.find((x) => x.id === state.report) || G.deepResearch[0];
-      return `
-        <div class="report">
-          <button class="back-btn" onclick="window.go('home')">${ICONS.x} Close reader</button>
-          <img class="cover" src="${r.cover}" alt=""/>
-          <div class="report-title"><h2>${esc(r.title)}</h2><p class="muted small">${esc(r.meta)}</p></div>
-          <div class="report-body">
-            ${r.sections.map((s) => `<h2>${esc(s.title)}</h2>${s.paras.map((p) => `<p>${citeText(p)}</p>${p.cites && p.cites.length ? `<div class="cite-row">${p.cites.map((c) => `<span class="cite" onclick="GUI.archive('${c[1]}')">${esc(c[0])}</span>`).join('')}</div>` : ''}`).join('')}`).join('')}
-          </div>
-          <div class="page-nav"><span class="muted small">${ICONS.report} Generated over the embedding-indexed archive + library</span><button class="btn ghost" onclick="GUI.toast('In the app: export to Word / PDF, or generate an audio edition.')">${ICONS.external} Export</button></div>
-        </div>`;
-    },
-
-    notes() {
-      const flat = G.notes.flatMap((f) => f.notes.map((n) => ({ ...n, folder: f.folder })));
-      const cur = flat.find((n) => n.id === state.note) || flat[0];
-      return `
-        ${viewHead('notebook', 'Notes', 'Your own working notes, with links back to the people and records they mention.')}
-        <div class="notes-grid">
-          <div>
-            ${G.notes.map((f) => `<div class="nav-group-label" style="padding-left:6px">${esc(f.folder)}</div>${f.notes.map((n) => `<div class="note-item ${n.id === cur.id ? 'active' : ''}" onclick="GUI.note('${n.id}')">${ICONS.notebook}<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n.title)}</span></div>`).join('')}`).join('')}
-          </div>
-          <div class="card">
-            <div class="list-title" style="margin-bottom:8px"><b style="font-size:15px">${esc(cur.title)}</b> <span class="muted small">· ${esc(cur.updated)}</span></div>
-            <div class="note-body">${cur.body.split(/(\[[^\]]+\])/).map((seg) => /^\[/.test(seg) ? `<span class="note-link">${ICONS.link}${esc(seg.replace(/^\[|\]$/g, ''))}</span>` : esc(seg)).join('')}</div>
-          </div>
-        </div>`;
+      return `${viewHead('book', 'Library', 'Secondary literature — synced from Zotero, the same as an academic vault. Primary sources live in the Archive.')}
+        <p class="muted small">This genealogy vault has no secondary bibliography yet. In the app, connect Zotero to bring in the historiography that frames the reconstruction.</p>`;
     },
 
     settings() {
-      const s = G.settings;
-      const tabs = [['providers', 'AI Providers'], ['models', 'Models'], ['vault', 'Vault']];
-      const panel = state.settingsTab === 'models'
-        ? `<div class="card"><h3>${ICONS.settings} Task models</h3><table class="tbl"><tbody>${s.models.map((m) => `<tr><td>${esc(m[0])}</td><td><span class="chip">${esc(m[1])}</span></td></tr>`).join('')}</tbody></table></div>`
-        : state.settingsTab === 'vault'
-          ? `<div class="card"><h3>${ICONS.archive} Vault</h3><div class="set-row"><div class="lbl"><b>Type</b><span>Tailors the sidebar and the assistant persona</span></div><span class="chip"><span class="dot" style="background:var(--amber)"></span>Genealogy</span></div><div class="set-row"><div class="lbl"><b>Assistant persona</b><span>Acts as a genealogist; proposes kinship from evidence, following the proof standard</span></div>${toggle('mcp')}</div><div class="set-row"><div class="lbl"><b>Encrypted auto-backup</b><span>Covers every vault, generational rotation</span></div>${toggle('autoBackup')}</div></div>`
-          : `<div class="card"><h3>${ICONS.settings} Providers</h3>${s.providers.map((p) => `<div class="set-row"><div class="set-prov"><span class="prov-badge" style="background:${p.on ? 'rgba(202,138,4,0.18)' : 'var(--bg-soft)'};color:${p.on ? '#fde68a' : 'var(--text-3)'}">${esc(p.name[0])}</span><div class="lbl"><b>${esc(p.name)}</b><span>${esc(p.desc)}${p.key ? ' · <span class="keymask">' + esc(p.key) + '</span>' : ''}</span></div></div><span class="chip"><span class="dot" style="background:${p.on ? 'var(--green)' : 'var(--text-3)'}"></span>${p.on ? 'active' : 'off'}</span></div>`).join('')}</div>`;
-      return `
-        ${viewHead('settings', 'Settings', 'Everything runs locally; AI is your own key or fully offline. This is a static preview.')}
-        <div class="settings-grid">
-          <div class="set-tabs">${tabs.map((t) => `<button class="set-tab ${state.settingsTab === t[0] ? 'active' : ''}" onclick="GUI.setTab('${t[0]}')">${ICONS.settings}<span>${t[1]}</span></button>`).join('')}</div>
-          <div>${panel}</div>
-        </div>`;
+      const tabs = [['providers', 'AI Providers'], ['vault', 'Vault']];
+      const panel = state.settingsTab === 'vault'
+        ? `<div class="card"><h3>${ICONS.archive} Vault</h3><div class="set-row"><div class="lbl"><b>Type</b><span>Tailors the sidebar and the assistant persona</span></div><span class="chip"><span class="dot" style="background:var(--amber)"></span>Genealogy</span></div><div class="set-row"><div class="lbl"><b>Assistant persona</b><span>A genealogist: proposes kinship from evidence, following the proof standard</span></div><span class="chip">on</span></div></div>`
+        : `<div class="card"><h3>${ICONS.settings} Providers</h3>${[['Anthropic', 'Claude models · cloud', true], ['OpenAI', 'GPT models · cloud', false], ['Ollama', 'Local models · fully offline', true]].map(([n, d, on]) => `<div class="set-row"><div class="set-prov"><span class="prov-badge" style="background:${on ? 'rgba(202,138,4,0.18)' : 'var(--bg-soft)'};color:${on ? '#fde68a' : 'var(--text-3)'}">${n[0]}</span><div class="lbl"><b>${n}</b><span>${d}</span></div></div><span class="chip"><span class="dot" style="background:${on ? 'var(--green)' : 'var(--text-3)'}"></span>${on ? 'active' : 'off'}</span></div>`).join('')}</div>`;
+      return `${viewHead('settings', 'Settings', 'Everything runs locally; AI is your own key or fully offline. This is a static preview.')}
+        <div class="settings-grid"><div class="set-tabs">${tabs.map((t) => `<button class="set-tab ${state.settingsTab === t[0] ? 'active' : ''}" onclick="GUI.setTab('${t[0]}')">${ICONS.settings}<span>${t[1]}</span></button>`).join('')}</div><div>${panel}</div></div>`;
     },
   };
 
-  function toggle(key) {
-    const on = state.toggles[key];
-    return `<button class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on}" onclick="GUI.sw('${key}',this)"></button>`;
-  }
-  function citeText(p) {
-    return esc(p.text);
-  }
-
-  // kin suggestion modal
-  function kinModal(id) {
-    const k = G.kinSuggestions.find((x) => x.id === id);
-    openModal(`
-      ${modalHead(esc(k.question), `<span class="gp-strength ${k.strength}">${k.strength} signal</span> · proposed from evidence`)}
-      <p class="muted small">Nothing is added to the tree without your confirmation. This is exactly how the assistant proposes kinship — with its evidence shown.</p>
-      <div class="nav-group-label" style="padding-left:0">Evidence</div>
-      ${k.evidence.map((e) => `<div class="gp-fact">${ICONS.bulb}<span>${esc(e)}</span></div>`).join('')}
-      <div class="tag-row" style="margin-top:16px">
-        <button class="btn primary" onclick="GUI.close();GUI.toast('In the app: adds the filiation to the tree, citing this evidence.')">${ICONS.check} Confirm kinship</button>
-        <button class="btn ghost" onclick="GUI.close();GUI.toast('In the app: dismisses the suggestion; it won’t be proposed again.')">Not the same</button>
-      </div>`, true);
+  function personDetail(p) {
+    const evs = eventsForPerson(p.id).slice().sort((a, b) => a.year - b.year);
+    return `<div style="padding:6px 24px 24px">
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        <div class="gp-ficha-portrait">${treeFichaSVG(p)}</div>
+        <div><h2 style="font-size:20px;margin:0">${esc(p.name)}</h2><p class="muted small" style="margin:2px 0 6px">${p.sex === 'female' ? 'Female' : 'Male'} · ${esc(datesOf(p))}</p><span class="chip">${esc(p.occupation || '—')}</span></div>
+        <button class="btn ghost" style="margin-left:auto;border:1px solid var(--border-soft)" onclick="GUI.person('${p.id}')">${ICONS.external} Full ficha</button>
+      </div>
+      <div class="nav-group-label" style="padding-left:0;margin-top:14px">Life events (${evs.length})</div>
+      ${evs.map((e) => `<div class="gp-event" ${e.source ? `onclick="GUI.archive('${e.source}')"` : ''}><span class="gp-event-dot" style="background:${EVC[e.type]}"></span><div style="flex:1;min-width:0"><div class="list-title"><b>${EVENT_LABEL[e.type] || e.type}</b> <span class="muted small">· ${esc(e.date)} · ${esc((placeById(e.placeId) || {}).name || '')}</span></div></div>${e.source ? `<span class="gp-src">${ICONS.archive}</span>` : ''}</div>`).join('') || '<p class="muted small">No events recorded.</p>'}
+    </div>`;
   }
 
-  // ---------- family tree SVG ----------
-  function treeSVG() {
-    const N = 156, H = 54;
-    const nodes = {
-      p1: { cx: 300, cy: 40 }, p2: { cx: 520, cy: 40 },
-      p3: { cx: 150, cy: 210 }, p6: { cx: 330, cy: 210 }, p4: { cx: 545, cy: 210 }, c1: { cx: 725, cy: 210 }, p5: { cx: 885, cy: 210 },
-      p7: { cx: 195, cy: 375 }, p8: { cx: 370, cy: 375 },
-    };
-    const node = (id) => {
-      const n = nodes[id];
-      const p = personById(id) || contactById(id);
-      const isContact = !personById(id);
-      const hyp = p && p.conf === 'hypothesis';
-      const infant = id === 'p5';
-      const w = infant ? 130 : N, h = infant ? 46 : H;
-      const x = n.cx - w / 2, y = n.cy - h / 2;
-      const fill = isContact ? '#161616' : (personById(id).sex === 'F' ? 'rgba(138,92,74,0.16)' : 'rgba(122,98,73,0.16)');
-      const stroke = hyp ? 'var(--amber)' : isContact ? 'var(--border-soft)' : (personById(id).sex === 'F' ? '#8a5c4a' : '#7a6249');
-      const dates = personById(id) ? lifespan(personById(id)) : 'in-law';
-      const nm = (p.name || id).replace(/[¿?]/g, '');
-      return `<g class="gp-tnode ${isContact ? 'contact' : ''}" ${personById(id) ? `onclick="GUI.person('${id}')"` : ''} transform="translate(${x},${y})">
-        <rect width="${w}" height="${h}" rx="10" fill="${fill}" stroke="${stroke}" stroke-width="1.4" ${hyp ? 'stroke-dasharray="5 4"' : ''}/>
-        <text x="10" y="21" font-size="12.5" font-weight="600" fill="#f0e6d6">${esc(nm.length > 22 ? nm.slice(0, 21) + '…' : nm)}</text>
-        <text x="10" y="38" font-size="11" fill="#b6a58c">${esc(dates)}${hyp ? ' · ?' : ''}</text>
-      </g>`;
-    };
-    const line = (x1, y1, x2, y2, dashed) => `<path d="M${x1},${y1} L${x2},${y2}" stroke="var(--border-soft)" stroke-width="1.6" fill="none" ${dashed ? 'stroke-dasharray="5 4"' : ''}/>`;
-    const poly = (pts, dashed) => `<polyline points="${pts}" stroke="var(--border-soft)" stroke-width="1.6" fill="none" ${dashed ? 'stroke-dasharray="5 4"' : ''}/>`;
-    // couple bars
-    const coupleP1 = line(nodes.p1.cx + 78, 40, nodes.p2.cx - 78, 40);        // Bartolomé — Dolores
-    const coupleP3 = line(nodes.p3.cx + 78, 210, nodes.p6.cx - 78, 210);      // Francisco — Carmen
-    const coupleP4 = line(nodes.p4.cx + 78, 210, nodes.c1.cx - 78, 210, false); // María — Manuel
-    // gen0 → gen1 children (Francisco, María, Antonio) via a sibling bus
-    const g0mid = (nodes.p1.cx + nodes.p2.cx) / 2; // 410
-    const busY1 = 128;
-    const g0bus = poly(`${g0mid},40 ${g0mid},${busY1} ${nodes.p3.cx},${busY1} ${nodes.p3.cx},183`) +
-      poly(`${nodes.p4.cx},${busY1} ${nodes.p4.cx},183`) +
-      poly(`${nodes.p5.cx},${busY1} ${nodes.p5.cx},187`) +
-      line(nodes.p3.cx, busY1, nodes.p5.cx, busY1);
-    // gen1 (Francisco+Carmen) → gen2 children (José, Ramón?)
-    const g1mid = (nodes.p3.cx + nodes.p6.cx) / 2; // 240
-    const busY2 = 300;
-    const g1bus = poly(`${g1mid},210 ${g1mid},${busY2} ${nodes.p7.cx},${busY2} ${nodes.p7.cx},348`) +
-      line(nodes.p7.cx, busY2, nodes.p8.cx, busY2) +
-      poly(`${nodes.p8.cx},${busY2} ${nodes.p8.cx},348`, true); // Ramón: dashed (unconfirmed)
-    return `<svg class="gp-tree" viewBox="0 0 980 420" role="img" aria-label="Family tree">
-      ${coupleP1}${coupleP3}${coupleP4}${g0bus}${g1bus}
-      ${Object.keys(nodes).map(node).join('')}
-    </svg>`;
+  function suggestionsModal() {
+    openModal(`${modalHead('Suggested relationships', 'Proposed from the evidence — nothing enters the tree without your approval')}
+      ${G.suggestions.map((k) => `<div class="gp-kin">
+        <div class="list-title"><b>${esc(k.question)}</b> <span class="gp-strength ${k.strength}">${k.strength} signal</span></div>
+        <div style="margin-top:8px">${k.evidence.map((e) => `<div class="gp-fact">${ICONS.bulb}<span>${esc(e)}</span></div>`).join('')}</div>
+        <div class="tag-row" style="margin-top:10px"><button class="btn primary small" onclick="GUI.toast('In the app: adds the link to the tree, citing this evidence.')">${ICONS.check} Confirm</button><button class="btn ghost small" onclick="GUI.toast('In the app: dismisses the suggestion.')">Dismiss</button></div>
+      </div>`).join('')}`, true);
   }
+
+  // ---------- Leaflet map ----------
+  function initMap() {
+    const el = $('#gp-map'); if (!el || !window.L) { if (el) el.innerHTML = '<div class="gp-empty">Map tiles load in the browser.</div>'; return; }
+    const map = L.map(el, { zoomControl: true, attributionControl: true }).setView([37.45, -5.55], 10);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '© OpenStreetMap · © CARTO' }).addTo(map);
+    // migration paths (Carmona → Sevilla, Carmona → Écija)
+    const P = (id) => { const pl = placeById(id); return [pl.lat, pl.lng]; };
+    L.polyline([P('carmona'), P('sevilla')], { color: '#818cf8', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(map);
+    L.polyline([P('carmona'), P('ecija')], { color: '#f472b6', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(map);
+    // markers: distinct persons per place
+    const counts = {};
+    G.personPlaces.forEach((pp) => { const id = pp.placeId === 'parr' ? 'carmona' : pp.placeId; (counts[id] = counts[id] || new Set()).add(pp.personId); });
+    [['carmona'], ['sevilla'], ['ecija']].forEach(([id]) => {
+      const pl = placeById(id); const n = (counts[id] || new Set()).size;
+      const icon = L.divIcon({ className: 'gp-pin-wrap', html: `<div class="gp-pin2"></div><div class="gp-pin-lab"><b>${esc(pl.name)}</b> ${n} people</div>`, iconSize: [0, 0] });
+      L.marker([pl.lat, pl.lng], { icon }).addTo(map).on('click', () => GUI.placeToast(id));
+    });
+    setTimeout(() => map.invalidateSize(), 200);
+  }
+
+  // ---------- relations node graph (canvas force sim) ----------
+  let relAnim = 0;
+  function initRelations() {
+    cancelAnimationFrame(relAnim);
+    const cv = $('#gp-relcanvas'); if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const wrap = cv.parentElement;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    function size() { cv.width = wrap.clientWidth * dpr; cv.height = wrap.clientHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    size();
+    const W = () => cv.width / dpr, H = () => cv.height / dpr;
+    const ids = [...new Set(G.social.flatMap((r) => [r.from, r.to]))];
+    const nodes = ids.map((id) => ({ id, person: !!personById(id), name: nameOf(id), x: W() / 2 + (Math.random() - 0.5) * 220, y: H() / 2 + (Math.random() - 0.5) * 220, vx: 0, vy: 0 }));
+    const nById = new Map(nodes.map((n) => [n.id, n]));
+    const links = G.social.map((r) => ({ a: nById.get(r.from), b: nById.get(r.to), role: r.role }));
+    let ticks = 0;
+    function step() {
+      ticks++;
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j]; let dx = a.x - b.x, dy = a.y - b.y; let d = Math.hypot(dx, dy) || 1;
+        const f = 5200 / (d * d); a.vx += (dx / d) * f; a.vy += (dy / d) * f; b.vx -= (dx / d) * f; b.vy -= (dy / d) * f;
+      }
+      links.forEach((l) => { let dx = l.b.x - l.a.x, dy = l.b.y - l.a.y, d = Math.hypot(dx, dy) || 1; const f = (d - 150) * 0.02; l.a.vx += (dx / d) * f; l.a.vy += (dy / d) * f; l.b.vx -= (dx / d) * f; l.b.vy -= (dy / d) * f; });
+      nodes.forEach((n) => { n.vx += (W() / 2 - n.x) * 0.004; n.vy += (H() / 2 - n.y) * 0.004; n.vx *= 0.86; n.vy *= 0.86; n.x += n.vx; n.y += n.vy; n.x = Math.max(70, Math.min(W() - 70, n.x)); n.y = Math.max(40, Math.min(H() - 40, n.y)); });
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W(), H());
+      links.forEach((l) => {
+        ctx.strokeStyle = '#6b6b73'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(l.a.x, l.a.y); ctx.lineTo(l.b.x, l.b.y); ctx.stroke();
+        const mx = (l.a.x + l.b.x) / 2, my = (l.a.y + l.b.y) / 2, ang = Math.atan2(l.b.y - l.a.y, l.b.x - l.a.x);
+        ctx.save(); ctx.translate(mx, my); ctx.rotate(Math.abs(ang) > Math.PI / 2 ? ang + Math.PI : ang);
+        ctx.fillStyle = '#c4c4cc'; ctx.font = '11px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(l.role, 0, -4); ctx.restore();
+      });
+      nodes.forEach((n) => {
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.person ? 7 : 5, 0, 6.29); ctx.fillStyle = n.person ? '#818cf8' : '#fbbf24'; ctx.fill();
+        const tx = n.x + (n.person ? 7 : 5) + 5, ty = n.y; ctx.font = '600 12px Inter, sans-serif';
+        const tw = ctx.measureText(n.name).width;
+        ctx.fillStyle = 'rgba(24,24,27,0.94)'; roundRect(ctx, tx, ty - 10, tw + 12, 20, 5); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)'; ctx.lineWidth = 1; roundRect(ctx, tx, ty - 10, tw + 12, 20, 5); ctx.stroke();
+        ctx.fillStyle = '#f4f4f5'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(n.name, tx + 6, ty); ctx.textBaseline = 'alphabetic';
+      });
+    }
+    function loop() { if (ticks < 320) step(); draw(); relAnim = requestAnimationFrame(loop); }
+    loop();
+    cv.onclick = (e) => { const r = cv.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top; const hit = nodes.find((n) => Math.hypot(n.x - mx, n.y - my) < 12); if (hit && personById(hit.id)) GUI.person(hit.id); };
+  }
+  function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
   // ---------- search ----------
   function runSearch(q) {
-    const box = $('#gp-search-results');
-    if (!box) return;
+    const box = $('#gp-search-results'); if (!box) return;
     const s = q.trim().toLowerCase();
     if (!s) { box.innerHTML = `<p class="muted small">Type to search people, events and every transcribed record.</p>`; return; }
-    const people = G.persons.filter((p) => (p.name + ' ' + (p.occupation || '') + ' ' + p.bio).toLowerCase().includes(s));
-    const recs = G.archive.filter((a) => (a.title + ' ' + a.transcript + ' ' + a.facts.join(' ')).toLowerCase().includes(s));
-    const evs = G.events.filter((e) => (e.summary + ' ' + e.place + ' ' + (EVENT_LABEL[e.type] || '')).toLowerCase().includes(s));
+    const ppl = G.persons.filter((p) => (p.name + ' ' + (p.occupation || '')).toLowerCase().includes(s));
+    const recs = G.archive.filter((a) => (a.title + ' ' + a.text + ' ' + Object.values(a.metadata).join(' ')).toLowerCase().includes(s));
     const sec = (label, items) => items.length ? `<div class="nav-group-label" style="padding-left:0">${label} (${items.length})</div>${items.join('')}` : '';
     box.innerHTML = [
-      sec('People', people.map((p) => `<div class="list-row" onclick="GUI.person('${p.id}')"><span class="gp-doc">${ICONS.people}</span><div class="list-main"><div class="list-title"><b>${esc(p.name)}</b> <span class="muted small">${esc(lifespan(p))}</span></div><div class="list-desc">${esc(p.bio.slice(0, 120))}…</div></div></div>`)),
-      sec('Records', recs.map((a) => `<div class="list-row" onclick="GUI.archive('${a.id}')"><span class="gp-doc">${ICONS.archive}</span><div class="list-main"><div class="list-title"><b>${esc(a.title)}</b> <span class="chip">${esc(a.kind)}</span></div><div class="list-desc">${esc(a.transcript.slice(0, 120))}…</div></div></div>`)),
-      sec('Events', evs.map((e) => `<div class="list-row" onclick="GUI.archive('${e.source}')"><span class="gp-doc">${ICONS.clock}</span><div class="list-main"><div class="list-title">${eventChip(e.type)} <b>${esc(e.date)}</b></div><div class="list-desc">${esc(e.summary)}</div></div></div>`)),
+      sec('People', ppl.map((p) => `<div class="list-row" onclick="GUI.person('${p.id}')"><span class="gp-doc-i">${ICONS.people}</span><div class="list-main"><div class="list-title"><b>${esc(p.name)}</b> <span class="muted small">${esc(datesOf(p))}</span></div></div></div>`)),
+      sec('Records', recs.map((a) => `<div class="list-row" onclick="GUI.archive('${a.id}')"><span class="gp-doc-i">${ICONS.archive}</span><div class="list-main"><div class="list-title"><b>${esc(a.title)}</b> <span class="chip gp-amber">${esc(a.docType)}</span></div><div class="list-desc">${esc(a.text.slice(0, 120))}…</div></div></div>`)),
     ].join('') || `<p class="muted small">No matches for “${esc(q)}”.</p>`;
   }
 
-  // ---------- assistant (genealogist persona) ----------
-  const chat = { open: false, messages: [], replyIdx: 0 };
+  // ---------- assistant ----------
+  const chat = { open: false, messages: [], i: 0 };
   const CANNED = [
-    { text: 'Following the genealogical proof standard, I never assert a link without a document. The 1897 marriage confirms Francisco ↔ Carmen, but their earliest tie is a godparent relation in 1874 — recorded, not inferred.' },
-    { text: 'The 1908 civil register calls Bartolomé a “widower”, yet Dolores dies in 1919. Every other source agrees, so I flag this as a likely clerk’s error rather than resolving it silently. Want me to draft a note?' },
-    { text: 'Ramón Ortega is a low-confidence lead: a 1901 foundling baptism with a “Herrera” godmother. I would not add him to the tree — I have logged it as an open identity question until a second source appears.' },
+    { text: 'Following the genealogical proof standard, I never add a link without a document. The Casimiro↔Dolores marriage is a strong suggestion from the 1890 marriage record and Encarnación’s diary — but it stays a proposal until you confirm it.' },
+    { text: 'Vicente Serrano died in Sevilla in 1918, aged 22 — the civil register names the 1918 influenza epidemic. His sister Amparo’s 1925 letter still mourns him.' },
+    { text: 'The family is rooted in Carmona; Rafael is the one who moves to Sevilla around 1912 and starts the city line. The Reyes branch runs east to Écija through Dolores.' },
   ];
   function renderChat() {
     const root = $('#chat-root');
     if (!chat.open) { root.innerHTML = ''; return; }
     root.innerHTML = `<div class="modal-overlay" id="chat-ov"><div class="modal chat-modal">
       <div class="chat-head"><div style="flex:1"><h3>${ICONS.wand} Assistant · Genealogist</h3><p>Grounded on this vault. Proposes kinship from evidence — never invents a source.</p></div><button class="modal-x" onclick="GUI.chatClose()">${ICONS.x}</button></div>
-      <div class="chat-msgs" id="gp-chat-msgs">
-        ${chat.messages.length ? chat.messages.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('') : `<div class="msg hint">Ask about a person, a record, or a contradiction. Try “Is Ramón a Herrera?”</div>`}
-      </div>
+      <div class="chat-msgs" id="gp-chat-msgs">${chat.messages.length ? chat.messages.map((m) => `<div class="msg ${m.who}">${esc(m.text)}</div>`).join('') : `<div class="msg hint">Ask about a person, a record, or a suggestion. Try “Is Casimiro a Serrano in-law?”</div>`}</div>
       <div class="chat-input"><input id="gp-chat-inp" placeholder="Ask the genealogist…" autocomplete="off"/><button class="btn primary" onclick="GUI.chatSend()">Send</button></div>
     </div></div>`;
     $('#chat-ov').addEventListener('mousedown', (e) => { if (e.target.id === 'chat-ov') GUI.chatClose(); });
@@ -489,44 +584,41 @@
 
   // ---------- router ----------
   window.go = function (view) {
+    cancelAnimationFrame(relAnim);
     state.view = view;
     document.querySelectorAll('.nav-item').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     const el = main();
-    el.innerHTML = `<div class="fade-in">${(VIEWS[view] || VIEWS.home)()}</div>`;
+    const full = view === 'people' || view === 'archive' || view === 'tree';
+    el.innerHTML = `<div class="fade-in gp-viewroot ${full ? 'gp-full' : 'gp-scroll'}">${(VIEWS[view] || VIEWS.home)()}</div>`;
     el.scrollTop = 0;
-    if (view === 'search') {
-      runSearch('');
-      const box = $('#gp-search'); if (box) { box.addEventListener('input', () => runSearch(box.value)); box.focus(); }
-    }
-    try { history.replaceState(null, '', '#' + view); } catch (e) { /* file:// */ }
+    if (view === 'map') initMap();
+    if (view === 'relations') initRelations();
+    if (view === 'search') { runSearch(''); const b = $('#gp-search'); if (b) { b.addEventListener('input', () => runSearch(b.value)); b.focus(); } }
+    try { history.replaceState(null, '', '#' + view); } catch (e) {}
   };
 
   window.GUI = {
     toast, close: closeModal,
-    person: personModal, archive: archiveModal, place: placeModal, kin: kinModal,
+    person: personModal, archive: archiveModal, suggestions: suggestionsModal,
+    focusTree(id) { state.focus = id; state.zoom = 1; if (state.view !== 'tree') window.go('tree'); else window.go('tree'); },
+    zoom(dir) { state.zoom = Math.max(0.4, Math.min(2, state.zoom + dir * 0.15)); window.go('tree'); },
+    selectPerson(id) { state.person = id; window.go('people'); },
+    peopleFilter(q) { const s = q.trim().toLowerCase(); document.querySelectorAll('#gp-plist .gp-prow').forEach((r) => { r.style.display = !s || r.dataset.name.includes(s) ? '' : 'none'; }); },
+    setFolder(f) { state.archiveFolder = f; window.go('archive'); },
     note(id) { state.note = id; window.go('notes'); },
     setTab(id) { state.settingsTab = id; window.go('settings'); },
-    sw(key, el) { state.toggles[key] = !state.toggles[key]; el.classList.toggle('on', state.toggles[key]); el.setAttribute('aria-checked', String(state.toggles[key])); },
+    relayout() { initRelations(); },
+    placeToast(id) { const pl = placeById(id); toast(`${pl.name} — ${pl.region}`); },
     chat() { chat.open = true; renderChat(); },
     chatClose() { chat.open = false; renderChat(); },
-    chatSend() {
-      const inp = $('#gp-chat-inp'); const v = inp && inp.value.trim(); if (!v) return;
-      chat.messages.push({ who: 'user', text: v }); inp.value = '';
-      renderChat();
-      setTimeout(() => { chat.messages.push({ who: 'ai', text: CANNED[chat.replyIdx++ % CANNED.length].text }); renderChat(); }, 700);
-    },
+    chatSend() { const inp = $('#gp-chat-inp'); const v = inp && inp.value.trim(); if (!v) return; chat.messages.push({ who: 'user', text: v }); inp.value = ''; renderChat(); setTimeout(() => { chat.messages.push({ who: 'ai', text: CANNED[chat.i++ % CANNED.length].text }); renderChat(); }, 650); },
   };
 
   // ---------- boot ----------
   const nav = $('#nav');
-  nav.innerHTML = NAV.map((n) =>
-    n.group !== undefined
-      ? `<div class="nav-group-label">${n.group}</div>`
-      : `<button class="nav-item" data-view="${n.id}">${ICONS[n.icon]}<span>${n.label}</span></button>`
-  ).join('');
+  nav.innerHTML = NAV.map((n) => n.group !== undefined ? `<div class="nav-group-label">${n.group}</div>` : `<button class="nav-item" data-view="${n.id}">${ICONS[n.icon]}<span>${n.label}</span></button>`).join('');
   nav.addEventListener('click', (e) => { const b = e.target.closest('.nav-item'); if (b) window.go(b.dataset.view); });
   document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if ($('#modal-root').innerHTML) closeModal(); else if (chat.open) GUI.chatClose(); });
-
   const initial = (location.hash || '#home').slice(1);
   window.go(VIEWS[initial] ? initial : 'home');
   window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (VIEWS[v] && v !== state.view) window.go(v); });

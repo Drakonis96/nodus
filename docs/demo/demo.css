@@ -595,7 +595,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 /* Safety net: any raw inline icon dropped into a modal/report text flow is capped,
    so an un-sized SVG can never blow up. The known-large SVGs are exempted. */
-.modal svg:not(.gp-portrait):not(.gp-tree),
+.modal svg:not(.gp-portrait):not(.gp-tree):not(.gp-fr),
 .report svg:not(.gp-tree) { max-width: 20px; max-height: 20px; }
 
 /* size the raw inline icons that sit outside the pre-sized contexts */
@@ -678,4 +678,104 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 
 @media (max-width: 860px) {
   .gp-map { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Genealogy demo v2.0.3 — views rebuilt to mirror the real app
+   (Serrano family). These append after the earlier .gp-* rules
+   and intentionally override them where names are reused.
+   ============================================================ */
+.gen .main { padding: 0; display: flex; flex-direction: column; }
+.gp-viewroot { flex: 1; min-height: 0; }
+.gp-viewroot.gp-scroll { overflow-y: auto; padding: 24px 30px 90px; }
+.gp-viewroot.gp-full { overflow: hidden; display: flex; flex-direction: column; }
+.gp-viewroot.gp-full > .gp-people, .gp-viewroot.gp-full > .gp-archive { flex: 1; min-height: 0; }
+.gp-viewroot.gp-full > .gp-tree-head { flex-shrink: 0; }
+.gp-viewroot.gp-full > .gp-tree-canvas { flex: 1; min-height: 0; }
+
+/* People two-pane */
+.gp-people, .gp-archive, .gp-tree-full { height: 100%; min-height: 0; }
+.gp-people { display: grid; grid-template-columns: 340px 1fr; }
+.gp-people-list { border-right: 1px solid var(--border); padding: 20px 16px; overflow-y: auto; }
+.gp-plist { margin-top: 10px; }
+.gp-prow { padding: 9px 8px; border-bottom: 1px solid #1d1d1d; cursor: pointer; border-radius: 6px; }
+.gp-prow:hover { background: var(--bg-soft); }
+.gp-prow.active { background: rgba(202,138,4,0.14); }
+.gp-prow b { display: block; font-size: 14px; }
+.gp-people-detail { overflow-y: auto; }
+.gp-empty { height: 100%; display: grid; place-items: center; color: var(--text-2); font-size: 14px; padding: 40px; text-align: center; }
+
+.gp-ficha-portrait { flex-shrink: 0; }
+.gp-ficha-portrait svg { display: block; }
+
+/* dossier / detail events (override earlier) */
+.gp-event { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; }
+.gp-event[onclick] { cursor: pointer; }
+.gp-event[onclick]:hover { border-color: rgba(202,138,4,0.5); background: #17140d; }
+.gp-event-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.gp-src { color: var(--text-3); flex-shrink: 0; }
+.gp-src svg { width: 15px; height: 15px; }
+.gp-source { padding: 10px 13px; border-radius: 8px; background: rgba(202,138,4,0.08); border: 1px solid rgba(202,138,4,0.25); font-size: 13px; color: #fcd34d; margin: 4px 0; }
+.gp-meta { display: flex; gap: 10px; padding: 5px 2px; font-size: 13px; border-bottom: 1px solid #1d1d1d; }
+.gp-meta-k { color: var(--text-3); min-width: 120px; flex-shrink: 0; }
+
+/* home */
+.gp-next { border-color: rgba(202,138,4,0.3) !important; background: rgba(202,138,4,0.05); }
+.gp-mini { display: flex; gap: 10px; margin-top: 8px; }
+.gp-mini span { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; color: var(--text-2); }
+.gp-mini b { color: var(--text); font-size: 15px; }
+.gp-amber { color: #fde68a; border-color: rgba(202,138,4,0.4); background: rgba(202,138,4,0.14); }
+
+/* tree */
+.gp-tree-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.gp-tree-canvas { padding: 16px; overflow: auto; background: rgba(10,10,10,0.4); }
+.gp-tnode { cursor: pointer; }
+.gp-tnode:hover > rect:first-of-type { filter: brightness(1.08); }
+
+/* timeline (override earlier) */
+.gp-timeline { border-left: 2px solid var(--border); margin-left: 8px; }
+.gp-tl-item { display: flex; gap: 14px; align-items: flex-start; padding: 12px 12px 12px 20px; position: relative; border-radius: 0 10px 10px 0; }
+.gp-tl-item[onclick] { cursor: pointer; }
+.gp-tl-item[onclick]:hover { background: rgba(202,138,4,0.05); }
+.gp-tl-dot { position: absolute; left: -7px; top: 18px; width: 11px; height: 11px; border-radius: 50%; background: #d4a017; border: 2px solid var(--bg); }
+.gp-tl-year { font-size: 14px; font-weight: 700; color: #fcd34d; min-width: 130px; width: auto; flex-shrink: 0; }
+.gp-fakeselect { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.gp-fakeselect svg { width: 13px; height: 13px; }
+
+/* archive */
+.gp-archive { display: grid; grid-template-columns: 240px 1fr; }
+.gp-arch-folders { border-right: 1px solid var(--border); padding: 16px 12px; overflow-y: auto; }
+.gp-folder { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--text-2); }
+.gp-folder svg { width: 15px; height: 15px; flex-shrink: 0; }
+.gp-folder:hover { background: var(--bg-soft); color: var(--text); }
+.gp-folder.active { background: rgba(202,138,4,0.14); color: #fde68a; }
+.gp-arch-main { padding: 18px 20px; overflow: auto; min-width: 0; }
+.gp-arch-tbl { margin-top: 6px; }
+.gp-arch-tbl b { font-weight: 600; }
+.gp-doc-i { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: rgba(202,138,4,0.12); color: #fcd34d; flex-shrink: 0; }
+.gp-doc-i svg { width: 15px; height: 15px; }
+
+/* map */
+.gp-leaflet { height: 600px; border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+.leaflet-container { background: #0d0d10 !important; font-family: var(--sans); }
+.gp-pin-wrap { position: relative; }
+.gp-pin2 { position: absolute; width: 13px; height: 13px; border-radius: 50%; background: #fbbf24; border: 2px solid #78350f; box-shadow: 0 0 0 4px rgba(251,191,36,0.22); }
+.gp-pin-lab { position: absolute; left: 14px; top: -9px; white-space: nowrap; background: rgba(14,12,9,0.92); border: 1px solid var(--border-soft); border-radius: 8px; padding: 3px 9px; font-size: 12px; color: var(--text); }
+.gp-pin-lab b { color: #fcd34d; }
+
+/* relations node graph */
+.gp-relwrap { position: relative; height: 600px; border-radius: var(--radius); border: 1px solid var(--border); background: #0d0d10; overflow: hidden; }
+.gp-relwrap canvas { width: 100%; height: 100%; display: block; }
+.gp-leg { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: middle; margin-right: 3px; }
+
+/* suggestions (override earlier) */
+.gp-kin { padding: 12px 14px; border-radius: 10px; border: 1px solid rgba(202,138,4,0.28); background: rgba(202,138,4,0.06); margin-top: 10px; }
+.gp-strength { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid; margin-left: 6px; }
+.gp-strength.high { color: var(--green); border-color: rgba(52,211,153,0.4); }
+.gp-fact { display: flex; gap: 9px; padding: 6px 2px; font-size: 13px; color: #d4d4d4; }
+.gp-fact svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; color: #fcd34d; }
+
+@media (max-width: 860px) {
+  .gp-people, .gp-archive { grid-template-columns: 1fr; }
+  .gen .main > .gp-viewroot > * { margin-left: 14px; margin-right: 14px; }
 }
