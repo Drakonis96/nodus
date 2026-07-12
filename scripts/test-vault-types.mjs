@@ -66,12 +66,18 @@ test('the tree view is scoped to genealogy only', () => {
   assert.equal(vt.isViewAllowedForVaultType('map', 'academic'), false);
 });
 
-test('genealogy hides coverage/gaps + argumentative views, keeps deep research', () => {
+test('genealogy hides argumentative + idea-graph writing views, keeps records + notes', () => {
   const hidden = vt.defaultHiddenViewsForType('genealogy');
-  for (const h of ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading', 'research', 'gaps', 'ideas', 'authors', 'graph']) {
+  // Argumentative/idea-graph surfaces AND the idea-graph writing tools are hidden:
+  // Deep Research / Writing / Projects all consume ideas/gaps/citations a genealogy
+  // vault doesn't have, so they'd run empty.
+  for (const h of ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading', 'research', 'gaps', 'ideas', 'authors', 'graph', 'deepResearch', 'writing', 'projects']) {
     assert.ok(hidden.includes(h), `${h} hidden in genealogy`);
   }
-  assert.ok(!hidden.includes('deepResearch'), 'deep research stays available in genealogy');
+  // The records/genealogy views and generic notes stay available.
+  for (const kept of ['persons', 'tree', 'timeline', 'archive', 'map', 'notes', 'library']) {
+    assert.ok(!hidden.includes(kept), `${kept} stays visible in genealogy`);
+  }
   assert.match(vt.vaultTypePromptPack('genealogy'), /MODO GENEALOGÍA/);
 });
 

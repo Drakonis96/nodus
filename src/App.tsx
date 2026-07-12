@@ -648,6 +648,7 @@ export function App() {
         <ResearchAssistantModal
           settings={settings}
           initialTarget={assistantTarget}
+          isGenealogy={isGenealogy}
           onClose={() => setResearchOpen(false)}
           onOpenGraph={openGraphFromAssistant}
         />

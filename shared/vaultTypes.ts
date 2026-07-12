@@ -79,9 +79,13 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
     id: 'genealogy',
     available: true,
     // Genealogy is record- and kinship-focused; hide the argumentative surfaces, the
-    // idea graph, and the coverage/gaps analysis. Deep Research stays (useful to trace
-    // a person across the corpus). The tree/persons/timeline/archive/map come in via
-    // scoping.
+    // idea graph and the coverage/gaps analysis. The writing tools (Deep Research,
+    // Writing workshop, Projects) are also hidden by default: they are built on the
+    // argumentative idea graph (ideas/gaps/contradictions + Zotero citations), which a
+    // genealogy vault doesn't have, so they'd run empty. The family workflow is served
+    // by the genealogy-aware chat, per-person AI biographies and kinship suggestions
+    // instead. All of these remain re-enableable from the sidebar for mixed corpora.
+    // The tree/persons/timeline/archive/map come in via scoping.
     defaultHiddenViews: [
       'argument',
       'debate',
@@ -94,6 +98,9 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
       'reading',
       'research',
       'gaps',
+      'deepResearch',
+      'writing',
+      'projects',
     ],
     promptPack: `
 

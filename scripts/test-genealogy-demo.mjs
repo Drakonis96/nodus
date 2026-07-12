@@ -121,6 +121,19 @@ try {
   // A name variant is searchable too (Encarna → Encarnación).
   assert.ok(globalSearch('Encarna', 8).some((r) => r.kind === 'person'), 'search matches a person name variant');
 
+  // ── Genealogy chat context: family-history material assembled from a question ──
+  const { buildGenealogyContext } = require(path.join(repoRoot, 'electron/ai/genealogyChatContext.ts'));
+  const ctx = await buildGenealogyContext('¿Quiénes eran los padres de Tomás Serrano y qué dice su partida de bautismo?');
+  assert.equal(ctx.resumen.personas, 14, 'the whole family is in the context');
+  const tomas = ctx.personas.find((p) => p.nombre === 'Tomás Serrano Campos');
+  assert.ok(tomas, 'the mentioned person is present');
+  assert.ok(tomas.padres.length >= 2, 'kinship resolved (parents present)');
+  assert.ok(tomas.relevante_para_la_consulta, 'a person named in the question is flagged relevant');
+  assert.ok(ctx.eventos.length > 0, 'life events assembled');
+  assert.ok(ctx.documentos.length > 0, 'documents assembled');
+  assert.ok(ctx.evidencia.some((e) => e.persona.includes('Tomás')), 'cited evidence for the mentioned person');
+  assert.equal(ctx.parentescos_sugeridos.length, 3, 'open kinship suggestions surfaced as hypotheses');
+
   // ── Clear restores everything ──────────────────────────────────────────────
   clearDemoData();
   assert.equal(entities.recordCounts().persons, 0, 'persons cleared');
