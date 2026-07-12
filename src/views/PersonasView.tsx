@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { HistoricalEvent, Person, PersonSex, PortraitFocus, RecordEvidence } from '@shared/types';
+import type { HistoricalEvent, MatchCandidatePair, Person, PersonSex, PortraitFocus, RecordEvidence } from '@shared/types';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 
 const SEX_LABEL: Record<PersonSex, string> = {
   male: 'Hombre',
@@ -24,6 +24,7 @@ export function PersonasView() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   const reload = useCallback(async () => {
     const list = await window.nodus.listPersons(search.trim() || undefined);
@@ -74,6 +75,13 @@ export function PersonasView() {
               <Icon name="download" size={13} /> {t('Exportar')}
             </button>
           </div>
+          <button
+            className="btn btn-ghost h-8 w-full gap-1.5 border border-neutral-700 text-xs"
+            title={t('Buscar registros que podrían ser la misma persona')}
+            onClick={() => setReviewing(true)}
+          >
+            <Icon name="users" size={13} /> {t('Revisar coincidencias')}
+          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           {persons.length === 0 && (
@@ -107,6 +115,119 @@ export function PersonasView() {
       </div>
 
       {adding && <AddPersonModal onClose={() => setAdding(false)} onSaved={reload} />}
+      {reviewing && (
+        <MatchReviewModal
+          onClose={() => setReviewing(false)}
+          onChanged={async () => {
+            setSelectedId(null);
+            await reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Review proposed identity matches: merge (keep one record) or dismiss (not the same). */
+function MatchReviewModal({ onClose, onChanged }: { onClose: () => void; onChanged: () => Promise<void> }) {
+  const [pairs, setPairs] = useState<MatchCandidatePair[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setPairs(await window.nodus.findMatches());
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      await load();
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">{t('Posibles coincidencias')}</h2>
+            <p className="text-xs text-neutral-500">
+              {t('Registros que podrían ser la misma persona. Tú decides; nada se fusiona automáticamente.')}
+            </p>
+          </div>
+          <button className="btn btn-ghost px-2 py-1" onClick={onClose}>
+            <Icon name="x" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {pairs === null ? (
+            <p className="py-8 text-center text-sm text-neutral-500">{t('Buscando coincidencias…')}</p>
+          ) : pairs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-neutral-500">{t('No hay coincidencias por revisar.')}</p>
+          ) : (
+            <ul className="space-y-3">
+              {pairs.map((pair) => (
+                <li key={`${pair.aId}-${pair.bId}`} className="rounded-lg border border-neutral-800 p-3">
+                  <div className="mb-2 grid grid-cols-2 gap-3">
+                    <PairPerson person={pair.a} />
+                    <PairPerson person={pair.b} />
+                  </div>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {pair.reasons.map((r) => (
+                      <span key={r} className="rounded-full bg-neutral-800 px-2 py-0.5 text-[11px] text-neutral-400">
+                        {t(r)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="btn btn-primary h-8 gap-1.5 text-xs"
+                      disabled={busy}
+                      onClick={() => void act(() => window.nodus.mergePersons(pair.aId, pair.bId))}
+                    >
+                      {tx('Fusionar en {name}', { name: pair.a.displayName })}
+                    </button>
+                    <button
+                      className="btn btn-ghost h-8 gap-1.5 border border-neutral-700 text-xs"
+                      disabled={busy}
+                      onClick={() => void act(() => window.nodus.mergePersons(pair.bId, pair.aId))}
+                    >
+                      {tx('Fusionar en {name}', { name: pair.b.displayName })}
+                    </button>
+                    <button
+                      className="btn btn-ghost h-8 gap-1.5 border border-neutral-700 text-xs text-neutral-400"
+                      disabled={busy}
+                      onClick={() => void act(() => window.nodus.dismissMatch(pair.aId, pair.bId))}
+                    >
+                      {t('No son la misma')}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PairPerson({ person }: { person: Person }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-neutral-900/50 p-2">
+      <PersonPortrait person={person} size={40} />
+      <div className="min-w-0">
+        <div className="truncate text-sm text-neutral-100">{person.displayName}</div>
+        <div className="truncate text-xs text-neutral-500">{lifeSpan(person) || t('sin fechas')}</div>
+      </div>
     </div>
   );
 }

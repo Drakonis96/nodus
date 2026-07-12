@@ -269,6 +269,7 @@ import {
   kinOf,
 } from './db/relationshipsRepo';
 import { importGedcom, exportGedcom } from './genealogy/gedcomBridge';
+import { findMatchCandidates, mergePersons, dismissMatch } from './db/matchRepo';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -549,6 +550,12 @@ export function registerIpc(
   h('entities:listRelationships', async (_e, personId: string) => listRelationshipsForPerson(personId));
   h('entities:allRelationships', async () => allRelationships());
   h('entities:kinOf', async (_e, personId: string) => kinOf(personId));
+  // Identity matching (record linkage)
+  h('entities:findMatches', async () => findMatchCandidates());
+  h('entities:mergePersons', async (_e, targetId: string, sourceId: string) => mergePersons(targetId, sourceId));
+  h('entities:dismissMatch', async (_e, a: string, b: string) => {
+    dismissMatch(a, b);
+  });
   // GEDCOM import / export
   h('genealogy:importGedcom', async () => {
     const win = getWindow();

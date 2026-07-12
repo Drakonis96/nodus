@@ -65,6 +65,9 @@ const api: NodusApi = {
   kinOf: (personId) => ipcRenderer.invoke('entities:kinOf', personId),
   importGedcom: () => ipcRenderer.invoke('genealogy:importGedcom'),
   exportGedcom: () => ipcRenderer.invoke('genealogy:exportGedcom'),
+  findMatches: () => ipcRenderer.invoke('entities:findMatches'),
+  mergePersons: (targetId, sourceId) => ipcRenderer.invoke('entities:mergePersons', targetId, sourceId),
+  dismissMatch: (a, b) => ipcRenderer.invoke('entities:dismissMatch', a, b).then(() => undefined),
   // Evidence archive
   archiveCounts: () => ipcRenderer.invoke('archive:counts'),
   listArchiveFolders: () => ipcRenderer.invoke('archive:listFolders'),

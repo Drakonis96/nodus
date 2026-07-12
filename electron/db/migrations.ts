@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 36;
+export const SCHEMA_VERSION = 37;
 
 export const migrations: Migration[] = [
   {
@@ -1177,6 +1177,23 @@ export const migrations: Migration[] = [
         focus_y    REAL NOT NULL DEFAULT 0.5,
         scale      REAL NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    version: 37,
+    up: /* sql */ `
+      -- Persistent verdicts over candidate identity matches ("are these two person
+      -- records the same individual?"). Same pattern as edge_feedback: keyed by the
+      -- normalised person pair (person_a < person_b), no foreign keys, so a "these are
+      -- NOT the same person" dismissal outlives rescans and is never re-proposed. An
+      -- accept is a merge (handled separately), so only dismissals are recorded here.
+      CREATE TABLE match_feedback (
+        person_a   TEXT NOT NULL,
+        person_b   TEXT NOT NULL,
+        verdict    TEXT NOT NULL DEFAULT 'dismissed',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (person_a, person_b)
       );
     `,
   },

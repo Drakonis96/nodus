@@ -789,6 +789,16 @@ export interface GedcomImportResult {
   events: number;
 }
 
+/** A proposed identity match between two person records, with why. */
+export interface MatchCandidatePair {
+  aId: string;
+  bId: string;
+  score: number;
+  reasons: string[];
+  a: Person;
+  b: Person;
+}
+
 export interface PersonName {
   name: string;
   kind: string | null;
@@ -3570,6 +3580,9 @@ export interface NodusApi {
   kinOf(personId: string): Promise<Kin>;
   importGedcom(): Promise<GedcomImportResult | null>;
   exportGedcom(): Promise<{ path: string } | null>;
+  findMatches(): Promise<MatchCandidatePair[]>;
+  mergePersons(targetId: string, sourceId: string): Promise<Person | null>;
+  dismissMatch(a: string, b: string): Promise<void>;
   // evidence archive
   archiveCounts(): Promise<ArchiveCounts>;
   listArchiveFolders(): Promise<ArchiveFolder[]>;
