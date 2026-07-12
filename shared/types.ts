@@ -923,6 +923,12 @@ export interface RecordEvidenceInput {
 
 export type ArchiveItemKind = 'image' | 'csv' | 'xlsx' | 'pdf' | 'text' | 'other';
 
+/** A tree member a document is linked to. */
+export interface ArchiveLinkedPerson {
+  personId: string;
+  displayName: string;
+}
+
 export interface ArchiveFolder {
   folderId: string;
   name: string;
@@ -948,6 +954,8 @@ export interface ArchiveItem {
   docType: string | null;
   /** Optional type-specific metadata form values. */
   metadata: Record<string, string> | null;
+  /** Tree members this document is linked to. */
+  linkedPersons: ArchiveLinkedPerson[];
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -3620,6 +3628,9 @@ export interface NodusApi {
   addArchiveTag(id: string, tag: string): Promise<void>;
   removeArchiveTag(id: string, tag: string): Promise<void>;
   listArchiveTags(): Promise<ArchiveTagCount[]>;
+  linkArchivePerson(itemId: string, personId: string): Promise<void>;
+  unlinkArchivePerson(itemId: string, personId: string): Promise<void>;
+  listArchiveItemsForPerson(personId: string): Promise<ArchiveItem[]>;
   pickAndIngestArchive(folderId?: string | null, docType?: string | null): Promise<ArchiveIngestSummary>;
   createArchiveTextEntry(input: {
     title: string;

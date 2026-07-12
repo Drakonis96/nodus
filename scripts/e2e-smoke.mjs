@@ -216,7 +216,11 @@ try {
       docType: 'birth_record',
       metadata: { persona: 'Juan Pérez', inventado: 'x' },
     });
+    await window.nodus.linkArchivePerson(entry.itemId, juan.personId);
+    const linkedDocs = await window.nodus.listArchiveItemsForPerson(juan.personId);
     return {
+      linkedDocs: linkedDocs.length,
+      linkedName: (await window.nodus.getArchiveItem(entry.itemId)).linkedPersons[0]?.displayName,
       entryDocType: entry.docType,
       entryMeta: entry.metadata,
       frameStyle: juanReloaded.frameStyle,
@@ -232,6 +236,8 @@ try {
   assert.equal(records.persons, 2, 'persons created over IPC');
   assert.equal(records.children, 1, 'kinship edge resolved over IPC');
   assert.equal(records.frameStyle, 'walnut', 'per-person tree frame stored over IPC');
+  assert.equal(records.linkedDocs, 1, 'document linked to the person over IPC');
+  assert.equal(records.linkedName, 'Juan Pérez', 'linked person surfaces on the item over IPC');
   assert.equal(records.events, 1, 'event linked to the person');
   assert.equal(records.evidence, 1, 'record evidence attached');
   assert.equal(records.placeName, 'Sevilla', 'event resolves its place');

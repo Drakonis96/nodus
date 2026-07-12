@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ArchiveFolder, ArchiveItem, ArchiveItemKind } from '@shared/types';
+import type { ArchiveFolder, ArchiveItem, ArchiveItemKind, Person } from '@shared/types';
 import { getArchiveDocType } from '@shared/archiveDocTypes';
 import { Icon } from '../components/ui';
 import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
+import { PersonLinkPicker } from '../components/PersonLinkPicker';
 import { t } from '../i18n';
 
 const KIND_ICON: Record<ArchiveItemKind, string> = {
@@ -20,6 +21,7 @@ const UNFILED = '__unfiled__';
 export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = {}) {
   const [folders, setFolders] = useState<ArchiveFolder[]>([]);
   const [items, setItems] = useState<ArchiveItem[]>([]);
+  const [treePersons, setTreePersons] = useState<Person[]>([]);
   const [folderId, setFolderId] = useState<string>(ALL);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ArchiveItem | null>(null);
@@ -30,6 +32,7 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
 
   const reload = useCallback(async () => {
     setFolders(await window.nodus.listArchiveFolders());
+    void window.nodus.listPersons().then(setTreePersons);
     const opts: { folderId?: string | null; search?: string } = {};
     if (folderId === UNFILED) opts.folderId = null;
     else if (folderId !== ALL) opts.folderId = folderId;
@@ -136,11 +139,12 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[44rem] text-sm">
+              <table className="w-full min-w-[54rem] text-sm">
                 <thead>
                   <tr className="border-b border-neutral-800 text-left text-xs font-medium text-neutral-500">
                     <th className="py-2 pr-3">{t('Nombre')}</th>
                     <th className="py-2 pr-3">{t('Tipo')}</th>
+                    <th className="py-2 pr-3">{t('Personas')}</th>
                     <th className="py-2 pr-3">{t('Descripción visual')}</th>
                     <th className="py-2 pr-3">{t('Texto detectado')}</th>
                     <th className="py-2 pr-3">{t('Etiquetas')}</th>
@@ -167,6 +171,9 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
                         ) : (
                           <span className="text-neutral-700">—</span>
                         )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <PersonLinkPicker item={it} persons={treePersons} onChanged={reload} />
                       </td>
                       <td className="max-w-[24rem] py-2 pr-3">
                         {it.description ? (

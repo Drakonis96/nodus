@@ -24,6 +24,7 @@ installRuntimeHooks(root);
 
 try {
   const repo = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));
+  const ent = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
   const { ingestArchiveFile } = require(path.join(repoRoot, 'electron/archive/archiveIngest.ts'));
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
@@ -106,6 +107,24 @@ try {
 
   const counts = repo.archiveCounts();
   assert.equal(counts.items, 3, 'image + CSV + partida (dedupe prevented a 4th)');
+
+  // ── Document ↔ person links ───────────────────────────────────────────────
+  const juan = ent.createPerson({ displayName: 'Juan Pérez' });
+  repo.linkItemPerson(partida.itemId, juan.personId);
+  assert.deepEqual(
+    repo.getItem(partida.itemId).linkedPersons.map((p) => p.displayName),
+    ['Juan Pérez'],
+    'linked person surfaces on the item'
+  );
+  assert.deepEqual(
+    repo.listItemsForPerson(juan.personId).map((i) => i.itemId),
+    [partida.itemId],
+    'the document is found from the person'
+  );
+  repo.linkItemPerson(partida.itemId, juan.personId); // idempotent
+  assert.equal(repo.getItem(partida.itemId).linkedPersons.length, 1, 'linking is idempotent');
+  repo.unlinkItemPerson(partida.itemId, juan.personId);
+  assert.equal(repo.getItem(partida.itemId).linkedPersons.length, 0, 'unlink removes the link');
 
   // ── Cleanup path ──────────────────────────────────────────────────────────
   repo.deleteItem(item.itemId);

@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 39;
+export const SCHEMA_VERSION = 40;
 
 export const migrations: Migration[] = [
   {
@@ -1220,6 +1220,21 @@ export const migrations: Migration[] = [
       --   null = use the vault-wide default (a setting).
       ALTER TABLE relationships ADD COLUMN subtype TEXT;
       ALTER TABLE persons ADD COLUMN frame_style TEXT;
+    `,
+  },
+  {
+    version: 40,
+    up: /* sql */ `
+      -- Link archive documents to the tree members they concern (a birth record to
+      -- one person, a marriage certificate to two). This lets a person's ficha gather
+      -- every document about them and feeds the AI biography with the right sources.
+      CREATE TABLE archive_item_persons (
+        item_id   TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        person_id TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, person_id)
+      );
+      CREATE INDEX idx_archive_item_persons_person ON archive_item_persons(person_id);
     `,
   },
 ];

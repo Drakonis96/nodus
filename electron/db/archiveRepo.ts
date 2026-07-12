@@ -6,7 +6,7 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import { sanitizeDocMetadata } from '@shared/archiveDocTypes';
-import type { ArchiveFolder, ArchiveItem, ArchiveItemInput, ArchiveItemKind } from '@shared/types';
+import type { ArchiveFolder, ArchiveItem, ArchiveItemInput, ArchiveItemKind, ArchiveLinkedPerson } from '@shared/types';
 
 function now(): string {
   return new Date().toISOString();
@@ -101,6 +101,18 @@ function itemTags(itemId: string): string[] {
   ).map((r) => r.tag);
 }
 
+function itemLinkedPersons(itemId: string): ArchiveLinkedPerson[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT p.person_id, p.display_name
+         FROM archive_item_persons ap JOIN persons p ON p.person_id = ap.person_id
+         WHERE ap.item_id = ? ORDER BY p.display_name`
+      )
+      .all(itemId) as { person_id: string; display_name: string }[]
+  ).map((r) => ({ personId: r.person_id, displayName: r.display_name }));
+}
+
 function rowToItem(row: ItemMetaRow): ArchiveItem {
   return {
     itemId: row.item_id,
@@ -116,10 +128,36 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     contentHash: row.content_hash,
     docType: row.doc_type,
     metadata: parseMetadata(row.metadata_json),
+    linkedPersons: itemLinkedPersons(row.item_id),
     tags: itemTags(row.item_id),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+// ── Document ↔ person links ────────────────────────────────────────────────────
+
+export function linkItemPerson(itemId: string, personId: string): void {
+  getDb()
+    .prepare('INSERT OR IGNORE INTO archive_item_persons (item_id, person_id, created_at) VALUES (?, ?, ?)')
+    .run(itemId, personId, now());
+}
+
+export function unlinkItemPerson(itemId: string, personId: string): void {
+  getDb().prepare('DELETE FROM archive_item_persons WHERE item_id = ? AND person_id = ?').run(itemId, personId);
+}
+
+/** Archive items (metadata only) linked to a person, newest first. */
+export function listItemsForPerson(personId: string): ArchiveItem[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
+        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json, i.created_at, i.updated_at
+       FROM archive_items i JOIN archive_item_persons ap ON ap.item_id = i.item_id
+       WHERE ap.person_id = ? ORDER BY i.updated_at DESC`
+    )
+    .all(personId) as ItemMetaRow[];
+  return rows.map(rowToItem);
 }
 
 /** Serialise sanitised metadata for a type, or null when empty. */

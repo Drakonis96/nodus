@@ -261,6 +261,9 @@ import {
   removeTag,
   listTags,
   archiveCounts,
+  linkItemPerson,
+  unlinkItemPerson,
+  listItemsForPerson,
 } from './db/archiveRepo';
 import { ingestArchiveFile } from './archive/archiveIngest';
 import { scanArchiveTextRecords } from './ai/recordsScan';
@@ -615,6 +618,13 @@ export function registerIpc(
     removeTag(id, tag);
   });
   h('archive:listTags', async () => listTags());
+  h('archive:linkPerson', async (_e, itemId: string, personId: string) => {
+    linkItemPerson(itemId, personId);
+  });
+  h('archive:unlinkPerson', async (_e, itemId: string, personId: string) => {
+    unlinkItemPerson(itemId, personId);
+  });
+  h('archive:listItemsForPerson', async (_e, personId: string) => listItemsForPerson(personId));
   h('archive:scanItem', async (_e, itemId: string) => {
     const item = getItem(itemId);
     if (!item) throw new Error('Elemento no encontrado.');
