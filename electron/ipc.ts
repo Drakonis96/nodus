@@ -77,6 +77,8 @@ import type {
   HistoricalEventType,
   RecordEvidenceInput,
   RecordEvidenceTargetKind,
+  RelationshipType,
+  RelationshipProvenance,
   ArchiveItemInput,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
@@ -255,6 +257,13 @@ import {
 } from './db/archiveRepo';
 import { ingestArchiveFile } from './archive/archiveIngest';
 import { scanArchiveTextRecords } from './ai/recordsScan';
+import {
+  addRelationship,
+  removeRelationship,
+  listRelationshipsForPerson,
+  allRelationships,
+  kinOf,
+} from './db/relationshipsRepo';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -494,6 +503,20 @@ export function registerIpc(
   h('entities:deleteEvidence', async (_e, id: string) => {
     deleteRecordEvidence(id);
   });
+  // kinship (genealogy)
+  h('entities:addRelationship', async (
+    _e,
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
+    provenance?: RelationshipProvenance
+  ) => addRelationship(fromPerson, toPerson, type, provenance ?? 'user_asserted'));
+  h('entities:removeRelationship', async (_e, relId: string) => {
+    removeRelationship(relId);
+  });
+  h('entities:listRelationships', async (_e, personId: string) => listRelationshipsForPerson(personId));
+  h('entities:allRelationships', async () => allRelationships());
+  h('entities:kinOf', async (_e, personId: string) => kinOf(personId));
 
   // ── Evidence archive ───────────────────────────────────────────────────────
   h('archive:counts', async () => archiveCounts());

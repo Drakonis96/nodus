@@ -759,8 +759,29 @@ export type ParticipantRole =
   | 'officiant'
   | 'other';
 
-export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participant';
+export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participant' | 'relationship';
 export type RecordSourceKind = 'work' | 'archive';
+
+// Kinship (genealogy layer, phase C)
+export type RelationshipType = 'parent' | 'spouse';
+export type RelationshipProvenance = 'user_asserted' | 'ai_confirmed';
+
+export interface Relationship {
+  relId: string;
+  fromPerson: string;
+  toPerson: string;
+  type: RelationshipType;
+  provenance: RelationshipProvenance;
+  notes: string | null;
+}
+
+/** A person's immediate kin, resolved for the ficha and the tree. */
+export interface Kin {
+  parents: Person[];
+  children: Person[];
+  spouses: Person[];
+  siblings: Person[];
+}
 
 export interface PersonName {
   name: string;
@@ -3517,6 +3538,17 @@ export interface NodusApi {
   addRecordEvidence(input: RecordEvidenceInput): Promise<RecordEvidence>;
   listRecordEvidence(targetKind: RecordEvidenceTargetKind, targetId: string): Promise<RecordEvidence[]>;
   deleteRecordEvidence(id: string): Promise<void>;
+  // kinship (genealogy)
+  addRelationship(
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
+    provenance?: RelationshipProvenance
+  ): Promise<Relationship | null>;
+  removeRelationship(relId: string): Promise<void>;
+  listRelationships(personId: string): Promise<Relationship[]>;
+  allRelationships(): Promise<Relationship[]>;
+  kinOf(personId: string): Promise<Kin>;
   // evidence archive
   archiveCounts(): Promise<ArchiveCounts>;
   listArchiveFolders(): Promise<ArchiveFolder[]>;

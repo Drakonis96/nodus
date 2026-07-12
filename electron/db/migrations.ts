@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 export const migrations: Migration[] = [
   {
@@ -1135,6 +1135,31 @@ export const migrations: Migration[] = [
         PRIMARY KEY (item_id, tag)
       );
       CREATE INDEX idx_archive_item_tags_tag ON archive_item_tags(tag);
+    `,
+  },
+  {
+    version: 35,
+    up: /* sql */ `
+      -- Genealogy kinship layer: explicit relationships between persons, the
+      -- specialisation the tree view is built on. In the primary-source layer
+      -- relationships are only asserted by events; here the user (or a confirmed AI
+      -- suggestion) states them directly. Provenance is tracked — 'user_asserted' or
+      -- 'ai_confirmed', never a raw AI write — so every edge in the tree is auditable.
+      --   type 'parent': from_person is the PARENT of to_person (the child).
+      --   type 'spouse': symmetric; stored once, queried in both directions.
+      -- Siblings are derived (persons sharing a parent), never stored.
+      CREATE TABLE relationships (
+        rel_id      TEXT PRIMARY KEY,
+        from_person TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        to_person   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        type        TEXT NOT NULL,
+        provenance  TEXT NOT NULL DEFAULT 'user_asserted',
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        UNIQUE (from_person, to_person, type)
+      );
+      CREATE INDEX idx_relationships_from ON relationships(from_person, type);
+      CREATE INDEX idx_relationships_to ON relationships(to_person, type);
     `,
   },
 ];

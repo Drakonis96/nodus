@@ -53,6 +53,12 @@ const api: NodusApi = {
   addRecordEvidence: (input) => ipcRenderer.invoke('entities:addEvidence', input),
   listRecordEvidence: (targetKind, targetId) => ipcRenderer.invoke('entities:listEvidence', targetKind, targetId),
   deleteRecordEvidence: (id) => ipcRenderer.invoke('entities:deleteEvidence', id).then(() => undefined),
+  addRelationship: (fromPerson, toPerson, type, provenance) =>
+    ipcRenderer.invoke('entities:addRelationship', fromPerson, toPerson, type, provenance),
+  removeRelationship: (relId) => ipcRenderer.invoke('entities:removeRelationship', relId).then(() => undefined),
+  listRelationships: (personId) => ipcRenderer.invoke('entities:listRelationships', personId),
+  allRelationships: () => ipcRenderer.invoke('entities:allRelationships'),
+  kinOf: (personId) => ipcRenderer.invoke('entities:kinOf', personId),
   // Evidence archive
   archiveCounts: () => ipcRenderer.invoke('archive:counts'),
   listArchiveFolders: () => ipcRenderer.invoke('archive:listFolders'),
