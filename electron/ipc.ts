@@ -81,6 +81,7 @@ import type {
   RelationshipProvenance,
   RelationshipSubtype,
   ArchiveItemInput,
+  ArchiveListOptions,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
@@ -603,9 +604,7 @@ export function registerIpc(
   h('archive:deleteFolder', async (_e, id: string) => {
     deleteFolder(id);
   });
-  h('archive:listItems', async (_e, opts?: { folderId?: string | null; tag?: string; search?: string }) =>
-    listItems(opts ?? {})
-  );
+  h('archive:listItems', async (_e, opts?: ArchiveListOptions) => listItems(opts ?? {}));
   h('archive:getItem', async (_e, id: string) => getItem(id));
   h('archive:getItemBlob', async (_e, id: string) => getItemBlob(id));
   h('archive:createItem', async (_e, input: ArchiveItemInput) => createItem(input));

@@ -8,6 +8,8 @@
  * ("c. 1850", "antes de 1880") and a date picker would fight that.
  */
 
+import { parseHistoricalDate } from './genealogyDates';
+
 export type ArchiveDocCategory = 'vital' | 'civil' | 'narrative' | 'visual' | 'data' | 'other';
 
 export interface DocField {
@@ -296,6 +298,31 @@ export function archiveDocTypesByCategory(): { category: ArchiveDocCategory; lab
     label: c.label,
     types: ARCHIVE_DOC_TYPES.filter((d) => d.category === c.id),
   })).filter((g) => g.types.length > 0);
+}
+
+// Fields whose type isn't 'date' but whose value is nonetheless date/year-ish
+// ("Año" as free text on a census/map, "Periodo" as a year range on a diary).
+const YEAR_LIKE_KEYS = new Set(['anio', 'periodo']);
+
+/**
+ * Best-effort year a document concerns, derived from its type-specific metadata
+ * (the first date-like field with a parseable value, in field order). Used for the
+ * archive's year filter/sort — not a property of the file, but of what it documents.
+ */
+export function extractItemYear(
+  docType: string | null | undefined,
+  metadata: Record<string, string> | null | undefined
+): number | null {
+  const def = getArchiveDocType(docType);
+  if (!def || !metadata) return null;
+  for (const field of def.fields) {
+    if (field.type !== 'date' && !YEAR_LIKE_KEYS.has(field.key)) continue;
+    const value = metadata[field.key];
+    if (!value) continue;
+    const year = parseHistoricalDate(value).year;
+    if (year != null) return year;
+  }
+  return null;
 }
 
 /** Keep only the fields defined for the type, trimmed and non-empty. */

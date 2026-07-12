@@ -5,8 +5,16 @@
 
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
-import { sanitizeDocMetadata } from '@shared/archiveDocTypes';
-import type { ArchiveFolder, ArchiveItem, ArchiveItemInput, ArchiveItemKind, ArchiveLinkedPerson } from '@shared/types';
+import { sanitizeDocMetadata, extractItemYear } from '@shared/archiveDocTypes';
+import { applyArchiveFilters, sortArchiveItems } from '@shared/archiveFilters';
+import type {
+  ArchiveFolder,
+  ArchiveItem,
+  ArchiveItemInput,
+  ArchiveItemKind,
+  ArchiveLinkedPerson,
+  ArchiveListOptions,
+} from '@shared/types';
 
 function now(): string {
   return new Date().toISOString();
@@ -114,6 +122,7 @@ function itemLinkedPersons(itemId: string): ArchiveLinkedPerson[] {
 }
 
 function rowToItem(row: ItemMetaRow): ArchiveItem {
+  const metadata = parseMetadata(row.metadata_json);
   return {
     itemId: row.item_id,
     folderId: row.folder_id,
@@ -127,12 +136,18 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     description: row.description,
     contentHash: row.content_hash,
     docType: row.doc_type,
-    metadata: parseMetadata(row.metadata_json),
+    metadata,
+    year: extractItemYear(row.doc_type, metadata),
     linkedPersons: itemLinkedPersons(row.item_id),
     tags: itemTags(row.item_id),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** Adapt an ArchiveItem to the shape shared/archiveFilters.ts needs for matching. */
+function withLinkedPersonIds(item: ArchiveItem): ArchiveItem & { linkedPersonIds: string[] } {
+  return { ...item, linkedPersonIds: item.linkedPersons.map((p) => p.personId) };
 }
 
 // ── Document ↔ person links ────────────────────────────────────────────────────
@@ -213,35 +228,37 @@ export function getItemBlob(itemId: string): Buffer | null {
   return row?.blob ?? null;
 }
 
-/** List items (metadata only) filtered by folder, tag and a text search over title + extracted text. */
-export function listItems(opts: { folderId?: string | null; tag?: string; search?: string } = {}): ArchiveItem[] {
+/**
+ * List items for the archive's "upload sources" window, with as many filters and
+ * sortings as the UI offers. Only `folderId` is pushed down to SQL (it cheaply
+ * narrows the scan); everything else — doc type, file kind, tags/persons (with a
+ * Notion-style any/all match mode), year range, and free-text search — runs through
+ * the shared pure filter/sort so the matching logic is unit-tested without a DB.
+ */
+export function listItems(opts: ArchiveListOptions = {}): ArchiveItem[] {
   const where: string[] = [];
   const params: unknown[] = [];
-  let join = '';
   if (opts.folderId !== undefined) {
-    if (opts.folderId === null) {
-      where.push('i.folder_id IS NULL');
-    } else {
-      where.push('i.folder_id = ?');
+    if (opts.folderId === null) where.push('folder_id IS NULL');
+    else {
+      where.push('folder_id = ?');
       params.push(opts.folderId);
     }
   }
-  if (opts.tag) {
-    join += ' JOIN archive_item_tags t ON t.item_id = i.item_id';
-    where.push('t.tag = ?');
-    params.push(opts.tag);
-  }
-  const search = (opts.search ?? '').trim();
-  if (search) {
-    where.push('(i.title LIKE ? OR i.extracted_text LIKE ? OR i.description LIKE ? OR i.metadata_json LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
-  }
-  const sql = `SELECT DISTINCT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
-      (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json, i.created_at, i.updated_at
-    FROM archive_items i${join}
-    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY i.updated_at DESC`;
-  return (getDb().prepare(sql).all(...params) as ItemMetaRow[]).map(rowToItem);
+  const sql = `${ITEM_META_SELECT}${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`;
+  const items = (getDb().prepare(sql).all(...params) as ItemMetaRow[]).map(rowToItem).map(withLinkedPersonIds);
+  const filtered = applyArchiveFilters(items, {
+    docTypes: opts.docTypes,
+    kinds: opts.kinds,
+    tags: opts.tags,
+    tagsMode: opts.tagsMode,
+    personIds: opts.personIds,
+    personsMode: opts.personsMode,
+    yearFrom: opts.yearFrom,
+    yearTo: opts.yearTo,
+    search: opts.search,
+  });
+  return sortArchiveItems(filtered, opts.sort ?? 'updatedDesc');
 }
 
 export function updateItem(

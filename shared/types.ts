@@ -3,6 +3,8 @@
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
+export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { VaultType };
 
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
@@ -957,6 +959,8 @@ export interface ArchiveItem {
   docType: string | null;
   /** Optional type-specific metadata form values. */
   metadata: Record<string, string> | null;
+  /** Best-effort year the document concerns, derived from its metadata date field(s). */
+  year: number | null;
   /** Tree members this document is linked to. */
   linkedPersons: ArchiveLinkedPerson[];
   tags: string[];
@@ -978,6 +982,22 @@ export interface ArchiveItemInput {
   docType?: string | null;
   metadata?: Record<string, string> | null;
   tags?: string[];
+}
+
+/** Filter + sort options for listArchiveItems ("upload sources" window). Every
+ *  category combines with AND; tags/persons support a Notion-style any/all toggle. */
+export interface ArchiveListOptions {
+  folderId?: string | null;
+  search?: string;
+  docTypes?: string[];
+  kinds?: ArchiveItemKind[];
+  tags?: string[];
+  tagsMode?: ArchiveMatchMode;
+  personIds?: string[];
+  personsMode?: ArchiveMatchMode;
+  yearFrom?: number | null;
+  yearTo?: number | null;
+  sort?: ArchiveSortKey;
 }
 
 export interface RecordCounts {
@@ -3623,7 +3643,7 @@ export interface NodusApi {
   createArchiveFolder(name: string, parentId?: string | null): Promise<ArchiveFolder>;
   renameArchiveFolder(id: string, name: string): Promise<ArchiveFolder | null>;
   deleteArchiveFolder(id: string): Promise<void>;
-  listArchiveItems(opts?: { folderId?: string | null; tag?: string; search?: string }): Promise<ArchiveItem[]>;
+  listArchiveItems(opts?: ArchiveListOptions): Promise<ArchiveItem[]>;
   getArchiveItem(id: string): Promise<ArchiveItem | null>;
   getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
   createArchiveItem(input: ArchiveItemInput): Promise<ArchiveItem>;

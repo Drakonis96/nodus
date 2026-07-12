@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ArchiveFolder, ArchiveItem, ArchiveItemKind, Person } from '@shared/types';
+import type { ArchiveFolder, ArchiveItem, ArchiveItemKind, ArchiveMatchMode, ArchiveSortKey, ArchiveTagCount, Person } from '@shared/types';
 import { getArchiveDocType } from '@shared/archiveDocTypes';
 import { Icon } from '../components/ui';
 import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
 import { PersonLinkPicker } from '../components/PersonLinkPicker';
+import { ArchiveFilterBar } from '../components/ArchiveFilterBar';
 import { t } from '../i18n';
 
 const KIND_ICON: Record<ArchiveItemKind, string> = {
@@ -30,15 +31,54 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
   const [addDocType, setAddDocType] = useState<string | null>(null);
   const [textEntry, setTextEntry] = useState(false);
 
+  // ── Filters (Notion-style) + sorting ────────────────────────────────────────
+  const [availableTags, setAvailableTags] = useState<ArchiveTagCount[]>([]);
+  const [fDocTypes, setFDocTypes] = useState<string[]>([]);
+  const [fKinds, setFKinds] = useState<ArchiveItemKind[]>([]);
+  const [fTags, setFTags] = useState<string[]>([]);
+  const [fTagsMode, setFTagsMode] = useState<ArchiveMatchMode>('all');
+  const [fPersonIds, setFPersonIds] = useState<string[]>([]);
+  const [fPersonsMode, setFPersonsMode] = useState<ArchiveMatchMode>('any');
+  const [fYearFrom, setFYearFrom] = useState('');
+  const [fYearTo, setFYearTo] = useState('');
+  const [sort, setSort] = useState<ArchiveSortKey>('updatedDesc');
+
+  const activeFilterCount =
+    fDocTypes.length + fKinds.length + fTags.length + fPersonIds.length + (fYearFrom.trim() || fYearTo.trim() ? 1 : 0);
+
+  const clearFilters = () => {
+    setFDocTypes([]);
+    setFKinds([]);
+    setFTags([]);
+    setFPersonIds([]);
+    setFYearFrom('');
+    setFYearTo('');
+  };
+
   const reload = useCallback(async () => {
     setFolders(await window.nodus.listArchiveFolders());
     void window.nodus.listPersons().then(setTreePersons);
-    const opts: { folderId?: string | null; search?: string } = {};
-    if (folderId === UNFILED) opts.folderId = null;
-    else if (folderId !== ALL) opts.folderId = folderId;
-    if (search.trim()) opts.search = search.trim();
-    setItems(await window.nodus.listArchiveItems(opts));
-  }, [folderId, search]);
+    void window.nodus.listArchiveTags().then(setAvailableTags);
+    const parseYear = (v: string) => {
+      const n = Number.parseInt(v.trim(), 10);
+      return Number.isFinite(n) ? n : null;
+    };
+    setItems(
+      await window.nodus.listArchiveItems({
+        folderId: folderId === UNFILED ? null : folderId === ALL ? undefined : folderId,
+        search: search.trim() || undefined,
+        docTypes: fDocTypes.length ? fDocTypes : undefined,
+        kinds: fKinds.length ? fKinds : undefined,
+        tags: fTags.length ? fTags : undefined,
+        tagsMode: fTagsMode,
+        personIds: fPersonIds.length ? fPersonIds : undefined,
+        personsMode: fPersonsMode,
+        yearFrom: parseYear(fYearFrom),
+        yearTo: parseYear(fYearTo),
+        sort,
+      })
+    );
+  }, [folderId, search, fDocTypes, fKinds, fTags, fTagsMode, fPersonIds, fPersonsMode, fYearFrom, fYearTo, sort]);
 
   useEffect(() => {
     void reload();
@@ -130,12 +170,42 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
             )}
           </p>
           {message && <p className="text-xs text-neutral-400">{message}</p>}
+
+          <ArchiveFilterBar
+            docTypes={fDocTypes}
+            onDocTypesChange={setFDocTypes}
+            kinds={fKinds}
+            onKindsChange={setFKinds}
+            tags={fTags}
+            tagsMode={fTagsMode}
+            onTagsChange={setFTags}
+            onTagsModeChange={setFTagsMode}
+            availableTags={availableTags}
+            personIds={fPersonIds}
+            personsMode={fPersonsMode}
+            onPersonIdsChange={setFPersonIds}
+            onPersonsModeChange={setFPersonsMode}
+            persons={treePersons}
+            yearFrom={fYearFrom}
+            yearTo={fYearTo}
+            onYearFromChange={setFYearFrom}
+            onYearToChange={setFYearTo}
+            sort={sort}
+            onSortChange={setSort}
+            activeCount={activeFilterCount}
+            onClear={clearFilters}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <p className="mb-2 text-xs text-neutral-600">
+            {t('{n} documentos').replace('{n}', String(items.length))}
+          </p>
           {items.length === 0 ? (
             <p className="py-10 text-center text-sm text-neutral-500">
-              {t('Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto (y una descripción visual de las imágenes) para poder buscarlos y citarlos.')}
+              {activeFilterCount > 0 || search.trim()
+                ? t('Ningún documento coincide con los filtros.')
+                : t('Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto (y una descripción visual de las imágenes) para poder buscarlos y citarlos.')}
             </p>
           ) : (
             <div className="overflow-x-auto">

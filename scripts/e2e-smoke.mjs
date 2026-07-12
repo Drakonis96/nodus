@@ -230,7 +230,8 @@ try {
       events: (await window.nodus.listEvents({ personId: juan.personId })).length,
       evidence: (await window.nodus.listRecordEvidence('person', juan.personId)).length,
       placeName: (await window.nodus.getEvent(event.eventId)).placeName,
-      archiveItems: (await window.nodus.listArchiveItems({ tag: 'censo' })).length,
+      archiveItems: (await window.nodus.listArchiveItems({ tags: ['censo'] })).length,
+      archiveFilteredOut: (await window.nodus.listArchiveItems({ tags: ['inexistente'] })).length,
       hasBlobFlag: item.hasBlob,
     };
   });
@@ -244,6 +245,7 @@ try {
   assert.equal(records.evidence, 1, 'record evidence attached');
   assert.equal(records.placeName, 'Sevilla', 'event resolves its place');
   assert.equal(records.archiveItems, 1, 'archive item created + tag-filtered');
+  assert.equal(records.archiveFilteredOut, 0, 'tag filter excludes non-matching items over IPC');
   assert.equal(records.entryDocType, 'birth_record', 'text entry keeps its document type');
   assert.deepEqual(records.entryMeta, { persona: 'Juan Pérez' }, 'metadata sanitised to the type (unknown key dropped)');
   console.log('[e2e] records ontology + archive ok over IPC');

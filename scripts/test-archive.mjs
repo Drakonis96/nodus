@@ -61,7 +61,7 @@ try {
 
   // List queries never carry the blob but do carry hasBlob.
   assert.equal(repo.listItems({ folderId: sub.folderId }).length, 1);
-  assert.equal(repo.listItems({ tag: 'censo' }).length, 1);
+  assert.equal(repo.listItems({ tags: ['censo'] }).length, 1);
   assert.equal(repo.listItems({ search: 'jornalero' }).length, 1, 'search hits extracted text');
   assert.equal(repo.listItems({ search: 'inexistente' }).length, 0);
 
