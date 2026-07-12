@@ -19,6 +19,7 @@ import { IdeasView } from './views/IdeasView';
 import { AuthorsView } from './views/AuthorsView';
 import { PersonasView } from './views/PersonasView';
 import { TimelineView } from './views/TimelineView';
+import { TreeView } from './views/TreeView';
 import { ArchiveView } from './views/ArchiveView';
 import { StudyGuideView } from './views/StudyGuideView';
 import { ImmersionView } from './views/ImmersionView';
@@ -512,6 +513,7 @@ export function App() {
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView />}
           {view === 'timeline' && <TimelineView />}
+          {view === 'tree' && <TreeView />}
           {view === 'archive' && <ArchiveView />}
           {view === 'study' && (
             <StudyGuideView

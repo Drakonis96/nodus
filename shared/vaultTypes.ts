@@ -77,9 +77,14 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
   },
   {
     id: 'genealogy',
-    available: false,
-    defaultHiddenViews: [],
-    promptPack: '',
+    available: true,
+    // Genealogy is record- and kinship-focused; hide the argumentative surfaces and
+    // the idea graph. The tree/persons/timeline/archive views come in via scoping.
+    defaultHiddenViews: ['argument', 'debate', 'ideas', 'authors', 'graph', 'study', 'immersion', 'hypothesis', 'reading'],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO GENEALOGÍA ═══
+Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas). Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; expón la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas.`,
   },
 ];
 
@@ -95,6 +100,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   persons: ['primary_sources', 'genealogy'],
   timeline: ['primary_sources', 'genealogy'],
   archive: ['primary_sources', 'genealogy'],
+  tree: ['genealogy'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

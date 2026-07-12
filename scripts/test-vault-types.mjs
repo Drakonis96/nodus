@@ -47,11 +47,20 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('academic + estudio + primary_sources are selectable; genealogy is not yet', () => {
+test('academic + estudio + primary_sources + genealogy are all selectable', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'estudio', 'primary_sources']);
-  assert.equal(vt.getVaultTypeDef('primary_sources').available, true);
-  assert.equal(vt.getVaultTypeDef('genealogy').available, false);
+  assert.deepEqual(ids, ['academic', 'estudio', 'primary_sources', 'genealogy']);
+  assert.equal(vt.getVaultTypeDef('genealogy').available, true);
+});
+
+test('the tree view is scoped to genealogy only', () => {
+  assert.equal(vt.isViewAllowedForVaultType('tree', 'genealogy'), true);
+  assert.equal(vt.isViewAllowedForVaultType('tree', 'primary_sources'), false);
+  assert.equal(vt.isViewAllowedForVaultType('tree', 'academic'), false);
+  // Genealogy also gets the shared records views.
+  for (const v of ['persons', 'timeline', 'archive']) {
+    assert.equal(vt.isViewAllowedForVaultType(v, 'genealogy'), true);
+  }
 });
 
 test('primary_sources hides argument/study surfaces but keeps ideas/authors', () => {
