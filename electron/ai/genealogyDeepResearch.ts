@@ -24,9 +24,9 @@ import type {
 } from '@shared/types';
 import { WORDS_PER_PAGE, countWords } from './deepResearchCore';
 import { getSettings } from '../db/settingsRepo';
-import { listPersons, listEvents, listEvidenceFor } from '../db/entitiesRepo';
+import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
 import { allRelationships } from '../db/relationshipsRepo';
-import { listItems, findArchiveItemsSimilar } from '../db/archiveRepo';
+import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
 import { resolveWorkText } from '../extraction/textExtractor';
@@ -63,8 +63,20 @@ export interface GenSource {
 }
 
 export interface FamilyFacts {
-  personas: { nombre: string; nacimiento: string | null; defuncion: string | null; padres: string[]; conyuges: string[]; hijos: string[] }[];
+  personas: { id: string; nombre: string; nacimiento: string | null; defuncion: string | null; padres: string[]; conyuges: string[]; hijos: string[] }[];
   eventos: { tipo: string; fecha: string | null; lugar: string | null; participantes: string[] }[];
+}
+
+/** The person a report is being centred on, with their kin and biography. */
+export interface FocusPerson {
+  id: string;
+  nombre: string;
+  nacimiento: string | null;
+  defuncion: string | null;
+  padres: string[];
+  conyuges: string[];
+  hijos: string[];
+  biografia: string | null;
 }
 
 /** Build the family-facts block (bounded) shared by the plan and every section. */
@@ -88,6 +100,7 @@ export function buildFamilyFacts(): FamilyFacts {
   }
   return {
     personas: persons.slice(0, MAX_PERSONS_CONTEXT).map((p) => ({
+      id: p.personId,
       nombre: p.displayName,
       nacimiento: p.birthDate,
       defuncion: p.deathDate,
@@ -106,12 +119,22 @@ export function buildFamilyFacts(): FamilyFacts {
   };
 }
 
+/** The focus person's own entry from the family facts, enriched with their biography. */
+export function buildFocusPerson(personId: string, family: FamilyFacts): FocusPerson | null {
+  const entry = family.personas.find((p) => p.id === personId);
+  if (!entry) return null;
+  const person = getPerson(personId);
+  return { ...entry, biografia: person?.biography ?? null };
+}
+
 /** Retrieve the sources relevant to the question by meaning (embeddings), with a
- *  lexical/recency fallback when no embedding provider is configured. */
-export async function buildGenealogySourcePool(objective: string): Promise<GenSource[]> {
+ *  lexical/recency fallback when no embedding provider is configured. When a focus
+ *  person is given, every document already linked to them is guaranteed into the
+ *  pool (even if it wouldn't rank high by similarity) and the retrieval query is
+ *  biased toward their name. */
+export async function buildGenealogySourcePool(objective: string, focusPersonId?: string | null): Promise<GenSource[]> {
   const sources: GenSource[] = [];
   const seen = new Set<string>();
-  const objVec = objective.trim() ? await embed(objective.trim()) : null;
 
   const addDoc = (item: { itemId: string; title: string; docType: string | null; extractedText: string | null; description: string | null; linkedPersons: { displayName: string }[] }) => {
     if (seen.has(item.itemId) || sources.filter((s) => s.kind === 'document').length >= MAX_DOC_SOURCES) return;
@@ -128,6 +151,12 @@ export async function buildGenealogySourcePool(objective: string): Promise<GenSo
       fullText: text,
     });
   };
+
+  const focusPerson = focusPersonId ? getPerson(focusPersonId) : null;
+  if (focusPerson) for (const item of listItemsForPerson(focusPerson.personId)) addDoc(item);
+
+  const queryText = focusPerson ? `${objective.trim()}\n${focusPerson.displayName}`.trim() : objective.trim();
+  const objVec = queryText ? await embed(queryText) : null;
   if (objVec) for (const item of findArchiveItemsSimilar(objVec, { limit: MAX_DOC_SOURCES, minSimilarity: 0.2 })) addDoc(item);
   // Fallback / backfill: recent documents so the report always has primary material.
   for (const item of listItems({}).slice(0, MAX_DOC_SOURCES)) addDoc(item);
@@ -175,6 +204,7 @@ export interface GenPlanInput {
   sectionHardCap: number;
   sources: { id: string; kind: string; title: string; label: string; persons: string[]; snippet: string }[];
   family: FamilyFacts;
+  focusPerson: FocusPerson | null;
 }
 export interface GenSectionInput {
   objective: string;
@@ -184,6 +214,7 @@ export interface GenSectionInput {
   isConclusion: boolean;
   sources: { id: string; title: string; label: string; persons: string[]; texto: string }[];
   family: FamilyFacts;
+  focusPerson: FocusPerson | null;
   evidence: { persona: string; cita: string; localizacion: string | null }[];
   priorSummary: string;
 }
@@ -215,7 +246,8 @@ export async function orchestrateGenealogyDeepResearch(
   sources: GenSource[],
   family: FamilyFacts,
   deps: GenDeepDeps,
-  onProgress?: (p: DeepResearchProgress) => void
+  onProgress?: (p: DeepResearchProgress) => void,
+  focusPerson: FocusPerson | null = null
 ): Promise<DeepResearchReport> {
   const language = request.language ?? 'es';
   const emit = (p: DeepResearchProgress) => {
@@ -229,7 +261,10 @@ export async function orchestrateGenealogyDeepResearch(
   const targetPages = resolveTargetPages(request.targetLength ?? 'adaptive', sources.length);
   const { target: sectionTarget, hardCap: sectionHardCap } = resolveSections(targetPages, request.sectionLimit ?? 'auto');
 
-  emit({ phase: 'snapshot', message: 'Reuniendo documentos y evidencia de la familia…' });
+  emit({
+    phase: 'snapshot',
+    message: focusPerson ? `Reuniendo documentos y evidencia sobre ${focusPerson.nombre}…` : 'Reuniendo documentos y evidencia de la familia…',
+  });
   emit({ phase: 'planning', message: `Planificando ~${sectionTarget} secciones (${targetPages.min}–${targetPages.max} páginas)…` });
 
   let plan: GenPlan;
@@ -243,14 +278,15 @@ export async function orchestrateGenealogyDeepResearch(
         sectionHardCap,
         sources: sources.map((s) => ({ id: s.id, kind: s.kind, title: s.title, label: s.label, persons: s.persons, snippet: s.snippet })),
         family,
+        focusPerson,
       }),
       sourceById,
       sectionHardCap
     );
   } catch {
-    plan = fallbackPlan(request.objective, sources);
+    plan = fallbackPlan(request.objective, sources, focusPerson);
   }
-  if (plan.sections.length === 0) plan = fallbackPlan(request.objective, sources);
+  if (plan.sections.length === 0) plan = fallbackPlan(request.objective, sources, focusPerson);
 
   const maxWords = targetPages.max * WORDS_PER_PAGE;
   const written: { section: GenPlanSection; markdown: string }[] = [];
@@ -287,11 +323,12 @@ export async function orchestrateGenealogyDeepResearch(
       if (budget <= 0) break;
     }
     const personNames = new Set(assigned.flatMap((s) => s.persons));
+    if (focusPerson) personNames.add(focusPerson.nombre);
     const evidence = evidenceForPersons(personNames);
 
     let raw = '';
     try {
-      raw = await deps.writeSection({ objective: request.objective, language, section, targetWords, isConclusion, sources: sectionSources, family, evidence, priorSummary: summarizePrior(written) });
+      raw = await deps.writeSection({ objective: request.objective, language, section, targetWords, isConclusion, sources: sectionSources, family, focusPerson, evidence, priorSummary: summarizePrior(written) });
     } catch {
       raw = degradedSection(section, sectionSources);
       if (!stoppedReason) stoppedReason = 'Una o más secciones se resolvieron de forma degradada por un fallo del modelo.';
@@ -373,8 +410,12 @@ export async function generateGenealogyDeepResearchReport(
 ): Promise<DeepResearchReport> {
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
-  const [sources, family] = await Promise.all([buildGenealogySourcePool(request.objective), Promise.resolve(buildFamilyFacts())]);
-  return orchestrateGenealogyDeepResearch(request, sources, family, realDeps(model), onProgress);
+  const [sources, family] = await Promise.all([
+    buildGenealogySourcePool(request.objective, request.focusPersonId),
+    Promise.resolve(buildFamilyFacts()),
+  ]);
+  const focusPerson = request.focusPersonId ? buildFocusPerson(request.focusPersonId, family) : null;
+  return orchestrateGenealogyDeepResearch(request, sources, family, realDeps(model), onProgress, focusPerson);
 }
 
 function realDeps(model: ModelRef | null): GenDeepDeps {
@@ -415,10 +456,21 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenP
     `Planifica en torno a ${input.sectionTarget} secciones; nunca más de ${input.sectionHardCap}. El cuerpo debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas.`,
     'Sigue el estándar de prueba genealógico: identidad y parentesco son HIPÓTESIS probadas con evidencia; no des por ciertos vínculos sin apoyo documental.',
     'Asigna a cada sección los `sourceIds` que la sostienen (copia los ids EXACTOS de la lista de fuentes). No inventes fuentes ni ids.',
+    input.focusPerson
+      ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Este informe es SU biografía documentada, no un panorama genérico de la familia. Organiza las secciones en torno a su vida (orígenes y familia, etapas vitales, vínculos y descendencia, su rastro documental) y trae al resto de personas solo en la medida en que se relacionan con ella. El título del informe debe nombrarla.`
+      : '',
     'Devuelve SOLO JSON: {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyPoints":["..."],"sourceIds":["..."]}]}',
-  ].join('\n');
+  ].filter(Boolean).join('\n');
   const user = JSON.stringify(
-    { objetivo: input.objective, idioma: input.language, paginas: input.targetPages, secciones_objetivo: input.sectionTarget, fuentes: input.sources, familia: input.family },
+    {
+      objetivo: input.objective,
+      idioma: input.language,
+      paginas: input.targetPages,
+      secciones_objetivo: input.sectionTarget,
+      fuentes: input.sources,
+      familia: input.family,
+      persona_en_foco: input.focusPerson,
+    },
     null,
     2
   );
@@ -446,7 +498,10 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): P
     'CITAS: cuando sostengas un hecho con una fuente, cítala inmediatamente como enlace Markdown. Documentos: `[Título](nodus://archive/<itemId>)`. Obras: `[Autor, Año](nodus://work/<nodusId>)`. Copia el `id` EXACTO del campo `id` de la fuente (quita el prefijo `doc:`/`work:`). Nunca inventes ids.',
     'Respeta los nombres y las fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo.',
     'No repitas lo ya dicho (se te da un resumen de las secciones previas). Empieza con un encabezado Markdown "## " y el título dado. Devuelve solo el Markdown de la sección.',
-  ].join('\n');
+    input.focusPerson
+      ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Mantén el relato centrado en ella: el resto de personas aparece solo en la medida en que se relaciona con su vida.`
+      : '',
+  ].filter(Boolean).join('\n');
   const user = JSON.stringify(
     {
       objetivo: input.objective,
@@ -454,6 +509,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): P
       seccion: { titulo: input.section.title, proposito: input.section.purpose, puntos_clave: input.section.keyPoints },
       fuentes_asignadas: input.sources,
       familia_relevante: input.family,
+      persona_en_foco: input.focusPerson,
       evidencia: input.evidence,
       resumen_secciones_previas: input.priorSummary || '(esta es la primera sección)',
     },
@@ -545,15 +601,22 @@ function normalizePlan(plan: GenPlan, sourceById: Map<string, GenSource>, maxSec
   return { title: cleanStr(plan.title, ''), abstract: cleanStr(plan.abstract, ''), sections };
 }
 
-function fallbackPlan(objective: string, sources: GenSource[]): GenPlan {
+function fallbackPlan(objective: string, sources: GenSource[], focusPerson: FocusPerson | null = null): GenPlan {
   const docs = sources.filter((s) => s.kind === 'document');
   const per = Math.max(1, Math.ceil(docs.length / 3));
-  const sections: GenPlanSection[] = [
-    { id: 's1', title: 'Panorama de la familia y sus fuentes', purpose: 'Presentar a las personas y los documentos disponibles.', keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
-    { id: 's2', title: 'Vidas y vínculos documentados', purpose: 'Reconstruir biografías y parentescos a partir de los registros.', keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
-    { id: 's3', title: 'Síntesis, incertidumbres y próximos pasos', purpose: 'Integrar lo probado, señalar lo incierto y qué fuentes faltan.', keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
-  ];
-  return { title: `Informe familiar: ${objective}`.slice(0, 140), abstract: '', sections };
+  const sections: GenPlanSection[] = focusPerson
+    ? [
+        { id: 's1', title: `Orígenes y familia de ${focusPerson.nombre}`, purpose: 'Presentar a la persona en foco y sus fuentes.', keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
+        { id: 's2', title: `Vida documentada de ${focusPerson.nombre}`, purpose: 'Reconstruir su biografía y vínculos a partir de los registros.', keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
+        { id: 's3', title: 'Síntesis, incertidumbres y próximos pasos', purpose: 'Integrar lo probado, señalar lo incierto y qué fuentes faltan.', keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
+      ]
+    : [
+        { id: 's1', title: 'Panorama de la familia y sus fuentes', purpose: 'Presentar a las personas y los documentos disponibles.', keyPoints: [], sourceIds: docs.slice(0, per).map((s) => s.id) },
+        { id: 's2', title: 'Vidas y vínculos documentados', purpose: 'Reconstruir biografías y parentescos a partir de los registros.', keyPoints: [], sourceIds: docs.slice(per, per * 2).map((s) => s.id) },
+        { id: 's3', title: 'Síntesis, incertidumbres y próximos pasos', purpose: 'Integrar lo probado, señalar lo incierto y qué fuentes faltan.', keyPoints: [], sourceIds: docs.slice(per * 2).map((s) => s.id) },
+      ];
+  const title = focusPerson ? `Historia de ${focusPerson.nombre}: ${objective}` : `Informe familiar: ${objective}`;
+  return { title: title.slice(0, 140), abstract: '', sections };
 }
 
 function degradedSection(section: GenPlanSection, sources: GenSectionInput['sources']): string {

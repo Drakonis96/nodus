@@ -100,6 +100,14 @@ export function mergePersons(targetId: string, sourceId: string): Person | null 
     // Kinship suggestions are advisory and regenerable; drop any touching the source
     // rather than risk a mis-ordered spouse pair. They will re-surface on the next scan.
     db.prepare('DELETE FROM kinship_suggestions WHERE from_person = ? OR to_person = ?').run(sourceId, sourceId);
+    // Social relations: repoint both as recorder and as target (the source's social
+    // network is real user data, not advisory). A relation between the two merged
+    // records themselves would become a self-loop; drop it.
+    db.prepare('UPDATE social_relations SET person_id = ? WHERE person_id = ?').run(targetId, sourceId);
+    db.prepare("UPDATE social_relations SET target_id = ? WHERE target_kind = 'person' AND target_id = ?").run(targetId, sourceId);
+    db.prepare("DELETE FROM social_relations WHERE target_kind = 'person' AND person_id = target_id").run();
+    // Per-person place records are real user data: move the source's to the target.
+    db.prepare('UPDATE person_places SET person_id = ? WHERE person_id = ?').run(targetId, sourceId);
 
     // Fill empty target fields from the source (target values win when present).
     updatePerson(targetId, {

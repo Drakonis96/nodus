@@ -757,9 +757,11 @@ function StatusCard({
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="font-semibold text-sm">{title}</h2>
-          <div className="mt-2">
-            <span className="text-2xl font-semibold tabular-nums">{metric}</span>
-            <span className="text-xs text-neutral-500 ml-2">{metricLabel}</span>
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+            {/* Numeric metrics get the big display size; status words (lista/pendiente)
+                would look disproportionate at that size, so render them smaller. */}
+            <span className={`font-semibold tabular-nums ${typeof metric === 'string' && !/\d/.test(metric) ? 'text-lg' : 'text-2xl'}`}>{metric}</span>
+            <span className="text-xs text-neutral-500">{metricLabel}</span>
           </div>
         </div>
         {action}

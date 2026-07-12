@@ -35,6 +35,8 @@ try {
   const rels = require(path.join(repoRoot, 'electron/db/relationshipsRepo.ts'));
   const sug = require(path.join(repoRoot, 'electron/db/kinshipSuggestionsRepo.ts'));
   const archive = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));
+  const social = require(path.join(repoRoot, 'electron/db/socialRepo.ts'));
+  const personPlaces = require(path.join(repoRoot, 'electron/db/personPlacesRepo.ts'));
   const orch = require(path.join(repoRoot, 'electron/archive/archiveDiscovery.ts'));
   const { getSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { getActiveVault } = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
@@ -58,6 +60,26 @@ try {
   assert.ok(counts.places >= 4, 'places seeded');
   assert.equal(archive.archiveCounts().items, 9, 'archive documents seeded');
   assert.equal(rels.allRelationships().length, 18, 'kinship relationships seeded');
+
+  // ── Map: per-person place records drive the individual + general maps ───────
+  const allMapPoints = personPlaces.mapPoints();
+  assert.ok(allMapPoints.length >= 15, 'demo person-places seeded and located on the map');
+  assert.ok(allMapPoints.every((p) => p.latitude != null && p.longitude != null), 'every map point is located');
+  const rafael = entities.listPersons({ search: 'Rafael Serrano' })[0];
+  assert.ok(rafael, 'the emigrant Rafael persisted');
+  const rafaelPlaces = personPlaces.listPersonPlaces(rafael.personId);
+  assert.ok(rafaelPlaces.some((p) => p.placeName === 'Carmona') && rafaelPlaces.some((p) => p.placeName === 'Sevilla'), 'Rafael moves Carmona → Sevilla');
+  assert.equal(rafaelPlaces[0].placeName, 'Carmona', 'his record starts at Carmona (birth) chronologically');
+  assert.ok(rafaelPlaces.every((p) => p.country === 'España'), 'demo places carry their country for display');
+  // The general map spans more than one municipality (Carmona, Sevilla, Écija).
+  assert.ok(new Set(allMapPoints.map((p) => p.placeId)).size >= 3, 'the family spreads across several places');
+
+  // ── Social-relations network: a SECOND graph, independent from kinship ──────
+  assert.equal(social.listSocialContacts().length, 2, 'demo social contacts seeded');
+  const socialGraph = social.socialGraph();
+  assert.equal(socialGraph.edges.length, 3, 'demo social relations seeded');
+  assert.ok(socialGraph.nodes.some((n) => n.kind === 'contact'), 'a contact node appears in the network');
+  assert.ok(socialGraph.nodes.some((n) => n.kind === 'person'), 'a tree-person node appears in the network');
 
   // Kinship suggestions: 3 open proposals awaiting review, with evidence + strength.
   const open = sug.listOpenSuggestions();
@@ -179,6 +201,9 @@ try {
   assert.equal(entities.recordCounts().persons, 0, 'persons cleared');
   assert.equal(archive.archiveCounts().items, 0, 'archive cleared');
   assert.equal(sug.listOpenSuggestions().length, 0, 'suggestions cleared');
+  assert.equal(social.listSocialContacts().length, 0, 'social contacts cleared');
+  assert.equal(social.socialGraph().edges.length, 0, 'social relations cleared');
+  assert.equal(personPlaces.mapPoints().length, 0, 'per-person place records cleared');
   assert.equal(
     getDb().prepare('SELECT COUNT(*) AS n FROM person_portraits').get().n,
     0,

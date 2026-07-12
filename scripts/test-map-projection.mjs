@@ -65,3 +65,43 @@ test('undated located events sort after dated ones', () => {
     ['B', 'A']
   );
 });
+
+test('boundsForPoints: empty → world; single point gets a minimum span', () => {
+  const world = mp.boundsForPoints([]);
+  assert.ok(world.maxLon - world.minLon > 300, 'no points falls back to the whole world');
+  const one = mp.boundsForPoints([{ latitude: 37.4, longitude: -5.6 }]);
+  assert.ok(one.maxLat - one.minLat >= 6, 'a lone place still shows its surroundings');
+  assert.ok(one.minLat < 37.4 && one.maxLat > 37.4, 'the point is inside the bounds');
+});
+
+test('boundsForPoints: adapts to far-flung points (village → world scale)', () => {
+  const near = mp.boundsForPoints([
+    { latitude: 37.4, longitude: -5.6 },
+    { latitude: 37.5, longitude: -5.0 },
+  ]);
+  const far = mp.boundsForPoints([
+    { latitude: 37.4, longitude: -5.6 },
+    { latitude: -34.6, longitude: -58.4 }, // Buenos Aires — an emigrant
+  ]);
+  assert.ok(far.maxLon - far.minLon > near.maxLon - near.minLon, 'a distant place widens the view');
+  assert.ok(far.minLat < 0 && far.maxLat > 0, 'both hemispheres are framed');
+});
+
+test('projectorFor maps the bounds window into the pixel box', () => {
+  const b = { minLat: 0, maxLat: 10, minLon: 0, maxLon: 10 };
+  const project = mp.projectorFor(b, 1000, 500);
+  assert.deepEqual(project(10, 0), { x: 0, y: 0 }, 'top-left corner');
+  assert.deepEqual(project(0, 10), { x: 1000, y: 500 }, 'bottom-right corner');
+});
+
+test('year helpers: parse, range and chronological slider filter', () => {
+  assert.equal(mp.yearFromSortKey('1889-03-12'), 1889);
+  assert.equal(mp.yearFromSortKey(null), null);
+  const pts = [{ sortKey: '1865-01-01' }, { sortKey: '1912-01-01' }, { sortKey: null }];
+  assert.deepEqual(mp.pointsYearRange(pts), { min: 1865, max: 1912 });
+  assert.equal(mp.pointsYearRange([{ sortKey: null }]), null, 'no dated points → no range');
+  // Up to 1900: keep 1865, drop 1912; keep the undated one by default.
+  assert.equal(mp.filterPointsByYear(pts, 1900).length, 2);
+  assert.equal(mp.filterPointsByYear(pts, 1900, false).length, 1, 'undated excluded when asked');
+  assert.equal(mp.filterPointsByYear(pts, null).length, 3, 'null year shows everything');
+});

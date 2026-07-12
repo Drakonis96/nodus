@@ -222,15 +222,17 @@ export function TreeView({
       )}
 
       {dossierId && personById.get(dossierId) && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-6" onClick={() => setDossierId(null)}>
-          <div className="card my-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
-            <PersonDossier
-              key={dossierId}
-              person={personById.get(dossierId)!}
-              onChanged={reload}
-              onClose={() => setDossierId(null)}
-              onNavigate={(id) => setDossierId(id)}
-            />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setDossierId(null)}>
+          <div className="card-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <PersonDossier
+                key={dossierId}
+                person={personById.get(dossierId)!}
+                onChanged={reload}
+                onClose={() => setDossierId(null)}
+                onNavigate={(id) => setDossierId(id)}
+              />
+            </div>
           </div>
         </div>
       )}

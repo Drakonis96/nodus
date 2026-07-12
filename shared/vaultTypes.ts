@@ -5,14 +5,17 @@
  * (vaults.json / manifest.json), NOT in the vault database, so it needs no schema
  * migration and is visible without opening the DB.
  *
- * Adding a type here is deliberately cheap. `available: false` keeps a type defined
- * but hidden from the picker until its dedicated views/ontology ship (primary
- * sources → phase B, genealogy → phase C). View ids are kept as plain strings to
+ * Adding a type here is deliberately cheap. `available: false` marks a type NOT
+ * selectable for this release — the picker still lists it (greyed out, "coming
+ * soon") so users see the full roadmap, but it can't be chosen for a new vault or
+ * set on an existing one until a release flips it to `true`. A type can be fully
+ * built (views, ontology, prompt pack all working) and still be `available: false`
+ * if it just isn't being shipped to users yet. View ids are kept as plain strings to
  * avoid importing the renderer-only `View` union into shared code; they mirror the
  * canonical nav list in src/navigation.ts.
  */
 
-export type VaultType = 'academic' | 'estudio' | 'primary_sources' | 'genealogy';
+export type VaultType = 'academic' | 'estudio' | 'primary_sources' | 'genealogy' | 'databases';
 
 /** Existing vaults (and anything unrecognised) resolve to this type. */
 export const DEFAULT_VAULT_TYPE: VaultType = 'academic';
@@ -37,8 +40,10 @@ export interface VaultTypeDef {
 }
 
 /**
- * Canonical registry. Order here is the order shown in the picker. `academic`
- * stays first and is the default for every pre-existing vault.
+ * Canonical registry. Order here is the order shown in the picker: the two shipped
+ * types first (`academic`, `genealogy`), then the announced-but-not-yet-shipped ones
+ * in the order they were promised publicly. `academic` stays first and is the
+ * default for every pre-existing vault.
  */
 export const VAULT_TYPES: VaultTypeDef[] = [
   {
@@ -46,34 +51,6 @@ export const VAULT_TYPES: VaultTypeDef[] = [
     available: true,
     defaultHiddenViews: [],
     promptPack: '',
-  },
-  {
-    id: 'estudio',
-    available: true,
-    // A learner doesn't need the research-debate and authoring surfaces; keep
-    // search, library, graph, ideas, study, immersion, coverage (self-testing),
-    // reading path, writing and notes. Everything stays reachable from Settings.
-    defaultHiddenViews: ['argument', 'authors', 'gaps', 'debate', 'hypothesis', 'deepResearch', 'projects'],
-    promptPack: `
-
-═══ CONTEXTO DEL VAULT — MODO ESTUDIO ═══
-Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Prioriza la claridad didáctica sobre la exhaustividad: explica los conceptos con precisión pero de forma accesible, define los términos técnicos la primera vez que aparecen, y cuando sea útil sugiere cómo autoevaluar la comprensión. No inventes datos ni fuentes que no estén en el corpus.`,
-  },
-  // primary_sources (phase B) and genealogy (phase C) are declared so the taxonomy
-  // is stable, but stay unavailable until their dedicated views/ontology land. Their
-  // presets and prompt packs are filled in by those phases.
-  {
-    id: 'primary_sources',
-    available: true,
-    // A primary-source corpus mixes secondary literature (ideas/authors stay) with
-    // archival records (persons/timeline/archive come in via scoping). Hide the
-    // argument-debate and study surfaces that don't fit source/record work; keep
-    // gaps/coverage/deep-research (reframed by the prompt pack).
-    defaultHiddenViews: ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading'],
-    promptPack: `
-
-═══ CONTEXTO DEL VAULT — MODO FUENTES PRIMARIAS ═══
-Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padrones, actas, partidas, prensa histórica, correspondencia), no solo con literatura secundaria. Prioriza la fidelidad al documento: extrae hechos, personas, lugares, fechas y eventos tal como constan, cita siempre de forma literal y con su localización, y aplica crítica de fuentes (distingue lo que la fuente afirma de lo que se infiere). No deduzcas parentescos, identidades ni fechas que la fuente no sostenga; si un dato es incierto, dilo. Respeta la ortografía y los nombres de época.`,
   },
   {
     id: 'genealogy',
@@ -105,6 +82,42 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
 ═══ CONTEXTO DEL VAULT — MODO GENEALOGÍA ═══
 Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas, correspondencia). Tu tarea es ayudar a IDENTIFICAR personas, reconstruir su biografía y trazar vínculos de parentesco y su rastro a través del corpus. Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; cita la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas. Cuando falte un dato, dilo y sugiere qué fuente podría aportarlo.`,
   },
+  // estudio and primary_sources are fully built (presets + prompt packs work for any
+  // vault already stored with that type) but kept off the picker for this release —
+  // shown greyed out with a "coming soon" badge instead of a selectable option, until
+  // they get their own release pass. databases hasn't been built yet at all.
+  {
+    id: 'estudio',
+    available: false,
+    // A learner doesn't need the research-debate and authoring surfaces; keep
+    // search, library, graph, ideas, study, immersion, coverage (self-testing),
+    // reading path, writing and notes. Everything stays reachable from Settings.
+    defaultHiddenViews: ['argument', 'authors', 'gaps', 'debate', 'hypothesis', 'deepResearch', 'projects'],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO ESTUDIO ═══
+Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Prioriza la claridad didáctica sobre la exhaustividad: explica los conceptos con precisión pero de forma accesible, define los términos técnicos la primera vez que aparecen, y cuando sea útil sugiere cómo autoevaluar la comprensión. No inventes datos ni fuentes que no estén en el corpus.`,
+  },
+  {
+    id: 'primary_sources',
+    available: false,
+    // A primary-source corpus mixes secondary literature (ideas/authors stay) with
+    // archival records (persons/timeline/archive come in via scoping). Hide the
+    // argument-debate and study surfaces that don't fit source/record work; keep
+    // gaps/coverage/deep-research (reframed by the prompt pack).
+    defaultHiddenViews: ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading'],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO FUENTES PRIMARIAS ═══
+Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padrones, actas, partidas, prensa histórica, correspondencia), no solo con literatura secundaria. Prioriza la fidelidad al documento: extrae hechos, personas, lugares, fechas y eventos tal como constan, cita siempre de forma literal y con su localización, y aplica crítica de fuentes (distingue lo que la fuente afirma de lo que se infiere). No deduzcas parentescos, identidades ni fechas que la fuente no sostenga; si un dato es incierto, dilo. Respeta la ortografía y los nombres de época.`,
+  },
+  {
+    id: 'databases',
+    available: false,
+    // Not built yet: reserved slot in the taxonomy, no preset or prompt pack.
+    defaultHiddenViews: [],
+    promptPack: '',
+  },
 ];
 
 /**
@@ -121,6 +134,9 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   archive: ['primary_sources', 'genealogy'],
   map: ['primary_sources', 'genealogy'],
   tree: ['genealogy'],
+  // The social-relations graph is independent from the kinship tree but needs the
+  // same Person entities, so it's available wherever persons/timeline/archive are.
+  relations: ['primary_sources', 'genealogy'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

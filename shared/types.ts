@@ -670,6 +670,11 @@ export interface AppSettings {
   autoBackupEnabled: boolean;
   autoBackupFolder: string;
   autoBackupIntervalHours: number;
+  /** Days of week the backup runs (0=Sun..6=Sat). Empty = every day. */
+  autoBackupDays: number[];
+  /** Local time of day for the scheduled backup. */
+  autoBackupHour: number;
+  autoBackupMinute: number;
   lastAutoBackupAt: string | null;
   lastAutoBackupStatus: string | null;
 }
@@ -801,6 +806,75 @@ export interface Kin {
   siblings: Person[];
 }
 
+// Social-relations network (genealogy layer) — a SECOND, independent graph from the
+// kinship tree: the connections a person had beyond family (patrons, friends,
+// employers, rivals, correspondents...), the material a social/prosopographical
+// historian works with. Always recorded from a tree person's ficha ("who they
+// knew"); the target is either another tree person or a lightweight contact who
+// isn't themselves a tree member.
+
+/** A person known only through a social relation, not themselves a tree member. */
+export interface SocialContact {
+  contactId: string;
+  displayName: string;
+  /** Free text (markdown) about who they were — occupation, dates, place... */
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SocialContactInput {
+  displayName: string;
+  notes?: string | null;
+}
+
+export type SocialRelationTargetKind = 'contact' | 'person';
+
+/** A directed, typed connection recorded from `personId`'s ficha. */
+export interface SocialRelation {
+  relationId: string;
+  personId: string;
+  /** personId's display name, resolved for convenience (always a tree person). */
+  personName: string;
+  targetKind: SocialRelationTargetKind;
+  targetId: string;
+  /** The target's display name, resolved for convenience (contact or person). */
+  targetName: string;
+  /** Free text from personId's perspective (amigo, patrón, socio...). */
+  role: string;
+  /** Markdown, about the connection itself (distinct from the contact's own notes). */
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SocialRelationInput {
+  personId: string;
+  targetKind: SocialRelationTargetKind;
+  targetId: string;
+  role: string;
+  notes?: string | null;
+}
+
+/** One node in the social-relations graph: a tree person or a standalone contact. */
+export interface SocialGraphNode {
+  id: string;
+  kind: SocialRelationTargetKind;
+  displayName: string;
+}
+
+export interface SocialGraphEdge {
+  relationId: string;
+  fromId: string;
+  toId: string;
+  role: string;
+}
+
+export interface SocialGraphData {
+  nodes: SocialGraphNode[];
+  edges: SocialGraphEdge[];
+}
+
 export interface GedcomImportResult {
   persons: number;
   relationships: number;
@@ -908,6 +982,10 @@ export interface Place {
   latitude: number | null;
   longitude: number | null;
   notes: string | null;
+  gazetteerId: string | null;
+  admin1: string | null;
+  country: string | null;
+  countryCode: string | null;
 }
 
 export interface PlaceInput {
@@ -917,6 +995,75 @@ export interface PlaceInput {
   latitude?: number | null;
   longitude?: number | null;
   notes?: string | null;
+  /** Stable gazetteer identity (e.g. 'geonames:2520118') when resolved from the picker. */
+  gazetteerId?: string | null;
+  admin1?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+}
+
+/** A candidate place returned by the offline gazetteer search (GeoNames-derived). */
+export interface GazetteerPlace {
+  /** Stable unique id, e.g. 'geonames:2520118'. */
+  gazetteerId: string;
+  name: string;
+  /** State / province / region (admin1). */
+  admin1: string;
+  country: string;
+  countryCode: string;
+  latitude: number;
+  longitude: number;
+  population: number;
+}
+
+/** A place associated with a person (their per-person place record → their map). */
+export interface PersonPlace {
+  id: string;
+  personId: string;
+  placeId: string;
+  /** Kind of association: birth | residence | death | other (free text ok). */
+  label: string | null;
+  date: string | null;
+  sortKey: string | null;
+  notes: string | null;
+  /** Resolved place fields for display/mapping (joined). */
+  placeName: string;
+  admin1: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface PersonPlaceInput {
+  personId: string;
+  placeId: string;
+  label?: string | null;
+  date?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * One located point on the map: a person associated with a place that has
+ * coordinates. Carries the person's identity/dates for the thumbnail and the place's
+ * geography for plotting. The renderer groups points by person (migration routes) and
+ * by place (thumbnails), and filters by the chronological slider using `sortKey`.
+ */
+export interface MapPlacePoint {
+  personPlaceId: string;
+  personId: string;
+  personName: string;
+  birthDate: string | null;
+  deathDate: string | null;
+  hasPortrait: boolean;
+  placeId: string;
+  placeName: string;
+  admin1: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  label: string | null;
+  date: string | null;
+  sortKey: string | null;
 }
 
 export interface EventParticipant {
@@ -2961,6 +3108,12 @@ export interface DeepResearchRequest {
   sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
   decorativeImage?: DecorativeImageOption;
+  /**
+   * Genealogy vaults only: centre the family-history report on this person — their
+   * documents are guaranteed into the source pool and every section is written to
+   * keep them as the throughline. Ignored outside the genealogy pipeline.
+   */
+  focusPersonId?: string | null;
 }
 
 /** One live progress event emitted while a report is being orchestrated. */
@@ -3686,10 +3839,20 @@ export interface NodusApi {
   getPersonPortrait(personId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
   updatePortraitFocus(personId: string, focus: PortraitFocus): Promise<void>;
   clearPersonPortrait(personId: string): Promise<void>;
+  /** Exceptional: an illustrative (non-photorealistic) reference portrait from a text description. */
+  generatePersonPortraitReference(personId: string, description: string): Promise<Person | null>;
   listPlaces(): Promise<Place[]>;
   createPlace(input: PlaceInput): Promise<Place>;
   findOrCreatePlace(name: string, kind?: string | null): Promise<Place>;
   updatePlace(id: string, patch: Partial<PlaceInput>): Promise<Place | null>;
+  // offline gazetteer + per-person place records (map)
+  searchGazetteer(query: string, limit?: number): Promise<GazetteerPlace[]>;
+  resolveGazetteerPlace(place: GazetteerPlace): Promise<Place>;
+  listPersonPlaces(personId: string): Promise<PersonPlace[]>;
+  addPersonPlace(input: PersonPlaceInput): Promise<PersonPlace>;
+  updatePersonPlace(id: string, patch: Partial<PersonPlaceInput>): Promise<PersonPlace | null>;
+  deletePersonPlace(id: string): Promise<void>;
+  mapPoints(personIds?: string[]): Promise<MapPlacePoint[]>;
   listEvents(opts?: {
     personId?: string;
     type?: HistoricalEventType;
@@ -3724,6 +3887,19 @@ export interface NodusApi {
   findMatches(): Promise<MatchCandidatePair[]>;
   mergePersons(targetId: string, sourceId: string): Promise<Person | null>;
   dismissMatch(a: string, b: string): Promise<void>;
+  // social-relations network (independent from kinship)
+  listSocialContacts(search?: string): Promise<SocialContact[]>;
+  getSocialContact(contactId: string): Promise<SocialContact | null>;
+  createSocialContact(input: SocialContactInput): Promise<SocialContact>;
+  updateSocialContact(contactId: string, patch: Partial<SocialContactInput>): Promise<SocialContact | null>;
+  deleteSocialContact(contactId: string): Promise<void>;
+  listSocialRelationsForPerson(personId: string): Promise<SocialRelation[]>;
+  listSocialRelationsTargetingPerson(personId: string): Promise<SocialRelation[]>;
+  listSocialRelationsTargetingContact(contactId: string): Promise<SocialRelation[]>;
+  createSocialRelation(input: SocialRelationInput): Promise<SocialRelation>;
+  updateSocialRelation(relationId: string, patch: Partial<SocialRelationInput>): Promise<SocialRelation | null>;
+  deleteSocialRelation(relationId: string): Promise<void>;
+  socialGraph(): Promise<SocialGraphData>;
   // evidence-driven kinship suggestions (AI proposes, the user disposes)
   listKinSuggestions(): Promise<KinSuggestion[]>;
   kinSuggestionsForPerson(personId: string): Promise<KinSuggestion[]>;

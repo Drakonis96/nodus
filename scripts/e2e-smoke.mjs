@@ -219,6 +219,17 @@ try {
     await window.nodus.linkArchivePerson(entry.itemId, juan.personId);
     const linkedDocs = await window.nodus.listArchiveItemsForPerson(juan.personId);
 
+    // Map: offline gazetteer search → resolve to a place → per-person place record →
+    // located map point (the whole map pipeline over IPC, fully offline).
+    const gaz = await window.nodus.searchGazetteer('Carmona', 6);
+    const carmonaEs = gaz.find((g) => g.countryCode === 'ES');
+    let mapPointCount = 0;
+    if (carmonaEs) {
+      const gplace = await window.nodus.resolveGazetteerPlace(carmonaEs);
+      await window.nodus.addPersonPlace({ personId: juan.personId, placeId: gplace.placeId, label: 'birth', date: 'c. 1850' });
+      mapPointCount = (await window.nodus.mapPoints([juan.personId])).length;
+    }
+
     // Kinship suggestion IPC is wired and answers cleanly with no proposals yet
     // (proposals are seeded by an AI scan, which needs a provider key we don't set here;
     // the accumulate/confirm/dismiss logic is covered by the unit repo test).
@@ -249,6 +260,9 @@ try {
       kinSuggestionsIsArray: Array.isArray(kinSuggestions),
       personSuggested: personSuggestions.some((p) => p.displayName === 'Juan Pérez'),
       docSuggested: docSuggestions.some((d) => d.itemId === item.itemId && d.reason === 'name'),
+      gazetteerHits: gaz.length,
+      gazetteerCarmona: !!carmonaEs,
+      mapPointCount,
     };
   });
   assert.equal(records.persons, 2, 'persons created over IPC');
@@ -269,6 +283,11 @@ try {
   assert.ok(records.personSuggested, 'archive → person discovery proposes the named person over IPC');
   assert.ok(records.docSuggested, 'person → document discovery proposes the naming document over IPC');
   console.log('[e2e] records ontology + archive ok over IPC');
+
+  assert.ok(records.gazetteerHits > 0, 'offline gazetteer search returns candidates over IPC');
+  assert.ok(records.gazetteerCarmona, 'the Spanish Carmona is found in the offline gazetteer');
+  assert.equal(records.mapPointCount, 1, 'a resolved gazetteer place becomes a located map point over IPC');
+  console.log('[e2e] map: gazetteer + per-person places ok over IPC');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

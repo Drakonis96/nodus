@@ -105,6 +105,13 @@ try {
   repo.updateItem(partida.itemId, { docType: 'photograph' });
   assert.equal(repo.getItem(partida.itemId).docType, 'photograph');
 
+  // Re-editing an item's description and extracted text by hand (correct OCR, etc.).
+  repo.updateItem(partida.itemId, { description: 'Descripción corregida a mano', extractedText: 'Texto transcrito a mano' });
+  const reedited = repo.getItem(partida.itemId);
+  assert.equal(reedited.description, 'Descripción corregida a mano', 'description hand-edited');
+  assert.equal(reedited.extractedText, 'Texto transcrito a mano', 'extracted text hand-edited');
+  assert.equal(repo.listItems({ search: 'transcrito a mano' }).length, 1, 'search hits the hand-edited text');
+
   const counts = repo.archiveCounts();
   assert.equal(counts.items, 3, 'image + CSV + partida (dedupe prevented a 4th)');
 

@@ -370,7 +370,7 @@ function TextEntryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card flex max-h-[85vh] w-full max-w-lg flex-col gap-3 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal flex max-h-[85vh] w-full max-w-lg flex-col gap-3 p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="font-semibold">{t('Nueva entrada de texto')}</h2>
         <input
           className="input h-9 w-full text-sm"
@@ -446,6 +446,10 @@ function ArchiveItemDetail({
   const [description, setDescription] = useState<string | null>(item.description);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState(false);
+  const [descDraft, setDescDraft] = useState(item.description ?? '');
+  const [textDraft, setTextDraft] = useState(item.extractedText ?? '');
+  const [savingContent, setSavingContent] = useState(false);
   const [docType, setDocType] = useState<string | null>(item.docType);
   const [metadata, setMetadata] = useState<Record<string, string>>(item.metadata ?? {});
   const [classDirty, setClassDirty] = useState(false);
@@ -483,6 +487,21 @@ function ArchiveItemDetail({
     if (title.trim() && title.trim() !== item.title) {
       await window.nodus.updateArchiveItem(item.itemId, { title: title.trim() });
       await onChanged();
+    }
+  };
+
+  const saveContent = async () => {
+    setSavingContent(true);
+    try {
+      await window.nodus.updateArchiveItem(item.itemId, {
+        description: descDraft.trim() || null,
+        extractedText: textDraft.trim() || null,
+      });
+      setDescription(descDraft.trim() || null);
+      setEditingContent(false);
+      await onChanged();
+    } finally {
+      setSavingContent(false);
     }
   };
 
@@ -585,7 +604,7 @@ function ArchiveItemDetail({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start gap-2">
           <input
             className="input h-9 flex-1 text-sm font-medium"
@@ -644,21 +663,68 @@ function ArchiveItemDetail({
           {imageUrl && (
             <img src={imageUrl} alt={item.title} className="mb-3 max-h-80 w-auto rounded-md border border-neutral-800" />
           )}
-          {description && (
-            <div className="mb-3">
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción visual')}</h3>
-              <p className="rounded-md bg-neutral-900/60 p-3 text-sm text-neutral-300">{description}</p>
-            </div>
-          )}
-          {item.extractedText ? (
-            <div className="mb-3">
-              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Texto extraído')}</h3>
-              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-900/60 p-3 text-xs text-neutral-300">
-                {item.extractedText}
-              </pre>
+
+          <div className="mb-3 flex justify-end">
+            <button
+              className="btn btn-ghost h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
+              onClick={() => {
+                setDescDraft(description ?? '');
+                setTextDraft(item.extractedText ?? '');
+                setEditingContent((v) => !v);
+              }}
+            >
+              <Icon name="edit" size={12} /> {t('Editar descripción y texto')}
+            </button>
+          </div>
+
+          {editingContent ? (
+            <div className="mb-3 space-y-2">
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción')}</h3>
+                <textarea
+                  className="input min-h-16 w-full resize-y text-sm"
+                  value={descDraft}
+                  placeholder={t('Descripción o resumen del documento…')}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                />
+              </div>
+              <div>
+                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Texto extraído')}</h3>
+                <textarea
+                  className="input min-h-40 w-full resize-y font-mono text-xs"
+                  value={textDraft}
+                  placeholder={t('Transcripción o texto del documento…')}
+                  onChange={(e) => setTextDraft(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button className="btn btn-primary h-8 text-xs" disabled={savingContent} onClick={() => void saveContent()}>
+                  {savingContent ? t('Guardando…') : t('Guardar cambios')}
+                </button>
+                <button className="btn btn-ghost h-8 border border-neutral-700 px-3 text-xs" onClick={() => setEditingContent(false)} disabled={savingContent}>
+                  {t('Cancelar')}
+                </button>
+              </div>
             </div>
           ) : (
-            <p className="mb-3 text-sm italic text-neutral-500">{t('Sin texto extraído.')}</p>
+            <>
+              {description && (
+                <div className="mb-3">
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción visual')}</h3>
+                  <p className="rounded-md bg-neutral-900/60 p-3 text-sm text-neutral-300">{description}</p>
+                </div>
+              )}
+              {item.extractedText ? (
+                <div className="mb-3">
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Texto extraído')}</h3>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-neutral-900/60 p-3 text-xs text-neutral-300">
+                    {item.extractedText}
+                  </pre>
+                </div>
+              ) : (
+                <p className="mb-3 text-sm italic text-neutral-500">{t('Sin texto extraído.')}</p>
+              )}
+            </>
           )}
 
           <div className="mb-3">

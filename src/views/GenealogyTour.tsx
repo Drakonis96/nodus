@@ -57,8 +57,8 @@ const STEPS: TourStep[] = [
     body: 'Importa un árbol GEDCOM desde Gramps o Ancestry, o exporta el tuyo, desde los botones de esta columna. Nodus complementa a tus herramientas; no te encierra.',
   },
   {
-    title: 'Retratos de época',
-    body: 'Los rostros son daguerrotipos en blanco y negro generados con un modelo de imagen económico, con la cara centrada en el marco. En cualquier ficha puedes sustituirlos por una fotografía real y encuadrarla arrastrando.',
+    title: 'Retratos',
+    body: 'En cualquier ficha puedes adjuntar el retrato real de la persona y encuadrarlo arrastrando. Si no conservas ninguna imagen, excepcionalmente puedes generar un retrato de referencia con IA a partir de una descripción de sus rasgos; no es lo recomendable —por motivos éticos, un rostro generado no es un documento— así que úsalo solo como marcador visual, nunca como si fuera real.',
   },
   {
     title: 'La IA propone; tú decides',

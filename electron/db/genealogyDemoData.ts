@@ -149,12 +149,47 @@ interface DemoPlace {
   kind: string;
   lat: number | null;
   lng: number | null;
+  admin1?: string | null;
+  country?: string | null;
+  gazetteerId?: string | null;
 }
 const PLACES: DemoPlace[] = [
-  { id: 'demo-plc-sevilla', name: 'Sevilla', parentId: null, kind: 'province', lat: 37.3886, lng: -5.9823 },
-  { id: 'demo-plc-carmona', name: 'Carmona', parentId: 'demo-plc-sevilla', kind: 'municipality', lat: 37.4713, lng: -5.6469 },
-  { id: 'demo-plc-parr', name: 'Parroquia de Santa María, Carmona', parentId: 'demo-plc-carmona', kind: 'parish', lat: 37.4718, lng: -5.6432 },
-  { id: 'demo-plc-ecija', name: 'Écija', parentId: 'demo-plc-sevilla', kind: 'municipality', lat: 37.5411, lng: -5.0824 },
+  { id: 'demo-plc-sevilla', name: 'Sevilla', parentId: null, kind: 'municipality', lat: 37.3886, lng: -5.9823, admin1: 'Andalucía', country: 'España', gazetteerId: 'geonames:2510911' },
+  { id: 'demo-plc-carmona', name: 'Carmona', parentId: 'demo-plc-sevilla', kind: 'municipality', lat: 37.4713, lng: -5.6469, admin1: 'Andalucía', country: 'España', gazetteerId: 'geonames:2520118' },
+  { id: 'demo-plc-parr', name: 'Parroquia de Santa María, Carmona', parentId: 'demo-plc-carmona', kind: 'parish', lat: 37.4718, lng: -5.6432, admin1: 'Andalucía', country: 'España' },
+  { id: 'demo-plc-ecija', name: 'Écija', parentId: 'demo-plc-sevilla', kind: 'municipality', lat: 37.5411, lng: -5.0824, admin1: 'Andalucía', country: 'España', gazetteerId: 'geonames:2513917' },
+];
+
+/** Per-person place records → the individual maps + the general map (movements). */
+interface DemoPersonPlace {
+  personId: string;
+  placeId: string;
+  label: string;
+  date: string | null;
+}
+const PERSON_PLACES: DemoPersonPlace[] = [
+  // Founding generation, rooted in Carmona.
+  { personId: 'demo-p1', placeId: 'demo-plc-carmona', label: 'residence', date: 'c. 1860' },
+  { personId: 'demo-p1', placeId: 'demo-plc-carmona', label: 'death', date: '1901' },
+  { personId: 'demo-p2', placeId: 'demo-plc-carmona', label: 'residence', date: 'c. 1865' },
+  // Tomás Serrano — a life in Carmona.
+  { personId: 'demo-p5', placeId: 'demo-plc-carmona', label: 'birth', date: '1865' },
+  { personId: 'demo-p5', placeId: 'demo-plc-carmona', label: 'marriage', date: '1889' },
+  { personId: 'demo-p5', placeId: 'demo-plc-carmona', label: 'residence', date: '1900' },
+  { personId: 'demo-p7', placeId: 'demo-plc-carmona', label: 'residence', date: '1889' },
+  { personId: 'demo-p7', placeId: 'demo-plc-sevilla', label: 'residence', date: '1912' },
+  // Rafael — the emigrant to the city (Carmona → Sevilla).
+  { personId: 'demo-p8', placeId: 'demo-plc-carmona', label: 'birth', date: '1890' },
+  { personId: 'demo-p8', placeId: 'demo-plc-sevilla', label: 'migration', date: '1912' },
+  { personId: 'demo-p8', placeId: 'demo-plc-sevilla', label: 'marriage', date: '1919' },
+  { personId: 'demo-p10', placeId: 'demo-plc-carmona', label: 'birth', date: '1896' },
+  { personId: 'demo-p10', placeId: 'demo-plc-sevilla', label: 'death', date: '1918' },
+  { personId: 'demo-p12', placeId: 'demo-plc-sevilla', label: 'birth', date: '1921' },
+  // Dolores' branch marries into Écija (the Reyes family).
+  { personId: 'demo-p6', placeId: 'demo-plc-carmona', label: 'birth', date: '1868' },
+  { personId: 'demo-p6', placeId: 'demo-plc-ecija', label: 'marriage', date: '1890' },
+  { personId: 'demo-p14', placeId: 'demo-plc-ecija', label: 'residence', date: 'c. 1885' },
+  { personId: 'demo-p15', placeId: 'demo-plc-ecija', label: 'birth', date: '1892' },
 ];
 
 interface DemoArchiveItem {
@@ -276,6 +311,63 @@ const SUGGESTIONS: DemoSuggestion[] = [
   },
 ];
 
+interface DemoContact {
+  id: string;
+  name: Localized;
+  notes: Localized;
+}
+const SOCIAL_CONTACTS: DemoContact[] = [
+  {
+    id: 'demo-ctc1',
+    name: { es: 'Antonio Ruiz Cabello', en: 'Antonio Ruiz Cabello' },
+    notes: {
+      es: 'Notario del pueblo entre 1868 y 1895. Redactó varias escrituras de la familia.',
+      en: 'The village notary between 1868 and 1895. Drafted several of the family’s deeds.',
+    },
+  },
+  {
+    id: 'demo-ctc2',
+    name: { es: 'Padre Eugenio Lozano', en: 'Father Eugenio Lozano' },
+    notes: {
+      es: 'Párroco de Santa María entre 1855 y 1880. Ofició varios bautismos y matrimonios de la familia.',
+      en: 'Parish priest of Santa María between 1855 and 1880. Officiated several of the family’s baptisms and marriages.',
+    },
+  },
+];
+
+interface DemoSocialRel {
+  id: string;
+  from: string;
+  targetId: string;
+  role: Localized;
+  notes: Localized;
+}
+// A SECOND, independent network from the kinship tree — the demo's payoff for the
+// social/prosopographical use case (patronage, clergy, professional ties).
+const SOCIAL_RELATIONSHIPS: DemoSocialRel[] = [
+  {
+    id: 'demo-srel1',
+    from: 'demo-p5',
+    targetId: 'demo-ctc1',
+    role: { es: 'cliente', en: 'client' },
+    notes: { es: 'Le compró una finca de olivar en 1889, según la escritura conservada.', en: 'Bought an olive grove through him in 1889, per the surviving deed.' },
+  },
+  {
+    id: 'demo-srel2',
+    from: 'demo-p1',
+    targetId: 'demo-ctc2',
+    role: { es: 'feligrés', en: 'parishioner' },
+    notes: { es: '', en: '' },
+  },
+  {
+    id: 'demo-srel3',
+    from: 'demo-p5',
+    targetId: 'demo-p14',
+    role: { es: 'socio', en: 'business partner' },
+    notes: { es: 'Compartieron la explotación de una prensa de aceite entre 1895 y 1905.', en: 'Ran a shared olive press between 1895 and 1905.' },
+  },
+];
+
 // ── Seed / clear ────────────────────────────────────────────────────────────────
 
 /** True when the vault already holds ANY content (genealogy or academic). Gates the
@@ -318,9 +410,11 @@ export function seedGenealogyDemoData(): boolean {
   const tx = db.transaction(() => {
     // Places (parents before children — PLACES is ordered so).
     const insPlace = db.prepare(
-      'INSERT INTO places (place_id, name, parent_id, kind, latitude, longitude, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)'
+      `INSERT INTO places (place_id, name, parent_id, kind, latitude, longitude, notes, gazetteer_id, admin1, country, country_code, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`
     );
-    for (const p of PLACES) insPlace.run(p.id, p.name, p.parentId, p.kind, p.lat, p.lng, now, now);
+    for (const p of PLACES)
+      insPlace.run(p.id, p.name, p.parentId, p.kind, p.lat, p.lng, p.gazetteerId ?? null, p.admin1 ?? null, p.country ?? null, p.country ? 'ES' : null, now, now);
 
     // Persons + name variants.
     const insPerson = db.prepare(
@@ -356,6 +450,16 @@ export function seedGenealogyDemoData(): boolean {
       insEvent.run(e.id, e.type, e.label, e.date, parsed.sortKey, parsed.endSortKey, e.placeId, now, now);
       e.participants.forEach((part, j) => insPart.run(`${e.id}-p${j}`, e.id, part.personId, part.role));
     }
+
+    // Per-person place records → the individual maps + the general map (movements).
+    const insPersonPlace = db.prepare(
+      `INSERT INTO person_places (id, person_id, place_id, label, date, date_sort, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`
+    );
+    PERSON_PLACES.forEach((pp, i) => {
+      const parsed = parseHistoricalDate(pp.date);
+      insPersonPlace.run(`demo-ppl${i + 1}`, pp.personId, pp.placeId, pp.label, pp.date, parsed.sortKey, now, now);
+    });
 
     // Evidence archive: folder, items, tags, person links.
     db.prepare('INSERT INTO archive_folders (folder_id, name, parent_id, created_at) VALUES (?, ?, NULL, ?)').run(
@@ -413,6 +517,22 @@ export function seedGenealogyDemoData(): boolean {
       for (const ev of s.evidence) insSugEv.run(ev.id, s.id, ev.signal, 'archive', ev.itemId, ev.quote, ev.location, ev.weight, now);
     }
 
+    // The social-relations network: a SECOND graph, independent from the kinship
+    // tree — patronage, clergy, business ties, the material for a social historian.
+    const insContact = db.prepare(
+      'INSERT INTO social_contacts (contact_id, display_name, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    );
+    for (const c of SOCIAL_CONTACTS) insContact.run(c.id, loc(c.name), loc(c.notes) || null, now, now);
+    const insSocialRel = db.prepare(
+      `INSERT INTO social_relations (relation_id, person_id, target_kind, target_id, role, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    const contactIds = new Set(SOCIAL_CONTACTS.map((c) => c.id));
+    for (const r of SOCIAL_RELATIONSHIPS) {
+      const targetKind = contactIds.has(r.targetId) ? 'contact' : 'person';
+      insSocialRel.run(r.id, r.from, targetKind, r.targetId, loc(r.role), loc(r.notes) || null, now, now);
+    }
+
     updateSettings({ demoMode: true, genealogyTourComplete: false });
   });
   tx();
@@ -438,6 +558,8 @@ export function clearGenealogyDemoData(): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`
+      DELETE FROM social_relations WHERE relation_id LIKE 'demo-%';
+      DELETE FROM social_contacts WHERE contact_id LIKE 'demo-%';
       DELETE FROM kinship_suggestion_evidence WHERE suggestion_id LIKE 'demo-%';
       DELETE FROM kinship_suggestions WHERE suggestion_id LIKE 'demo-%';
       DELETE FROM archive_item_persons WHERE item_id LIKE 'demo-%';
@@ -447,6 +569,7 @@ export function clearGenealogyDemoData(): void {
       DELETE FROM record_evidence WHERE id LIKE 'demo-%';
       DELETE FROM event_participants WHERE event_id LIKE 'demo-%';
       DELETE FROM events WHERE event_id LIKE 'demo-%';
+      DELETE FROM person_places WHERE id LIKE 'demo-%';
       DELETE FROM relationships WHERE rel_id LIKE 'demo-%';
       DELETE FROM person_portraits WHERE person_id LIKE 'demo-%';
       DELETE FROM person_names WHERE person_id LIKE 'demo-%';

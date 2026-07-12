@@ -20,6 +20,7 @@ import { AuthorsView } from './views/AuthorsView';
 import { PersonasView } from './views/PersonasView';
 import { TimelineView } from './views/TimelineView';
 import { TreeView } from './views/TreeView';
+import { RelationsView } from './views/RelationsView';
 import { MapView } from './views/MapView';
 import { ArchiveView } from './views/ArchiveView';
 import { StudyGuideView } from './views/StudyGuideView';
@@ -565,6 +566,7 @@ export function App() {
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
           {view === 'timeline' && <TimelineView />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
+          {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
           {view === 'map' && <MapView />}
           {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} />}
           {view === 'study' && (

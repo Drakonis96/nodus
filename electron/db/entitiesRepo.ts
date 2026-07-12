@@ -176,10 +176,13 @@ export function listPersons(opts: { search?: string } = {}): Person[] {
 }
 
 export function deletePerson(personId: string): void {
-  // Cascades remove person_names and event_participants; drop the person's own evidence too.
+  // Cascades remove person_names, event_participants and social_relations this
+  // person AUTHORED; drop their own evidence too, plus any relation another person
+  // recorded that targets them (polymorphic target, no FK to cascade it).
   const db = getDb();
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM record_evidence WHERE target_kind = ? AND target_id = ?').run('person', personId);
+    db.prepare("DELETE FROM social_relations WHERE target_kind = 'person' AND target_id = ?").run(personId);
     db.prepare('DELETE FROM persons WHERE person_id = ?').run(personId);
   });
   tx();
@@ -242,6 +245,10 @@ interface PlaceRow {
   latitude: number | null;
   longitude: number | null;
   notes: string | null;
+  gazetteer_id: string | null;
+  admin1: string | null;
+  country: string | null;
+  country_code: string | null;
 }
 
 function rowToPlace(row: PlaceRow): Place {
@@ -253,6 +260,10 @@ function rowToPlace(row: PlaceRow): Place {
     latitude: row.latitude,
     longitude: row.longitude,
     notes: row.notes,
+    gazetteerId: row.gazetteer_id ?? null,
+    admin1: row.admin1 ?? null,
+    country: row.country ?? null,
+    countryCode: row.country_code ?? null,
   };
 }
 
@@ -261,8 +272,8 @@ export function createPlace(input: PlaceInput): Place {
   const ts = now();
   getDb()
     .prepare(
-      `INSERT INTO places (place_id, name, parent_id, kind, latitude, longitude, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO places (place_id, name, parent_id, kind, latitude, longitude, notes, gazetteer_id, admin1, country, country_code, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       id,
@@ -272,10 +283,42 @@ export function createPlace(input: PlaceInput): Place {
       input.latitude ?? null,
       input.longitude ?? null,
       input.notes ?? null,
+      input.gazetteerId ?? null,
+      input.admin1 ?? null,
+      input.country ?? null,
+      input.countryCode ?? null,
       ts,
       ts
     );
   return getPlace(id)!;
+}
+
+/**
+ * Resolve a gazetteer place to a single `places` row, creating it once and reusing
+ * it thereafter (so the same city links many people to one place node). Keyed by the
+ * stable gazetteer id.
+ */
+export function findOrCreateGazetteerPlace(input: {
+  gazetteerId: string;
+  name: string;
+  admin1?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  latitude: number;
+  longitude: number;
+}): Place {
+  const existing = getDb().prepare('SELECT * FROM places WHERE gazetteer_id = ?').get(input.gazetteerId) as PlaceRow | undefined;
+  if (existing) return rowToPlace(existing);
+  return createPlace({
+    name: input.name,
+    kind: 'municipality',
+    latitude: input.latitude,
+    longitude: input.longitude,
+    gazetteerId: input.gazetteerId,
+    admin1: input.admin1 ?? null,
+    country: input.country ?? null,
+    countryCode: input.countryCode ?? null,
+  });
 }
 
 export function getPlace(placeId: string): Place | null {

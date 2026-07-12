@@ -229,6 +229,46 @@ export function createVault(name: string, type: VaultType = 'academic'): VaultSu
   return toSummary(vault, registry.activeVaultId);
 }
 
+/**
+ * Restore a vault's database from a backup, KEYED BY ITS ORIGINAL ID. If a vault with
+ * that id already exists locally its database file is replaced in place; otherwise the
+ * vault is registered (recreating the folder for a non-legacy vault, or the legacy
+ * path for the primary one). The copied file's stale WAL/SHM siblings are cleared so
+ * SQLite never replays an old journal over the restored data. Migrations run lazily
+ * when the vault is next opened. Does NOT touch the live DB connection — the caller
+ * must closeDb() before restoring the active vault and reopen afterwards.
+ */
+export function restoreVaultDatabase(
+  input: { id: string; name: string; type: VaultType; legacy: boolean },
+  sourceFile: string
+): void {
+  const registry = ensureVaultRegistry();
+  let record = registry.vaults.find((v) => v.id === input.id);
+  if (record) {
+    record.name = cleanName(input.name);
+    record.type = normalizeVaultType(input.type);
+    record.lastOpenedAt = nowIso();
+  } else {
+    const legacy = input.legacy || input.id === LEGACY_VAULT_ID;
+    const target = legacy ? legacyDbPath() : path.join(vaultsDir(), input.id, 'nodus.sqlite');
+    record = {
+      id: input.id,
+      name: cleanName(input.name),
+      path: target,
+      createdAt: nowIso(),
+      lastOpenedAt: nowIso(),
+      legacy,
+      type: normalizeVaultType(input.type),
+    };
+    registry.vaults.push(record);
+  }
+  fs.mkdirSync(path.dirname(record.path), { recursive: true });
+  removeSqliteDatabaseFiles(record.path);
+  fs.copyFileSync(sourceFile, record.path);
+  writeVaultManifest(record);
+  writeRegistry(registry);
+}
+
 export function createVaultFromDatabaseFile(
   sourceFile: string,
   name: string,

@@ -124,7 +124,8 @@ function EventDetail({ event, onClose }: { event: HistoricalEvent; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card w-full max-w-lg space-y-4 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold">{t(EVENT_TYPE_LABEL[event.type] ?? event.type)}</h2>
@@ -173,6 +174,7 @@ function EventDetail({ event, onClose }: { event: HistoricalEvent; onClose: () =
             </ul>
           )}
         </section>
+        </div>
       </div>
     </div>
   );

@@ -79,6 +79,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   autoBackupEnabled: false,
   autoBackupFolder: '',
   autoBackupIntervalHours: 24,
+  autoBackupDays: [],
+  autoBackupHour: 3,
+  autoBackupMinute: 0,
   lastAutoBackupAt: null,
   lastAutoBackupStatus: null,
 };

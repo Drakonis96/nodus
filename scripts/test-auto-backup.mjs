@@ -58,6 +58,23 @@ try {
   assert.equal(autoBackup.isBackupDue(new Date(Date.now() - 25 * 3600e3).toISOString(), 24), true, '25h ago → due');
   assert.equal(autoBackup.isBackupDue('garbage-date', 24), true, 'unparseable timestamp → fail open (due)');
 
+  // ── Schedule by day(s)-of-week + time, with startup catch-up semantics ──────
+  const now = new Date(2026, 6, 10, 10, 0, 0); // fixed reference: 10:00 local
+  const at = (dayOffset, h, m = 0) => new Date(2026, 6, 10 + dayOffset, h, m, 0).toISOString();
+  // Daily schedule at 03:00.
+  assert.equal(autoBackup.isScheduledBackupDue(null, [], 3, 0, now), true, 'never backed up → due');
+  assert.equal(autoBackup.isScheduledBackupDue(at(0, 9), [], 3, 0, now), false, 'already backed up after today’s 03:00 slot → not due');
+  assert.equal(autoBackup.isScheduledBackupDue(at(-1, 9), [], 3, 0, now), true, 'last backup yesterday → today’s slot passed → due');
+  // Startup catch-up: machine was off for a week, daily schedule → due on next launch.
+  assert.equal(autoBackup.isScheduledBackupDue(at(-8, 9), [], 3, 0, now), true, 'missed slots while off → due at next start');
+  // Weekly on today's weekday → today's slot applies like the daily case.
+  const today = now.getDay();
+  const tomorrow = (today + 1) % 7;
+  assert.equal(autoBackup.isScheduledBackupDue(at(-1, 9), [today], 3, 0, now), true, 'scheduled weekday, last backup yesterday → due');
+  assert.equal(autoBackup.isScheduledBackupDue(at(-1, 9), [tomorrow], 3, 0, now), false, 'not a scheduled weekday today → last slot was days ago, already covered');
+  // A slot exactly now counts as passed.
+  assert.equal(autoBackup.isScheduledBackupDue(at(-1, 9), [], 10, 0, now), true, 'slot at exactly now has passed');
+
   assert.equal(autoBackup.sanitizeHostname('MacBook-Pro-de-Jorge.local'), 'macbook-pro-de-jorge');
   const name = autoBackup.backupFileName('MacBook-Pro-de-Jorge.local', new Date(2026, 6, 10, 9, 30, 5));
   assert.equal(name, 'nodus-backup-macbook-pro-de-jorge-20260710-093005.nodus');
@@ -91,21 +108,24 @@ try {
   const zip = new AdmZip(path.join(backupDir, written[0]));
   const manifest = JSON.parse(zip.readAsText('manifest.json'));
   assert.equal(manifest.format, 'nodus.encrypted-backup');
-  assert.equal(manifest.formatVersion, 3, 'automatic backups are v3 (secret-free)');
+  assert.equal(manifest.formatVersion, 4, 'automatic backups are v4 (multi-vault, secret-free)');
   assert.equal(manifest.includesSecrets, false);
   assert.equal(manifest.appVersion, '9.9.9-test');
+  assert.ok(manifest.vaultCount >= 1, 'at least one vault backed up');
 
   const payload = new AdmZip(crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), 'mi-frase-maestra', manifest.cipher));
   const names = payload.getEntries().map((e) => e.entryName).sort();
   assert.ok(!names.includes('api-keys.json'), 'no API keys inside');
-  assert.ok(names.includes('database.sqlite') && names.includes('settings.json') && names.includes('backup-inventory.json'));
-  const settingsJson = JSON.parse(payload.readAsText('settings.json'));
-  assert.equal(settingsJson.mcpToken, undefined, 'mcp token scrubbed');
-  assert.equal(settingsJson.mcpEnabled, false, 'mcp listener never restored enabled');
+  assert.ok(names.includes('registry.json'), 'the vault registry is included');
+  const dbEntryName = names.find((n) => /^vaults\/.+\/database\.sqlite$/.test(n));
+  const invEntryName = names.find((n) => /^vaults\/.+\/inventory\.json$/.test(n));
+  assert.ok(dbEntryName && invEntryName, 'each vault carries its DB snapshot + inventory');
+  const registry = JSON.parse(payload.readAsText('registry.json'));
+  assert.ok(Array.isArray(registry.vaults) && registry.vaults.length >= 1, 'registry lists the vaults');
 
   // The DB snapshot inside is a valid SQLite file with the scrubbed settings row.
   const snapshotFile = path.join(root, 'snapshot-check.sqlite');
-  await writeFile(snapshotFile, payload.getEntry('database.sqlite').getData());
+  await writeFile(snapshotFile, payload.getEntry(dbEntryName).getData());
   const snap = new Database(snapshotFile, { readonly: true });
   const snapSettings = JSON.parse(snap.prepare("SELECT value FROM settings WHERE key = 'app'").get().value);
   assert.equal(snapSettings.mcpToken, undefined, 'token scrubbed inside the DB snapshot too');
@@ -143,7 +163,8 @@ try {
   const manual = await exportImport.createBackupArchive({ password: 'clave-manual-larga', includeSecrets: true, appVersion: 'x' });
   const manualZip = new AdmZip(manual);
   const manualManifest = JSON.parse(manualZip.readAsText('manifest.json'));
-  assert.equal(manualManifest.formatVersion, 2, 'manual export stays v2');
+  assert.equal(manualManifest.formatVersion, 4, 'manual export is v4 (multi-vault) with secrets');
+  assert.equal(manualManifest.includesSecrets, true, 'manual export includes secrets');
   const manualPayload = new AdmZip(
     crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), 'clave-manual-larga', manualManifest.cipher)
   );

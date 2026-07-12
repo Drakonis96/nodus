@@ -30,7 +30,7 @@ function decodeXmlEntities(text: string): string {
 
 /** Pick the delimiter that appears most on the first non-empty line (outside quotes). */
 export function detectDelimiter(text: string): string {
-  const firstLine = text.replace(/^﻿/, '').split(/\r?\n/).find((line) => line.trim() !== '') ?? '';
+  const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/).find((line) => line.trim() !== '') ?? '';
   let best = ',';
   let bestCount = -1;
   for (const delim of DELIMITERS) {
@@ -54,7 +54,7 @@ export function detectDelimiter(text: string): string {
  * both LF and CRLF. The delimiter is auto-detected when not given.
  */
 export function parseCsv(input: string, delimiter?: string): string[][] {
-  const text = input.replace(/^﻿/, '');
+  const text = input.replace(/^\uFEFF/, '');
   const delim = delimiter ?? detectDelimiter(text);
   const rows: string[][] = [];
   let row: string[] = [];

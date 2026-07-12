@@ -1,5 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+
+/** Track whether the light theme is active (App stamps `.light` on <html>). */
+export function useIsLightTheme(): boolean {
+  const [light, setLight] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('light')
+  );
+  useEffect(() => {
+    const el = document.documentElement;
+    const update = () => setLight(el.classList.contains('light'));
+    update();
+    const obs = new MutationObserver(update);
+    obs.observe(el, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+  return light;
+}
 
 const DATA_CHANGED_EVENT = 'nodus:data-changed';
 const DISMISSABLE_LAYER_OPEN_EVENT = 'nodus:dismissable-layer-open';

@@ -474,6 +474,55 @@ body {
   @apply bg-white border-neutral-200;
 }
 
+/* Opaque surface for dialogs/modals: the translucent .card lets the dimmed page
+ * bleed through, which reads as a bug when floated over the scrim. Use this for any
+ * modal panel instead of .card. */
+.card-modal {
+  @apply bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl;
+}
+.light .card-modal {
+  @apply bg-white border-neutral-200;
+}
+
+/* ── Leaflet map (PlacesMap): real OpenStreetMap tiles ───────────────────────
+ * Reset the default white div-icon box (our markers draw their own chip), theme the
+ * popups to match the app, and darken the raster tiles with a CSS filter in dark
+ * mode (OSM has no free no-key dark style). */
+.leaflet-container {
+  background: #0b1220;
+  font: inherit;
+}
+.leaflet-container.pm-dark {
+  background: #0b1220;
+}
+.leaflet-div-icon.pm-marker {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.pm-dark .leaflet-tile {
+  filter: brightness(0.7) invert(1) contrast(1.05) hue-rotate(180deg) saturate(0.8) brightness(0.95);
+}
+.pm-popup-dark .leaflet-popup-content-wrapper,
+.pm-popup-dark .leaflet-popup-tip {
+  background: #18181b;
+  color: #f4f4f5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+.leaflet-popup-content {
+  margin: 8px 10px;
+}
+.leaflet-control-attribution {
+  font-size: 10px;
+}
+.pm-dark .leaflet-control-attribution {
+  background: rgba(24, 24, 27, 0.8);
+  color: #a1a1aa;
+}
+.pm-dark .leaflet-control-attribution a {
+  color: #818cf8;
+}
+
 .btn {
   @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
 }

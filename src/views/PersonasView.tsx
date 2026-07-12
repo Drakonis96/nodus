@@ -198,7 +198,7 @@ function KinReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="font-semibold">{t('Parentescos sugeridos')}</h2>
@@ -303,7 +303,7 @@ function MatchReviewModal({ onClose, onChanged }: { onClose: () => void; onChang
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h2 className="font-semibold">{t('Posibles coincidencias')}</h2>
@@ -409,7 +409,7 @@ function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card w-full max-w-md space-y-3 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal w-full max-w-md space-y-3 p-5" onClick={(e) => e.stopPropagation()}>
         <h2 className="font-semibold">{t('Añadir persona')}</h2>
         <input
           className="input h-9 w-full text-sm"

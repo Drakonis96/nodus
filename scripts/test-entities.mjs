@@ -96,6 +96,22 @@ try {
   const juanEvents = repo.listEvents({ personId: juan.personId });
   assert.ok(juanEvents.length >= 3 && juanEvents.every((e) => e.type !== 'other'), 'person filter narrows the timeline');
 
+  // ── Manual record editing (person fields, name variants, event edit/delete) ──
+  const editedPerson = repo.updatePerson(juan.personId, { deathDate: '1879', notes: 'jornalero' });
+  assert.equal(editedPerson.deathDate, '1879', 'person death date edited by hand');
+  assert.equal(editedPerson.notes, 'jornalero', 'person notes edited by hand');
+  repo.addPersonName(juan.personId, 'Juanito', 'apodo');
+  assert.ok(
+    repo.listPersons({ search: 'juanito' }).some((p) => p.personId === juan.personId),
+    'a hand-added name variant is searchable'
+  );
+  const occ = repo.createEvent({ type: 'occupation', date: '1876', notes: 'jornalero', participants: [{ personId: juan.personId, role: 'principal' }] });
+  const editedEvent = repo.updateEvent(occ.eventId, { date: '1877', notes: 'labrador' });
+  assert.equal(editedEvent.date, '1877', 'event date edited');
+  assert.equal(editedEvent.notes, 'labrador', 'event notes edited');
+  repo.deleteEvent(occ.eventId);
+  assert.equal(repo.getEvent(occ.eventId), null, 'event deleted (records stay net-4)');
+
   // ── Evidence ──────────────────────────────────────────────────────────────
   repo.addRecordEvidence({
     targetKind: 'person',
@@ -112,6 +128,31 @@ try {
 
   const counts = repo.recordCounts();
   assert.deepEqual(counts, { persons: 2, places: 1, events: 4 });
+
+  // ── Per-person place records (the map) ─────────────────────────────────────
+  const pp = require(path.join(repoRoot, 'electron/db/personPlacesRepo.ts'));
+  const carmona = repo.findOrCreateGazetteerPlace({ gazetteerId: 'geonames:2520118', name: 'Carmona', admin1: 'Andalusia', country: 'Spain', countryCode: 'ES', latitude: 37.47, longitude: -5.64 });
+  const carmonaAgain = repo.findOrCreateGazetteerPlace({ gazetteerId: 'geonames:2520118', name: 'Carmona', latitude: 37.47, longitude: -5.64 });
+  assert.equal(carmonaAgain.placeId, carmona.placeId, 'a gazetteer place is reused by its stable id, not duplicated');
+  assert.equal(carmona.admin1, 'Andalusia', 'gazetteer place carries admin1/country');
+  const sevillaCity = repo.findOrCreateGazetteerPlace({ gazetteerId: 'geonames:2510911', name: 'Sevilla', admin1: 'Andalusia', country: 'Spain', countryCode: 'ES', latitude: 37.39, longitude: -5.98 });
+
+  pp.addPersonPlace({ personId: juan.personId, placeId: sevillaCity.placeId, label: 'migration', date: '1875' });
+  pp.addPersonPlace({ personId: juan.personId, placeId: carmona.placeId, label: 'birth', date: 'c. 1850' });
+  const juanPlaces = pp.listPersonPlaces(juan.personId);
+  assert.equal(juanPlaces.length, 2, 'person place records listed');
+  assert.equal(juanPlaces[0].placeName, 'Carmona', 'ordered chronologically (birth c.1850 before 1875)');
+  assert.equal(juanPlaces[0].admin1, 'Andalusia', 'the place geography is joined for display');
+
+  const points = pp.mapPoints([juan.personId]);
+  assert.equal(points.length, 2, 'both located points surface on the map');
+  assert.ok(points.every((p) => p.latitude != null && p.longitude != null), 'map points are located');
+  assert.equal(points[0].personName, 'Juan Pérez', 'a point carries the person identity for its thumbnail');
+
+  const updatedPlace = pp.updatePersonPlace(juanPlaces[0].id, { label: 'residence', date: '1852' });
+  assert.equal(updatedPlace.label, 'residence', 'person place edited');
+  pp.deletePersonPlace(juanPlaces[1].id);
+  assert.equal(pp.listPersonPlaces(juan.personId).length, 1, 'person place deleted');
 
   // ── Portraits (non-destructive framing, stored out of the person row) ──────
   assert.equal(repo.getPerson(juan.personId).portrait, null, 'no portrait initially');
@@ -141,6 +182,9 @@ try {
   );
   // The marriage event survives; María's participation remains.
   assert.equal(repo.getEvent(marriage.eventId).participants.length, 1, 'event keeps its other participant');
+  // Per-person place records cascade away with the person.
+  assert.equal(pp.listPersonPlaces(juan.personId).length, 0, 'person places cascade away');
+  assert.equal(pp.mapPoints([juan.personId]).length, 0, 'the person leaves no map points behind');
 
   console.log('Entities repository test passed!');
 } finally {

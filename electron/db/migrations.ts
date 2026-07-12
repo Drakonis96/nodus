@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 42;
+export const SCHEMA_VERSION = 44;
 
 export const migrations: Migration[] = [
   {
@@ -1301,6 +1301,83 @@ export const migrations: Migration[] = [
       ALTER TABLE archive_items ADD COLUMN embedding_model TEXT;
       ALTER TABLE archive_items ADD COLUMN embedding_dim INTEGER;
       ALTER TABLE archive_items ADD COLUMN embedding_text_hash TEXT;
+    `,
+  },
+  {
+    version: 43,
+    up: /* sql */ `
+      -- Social-relations network: a SECOND graph, independent from the kinship tree,
+      -- for the connections a person had beyond family (patrons, friends, employers,
+      -- rivals, correspondents...) — the material a social/prosopographical historian
+      -- works with. A social_contact is a lightweight node for someone who is known
+      -- ONLY through a relation (not themselves a tree member); 'notes' holds whatever
+      -- the user knows about them, free text. Contacts never author relations — only
+      -- persons in the kinship tree do (a relation is recorded from a person's ficha).
+      CREATE TABLE social_contacts (
+        contact_id   TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        notes        TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_social_contacts_name ON social_contacts(display_name);
+
+      -- A directed, typed connection recorded from person_id's ficha ("who they
+      -- knew"). role is free text from person_id's perspective (amigo, patrón,
+      -- socio...). The target is polymorphic (mirrors record_evidence's
+      -- target_kind/target_id pattern): either another tree person or a
+      -- social_contact, so the two graphs can interconnect without merging their
+      -- ontologies. notes is markdown, about the connection itself (distinct from a
+      -- contact's own notes, which describe the person).
+      CREATE TABLE social_relations (
+        relation_id TEXT PRIMARY KEY,
+        person_id   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        target_kind TEXT NOT NULL,   -- 'contact' | 'person'
+        target_id   TEXT NOT NULL,
+        role        TEXT NOT NULL,
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_social_relations_person ON social_relations(person_id);
+      CREATE INDEX idx_social_relations_target ON social_relations(target_kind, target_id);
+    `,
+  },
+  {
+    version: 44,
+    up: /* sql */ `
+      -- Places gain a gazetteer identity so the map's place picker can resolve a
+      -- typed name to a real, unique populated place (GeoNames): gazetteer_id is the
+      -- stable external id (e.g. 'geonames:2520118'), admin1/country are the
+      -- state/province and country names for display ("municipio, estado, país"),
+      -- country_code is the ISO code. All nullable — a hand-entered place with just
+      -- coordinates still works. A partial unique index keeps one row per gazetteer
+      -- entry so the same city links many people to a single place node.
+      ALTER TABLE places ADD COLUMN gazetteer_id TEXT;
+      ALTER TABLE places ADD COLUMN admin1 TEXT;
+      ALTER TABLE places ADD COLUMN country TEXT;
+      ALTER TABLE places ADD COLUMN country_code TEXT;
+      CREATE UNIQUE INDEX idx_places_gazetteer ON places(gazetteer_id) WHERE gazetteer_id IS NOT NULL;
+
+      -- A person's PLACE RECORD: the log of places associated with a person, which
+      -- drives their individual map and (aggregated) the general map. Independent
+      -- from events — a place can be logged without a full event — though the two
+      -- coexist. label is the kind of association (birth, residence, death, other);
+      -- date is a free-text (possibly fuzzy) date with a sortable key so the map's
+      -- chronological slider and the migration path can order the stops.
+      CREATE TABLE person_places (
+        id         TEXT PRIMARY KEY,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        place_id   TEXT NOT NULL REFERENCES places(place_id) ON DELETE CASCADE,
+        label      TEXT,
+        date       TEXT,
+        date_sort  TEXT,
+        notes      TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_person_places_person ON person_places(person_id);
+      CREATE INDEX idx_person_places_place ON person_places(place_id);
     `,
   },
 ];

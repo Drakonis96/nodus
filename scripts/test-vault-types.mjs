@@ -47,10 +47,15 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('academic + estudio + primary_sources + genealogy are all selectable', () => {
+test('academic + genealogy are selectable this release; estudio/primary_sources/databases are declared but gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'estudio', 'primary_sources', 'genealogy']);
+  assert.deepEqual(ids, ['academic', 'genealogy']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
+  for (const gated of ['estudio', 'primary_sources', 'databases']) {
+    assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
+  }
+  // Order shown in the picker: shipped types first, then the coming-soon ones.
+  assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases']);
 });
 
 test('the tree view is scoped to genealogy only', () => {

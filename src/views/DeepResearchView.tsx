@@ -8,6 +8,7 @@ import type {
   DeepResearchProgress,
   DeepResearchSectionLimit,
   DeepResearchTargetLength,
+  Person,
   PromptLanguage,
   WritingWorkshopSavedDraft,
   DecorativeImage,
@@ -86,6 +87,8 @@ export function DeepResearchView({
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [includeImage, setIncludeImage] = useState(false);
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
+  const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
+  const [personsList, setPersonsList] = useState<Person[]>([]);
 
   // Data.
   const [savedDrafts, setSavedDrafts] = useState<WritingWorkshopSavedDraft[]>([]);
@@ -119,6 +122,17 @@ export function DeepResearchView({
 
   useEffect(() => subscribeBackgroundJob(DEEP_RESEARCH_MAIN_JOB_KEY, setDeepJob), []);
   useEffect(() => subscribeDeepResearchQueue(setQueue), []);
+
+  useEffect(() => {
+    if (!composerOpen || !isGenealogy) return;
+    let cancelled = false;
+    void window.nodus.listPersons().then((list) => {
+      if (!cancelled) setPersonsList([...list].sort((a, b) => a.displayName.localeCompare(b.displayName)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [composerOpen, isGenealogy]);
 
   const refreshSavedDrafts = useCallback(async () => {
     setLoadingSavedDrafts(true);
@@ -162,9 +176,11 @@ export function DeepResearchView({
       sectionLimit: deepSectionLimit,
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
+      ...(isGenealogy ? { focusPersonId } : {}),
     });
     setComposerOpen(false);
     setObjective('');
+    setFocusPersonId(null);
     setError(null);
     setMessage(t('Informe añadido a la cola. Se generará en segundo plano.'));
   };
@@ -187,6 +203,7 @@ export function DeepResearchView({
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     if (saved.model) setSelectedModel(saved.model);
+    setFocusPersonId(null);
     setComposerOpen(true);
   };
 
@@ -514,6 +531,8 @@ export function DeepResearchView({
           imageStyle={imageStyle}
           hasModel={hasModel}
           queuedCount={activeQueue.length}
+          persons={personsList}
+          focusPersonId={focusPersonId}
           onObjective={setObjective}
           onLanguage={setLanguage}
           onModel={setSelectedModel}
@@ -521,6 +540,7 @@ export function DeepResearchView({
           onSectionLimit={setDeepSectionLimit}
           onIncludeImage={setIncludeImage}
           onImageStyle={setImageStyle}
+          onFocusPerson={setFocusPersonId}
           onSubmit={submitComposer}
           onClose={() => setComposerOpen(false)}
         />
@@ -881,6 +901,8 @@ function ComposerModal({
   imageStyle,
   hasModel,
   queuedCount,
+  persons = [],
+  focusPersonId = null,
   onObjective,
   onLanguage,
   onModel,
@@ -888,6 +910,7 @@ function ComposerModal({
   onSectionLimit,
   onIncludeImage,
   onImageStyle,
+  onFocusPerson,
   onSubmit,
   onClose,
 }: {
@@ -902,6 +925,8 @@ function ComposerModal({
   imageStyle: DecorativeImageStyle;
   hasModel: boolean;
   queuedCount: number;
+  persons?: Person[];
+  focusPersonId?: string | null;
   onObjective: (v: string) => void;
   onLanguage: (v: PromptLanguage) => void;
   onModel: (m: AppSettings['deepResearchModel']) => void;
@@ -909,6 +934,7 @@ function ComposerModal({
   onSectionLimit: (v: DeepResearchSectionLimit) => void;
   onIncludeImage: (v: boolean) => void;
   onImageStyle: (v: DecorativeImageStyle) => void;
+  onFocusPerson?: (v: string | null) => void;
   onSubmit: () => void;
   onClose: () => void;
 }) {
@@ -956,6 +982,26 @@ function ComposerModal({
                 : t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
             }
           />
+          {isGenealogy && (
+            <div>
+              <select
+                className="input text-sm"
+                value={focusPersonId ?? ''}
+                onChange={(e) => onFocusPerson?.(e.target.value || null)}
+              >
+                <option value="">{t('Toda la familia (sin persona en foco)')}</option>
+                {persons.map((p) => (
+                  <option key={p.personId} value={p.personId}>
+                    {p.displayName}
+                    {p.birthDate ? ` (${p.birthDate})` : ''}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                {t('Opcional: centra el informe en la biografía documentada de una persona concreta.')}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
             <select className="input text-sm" value={target} onChange={(e) => onTarget(e.target.value as DeepResearchTargetLength)}>
               {Object.entries(DEEP_TARGET_LABELS).map(([id, label]) => (

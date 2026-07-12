@@ -72,6 +72,8 @@ import type {
   VaultType,
   PersonInput,
   PlaceInput,
+  GazetteerPlace,
+  PersonPlaceInput,
   EventInput,
   ParticipantRole,
   HistoricalEventType,
@@ -80,6 +82,8 @@ import type {
   RelationshipType,
   RelationshipProvenance,
   RelationshipSubtype,
+  SocialContactInput,
+  SocialRelationInput,
   ArchiveItemInput,
   ArchiveListOptions,
   DecorativeImageActionRequest,
@@ -105,6 +109,7 @@ import { listImageModels } from './ai/imageModels';
 import {
   applyDecorativeImageOption,
   deleteDecorativeImage,
+  generatePersonPortraitFromDescription,
   interruptDecorativeImageGenerations,
   invalidateDecorativeImageGeneration,
   queueDecorativeImageGeneration,
@@ -237,6 +242,7 @@ import {
   listPlaces,
   updatePlace,
   findOrCreatePlace,
+  findOrCreateGazetteerPlace,
   createEvent,
   updateEvent,
   getEvent,
@@ -282,6 +288,28 @@ import {
 } from './db/relationshipsRepo';
 import { importGedcom, exportGedcom } from './genealogy/gedcomBridge';
 import { findMatchCandidates, mergePersons, dismissMatch } from './db/matchRepo';
+import {
+  listSocialContacts,
+  getSocialContact,
+  createSocialContact,
+  updateSocialContact,
+  deleteSocialContact,
+  listSocialRelationsForPerson,
+  listSocialRelationsTargetingPerson,
+  listSocialRelationsTargetingContact,
+  createSocialRelation,
+  updateSocialRelation,
+  deleteSocialRelation,
+  socialGraph,
+} from './db/socialRepo';
+import { searchGazetteer } from './geo/gazetteer';
+import {
+  addPersonPlace,
+  updatePersonPlace,
+  deletePersonPlace,
+  listPersonPlaces,
+  mapPoints,
+} from './db/personPlacesRepo';
 import {
   listOpenSuggestions,
   listSuggestionsForPerson,
@@ -536,10 +564,34 @@ export function registerIpc(
   h('entities:clearPersonPortrait', async (_e, personId: string) => {
     clearPersonPortrait(personId);
   });
+  h('entities:generatePersonPortraitReference', async (_e, personId: string, description: string) => {
+    await generatePersonPortraitFromDescription(personId, description);
+    return getPerson(personId);
+  });
   h('entities:listPlaces', async () => listPlaces());
   h('entities:createPlace', async (_e, input: PlaceInput) => createPlace(input));
   h('entities:findOrCreatePlace', async (_e, name: string, kind?: string | null) => findOrCreatePlace(name, kind ?? null));
   h('entities:updatePlace', async (_e, id: string, patch: Partial<PlaceInput>) => updatePlace(id, patch));
+  // Offline gazetteer + per-person place records (map)
+  h('geo:search', async (_e, query: string, limit?: number) => searchGazetteer(query, limit ?? 12));
+  h('geo:resolve', async (_e, place: GazetteerPlace) =>
+    findOrCreateGazetteerPlace({
+      gazetteerId: place.gazetteerId,
+      name: place.name,
+      admin1: place.admin1,
+      country: place.country,
+      countryCode: place.countryCode,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    })
+  );
+  h('places:listForPerson', async (_e, personId: string) => listPersonPlaces(personId));
+  h('places:add', async (_e, input: PersonPlaceInput) => addPersonPlace(input));
+  h('places:update', async (_e, id: string, patch: Partial<PersonPlaceInput>) => updatePersonPlace(id, patch));
+  h('places:delete', async (_e, id: string) => {
+    deletePersonPlace(id);
+  });
+  h('places:mapPoints', async (_e, personIds?: string[]) => mapPoints(personIds));
   h('entities:listEvents', async (
     _e,
     opts?: { personId?: string; type?: HistoricalEventType; from?: string; to?: string }
@@ -588,6 +640,23 @@ export function registerIpc(
   h('entities:dismissMatch', async (_e, a: string, b: string) => {
     dismissMatch(a, b);
   });
+  // Social-relations network (independent from kinship)
+  h('social:listContacts', async (_e, search?: string) => listSocialContacts({ search }));
+  h('social:getContact', async (_e, id: string) => getSocialContact(id));
+  h('social:createContact', async (_e, input: SocialContactInput) => createSocialContact(input));
+  h('social:updateContact', async (_e, id: string, patch: Partial<SocialContactInput>) => updateSocialContact(id, patch));
+  h('social:deleteContact', async (_e, id: string) => {
+    deleteSocialContact(id);
+  });
+  h('social:listRelationsForPerson', async (_e, personId: string) => listSocialRelationsForPerson(personId));
+  h('social:listRelationsTargetingPerson', async (_e, personId: string) => listSocialRelationsTargetingPerson(personId));
+  h('social:listRelationsTargetingContact', async (_e, contactId: string) => listSocialRelationsTargetingContact(contactId));
+  h('social:createRelation', async (_e, input: SocialRelationInput) => createSocialRelation(input));
+  h('social:updateRelation', async (_e, id: string, patch: Partial<SocialRelationInput>) => updateSocialRelation(id, patch));
+  h('social:deleteRelation', async (_e, id: string) => {
+    deleteSocialRelation(id);
+  });
+  h('social:graph', async () => socialGraph());
   // Evidence-driven kinship suggestions (AI proposes, the user disposes)
   h('kinship:listSuggestions', async () => listOpenSuggestions());
   h('kinship:suggestionsForPerson', async (_e, personId: string) => listSuggestionsForPerson(personId));

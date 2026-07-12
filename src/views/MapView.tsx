@@ -1,236 +1,201 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { HistoricalEvent, Person, Place } from '@shared/types';
-import { buildMigrationPath, type MigrationStop } from '@shared/mapProjection';
+import type { MapPlacePoint } from '@shared/types';
+import { pointsYearRange, filterPointsByYear } from '@shared/mapProjection';
+import { PlacesMap } from '../components/PlacesMap';
 import { Icon } from '../components/ui';
-import { t } from '../i18n';
+import { useDismissableLayer } from '../hooks';
+import { t, tx } from '../i18n';
 
-const W = 1000;
-const H = 560;
-const PADDING = 0.15; // fraction of span to pad the auto-fit bounds
+// The general map: every located person-place, filterable by person (all / one /
+// several) and swept by a chronological slider. Portrait thumbnails, per-person
+// migration routes and an auto-fitting basemap all come from <PlacesMap>. Selecting
+// no one shows the whole family; the view scales from a village to a world map.
 
-interface Bounds {
-  minLat: number;
-  maxLat: number;
-  minLon: number;
-  maxLon: number;
-}
-
-function boundsOf(located: Place[]): Bounds {
-  if (located.length === 0) return { minLat: -60, maxLat: 75, minLon: -170, maxLon: 175 };
-  let minLat = 90;
-  let maxLat = -90;
-  let minLon = 180;
-  let maxLon = -180;
-  for (const p of located) {
-    minLat = Math.min(minLat, p.latitude!);
-    maxLat = Math.max(maxLat, p.latitude!);
-    minLon = Math.min(minLon, p.longitude!);
-    maxLon = Math.max(maxLon, p.longitude!);
-  }
-  const latPad = Math.max(0.5, (maxLat - minLat) * PADDING);
-  const lonPad = Math.max(0.5, (maxLon - minLon) * PADDING);
-  return { minLat: minLat - latPad, maxLat: maxLat + latPad, minLon: minLon - lonPad, maxLon: maxLon + lonPad };
-}
-
-function makeProjector(b: Bounds) {
-  const lonSpan = Math.max(1e-6, b.maxLon - b.minLon);
-  const latSpan = Math.max(1e-6, b.maxLat - b.minLat);
-  return (lat: number, lon: number) => ({
-    x: ((lon - b.minLon) / lonSpan) * W,
-    y: ((b.maxLat - lat) / latSpan) * H,
-  });
+interface PersonOption {
+  personId: string;
+  personName: string;
 }
 
 export function MapView() {
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [persons, setPersons] = useState<Person[]>([]);
-  const [personId, setPersonId] = useState('');
-  const [events, setEvents] = useState<HistoricalEvent[]>([]);
-  const [editing, setEditing] = useState<Place | null>(null);
+  const [allPoints, setAllPoints] = useState<MapPlacePoint[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // empty = all
+  const [year, setYear] = useState<number | null>(null);
+  const [playing, setPlaying] = useState(false);
 
   const reload = useCallback(async () => {
-    setPlaces(await window.nodus.listPlaces());
-    setPersons(await window.nodus.listPersons());
+    setAllPoints(await window.nodus.mapPoints());
   }, []);
-
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // The people who actually have located places (dedup, sorted).
+  const personOptions = useMemo<PersonOption[]>(() => {
+    const byId = new Map<string, PersonOption>();
+    for (const p of allPoints) if (!byId.has(p.personId)) byId.set(p.personId, { personId: p.personId, personName: p.personName });
+    return [...byId.values()].sort((a, b) => a.personName.localeCompare(b.personName));
+  }, [allPoints]);
+
+  const personFiltered = useMemo(
+    () => (selected.size === 0 ? allPoints : allPoints.filter((p) => selected.has(p.personId))),
+    [allPoints, selected]
+  );
+
+  const yearRange = useMemo(() => pointsYearRange(personFiltered), [personFiltered]);
+
+  // Keep the slider valid as the filter changes; default to the latest year (all shown).
   useEffect(() => {
-    if (personId) void window.nodus.listEvents({ personId }).then(setEvents);
-    else setEvents([]);
-  }, [personId]);
-
-  const located = useMemo(() => places.filter((p) => p.latitude != null && p.longitude != null), [places]);
-  const bounds = useMemo(() => boundsOf(located), [located]);
-  const project = useMemo(() => makeProjector(bounds), [bounds]);
-  const placeById = useMemo(() => new Map(places.map((p) => [p.placeId, p])), [places]);
-
-  const route = useMemo(() => {
-    if (!personId) return [] as MigrationStop[];
-    const stops: MigrationStop[] = [];
-    for (const e of events) {
-      const place = e.placeId ? placeById.get(e.placeId) : undefined;
-      if (place?.latitude != null && place.longitude != null) {
-        stops.push({
-          placeId: place.placeId,
-          placeName: place.name,
-          date: e.date,
-          sortKey: e.sortKey,
-          lat: place.latitude,
-          lon: place.longitude,
-        });
-      }
+    if (!yearRange) {
+      setYear(null);
+      return;
     }
-    return buildMigrationPath(stops);
-  }, [personId, events, placeById]);
+    setYear((y) => (y == null || y < yearRange.min || y > yearRange.max ? yearRange.max : y));
+  }, [yearRange?.min, yearRange?.max]);
 
-  const unlocated = places.length - located.length;
+  // Play sweeps the slider forward once, then stops at the end.
+  useEffect(() => {
+    if (!playing || !yearRange) return;
+    const id = window.setInterval(() => {
+      setYear((y) => {
+        const next = (y ?? yearRange.min) + 1;
+        if (next >= yearRange.max) {
+          setPlaying(false);
+          return yearRange.max;
+        }
+        return next;
+      });
+    }, 550);
+    return () => window.clearInterval(id);
+  }, [playing, yearRange?.min, yearRange?.max]);
+
+  const shownPoints = useMemo(() => filterPointsByYear(personFiltered, year), [personFiltered, year]);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 p-4">
         <Icon name="map" size={20} className="text-indigo-300" />
         <h1 className="text-lg font-semibold">{t('Mapa')}</h1>
-        <select
-          className="input h-9 max-w-[16rem] text-sm"
-          value={personId}
-          onChange={(e) => setPersonId(e.target.value)}
-          title={t('Trazar la migración de…')}
-        >
-          <option value="">{t('Sin ruta de migración')}</option>
-          {persons.map((p) => (
-            <option key={p.personId} value={p.personId}>
-              {p.displayName}
-            </option>
-          ))}
-        </select>
-        {unlocated > 0 && (
-          <span className="ml-auto text-xs text-neutral-500">
-            {t('{n} lugares sin coordenadas').replace('{n}', String(unlocated))}
-          </span>
+
+        <PersonFilter options={personOptions} selected={selected} onToggle={toggle} onClear={() => setSelected(new Set())} />
+
+        {yearRange && (
+          <div className="flex items-center gap-2">
+            <button
+              className="btn btn-ghost h-8 w-8 border border-neutral-700 p-0"
+              title={playing ? t('Pausa') : t('Reproducir la línea temporal')}
+              onClick={() => setPlaying((v) => !v)}
+              disabled={yearRange.min === yearRange.max}
+            >
+              <Icon name={playing ? 'pause' : 'play'} size={13} />
+            </button>
+            <input
+              type="range"
+              min={yearRange.min}
+              max={yearRange.max}
+              value={year ?? yearRange.max}
+              onChange={(e) => {
+                setPlaying(false);
+                setYear(Number(e.target.value));
+              }}
+              className="w-40"
+              title={t('Línea cronológica')}
+            />
+            <span className="w-24 text-xs tabular-nums text-neutral-400">
+              {year != null && year < yearRange.max ? tx('hasta {y}', { y: year }) : t('todo')}
+            </span>
+          </div>
         )}
+
+        <span className="ml-auto text-xs text-neutral-500">
+          {tx('{n} ubicaciones', { n: shownPoints.length })}
+        </span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-4">
-        {located.length === 0 ? (
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        {allPoints.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Icon name="map" size={30} className="text-neutral-600" />
             <p className="max-w-md text-sm text-neutral-500">
-              {t('Ningún lugar tiene coordenadas todavía. Añádelas a los lugares para verlos en el mapa; todo funciona sin conexión.')}
+              {t('Ningún lugar localizado todavía. Abre la ficha de una persona y añade sus lugares (municipio, estado, país); aparecerán aquí sobre el mapa.')}
             </p>
           </div>
         ) : (
-          <svg viewBox={`0 0 ${W} ${H}`} className="w-full rounded-lg border border-neutral-800 bg-neutral-950/60">
-            {/* Graticule every ~10° for a geographic frame (no tile server). */}
-            {gridLines(bounds, project)}
-            {/* Migration route. */}
-            {route.length > 1 && (
-              <polyline
-                points={route.map((s) => { const p = project(s.lat, s.lon); return `${p.x},${p.y}`; }).join(' ')}
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth={2}
-                strokeDasharray="6 4"
-                markerEnd="url(#arrow)"
-              />
-            )}
-            <defs>
-              <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="#6366f1" />
-              </marker>
-            </defs>
-            {/* Places. */}
-            {located.map((pl) => {
-              const p = project(pl.latitude!, pl.longitude!);
-              const onRoute = route.some((s) => s.placeId === pl.placeId);
-              return (
-                <g key={pl.placeId} transform={`translate(${p.x}, ${p.y})`} style={{ cursor: 'pointer' }} onClick={() => setEditing(pl)}>
-                  <circle r={onRoute ? 6 : 4.5} fill={onRoute ? '#818cf8' : '#f59e0b'} stroke="#0a0a0a" strokeWidth={1.5} />
-                  <text x={8} y={4} fill="#d4d4d8" fontSize={12}>
-                    {pl.name}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
+          <PlacesMap points={shownPoints} fitPoints={personFiltered} showRoutes />
         )}
       </div>
-
-      {editing && (
-        <PlaceCoordsModal
-          place={editing}
-          onClose={() => setEditing(null)}
-          onSaved={async () => {
-            setEditing(null);
-            await reload();
-          }}
-        />
-      )}
     </div>
   );
 }
 
-function gridLines(bounds: Bounds, project: (lat: number, lon: number) => { x: number; y: number }) {
-  const lines: JSX.Element[] = [];
-  const step = 10;
-  const startLon = Math.ceil(bounds.minLon / step) * step;
-  for (let lon = startLon; lon <= bounds.maxLon; lon += step) {
-    const a = project(bounds.maxLat, lon);
-    const b = project(bounds.minLat, lon);
-    lines.push(<line key={`lon${lon}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#27272a" strokeWidth={1} />);
-  }
-  const startLat = Math.ceil(bounds.minLat / step) * step;
-  for (let lat = startLat; lat <= bounds.maxLat; lat += step) {
-    const a = project(lat, bounds.minLon);
-    const b = project(lat, bounds.maxLon);
-    lines.push(<line key={`lat${lat}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#27272a" strokeWidth={1} />);
-  }
-  return lines;
-}
+function PersonFilter({
+  options,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  options: PersonOption[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useDismissableLayer<HTMLDivElement>({ open, onDismiss: () => setOpen(false) });
 
-function PlaceCoordsModal({ place, onClose, onSaved }: { place: Place; onClose: () => void; onSaved: () => Promise<void> }) {
-  const [lat, setLat] = useState(place.latitude != null ? String(place.latitude) : '');
-  const [lon, setLon] = useState(place.longitude != null ? String(place.longitude) : '');
-  const [busy, setBusy] = useState(false);
+  const label =
+    selected.size === 0
+      ? t('Todas las personas')
+      : selected.size === 1
+        ? options.find((o) => selected.has(o.personId))?.personName ?? tx('{n} seleccionadas', { n: 1 })
+        : tx('{n} seleccionadas', { n: selected.size });
 
-  const save = async () => {
-    setBusy(true);
-    try {
-      await window.nodus.updatePlace(place.placeId, {
-        latitude: lat.trim() === '' ? null : Number(lat),
-        longitude: lon.trim() === '' ? null : Number(lon),
-      });
-      await onSaved();
-    } finally {
-      setBusy(false);
-    }
-  };
+  const filtered = q.trim() ? options.filter((o) => o.personName.toLowerCase().includes(q.trim().toLowerCase())) : options;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card w-full max-w-sm space-y-3 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-semibold">{place.name}</h2>
-        <p className="text-xs text-neutral-500">{t('Coordenadas (grados decimales). Se guardan localmente.')}</p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1">
-            <span className="text-xs text-neutral-500">{t('Latitud')}</span>
-            <input className="input h-9 w-full text-sm" value={lat} onChange={(e) => setLat(e.target.value)} placeholder="37.39" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs text-neutral-500">{t('Longitud')}</span>
-            <input className="input h-9 w-full text-sm" value={lon} onChange={(e) => setLon(e.target.value)} placeholder="-5.99" />
-          </label>
-        </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <button className="btn btn-ghost" onClick={onClose}>
-            {t('Cancelar')}
+    <div className="relative" ref={ref}>
+      <button className="btn btn-ghost h-9 gap-1.5 border border-neutral-700 text-sm" onClick={() => setOpen((v) => !v)}>
+        <Icon name="users" size={14} /> <span className="max-w-[12rem] truncate">{label}</span>
+        <Icon name="chevronDown" size={13} />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl">
+          <input
+            className="input mb-1.5 h-8 w-full text-sm"
+            placeholder={t('Buscar persona…')}
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button
+            className={`mb-1 flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm ${selected.size === 0 ? 'text-indigo-300' : 'text-neutral-300 hover:bg-neutral-800'}`}
+            onClick={onClear}
+          >
+            <Icon name={selected.size === 0 ? 'check' : 'minus'} size={13} /> {t('Todas las personas')}
           </button>
-          <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
-            {t('Guardar')}
-          </button>
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.map((o) => (
+              <button
+                key={o.personId}
+                className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm text-neutral-200 hover:bg-neutral-800"
+                onClick={() => onToggle(o.personId)}
+              >
+                <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${selected.has(o.personId) ? 'border-indigo-500 bg-indigo-600' : 'border-neutral-600'}`}>
+                  {selected.has(o.personId) && <Icon name="check" size={10} className="text-white" />}
+                </span>
+                <span className="truncate">{o.personName}</span>
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-2 py-2 text-center text-xs text-neutral-600">{t('Sin coincidencias')}</p>}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

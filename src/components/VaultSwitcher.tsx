@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { VaultSummary, VaultType } from '@shared/types';
-import { availableVaultTypes } from '@shared/vaultTypes';
+import { VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
 import { useDismissableLayer } from '../hooks';
 import { ConfirmModal } from './ConfirmModal';
@@ -35,10 +35,17 @@ export function vaultTypeLabel(type: VaultType): string {
       return t('Fuentes primarias');
     case 'genealogy':
       return t('Genealogía');
+    case 'databases':
+      return t('Bases de datos');
     case 'academic':
     default:
       return t('Académico');
   }
+}
+
+/** Option label for the type picker: unavailable types get a "coming soon" suffix. */
+function vaultTypeOptionLabel(id: VaultType, available: boolean): string {
+  return available ? vaultTypeLabel(id) : `${vaultTypeLabel(id)} (${t('próximamente')})`;
 }
 
 export function VaultSwitcher({
@@ -290,9 +297,9 @@ export function VaultSwitcher({
                   onChange={(event) => setNewVaultType(event.target.value as VaultType)}
                   title={t('Tipo de bóveda')}
                 >
-                  {availableVaultTypes().map((def) => (
-                    <option key={def.id} value={def.id}>
-                      {vaultTypeLabel(def.id)}
+                  {VAULT_TYPES.map((def) => (
+                    <option key={def.id} value={def.id} disabled={!def.available}>
+                      {vaultTypeOptionLabel(def.id, def.available)}
                     </option>
                   ))}
                 </select>
@@ -324,15 +331,13 @@ export function VaultSwitcher({
                   onChange={(event) => void changeActiveType(event.target.value as VaultType)}
                   disabled={busy}
                 >
-                  {availableVaultTypes().map((def) => (
-                    <option key={def.id} value={def.id}>
-                      {vaultTypeLabel(def.id)}
+                  {VAULT_TYPES.map((def) => (
+                    // The vault's own current type stays selectable even if it's
+                    // otherwise gated off (e.g. it was set before this release).
+                    <option key={def.id} value={def.id} disabled={!def.available && def.id !== activeVault.type}>
+                      {vaultTypeOptionLabel(def.id, def.available)}
                     </option>
                   ))}
-                  {/* Keep an unavailable current type visible instead of silently blank. */}
-                  {!availableVaultTypes().some((def) => def.id === activeVault.type) && (
-                    <option value={activeVault.type}>{vaultTypeLabel(activeVault.type)}</option>
-                  )}
                 </select>
               </label>
             )}
