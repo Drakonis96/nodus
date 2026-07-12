@@ -70,6 +70,14 @@ import type {
   VaultSwitchOptions,
   VaultSwitchResult,
   VaultType,
+  PersonInput,
+  PlaceInput,
+  EventInput,
+  ParticipantRole,
+  HistoricalEventType,
+  RecordEvidenceInput,
+  RecordEvidenceTargetKind,
+  ArchiveItemInput,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
@@ -207,6 +215,45 @@ import {
   setVaultType,
 } from './vaults/vaultRegistry';
 import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
+import {
+  createPerson,
+  updatePerson,
+  getPerson,
+  listPersons,
+  deletePerson,
+  addPersonName,
+  createPlace,
+  listPlaces,
+  findOrCreatePlace,
+  createEvent,
+  updateEvent,
+  getEvent,
+  deleteEvent,
+  listEvents,
+  addParticipant,
+  removeParticipant,
+  addRecordEvidence,
+  listEvidenceFor,
+  deleteRecordEvidence,
+  recordCounts,
+} from './db/entitiesRepo';
+import {
+  createFolder,
+  listFolders,
+  renameFolder,
+  deleteFolder,
+  createItem,
+  getItem,
+  getItemBlob,
+  listItems,
+  updateItem,
+  deleteItem,
+  addTag,
+  removeTag,
+  listTags,
+  archiveCounts,
+} from './db/archiveRepo';
+import { ingestArchiveFile } from './archive/archiveIngest';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -408,6 +455,96 @@ export function registerIpc(
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),
   }));
+  // ── Records ontology (persons / places / events / evidence) ────────────────
+  h('entities:counts', async () => recordCounts());
+  h('entities:listPersons', async (_e, search?: string) => listPersons({ search }));
+  h('entities:getPerson', async (_e, id: string) => getPerson(id));
+  h('entities:createPerson', async (_e, input: PersonInput) => createPerson(input));
+  h('entities:updatePerson', async (_e, id: string, patch: Partial<PersonInput>) => updatePerson(id, patch));
+  h('entities:deletePerson', async (_e, id: string) => {
+    deletePerson(id);
+  });
+  h('entities:addPersonName', async (_e, id: string, name: string, kind?: string | null) =>
+    addPersonName(id, name, kind ?? null)
+  );
+  h('entities:listPlaces', async () => listPlaces());
+  h('entities:createPlace', async (_e, input: PlaceInput) => createPlace(input));
+  h('entities:findOrCreatePlace', async (_e, name: string, kind?: string | null) => findOrCreatePlace(name, kind ?? null));
+  h('entities:listEvents', async (
+    _e,
+    opts?: { personId?: string; type?: HistoricalEventType; from?: string; to?: string }
+  ) => listEvents(opts ?? {}));
+  h('entities:getEvent', async (_e, id: string) => getEvent(id));
+  h('entities:createEvent', async (_e, input: EventInput) => createEvent(input));
+  h('entities:updateEvent', async (_e, id: string, patch: Partial<EventInput>) => updateEvent(id, patch));
+  h('entities:deleteEvent', async (_e, id: string) => {
+    deleteEvent(id);
+  });
+  h('entities:addParticipant', async (_e, eventId: string, personId: string, role: ParticipantRole) =>
+    addParticipant(eventId, personId, role)
+  );
+  h('entities:removeParticipant', async (_e, eventId: string, personId: string, role: ParticipantRole) =>
+    removeParticipant(eventId, personId, role)
+  );
+  h('entities:addEvidence', async (_e, input: RecordEvidenceInput) => addRecordEvidence(input));
+  h('entities:listEvidence', async (_e, targetKind: RecordEvidenceTargetKind, targetId: string) =>
+    listEvidenceFor(targetKind, targetId)
+  );
+  h('entities:deleteEvidence', async (_e, id: string) => {
+    deleteRecordEvidence(id);
+  });
+
+  // ── Evidence archive ───────────────────────────────────────────────────────
+  h('archive:counts', async () => archiveCounts());
+  h('archive:listFolders', async () => listFolders());
+  h('archive:createFolder', async (_e, name: string, parentId?: string | null) => createFolder(name, parentId ?? null));
+  h('archive:renameFolder', async (_e, id: string, name: string) => renameFolder(id, name));
+  h('archive:deleteFolder', async (_e, id: string) => {
+    deleteFolder(id);
+  });
+  h('archive:listItems', async (_e, opts?: { folderId?: string | null; tag?: string; search?: string }) =>
+    listItems(opts ?? {})
+  );
+  h('archive:getItem', async (_e, id: string) => getItem(id));
+  h('archive:getItemBlob', async (_e, id: string) => getItemBlob(id));
+  h('archive:createItem', async (_e, input: ArchiveItemInput) => createItem(input));
+  h('archive:updateItem', async (_e, id: string, patch: Partial<ArchiveItemInput>) => updateItem(id, patch));
+  h('archive:deleteItem', async (_e, id: string) => {
+    deleteItem(id);
+  });
+  h('archive:addTag', async (_e, id: string, tag: string) => {
+    addTag(id, tag);
+  });
+  h('archive:removeTag', async (_e, id: string, tag: string) => {
+    removeTag(id, tag);
+  });
+  h('archive:listTags', async () => listTags());
+  h('archive:pickAndIngest', async (_e, folderId?: string | null) => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Añadir al archivo de evidencias',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },
+        { name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { added: 0, duplicates: 0, items: [] };
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    let added = 0;
+    let duplicates = 0;
+    const items = [];
+    for (const filePath of picked.filePaths) {
+      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr });
+      if (result.duplicate) duplicates++;
+      else added++;
+      items.push(result.item);
+    }
+    return { added, duplicates, items };
+  });
+
   h('mcp:status', async () => getMcpStatus());
   h('mcp:regenerateToken', async () => regenerateMcpToken());
   h('copilot:status', async () => getCopilotStatus());

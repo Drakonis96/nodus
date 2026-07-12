@@ -76,6 +76,24 @@ test('prompt pack: academic empty, estudio carries a persona directive', () => {
   assert.match(vt.vaultTypePromptPack('estudio'), /MODO ESTUDIO/);
 });
 
+test('records views are scoped to primary_sources + genealogy only', () => {
+  for (const view of ['persons', 'timeline', 'archive']) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'primary_sources'), true, `${view} allowed for primary_sources`);
+    assert.equal(vt.isViewAllowedForVaultType(view, 'genealogy'), true, `${view} allowed for genealogy`);
+    assert.equal(vt.isViewAllowedForVaultType(view, 'academic'), false, `${view} hidden for academic`);
+    assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), false, `${view} hidden for estudio`);
+  }
+  // Universal views are allowed everywhere.
+  assert.equal(vt.isViewAllowedForVaultType('library', 'academic'), true);
+  assert.equal(vt.isViewAllowedForVaultType('graph', 'genealogy'), true);
+});
+
+test('viewsDisallowedForType lists the scoped views not applicable to a type', () => {
+  const all = ['home', 'library', 'persons', 'timeline', 'archive', 'settings'];
+  assert.deepEqual(vt.viewsDisallowedForType(all, 'academic'), ['persons', 'timeline', 'archive']);
+  assert.deepEqual(vt.viewsDisallowedForType(all, 'primary_sources'), []);
+});
+
 test('effectiveSidebarHidden: preset when untouched, user choice once customised', () => {
   // Untouched → the type preset drives visibility.
   assert.deepEqual(vt.effectiveSidebarHidden([], false, 'estudio'), vt.defaultHiddenViewsForType('estudio'));

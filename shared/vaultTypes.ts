@@ -76,6 +76,20 @@ Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Pri
   },
 ];
 
+/**
+ * Views that exist ONLY for specific vault types. A view listed here shows only
+ * when the active vault type is in its list; any view absent from this map is
+ * universal (shows for every type, subject to the user's sidebar preferences).
+ * The records views (Personas, Timeline, Archivo) belong to the primary-source and
+ * genealogy modes — an academic vault never shows them. The genealogy tree is added
+ * by phase C.
+ */
+export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
+  persons: ['primary_sources', 'genealogy'],
+  timeline: ['primary_sources', 'genealogy'],
+  archive: ['primary_sources', 'genealogy'],
+};
+
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));
 
 export function isVaultType(value: unknown): value is VaultType {
@@ -114,4 +128,15 @@ export function vaultTypePromptPack(value: unknown): string {
 export function effectiveSidebarHidden(userHidden: string[], customized: boolean, type: unknown): string[] {
   if (customized) return [...userHidden];
   return defaultHiddenViewsForType(type);
+}
+
+/** Whether a view may appear for the given vault type (universal views always may). */
+export function isViewAllowedForVaultType(viewId: string, type: unknown): boolean {
+  const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];
+  return allowed ? allowed.includes(normalizeVaultType(type)) : true;
+}
+
+/** The subset of the given view ids that do NOT apply to this vault type. */
+export function viewsDisallowedForType(allViewIds: string[], type: unknown): string[] {
+  return allViewIds.filter((id) => !isViewAllowedForVaultType(id, type));
 }

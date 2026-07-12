@@ -904,6 +904,28 @@ export interface ArchiveItemInput {
   tags?: string[];
 }
 
+export interface RecordCounts {
+  persons: number;
+  places: number;
+  events: number;
+}
+
+export interface ArchiveCounts {
+  items: number;
+  folders: number;
+}
+
+export interface ArchiveTagCount {
+  tag: string;
+  count: number;
+}
+
+export interface ArchiveIngestSummary {
+  added: number;
+  duplicates: number;
+  items: ArchiveItem[];
+}
+
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
 export interface McpServerStatus {
   running: boolean;
@@ -3460,6 +3482,47 @@ export interface NodusApi {
   resetVault(id: string): Promise<VaultSummary>;
   reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
+  // records ontology (primary sources / genealogy)
+  recordCounts(): Promise<RecordCounts>;
+  listPersons(search?: string): Promise<Person[]>;
+  getPerson(id: string): Promise<Person | null>;
+  createPerson(input: PersonInput): Promise<Person>;
+  updatePerson(id: string, patch: Partial<PersonInput>): Promise<Person | null>;
+  deletePerson(id: string): Promise<void>;
+  addPersonName(id: string, name: string, kind?: string | null): Promise<void>;
+  listPlaces(): Promise<Place[]>;
+  createPlace(input: PlaceInput): Promise<Place>;
+  findOrCreatePlace(name: string, kind?: string | null): Promise<Place>;
+  listEvents(opts?: {
+    personId?: string;
+    type?: HistoricalEventType;
+    from?: string;
+    to?: string;
+  }): Promise<HistoricalEvent[]>;
+  getEvent(id: string): Promise<HistoricalEvent | null>;
+  createEvent(input: EventInput): Promise<HistoricalEvent>;
+  updateEvent(id: string, patch: Partial<EventInput>): Promise<HistoricalEvent | null>;
+  deleteEvent(id: string): Promise<void>;
+  addParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
+  removeParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
+  addRecordEvidence(input: RecordEvidenceInput): Promise<RecordEvidence>;
+  listRecordEvidence(targetKind: RecordEvidenceTargetKind, targetId: string): Promise<RecordEvidence[]>;
+  deleteRecordEvidence(id: string): Promise<void>;
+  // evidence archive
+  archiveCounts(): Promise<ArchiveCounts>;
+  listArchiveFolders(): Promise<ArchiveFolder[]>;
+  createArchiveFolder(name: string, parentId?: string | null): Promise<ArchiveFolder>;
+  renameArchiveFolder(id: string, name: string): Promise<ArchiveFolder | null>;
+  deleteArchiveFolder(id: string): Promise<void>;
+  listArchiveItems(opts?: { folderId?: string | null; tag?: string; search?: string }): Promise<ArchiveItem[]>;
+  getArchiveItem(id: string): Promise<ArchiveItem | null>;
+  getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
+  updateArchiveItem(id: string, patch: Partial<ArchiveItemInput>): Promise<ArchiveItem | null>;
+  deleteArchiveItem(id: string): Promise<void>;
+  addArchiveTag(id: string, tag: string): Promise<void>;
+  removeArchiveTag(id: string, tag: string): Promise<void>;
+  listArchiveTags(): Promise<ArchiveTagCount[]>;
+  pickAndIngestArchive(folderId?: string | null): Promise<ArchiveIngestSummary>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
