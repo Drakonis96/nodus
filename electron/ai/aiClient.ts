@@ -11,6 +11,8 @@ import {
 } from './providers';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
 import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
+import { vaultTypePromptPack } from '@shared/vaultTypes';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
 
@@ -140,6 +142,31 @@ export function withPromptLanguage<T extends { system: string }>(opts: T): T {
   const lang = getSettings().promptLanguage ?? 'es';
   if (lang === 'es') return opts;
   return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}` };
+}
+
+/**
+ * Appends the active vault type's prompt-pack persona to the system prompt (empty
+ * for academic, so a no-op for existing vaults). Applied at the same public entry
+ * points as the language directive, but BEFORE it, so the highest-priority
+ * output-language directive always stays at the very end of the prompt. Robust to
+ * contexts where the vault registry isn't ready (headless/MCP) — falls back to no
+ * pack rather than throwing. Exported for unit testing.
+ */
+export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
+  let pack = '';
+  try {
+    pack = vaultTypePromptPack(getActiveVault().type);
+  } catch {
+    pack = '';
+  }
+  if (!pack) return opts;
+  return { ...opts, system: `${opts.system}${pack}` };
+}
+
+/** Compose both context directives: vault-type persona first, then the language
+ *  override last (highest priority). Every public completion entry point uses this. */
+function withPromptContext<T extends { system: string }>(opts: T): T {
+  return withPromptLanguage(withVaultTypeContext(opts));
 }
 
 /** Resolve which model to use: explicit override, else the synthesis workload. */
@@ -381,7 +408,7 @@ export async function completeJson<T>(
   model?: ModelRef | null
 ): Promise<T> {
   const resolved = resolveModel(model);
-  const langOpts = withPromptLanguage(opts);
+  const langOpts = withPromptContext(opts);
   // JSON/structured calls (scans, extraction) default to reasoning off for speed.
   const reasoning = langOpts.reasoning ?? 'off';
   let lastErr: unknown;
@@ -420,7 +447,7 @@ export async function completeJson<T>(
 export async function completeText(opts: CallOpts, model?: ModelRef | null): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawComplete(resolved, withPromptLanguage(opts), false, reasoning);
+  return rawComplete(resolved, withPromptContext(opts), false, reasoning);
 }
 
 /**
@@ -443,7 +470,7 @@ export async function completeTextStream(
 ): Promise<string> {
   const resolved = resolveModel(model);
   const reasoning = opts.reasoning ?? getSettings().chatReasoning ?? 'off';
-  return rawCompleteStream(resolved, withPromptLanguage(opts), onDelta, reasoning, signal);
+  return rawCompleteStream(resolved, withPromptContext(opts), onDelta, reasoning, signal);
 }
 
 async function rawCompleteStream(
