@@ -121,9 +121,9 @@ export function parseHistoricalDate(input: string | null | undefined): ParsedHis
   };
   if (!trimmed) return empty;
 
-  // Range: "between X and Y", "entre X y Y", "X/Y" (two years), or "X - Y" (two years).
+  // Range: "between X and Y", "entre X y Y", GEDCOM "BET X AND Y", "X/Y" or "X - Y".
   const range =
-    /^(?:between|entre)\s+(.+?)\s+(?:and|y)\s+(.+)$/i.exec(trimmed) ||
+    /^(?:between|entre|bet)\s+(.+?)\s+(?:and|y)\s+(.+)$/i.exec(trimmed) ||
     /^(\d{4})\s*[/–—-]\s*(\d{4})$/.exec(trimmed);
   if (range) {
     const a = parseCore(range[1]);

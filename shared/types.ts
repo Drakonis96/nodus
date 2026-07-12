@@ -783,6 +783,12 @@ export interface Kin {
   siblings: Person[];
 }
 
+export interface GedcomImportResult {
+  persons: number;
+  relationships: number;
+  events: number;
+}
+
 export interface PersonName {
   name: string;
   kind: string | null;
@@ -3549,6 +3555,8 @@ export interface NodusApi {
   listRelationships(personId: string): Promise<Relationship[]>;
   allRelationships(): Promise<Relationship[]>;
   kinOf(personId: string): Promise<Kin>;
+  importGedcom(): Promise<GedcomImportResult | null>;
+  exportGedcom(): Promise<{ path: string } | null>;
   // evidence archive
   archiveCounts(): Promise<ArchiveCounts>;
   listArchiveFolders(): Promise<ArchiveFolder[]>;

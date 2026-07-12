@@ -53,6 +53,26 @@ export function PersonasView() {
           <button className="btn btn-primary h-9 w-full gap-1.5" onClick={() => setAdding(true)}>
             <Icon name="plus" /> {t('Añadir persona')}
           </button>
+          <div className="flex gap-2">
+            <button
+              className="btn btn-ghost h-8 flex-1 gap-1.5 border border-neutral-700 text-xs"
+              title={t('Importar un árbol GEDCOM (Gramps, Ancestry…)')}
+              onClick={() =>
+                void window.nodus.importGedcom().then((r) => {
+                  if (r) void reload();
+                })
+              }
+            >
+              <Icon name="upload" size={13} /> {t('Importar GEDCOM')}
+            </button>
+            <button
+              className="btn btn-ghost h-8 flex-1 gap-1.5 border border-neutral-700 text-xs"
+              title={t('Exportar a GEDCOM para Gramps / Ancestry')}
+              onClick={() => void window.nodus.exportGedcom()}
+            >
+              <Icon name="download" size={13} /> {t('Exportar')}
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           {persons.length === 0 && (

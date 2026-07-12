@@ -264,6 +264,7 @@ import {
   allRelationships,
   kinOf,
 } from './db/relationshipsRepo';
+import { importGedcom, exportGedcom } from './genealogy/gedcomBridge';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -517,6 +518,29 @@ export function registerIpc(
   h('entities:listRelationships', async (_e, personId: string) => listRelationshipsForPerson(personId));
   h('entities:allRelationships', async () => allRelationships());
   h('entities:kinOf', async (_e, personId: string) => kinOf(personId));
+  // GEDCOM import / export
+  h('genealogy:importGedcom', async () => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Importar GEDCOM',
+      properties: ['openFile'],
+      filters: [{ name: 'GEDCOM', extensions: ['ged', 'gedcom'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const text = fs.readFileSync(picked.filePaths[0], 'utf8');
+    return importGedcom(text);
+  });
+  h('genealogy:exportGedcom', async () => {
+    const win = getWindow();
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Exportar GEDCOM',
+      defaultPath: 'nodus.ged',
+      filters: [{ name: 'GEDCOM', extensions: ['ged'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, exportGedcom(), 'utf8');
+    return { path: picked.filePath };
+  });
 
   // ── Evidence archive ───────────────────────────────────────────────────────
   h('archive:counts', async () => archiveCounts());

@@ -59,6 +59,8 @@ const api: NodusApi = {
   listRelationships: (personId) => ipcRenderer.invoke('entities:listRelationships', personId),
   allRelationships: () => ipcRenderer.invoke('entities:allRelationships'),
   kinOf: (personId) => ipcRenderer.invoke('entities:kinOf', personId),
+  importGedcom: () => ipcRenderer.invoke('genealogy:importGedcom'),
+  exportGedcom: () => ipcRenderer.invoke('genealogy:exportGedcom'),
   // Evidence archive
   archiveCounts: () => ipcRenderer.invoke('archive:counts'),
   listArchiveFolders: () => ipcRenderer.invoke('archive:listFolders'),
