@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { HistoricalEvent, MatchCandidatePair, Person, PersonSex, PortraitFocus, RecordEvidence } from '@shared/types';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
+import { detectPersonConflicts } from '@shared/conflictDetection';
 import { t, tx } from '../i18n';
+
+const FACT_LABEL: Record<string, string> = { birth: 'nacimiento', death: 'defunción' };
 
 const SEX_LABEL: Record<PersonSex, string> = {
   male: 'Hombre',
@@ -241,6 +244,16 @@ function PersonDetail({ person, onChanged, onClose }: { person: Person; onChange
     void window.nodus.listRecordEvidence('person', person.personId).then(setEvidence);
   }, [person.personId]);
 
+  const conflicts = useMemo(
+    () =>
+      detectPersonConflicts({
+        birthDate: person.birthDate,
+        deathDate: person.deathDate,
+        events: events.map((e) => ({ type: e.type, date: e.date })),
+      }),
+    [person.birthDate, person.deathDate, events]
+  );
+
   const remove = async () => {
     if (!window.confirm(t('¿Eliminar esta persona y su evidencia? Los eventos en que participa se conservan.'))) return;
     await window.nodus.deletePerson(person.personId);
@@ -263,6 +276,33 @@ function PersonDetail({ person, onChanged, onClose }: { person: Person; onChange
           <Icon name="trash" size={14} /> {t('Eliminar')}
         </button>
       </div>
+
+      {conflicts.length > 0 && (
+        <section className="rounded-md border border-amber-900/60 bg-amber-950/20 p-3">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-300">
+            <Icon name="alert" size={14} /> {t('Hechos en conflicto')}
+          </h3>
+          <ul className="space-y-2">
+            {conflicts.map((c) => (
+              <li key={c.fact} className="text-sm">
+                <span className="text-neutral-300">
+                  {tx('Fechas de {fact} discrepantes ({span} años):', {
+                    fact: t(FACT_LABEL[c.fact] ?? c.fact),
+                    span: String(c.spanYears),
+                  })}
+                </span>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {c.values.map((v, i) => (
+                    <span key={i} className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300">
+                      {v.date} <span className="text-neutral-500">· {t(v.label)}</span>
+                    </span>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {person.names.length > 0 && (
         <section>
