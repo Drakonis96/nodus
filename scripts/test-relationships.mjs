@@ -74,6 +74,14 @@ try {
   rel.addRelationship(abuelo, suggested, 'parent', 'user_asserted');
   assert.equal(rel.listRelationshipsForPerson(suggested)[0].provenance, 'user_asserted', 'provenance upgraded on re-assert');
 
+  // Adoptive parent edge keeps its subtype (hung off the grandfather so it doesn't
+  // change the father's children set used by the cascade test below).
+  const adoptado = mk('Adoptado');
+  rel.addRelationship(abuelo, adoptado, 'parent', 'user_asserted', 'adoptive');
+  const adoptiveRel = rel.listRelationshipsForPerson(adoptado).find((r) => r.type === 'parent');
+  assert.equal(adoptiveRel.subtype, 'adoptive', 'adoptive subtype stored');
+  assert.ok(rel.childIdsOf(abuelo).includes(adoptado), 'adoptive child is still a child for layout');
+
   // Self relationship is rejected.
   assert.equal(rel.addRelationship(padre, padre, 'parent'), null);
 

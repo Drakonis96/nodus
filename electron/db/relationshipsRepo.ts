@@ -6,7 +6,7 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
 import { getPerson } from './entitiesRepo';
-import type { Kin, Person, Relationship, RelationshipProvenance, RelationshipType } from '@shared/types';
+import type { Kin, Person, Relationship, RelationshipProvenance, RelationshipSubtype, RelationshipType } from '@shared/types';
 
 function now(): string {
   return new Date().toISOString();
@@ -18,6 +18,7 @@ interface RelRow {
   to_person: string;
   type: RelationshipType;
   provenance: RelationshipProvenance;
+  subtype: RelationshipSubtype;
   notes: string | null;
 }
 
@@ -28,6 +29,7 @@ function rowToRel(row: RelRow): Relationship {
     toPerson: row.to_person,
     type: row.type,
     provenance: row.provenance,
+    subtype: row.subtype ?? null,
     notes: row.notes,
   };
 }
@@ -42,6 +44,7 @@ export function addRelationship(
   toPerson: string,
   type: RelationshipType,
   provenance: RelationshipProvenance = 'user_asserted',
+  subtype: RelationshipSubtype = null,
   notes: string | null = null
 ): Relationship | null {
   if (fromPerson === toPerson) return null;
@@ -54,9 +57,10 @@ export function addRelationship(
     .prepare('SELECT * FROM relationships WHERE from_person = ? AND to_person = ? AND type = ?')
     .get(a, b, type) as RelRow | undefined;
   if (existing) {
-    // Upgrade provenance/notes if re-asserted (e.g. AI suggestion later user-confirmed).
-    db.prepare('UPDATE relationships SET provenance = ?, notes = COALESCE(?, notes) WHERE rel_id = ?').run(
+    // Upgrade provenance/subtype/notes if re-asserted (e.g. AI suggestion later confirmed).
+    db.prepare('UPDATE relationships SET provenance = ?, subtype = COALESCE(?, subtype), notes = COALESCE(?, notes) WHERE rel_id = ?').run(
       provenance,
+      subtype,
       notes,
       existing.rel_id
     );
@@ -64,8 +68,8 @@ export function addRelationship(
   }
   const id = `rel_${uuid()}`;
   db.prepare(
-    'INSERT INTO relationships (rel_id, from_person, to_person, type, provenance, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(id, a, b, type, provenance, notes, now());
+    'INSERT INTO relationships (rel_id, from_person, to_person, type, provenance, subtype, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, a, b, type, provenance, subtype, notes, now());
   return getRelationship(id);
 }
 

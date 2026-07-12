@@ -79,6 +79,7 @@ import type {
   RecordEvidenceTargetKind,
   RelationshipType,
   RelationshipProvenance,
+  RelationshipSubtype,
   ArchiveItemInput,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
@@ -228,6 +229,7 @@ import {
   getPersonPortrait,
   updatePortraitFocus,
   clearPersonPortrait,
+  setPersonFrame,
   createPlace,
   listPlaces,
   updatePlace,
@@ -546,8 +548,12 @@ export function registerIpc(
     fromPerson: string,
     toPerson: string,
     type: RelationshipType,
-    provenance?: RelationshipProvenance
-  ) => addRelationship(fromPerson, toPerson, type, provenance ?? 'user_asserted'));
+    provenance?: RelationshipProvenance,
+    subtype?: RelationshipSubtype
+  ) => addRelationship(fromPerson, toPerson, type, provenance ?? 'user_asserted', subtype ?? null));
+  h('entities:setPersonFrame', async (_e, personId: string, frameStyle: string | null) => {
+    setPersonFrame(personId, frameStyle);
+  });
   h('entities:removeRelationship', async (_e, relId: string) => {
     removeRelationship(relId);
   });

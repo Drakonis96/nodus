@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 38;
+export const SCHEMA_VERSION = 39;
 
 export const migrations: Migration[] = [
   {
@@ -1208,6 +1208,18 @@ export const migrations: Migration[] = [
       -- library via Zotero.
       ALTER TABLE archive_items ADD COLUMN doc_type TEXT;
       ALTER TABLE archive_items ADD COLUMN metadata_json TEXT;
+    `,
+  },
+  {
+    version: 39,
+    up: /* sql */ `
+      -- Kinship nuance + tree presentation.
+      --   relationships.subtype: null = biological/default, 'adoptive' for adoptions
+      --   (rendered distinctly on the tree; still a real parent edge for layout).
+      --   persons.frame_style: per-person override of the wooden tree frame design;
+      --   null = use the vault-wide default (a setting).
+      ALTER TABLE relationships ADD COLUMN subtype TEXT;
+      ALTER TABLE persons ADD COLUMN frame_style TEXT;
     `,
   },
 ];

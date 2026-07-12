@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Person, Relationship, RelationshipType } from '@shared/types';
+import type { AppSettings, Person, Relationship, RelationshipType } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { mirrorDefaultPortrait } from '@shared/treePortraits';
+import { effectiveFrame, TREE_FRAMES } from '@shared/treeFrames';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
+import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
 import { t } from '../i18n';
 
-const NODE_W = 160;
-const NODE_H = 64;
+const NODE_W = 128;
+const NODE_H = 158;
+const FRAME_W = 100;
+const FRAME_H = 116;
 const PAD = 40;
 
 function dates(p: Person): string {
@@ -20,12 +24,19 @@ function dates(p: Person): string {
   return '';
 }
 
-export function TreeView() {
+export function TreeView({
+  settings,
+  onSettingsChange,
+}: {
+  settings?: AppSettings;
+  onSettingsChange?: () => Promise<unknown>;
+} = {}) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [rels, setRels] = useState<Relationship[]>([]);
   const [focusId, setFocusId] = useState<string>('');
   const [selected, setSelected] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const vaultFrame = settings?.treeFrame ?? 'oak';
 
   const reload = useCallback(async () => {
     const [ps, rs] = await Promise.all([window.nodus.listPersons(), window.nodus.allRelationships()]);
@@ -39,6 +50,10 @@ export function TreeView() {
   }, [reload]);
 
   const personById = useMemo(() => new Map(persons.map((p) => [p.personId, p])), [persons]);
+  const adoptiveSet = useMemo(
+    () => new Set(rels.filter((r) => r.type === 'parent' && r.subtype === 'adoptive').map((r) => `${r.fromPerson}->${r.toPerson}`)),
+    [rels]
+  );
 
   const layout: TreeLayoutResult = useMemo(
     () =>
@@ -49,12 +64,15 @@ export function TreeView() {
         spouseEdges: rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
         nodeWidth: NODE_W,
         nodeHeight: NODE_H,
+        vGap: 52,
       }),
     [focusId, rels, persons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
   const center = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + NODE_H / 2 });
+  const frameTop = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD });
+  const frameBottom = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H });
 
   if (persons.length === 0) {
     return (
@@ -106,21 +124,26 @@ export function TreeView() {
           className="select-none"
           style={{ minWidth: '100%' }}
         >
+          <TreeFrameDefs />
           {layout.edges.map((e, i) => {
-            const a = center(e.from);
-            const b = center(e.to);
             if (e.kind === 'spouse') {
-              return <line key={`s${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#6366f1" strokeWidth={2} strokeDasharray="4 3" />;
+              const a = center(e.from);
+              const b = center(e.to);
+              return <line key={`s${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#8a5a2b" strokeWidth={2.5} strokeDasharray="2 4" strokeLinecap="round" />;
             }
-            // parent → child: elbow from parent bottom to child top.
-            const midY = (a.y + NODE_H / 2 + (b.y - NODE_H / 2)) / 2;
+            // parent → child: elbow from the parent's frame bottom to the child's top.
+            const a = frameBottom(e.from);
+            const b = frameTop(e.to);
+            const adoptive = adoptiveSet.has(`${e.from}->${e.to}`);
+            const midY = (a.y + b.y) / 2;
             return (
               <path
                 key={`p${i}`}
-                d={`M ${a.x} ${a.y + NODE_H / 2} V ${midY} H ${b.x} V ${b.y - NODE_H / 2}`}
+                d={`M ${a.x} ${a.y} V ${midY} H ${b.x} V ${b.y}`}
                 fill="none"
-                stroke="#3f3f46"
+                stroke={adoptive ? '#6b7280' : '#4b5563'}
                 strokeWidth={1.5}
+                strokeDasharray={adoptive ? '5 4' : undefined}
               />
             );
           })}
@@ -132,37 +155,42 @@ export function TreeView() {
             const y = n.y + PAD;
             const isFocus = n.personId === focusId;
             const isSel = n.personId === selected;
-            const stroke = isFocus ? '#6366f1' : isSel ? '#818cf8' : '#3f3f46';
-            const sexColor = p.sex === 'male' ? '#60a5fa' : p.sex === 'female' ? '#f472b6' : '#a1a1aa';
+            const frame = effectiveFrame(p.frameStyle, vaultFrame);
+            const mirror = mirrorDefaultPortrait(p.sex, n.coupleSide);
+            const frameX = x + (NODE_W - FRAME_W) / 2;
+            const max = 16;
             return (
               <g
                 key={n.personId}
-                transform={`translate(${x}, ${y})`}
                 style={{ cursor: 'pointer', transition: 'transform 300ms ease' }}
                 onClick={() => setSelected(n.personId)}
                 onDoubleClick={() => setFocusId(n.personId)}
               >
-                <rect
-                  width={NODE_W}
-                  height={NODE_H}
-                  rx={8}
-                  fill="#18181b"
-                  stroke={stroke}
-                  strokeWidth={isFocus || isSel ? 2 : 1}
-                />
-                <rect width={4} height={NODE_H} rx={2} fill={sexColor} />
-                {p.portrait && (
-                  <foreignObject x={12} y={11} width={42} height={42}>
-                    <PersonPortrait person={p} size={42} />
-                  </foreignObject>
+                {(isFocus || isSel) && (
+                  <rect
+                    x={frameX - 4}
+                    y={y - 4}
+                    width={FRAME_W + 8}
+                    height={FRAME_H + 8}
+                    rx={16}
+                    fill="none"
+                    stroke={isFocus ? '#818cf8' : '#a5b4fc'}
+                    strokeWidth={2.5}
+                  />
                 )}
-                <text x={p.portrait ? 64 : 14} y={26} fill="#e4e4e7" fontSize={13} fontWeight={600}>
-                  {(() => {
-                    const max = p.portrait ? 12 : 20;
-                    return p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName;
-                  })()}
+                <TreeFrame
+                  x={frameX}
+                  y={y}
+                  w={FRAME_W}
+                  h={FRAME_H}
+                  frame={frame}
+                  sex={p.sex}
+                  portrait={<PersonPortrait person={p} fill mirror={mirror} rounded="none" />}
+                />
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill="#e4e4e7" fontSize={13} fontWeight={600}>
+                  {p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName}
                 </text>
-                <text x={p.portrait ? 64 : 14} y={46} fill="#a1a1aa" fontSize={11}>
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill="#a1a1aa" fontSize={11}>
                   {dates(p)}
                 </text>
               </g>
@@ -175,10 +203,16 @@ export function TreeView() {
         <NodePanel
           person={personById.get(selected)!}
           persons={persons}
+          vaultFrame={vaultFrame}
           onClose={() => setSelected(null)}
           onFocus={() => {
             setFocusId(selected);
             setSelected(null);
+          }}
+          onApplyFrameToAll={async (frame) => {
+            await window.nodus.updateSettings({ treeFrame: frame });
+            await onSettingsChange?.();
+            await reload();
           }}
           onChanged={reload}
         />
@@ -190,21 +224,33 @@ export function TreeView() {
 function NodePanel({
   person,
   persons,
+  vaultFrame,
   onClose,
   onFocus,
+  onApplyFrameToAll,
   onChanged,
 }: {
   person: Person;
   persons: Person[];
+  vaultFrame: string;
   onClose: () => void;
   onFocus: () => void;
+  onApplyFrameToAll: (frame: string) => Promise<void>;
   onChanged: () => Promise<void>;
 }) {
   const [relType, setRelType] = useState<'father' | 'mother' | 'child' | 'spouse'>('child');
   const [otherId, setOtherId] = useState('');
+  const [adoptive, setAdoptive] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const others = persons.filter((p) => p.personId !== person.personId);
+  const currentFrame = effectiveFrame(person.frameStyle, vaultFrame);
+  const isParentRel = relType !== 'spouse';
+
+  const setFrameForPerson = async (frame: string) => {
+    await window.nodus.setPersonFrame(person.personId, frame);
+    await onChanged();
+  };
 
   const connect = async () => {
     if (!otherId) return;
@@ -223,7 +269,7 @@ function NodePanel({
       } else {
         type = 'spouse';
       }
-      await window.nodus.addRelationship(from, to, type, 'user_asserted');
+      await window.nodus.addRelationship(from, to, type, 'user_asserted', type === 'parent' && adoptive ? 'adoptive' : null);
       await onChanged();
       onClose();
     } finally {
@@ -247,6 +293,35 @@ function NodePanel({
         <Icon name="target" size={14} /> {t('Centrar el árbol aquí')}
       </button>
 
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Marco')}</h3>
+      <div className="mb-2 grid grid-cols-2 gap-2">
+        {TREE_FRAMES.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => void setFrameForPerson(f.id)}
+            className={`flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs ${
+              currentFrame === f.id ? 'border-indigo-500 bg-indigo-600/15' : 'border-neutral-800 hover:bg-neutral-800/60'
+            }`}
+          >
+            <FrameSwatch frame={f.id} />
+            <span className="truncate">{t(f.label)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mb-4 flex items-center gap-2">
+        {person.frameStyle && (
+          <button
+            className="text-xs text-neutral-400 hover:underline"
+            onClick={() => void window.nodus.setPersonFrame(person.personId, null).then(onChanged)}
+          >
+            {t('Usar el del árbol')}
+          </button>
+        )}
+        <button className="ml-auto text-xs text-indigo-400 hover:underline" onClick={() => void onApplyFrameToAll(currentFrame)}>
+          {t('Aplicar «{f}» a todo el árbol').replace('{f}', t(TREE_FRAMES.find((x) => x.id === currentFrame)?.label ?? ''))}
+        </button>
+      </div>
+
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Añadir conexión')}</h3>
       <div className="space-y-2">
         <select className="input h-9 w-full text-sm" value={relType} onChange={(e) => setRelType(e.target.value as typeof relType)}>
@@ -263,11 +338,28 @@ function NodePanel({
             </option>
           ))}
         </select>
+        {isParentRel && (
+          <label className="flex items-center gap-2 text-xs text-neutral-400">
+            <input type="checkbox" checked={adoptive} onChange={(e) => setAdoptive(e.target.checked)} />
+            {t('Relación adoptiva')}
+          </label>
+        )}
         <button className="btn btn-primary w-full" disabled={busy || !otherId} onClick={() => void connect()}>
           {t('Conectar')}
         </button>
         <p className="text-xs text-neutral-500">{t('Las conexiones que añades quedan marcadas como afirmadas por ti.')}</p>
       </div>
     </div>
+  );
+}
+
+/** A tiny swatch of a wooden frame design for the picker. */
+function FrameSwatch({ frame }: { frame: string }) {
+  return (
+    <svg width={20} height={20} className="shrink-0">
+      <TreeFrameDefs />
+      <rect x={0} y={0} width={20} height={20} rx={4} fill={`url(#frame-${frame})`} stroke="#00000055" />
+      <rect x={5} y={5} width={10} height={10} rx={1} fill="#0a0a0a" />
+    </svg>
   );
 }

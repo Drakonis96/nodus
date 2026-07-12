@@ -653,6 +653,8 @@ export interface AppSettings {
    * `sidebarHidden` and this flips true, so their choice is respected thereafter.
    */
   sidebarCustomized: boolean;
+  /** Default wooden frame design for the genealogy tree (per-person overrides win). */
+  treeFrame: string;
   // ── Automatic encrypted backups ────────────────────────────────────────────
   // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
   // Google Drive to get off-machine copies for free). Encrypted with the
@@ -771,6 +773,8 @@ export type RecordSourceKind = 'work' | 'archive';
 // Kinship (genealogy layer, phase C)
 export type RelationshipType = 'parent' | 'spouse';
 export type RelationshipProvenance = 'user_asserted' | 'ai_confirmed';
+/** Nuance on a parent edge: null = biological/default, 'adoptive' for adoptions. */
+export type RelationshipSubtype = 'adoptive' | null;
 
 export interface Relationship {
   relId: string;
@@ -778,6 +782,7 @@ export interface Relationship {
   toPerson: string;
   type: RelationshipType;
   provenance: RelationshipProvenance;
+  subtype: RelationshipSubtype;
   notes: string | null;
 }
 
@@ -829,6 +834,8 @@ export interface Person {
   names: PersonName[];
   /** Portrait framing when a photo is attached; null when there is none. */
   portrait: PortraitFocus | null;
+  /** Per-person wooden tree-frame design override; null = use the vault default. */
+  frameStyle: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3585,8 +3592,10 @@ export interface NodusApi {
     fromPerson: string,
     toPerson: string,
     type: RelationshipType,
-    provenance?: RelationshipProvenance
+    provenance?: RelationshipProvenance,
+    subtype?: RelationshipSubtype
   ): Promise<Relationship | null>;
+  setPersonFrame(personId: string, frameStyle: string | null): Promise<void>;
   removeRelationship(relId: string): Promise<void>;
   listRelationships(personId: string): Promise<Relationship[]>;
   allRelationships(): Promise<Relationship[]>;

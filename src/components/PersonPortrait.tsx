@@ -19,12 +19,16 @@ export function PersonPortrait({
   size = 48,
   rounded = 'full',
   mirror = false,
+  fill = false,
 }: {
   person: Person;
   size?: number;
   rounded?: 'full' | 'md' | 'none';
   mirror?: boolean;
+  /** Fill the parent container (100%×100%) instead of a fixed square. */
+  fill?: boolean;
 }) {
+  const box = fill ? { width: '100%', height: '100%' } : { width: size, height: size };
   const [url, setUrl] = useState<string | null>(null);
   const urlRef = useRef<string | null>(null);
 
@@ -56,7 +60,7 @@ export function PersonPortrait({
   // Real user photo — framed by its focal point, never mirrored.
   if (url && focus) {
     return (
-      <div className="shrink-0 overflow-hidden bg-neutral-900" style={{ width: size, height: size, borderRadius: radius }}>
+      <div className="shrink-0 overflow-hidden bg-neutral-900" style={{ ...box, borderRadius: radius }}>
         <img
           src={url}
           alt=""
@@ -77,7 +81,7 @@ export function PersonPortrait({
   const kind = defaultPortraitKind(person.sex);
   if (kind) {
     return (
-      <div className="shrink-0 overflow-hidden bg-neutral-800/40" style={{ width: size, height: size, borderRadius: radius }}>
+      <div className="shrink-0 overflow-hidden bg-neutral-800/40" style={{ ...box, borderRadius: radius }}>
         <img
           src={DEFAULT_SRC[kind]}
           alt=""
@@ -98,7 +102,7 @@ export function PersonPortrait({
   return (
     <div
       className="flex shrink-0 items-center justify-center bg-neutral-800"
-      style={{ width: size, height: size, borderRadius: radius }}
+      style={{ ...box, borderRadius: radius }}
     >
       <Icon name="user" size={Math.round(size * 0.5)} className="text-neutral-500" />
     </div>

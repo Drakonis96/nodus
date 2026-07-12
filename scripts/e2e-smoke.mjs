@@ -185,8 +185,10 @@ try {
   const records = await page.evaluate(async () => {
     const juan = await window.nodus.createPerson({ displayName: 'Juan Pérez', sex: 'male', birthDate: 'c. 1850' });
     const hijo = await window.nodus.createPerson({ displayName: 'Pedro Pérez', sex: 'male' });
-    await window.nodus.addRelationship(juan.personId, hijo.personId, 'parent', 'user_asserted');
+    await window.nodus.addRelationship(juan.personId, hijo.personId, 'parent', 'user_asserted', 'adoptive');
+    await window.nodus.setPersonFrame(juan.personId, 'walnut');
     const kin = await window.nodus.kinOf(juan.personId);
+    const juanReloaded = await window.nodus.getPerson(juan.personId);
     const place = await window.nodus.findOrCreatePlace('Sevilla', 'municipality');
     const event = await window.nodus.createEvent({
       type: 'marriage',
@@ -217,6 +219,7 @@ try {
     return {
       entryDocType: entry.docType,
       entryMeta: entry.metadata,
+      frameStyle: juanReloaded.frameStyle,
       persons: (await window.nodus.listPersons()).length,
       children: kin.children.length,
       events: (await window.nodus.listEvents({ personId: juan.personId })).length,
@@ -228,6 +231,7 @@ try {
   });
   assert.equal(records.persons, 2, 'persons created over IPC');
   assert.equal(records.children, 1, 'kinship edge resolved over IPC');
+  assert.equal(records.frameStyle, 'walnut', 'per-person tree frame stored over IPC');
   assert.equal(records.events, 1, 'event linked to the person');
   assert.equal(records.evidence, 1, 'record evidence attached');
   assert.equal(records.placeName, 'Sevilla', 'event resolves its place');

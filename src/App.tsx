@@ -514,7 +514,7 @@ export function App() {
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView />}
           {view === 'timeline' && <TimelineView />}
-          {view === 'tree' && <TreeView />}
+          {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'map' && <MapView />}
           {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} />}
           {view === 'study' && (

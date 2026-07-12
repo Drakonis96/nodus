@@ -73,6 +73,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,
+  treeFrame: 'oak',
   autoBackupEnabled: false,
   autoBackupFolder: '',
   autoBackupIntervalHours: 24,
