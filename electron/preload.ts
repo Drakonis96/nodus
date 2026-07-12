@@ -69,6 +69,7 @@ const api: NodusApi = {
   removeArchiveTag: (id, tag) => ipcRenderer.invoke('archive:removeTag', id, tag).then(() => undefined),
   listArchiveTags: () => ipcRenderer.invoke('archive:listTags'),
   pickAndIngestArchive: (folderId) => ipcRenderer.invoke('archive:pickAndIngest', folderId),
+  scanArchiveItem: (itemId) => ipcRenderer.invoke('archive:scanItem', itemId),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),

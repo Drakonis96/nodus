@@ -254,6 +254,7 @@ import {
   archiveCounts,
 } from './db/archiveRepo';
 import { ingestArchiveFile } from './archive/archiveIngest';
+import { scanArchiveTextRecords } from './ai/recordsScan';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -519,6 +520,16 @@ export function registerIpc(
     removeTag(id, tag);
   });
   h('archive:listTags', async () => listTags());
+  h('archive:scanItem', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    if (!item.extractedText || !item.extractedText.trim()) {
+      return { persons: 0, places: 0, events: 0, evidence: 0, noText: true };
+    }
+    const model = getSettings().extractionModel ?? undefined;
+    const result = await scanArchiveTextRecords(itemId, item.extractedText, model);
+    return { ...result, noText: false };
+  });
   h('archive:pickAndIngest', async (_e, folderId?: string | null) => {
     const win = getWindow();
     const picked = await dialog.showOpenDialog(win ?? undefined!, {

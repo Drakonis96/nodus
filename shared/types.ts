@@ -926,6 +926,15 @@ export interface ArchiveIngestSummary {
   items: ArchiveItem[];
 }
 
+export interface RecordsScanSummary {
+  persons: number;
+  places: number;
+  events: number;
+  evidence: number;
+  /** True when the item had no extracted text to scan. */
+  noText: boolean;
+}
+
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
 export interface McpServerStatus {
   running: boolean;
@@ -3524,6 +3533,7 @@ export interface NodusApi {
   removeArchiveTag(id: string, tag: string): Promise<void>;
   listArchiveTags(): Promise<ArchiveTagCount[]>;
   pickAndIngestArchive(folderId?: string | null): Promise<ArchiveIngestSummary>;
+  scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;

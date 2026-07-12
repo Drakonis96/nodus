@@ -90,6 +90,19 @@ try {
   assert.equal(wiringResult.persons, 1);
   assert.equal(repo.listPersons({ search: 'testigo aparte' }).length, 1, 'runRecordsScan persisted its person');
 
+  // ── Scenario C: archive source_kind flows through to the evidence ──────────
+  await scan.runRecordsScan(
+    'archive-item-1',
+    'padrón',
+    async () => ({ persons: [{ name: 'Registro Archivado', quote: 'consta en el padrón', location: 'p. 1' }] }),
+    'archive'
+  );
+  const archived = repo.listPersons({ search: 'registro archivado' })[0];
+  assert.ok(archived, 'archive-scanned person persisted');
+  const archEvidence = repo.listEvidenceFor('person', archived.personId);
+  assert.equal(archEvidence[0].sourceKind, 'archive', 'evidence marks the archive source kind');
+  assert.equal(archEvidence[0].nodusId, 'archive-item-1', 'evidence points at the archive item id');
+
   console.log('Records scan orchestrator test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });

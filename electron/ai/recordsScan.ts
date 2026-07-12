@@ -20,7 +20,7 @@ import {
   type MergedRecords,
   type RecordsChunkResult,
 } from '@shared/recordsExtraction';
-import type { ModelRef, PersonSex } from '@shared/types';
+import type { ModelRef, PersonSex, RecordSourceKind } from '@shared/types';
 
 export interface RecordsScanResult {
   persons: number;
@@ -32,11 +32,17 @@ export interface RecordsScanResult {
 export type ChunkExtractor = (input: ReturnType<typeof buildRecordsInput>) => Promise<RecordsChunkResult>;
 
 /**
- * Persist a merged record set, attaching every fact's evidence to the source work.
+ * Persist a merged record set, attaching every fact's evidence to its source — a
+ * Zotero work (sourceKind 'work') or an evidence-archive item (sourceKind 'archive').
  * Persons and places are resolved by normalised name so repeated mentions collapse
  * onto one entity; event participants reuse those same persons.
  */
-export function persistRecords(workNodusId: string, merged: MergedRecords): RecordsScanResult {
+export function persistRecords(
+  sourceId: string,
+  merged: MergedRecords,
+  sourceKind: RecordSourceKind = 'work'
+): RecordsScanResult {
+  const workNodusId = sourceId;
   const personIdByKey = new Map<string, string>();
   const placeIdByKey = new Map<string, string>();
   let evidence = 0;
@@ -67,6 +73,7 @@ export function persistRecords(workNodusId: string, merged: MergedRecords): Reco
         targetKind: 'person',
         targetId: person.personId,
         nodusId: workNodusId,
+        sourceKind,
         quote: ev.quote ?? null,
         location: ev.location ?? null,
       });
@@ -90,6 +97,7 @@ export function persistRecords(workNodusId: string, merged: MergedRecords): Reco
         targetKind: 'event',
         targetId: event.eventId,
         nodusId: workNodusId,
+        sourceKind,
         quote: e.evidence.quote ?? null,
         location: e.evidence.location ?? null,
       });
@@ -100,27 +108,41 @@ export function persistRecords(workNodusId: string, merged: MergedRecords): Reco
   return { persons: personIdByKey.size, places: placeIdByKey.size, events: merged.events.length, evidence };
 }
 
-/** Run the records lens over a work's text using the given per-chunk extractor. */
+/** Run the records lens over a source's text using the given per-chunk extractor. */
 export async function runRecordsScan(
-  workNodusId: string,
+  sourceId: string,
   text: string,
-  extractChunk: ChunkExtractor
+  extractChunk: ChunkExtractor,
+  sourceKind: RecordSourceKind = 'work'
 ): Promise<RecordsScanResult> {
   const { chunks } = planTextChunks(text);
   const results: RecordsChunkResult[] = [];
   for (let i = 0; i < chunks.length; i++) {
     results.push(await extractChunk(buildRecordsInput(chunks[i], i, chunks.length)));
   }
-  return persistRecords(workNodusId, mergeRecordsResults(results));
+  return persistRecords(sourceId, mergeRecordsResults(results), sourceKind);
 }
 
-/** Production entry point: extract each chunk with the configured AI model. */
-export function scanWorkRecords(workNodusId: string, text: string, model?: ModelRef | null): Promise<RecordsScanResult> {
-  return runRecordsScan(workNodusId, text, (input) =>
+/** The per-chunk extractor backed by the configured AI model. */
+function modelExtractor(model?: ModelRef | null): ChunkExtractor {
+  return (input) =>
     completeJson<RecordsChunkResult>(
       { system: RECORDS_EXTRACTION_PROMPT, user: JSON.stringify(input), temperature: 0.15, maxTokens: 8000 },
       isRecordsChunkResult,
       model
-    )
-  );
+    );
+}
+
+/** Production entry point for a Zotero work's text. */
+export function scanWorkRecords(workNodusId: string, text: string, model?: ModelRef | null): Promise<RecordsScanResult> {
+  return runRecordsScan(workNodusId, text, modelExtractor(model), 'work');
+}
+
+/** Production entry point for an evidence-archive item's extracted text. */
+export function scanArchiveTextRecords(
+  itemId: string,
+  text: string,
+  model?: ModelRef | null
+): Promise<RecordsScanResult> {
+  return runRecordsScan(itemId, text, modelExtractor(model), 'archive');
 }

@@ -192,6 +192,8 @@ function ArchiveItemDetail({
   const [tag, setTag] = useState('');
   const [title, setTitle] = useState(item.title);
   const [tags, setTags] = useState<string[]>(item.tags);
+  const [scanning, setScanning] = useState(false);
+  const [scanMsg, setScanMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let revoked: string | null = null;
@@ -238,6 +240,27 @@ function ArchiveItemDetail({
     await onChanged();
   };
 
+  const scan = async () => {
+    setScanning(true);
+    setScanMsg(null);
+    try {
+      const r = await window.nodus.scanArchiveItem(item.itemId);
+      if (r.noText) {
+        setScanMsg(t('Este elemento no tiene texto extraído para analizar.'));
+      } else {
+        setScanMsg(
+          t('Extraídos: {p} personas, {e} eventos.')
+            .replace('{p}', String(r.persons))
+            .replace('{e}', String(r.events))
+        );
+      }
+    } catch (err) {
+      setScanMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setScanning(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
       <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
@@ -256,11 +279,24 @@ function ArchiveItemDetail({
           </button>
         </div>
 
-        <p className="mb-3 text-xs text-neutral-500">
-          {item.kind.toUpperCase()}
-          {item.fileName ? ` · ${item.fileName}` : ''}
-          {item.bytes ? ` · ${(item.bytes / 1024).toFixed(0)} KB` : ''}
-        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <p className="text-xs text-neutral-500">
+            {item.kind.toUpperCase()}
+            {item.fileName ? ` · ${item.fileName}` : ''}
+            {item.bytes ? ` · ${(item.bytes / 1024).toFixed(0)} KB` : ''}
+          </p>
+          {item.extractedText && (
+            <button
+              className="btn btn-ghost h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
+              disabled={scanning}
+              onClick={() => void scan()}
+              title={t('Extraer personas, lugares y eventos de este documento')}
+            >
+              <Icon name="users" size={13} /> {scanning ? t('Analizando…') : t('Extraer personas y eventos')}
+            </button>
+          )}
+          {scanMsg && <span className="text-xs text-neutral-400">{scanMsg}</span>}
+        </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {imageUrl && (
