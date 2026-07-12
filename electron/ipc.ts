@@ -69,6 +69,7 @@ import type {
   VaultSummary,
   VaultSwitchOptions,
   VaultSwitchResult,
+  VaultType,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
@@ -203,6 +204,7 @@ import {
   renameVault,
   resetVaultDatabase,
   setActiveVault,
+  setVaultType,
 } from './vaults/vaultRegistry';
 import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
 
@@ -347,10 +349,11 @@ export function registerIpc(
   h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
   h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));
   h('vaults:create', async (_e, input: CreateVaultInput) => {
-    const vault = createVault(input.name);
+    const vault = createVault(input.name, input.type);
     return { vault: withVaultKeyProviders(vault) };
   });
   h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));
+  h('vaults:setType', async (_e, id: string, type: VaultType) => withVaultKeyProviders(setVaultType(id, type)));
   h('vaults:switch', async (_e, id: string, options?: VaultSwitchOptions) => switchVaultSafely(id, options));
   h('vaults:duplicate', async (_e, id: string, name: string, options?: VaultSwitchOptions) => {
     const source = getVault(id);
@@ -362,7 +365,7 @@ export function registerIpc(
       } else {
         fs.copyFileSync(source.path, tmp);
       }
-      const vault = createVaultFromDatabaseFile(tmp, name);
+      const vault = createVaultFromDatabaseFile(tmp, name, source.type);
       const hasExplicitSource = options && Object.prototype.hasOwnProperty.call(options, 'copyApiKeysFromVaultId');
       const keySource = hasExplicitSource ? options.copyApiKeysFromVaultId ?? null : id;
       const copiedProviders = keySource && keySource !== vault.id ? copyApiKeysBetweenVaults(keySource, vault.id) : [];

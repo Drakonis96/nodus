@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import Module, { createRequire } from 'node:module';
 import os from 'node:os';
@@ -63,6 +63,7 @@ const require = createRequire(import.meta.url);
 const { registry, analysisReuse, database, secrets } = require(bundle);
 
 assert.equal(registry.getActiveVault().id, 'default');
+assert.equal(registry.getActiveVault().type, 'academic', 'pre-existing/legacy vault defaults to academic type');
 assert.equal(database.dbPath(), path.join(userData, 'nodus.sqlite'));
 
 let db = database.getDb();
@@ -73,7 +74,28 @@ assert.equal(secrets.getApiKey('openai'), 'sk-default');
 database.closeDb();
 
 const researchVault = registry.createVault('Investigación separada');
+assert.equal(researchVault.type, 'academic', 'createVault defaults to academic when no type is given');
 assert.equal(registry.listVaults().length, 2);
+
+// ── Vault types ────────────────────────────────────────────────────────────
+const studyVault = registry.createVault('Estudio de oposición', 'estudio');
+assert.equal(studyVault.type, 'estudio', 'createVault honours an explicit type');
+const studyManifest = JSON.parse(readFileSync(path.join(path.dirname(studyVault.path), 'manifest.json'), 'utf8'));
+assert.equal(studyManifest.type, 'estudio', 'vault type is persisted to the manifest');
+
+// setVaultType changes it and survives a fresh registry read.
+registry.setVaultType(researchVault.id, 'estudio');
+assert.equal(registry.getVault(researchVault.id).type, 'estudio', 'setVaultType updates the stored type');
+assert.equal(
+  JSON.parse(readFileSync(path.join(path.dirname(researchVault.path), 'manifest.json'), 'utf8')).type,
+  'estudio',
+  'setVaultType rewrites the manifest'
+);
+// Unknown types coerce back to academic instead of persisting garbage.
+registry.setVaultType(researchVault.id, 'not-a-type');
+assert.equal(registry.getVault(researchVault.id).type, 'academic', 'unknown vault types normalise to academic');
+registry.deleteVault(studyVault.id, true);
+assert.equal(registry.listVaults().length, 2, 'temporary study vault removed');
 assert.deepEqual(secrets.copyApiKeysBetweenVaults('default', researchVault.id), ['openai']);
 assert.deepEqual(secrets.listApiKeyProvidersForVault(researchVault.id), ['openai']);
 

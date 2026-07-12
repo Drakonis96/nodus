@@ -1,6 +1,10 @@
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 
+// Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
+import type { VaultType } from './vaultTypes';
+export type { VaultType };
+
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
 export type GraphNodeType = IdeaType | 'theme' | 'author';
 
@@ -663,11 +667,15 @@ export interface VaultSummary {
   lastOpenedAt: string;
   active: boolean;
   legacy: boolean;
+  /** The vault's mode. Pre-existing vaults default to 'academic'. */
+  type: VaultType;
   apiKeyProviders: AiProvider[];
 }
 
 export interface CreateVaultInput {
   name: string;
+  /** Optional vault type; defaults to 'academic' when omitted. */
+  type?: VaultType;
 }
 
 export interface VaultSwitchOptions {
@@ -3266,6 +3274,7 @@ export interface NodusApi {
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
   renameVault(id: string, name: string): Promise<VaultSummary>;
+  setVaultType(id: string, type: VaultType): Promise<VaultSummary>;
   switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;

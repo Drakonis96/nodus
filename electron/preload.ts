@@ -23,6 +23,7 @@ const api: NodusApi = {
   getActiveVault: () => ipcRenderer.invoke('vaults:getActive'),
   createVault: (input) => ipcRenderer.invoke('vaults:create', input),
   renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),
+  setVaultType: (id, type) => ipcRenderer.invoke('vaults:setType', id, type),
   switchVault: (id, options) => ipcRenderer.invoke('vaults:switch', id, options),
   duplicateVault: (id, name, options) => ipcRenderer.invoke('vaults:duplicate', id, name, options),
   deleteVault: (id, deleteFiles) => ipcRenderer.invoke('vaults:delete', id, deleteFiles).then(() => undefined),
