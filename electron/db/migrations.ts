@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 41;
+export const SCHEMA_VERSION = 42;
 
 export const migrations: Migration[] = [
   {
@@ -1244,6 +1244,63 @@ export const migrations: Migration[] = [
       -- evidence (events, kinship, linked documents). Stored so it persists and travels.
       ALTER TABLE persons ADD COLUMN biography TEXT;
       ALTER TABLE persons ADD COLUMN biography_at TEXT;
+    `,
+  },
+  {
+    version: 42,
+    up: /* sql */ `
+      -- Evidence-driven kinship SUGGESTIONS. The cardinal rule of AI-assisted
+      -- genealogy is that the machine must never contaminate the tree: it proposes,
+      -- the user disposes. So structural record roles (a baptism naming the parents,
+      -- a marriage naming the spouses) and explicit textual claims ("mi padre Juan")
+      -- never write to the relationships table — they accumulate here as proposals,
+      -- each carrying its verbatim quote + source. A mere co-mention of two names produces
+      -- NOTHING here; only real evidence does. A suggestion surfaces once its evidence
+      -- crosses a threshold; the user confirms it (→ an ai_confirmed relationship) or
+      -- dismisses it (persistent, like match_feedback — never re-proposed).
+      CREATE TABLE kinship_suggestions (
+        suggestion_id TEXT PRIMARY KEY,
+        from_person   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        to_person     TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        type          TEXT NOT NULL,                 -- 'parent' | 'spouse'
+        subtype       TEXT,                          -- null | 'adoptive'
+        status        TEXT NOT NULL DEFAULT 'open',  -- 'open' | 'confirmed' | 'dismissed'
+        score         REAL NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL,
+        UNIQUE (from_person, to_person, type)
+      );
+      CREATE INDEX idx_kinship_suggestions_status ON kinship_suggestions(status);
+      CREATE INDEX idx_kinship_suggestions_from ON kinship_suggestions(from_person);
+      CREATE INDEX idx_kinship_suggestions_to ON kinship_suggestions(to_person);
+
+      -- One row per piece of evidence backing a suggestion. 'record_role' = implied by
+      -- an event's participant roles (structural); 'explicit_claim' = the source text
+      -- states the relationship outright. Deduplicated by (suggestion, signal, source,
+      -- quote) so re-scanning the same source doesn't inflate a suggestion's score.
+      CREATE TABLE kinship_suggestion_evidence (
+        id            TEXT PRIMARY KEY,
+        suggestion_id TEXT NOT NULL REFERENCES kinship_suggestions(suggestion_id) ON DELETE CASCADE,
+        signal        TEXT NOT NULL,                 -- 'record_role' | 'explicit_claim'
+        source_kind   TEXT NOT NULL DEFAULT 'work',  -- 'work' | 'archive'
+        nodus_id      TEXT,
+        quote         TEXT,
+        location      TEXT,
+        weight        REAL NOT NULL DEFAULT 1,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_kinship_sugg_ev_suggestion ON kinship_suggestion_evidence(suggestion_id);
+      CREATE UNIQUE INDEX idx_kinship_sugg_ev_dedupe
+        ON kinship_suggestion_evidence(suggestion_id, signal, COALESCE(nodus_id, ''), COALESCE(quote, ''));
+
+      -- Semantic index for the evidence archive: embed each item's extracted text so
+      -- documents can be discovered by meaning ("which documents concern this person?"),
+      -- reusing the same float32-BLOB + vec_cosine machinery as ideas. Nullable: an
+      -- item is simply un-indexed until an embedding provider is configured and run.
+      ALTER TABLE archive_items ADD COLUMN embedding BLOB;
+      ALTER TABLE archive_items ADD COLUMN embedding_model TEXT;
+      ALTER TABLE archive_items ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE archive_items ADD COLUMN embedding_text_hash TEXT;
     `,
   },
 ];

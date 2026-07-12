@@ -72,6 +72,12 @@ const api: NodusApi = {
   findMatches: () => ipcRenderer.invoke('entities:findMatches'),
   mergePersons: (targetId, sourceId) => ipcRenderer.invoke('entities:mergePersons', targetId, sourceId),
   dismissMatch: (a, b) => ipcRenderer.invoke('entities:dismissMatch', a, b).then(() => undefined),
+  // Evidence-driven kinship suggestions
+  listKinSuggestions: () => ipcRenderer.invoke('kinship:listSuggestions'),
+  kinSuggestionsForPerson: (personId) => ipcRenderer.invoke('kinship:suggestionsForPerson', personId),
+  kinSuggestionCount: () => ipcRenderer.invoke('kinship:suggestionCount'),
+  confirmKinSuggestion: (suggestionId) => ipcRenderer.invoke('kinship:confirmSuggestion', suggestionId),
+  dismissKinSuggestion: (suggestionId) => ipcRenderer.invoke('kinship:dismissSuggestion', suggestionId),
   // Evidence archive
   archiveCounts: () => ipcRenderer.invoke('archive:counts'),
   listArchiveFolders: () => ipcRenderer.invoke('archive:listFolders'),
@@ -94,6 +100,10 @@ const api: NodusApi = {
   createArchiveTextEntry: (input) => ipcRenderer.invoke('archive:createTextEntry', input),
   scanArchiveItem: (itemId) => ipcRenderer.invoke('archive:scanItem', itemId),
   analyzeArchiveItem: (itemId) => ipcRenderer.invoke('archive:analyzeItem', itemId),
+  suggestPersonsForItem: (itemId) => ipcRenderer.invoke('archive:suggestPersonsForItem', itemId),
+  suggestDocumentsForPerson: (personId) => ipcRenderer.invoke('archive:suggestDocumentsForPerson', personId),
+  indexArchive: () => ipcRenderer.invoke('archive:index'),
+  archiveIndexStatus: () => ipcRenderer.invoke('archive:indexStatus'),
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),

@@ -89,12 +89,17 @@ export function mergePersons(targetId: string, sourceId: string): Person | null 
     db.prepare('UPDATE OR IGNORE relationships SET to_person = ? WHERE to_person = ?').run(targetId, sourceId);
     db.prepare('DELETE FROM relationships WHERE from_person = to_person').run();
     db.prepare("UPDATE record_evidence SET target_id = ? WHERE target_kind = 'person' AND target_id = ?").run(targetId, sourceId);
+    // Preserve the source's document links (manual user data): move them to the target.
+    db.prepare('UPDATE OR IGNORE archive_item_persons SET person_id = ? WHERE person_id = ?').run(targetId, sourceId);
     // Keep the target's portrait if it has one; otherwise adopt the source's.
     db.prepare('UPDATE OR IGNORE person_portraits SET person_id = ? WHERE person_id = ?').run(targetId, sourceId);
     // Merged dismissals: repoint so past decisions about the source still apply.
     db.prepare('UPDATE OR IGNORE match_feedback SET person_a = ? WHERE person_a = ?').run(targetId, sourceId);
     db.prepare('UPDATE OR IGNORE match_feedback SET person_b = ? WHERE person_b = ?').run(targetId, sourceId);
     db.prepare('DELETE FROM match_feedback WHERE person_a = person_b').run();
+    // Kinship suggestions are advisory and regenerable; drop any touching the source
+    // rather than risk a mis-ordered spouse pair. They will re-surface on the next scan.
+    db.prepare('DELETE FROM kinship_suggestions WHERE from_person = ? OR to_person = ?').run(sourceId, sourceId);
 
     // Fill empty target fields from the source (target values win when present).
     updatePerson(targetId, {

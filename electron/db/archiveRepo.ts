@@ -5,6 +5,7 @@
 
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
+import { encodeEmbedding } from './ideasRepo';
 import { sanitizeDocMetadata, extractItemYear } from '@shared/archiveDocTypes';
 import { applyArchiveFilters, sortArchiveItems } from '@shared/archiveFilters';
 import type {
@@ -82,12 +83,14 @@ interface ItemMetaRow {
   content_hash: string | null;
   doc_type: string | null;
   metadata_json: string | null;
+  has_embedding?: number;
   created_at: string;
   updated_at: string;
 }
 
 const ITEM_META_COLS = `item_id, folder_id, title, kind, file_name, mime_type, bytes,
-  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at`;
+  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, doc_type, metadata_json,
+  (embedding IS NOT NULL) AS has_embedding, created_at, updated_at`;
 
 const ITEM_META_SELECT = `SELECT ${ITEM_META_COLS} FROM archive_items`;
 
@@ -140,6 +143,7 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     year: extractItemYear(row.doc_type, metadata),
     linkedPersons: itemLinkedPersons(row.item_id),
     tags: itemTags(row.item_id),
+    hasEmbedding: Boolean(row.has_embedding),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -167,7 +171,8 @@ export function listItemsForPerson(personId: string): ArchiveItem[] {
   const rows = getDb()
     .prepare(
       `SELECT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
-        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json, i.created_at, i.updated_at
+        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json,
+        (i.embedding IS NOT NULL) AS has_embedding, i.created_at, i.updated_at
        FROM archive_items i JOIN archive_item_persons ap ON ap.item_id = i.item_id
        WHERE ap.person_id = ? ORDER BY i.updated_at DESC`
     )
@@ -334,4 +339,112 @@ export function archiveCounts(): { items: number; folders: number } {
     items: (db.prepare('SELECT COUNT(*) AS c FROM archive_items').get() as { c: number }).c,
     folders: (db.prepare('SELECT COUNT(*) AS c FROM archive_folders').get() as { c: number }).c,
   };
+}
+
+// ── Semantic index (embeddings) ────────────────────────────────────────────────
+
+export interface ArchiveEmbeddingRow {
+  itemId: string;
+  title: string;
+  description: string | null;
+  extractedText: string | null;
+  docType: string | null;
+  hasEmbedding: boolean;
+  embeddingModel: string | null;
+  embeddingTextHash: string | null;
+}
+
+/** Text-bearing items with their embedding metadata (no blobs), for the indexer. */
+export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT item_id, title, description, extracted_text, doc_type,
+        (embedding IS NOT NULL) AS has_embedding, embedding_model, embedding_text_hash
+       FROM archive_items
+       WHERE COALESCE(extracted_text, '') <> '' OR COALESCE(description, '') <> ''`
+    )
+    .all() as {
+    item_id: string;
+    title: string;
+    description: string | null;
+    extracted_text: string | null;
+    doc_type: string | null;
+    has_embedding: number;
+    embedding_model: string | null;
+    embedding_text_hash: string | null;
+  }[];
+  return rows.map((r) => ({
+    itemId: r.item_id,
+    title: r.title,
+    description: r.description,
+    extractedText: r.extracted_text,
+    docType: r.doc_type,
+    hasEmbedding: Boolean(r.has_embedding),
+    embeddingModel: r.embedding_model,
+    embeddingTextHash: r.embedding_text_hash,
+  }));
+}
+
+export function setItemEmbedding(itemId: string, vec: number[], model: string, textHash: string): void {
+  getDb()
+    .prepare(
+      'UPDATE archive_items SET embedding = ?, embedding_model = ?, embedding_dim = ?, embedding_text_hash = ?, updated_at = ? WHERE item_id = ?'
+    )
+    .run(encodeEmbedding(vec), model, vec.length, textHash, now(), itemId);
+}
+
+export function clearAllArchiveEmbeddings(): void {
+  getDb()
+    .prepare('UPDATE archive_items SET embedding = NULL, embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL')
+    .run();
+}
+
+export function archiveEmbeddingCount(): { indexed: number; total: number } {
+  const db = getDb();
+  return {
+    indexed: (db.prepare('SELECT COUNT(*) AS c FROM archive_items WHERE embedding IS NOT NULL').get() as { c: number }).c,
+    total: (
+      db
+        .prepare("SELECT COUNT(*) AS c FROM archive_items WHERE COALESCE(extracted_text,'') <> '' OR COALESCE(description,'') <> ''")
+        .get() as { c: number }
+    ).c,
+  };
+}
+
+/**
+ * Archive items most similar to a query vector, computed inside SQLite via vec_cosine.
+ * Optionally excludes items already linked to a given person (so discovery only ever
+ * proposes NEW links). Returns metadata items plus their similarity, strongest first.
+ */
+export function findArchiveItemsSimilar(
+  queryVec: number[],
+  opts: { limit?: number; minSimilarity?: number; excludePersonId?: string; excludeItemIds?: string[] } = {}
+): (ArchiveItem & { similarity: number })[] {
+  const limit = opts.limit ?? 8;
+  const minSim = opts.minSimilarity ?? 0.35;
+  const where: string[] = ['embedding IS NOT NULL'];
+  const params: unknown[] = [encodeEmbedding(queryVec)];
+  if (opts.excludePersonId) {
+    where.push('item_id NOT IN (SELECT item_id FROM archive_item_persons WHERE person_id = ?)');
+    params.push(opts.excludePersonId);
+  }
+  if (opts.excludeItemIds?.length) {
+    where.push(`item_id NOT IN (${opts.excludeItemIds.map(() => '?').join(',')})`);
+    params.push(...opts.excludeItemIds);
+  }
+  const rows = getDb()
+    .prepare(
+      `SELECT item_id, vec_cosine(embedding, ?) AS similarity
+       FROM archive_items WHERE ${where.join(' AND ')}
+       ORDER BY similarity DESC LIMIT ?`
+    )
+    .all(...params, limit * 2) as { item_id: string; similarity: number }[];
+  const out: (ArchiveItem & { similarity: number })[] = [];
+  for (const r of rows) {
+    if (r.similarity < minSim) continue;
+    const item = getItem(r.item_id);
+    if (item) out.push({ ...item, similarity: r.similarity });
+    if (out.length >= limit) break;
+  }
+  return out;
 }

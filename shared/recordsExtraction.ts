@@ -13,7 +13,9 @@
 
 import type { HistoricalEventType, ParticipantRole, PersonSex } from './types';
 
-export const RECORDS_EXTRACTION_PROMPT = `Eres un archivero experto en fuentes primarias y genealogía. Recibes un fragmento de un documento (censo, padrón, partida parroquial, acta, registro). Extrae ÚNICAMENTE los hechos explícitos en el texto: personas, lugares y eventos. No inventes datos, no deduzcas parentescos que el texto no afirme, no completes fechas que no aparezcan.
+export const RECORDS_EXTRACTION_PROMPT = `Eres un archivero experto en fuentes primarias y genealogía. Recibes un fragmento de un documento (censo, padrón, partida parroquial, acta, registro, diario, carta, memorias). Extrae ÚNICAMENTE los hechos explícitos en el texto: personas, lugares, eventos y los parentescos que el texto AFIRME. No inventes datos, no deduzcas parentescos que el texto no afirme, no completes fechas que no aparezcan.
+
+REGLA DE ORO: la mera aparición de dos nombres en el mismo texto NO implica ningún parentesco entre ellos. Nunca conviertas una co-aparición en una relación familiar. Solo registra un parentesco cuando el texto lo enuncie de forma explícita (p. ej. "Juan, padre de Ana"; "María, su esposa"; "hijo de Pedro").
 
 Devuelve SOLO un objeto JSON con esta forma:
 {
@@ -28,6 +30,9 @@ Devuelve SOLO un objeto JSON con esta forma:
       "label": "descripción breve opcional",
       "participants": [ { "name": "nombre de la persona", "role": "principal|spouse|father|mother|child|witness|officiant|other" } ],
       "quote": "cita literal", "location": "p. N" }
+  ],
+  "relations": [
+    { "subject": "nombre de una persona nombrada", "relation": "father|mother|parent|son|daughter|child|husband|wife|spouse", "object": "nombre de la otra persona nombrada", "quote": "cita literal que afirma el parentesco", "location": "p. N" }
   ]
 }
 
@@ -36,7 +41,8 @@ Reglas:
 - Usa los marcadores [[p. N]] del texto para "location". Si no hay marcador, deja "location" vacío; no inventes páginas.
 - Las fechas se copian tal como aparecen (p. ej. "hacia 1850", "2 de marzo de 1875"); no las normalices.
 - Si un dato no consta, omite el campo (no pongas null ni cadenas inventadas).
-- Cada persona que participe en un evento debe aparecer también con su "name" en "participants".`;
+- Cada persona que participe en un evento debe aparecer también con su "name" en "participants".
+- En "relations", "subject" es <relation> de "object" (p. ej. relation="father" significa que subject es el padre de object). Ambos deben ser personas NOMBRADAS en el texto; no uses la primera persona ("mi padre") salvo que el narrador esté nombrado. Si el texto no afirma ningún parentesco, deja "relations" vacío.`;
 
 export interface RawEvidence {
   quote?: string;
@@ -68,18 +74,25 @@ export interface RawEvent extends RawEvidence {
   participants?: RawParticipant[];
 }
 
+export interface RawRelation extends RawEvidence {
+  subject?: string;
+  relation?: string;
+  object?: string;
+}
+
 export interface RecordsChunkResult {
   persons?: RawPerson[];
   places?: RawPlace[];
   events?: RawEvent[];
+  relations?: RawRelation[];
 }
 
-/** Lenient shape guard: an object whose persons/places/events, when present, are arrays. */
+/** Lenient shape guard: an object whose persons/places/events/relations, when present, are arrays. */
 export function isRecordsChunkResult(v: unknown): v is RecordsChunkResult {
   if (!v || typeof v !== 'object') return false;
   const o = v as Record<string, unknown>;
   const okArr = (x: unknown) => x === undefined || Array.isArray(x);
-  return okArr(o.persons) && okArr(o.places) && okArr(o.events);
+  return okArr(o.persons) && okArr(o.places) && okArr(o.events) && okArr(o.relations);
 }
 
 /** Input payload for one chunk (stringified as the user message). */
@@ -176,10 +189,20 @@ export interface MergedEvent {
   evidence: RawEvidence | null;
 }
 
+/** An explicit kinship claim from the text, its names left unresolved for the persist step. */
+export interface MergedRelation {
+  subject: string;
+  relation: string;
+  object: string;
+  quote: string | null;
+  location: string | null;
+}
+
 export interface MergedRecords {
   persons: MergedPerson[];
   places: MergedPlace[];
   events: MergedEvent[];
+  relations: MergedRelation[];
 }
 
 /**
@@ -191,6 +214,8 @@ export function mergeRecordsResults(results: RecordsChunkResult[]): MergedRecord
   const persons = new Map<string, MergedPerson>();
   const places = new Map<string, MergedPlace>();
   const events: MergedEvent[] = [];
+  const relations: MergedRelation[] = [];
+  const relationSeen = new Set<string>();
 
   const rememberPerson = (name: string, sex?: string, birth?: string, death?: string, ev?: RawEvidence | null) => {
     const trimmed = name.trim();
@@ -248,7 +273,26 @@ export function mergeRecordsResults(results: RecordsChunkResult[]): MergedRecord
         evidence: cleanEvidence(e),
       });
     }
+    for (const r of result.relations ?? []) {
+      const subject = (r?.subject ?? '').trim();
+      const object = (r?.object ?? '').trim();
+      const relation = (r?.relation ?? '').trim();
+      if (!subject || !object || !relation) continue;
+      // Both parties of an explicit claim are persons; make sure they exist as such.
+      rememberPerson(subject);
+      rememberPerson(object);
+      const key = `${normalizeNameKey(subject)}|${relation.toLowerCase()}|${normalizeNameKey(object)}`;
+      if (relationSeen.has(key)) continue;
+      relationSeen.add(key);
+      relations.push({
+        subject,
+        object,
+        relation,
+        quote: (r.quote ?? '').trim() || null,
+        location: (r.location ?? '').trim() || null,
+      });
+    }
   }
 
-  return { persons: [...persons.values()], places: [...places.values()], events };
+  return { persons: [...persons.values()], places: [...places.values()], events, relations };
 }

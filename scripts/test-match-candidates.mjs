@@ -84,3 +84,33 @@ test('unknown years do not block a name match', () => {
   const cands = mc.computeMatchCandidates([person('a', 'Juan Pérez'), person('b', 'Juan Pérez')]);
   assert.equal(cands.length, 1, 'both years null → still a candidate on name alone');
 });
+
+const target = (name, birthYear = null) => ({
+  tokens: name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/\s+/),
+  birthYear,
+});
+
+test('shouldLinkToExisting: unambiguous exact match links', () => {
+  const existing = [person('e1', 'Juan Pérez', 1850)];
+  assert.equal(mc.shouldLinkToExisting(target('Juan Pérez', 1850), existing), 'e1');
+  assert.equal(mc.shouldLinkToExisting(target('Juan Pérez', null), existing), 'e1', 'unknown year still links to the single exact match');
+});
+
+test('shouldLinkToExisting: a merely-similar name never auto-links', () => {
+  const existing = [person('e1', 'Juan Peres', 1850)];
+  assert.equal(mc.shouldLinkToExisting(target('Juan Pérez', 1850), existing), null, 'similar-but-not-exact → review, not silent merge');
+});
+
+test('shouldLinkToExisting: conflicting birth years block the link', () => {
+  const existing = [person('e1', 'Juan Pérez', 1850)];
+  assert.equal(mc.shouldLinkToExisting(target('Juan Pérez', 1875), existing), null);
+});
+
+test('shouldLinkToExisting: two exact matches are ambiguous → no link', () => {
+  const existing = [person('e1', 'Juan Pérez', 1850), person('e2', 'Juan Pérez', 1851)];
+  assert.equal(mc.shouldLinkToExisting(target('Juan Pérez', null), existing), null, 'ambiguous → user adjudicates');
+});
+
+test('shouldLinkToExisting: no candidates → create new', () => {
+  assert.equal(mc.shouldLinkToExisting(target('Nadie Conocido'), [person('e1', 'Juan Pérez')]), null);
+});

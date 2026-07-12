@@ -103,6 +103,35 @@ try {
   assert.equal(archEvidence[0].sourceKind, 'archive', 'evidence marks the archive source kind');
   assert.equal(archEvidence[0].nodusId, 'archive-item-1', 'evidence points at the archive item id');
 
+  // ── Scenario D: reconciliation — a second record LINKS to the existing person ──
+  const sugRepo = require(path.join(repoRoot, 'electron/db/kinshipSuggestionsRepo.ts'));
+  const before = repo.recordCounts().persons;
+  // "Juan Pérez" already exists from scenario A (born c. 1850). A diary that names him
+  // again must attach to him, not create a duplicate.
+  const diaryMerged = require(path.join(repoRoot, 'shared/recordsExtraction.ts')).mergeRecordsResults([
+    {
+      persons: [{ name: 'Juan Pérez', quote: 'Juan escribió en su diario', location: 'p. 9' }],
+      relations: [
+        { subject: 'Juan Pérez', relation: 'father', object: 'Ana Pérez', quote: 'Ana, mi hija', location: 'p. 9' },
+      ],
+    },
+  ]);
+  const dRes = scan.persistRecords('archive-diary-1', diaryMerged, 'archive');
+  assert.equal(dRes.linked, 1, 'the diary mention linked to the existing Juan, not a duplicate');
+  assert.equal(repo.recordCounts().persons, before + 1, 'only Ana (new) was created; Juan reused');
+  const juanAfter = repo.listPersons({ search: 'juan pérez' });
+  assert.equal(juanAfter.length, 1, 'still a single Juan Pérez record');
+  // The explicit "father of" claim became a kinship SUGGESTION, not a written edge.
+  const juanRels = require(path.join(repoRoot, 'electron/db/relationshipsRepo.ts')).listRelationshipsForPerson(
+    juanAfter[0].personId
+  );
+  assert.equal(juanRels.length, 0, 'no relationship written by the scan');
+  const juanSug = sugRepo.listSuggestionsForPerson(juanAfter[0].personId);
+  assert.ok(
+    juanSug.some((s) => s.type === 'parent'),
+    'the explicit paternity claim surfaced as a suggestion to confirm'
+  );
+
   console.log('Records scan orchestrator test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });

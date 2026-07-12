@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { ArchiveFolder, ArchiveItem, ArchiveItemKind, ArchiveMatchMode, ArchiveSortKey, ArchiveTagCount, Person } from '@shared/types';
+import type {
+  ArchiveFolder,
+  ArchiveItem,
+  ArchiveItemKind,
+  ArchiveMatchMode,
+  ArchiveSortKey,
+  ArchiveTagCount,
+  Person,
+  PersonLinkSuggestion,
+} from '@shared/types';
 import { getArchiveDocType } from '@shared/archiveDocTypes';
 import { Icon } from '../components/ui';
 import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
@@ -159,6 +168,29 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
               title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
             >
               <Icon name="edit" /> {t('Nueva entrada')}
+            </button>
+            <button
+              className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+              disabled={busy}
+              title={t('Indexar el texto de los documentos para descubrir relaciones semánticas con las personas')}
+              onClick={async () => {
+                setBusy(true);
+                setMessage(t('Indexando el archivo…'));
+                try {
+                  const r = await window.nodus.indexArchive();
+                  setMessage(
+                    r.indexed > 0
+                      ? t('Indexados {n} documentos para la búsqueda semántica.').replace('{n}', String(r.indexed))
+                      : t('El archivo ya está indexado (o no hay proveedor de embeddings configurado).')
+                  );
+                } catch (err) {
+                  setMessage(err instanceof Error ? err.message : String(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Icon name="wand" size={15} /> {t('Indexar')}
             </button>
           </div>
           <p className="text-xs text-neutral-500">
@@ -416,6 +448,13 @@ function ArchiveItemDetail({
   const [docType, setDocType] = useState<string | null>(item.docType);
   const [metadata, setMetadata] = useState<Record<string, string>>(item.metadata ?? {});
   const [classDirty, setClassDirty] = useState(false);
+  const [personSuggestions, setPersonSuggestions] = useState<PersonLinkSuggestion[]>([]);
+  const [hiddenPersons, setHiddenPersons] = useState<Set<string>>(new Set());
+
+  const loadPersonSuggestions = useCallback(() => {
+    void window.nodus.suggestPersonsForItem(item.itemId).then(setPersonSuggestions);
+  }, [item.itemId]);
+  useEffect(() => loadPersonSuggestions(), [loadPersonSuggestions]);
 
   const saveClassification = async () => {
     await window.nodus.updateArchiveItem(item.itemId, { docType, metadata });
@@ -495,11 +534,16 @@ function ArchiveItemDetail({
       if (r.noText) {
         setScanMsg(t('Este elemento no tiene texto extraído para analizar.'));
       } else {
-        setScanMsg(
+        const parts = [
           t('Extraídos: {p} personas, {e} eventos.')
             .replace('{p}', String(r.persons))
-            .replace('{e}', String(r.events))
-        );
+            .replace('{e}', String(r.events)),
+        ];
+        if (r.linked) parts.push(t('{n} enlazadas a personas existentes.').replace('{n}', String(r.linked)));
+        if (r.suggestions) parts.push(t('{n} parentescos sugeridos por revisar.').replace('{n}', String(r.suggestions)));
+        setScanMsg(parts.join(' '));
+        loadPersonSuggestions();
+        await onChanged();
       }
     } catch (err) {
       setScanMsg(err instanceof Error ? err.message : String(err));
@@ -603,6 +647,43 @@ function ArchiveItemDetail({
               </button>
             )}
           </div>
+
+          {personSuggestions.filter((p) => !hiddenPersons.has(p.personId)).length > 0 && (
+            <div className="mb-3">
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-300">
+                <Icon name="bulb" size={12} /> {t('Personas mencionadas en este documento')}
+              </h3>
+              <p className="mb-2 text-[11px] text-neutral-500">
+                {t('Coinciden con miembros del árbol. Vincúlalas si son la misma persona.')}
+              </p>
+              <ul className="space-y-1.5">
+                {personSuggestions
+                  .filter((p) => !hiddenPersons.has(p.personId))
+                  .map((p) => (
+                    <li key={p.personId} className="flex items-center gap-2 rounded-md border border-indigo-900/40 bg-indigo-950/10 px-3 py-2 text-sm">
+                      <Icon name="user" size={14} className="shrink-0 text-neutral-500" />
+                      <span className="truncate text-neutral-200">{p.displayName}</span>
+                      <button
+                        className="btn btn-primary ml-auto h-7 shrink-0 px-2 text-xs"
+                        onClick={async () => {
+                          await window.nodus.linkArchivePerson(item.itemId, p.personId);
+                          setHiddenPersons((prev) => new Set(prev).add(p.personId));
+                          await onChanged();
+                        }}
+                      >
+                        {t('Vincular')}
+                      </button>
+                      <button
+                        className="btn btn-ghost h-7 shrink-0 border border-neutral-700 px-2 text-xs text-neutral-400"
+                        onClick={() => setHiddenPersons((prev) => new Set(prev).add(p.personId))}
+                      >
+                        {t('Ocultar')}
+                      </button>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="mt-2 border-t border-neutral-800 pt-3">

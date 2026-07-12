@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MatchCandidatePair, Person, PersonSex } from '@shared/types';
+import type { KinSuggestion, MatchCandidatePair, Person, PersonSex } from '@shared/types';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { PersonDossier } from '../components/PersonDossier';
 import { t, tx } from '../i18n';
+
+const STRENGTH_STYLE: Record<string, string> = {
+  alta: 'bg-emerald-900/40 text-emerald-300',
+  media: 'bg-amber-900/40 text-amber-300',
+  baja: 'bg-neutral-800 text-neutral-400',
+};
 
 function lifeSpan(p: Person): string {
   const b = p.birthDate?.trim();
@@ -20,10 +26,13 @@ export function PersonasView() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [reviewingKin, setReviewingKin] = useState(false);
+  const [kinCount, setKinCount] = useState(0);
 
   const reload = useCallback(async () => {
     const list = await window.nodus.listPersons(search.trim() || undefined);
     setPersons(list);
+    void window.nodus.kinSuggestionCount().then(setKinCount);
   }, [search]);
 
   useEffect(() => {
@@ -77,6 +86,17 @@ export function PersonasView() {
           >
             <Icon name="users" size={13} /> {t('Revisar coincidencias')}
           </button>
+          <button
+            className="btn btn-ghost h-8 w-full gap-1.5 border border-neutral-700 text-xs disabled:opacity-40"
+            title={t('Revisar parentescos propuestos a partir de la evidencia')}
+            disabled={kinCount === 0}
+            onClick={() => setReviewingKin(true)}
+          >
+            <Icon name="tree" size={13} /> {t('Parentescos sugeridos')}
+            {kinCount > 0 && (
+              <span className="ml-auto rounded-full bg-indigo-600/30 px-1.5 text-[11px] text-indigo-200">{kinCount}</span>
+            )}
+          </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           {persons.length === 0 && (
@@ -125,6 +145,122 @@ export function PersonasView() {
           }}
         />
       )}
+      {reviewingKin && (
+        <KinReviewModal onClose={() => setReviewingKin(false)} onChanged={reload} onNavigate={(id) => setSelectedId(id)} />
+      )}
+    </div>
+  );
+}
+
+/** Review evidence-driven kinship proposals in bulk: confirm (writes an ai_confirmed
+ *  edge) or dismiss (persistent). Nothing is ever added to the tree automatically. */
+function KinReviewModal({
+  onClose,
+  onChanged,
+  onNavigate,
+}: {
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+  onNavigate: (id: string) => void;
+}) {
+  const [items, setItems] = useState<KinSuggestion[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setItems(await window.nodus.listKinSuggestions());
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      await load();
+      await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="card flex max-h-[85vh] w-full max-w-2xl flex-col p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">{t('Parentescos sugeridos')}</h2>
+            <p className="text-xs text-neutral-500">
+              {t('Propuestos a partir de la evidencia de las fuentes. Tú confirmas; nada se añade al árbol solo.')}
+            </p>
+          </div>
+          <button className="btn btn-ghost px-2 py-1" onClick={onClose}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {items === null ? (
+            <p className="py-8 text-center text-sm text-neutral-500">{t('Cargando…')}</p>
+          ) : items.length === 0 ? (
+            <p className="py-8 text-center text-sm text-neutral-500">{t('No hay parentescos por revisar.')}</p>
+          ) : (
+            <ul className="space-y-3">
+              {items.map((s) => (
+                <li key={s.suggestionId} className="rounded-lg border border-neutral-800 p-3">
+                  <div className="mb-1 flex items-start gap-2">
+                    <p className="flex-1 text-sm text-neutral-200">
+                      {s.type === 'spouse'
+                        ? tx('¿{a} y {b} eran cónyuges?', { a: s.fromName, b: s.toName })
+                        : tx('¿{parent} era progenitor(a) de {child}?', { parent: s.fromName, child: s.toName })}
+                    </p>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase ${STRENGTH_STYLE[s.strength] ?? STRENGTH_STYLE.baja}`}>
+                      {t(s.strength)}
+                    </span>
+                  </div>
+                  {s.evidence.some((ev) => ev.quote) && (
+                    <ul className="mb-2 space-y-1 border-l-2 border-neutral-800 pl-2">
+                      {s.evidence
+                        .filter((ev) => ev.quote)
+                        .slice(0, 4)
+                        .map((ev) => (
+                          <li key={ev.id} className="text-xs italic text-neutral-400">
+                            “{ev.quote}”
+                            <span className="not-italic text-neutral-600">
+                              {' '}
+                              · {ev.signal === 'explicit_claim' ? t('mención explícita') : t('registro')}
+                              {ev.location ? ` · ${ev.location}` : ''}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn btn-primary h-8 text-xs" disabled={busy} onClick={() => void act(() => window.nodus.confirmKinSuggestion(s.suggestionId))}>
+                      {t('Confirmar parentesco')}
+                    </button>
+                    <button
+                      className="btn btn-ghost h-8 border border-neutral-700 text-xs text-neutral-400"
+                      disabled={busy}
+                      onClick={() => void act(() => window.nodus.dismissKinSuggestion(s.suggestionId))}
+                    >
+                      {t('Descartar')}
+                    </button>
+                    <button
+                      className="btn btn-ghost ml-auto h-8 border border-neutral-700 text-xs"
+                      onClick={() => {
+                        onNavigate(s.fromPerson);
+                        onClose();
+                      }}
+                    >
+                      {t('Ver ficha')}
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

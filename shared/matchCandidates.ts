@@ -77,6 +77,39 @@ export function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
+export interface ReconcileTarget {
+  /** Normalised name tokens of the freshly extracted person. */
+  tokens: string[];
+  birthYear: number | null;
+}
+
+/**
+ * Decide whether a freshly extracted person should LINK to an existing record instead
+ * of creating a duplicate. Deliberately conservative — the whole point of Nodus is not
+ * to silently fold two people together on a weak signal. It links ONLY when there is an
+ * EXACT name match, with no conflicting birth year, and exactly ONE such candidate.
+ * Anything ambiguous — a merely-similar name, several exact matches, or a date conflict
+ * — returns null, so a new person is created and the pair flows to the user-adjudicated
+ * "Revisar coincidencias" review rather than being merged behind the user's back.
+ */
+export function shouldLinkToExisting(extracted: ReconcileTarget, existing: MatchPerson[]): string | null {
+  const matches: string[] = [];
+  for (const e of existing) {
+    const cmp = compareNames(extracted.tokens, e.tokens);
+    if (!cmp || !cmp.exact) continue;
+    if (
+      extracted.birthYear != null &&
+      e.birthYear != null &&
+      Math.abs(extracted.birthYear - e.birthYear) > BIRTH_YEAR_WINDOW
+    ) {
+      continue; // Same name but incompatible years → different people; do not link.
+    }
+    matches.push(e.id);
+    if (matches.length > 1) return null; // Ambiguous → let the user adjudicate.
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
 /**
  * Compute candidate matches over the person set, skipping dismissed pairs. Persons
  * with incompatible known birth years are never paired.

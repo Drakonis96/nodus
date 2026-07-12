@@ -33,6 +33,9 @@ import * as researchQuestions from '../db/researchMapRepo';
 import * as themes from '../db/themesRepo';
 import * as tutorRoutes from '../db/tutorRepo';
 import * as workSummaries from '../db/workSummariesRepo';
+import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
+import { kinOf } from '../db/relationshipsRepo';
+import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
 import * as writingDrafts from '../db/writingDraftsRepo';
 import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
@@ -310,8 +313,8 @@ function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes' | 'themes
 function vaultContext() {
   const active = getActiveVault();
   return {
-    active: { id: active.id, name: active.name },
-    available: listVaults().map((vault) => ({ id: vault.id, name: vault.name, active: vault.active })),
+    active: { id: active.id, name: active.name, type: active.type },
+    available: listVaults().map((vault) => ({ id: vault.id, name: vault.name, type: vault.type, active: vault.active })),
   };
 }
 
@@ -1481,6 +1484,108 @@ export function registerTools(server: McpServer): void {
         const note = notes.updateNote({ id, title, content, folderId });
         if (!note) throw notFound('note', id);
         return note;
+      })()
+  );
+
+  // ── Genealogy / primary-source records (read-only) ─────────────────────────
+  // These read the entity ontology (persons, events, kinship). In a genealogy or
+  // primary-sources vault they let an AI client reason over the family/record layer;
+  // in an academic vault they simply return empty. They are strictly read-only: an
+  // AI client can never write a relationship or confirm a suggestion through MCP —
+  // that stays in the user's hands inside the Nodus app.
+
+  server.registerTool(
+    'nodus_list_persons',
+    {
+      title: 'List persons',
+      description:
+        'Lists persons in the records ontology (genealogy / primary-source vaults): the people extracted from records or entered by hand. Optional name query matches the display name or a name variant. Read-only; returns an empty list in vaults without a records layer.',
+      inputSchema: {
+        limit: z.number().int().min(1).max(200).default(100),
+        offset: z.number().int().min(0).default(0),
+        query: querySchema,
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query }) =>
+      tool(() => {
+        const all = listPersons({ search: query || undefined }).map((p) => ({
+          personId: p.personId,
+          displayName: p.displayName,
+          sex: p.sex,
+          birthDate: p.birthDate,
+          deathDate: p.deathDate,
+        }));
+        return { persons: all.slice(offset, offset + limit), total: all.length };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_person',
+    {
+      title: 'Get a person with kin, events and evidence',
+      description:
+        'Gets one person with their immediate kinship (parents, spouses, children, siblings), life events, the cited evidence backing them, and any OPEN kinship suggestions that concern them. Kinship suggestions are evidence-backed proposals awaiting the user\'s confirmation in the Nodus app — they are NOT asserted relationships, and this tool cannot confirm or write them. Read-only. Do not present a suggestion as an established fact.',
+      inputSchema: { personId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ personId }) =>
+      tool(() => {
+        const person = getPerson(personId);
+        if (!person) throw notFound('person', personId);
+        const kin = kinOf(personId);
+        const names = (people: { displayName: string }[]) => people.map((p) => p.displayName);
+        return {
+          personId: person.personId,
+          displayName: person.displayName,
+          sex: person.sex,
+          birthDate: person.birthDate,
+          deathDate: person.deathDate,
+          nameVariants: person.names.map((n) => n.name),
+          biography: person.biography,
+          kin: {
+            parents: names(kin.parents),
+            spouses: names(kin.spouses),
+            children: names(kin.children),
+            siblings: names(kin.siblings),
+          },
+          events: listEvents({ personId }).map((e) => ({ type: e.type, date: e.date, place: e.placeName, label: e.label })),
+          evidence: listEvidenceFor('person', personId).map((ev) => ({ quote: ev.quote, location: ev.location, source: ev.sourceKind })),
+          kinshipSuggestions: listSuggestionsForPerson(personId).map((s) => ({
+            type: s.type,
+            fromName: s.fromName,
+            toName: s.toName,
+            strength: s.strength,
+            status: 'proposed (awaiting user confirmation in Nodus)',
+            evidence: s.evidence.filter((ev) => ev.quote).map((ev) => ({ quote: ev.quote, location: ev.location, signal: ev.signal })),
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_kin_suggestions',
+    {
+      title: 'List open kinship suggestions',
+      description:
+        'Lists the vault\'s OPEN kinship suggestions: evidence-backed parent/spouse proposals derived from records and explicit textual claims, each carrying its verbatim quotes and a strength (alta/media/baja). These are hypotheses awaiting the user\'s confirmation in the Nodus app — never present them as established relationships, and note that only the user can confirm them. Read-only.',
+      inputSchema: {
+        limit: z.number().int().min(1).max(200).default(100),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset }) =>
+      tool(() => {
+        const all = listOpenSuggestions().map((s) => ({
+          suggestionId: s.suggestionId,
+          type: s.type,
+          fromName: s.fromName,
+          toName: s.toName,
+          strength: s.strength,
+          evidence: s.evidence.filter((ev) => ev.quote).map((ev) => ({ quote: ev.quote, location: ev.location, signal: ev.signal })),
+        }));
+        return { suggestions: all.slice(offset, offset + limit), total: all.length };
       })()
   );
 }

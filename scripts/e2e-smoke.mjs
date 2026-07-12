@@ -218,6 +218,18 @@ try {
     });
     await window.nodus.linkArchivePerson(entry.itemId, juan.personId);
     const linkedDocs = await window.nodus.listArchiveItemsForPerson(juan.personId);
+
+    // Kinship suggestion IPC is wired and answers cleanly with no proposals yet
+    // (proposals are seeded by an AI scan, which needs a provider key we don't set here;
+    // the accumulate/confirm/dismiss logic is covered by the unit repo test).
+    const kinSuggestionCount = await window.nodus.kinSuggestionCount();
+    const kinSuggestions = await window.nodus.listKinSuggestions();
+
+    // Archive discovery is AI-free (lexical): the censal sheet names Juan, so he is
+    // proposed for the document and the document is proposed for him — both directions.
+    const personSuggestions = await window.nodus.suggestPersonsForItem(item.itemId);
+    const docSuggestions = await window.nodus.suggestDocumentsForPerson(juan.personId);
+
     return {
       linkedDocs: linkedDocs.length,
       linkedName: (await window.nodus.getArchiveItem(entry.itemId)).linkedPersons[0]?.displayName,
@@ -233,6 +245,10 @@ try {
       archiveItems: (await window.nodus.listArchiveItems({ tags: ['censo'] })).length,
       archiveFilteredOut: (await window.nodus.listArchiveItems({ tags: ['inexistente'] })).length,
       hasBlobFlag: item.hasBlob,
+      kinSuggestionCount,
+      kinSuggestionsIsArray: Array.isArray(kinSuggestions),
+      personSuggested: personSuggestions.some((p) => p.displayName === 'Juan Pérez'),
+      docSuggested: docSuggestions.some((d) => d.itemId === item.itemId && d.reason === 'name'),
     };
   });
   assert.equal(records.persons, 2, 'persons created over IPC');
@@ -248,6 +264,10 @@ try {
   assert.equal(records.archiveFilteredOut, 0, 'tag filter excludes non-matching items over IPC');
   assert.equal(records.entryDocType, 'birth_record', 'text entry keeps its document type');
   assert.deepEqual(records.entryMeta, { persona: 'Juan Pérez' }, 'metadata sanitised to the type (unknown key dropped)');
+  assert.equal(records.kinSuggestionCount, 0, 'kinship suggestions IPC answers (none seeded without AI)');
+  assert.ok(records.kinSuggestionsIsArray, 'listKinSuggestions returns an array over IPC');
+  assert.ok(records.personSuggested, 'archive → person discovery proposes the named person over IPC');
+  assert.ok(records.docSuggested, 'person → document discovery proposes the naming document over IPC');
   console.log('[e2e] records ontology + archive ok over IPC');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────

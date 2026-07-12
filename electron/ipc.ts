@@ -280,6 +280,20 @@ import {
 } from './db/relationshipsRepo';
 import { importGedcom, exportGedcom } from './genealogy/gedcomBridge';
 import { findMatchCandidates, mergePersons, dismissMatch } from './db/matchRepo';
+import {
+  listOpenSuggestions,
+  listSuggestionsForPerson,
+  confirmSuggestion,
+  dismissSuggestion,
+  openSuggestionCount,
+} from './db/kinshipSuggestionsRepo';
+import {
+  embedArchiveItem,
+  embedArchiveBacklog,
+  archiveIndexStatus,
+  suggestPersonsForItem,
+  suggestDocumentsForPerson,
+} from './archive/archiveDiscovery';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -572,6 +586,17 @@ export function registerIpc(
   h('entities:dismissMatch', async (_e, a: string, b: string) => {
     dismissMatch(a, b);
   });
+  // Evidence-driven kinship suggestions (AI proposes, the user disposes)
+  h('kinship:listSuggestions', async () => listOpenSuggestions());
+  h('kinship:suggestionsForPerson', async (_e, personId: string) => listSuggestionsForPerson(personId));
+  h('kinship:suggestionCount', async () => openSuggestionCount());
+  h('kinship:confirmSuggestion', async (_e, suggestionId: string) => confirmSuggestion(suggestionId));
+  h('kinship:dismissSuggestion', async (_e, suggestionId: string) => dismissSuggestion(suggestionId));
+  // Archive → person link discovery (proposals only)
+  h('archive:suggestPersonsForItem', async (_e, itemId: string) => suggestPersonsForItem(itemId));
+  h('archive:suggestDocumentsForPerson', async (_e, personId: string) => suggestDocumentsForPerson(personId));
+  h('archive:index', async () => embedArchiveBacklog());
+  h('archive:indexStatus', async () => archiveIndexStatus());
   // GEDCOM import / export
   h('genealogy:importGedcom', async () => {
     const win = getWindow();
@@ -634,6 +659,8 @@ export function registerIpc(
     }
     const model = getSettings().extractionModel ?? undefined;
     const result = await scanArchiveTextRecords(itemId, item.extractedText, model);
+    // Index the item so it can be discovered semantically (best-effort).
+    await embedArchiveItem(itemId).catch(() => false);
     return { ...result, noText: false };
   });
   h('archive:pickAndIngest', async (_e, folderId?: string | null, docType?: string | null) => {
@@ -660,6 +687,8 @@ export function registerIpc(
       else added++;
       items.push(result.item);
     }
+    // Index the freshly ingested text for semantic discovery, in the background.
+    void embedArchiveBacklog().catch(() => undefined);
     return { added, duplicates, items };
   });
   // A typed text entry (diary page, note, memoir) with no file to upload.
@@ -692,6 +721,7 @@ export function registerIpc(
       description: analysis.description || null,
       extractedText: analysis.text.trim() ? analysis.text : item.extractedText,
     });
+    await embedArchiveItem(itemId).catch(() => false);
     return { unsupported: false, description: analysis.description || null };
   });
 

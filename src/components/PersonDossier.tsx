@@ -1,11 +1,27 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ArchiveItem, HistoricalEvent, Kin, MatchCandidatePair, Person, PortraitFocus, RecordEvidence } from '@shared/types';
+import type {
+  ArchiveItem,
+  DocumentLinkSuggestion,
+  HistoricalEvent,
+  Kin,
+  KinSuggestion,
+  MatchCandidatePair,
+  Person,
+  PortraitFocus,
+  RecordEvidence,
+} from '@shared/types';
 import { detectPersonConflicts } from '@shared/conflictDetection';
 import { Icon } from './ui';
 import { PersonPortrait } from './PersonPortrait';
 import { docTypeLabel } from './DocTypeForm';
 import { EVENT_TYPE_LABEL, FACT_LABEL } from './personLabels';
 import { t, tx } from '../i18n';
+
+const STRENGTH_STYLE: Record<string, string> = {
+  alta: 'bg-emerald-900/40 text-emerald-300',
+  media: 'bg-amber-900/40 text-amber-300',
+  baja: 'bg-neutral-800 text-neutral-400',
+};
 
 function lifeSpan(p: Person): string {
   const b = p.birthDate?.trim();
@@ -41,6 +57,9 @@ export function PersonDossier({
   const [kin, setKin] = useState<Kin | null>(null);
   const [documents, setDocuments] = useState<ArchiveItem[]>([]);
   const [suggestions, setSuggestions] = useState<MatchCandidatePair[]>([]);
+  const [kinSuggestions, setKinSuggestions] = useState<KinSuggestion[]>([]);
+  const [docSuggestions, setDocSuggestions] = useState<DocumentLinkSuggestion[]>([]);
+  const [hiddenDocs, setHiddenDocs] = useState<Set<string>>(new Set());
   const [bioBusy, setBioBusy] = useState(false);
   const [bioMsg, setBioMsg] = useState<string | null>(null);
 
@@ -52,6 +71,8 @@ export function PersonDossier({
     void window.nodus.findMatches().then((all) =>
       setSuggestions(all.filter((m) => m.aId === person.personId || m.bId === person.personId))
     );
+    void window.nodus.kinSuggestionsForPerson(person.personId).then(setKinSuggestions);
+    void window.nodus.suggestDocumentsForPerson(person.personId).then(setDocSuggestions);
   }, [person.personId]);
 
   useEffect(() => {
@@ -176,6 +197,72 @@ export function PersonDossier({
         </section>
       )}
 
+      {/* Evidence-driven kinship suggestions: the AI proposes, the user confirms. */}
+      {kinSuggestions.length > 0 && (
+        <section className="rounded-md border border-indigo-900/50 bg-indigo-950/10 p-3">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-300">
+            <Icon name="tree" size={13} /> {t('Parentescos sugeridos')}
+          </h3>
+          <p className="mb-2 text-[11px] text-neutral-500">
+            {t('Propuestas a partir de la evidencia. Nada se añade al árbol sin tu confirmación.')}
+          </p>
+          <ul className="space-y-2">
+            {kinSuggestions.map((s) => (
+              <li key={s.suggestionId} className="rounded-md border border-neutral-800 p-2">
+                <div className="flex items-start gap-2">
+                  <p className="flex-1 text-sm text-neutral-200">
+                    {s.type === 'spouse'
+                      ? tx('¿{a} y {b} eran cónyuges?', { a: s.fromName, b: s.toName })
+                      : tx('¿{parent} era progenitor(a) de {child}?', { parent: s.fromName, child: s.toName })}
+                  </p>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase ${STRENGTH_STYLE[s.strength] ?? STRENGTH_STYLE.baja}`}>
+                    {t(s.strength)}
+                  </span>
+                </div>
+                {s.evidence.some((ev) => ev.quote) && (
+                  <ul className="mt-1.5 space-y-1 border-l-2 border-neutral-800 pl-2">
+                    {s.evidence
+                      .filter((ev) => ev.quote)
+                      .slice(0, 3)
+                      .map((ev) => (
+                        <li key={ev.id} className="text-xs italic text-neutral-400">
+                          “{ev.quote}”
+                          <span className="not-italic text-neutral-600">
+                            {' '}
+                            · {ev.signal === 'explicit_claim' ? t('mención explícita') : t('registro')}
+                            {ev.location ? ` · ${ev.location}` : ''}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                <div className="mt-1.5 flex gap-2">
+                  <button
+                    className="btn btn-primary h-7 text-xs"
+                    onClick={async () => {
+                      await window.nodus.confirmKinSuggestion(s.suggestionId);
+                      await onChanged();
+                      await load();
+                    }}
+                  >
+                    {t('Confirmar parentesco')}
+                  </button>
+                  <button
+                    className="btn btn-ghost h-7 border border-neutral-700 text-xs text-neutral-400"
+                    onClick={async () => {
+                      await window.nodus.dismissKinSuggestion(s.suggestionId);
+                      await load();
+                    }}
+                  >
+                    {t('Descartar')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {conflicts.length > 0 && (
         <section className="rounded-md border border-amber-900/60 bg-amber-950/20 p-3">
           <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-300">
@@ -250,7 +337,7 @@ export function PersonDossier({
           {t('Documentos')} <span className="text-neutral-600">({documents.length})</span>
         </h3>
         {documents.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t('Ningún documento vinculado. Vincúlalos desde el Archivo.')}</p>
+          <p className="text-sm text-neutral-500">{t('Ningún documento vinculado. Vincúlalos desde el Archivo o acepta una sugerencia.')}</p>
         ) : (
           <ul className="space-y-1.5">
             {documents.map((d) => (
@@ -261,6 +348,41 @@ export function PersonDossier({
               </li>
             ))}
           </ul>
+        )}
+        {docSuggestions.filter((d) => !hiddenDocs.has(d.itemId)).length > 0 && (
+          <div className="mt-3">
+            <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-300">
+              <Icon name="bulb" size={12} /> {t('Documentos que podrían tratar sobre esta persona')}
+            </h4>
+            <ul className="space-y-1.5">
+              {docSuggestions
+                .filter((d) => !hiddenDocs.has(d.itemId))
+                .map((d) => (
+                  <li key={d.itemId} className="flex items-center gap-2 rounded-md border border-indigo-900/40 bg-indigo-950/10 px-3 py-2 text-sm">
+                    <Icon name="archive" size={14} className="shrink-0 text-neutral-500" />
+                    <span className="truncate text-neutral-200">{d.title}</span>
+                    <span className="shrink-0 text-[11px] text-neutral-500">
+                      {d.reason === 'semantic' ? tx('similitud {n}', { n: d.score.toFixed(2) }) : t('nombre citado')}
+                    </span>
+                    <button
+                      className="btn btn-primary ml-auto h-7 shrink-0 px-2 text-xs"
+                      onClick={async () => {
+                        await window.nodus.linkArchivePerson(d.itemId, person.personId);
+                        await load();
+                      }}
+                    >
+                      {t('Vincular')}
+                    </button>
+                    <button
+                      className="btn btn-ghost h-7 shrink-0 border border-neutral-700 px-2 text-xs text-neutral-400"
+                      onClick={() => setHiddenDocs((prev) => new Set(prev).add(d.itemId))}
+                    >
+                      {t('Ocultar')}
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
         )}
       </section>
 

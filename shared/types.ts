@@ -802,6 +802,47 @@ export interface GedcomImportResult {
   events: number;
 }
 
+// ── Evidence-driven kinship suggestions (genealogy) ──────────────────────────
+// The AI proposes kinship; it never asserts it. A suggestion accumulates evidence
+// and is confirmed (→ a real ai_confirmed relationship) or dismissed by the user.
+
+/** How a piece of evidence came to back a kinship suggestion. */
+export type KinSignal = 'record_role' | 'explicit_claim';
+
+export type KinSuggestionStatus = 'open' | 'confirmed' | 'dismissed';
+
+/** Qualitative strength of a suggestion, derived from its accumulated score. */
+export type KinStrength = 'alta' | 'media' | 'baja';
+
+/** One evidence item behind a kinship suggestion, with its verbatim quote. */
+export interface KinSuggestionEvidence {
+  id: string;
+  suggestionId: string;
+  signal: KinSignal;
+  sourceKind: RecordSourceKind;
+  nodusId: string | null;
+  quote: string | null;
+  location: string | null;
+  weight: number;
+}
+
+/** A proposed parent/spouse relationship with the evidence and people it concerns. */
+export interface KinSuggestion {
+  suggestionId: string;
+  fromPerson: string;
+  toPerson: string;
+  type: RelationshipType;
+  subtype: RelationshipSubtype;
+  status: KinSuggestionStatus;
+  score: number;
+  strength: KinStrength;
+  fromName: string;
+  toName: string;
+  evidence: KinSuggestionEvidence[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A proposed identity match between two person records, with why. */
 export interface MatchCandidatePair {
   aId: string;
@@ -964,8 +1005,34 @@ export interface ArchiveItem {
   /** Tree members this document is linked to. */
   linkedPersons: ArchiveLinkedPerson[];
   tags: string[];
+  /** Whether the item's text has been embedded for semantic discovery. */
+  hasEmbedding?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** How a document↔person link came to be proposed. */
+export type LinkSuggestionReason = 'name' | 'semantic';
+
+/** A proposed link between an archive document and a person (never auto-applied). */
+export interface DocumentLinkSuggestion {
+  itemId: string;
+  title: string;
+  docType: string | null;
+  reason: LinkSuggestionReason;
+  /** 0..1 semantic similarity when reason === 'semantic'. */
+  score: number;
+  /** The person's name as it appears in the document, when reason === 'name'. */
+  snippet: string | null;
+}
+
+/** A proposed link between a person and an archive document (person side of the pair). */
+export interface PersonLinkSuggestion {
+  personId: string;
+  displayName: string;
+  reason: LinkSuggestionReason;
+  score: number;
+  snippet: string | null;
 }
 
 export interface ArchiveItemInput {
@@ -1027,6 +1094,10 @@ export interface RecordsScanSummary {
   places: number;
   events: number;
   evidence: number;
+  /** Extracted persons linked to an existing record instead of duplicated. */
+  linked?: number;
+  /** Open kinship suggestions across the vault after the scan. */
+  suggestions?: number;
   /** True when the item had no extracted text to scan. */
   noText: boolean;
 }
@@ -3637,6 +3708,12 @@ export interface NodusApi {
   findMatches(): Promise<MatchCandidatePair[]>;
   mergePersons(targetId: string, sourceId: string): Promise<Person | null>;
   dismissMatch(a: string, b: string): Promise<void>;
+  // evidence-driven kinship suggestions (AI proposes, the user disposes)
+  listKinSuggestions(): Promise<KinSuggestion[]>;
+  kinSuggestionsForPerson(personId: string): Promise<KinSuggestion[]>;
+  kinSuggestionCount(): Promise<number>;
+  confirmKinSuggestion(suggestionId: string): Promise<boolean>;
+  dismissKinSuggestion(suggestionId: string): Promise<boolean>;
   // evidence archive
   archiveCounts(): Promise<ArchiveCounts>;
   listArchiveFolders(): Promise<ArchiveFolder[]>;
@@ -3666,6 +3743,13 @@ export interface NodusApi {
   }): Promise<ArchiveItem>;
   scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
   analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
+  /** Persons whose name appears in a document's text but who are not yet linked. */
+  suggestPersonsForItem(itemId: string): Promise<PersonLinkSuggestion[]>;
+  /** Documents that likely concern a person (lexical + semantic), not yet linked. */
+  suggestDocumentsForPerson(personId: string): Promise<DocumentLinkSuggestion[]>;
+  /** Embed text-bearing archive items for semantic discovery (idempotent). */
+  indexArchive(): Promise<{ indexed: number; skipped: number }>;
+  archiveIndexStatus(): Promise<{ indexed: number; total: number }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
