@@ -87,6 +87,7 @@ export function PersonasView() {
             <Icon name="users" size={13} /> {t('Revisar coincidencias')}
           </button>
           <button
+            data-tour="kin-suggestions"
             className="btn btn-ghost h-8 w-full gap-1.5 border border-neutral-700 text-xs disabled:opacity-40"
             title={t('Revisar parentescos propuestos a partir de la evidencia')}
             disabled={kinCount === 0}

@@ -31,6 +31,7 @@ interface HomeViewProps {
   showDemoOffer: boolean;
   demoBusy: boolean;
   onLoadDemo: () => Promise<void>;
+  onLoadGenealogyDemo: () => Promise<void>;
 }
 
 interface HomeSnapshot {
@@ -55,6 +56,7 @@ export function HomeView({
   showDemoOffer,
   demoBusy,
   onLoadDemo,
+  onLoadGenealogyDemo,
 }: HomeViewProps) {
   const [snapshot, setSnapshot] = useState<HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,21 +141,31 @@ export function HomeView({
 
       {showDemoOffer && (
         <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
-          <div className="flex flex-wrap items-start gap-4">
-            <div className="flex-1 min-w-[18rem]">
-              <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
-              <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
-              <p className="text-sm text-neutral-400 mt-1 max-w-2xl">
-                {t('Carga un corpus de demostración de seis obras sobre la ciencia del aprendizaje. Podrás recorrer el grafo, ideas, debates, huecos y notas sin conectar Zotero ni configurar una clave de IA.')}
+          <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
+          <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+              <div className="text-sm font-medium">{t('Demo académica')}</div>
+              <p className="text-xs text-neutral-400 mt-1 flex-1">
+                {t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.')}
               </p>
+              <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void onLoadDemo()} disabled={demoBusy}>
+                <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo académica')}
+              </button>
             </div>
-            <button
-              className="btn btn-primary gap-1.5"
-              onClick={() => void onLoadDemo()}
-              disabled={demoBusy}
-            >
-              <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo')}
-            </button>
+            <div className="flex flex-col rounded-lg border border-amber-800/50 bg-amber-950/10 p-3">
+              <div className="text-sm font-medium text-amber-200">{t('Demo de genealogía')}</div>
+              <p className="text-xs text-neutral-400 mt-1 flex-1">
+                {t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.')}
+              </p>
+              <button
+                className="btn gap-1.5 mt-3 self-start border border-amber-500/50 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+                onClick={() => void onLoadGenealogyDemo()}
+                disabled={demoBusy}
+              >
+                <Icon name="tree" /> {demoBusy ? t('Cargando…') : t('Cargar demo de genealogía')}
+              </button>
+            </div>
           </div>
         </section>
       )}

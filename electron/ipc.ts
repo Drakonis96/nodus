@@ -150,6 +150,8 @@ import { exportData, importData } from './export/exportImport';
 import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
 import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
+import { seedGenealogyDemoData } from './db/genealogyDemoData';
+import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
@@ -1562,6 +1564,24 @@ export function registerIpc(
     scanQueue.clear();
     clearDemoData();
   });
+  // Genealogy demo: seeds the Serrano–Vidal family (tree, archive, evidence, open
+  // kinship suggestions) and flips the vault to the genealogy type. Portraits are
+  // generated in the background with the cheap Gemini model when a key is present.
+  h('data:seedGenealogyDemo', async () => {
+    const seeded = seedGenealogyDemoData();
+    const willGeneratePortraits = seeded && hasDemoPortraitKey();
+    if (willGeneratePortraits) {
+      void generateDemoPortraits({
+        onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+      }).catch(() => undefined);
+    }
+    return { seeded, willGeneratePortraits };
+  });
+  h('data:generateDemoPortraits', async () =>
+    generateDemoPortraits({
+      onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+    })
+  );
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());

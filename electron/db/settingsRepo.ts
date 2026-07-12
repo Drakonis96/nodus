@@ -56,6 +56,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   tourComplete: false,
   advancedTourComplete: true,
   demoMode: false,
+  demoPriorVaultType: null,
+  genealogyTourComplete: false,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',

@@ -34,6 +34,7 @@ import { VaultSwitcher } from './components/VaultSwitcher';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
+import { GenealogyTour } from './views/GenealogyTour';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
@@ -198,17 +199,33 @@ export function App() {
     }
   }, [reloadSettings, refreshHasData]);
 
+  const loadGenealogyDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      await window.nodus.seedGenealogyDemoData();
+      await reloadSettings();
+      await reloadVaults();
+      await refreshHasData();
+      notifyDataChanged();
+      setView('tree');
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, reloadVaults, refreshHasData]);
+
   const exitDemo = useCallback(async () => {
     setDemoBusy(true);
     try {
       await window.nodus.clearDemoData();
       await reloadSettings();
+      await reloadVaults();
       await refreshHasData();
       notifyDataChanged();
+      setView('home');
     } finally {
       setDemoBusy(false);
     }
-  }, [reloadSettings, refreshHasData]);
+  }, [reloadSettings, reloadVaults, refreshHasData]);
 
   const toggleNav = () => {
     setNavCollapsed((v) => {
@@ -505,6 +522,7 @@ export function App() {
               showDemoOffer={hasData === false && !settings.demoMode}
               demoBusy={demoBusy}
               onLoadDemo={loadDemo}
+              onLoadGenealogyDemo={loadGenealogyDemo}
             />
           )}
           {view === 'library' && (
@@ -613,11 +631,21 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && !settings.tourComplete && (
+      {settings.onboardingComplete && !settings.tourComplete && !(isGenealogy && settings.demoMode) && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && isGenealogy && settings.demoMode && !settings.genealogyTourComplete && (
+        <GenealogyTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ genealogyTourComplete: true });
             void reloadSettings();
           }}
         />

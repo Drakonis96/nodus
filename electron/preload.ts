@@ -479,6 +479,13 @@ const api: NodusApi = {
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),
   seedDemoData: () => ipcRenderer.invoke('data:seedDemo'),
   clearDemoData: () => ipcRenderer.invoke('data:clearDemo').then(() => undefined),
+  seedGenealogyDemoData: () => ipcRenderer.invoke('data:seedGenealogyDemo'),
+  generateDemoPortraits: () => ipcRenderer.invoke('data:generateDemoPortraits'),
+  onDemoPortraitsProgress: (cb) => {
+    const listener = (_e: unknown, p: { done: number; total: number }) => cb(p);
+    ipcRenderer.on('demo:portraits', listener);
+    return () => ipcRenderer.removeListener('demo:portraits', listener);
+  },
 
   startEmbedding: (nodusIds) => ipcRenderer.invoke('embeddings:start', nodusIds).then(() => undefined),
   reindexAll: () => ipcRenderer.invoke('embeddings:reindexAll').then(() => undefined),

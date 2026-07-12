@@ -610,6 +610,11 @@ export interface AppSettings {
   // True while the app is showing the seeded sample corpus. Only ever set on an
   // empty database; cleared (and the demo rows wiped) when the user leaves demo mode.
   demoMode: boolean;
+  // The active vault's type before the genealogy demo flipped it, so leaving the demo
+  // restores it. Null when no genealogy demo is active. (KV setting, no migration.)
+  demoPriorVaultType: VaultType | null;
+  // Completion flag for the genealogy-specific guided tour (shown in the genealogy demo).
+  genealogyTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -4159,6 +4164,13 @@ export interface NodusApi {
   seedDemoData(): Promise<boolean>;
   /** Remove every demo row and leave demo mode. */
   clearDemoData(): Promise<void>;
+  /** Seed the genealogy demo (Serrano–Vidal family) and flip the vault to genealogy;
+   *  kicks off background portrait generation when a Gemini key is present. */
+  seedGenealogyDemoData(): Promise<{ seeded: boolean; willGeneratePortraits: boolean }>;
+  /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
+  generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
+  /** Progress of demo portrait generation. Returns an unsubscribe function. */
+  onDemoPortraitsProgress(cb: (p: { done: number; total: number }) => void): () => void;
 
   // embedding pipeline
   /** Start embedding generation for the given works (or all non-archived works if empty). */
