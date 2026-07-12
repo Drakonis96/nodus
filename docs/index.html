@@ -252,7 +252,8 @@
     width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
     background: var(--bg2); border: 1px solid var(--border); font-weight: 800; font-size: 10.5px; color: var(--amber);
   }
-  .in .vig-debate .vs { animation: pop 0.5s cubic-bezier(0.2,1.6,0.4,1) 0.7s forwards; }
+  .in .vig-debate .vs { animation: vsPop 0.5s cubic-bezier(0.2,1.6,0.4,1) 0.7s forwards; }
+  @keyframes vsPop { 0% { opacity: 0; transform: translate(-50%,-50%) scale(0); } 100% { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
   .vig-debate h5 { margin: 0 0 6px; font-size: 11px; }
   .vig-debate .ev { padding: 6px 8px; margin-top: 6px; border-radius: 8px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-2); font-size: 10.5px; }
   .vig-debate .tl { display: flex; gap: 6px; align-items: center; margin-top: 12px; font-size: 10px; color: var(--text-2); }
