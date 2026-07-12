@@ -107,36 +107,61 @@ export function ArchiveView() {
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {items.length === 0 ? (
             <p className="py-10 text-center text-sm text-neutral-500">
-              {t('Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto para poder buscarlos y citarlos.')}
+              {t('Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto (y una descripción visual de las imágenes) para poder buscarlos y citarlos.')}
             </p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3">
-              {items.map((it) => (
-                <button
-                  key={it.itemId}
-                  onClick={() => setSelected(it)}
-                  className="flex flex-col rounded-lg border border-neutral-800 p-3 text-left transition hover:bg-neutral-800/50"
-                >
-                  <div className="mb-2 flex items-center gap-2">
-                    <Icon name={KIND_ICON[it.kind]} size={16} className="text-neutral-400" />
-                    <span className="truncate text-sm font-medium text-neutral-100">{it.title}</span>
-                  </div>
-                  {it.extractedText ? (
-                    <p className="line-clamp-2 text-xs text-neutral-500">{it.extractedText.slice(0, 160)}</p>
-                  ) : (
-                    <p className="text-xs italic text-neutral-600">{t('sin texto extraído')}</p>
-                  )}
-                  {it.tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {it.tags.slice(0, 4).map((tag) => (
-                        <span key={tag} className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-400">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </button>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[44rem] text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-800 text-left text-xs font-medium text-neutral-500">
+                    <th className="py-2 pr-3">{t('Nombre')}</th>
+                    <th className="py-2 pr-3">{t('Descripción visual')}</th>
+                    <th className="py-2 pr-3">{t('Texto detectado')}</th>
+                    <th className="py-2 pr-3">{t('Etiquetas')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((it) => (
+                    <tr
+                      key={it.itemId}
+                      onClick={() => setSelected(it)}
+                      className="cursor-pointer border-b border-neutral-900 align-top hover:bg-neutral-800/40"
+                    >
+                      <td className="py-2 pr-3">
+                        <div className="flex min-w-[9rem] items-center gap-2">
+                          <Icon name={KIND_ICON[it.kind]} size={15} className="shrink-0 text-neutral-400" />
+                          <span className="truncate text-neutral-100">{it.title}</span>
+                        </div>
+                      </td>
+                      <td className="max-w-[24rem] py-2 pr-3">
+                        {it.description ? (
+                          <span className="line-clamp-2 text-neutral-400">{it.description}</span>
+                        ) : it.kind === 'image' ? (
+                          <span className="text-xs italic text-neutral-600">{t('sin analizar')}</span>
+                        ) : (
+                          <span className="text-neutral-700">—</span>
+                        )}
+                      </td>
+                      <td className="max-w-[20rem] py-2 pr-3">
+                        {it.extractedText ? (
+                          <span className="line-clamp-2 text-neutral-500">{it.extractedText.slice(0, 160)}</span>
+                        ) : (
+                          <span className="text-neutral-700">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <div className="flex flex-wrap gap-1">
+                          {it.tags.slice(0, 3).map((tag) => (
+                            <span key={tag} className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-400">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -194,6 +219,9 @@ function ArchiveItemDetail({
   const [tags, setTags] = useState<string[]>(item.tags);
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
+  const [description, setDescription] = useState<string | null>(item.description);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let revoked: string | null = null;
@@ -238,6 +266,25 @@ function ArchiveItemDetail({
     await window.nodus.deleteArchiveItem(item.itemId);
     onClose();
     await onChanged();
+  };
+
+  const analyze = async () => {
+    setAnalyzing(true);
+    setAnalyzeMsg(null);
+    try {
+      const r = await window.nodus.analyzeArchiveItem(item.itemId);
+      if (r.unsupported) {
+        setAnalyzeMsg(t('Este elemento no es una imagen analizable.'));
+      } else {
+        setDescription(r.description);
+        setAnalyzeMsg(t('Imagen analizada.'));
+        await onChanged();
+      }
+    } catch (err) {
+      setAnalyzeMsg(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const scan = async () => {
@@ -285,6 +332,16 @@ function ArchiveItemDetail({
             {item.fileName ? ` · ${item.fileName}` : ''}
             {item.bytes ? ` · ${(item.bytes / 1024).toFixed(0)} KB` : ''}
           </p>
+          {item.kind === 'image' && (
+            <button
+              className="btn btn-ghost h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
+              disabled={analyzing}
+              onClick={() => void analyze()}
+              title={t('Describir la imagen y transcribir su texto con el modelo de visión')}
+            >
+              <Icon name="eye" size={13} /> {analyzing ? t('Analizando…') : t('Analizar imagen')}
+            </button>
+          )}
           {item.extractedText && (
             <button
               className="btn btn-ghost h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
@@ -295,12 +352,18 @@ function ArchiveItemDetail({
               <Icon name="users" size={13} /> {scanning ? t('Analizando…') : t('Extraer personas y eventos')}
             </button>
           )}
-          {scanMsg && <span className="text-xs text-neutral-400">{scanMsg}</span>}
+          {(scanMsg || analyzeMsg) && <span className="text-xs text-neutral-400">{scanMsg ?? analyzeMsg}</span>}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {imageUrl && (
             <img src={imageUrl} alt={item.title} className="mb-3 max-h-80 w-auto rounded-md border border-neutral-800" />
+          )}
+          {description && (
+            <div className="mb-3">
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Descripción visual')}</h3>
+              <p className="rounded-md bg-neutral-900/60 p-3 text-sm text-neutral-300">{description}</p>
+            </div>
           )}
           {item.extractedText ? (
             <div className="mb-3">

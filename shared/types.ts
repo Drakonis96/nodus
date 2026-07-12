@@ -3607,6 +3607,7 @@ export interface NodusApi {
   listArchiveTags(): Promise<ArchiveTagCount[]>;
   pickAndIngestArchive(folderId?: string | null): Promise<ArchiveIngestSummary>;
   scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
+  analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;

@@ -880,6 +880,9 @@ export function Settings({
             <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
             </Row>
+            <Row label={t('Modelo de visión (describe imágenes del archivo y transcribe su texto; usa uno con soporte de imagen)')}>
+              <ModelPicker settings={settings} value={settings.visionModel} onChange={(m) => patch({ visionModel: m })} emptyLabel="Usar modelo de extracción" />
+            </Row>
             <Row label={t('Modelo de síntesis general (fallback inicial para herramientas con selector propio)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
             </Row>

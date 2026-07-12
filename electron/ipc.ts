@@ -262,6 +262,8 @@ import {
 } from './db/archiveRepo';
 import { ingestArchiveFile } from './archive/archiveIngest';
 import { scanArchiveTextRecords } from './ai/recordsScan';
+import { analyzeImageBytes } from './ai/imageAnalysis';
+import { isVisionMime } from '@shared/imageAnalysis';
 import {
   addRelationship,
   removeRelationship,
@@ -631,16 +633,34 @@ export function registerIpc(
     if (picked.canceled || picked.filePaths.length === 0) return { added: 0, duplicates: 0, items: [] };
     const settings = getSettings();
     const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? null;
     let added = 0;
     let duplicates = 0;
     const items = [];
     for (const filePath of picked.filePaths) {
-      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr });
+      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr, visionModel });
       if (result.duplicate) duplicates++;
       else added++;
       items.push(result.item);
     }
     return { added, duplicates, items };
+  });
+  h('archive:analyzeItem', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    if (item.kind !== 'image' || !isVisionMime(item.mimeType)) return { unsupported: true, description: null };
+    const blob = getItemBlob(itemId);
+    if (!blob) return { unsupported: true, description: null };
+    const settings = getSettings();
+    const model = settings.visionModel ?? settings.extractionModel ?? null;
+    if (!model) throw new Error('No hay un modelo de visión configurado. Elígelo en Ajustes.');
+    const analysis = await analyzeImageBytes(blob, item.mimeType!, model);
+    if (!analysis) return { unsupported: true, description: null };
+    updateItem(itemId, {
+      description: analysis.description || null,
+      extractedText: analysis.text.trim() ? analysis.text : item.extractedText,
+    });
+    return { unsupported: false, description: analysis.description || null };
   });
 
   h('mcp:status', async () => getMcpStatus());

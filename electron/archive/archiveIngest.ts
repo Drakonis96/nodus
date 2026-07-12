@@ -7,7 +7,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { extractFromPath, type OcrOptions } from '../extraction/textExtractor';
 import { createItem, findItemByHash, getItem } from '../db/archiveRepo';
-import type { ArchiveItem, ArchiveItemKind } from '@shared/types';
+import { analyzeImageBytes } from '../ai/imageAnalysis';
+import { isVisionMime } from '@shared/imageAnalysis';
+import type { ArchiveItem, ArchiveItemKind, ModelRef } from '@shared/types';
 
 function kindForExt(ext: string): ArchiveItemKind {
   const e = ext.toLowerCase();
@@ -44,6 +46,8 @@ export interface IngestOptions {
   title?: string;
   tags?: string[];
   ocr?: OcrOptions;
+  /** Vision model for analysing images (description + OCR). Null/undefined skips it. */
+  visionModel?: ModelRef | null;
 }
 
 export interface IngestResult {
@@ -72,15 +76,31 @@ export async function ingestArchiveFile(filePath: string, opts: IngestOptions = 
   }
 
   const ext = path.extname(filePath);
+  const kind = kindForExt(ext);
+  const mime = mimeForExt(ext);
+
+  // For images, a vision model yields a searchable visual description + a literal OCR
+  // (better than tesseract for many records). Best-effort: failures keep whatever the
+  // extractor produced.
+  let description: string | null = null;
+  if (kind === 'image' && opts.visionModel && isVisionMime(mime)) {
+    const analysis = await analyzeImageBytes(bytes, mime!, opts.visionModel).catch(() => null);
+    if (analysis) {
+      description = analysis.description || null;
+      if (analysis.text.trim()) extractedText = analysis.text;
+    }
+  }
+
   const item = createItem({
     folderId: opts.folderId ?? null,
     title: opts.title?.trim() || path.basename(filePath),
-    kind: kindForExt(ext),
+    kind,
     fileName: path.basename(filePath),
-    mimeType: mimeForExt(ext),
+    mimeType: mime,
     bytes: bytes.length,
     blob: bytes,
     extractedText: extractedText.trim() ? extractedText : null,
+    description,
     contentHash: hash,
     tags: opts.tags,
   });

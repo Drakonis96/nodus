@@ -47,10 +47,13 @@ try {
     mimeType: 'image/png',
     blob: Buffer.from('PNGDATA'),
     extractedText: 'Juan Pérez jornalero',
+    description: 'Fotografía de una hoja de padrón manuscrita en buen estado',
     tags: ['censo', 'Sevilla', 'censo'], // duplicate tag ignored
   });
   const fetched = repo.getItem(item.itemId);
   assert.equal(fetched.hasBlob, true, 'item reports it has a blob');
+  assert.equal(fetched.description, 'Fotografía de una hoja de padrón manuscrita en buen estado', 'visual description stored');
+  assert.equal(repo.listItems({ search: 'manuscrita' }).length, 1, 'search hits the visual description');
   assert.equal(fetched.bytes, Buffer.from('PNGDATA').length, 'byte count derived from blob');
   assert.deepEqual(fetched.tags, ['Sevilla', 'censo'], 'tags de-duplicated and sorted');
   assert.equal(repo.getItemBlob(item.itemId).toString(), 'PNGDATA', 'blob fetched on demand');
