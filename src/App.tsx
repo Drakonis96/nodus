@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
-import { HomeView } from './views/HomeView';
+import { HomeView, GenealogyHome } from './views/HomeView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -17,6 +17,12 @@ import { SearchView } from './views/SearchView';
 import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { AuthorsView } from './views/AuthorsView';
+import { PersonasView } from './views/PersonasView';
+import { TimelineView } from './views/TimelineView';
+import { TreeView } from './views/TreeView';
+import { RelationsView } from './views/RelationsView';
+import { MapView } from './views/MapView';
+import { ArchiveView } from './views/ArchiveView';
 import { StudyGuideView } from './views/StudyGuideView';
 import { ImmersionView } from './views/ImmersionView';
 import { Settings } from './views/Settings';
@@ -25,10 +31,11 @@ import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
-import { VaultSwitcher } from './components/VaultSwitcher';
+import { VaultSwitcher, vaultTypeLabel } from './components/VaultSwitcher';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
+import { GenealogyTour } from './views/GenealogyTour';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
@@ -41,8 +48,10 @@ import type {
   View,
 } from './navigation';
 import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { effectiveSidebarHidden, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
+import nodusLogoGold from './assets/nodus-logo-gold.svg';
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -82,6 +91,8 @@ export function App() {
   // A note the user opened from global search; the nonce re-triggers even if the
   // same note is chosen twice.
   const [noteTarget, setNoteTarget] = useState<{ id: string; nonce: number } | null>(null);
+  // A person opened from global search, to preselect in the Personas view.
+  const [personsTarget, setPersonsTarget] = useState<{ id: string; nonce: number } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -92,10 +103,31 @@ export function App() {
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
   // pinned first and Settings last, both outside every group and never hidden.
-  const navGroups = useMemo(
-    () => groupedNav(settings?.sidebarOrder ?? [], settings?.sidebarHidden ?? []),
-    [settings?.sidebarOrder, settings?.sidebarHidden]
-  );
+  const navGroups = useMemo(() => {
+    const hidden = effectiveSidebarHidden(
+      settings?.sidebarHidden ?? [],
+      settings?.sidebarCustomized ?? false,
+      activeVault?.type
+    );
+    // Views scoped to other vault types are removed outright (not user-toggleable here).
+    const disallowed = viewsDisallowedForType(
+      NAV_ITEMS.map((n) => n.id),
+      activeVault?.type
+    );
+    return groupedNav(settings?.sidebarOrder ?? [], [...hidden, ...disallowed]);
+  }, [settings?.sidebarOrder, settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type]);
+
+  // If the active vault type doesn't allow the current view (e.g. switching from a
+  // primary-source vault to an academic one while on Personas), fall back to Home.
+  useEffect(() => {
+    if (activeVault && !isViewAllowedForVaultType(view, activeVault.type)) setView('home');
+  }, [activeVault?.type, view]);
+
+  // Genealogy vaults wear a golden accent + logo instead of the indigo default.
+  const isGenealogy = activeVault?.type === 'genealogy';
+  useEffect(() => {
+    document.documentElement.classList.toggle('genealogy', isGenealogy);
+  }, [isGenealogy]);
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -170,17 +202,33 @@ export function App() {
     }
   }, [reloadSettings, refreshHasData]);
 
+  const loadGenealogyDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      await window.nodus.seedGenealogyDemoData();
+      await reloadSettings();
+      await reloadVaults();
+      await refreshHasData();
+      notifyDataChanged();
+      setView('tree');
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, reloadVaults, refreshHasData]);
+
   const exitDemo = useCallback(async () => {
     setDemoBusy(true);
     try {
       await window.nodus.clearDemoData();
       await reloadSettings();
+      await reloadVaults();
       await refreshHasData();
       notifyDataChanged();
+      setView('home');
     } finally {
       setDemoBusy(false);
     }
-  }, [reloadSettings, refreshHasData]);
+  }, [reloadSettings, reloadVaults, refreshHasData]);
 
   const toggleNav = () => {
     setNavCollapsed((v) => {
@@ -341,13 +389,23 @@ export function App() {
   return (
     <div className="h-full flex flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
+      <header className="relative flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
+        {/* Vault mode, centered, in the vault's accent colour (gold in genealogy via the
+            `.genealogy` remap of the indigo utilities, indigo otherwise). */}
+        {activeVault && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 xl:block">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200">
+              <Icon name={isGenealogy ? 'tree' : 'network'} size={13} />
+              {vaultTypeLabel(activeVault.type)}
+            </span>
+          </div>
+        )}
         <button
           className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <img src={nodusLogo} alt="" className="h-7 w-7" />
+          <img src={isGenealogy ? nodusLogoGold : nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
@@ -465,7 +523,18 @@ export function App() {
               recovery card here instead of blanking the whole window. key={view}
               clears the error automatically when the user switches sections. */}
           <AppErrorBoundary key={view}>
-          {view === 'home' && (
+          {view === 'home' && isGenealogy && (
+            <GenealogyHome
+              settings={settings}
+              onNavigate={(target) => navigate(target)}
+              onOpenAssistant={() => openAssistant()}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadDemo}
+              onLoadGenealogyDemo={loadGenealogyDemo}
+            />
+          )}
+          {view === 'home' && !isGenealogy && (
             <HomeView
               settings={settings}
               lastSync={lastSync}
@@ -477,20 +546,29 @@ export function App() {
               showDemoOffer={hasData === false && !settings.demoMode}
               demoBusy={demoBusy}
               onLoadDemo={loadDemo}
+              onLoadGenealogyDemo={loadGenealogyDemo}
             />
           )}
           {view === 'library' && (
             <Library
               target={libraryTarget}
+              vaultType={activeVault?.type}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
+              onOpenArchive={() => setView('archive')}
             />
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
+          {view === 'timeline' && <TimelineView />}
+          {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
+          {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
+          {view === 'map' && <MapView />}
+          {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}
@@ -529,13 +607,20 @@ export function App() {
             <ReadingPathView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />
           )}
           {view === 'writing' && <WritingWorkshopView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'deepResearch' && <DeepResearchView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'deepResearch' && <DeepResearchView settings={settings} isGenealogy={isGenealogy} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'projects' && <ProjectsView settings={settings} />}
           {view === 'search' && (
             <SearchView
+              vaultType={activeVault?.type}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenNote={openNoteFromSearch}
               onOpenGaps={() => setView('gaps')}
+              onOpenPerson={(id) => {
+                setPersonsTarget({ id, nonce: Date.now() });
+                setView('persons');
+              }}
+              onOpenTimeline={() => setView('timeline')}
+              onOpenArchive={() => setView('archive')}
             />
           )}
           {view === 'notes' && (
@@ -575,16 +660,27 @@ export function App() {
         <ResearchAssistantModal
           settings={settings}
           initialTarget={assistantTarget}
+          isGenealogy={isGenealogy}
           onClose={() => setResearchOpen(false)}
           onOpenGraph={openGraphFromAssistant}
         />
       )}
 
-      {settings.onboardingComplete && !settings.tourComplete && (
+      {settings.onboardingComplete && !settings.tourComplete && !(isGenealogy && settings.demoMode) && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ tourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && isGenealogy && !settings.genealogyTourComplete && (
+        <GenealogyTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ genealogyTourComplete: true });
             void reloadSettings();
           }}
         />

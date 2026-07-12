@@ -181,6 +181,114 @@ try {
   const authorsGraph = await page.evaluate(() => window.nodus.getGraph('authors'));
   assert.ok(Array.isArray(authorsGraph.nodes), 'authors lens answers too');
 
+  // ── Records ontology + evidence archive over real IPC ───────────────────────
+  const records = await page.evaluate(async () => {
+    const juan = await window.nodus.createPerson({ displayName: 'Juan Pérez', sex: 'male', birthDate: 'c. 1850' });
+    const hijo = await window.nodus.createPerson({ displayName: 'Pedro Pérez', sex: 'male' });
+    await window.nodus.addRelationship(juan.personId, hijo.personId, 'parent', 'user_asserted', 'adoptive');
+    await window.nodus.setPersonFrame(juan.personId, 'walnut');
+    const kin = await window.nodus.kinOf(juan.personId);
+    const juanReloaded = await window.nodus.getPerson(juan.personId);
+    const place = await window.nodus.findOrCreatePlace('Sevilla', 'municipality');
+    const event = await window.nodus.createEvent({
+      type: 'marriage',
+      date: '1875',
+      placeId: place.placeId,
+      participants: [{ personId: juan.personId, role: 'principal' }],
+    });
+    await window.nodus.addRecordEvidence({
+      targetKind: 'person',
+      targetId: juan.personId,
+      quote: 'Juan Pérez, jornalero',
+      location: 'p. 1',
+    });
+    const folder = await window.nodus.createArchiveFolder('Censos', null);
+    const item = await window.nodus.createArchiveItem({
+      folderId: folder.folderId,
+      title: 'Hoja censal',
+      kind: 'image',
+      extractedText: 'Juan Pérez jornalero',
+      tags: ['censo'],
+    });
+    const entry = await window.nodus.createArchiveTextEntry({
+      title: 'Partida',
+      content: 'texto',
+      docType: 'birth_record',
+      metadata: { persona: 'Juan Pérez', inventado: 'x' },
+    });
+    await window.nodus.linkArchivePerson(entry.itemId, juan.personId);
+    const linkedDocs = await window.nodus.listArchiveItemsForPerson(juan.personId);
+
+    // Map: offline gazetteer search → resolve to a place → per-person place record →
+    // located map point (the whole map pipeline over IPC, fully offline).
+    const gaz = await window.nodus.searchGazetteer('Carmona', 6);
+    const carmonaEs = gaz.find((g) => g.countryCode === 'ES');
+    let mapPointCount = 0;
+    if (carmonaEs) {
+      const gplace = await window.nodus.resolveGazetteerPlace(carmonaEs);
+      await window.nodus.addPersonPlace({ personId: juan.personId, placeId: gplace.placeId, label: 'birth', date: 'c. 1850' });
+      mapPointCount = (await window.nodus.mapPoints([juan.personId])).length;
+    }
+
+    // Kinship suggestion IPC is wired and answers cleanly with no proposals yet
+    // (proposals are seeded by an AI scan, which needs a provider key we don't set here;
+    // the accumulate/confirm/dismiss logic is covered by the unit repo test).
+    const kinSuggestionCount = await window.nodus.kinSuggestionCount();
+    const kinSuggestions = await window.nodus.listKinSuggestions();
+
+    // Archive discovery is AI-free (lexical): the censal sheet names Juan, so he is
+    // proposed for the document and the document is proposed for him — both directions.
+    const personSuggestions = await window.nodus.suggestPersonsForItem(item.itemId);
+    const docSuggestions = await window.nodus.suggestDocumentsForPerson(juan.personId);
+
+    return {
+      linkedDocs: linkedDocs.length,
+      linkedName: (await window.nodus.getArchiveItem(entry.itemId)).linkedPersons[0]?.displayName,
+      entryDocType: entry.docType,
+      entryMeta: entry.metadata,
+      frameStyle: juanReloaded.frameStyle,
+      biographyField: juanReloaded.biography, // null until generated; confirms the v41 column
+      persons: (await window.nodus.listPersons()).length,
+      children: kin.children.length,
+      events: (await window.nodus.listEvents({ personId: juan.personId })).length,
+      evidence: (await window.nodus.listRecordEvidence('person', juan.personId)).length,
+      placeName: (await window.nodus.getEvent(event.eventId)).placeName,
+      archiveItems: (await window.nodus.listArchiveItems({ tags: ['censo'] })).length,
+      archiveFilteredOut: (await window.nodus.listArchiveItems({ tags: ['inexistente'] })).length,
+      hasBlobFlag: item.hasBlob,
+      kinSuggestionCount,
+      kinSuggestionsIsArray: Array.isArray(kinSuggestions),
+      personSuggested: personSuggestions.some((p) => p.displayName === 'Juan Pérez'),
+      docSuggested: docSuggestions.some((d) => d.itemId === item.itemId && d.reason === 'name'),
+      gazetteerHits: gaz.length,
+      gazetteerCarmona: !!carmonaEs,
+      mapPointCount,
+    };
+  });
+  assert.equal(records.persons, 2, 'persons created over IPC');
+  assert.equal(records.children, 1, 'kinship edge resolved over IPC');
+  assert.equal(records.frameStyle, 'walnut', 'per-person tree frame stored over IPC');
+  assert.equal(records.linkedDocs, 1, 'document linked to the person over IPC');
+  assert.equal(records.linkedName, 'Juan Pérez', 'linked person surfaces on the item over IPC');
+  assert.equal(records.biographyField, null, 'biography column present (null until generated)');
+  assert.equal(records.events, 1, 'event linked to the person');
+  assert.equal(records.evidence, 1, 'record evidence attached');
+  assert.equal(records.placeName, 'Sevilla', 'event resolves its place');
+  assert.equal(records.archiveItems, 1, 'archive item created + tag-filtered');
+  assert.equal(records.archiveFilteredOut, 0, 'tag filter excludes non-matching items over IPC');
+  assert.equal(records.entryDocType, 'birth_record', 'text entry keeps its document type');
+  assert.deepEqual(records.entryMeta, { persona: 'Juan Pérez' }, 'metadata sanitised to the type (unknown key dropped)');
+  assert.equal(records.kinSuggestionCount, 0, 'kinship suggestions IPC answers (none seeded without AI)');
+  assert.ok(records.kinSuggestionsIsArray, 'listKinSuggestions returns an array over IPC');
+  assert.ok(records.personSuggested, 'archive → person discovery proposes the named person over IPC');
+  assert.ok(records.docSuggested, 'person → document discovery proposes the naming document over IPC');
+  console.log('[e2e] records ontology + archive ok over IPC');
+
+  assert.ok(records.gazetteerHits > 0, 'offline gazetteer search returns candidates over IPC');
+  assert.ok(records.gazetteerCarmona, 'the Spanish Carmona is found in the offline gazetteer');
+  assert.equal(records.mapPointCount, 1, 'a resolved gazetteer place becomes a located map point over IPC');
+  console.log('[e2e] map: gazetteer + per-person places ok over IPC');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

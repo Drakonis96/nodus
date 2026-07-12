@@ -11,6 +11,8 @@ import { maybeRunAutoBackup } from './export/autoBackup';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
+import { getActiveVault } from './vaults/vaultRegistry';
+import { generateDemoPortraits, hasDemoPortraitKey, demoPortraitsPending } from './ai/genealogyDemoPortraits';
 import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startMcpServer, stopMcpServer } from './mcp';
@@ -381,6 +383,14 @@ app.whenReady().then(() => {
   if (settings.mcpEnabled) void startMcpServer();
   if (settings.copilotEnabled) void startCopilotServer();
   setupAutoUpdates();
+
+  // Genealogy demo: fill in the daguerreotype portraits in the background if this
+  // vault is showing the demo, a Gemini key is present, and some are still missing.
+  if (settings.demoMode && getActiveVault().type === 'genealogy' && hasDemoPortraitKey() && demoPortraitsPending()) {
+    void generateDemoPortraits({
+      onProgress: (done, total) => mainWindow?.webContents.send('demo:portraits', { done, total }),
+    }).catch(() => undefined);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

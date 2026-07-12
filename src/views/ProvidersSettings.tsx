@@ -593,6 +593,14 @@ function ModelList({
           <span className="truncate" title={m.name ?? m.id}>{m.id}</span>
           {meta.length > 0 && <span className="truncate text-[10px] text-neutral-500">{meta.join(' · ')}</span>}
         </span>
+        {m.vision && (
+          <span
+            className="shrink-0 rounded bg-indigo-100 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300/90"
+            title={t('Acepta imágenes: apto como modelo de visión.')}
+          >
+            {t('visión')}
+          </span>
+        )}
         {m.reasoning && (
           <span
             className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-700 dark:bg-amber-950/60 dark:text-amber-400/90"

@@ -2532,5 +2532,558 @@ export const EN: Record<string, string> = {
   'Desplegar': 'Expand',
   'Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.':
     'Choose the collections to monitor. Expand any collection to pick specific subcollections if one is too large. Metadata is imported; analyses run manually unless you enable automation in Settings.',
+  // ── Genealogy · vault types · header ('Académico' defined above) ───────────
+  'Fuentes primarias': 'Primary sources',
+  'Genealogía': 'Genealogy',
+  'Bases de datos': 'Databases',
+  'próximamente': 'coming soon',
+  'Tipo de bóveda: {type}.': 'Vault type: {type}.',
+  'Nombre de la bóveda': 'Vault name',
+  'Tipo de bóveda': 'Vault type',
+
+  // ── Personas view ──────────────────────────────────────────────────────────
+  'Personas': 'People',
+  'Buscar por nombre o variante…': 'Search by name or variant…',
+  'Añadir persona': 'Add person',
+  'Importar un árbol GEDCOM (Gramps, Ancestry…)': 'Import a GEDCOM tree (Gramps, Ancestry…)',
+  'Importar': 'Import',
+  'Exportar a GEDCOM para Gramps / Ancestry': 'Export to GEDCOM for Gramps / Ancestry',
+  'Buscar registros que podrían ser la misma persona': 'Find records that might be the same person',
+  'Revisar coincidencias': 'Review matches',
+  'Revisar parentescos propuestos a partir de la evidencia': 'Review relationships proposed from the evidence',
+  'Parentescos sugeridos': 'Suggested relationships',
+  'Aún no hay personas. Se crean al analizar fuentes primarias o añadiéndolas a mano.':
+    'No people yet. They appear when you analyse primary sources, or add them by hand.',
+  'sin fechas': 'no dates',
+  'Selecciona una persona para ver su ficha, sus eventos y la evidencia que la respalda.':
+    'Select a person to see their record, their events and the evidence behind them.',
+  'Propuestos a partir de la evidencia de las fuentes. Tú confirmas; nada se añade al árbol solo.':
+    'Proposed from the evidence in the sources. You confirm; nothing is added to the tree on its own.',
+  'No hay parentescos por revisar.': 'No relationships to review.',
+  '¿{a} y {b} eran cónyuges?': 'Were {a} and {b} spouses?',
+  '¿{parent} era progenitor(a) de {child}?': 'Was {parent} a parent of {child}?',
+  'mención explícita': 'explicit mention',
+  'registro': 'record',
+  'Confirmar parentesco': 'Confirm relationship',
+  'Descartar': 'Dismiss',
+  'Ver ficha': 'Open record',
+  'Posibles coincidencias': 'Possible matches',
+  'Registros que podrían ser la misma persona. Tú decides; nada se fusiona automáticamente.':
+    'Records that might be the same person. You decide; nothing is merged automatically.',
+  'Buscando coincidencias…': 'Searching for matches…',
+  'No hay coincidencias por revisar.': 'No matches to review.',
+  'Fusionar en {name}': 'Merge into {name}',
+  'No son la misma': 'Not the same',
+  'Nombre completo': 'Full name',
+  'Sin determinar': 'Unspecified',
+  'Hombre': 'Male',
+  'Mujer': 'Female',
+  'Nacimiento': 'Birth',
+  'Defunción': 'Death',
+  'Las fechas pueden ser inciertas: "c. 1850", "antes de 1880".':
+    'Dates may be uncertain: “c. 1850”, “before 1880”.',
+
+  // ── Person record (dossier) ────────────────────────────────────────────────
+  'Aún no hay evidencia suficiente para redactar una biografía.':
+    'There isn’t enough evidence yet to write a biography.',
+  '¿Eliminar esta persona y su evidencia? Los eventos en que participa se conservan.':
+    'Delete this person and their evidence? The events they take part in are kept.',
+  'Biografía': 'Biography',
+  'Generar biografía': 'Generate biography',
+  'Genera un resumen biográfico a partir de la evidencia disponible.':
+    'Generate a biographical summary from the available evidence.',
+  'Sugerencias de la IA': 'AI suggestions',
+  '¿Es la misma persona que {name}?': 'Is this the same person as {name}?',
+  'Fusionar aquí': 'Merge here',
+  'No es la misma': 'Not the same',
+  'Propuestas a partir de la evidencia. Nada se añade al árbol sin tu confirmación.':
+    'Proposed from the evidence. Nothing is added to the tree without your confirmation.',
+  'Hechos en conflicto': 'Conflicting facts',
+  'Fechas de {fact} discrepantes ({span} años):': 'Conflicting {fact} dates ({span} years):',
+  'Parentesco': 'Kinship',
+  'Padres': 'Parents',
+  'Cónyuges': 'Spouses',
+  'Hijos': 'Children',
+  'Hermanos': 'Siblings',
+  'Variantes del nombre': 'Name variants',
+  'Eventos de su vida': 'Life events',
+  'Sin eventos registrados.': 'No events recorded.',
+  'Ningún documento vinculado. Vincúlalos desde el Archivo o acepta una sugerencia.':
+    'No linked documents. Link them from the Archive or accept a suggestion.',
+  'Documentos que podrían tratar sobre esta persona': 'Documents that might concern this person',
+  'similitud {n}': 'similarity {n}',
+  'nombre citado': 'name cited',
+  'Vincular': 'Link',
+  'Sin evidencia adjunta.': 'No evidence attached.',
+  'Archivo': 'Archive',
+  'Fuente': 'Source',
+  'Notas libres sobre esta persona, en Markdown…': 'Free notes about this person, in Markdown…',
+  'Arrastra para encuadrar la cara': 'Drag to frame the face',
+  'Sube una foto': 'Upload a photo',
+  'o generar retrato de referencia con IA': 'or generate a reference portrait with AI',
+  'Zoom': 'Zoom',
+  'Cambiar': 'Change',
+  'No recomendado: un retrato generado por IA es una impresión artística, no una fotografía real. Úsalo solo como marcador visual excepcional cuando no conserves ninguna imagen.':
+    'Not recommended: an AI-generated portrait is an artistic impression, not a real photograph. Use it only as an exceptional visual placeholder when no image survives.',
+  'Describe sus rasgos (p. ej. «hombre mayor, bigote canoso, mirada seria»)':
+    'Describe their features (e.g. “older man, grey moustache, serious look”)',
+  // Portrait controls (rebuilt)
+  'Retrato': 'Portrait',
+  'Subir foto': 'Upload photo',
+  'Generar con IA': 'Generate with AI',
+  'Ajustar encuadre': 'Adjust framing',
+  'Retrato de referencia con IA': 'AI reference portrait',
+  'Arrastra el retrato para encuadrar la cara y usa el zoom.': 'Drag the portrait to frame the face and use the zoom.',
+  // Manual records editor ('Guardar','Guardando…','Cancelar','Notas','Editar',
+  // 'Eliminar','Generar','Generando…','Quitar' are defined elsewhere in this file)
+  'Editar datos': 'Edit details',
+  'Añadir evento': 'Add event',
+  'Añadir variante': 'Add variant',
+  'Nueva variante del nombre…': 'New name variant…',
+  'Tipo de evento': 'Event type',
+  'Fecha (puede ser incierta: «c. 1850»)': 'Date (may be uncertain: “c. 1850”)',
+  'Lugar': 'Place',
+  '¿Eliminar este evento?': 'Delete this event?',
+  'Añade un evento (bautismo, matrimonio, censo…) con su fecha y lugar.':
+    'Add an event (baptism, marriage, census…) with its date and place.',
+  'Guardar evento': 'Save event',
+
+  // ── Social relations ───────────────────────────────────────────────────────
+  'Relaciones sociales': 'Social relations',
+  'Añadir relación': 'Add relation',
+  'Conexiones más allá del parentesco: amistades, patronazgo, empleo, rivalidad, correspondencia… Un árbol independiente del genealógico.':
+    'Connections beyond kinship: friendship, patronage, employment, rivalry, correspondence… A network independent from the family tree.',
+  'Sin relaciones registradas.': 'No relations recorded.',
+  'contacto': 'contact',
+  'Conocido/a por': 'Known by',
+  'Rol (amigo, patrón, socio…)': 'Role (friend, patron, partner…)',
+  'Notas sobre esta relación, en Markdown…': 'Notes about this relation, in Markdown…',
+  'Indica el rol de esta relación.': 'State the role of this relation.',
+  'Escribe o elige a la persona con quien tuvo esta relación.':
+    'Type or choose the person this relation was with.',
+  'Rol (amigo, patrón, socio, rival…)': 'Role (friend, patron, partner, rival…)',
+  'Nombre de la persona…': 'Person’s name…',
+  'familiar': 'family member',
+  'Crear contacto «{name}»': 'Create contact “{name}”',
+  'Datos de esta persona, si los conoces (ocupación, fechas, lugar…) — opcional':
+    'Details about this person, if known (occupation, dates, place…) — optional',
+  'Guardar relación': 'Save relation',
+  'Eliminar relación': 'Delete relation',
+  '¿Eliminar la relación con {name}?': 'Delete the relation with {name}?',
+  // Contact card
+  'Eliminar contacto': 'Delete contact',
+  '¿Eliminar a «{name}»? Se eliminarán también las relaciones que lo mencionan.':
+    'Delete “{name}”? The relations that mention them will be deleted too.',
+  'Contacto — no forma parte del árbol genealógico': 'Contact — not part of the family tree',
+  'Qué sabemos de esta persona': 'What we know about this person',
+  'Ocupación, fechas, lugar… lo que se sepa, en Markdown.':
+    'Occupation, dates, place… whatever is known, in Markdown.',
+  'Mencionado por': 'Mentioned by',
+  'Ninguna persona del árbol lo relaciona todavía.': 'No one in the tree relates to them yet.',
+  // Relations graph view
+  '{persons} personas · {contacts} contactos · {relations} relaciones':
+    '{persons} people · {contacts} contacts · {relations} relations',
+  'Buscar en la red…': 'Search the network…',
+  'Reorganizar el grafo': 'Re-arrange the graph',
+  'Reorganizar': 'Re-arrange',
+  'Aún no hay relaciones registradas. Es un árbol independiente del genealógico: amistades, patronazgo, empleo, rivalidad, correspondencia…':
+    'No relations recorded yet. It’s a network independent from the family tree: friendship, patronage, employment, rivalry, correspondence…',
+  'Añade la primera desde la ficha de una persona, sección «Relaciones sociales».':
+    'Add the first one from a person’s record, in the “Social relations” section.',
+  'Ir a Personas': 'Go to People',
+
+  // ── Markdown notes editor ──────────────────────────────────────────────────
+  'Vista previa': 'Preview',
+
+  // ── Tree view ──────────────────────────────────────────────────────────────
+  'Aún no hay personas. Importa un GEDCOM o añade personas y sus parentescos desde la vista Personas.':
+    'No people yet. Import a GEDCOM, or add people and their kinship from the People view.',
+  'Árbol genealógico': 'Family tree',
+  'Centrar el árbol en…': 'Centre the tree on…',
+  'Ver ficha completa': 'Open full record',
+  'Centrar el árbol aquí': 'Centre the tree here',
+  'Marco': 'Frame',
+  'Usar el del árbol': 'Use the tree’s',
+  'Aplicar «{f}» a todo el árbol': 'Apply “{f}” to the whole tree',
+  'Añadir conexión': 'Add connection',
+  '…es hijo/a de esta persona': '…is a child of this person',
+  '…es el padre de esta persona': '…is the father of this person',
+  '…es la madre de esta persona': '…is the mother of this person',
+  '…es cónyuge de esta persona': '…is a spouse of this person',
+  'Elegir persona…': 'Choose person…',
+  'Relación adoptiva': 'Adoptive relationship',
+  'Conectar': 'Connect',
+  'Las conexiones que añades quedan marcadas como afirmadas por ti.':
+    'Connections you add are marked as asserted by you.',
+
+  // ── Map view ───────────────────────────────────────────────────────────────
+  'Mapa': 'Map',
+  'Trazar la migración de…': 'Trace the migration of…',
+  'Sin ruta de migración': 'No migration route',
+  '{n} lugares sin coordenadas': '{n} places without coordinates',
+  'Ningún lugar tiene coordenadas todavía. Añádelas a los lugares para verlos en el mapa; todo funciona sin conexión.':
+    'No place has coordinates yet. Add them to your places to see them on the map; everything works offline.',
+  'Coordenadas (grados decimales). Se guardan localmente.':
+    'Coordinates (decimal degrees). Stored locally.',
+  'Latitud': 'Latitude',
+  'Longitud': 'Longitude',
+
+  // ── Timeline view ──────────────────────────────────────────────────────────
+  'Línea temporal': 'Timeline',
+  '{n} eventos': '{n} events',
+  'Todas las personas': 'All people',
+  'No hay eventos. Se crean al analizar fuentes primarias con la lente de registros.':
+    'No events. They appear when you analyse primary sources with the records lens.',
+  'sin fecha': 'no date',
+  'Participantes': 'Participants',
+  'Sin participantes.': 'No participants.',
+  // Event-type labels (EVENT_TYPE_LABEL values, rendered via t()). 'Nacimiento' and
+  // 'Defunción' are already defined in the Personas section above.
+  'Bautismo': 'Baptism',
+  'Matrimonio': 'Marriage',
+  'Entierro': 'Burial',
+  'Censo': 'Census',
+  'Residencia': 'Residence',
+  'Migración': 'Migration',
+  'Ocupación': 'Occupation',
+  'Otro': 'Other',
+  // Role labels (ROLE_LABEL values, rendered via t())
+  'principal': 'principal',
+  'cónyuge': 'spouse',
+  'padre': 'father',
+  'madre': 'mother',
+  'hijo/a': 'child',
+  'testigo': 'witness',
+  'oficiante': 'officiant',
+  'otro': 'other',
+  // Fact labels (FACT_LABEL values, rendered via t())
+  'nacimiento': 'birth',
+  'defunción': 'death',
+
+  // ── Archive view ───────────────────────────────────────────────────────────
+  'Añadidos: {a} · duplicados omitidos: {d}': 'Added: {a} · duplicates skipped: {d}',
+  'Nombre de la carpeta': 'Folder name',
+  'Buscar en títulos, texto y metadatos…': 'Search titles, text and metadata…',
+  'Añadir archivos': 'Add files',
+  'Crear una entrada de texto (diario, nota, memorias) sin subir un archivo':
+    'Create a text entry (diary, note, memoir) without uploading a file',
+  'Nueva entrada': 'New entry',
+  'Indexar el texto de los documentos para descubrir relaciones semánticas con las personas':
+    'Index the documents’ text to discover semantic links with people',
+  'Indexando el archivo…': 'Indexing the archive…',
+  'Indexados {n} documentos para la búsqueda semántica.': 'Indexed {n} documents for semantic search.',
+  'El archivo ya está indexado (o no hay proveedor de embeddings configurado).':
+    'The archive is already indexed (or no embedding provider is configured).',
+  'El Archivo guarda fuentes primarias (documentos, registros, fotografías). La bibliografía académica (libros, artículos, tesis) se gestiona en la Biblioteca importándola desde Zotero.':
+    'The Archive holds primary sources (documents, records, photographs). Academic bibliography (books, articles, theses) is managed in the Library by importing from Zotero.',
+  'Ir a la Biblioteca': 'Go to the Library',
+  '{n} documentos': '{n} documents',
+  'Ningún documento coincide con los filtros.': 'No document matches the filters.',
+  'Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto (y una descripción visual de las imágenes) para poder buscarlos y citarlos.':
+    'This archive is empty. Add photos of records, CSV/XLSX or scans; Nodus will extract their text (and a visual description of images) so you can search and cite them.',
+  'Descripción visual': 'Visual description',
+  'Texto detectado': 'Detected text',
+  'Etiquetas': 'Tags',
+  'sin analizar': 'not analysed',
+  'Entrada sin título': 'Untitled entry',
+  'Nueva entrada de texto': 'New text entry',
+  'Escribe el contenido (se indexa para búsqueda)…': 'Write the content (indexed for search)…',
+  'Eliminar del archivo': 'Delete from the archive',
+  '¿Eliminar «{title}» y su archivo adjunto? Esta acción no se puede deshacer.':
+    'Delete “{title}” and its attached file? This action cannot be undone.',
+  'Reemplazar el archivo adjunto': 'Replace the attached file',
+  'Se sustituirá el archivo de «{title}» por otro y se volverá a extraer su texto. Se conservan el título, la clasificación, las etiquetas y las personas vinculadas. ¿Continuar?':
+    'The file of “{title}” will be replaced by another and its text re-extracted. The title, classification, tags and linked people are kept. Continue?',
+  'Elegir archivo…': 'Choose file…',
+  'Archivo reemplazado.': 'File replaced.',
+  'Este elemento no es una imagen analizable.': 'This item is not an analysable image.',
+  'Imagen analizada.': 'Image analysed.',
+  'Este elemento no tiene texto extraído para analizar.': 'This item has no extracted text to analyse.',
+  'Extraídos: {p} personas, {e} eventos.': 'Extracted: {p} people, {e} events.',
+  '{n} enlazadas a personas existentes.': '{n} linked to existing people.',
+  '{n} parentescos sugeridos por revisar.': '{n} suggested relationships to review.',
+  'Describir la imagen y transcribir su texto con el modelo de visión':
+    'Describe the image and transcribe its text with the vision model',
+  'Analizar imagen': 'Analyse image',
+  'Extraer personas, lugares y eventos de este documento':
+    'Extract people, places and events from this document',
+  'Extraer personas y eventos': 'Extract people and events',
+  'Sustituir el archivo adjunto por otro (se vuelve a extraer su texto)':
+    'Replace the attached file with another (its text is re-extracted)',
+  'Reemplazando…': 'Replacing…',
+  'Reemplazar archivo': 'Replace file',
+  'Texto extraído': 'Extracted text',
+  'Sin texto extraído.': 'No extracted text.',
+  'Clasificación': 'Classification',
+  'Guardar clasificación': 'Save classification',
+  'Personas mencionadas en este documento': 'People mentioned in this document',
+  'Coinciden con miembros del árbol. Vincúlalas si son la misma persona.':
+    'They match members of the tree. Link them if they are the same person.',
+  'Añadir etiqueta…': 'Add tag…',
+  'Editar descripción y texto': 'Edit description and text',
+  'Descripción': 'Description',
+  'Guardar cambios': 'Save changes',
+  'Descripción o resumen del documento…': 'Description or summary of the document…',
+  'Transcripción o texto del documento…': 'Transcription or text of the document…',
+
+  // ── Archive filter bar ─────────────────────────────────────────────────────
+  'No hay etiquetas todavía.': 'No tags yet.',
+  'No hay personas todavía.': 'No people yet.',
+  'Ordenar por': 'Sort by',
+  'El documento tiene al menos una de las seleccionadas': 'The document has at least one of those selected',
+  'El documento tiene todas las seleccionadas': 'The document has all of those selected',
+  'Todas (AND)': 'All (AND)',
+  'Buscar…': 'Search…',
+  'Sin opciones': 'No options',
+  'Tipo de documento': 'Document type',
+  'Desde': 'From',
+  'Hasta': 'To',
+  'Año del documento (según su fecha registrada), no el de subida.':
+    'The document’s year (from its recorded date), not the upload date.',
+
+  // ── Doc-type form ──────────────────────────────────────────────────────────
+  'Sin clasificar': 'Unclassified',
+
+  // ── Person link picker ─────────────────────────────────────────────────────
+  'Desvincular': 'Unlink',
+  'vincular': 'link',
+  'Buscar miembro…': 'Search member…',
+
+  // ── Home (genealogy) ───────────────────────────────────────────────────────
+  'Demo académica': 'Academic demo',
+  'Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.':
+    'Six works on the science of learning: idea graph, debates, gaps and notes, with no Zotero connection or AI setup.',
+  'Cargar demo académica': 'Load academic demo',
+  'Demo de genealogía': 'Genealogy demo',
+  'Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.':
+    'A 19th-century family with a tree, period portraits, a document archive, cited evidence and AI-suggested relationships to review. Includes a guided tutorial.',
+  'Cargar demo de genealogía': 'Load genealogy demo',
+  'Empieza tu árbol genealógico': 'Start your family tree',
+  'Importa un árbol GEDCOM (desde Gramps, Ancestry…) en Personas, o sube tus documentos —partidas, censos, cartas— al Archivo y extrae de ellos personas y eventos.':
+    'Import a GEDCOM tree (from Gramps, Ancestry…) in People, or upload your documents —records, censuses, letters— to the Archive and extract people and events from them.',
+  'Abrir Archivo': 'Open Archive',
+  'Revisa {n} parentesco(s) sugerido(s)': 'Review {n} suggested relationship(s)',
+  'La IA ha propuesto vínculos de parentesco a partir de la evidencia de tus fuentes. Confírmalos o descártalos: nada entra en el árbol sin tu visto bueno.':
+    'The AI has proposed kinship links from the evidence in your sources. Confirm or dismiss them: nothing enters the tree without your approval.',
+  'Revisar parentescos': 'Review relationships',
+  'Ver árbol': 'View tree',
+  'Indexa el archivo para descubrir vínculos': 'Index the archive to discover links',
+  'Hay documentos sin indexar. Indexarlos permite descubrir qué fuente trata sobre qué persona, también por significado y no solo por nombre.':
+    'There are un-indexed documents. Indexing them reveals which source concerns which person, by meaning and not only by name.',
+  'Explora tu árbol y su línea temporal': 'Explore your tree and its timeline',
+  'Recorre el árbol, abre la ficha de cada persona con su evidencia citada, sigue la línea temporal de la familia o pregúntale al asistente por un antepasado.':
+    'Walk the tree, open each person’s record with its cited evidence, follow the family timeline or ask the assistant about an ancestor.',
+  'Tu historia familiar: personas, árbol, línea temporal y archivo de evidencias.':
+    'Your family history: people, tree, timeline and evidence archive.',
+  'personas': 'people',
+  'vínculos': 'links',
+  'lugares': 'places',
+  'Cada persona reúne su parentesco, eventos, documentos y la evidencia que la respalda.':
+    'Each person gathers their kinship, events, documents and the evidence behind them.',
+  'vínculos de parentesco': 'kinship links',
+  '{n} personas': '{n} people',
+  '{n} parentescos sugeridos': '{n} suggested relationships',
+  'sin sugerencias pendientes': 'no pending suggestions',
+  'Importa o exporta GEDCOM para ir y venir de Gramps o Ancestry.':
+    'Import or export GEDCOM to move between Gramps or Ancestry.',
+  'por revisar': 'to review',
+  'La IA propone vínculos a partir de la evidencia; tú confirmas o descartas. Nada se añade solo.':
+    'The AI proposes links from the evidence; you confirm or dismiss. Nothing is added on its own.',
+  'La IA propondrá vínculos aquí a medida que extraigas personas y eventos de tus fuentes.':
+    'The AI will propose links here as you extract people and events from your sources.',
+  'eventos': 'events',
+  'Ver mapa': 'View map',
+  'documentos': 'documents',
+  'indexados': 'indexed',
+  '{n} carpetas': '{n} folders',
+  'Tus fuentes primarias (partidas, censos, cartas, fotos) vinculadas a las personas.':
+    'Your primary sources (records, censuses, letters, photos) linked to people.',
+  'modelo de extracción': 'extraction model',
+  'La IA extrae personas y eventos de tus documentos, sugiere parentescos, redacta biografías y genera retratos. Configura los modelos en Ajustes.':
+    'The AI extracts people and events from your documents, suggests relationships, writes biographies and generates portraits. Configure the models in Settings.',
+
+  // ── Library (genealogy framing) ────────────────────────────────────────────
+  'Esta obra no tiene texto para extraer registros.': 'This work has no text to extract records from.',
+  'Extraídos {p} personas y {e} eventos.': 'Extracted {p} people and {e} events.',
+  '{n} parentescos sugeridos.': '{n} suggested relationships.',
+  'Extrayendo registros de {n} obra(s)…': 'Extracting records from {n} work(s)…',
+  'Extraídos {p} personas y {e} eventos de la Biblioteca.':
+    'Extracted {p} people and {e} events from the Library.',
+  'En este modo la Biblioteca guarda fuentes secundarias o publicadas (libros, genealogías impresas, historias locales, colecciones de registros transcritas) importadas desde Zotero. Puedes extraer de ellas personas y eventos hacia el árbol con «Extraer personas y eventos». Los documentos originales (partidas, censos, cartas, fotos) van en el Archivo.':
+    'In this mode the Library holds secondary or published sources (books, printed genealogies, local histories, transcribed record collections) imported from Zotero. You can extract people and events from them into the tree with “Extract people and events”. Original documents (records, censuses, letters, photos) go in the Archive.',
+  'Ir al Archivo': 'Go to the Archive',
+  'Extraer personas, lugares y eventos de estas obras hacia el árbol':
+    'Extract people, places and events from these works into the tree',
+  'Extraer personas, lugares y eventos de esta obra':
+    'Extract people, places and events from this work',
+
+  // ── Deep Research (genealogy) ──────────────────────────────────────────────
+  'Tu biblioteca de informes de historia familiar, generados en cola y citando tus documentos y fuentes.':
+    'Your library of family-history reports, generated in a queue and citing your documents and sources.',
+  'El informe reconstruye la historia familiar a partir de tus documentos y fuentes, citándolos.':
+    'The report reconstructs the family history from your documents and sources, citing them.',
+  'Escribe el tema o la pregunta (p. ej. «Historia de la familia» o «La migración a la ciudad»). El informe la desarrollará citando tus documentos y fuentes.':
+    'Write the topic or question (e.g. “History of the family” or “The migration to the city”). The report will develop it, citing your documents and sources.',
+  'Toda la familia (sin persona en foco)': 'The whole family (no person in focus)',
+  'Opcional: centra el informe en la biografía documentada de una persona concreta.':
+    'Optional: centre the report on the documented biography of one specific person.',
+
+  // ── Research assistant (genealogy) ─────────────────────────────────────────
+  'El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.':
+    'The assistant uses the family context: people, kinship, events, documents and evidence.',
+  'Contexto familiar': 'Family context',
+  'Pregunta sobre personas, parentescos, eventos, documentos y evidencia de la familia.':
+    'Ask about the family’s people, kinship, events, documents and evidence.',
+
+  // ── Settings (genealogy) ───────────────────────────────────────────────────
+  'Tutorial de genealogía': 'Genealogy tutorial',
+  'El árbol, las fichas con evidencia, los parentescos sugeridos, la línea temporal, el archivo y el mapa.':
+    'The tree, records with evidence, suggested relationships, the timeline, the archive and the map.',
+  'Se mostrará el tutorial de genealogía.': 'The genealogy tutorial will be shown.',
+  'Modelo de visión (describe imágenes del archivo y transcribe su texto; usa uno con soporte de imagen)':
+    'Vision model (describes archive images and transcribes their text; use one with image support)',
+  'No disponible': 'Not available',
+  'Acepta imágenes: apto como modelo de visión.': 'Accepts images: suitable as a vision model.',
+  'visión': 'vision',
+
+  // ── Genealogy tour ─────────────────────────────────────────────────────────
+  'Bienvenido al modo genealogía': 'Welcome to genealogy mode',
+  'Este es el modo genealogía de Nodus. En un minuto te enseño sus piezas: el árbol, las fichas de persona con su evidencia, las sugerencias de parentesco de la IA, la línea temporal, el archivo de documentos y el mapa. Puedes salir cuando quieras y volver a verlo desde Ajustes.':
+    'This is Nodus’ genealogy mode. In a minute I’ll show you its pieces: the tree, person records with their evidence, the AI’s kinship suggestions, the timeline, the document archive and the map. You can leave any time and reopen it from Settings.',
+  'El árbol genealógico': 'The family tree',
+  'Cuatro generaciones dispuestas por generación, con cónyuges juntos y retratos enmarcados. Haz doble clic en una persona para recentrar el árbol en ella, y abre su ficha completa desde el nodo.':
+    'Four generations laid out by generation, with spouses together and framed portraits. Double-click a person to re-centre the tree on them, and open their full record from the node.',
+  'Fichas de persona': 'Person records',
+  'Cada persona reúne su parentesco, sus eventos, los documentos vinculados y la EVIDENCIA citada que la respalda. Puedes generar una biografía factual con un clic: se escribe solo a partir de la evidencia, sin inventar.':
+    'Each person gathers their kinship, their events, the linked documents and the cited EVIDENCE behind them. You can generate a factual biography with one click: it’s written only from the evidence, without inventing.',
+  'Parentescos sugeridos por la IA': 'AI-suggested relationships',
+  'Aquí está el corazón de Nodus: la IA PROPONE parentescos a partir de la evidencia de las fuentes (una partida que nombra a los padres, un acta de matrimonio), pero nunca los añade sola al árbol. Revísalos con su cita literal y confírmalos o descártalos. Una simple coincidencia de nombres jamás crea un parentesco.':
+    'Here is the heart of Nodus: the AI PROPOSES relationships from the evidence in the sources (a record naming the parents, a marriage certificate), but never adds them to the tree on its own. Review them with their verbatim quote and confirm or dismiss. A mere name match never creates a relationship.',
+  'Todos los eventos de la familia ordenados en el tiempo, con fechas inciertas incluidas («hacia 1850»). Filtra por persona o por tipo de evento para seguir una vida o un lugar.':
+    'All the family’s events ordered in time, uncertain dates included (“around 1850”). Filter by person or by event type to follow a life or a place.',
+  'Archivo de evidencias': 'Evidence archive',
+  'Tus fuentes primarias —partidas, censos, diarios, cartas, fotografías— clasificadas por tipo documental y con sus metadatos, vinculadas a las personas que mencionan. La IA sugiere qué documento trata sobre quién (por nombre y por similitud). Es tu archivo, local; la bibliografía académica vive en la Biblioteca (Zotero).':
+    'Your primary sources —records, censuses, diaries, letters, photographs— classified by document type and with their metadata, linked to the people they mention. The AI suggests which document concerns whom (by name and by similarity). It’s your archive, local; academic bibliography lives in the Library (Zotero).',
+  'Mapa de lugares y migraciones': 'Map of places and migrations',
+  'Los lugares de la familia y sus movimientos (Carmona → Sevilla), dibujados sobre un mapa offline, sin depender de servidores de mapas.':
+    'The family’s places and their movements (Carmona → Seville), drawn on an offline map, with no reliance on map servers.',
+  'Retratos': 'Portraits',
+  'GEDCOM: entra y sal cuando quieras': 'GEDCOM: come and go as you like',
+  'Importa un árbol GEDCOM desde Gramps o Ancestry, o exporta el tuyo, desde los botones de esta columna. Nodus complementa a tus herramientas; no te encierra.':
+    'Import a GEDCOM tree from Gramps or Ancestry, or export yours, from the buttons in this column. Nodus complements your tools; it doesn’t lock you in.',
+  'En cualquier ficha puedes adjuntar el retrato real de la persona y encuadrarlo arrastrando. Si no conservas ninguna imagen, excepcionalmente puedes generar un retrato de referencia con IA a partir de una descripción de sus rasgos; no es lo recomendable —por motivos éticos, un rostro generado no es un documento— así que úsalo solo como marcador visual, nunca como si fuera real.':
+    'On any record you can attach the person’s real portrait and frame it by dragging. If no image survives, you may exceptionally generate an AI reference portrait from a description of their features; it isn’t advisable —for ethical reasons, a generated face is not a document— so use it only as a visual placeholder, never as if it were real.',
+  'La IA propone; tú decides': 'The AI proposes; you decide',
+  'Recuerda: ninguna relación entra en el árbol sin tu confirmación, cada dato lleva su evidencia y la IA nunca inventa parentescos. Para empezar con tu propia familia, importa un GEDCOM desde Personas o sube tus documentos al Archivo y extrae de ellos personas y eventos.':
+    'Remember: no relationship enters the tree without your confirmation, every fact carries its evidence and the AI never invents relationships. To start with your own family, import a GEDCOM from People or upload your documents to the Archive and extract people and events from them.',
+
+  // ── Graph view (idea graph, previously untranslated) ───────────────────────
+  '{n} temas · haz clic para explorar': '{n} themes · click to explore',
+  'Volver a los temas del corpus': 'Back to the corpus themes',
+  'Idea enfocada': 'Focused idea',
+  'Todas · {n} ideas': 'All · {n} ideas',
+  '{n} de {m} más conectadas': '{n} of {m} most connected',
+  'Cuántas ideas mostrar (por conectividad)': 'How many ideas to show (by connectivity)',
+  'Número de ideas a mostrar': 'Number of ideas to show',
+  'Mostrar todas las ideas del tema (puede ir más lento)':
+    'Show all the theme’s ideas (may be slower)',
+  'Conectada con': 'Connected with',
+  'Abrir esta idea': 'Open this idea',
+
+  // ── Immersion (previously untranslated) ────────────────────────────────────
+  '{s} estaciones · {i} ideas · {w} obras · ~{m} minutos':
+    '{s} stops · {i} ideas · {w} works · ~{m} minutes',
+
+  // ── Audio player / panel / settings (previously untranslated) ──────────────
+  'Elige y prepara una voz en Ajustes → IA → Audio y voz.':
+    'Choose and set up a voice in Settings → AI → Audio and voice.',
+  'No hay texto narrable en este contenido.': 'There is no narratable text in this content.',
+  'Audio': 'Audio',
+  '{n} pistas': '{n} tracks',
+  'Reproducir todo': 'Play all',
+  'Eliminar audio': 'Delete audio',
+  'Generar audio': 'Generate audio',
+  'Elige y prepara una voz en Ajustes → IA → Audio y voz para poder narrar.':
+    'Choose and set up a voice in Settings → AI → Audio and voice to narrate.',
+  'Faltan algunos archivos de audio (no se guardan en las copias de seguridad). Pulsa Regenerar para recuperarlos.':
+    'Some audio files are missing (they aren’t kept in backups). Press Regenerate to recover them.',
+  'Archivo no disponible': 'File unavailable',
+  'Pausa': 'Pause',
+  'Reproducir': 'Play',
+  'sin archivo': 'no file',
+  'Eliminar pista': 'Delete track',
+  'Velocidad de reproducción': 'Playback speed',
+  'Velocidad': 'Speed',
+  'Detener y cerrar': 'Stop and close',
+  'Audio y voz': 'Audio and voice',
+  'Narra tus informes de Deep Research y tus inmersiones con una voz. La generación se hace por secciones y en segundo plano; puede tardar según la longitud.':
+    'Narrate your Deep Research reports and immersions with a voice. Generation runs section by section in the background; it may take a while depending on length.',
+  'Nube · clave propia': 'Cloud · your own key',
+  'Local · sin conexión': 'Local · offline',
+  'Proveedor de voz': 'Voice provider',
+  'Clave guardada': 'Key saved',
+  'Cargando voces…': 'Loading voices…',
+  'Recargar voces': 'Reload voices',
+  'Borrar clave': 'Clear key',
+  'Clave de API de Hume (se guarda cifrada, nunca se exporta)':
+    'Hume API key (stored encrypted, never exported)',
+  'Guardar clave': 'Save key',
+  'El audio se genera con tu cuenta de Hume y se factura a tu clave. El texto de la sección se envía a Hume para sintetizarlo.':
+    'Audio is generated with your Hume account and billed to your key. The section text is sent to Hume to synthesise it.',
+  'Modelo {label} (inglés)': '{label} model (English)',
+  '~{n} MB · una sola descarga para todas las voces': '~{n} MB · a single download for all voices',
+  'Eliminar modelo': 'Delete model',
+  '{n}%': '{n}%',
+  'Descargar modelo': 'Download model',
+  'No se encontraron voces para esta clave.': 'No voices found for this key.',
+  'Usar esta voz': 'Use this voice',
+  'Descárgala para poder usarla': 'Download it to use it',
+  'en uso': 'in use',
+  'Descargar': 'Download',
+  'descarga el modelo': 'download the model',
+
+  // ── Map · places · gazetteer ───────────────────────────────────────────────
+  'Lugares': 'Places',
+  'Añadir lugar': 'Add place',
+  'Registra los lugares de esta persona (municipio, estado, país). Construyen su mapa individual y alimentan el mapa general.':
+    'Log this person’s places (municipality, state, country). They build their individual map and feed the general map.',
+  'Sin lugares registrados.': 'No places recorded.',
+  'sin coordenadas': 'no coordinates',
+  'Guardar lugar': 'Save place',
+  'Eliminar lugar': 'Delete place',
+  '¿Eliminar «{name}» de los lugares de esta persona?': 'Remove “{name}” from this person’s places?',
+  'Eliminar persona': 'Delete person',
+  'Eliminar evento': 'Delete event',
+  'Buscar un lugar (municipio, ciudad…)': 'Search a place (municipality, city…)',
+  'Sin coincidencias. Prueba con el nombre en su idioma original.':
+    'No matches. Try the name in its original language.',
+  '+{n} más': '+{n} more',
+  'Ningún lugar localizado todavía. Añade lugares a las personas (con su municipio, estado y país) para verlos en el mapa.':
+    'No place located yet. Add places to people (with their municipality, state and country) to see them on the map.',
+  'Ningún lugar localizado todavía. Abre la ficha de una persona y añade sus lugares (municipio, estado, país); aparecerán aquí sobre el mapa.':
+    'No place located yet. Open a person’s record and add their places (municipality, state, country); they will appear here on the map.',
+  'Reproducir la línea temporal': 'Play the timeline',
+  'Línea cronológica': 'Chronological timeline',
+  'hasta {y}': 'up to {y}',
+  'todo': 'all',
+  '{n} ubicaciones': '{n} locations',
+  'Buscar persona…': 'Search person…',
+
+  // ── Backup schedule ────────────────────────────────────────────────────────
+  'Días': 'Days',
+  // Weekday initials (L M X J V S D → M T W T F S S).
+  'L': 'M',
+  'M': 'T',
+  'X': 'W',
+  'J': 'T',
+  'V': 'F',
+  'S': 'S',
+  'D': 'S',
+  'Inactivo': 'Off',
+  'todos los días': 'every day',
+  'Hora': 'Time',
+  'Si el equipo estaba apagado, la copia se hace al arrancar la app.':
+    'If the computer was off, the backup runs when the app next starts.',
+
   // <<END_EN>>
 };

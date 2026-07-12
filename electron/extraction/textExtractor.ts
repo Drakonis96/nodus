@@ -6,7 +6,8 @@ import type { DeepContextMode, SourceType, PdfAnalysis } from '@shared/types';
 import { itemChildren, itemAsAttachment, getFulltext, ZoteroAttachment } from '../zotero/zoteroClient';
 import { openPdf, pageText } from './pdfjsLoader';
 import { analyzePdf } from './pdfAnalyzer';
-import { ocrPdfPages } from './ocr';
+import { ocrPdfPages, ocrImageFile } from './ocr';
+import { csvFileToText, xlsxFileToText } from './tabular';
 import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 
@@ -273,6 +274,41 @@ export function extractTextFile(filePath: string): string {
   return fs.readFileSync(filePath, 'utf8');
 }
 
+/** Raster image formats Nodus can OCR directly (a scan, a photographed record). */
+const IMAGE_EXT_RE = /\.(png|jpe?g|tiff?|webp|bmp)$/i;
+
+/**
+ * Extract text from a standalone image via OCR. OCR is opt-in (like scanned PDFs):
+ * with it disabled the image yields no text but is still recorded with a note. A
+ * richer AI vision description belongs to the evidence archive (phase B), not this
+ * deterministic, content-hash-cached extractor.
+ */
+async function extractImage(
+  filePath: string,
+  ocr: OcrOptions,
+  onProgress?: OnExtractProgress,
+  perf?: PerfContext
+): Promise<ExtractedDoc> {
+  if (!ocr.enabled) {
+    return { text: '', sourceType: 'upload', notes: 'Imagen sin capa de texto y OCR desactivado.' };
+  }
+  onProgress?.({ phase: 'ocr', detail: 'OCR de imagen…', pct: null });
+  const done = startPerf('image OCR', perf, { file: path.basename(filePath), languages: ocr.languages });
+  try {
+    const text = await ocrImageFile(filePath, ocr.languages);
+    done({ chars: text.length });
+    return {
+      text,
+      sourceType: 'upload',
+      notes: text ? 'Texto reconocido por OCR.' : 'Imagen sin texto reconocible por OCR.',
+    };
+  } catch (e) {
+    // OCR deps missing or failed — record the image without text rather than throw.
+    done({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+    return { text: '', sourceType: 'upload', notes: 'OCR de imagen no disponible.' };
+  }
+}
+
 function decodeHtmlEntities(text: string): string {
   const named: Record<string, string> = {
     amp: '&',
@@ -415,6 +451,16 @@ export async function extractFromPath(
     const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'txt' });
     doc = { text: extractTextFile(filePath), sourceType: 'upload', notes: null };
     done({ chars: doc.text.length });
+  } else if (ext === '.csv') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'csv' });
+    doc = { text: csvFileToText(filePath), sourceType: 'upload', notes: null };
+    done({ chars: doc.text.length });
+  } else if (ext === '.xlsx') {
+    const done = startPerf('document extraction', opts.perf, { file: path.basename(filePath), type: 'xlsx' });
+    doc = { text: xlsxFileToText(filePath), sourceType: 'upload', notes: null };
+    done({ chars: doc.text.length });
+  } else if (IMAGE_EXT_RE.test(ext)) {
+    doc = await extractImage(filePath, ocr, opts.onProgress, opts.perf);
   } else {
     throw new Error(`Tipo de archivo no soportado: ${ext}`);
   }

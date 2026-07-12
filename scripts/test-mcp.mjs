@@ -80,6 +80,9 @@ try {
     'nodus_update_folder_summary',
     'nodus_create_note',
     'nodus_update_note',
+    'nodus_list_persons',
+    'nodus_get_person',
+    'nodus_list_kin_suggestions',
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
 
@@ -100,6 +103,13 @@ try {
   assert.equal(capabilities.counts.notes, 1);
   assert.equal(capabilities.counts.themes, 1);
   assert.equal(capabilities.counts.passages, 2);
+  assert.ok(capabilities.vault.active.type, 'capabilities exposes the active vault type');
+
+  // Read-only genealogy tools are wired and safe on a non-genealogy corpus.
+  const personList = await callTool(server, 'nodus_list_persons', { limit: 10, offset: 0 });
+  assert.deepEqual(personList, { persons: [], total: 0 }, 'nodus_list_persons callable, empty without a records layer');
+  const kinList = await callTool(server, 'nodus_list_kin_suggestions', { limit: 10, offset: 0 });
+  assert.deepEqual(kinList, { suggestions: [], total: 0 }, 'nodus_list_kin_suggestions callable, empty');
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);

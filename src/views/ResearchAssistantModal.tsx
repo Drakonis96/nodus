@@ -180,6 +180,16 @@ const CHAT_SUGGESTIONS = [
   '¿Qué autores son clave y cómo se relacionan?',
 ];
 
+// Genealogy-mode openers: they read the family context (people, kinship, events,
+// documents, evidence), not the idea graph.
+const GENEALOGY_SUGGESTIONS = [
+  'Hazme una semblanza de una persona a partir de su evidencia.',
+  '¿Qué parentescos sugeridos hay pendientes y con qué evidencia?',
+  '¿Hay fechas o datos contradictorios entre las fuentes?',
+  '¿Qué documentos mencionan a una misma persona?',
+  '¿Qué datos faltan y qué fuente podría aportarlos?',
+];
+
 interface UiMessage extends ChatMessageRecord {
   id: string;
   /** Live reasoning/thinking trace from the model. Transient — never persisted. */
@@ -189,11 +199,15 @@ interface UiMessage extends ChatMessageRecord {
 export function ResearchAssistantModal({
   settings,
   initialTarget,
+  isGenealogy = false,
   onOpenGraph,
   onClose,
 }: {
   settings: AppSettings;
   initialTarget?: AssistantNavigationTarget | null;
+  /** Genealogy vault: the assistant answers over the family (people, kinship, events,
+   *  documents, evidence), so the academic context selector is not shown. */
+  isGenealogy?: boolean;
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
   onClose: () => void;
 }) {
@@ -564,16 +578,25 @@ export function ResearchAssistantModal({
               </option>
             ))}
           </select>
-          <button
-            className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
-            title={t('Elegir qué partes del corpus ve el asistente')}
-            onClick={() => setShowContext(true)}
-          >
-            <Icon name="layers" size={13} className="text-indigo-300" />
-            <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
-            <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
-          </button>
-          {contextTitle && (
+          {isGenealogy ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-900/60 bg-amber-950/20 px-2 py-1 text-xs text-amber-200"
+              title={t('El asistente usa el contexto familiar: personas, parentescos, eventos, documentos y evidencia.')}
+            >
+              <Icon name="tree" size={13} /> <span className="hidden sm:inline">{t('Contexto familiar')}</span>
+            </span>
+          ) : (
+            <button
+              className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1"
+              title={t('Elegir qué partes del corpus ve el asistente')}
+              onClick={() => setShowContext(true)}
+            >
+              <Icon name="layers" size={13} className="text-indigo-300" />
+              <span className="hidden sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
+              <span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
+            </button>
+          )}
+          {!isGenealogy && contextTitle && (
             <span className="hidden md:inline-flex max-w-xs items-center gap-1.5 rounded-md border border-indigo-900/70 bg-indigo-950/25 px-2 py-1 text-xs text-indigo-200">
               <Icon name="fit" size={12} />
               <span className="truncate">{contextTitle}</span>
@@ -636,11 +659,13 @@ export function ResearchAssistantModal({
                         <Icon name="chat" size={22} />
                       </span>
                       <p className="max-w-md text-sm text-neutral-400">
-                        {t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
+                        {isGenealogy
+                          ? t('Pregunta sobre personas, parentescos, eventos, documentos y evidencia de la familia.')
+                          : t('Pregunta sobre ideas, autores, temas, contradicciones o documentos.')}
                       </p>
                     </div>
                     <div className="flex max-w-xl flex-wrap justify-center gap-2">
-                      {CHAT_SUGGESTIONS.map((suggestion) => (
+                      {(isGenealogy ? GENEALOGY_SUGGESTIONS : CHAT_SUGGESTIONS).map((suggestion) => (
                         <button
                           key={suggestion}
                           className="suggestion-chip"

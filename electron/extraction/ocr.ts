@@ -31,6 +31,23 @@ async function renderPageToPng(page: any, scale = 2.5): Promise<Buffer> {
  * OCR the given 1-based page numbers of an already-open pdfjs document.
  * Returns a map of pageNumber -> recognized text.
  */
+/**
+ * OCR a standalone image file (PNG/JPEG/TIFF/…). Simpler than the PDF path — no
+ * page rendering — since Tesseract reads the image file directly. Returns the
+ * recognised text (trimmed), or throws if the OCR deps are unavailable (the caller
+ * degrades to no text).
+ */
+export async function ocrImageFile(filePath: string, languages: string): Promise<string> {
+  const Tesseract: any = await import('tesseract.js');
+  const worker = await Tesseract.createWorker(languages);
+  try {
+    const { data } = await worker.recognize(filePath);
+    return (data?.text ?? '').trim();
+  } finally {
+    await worker.terminate();
+  }
+}
+
 export async function ocrPdfPages(
   pdf: any,
   pageNumbers: number[],

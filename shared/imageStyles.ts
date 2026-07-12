@@ -76,15 +76,17 @@ export function imageStyleTemplate(style: DecorativeImageStyle): DecorativeImage
   return DECORATIVE_IMAGE_STYLES.find((entry) => entry.id === style) ?? DECORATIVE_IMAGE_STYLES[0];
 }
 
-/** Deliberately compact: image cost should go to pixels, not a verbose prompt. */
-export function buildDecorativeImagePrompt(style: DecorativeImageStyle, visualContext: string): string {
+/** Deliberately compact: image cost should go to pixels, not a verbose prompt. The
+ *  optional `extra` lets the vault type steer the aesthetic (e.g. genealogy → heritage). */
+export function buildDecorativeImagePrompt(style: DecorativeImageStyle, visualContext: string, extra = ''): string {
   const clean = visualContext.replace(/\s+/g, ' ').trim().slice(0, 260);
   return [
     imageStyleTemplate(style).prompt,
     clean,
+    extra.trim(),
     'single decorative landscape image, no text, no letters, no numbers, no logos, no watermark',
   ]
     .filter(Boolean)
     .join('. ')
-    .slice(0, 560);
+    .slice(0, 640);
 }

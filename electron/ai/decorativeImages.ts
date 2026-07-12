@@ -10,9 +10,12 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
+import { vaultTypeImagePrompt } from '@shared/vaultTypes';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
+import { setPersonPortrait } from '../db/entitiesRepo';
 import {
   getDecorativeImage,
   markDecorativeImageNotRequested,
@@ -249,7 +252,7 @@ async function runGeneration(
     if (!prompt) {
       const context = pending.visualContext || await visualContextFor(imageSource(request.entityKind, request.entityId));
       if (active.get(key) !== token) return;
-      prompt = buildDecorativeImagePrompt(pending.style, context);
+      prompt = buildDecorativeImagePrompt(pending.style, context, vaultTypeImagePrompt(getActiveVault().type));
       saveDecorativeImagePrompt(request.entityKind, request.entityId, context, prompt);
     }
     if (active.get(key) !== token) return;
@@ -374,6 +377,37 @@ export function invalidateDecorativeImageGeneration(
   entityId: string
 ): void {
   active.delete(taskKey(entityKind, entityId));
+}
+
+/**
+ * Genealogy only: generate an ILLUSTRATIVE reference portrait for a person from a
+ * text description of their features, when no real photograph survives. Explicitly
+ * non-photorealistic in the prompt — a generated face must never be mistaken for a
+ * real likeness or documentary evidence. Exceptional and not the recommended path
+ * (real photographs stay the default); reuses the same multi-provider image
+ * pipeline as decorative images, synchronously (no pending/queue state), since a
+ * portrait is a single small on-demand action a user explicitly triggers.
+ */
+export async function generatePersonPortraitFromDescription(personId: string, description: string): Promise<void> {
+  const trimmed = description.replace(/\s+/g, ' ').trim();
+  if (!trimmed) throw new Error('Describe los rasgos de la persona antes de generar el retrato.');
+  const settings = getSettings();
+  if (!settings.imageProvider || !settings.imageModel) {
+    throw new Error('Configura un proveedor y modelo de imagen en Ajustes → Proveedores.');
+  }
+  const prompt = buildReferencePortraitPrompt(trimmed);
+  const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
+  const optimized = await optimizedJpegs(generated);
+  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 });
+}
+
+function buildReferencePortraitPrompt(description: string): string {
+  return [
+    `An illustrative, hand-drawn reference portrait suggesting a person with these features: ${description}.`,
+    'Painterly or engraved-illustration style, clearly NOT a photograph — it must read as an artistic impression, never as a documentary likeness of a real person.',
+    'Head-and-shoulders composition, calm neutral expression, plain muted backdrop, restrained sepia and warm heritage tones.',
+    'A single person only. No text, no words, no letters, no caption, no signature, no border and no decorative frame.',
+  ].join(' ');
 }
 
 /** End process-local tasks before a vault switch/reset or app shutdown. */

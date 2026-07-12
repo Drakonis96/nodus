@@ -7,6 +7,7 @@ import type {
   ModelInfo,
   UpdateProgressEvent,
   VaultSummary,
+  VaultType,
 } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -16,6 +17,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
+import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
 
@@ -459,9 +461,10 @@ export function Settings({
             </p>
             <SidebarOrderEditor
               sidebarOrder={settings.sidebarOrder}
-              sidebarHidden={settings.sidebarHidden}
+              sidebarHidden={effectiveSidebarHidden(settings.sidebarHidden, settings.sidebarCustomized, activeVault?.type)}
+              vaultType={activeVault?.type}
               onReorder={(ids) => void patch({ sidebarOrder: ids })}
-              onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden })}
+              onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden, sidebarCustomized: true })}
             />
           </Section>
       )}
@@ -492,6 +495,20 @@ export function Settings({
                 <Icon name="route" /> {t('Empezar')}
               </button>
             </div>
+            {activeVault?.type === 'genealogy' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de genealogía')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('El árbol, las fichas con evidencia, los parentescos sugeridos, la línea temporal, el archivo y el mapa.')}</p>
+                </div>
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ genealogyTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de genealogía.')))}
+                >
+                  <Icon name="tree" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>
@@ -779,15 +796,59 @@ export function Settings({
                     <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={settings.autoBackupFolder}>
                       {settings.autoBackupFolder || t('Sin carpeta elegida')}
                     </span>
-                    <select
-                      className="input w-auto text-xs"
-                      value={settings.autoBackupIntervalHours}
-                      onChange={(e) => void patch({ autoBackupIntervalHours: Number(e.target.value) })}
-                    >
-                      <option value={12}>{t('Cada 12 horas')}</option>
-                      <option value={24}>{t('Cada día')}</option>
-                      <option value={168}>{t('Cada semana')}</option>
-                    </select>
+                  </div>
+
+                  {/* Schedule: which day(s) of the week + at what time. If the machine
+                      was off at the scheduled time, the backup runs at the next launch. */}
+                  <div className="space-y-2 rounded-md border border-neutral-800 p-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-neutral-500">{t('Días')}</span>
+                      {[
+                        { d: 1, label: t('L') },
+                        { d: 2, label: t('M') },
+                        { d: 3, label: t('X') },
+                        { d: 4, label: t('J') },
+                        { d: 5, label: t('V') },
+                        { d: 6, label: t('S') },
+                        { d: 0, label: t('D') },
+                      ].map(({ d, label }) => {
+                        const days = settings.autoBackupDays ?? [];
+                        const on = days.length === 0 || days.includes(d);
+                        return (
+                          <button
+                            key={d}
+                            className={`h-7 w-7 rounded-md border text-xs ${on ? 'border-indigo-600 bg-indigo-600/25 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}
+                            title={on ? t('Activo') : t('Inactivo')}
+                            onClick={() => {
+                              // From "every day" (empty), first click selects a single explicit day.
+                              const base = days.length === 0 ? [0, 1, 2, 3, 4, 5, 6] : [...days];
+                              const next = base.includes(d) ? base.filter((x) => x !== d) : [...base, d];
+                              void patch({ autoBackupDays: next.length === 7 ? [] : next.sort((a, b) => a - b) });
+                            }}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                      {(settings.autoBackupDays ?? []).length === 0 && (
+                        <span className="text-[11px] text-neutral-500">{t('todos los días')}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-neutral-500">{t('Hora')}</span>
+                      <input
+                        type="time"
+                        className="input w-auto text-xs"
+                        value={`${String(settings.autoBackupHour ?? 3).padStart(2, '0')}:${String(settings.autoBackupMinute ?? 0).padStart(2, '0')}`}
+                        onChange={(e) => {
+                          const [h, m] = e.target.value.split(':').map(Number);
+                          if (Number.isFinite(h) && Number.isFinite(m)) void patch({ autoBackupHour: h, autoBackupMinute: m });
+                        }}
+                      />
+                      <span className="text-[11px] text-neutral-500">
+                        {t('Si el equipo estaba apagado, la copia se hace al arrancar la app.')}
+                      </span>
+                    </div>
                   </div>
                   {autoBackupHasPassword ? (
                     <div className="flex flex-wrap items-center gap-2">
@@ -876,6 +937,9 @@ export function Settings({
             </p>
             <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
               <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
+            </Row>
+            <Row label={t('Modelo de visión (describe imágenes del archivo y transcribe su texto; usa uno con soporte de imagen)')}>
+              <ModelPicker settings={settings} value={settings.visionModel} onChange={(m) => patch({ visionModel: m })} emptyLabel="Usar modelo de extracción" />
             </Row>
             <Row label={t('Modelo de síntesis general (fallback inicial para herramientas con selector propio)')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
@@ -1233,15 +1297,19 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
 function SidebarOrderEditor({
   sidebarOrder,
   sidebarHidden,
+  vaultType,
   onReorder,
   onToggleHidden,
 }: {
   sidebarOrder: string[];
   sidebarHidden: string[];
+  vaultType: VaultType | undefined;
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
 }) {
-  const orderedAll = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const orderedAll = orderedNav(sidebarOrder).filter(
+    (n) => n.id !== 'home' && n.id !== 'settings' && isViewAllowedForVaultType(n.id, vaultType)
+  );
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: orderedAll.filter((n) => n.group === g.id) }));
   const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);

@@ -69,6 +69,23 @@ import type {
   VaultSummary,
   VaultSwitchOptions,
   VaultSwitchResult,
+  VaultType,
+  PersonInput,
+  PlaceInput,
+  GazetteerPlace,
+  PersonPlaceInput,
+  EventInput,
+  ParticipantRole,
+  HistoricalEventType,
+  RecordEvidenceInput,
+  RecordEvidenceTargetKind,
+  RelationshipType,
+  RelationshipProvenance,
+  RelationshipSubtype,
+  SocialContactInput,
+  SocialRelationInput,
+  ArchiveItemInput,
+  ArchiveListOptions,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
@@ -92,6 +109,7 @@ import { listImageModels } from './ai/imageModels';
 import {
   applyDecorativeImageOption,
   deleteDecorativeImage,
+  generatePersonPortraitFromDescription,
   interruptDecorativeImageGenerations,
   invalidateDecorativeImageGeneration,
   queueDecorativeImageGeneration,
@@ -137,6 +155,8 @@ import { exportData, importData } from './export/exportImport';
 import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
 import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
+import { seedGenealogyDemoData } from './db/genealogyDemoData';
+import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
 import { suggestFolderIdeas } from './ai/folderIdeaSuggestions';
@@ -148,7 +168,7 @@ import { getCorpusHealth } from './db/corpusHealthRepo';
 import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
 import { applyManuscriptCitation, verifyManuscriptCitations } from './ai/manuscriptVerifier';
 import { suggestGapSearch } from './ai/gapSearch';
-import { extractFromPath } from './extraction/textExtractor';
+import { extractFromPath, resolveWorkText } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { summaryContentHash } from './ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
@@ -203,8 +223,107 @@ import {
   renameVault,
   resetVaultDatabase,
   setActiveVault,
+  setVaultType,
 } from './vaults/vaultRegistry';
 import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
+import {
+  createPerson,
+  updatePerson,
+  getPerson,
+  listPersons,
+  deletePerson,
+  addPersonName,
+  setPersonPortrait,
+  getPersonPortrait,
+  updatePortraitFocus,
+  clearPersonPortrait,
+  setPersonFrame,
+  createPlace,
+  listPlaces,
+  updatePlace,
+  findOrCreatePlace,
+  findOrCreateGazetteerPlace,
+  createEvent,
+  updateEvent,
+  getEvent,
+  deleteEvent,
+  listEvents,
+  addParticipant,
+  removeParticipant,
+  addRecordEvidence,
+  listEvidenceFor,
+  deleteRecordEvidence,
+  recordCounts,
+} from './db/entitiesRepo';
+import {
+  createFolder,
+  listFolders,
+  renameFolder,
+  deleteFolder,
+  createItem,
+  getItem,
+  getItemBlob,
+  listItems,
+  updateItem,
+  deleteItem,
+  addTag,
+  removeTag,
+  listTags,
+  archiveCounts,
+  linkItemPerson,
+  unlinkItemPerson,
+  listItemsForPerson,
+} from './db/archiveRepo';
+import { ingestArchiveFile, replaceArchiveFile } from './archive/archiveIngest';
+import { scanArchiveTextRecords, scanWorkRecords } from './ai/recordsScan';
+import { analyzeImageBytes } from './ai/imageAnalysis';
+import { generatePersonBiography } from './ai/personBiography';
+import { isVisionMime } from '@shared/imageAnalysis';
+import {
+  addRelationship,
+  removeRelationship,
+  listRelationshipsForPerson,
+  allRelationships,
+  kinOf,
+} from './db/relationshipsRepo';
+import { importGedcom, exportGedcom } from './genealogy/gedcomBridge';
+import { findMatchCandidates, mergePersons, dismissMatch } from './db/matchRepo';
+import {
+  listSocialContacts,
+  getSocialContact,
+  createSocialContact,
+  updateSocialContact,
+  deleteSocialContact,
+  listSocialRelationsForPerson,
+  listSocialRelationsTargetingPerson,
+  listSocialRelationsTargetingContact,
+  createSocialRelation,
+  updateSocialRelation,
+  deleteSocialRelation,
+  socialGraph,
+} from './db/socialRepo';
+import { searchGazetteer } from './geo/gazetteer';
+import {
+  addPersonPlace,
+  updatePersonPlace,
+  deletePersonPlace,
+  listPersonPlaces,
+  mapPoints,
+} from './db/personPlacesRepo';
+import {
+  listOpenSuggestions,
+  listSuggestionsForPerson,
+  confirmSuggestion,
+  dismissSuggestion,
+  openSuggestionCount,
+} from './db/kinshipSuggestionsRepo';
+import {
+  embedArchiveItem,
+  embedArchiveBacklog,
+  archiveIndexStatus,
+  suggestPersonsForItem,
+  suggestDocumentsForPerson,
+} from './archive/archiveDiscovery';
 
 /**
  * Queue the full analysis chain for one work: themes (if missing) → ideas, marked
@@ -347,10 +466,11 @@ export function registerIpc(
   h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
   h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));
   h('vaults:create', async (_e, input: CreateVaultInput) => {
-    const vault = createVault(input.name);
+    const vault = createVault(input.name, input.type);
     return { vault: withVaultKeyProviders(vault) };
   });
   h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));
+  h('vaults:setType', async (_e, id: string, type: VaultType) => withVaultKeyProviders(setVaultType(id, type)));
   h('vaults:switch', async (_e, id: string, options?: VaultSwitchOptions) => switchVaultSafely(id, options));
   h('vaults:duplicate', async (_e, id: string, name: string, options?: VaultSwitchOptions) => {
     const source = getVault(id);
@@ -362,7 +482,7 @@ export function registerIpc(
       } else {
         fs.copyFileSync(source.path, tmp);
       }
-      const vault = createVaultFromDatabaseFile(tmp, name);
+      const vault = createVaultFromDatabaseFile(tmp, name, source.type);
       const hasExplicitSource = options && Object.prototype.hasOwnProperty.call(options, 'copyApiKeysFromVaultId');
       const keySource = hasExplicitSource ? options.copyApiKeysFromVaultId ?? null : id;
       const copiedProviders = keySource && keySource !== vault.id ? copyApiKeysBetweenVaults(keySource, vault.id) : [];
@@ -405,6 +525,323 @@ export function registerIpc(
   h('vaults:copyApiKeys', async (_e, sourceVaultId: string, targetVaultId: string) => ({
     copiedProviders: copyApiKeysBetweenVaults(sourceVaultId, targetVaultId),
   }));
+  // ── Records ontology (persons / places / events / evidence) ────────────────
+  h('entities:counts', async () => recordCounts());
+  h('entities:listPersons', async (_e, search?: string) => listPersons({ search }));
+  h('entities:getPerson', async (_e, id: string) => getPerson(id));
+  h('entities:createPerson', async (_e, input: PersonInput) => createPerson(input));
+  h('entities:updatePerson', async (_e, id: string, patch: Partial<PersonInput>) => updatePerson(id, patch));
+  h('entities:deletePerson', async (_e, id: string) => {
+    deletePerson(id);
+  });
+  h('entities:addPersonName', async (_e, id: string, name: string, kind?: string | null) =>
+    addPersonName(id, name, kind ?? null)
+  );
+  // Portraits
+  h('entities:setPersonPortraitFromFile', async (_e, personId: string) => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Elegir retrato',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const filePath = picked.filePaths[0];
+    const bytes = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.bmp' ? 'image/bmp' : ext === '.tif' || ext === '.tiff' ? 'image/tiff' : 'image/jpeg';
+    setPersonPortrait(personId, bytes, mime);
+    return getPerson(personId);
+  });
+  h('entities:getPersonPortrait', async (_e, personId: string) => getPersonPortrait(personId));
+  h('entities:updatePortraitFocus', async (
+    _e,
+    personId: string,
+    focus: { focusX: number; focusY: number; scale: number }
+  ) => {
+    updatePortraitFocus(personId, focus);
+  });
+  h('entities:clearPersonPortrait', async (_e, personId: string) => {
+    clearPersonPortrait(personId);
+  });
+  h('entities:generatePersonPortraitReference', async (_e, personId: string, description: string) => {
+    await generatePersonPortraitFromDescription(personId, description);
+    return getPerson(personId);
+  });
+  h('entities:listPlaces', async () => listPlaces());
+  h('entities:createPlace', async (_e, input: PlaceInput) => createPlace(input));
+  h('entities:findOrCreatePlace', async (_e, name: string, kind?: string | null) => findOrCreatePlace(name, kind ?? null));
+  h('entities:updatePlace', async (_e, id: string, patch: Partial<PlaceInput>) => updatePlace(id, patch));
+  // Offline gazetteer + per-person place records (map)
+  h('geo:search', async (_e, query: string, limit?: number) => searchGazetteer(query, limit ?? 12));
+  h('geo:resolve', async (_e, place: GazetteerPlace) =>
+    findOrCreateGazetteerPlace({
+      gazetteerId: place.gazetteerId,
+      name: place.name,
+      admin1: place.admin1,
+      country: place.country,
+      countryCode: place.countryCode,
+      latitude: place.latitude,
+      longitude: place.longitude,
+    })
+  );
+  h('places:listForPerson', async (_e, personId: string) => listPersonPlaces(personId));
+  h('places:add', async (_e, input: PersonPlaceInput) => addPersonPlace(input));
+  h('places:update', async (_e, id: string, patch: Partial<PersonPlaceInput>) => updatePersonPlace(id, patch));
+  h('places:delete', async (_e, id: string) => {
+    deletePersonPlace(id);
+  });
+  h('places:mapPoints', async (_e, personIds?: string[]) => mapPoints(personIds));
+  h('entities:listEvents', async (
+    _e,
+    opts?: { personId?: string; type?: HistoricalEventType; from?: string; to?: string }
+  ) => listEvents(opts ?? {}));
+  h('entities:getEvent', async (_e, id: string) => getEvent(id));
+  h('entities:createEvent', async (_e, input: EventInput) => createEvent(input));
+  h('entities:updateEvent', async (_e, id: string, patch: Partial<EventInput>) => updateEvent(id, patch));
+  h('entities:deleteEvent', async (_e, id: string) => {
+    deleteEvent(id);
+  });
+  h('entities:addParticipant', async (_e, eventId: string, personId: string, role: ParticipantRole) =>
+    addParticipant(eventId, personId, role)
+  );
+  h('entities:removeParticipant', async (_e, eventId: string, personId: string, role: ParticipantRole) =>
+    removeParticipant(eventId, personId, role)
+  );
+  h('entities:addEvidence', async (_e, input: RecordEvidenceInput) => addRecordEvidence(input));
+  h('entities:listEvidence', async (_e, targetKind: RecordEvidenceTargetKind, targetId: string) =>
+    listEvidenceFor(targetKind, targetId)
+  );
+  h('entities:deleteEvidence', async (_e, id: string) => {
+    deleteRecordEvidence(id);
+  });
+  // kinship (genealogy)
+  h('entities:addRelationship', async (
+    _e,
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
+    provenance?: RelationshipProvenance,
+    subtype?: RelationshipSubtype
+  ) => addRelationship(fromPerson, toPerson, type, provenance ?? 'user_asserted', subtype ?? null));
+  h('entities:setPersonFrame', async (_e, personId: string, frameStyle: string | null) => {
+    setPersonFrame(personId, frameStyle);
+  });
+  h('entities:generateBiography', async (_e, personId: string) => generatePersonBiography(personId));
+  h('entities:removeRelationship', async (_e, relId: string) => {
+    removeRelationship(relId);
+  });
+  h('entities:listRelationships', async (_e, personId: string) => listRelationshipsForPerson(personId));
+  h('entities:allRelationships', async () => allRelationships());
+  h('entities:kinOf', async (_e, personId: string) => kinOf(personId));
+  // Identity matching (record linkage)
+  h('entities:findMatches', async () => findMatchCandidates());
+  h('entities:mergePersons', async (_e, targetId: string, sourceId: string) => mergePersons(targetId, sourceId));
+  h('entities:dismissMatch', async (_e, a: string, b: string) => {
+    dismissMatch(a, b);
+  });
+  // Social-relations network (independent from kinship)
+  h('social:listContacts', async (_e, search?: string) => listSocialContacts({ search }));
+  h('social:getContact', async (_e, id: string) => getSocialContact(id));
+  h('social:createContact', async (_e, input: SocialContactInput) => createSocialContact(input));
+  h('social:updateContact', async (_e, id: string, patch: Partial<SocialContactInput>) => updateSocialContact(id, patch));
+  h('social:deleteContact', async (_e, id: string) => {
+    deleteSocialContact(id);
+  });
+  h('social:listRelationsForPerson', async (_e, personId: string) => listSocialRelationsForPerson(personId));
+  h('social:listRelationsTargetingPerson', async (_e, personId: string) => listSocialRelationsTargetingPerson(personId));
+  h('social:listRelationsTargetingContact', async (_e, contactId: string) => listSocialRelationsTargetingContact(contactId));
+  h('social:createRelation', async (_e, input: SocialRelationInput) => createSocialRelation(input));
+  h('social:updateRelation', async (_e, id: string, patch: Partial<SocialRelationInput>) => updateSocialRelation(id, patch));
+  h('social:deleteRelation', async (_e, id: string) => {
+    deleteSocialRelation(id);
+  });
+  h('social:graph', async () => socialGraph());
+  // Evidence-driven kinship suggestions (AI proposes, the user disposes)
+  h('kinship:listSuggestions', async () => listOpenSuggestions());
+  h('kinship:suggestionsForPerson', async (_e, personId: string) => listSuggestionsForPerson(personId));
+  h('kinship:suggestionCount', async () => openSuggestionCount());
+  h('kinship:confirmSuggestion', async (_e, suggestionId: string) => confirmSuggestion(suggestionId));
+  h('kinship:dismissSuggestion', async (_e, suggestionId: string) => dismissSuggestion(suggestionId));
+  // Records lens on a Zotero library work (genealogy/primary-source vaults): resolve
+  // the work's text like a deep scan, then extract persons/places/events from it, so
+  // published/secondary sources feed the same tree as the evidence archive.
+  h('works:scanRecords', async (_e, nodusId: string) => {
+    const work = works.getWork(nodusId);
+    if (!work) throw new Error('Obra no encontrada.');
+    const settings = getSettings();
+    const doc = await resolveWorkText(
+      settings.zoteroUserId,
+      work.zotero_key,
+      settings.zoteroStoragePath,
+      null,
+      work.doi ?? null,
+      {
+        unpaywallEmail: settings.unpaywallEmail,
+        preferZoteroFulltext: settings.preferZoteroFulltext,
+        ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+      },
+      work.item_type
+    );
+    if (!doc.text || !doc.text.trim()) return { persons: 0, places: 0, events: 0, evidence: 0, linked: 0, suggestions: 0, noText: true };
+    const model = settings.extractionModel ?? undefined;
+    const result = await scanWorkRecords(nodusId, doc.text, model);
+    return { ...result, noText: false };
+  });
+  // Archive → person link discovery (proposals only)
+  h('archive:suggestPersonsForItem', async (_e, itemId: string) => suggestPersonsForItem(itemId));
+  h('archive:suggestDocumentsForPerson', async (_e, personId: string) => suggestDocumentsForPerson(personId));
+  h('archive:index', async () => embedArchiveBacklog());
+  h('archive:indexStatus', async () => archiveIndexStatus());
+  // GEDCOM import / export
+  h('genealogy:importGedcom', async () => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Importar GEDCOM',
+      properties: ['openFile'],
+      filters: [{ name: 'GEDCOM', extensions: ['ged', 'gedcom'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const text = fs.readFileSync(picked.filePaths[0], 'utf8');
+    return importGedcom(text);
+  });
+  h('genealogy:exportGedcom', async () => {
+    const win = getWindow();
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Exportar GEDCOM',
+      defaultPath: 'nodus.ged',
+      filters: [{ name: 'GEDCOM', extensions: ['ged'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, exportGedcom(), 'utf8');
+    return { path: picked.filePath };
+  });
+
+  // ── Evidence archive ───────────────────────────────────────────────────────
+  h('archive:counts', async () => archiveCounts());
+  h('archive:listFolders', async () => listFolders());
+  h('archive:createFolder', async (_e, name: string, parentId?: string | null) => createFolder(name, parentId ?? null));
+  h('archive:renameFolder', async (_e, id: string, name: string) => renameFolder(id, name));
+  h('archive:deleteFolder', async (_e, id: string) => {
+    deleteFolder(id);
+  });
+  h('archive:listItems', async (_e, opts?: ArchiveListOptions) => listItems(opts ?? {}));
+  h('archive:getItem', async (_e, id: string) => getItem(id));
+  h('archive:getItemBlob', async (_e, id: string) => getItemBlob(id));
+  h('archive:createItem', async (_e, input: ArchiveItemInput) => createItem(input));
+  h('archive:updateItem', async (_e, id: string, patch: Partial<ArchiveItemInput>) => updateItem(id, patch));
+  h('archive:deleteItem', async (_e, id: string) => {
+    deleteItem(id);
+  });
+  h('archive:addTag', async (_e, id: string, tag: string) => {
+    addTag(id, tag);
+  });
+  h('archive:removeTag', async (_e, id: string, tag: string) => {
+    removeTag(id, tag);
+  });
+  h('archive:listTags', async () => listTags());
+  h('archive:linkPerson', async (_e, itemId: string, personId: string) => {
+    linkItemPerson(itemId, personId);
+  });
+  h('archive:unlinkPerson', async (_e, itemId: string, personId: string) => {
+    unlinkItemPerson(itemId, personId);
+  });
+  h('archive:listItemsForPerson', async (_e, personId: string) => listItemsForPerson(personId));
+  h('archive:scanItem', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    if (!item.extractedText || !item.extractedText.trim()) {
+      return { persons: 0, places: 0, events: 0, evidence: 0, noText: true };
+    }
+    const model = getSettings().extractionModel ?? undefined;
+    const result = await scanArchiveTextRecords(itemId, item.extractedText, model);
+    // Index the item so it can be discovered semantically (best-effort).
+    await embedArchiveItem(itemId).catch(() => false);
+    return { ...result, noText: false };
+  });
+  h('archive:pickAndIngest', async (_e, folderId?: string | null, docType?: string | null) => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Añadir al archivo de evidencias',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },
+        { name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { added: 0, duplicates: 0, items: [] };
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? null;
+    let added = 0;
+    let duplicates = 0;
+    const items = [];
+    for (const filePath of picked.filePaths) {
+      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr, visionModel, docType: docType ?? null });
+      if (result.duplicate) duplicates++;
+      else added++;
+      items.push(result.item);
+    }
+    // Index the freshly ingested text for semantic discovery, in the background.
+    void embedArchiveBacklog().catch(() => undefined);
+    return { added, duplicates, items };
+  });
+  // A typed text entry (diary page, note, memoir) with no file to upload.
+  h('archive:createTextEntry', async (
+    _e,
+    input: { title: string; content: string; folderId?: string | null; docType?: string | null; metadata?: Record<string, string> | null; tags?: string[] }
+  ) =>
+    createItem({
+      title: input.title,
+      kind: 'text',
+      folderId: input.folderId ?? null,
+      extractedText: input.content?.trim() ? input.content : null,
+      docType: input.docType ?? null,
+      metadata: input.metadata ?? null,
+      tags: input.tags,
+    })
+  );
+  h('archive:replaceFile', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Reemplazar el archivo adjunto',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },
+        { name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { replaced: false, item };
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? null;
+    const updated = await replaceArchiveFile(itemId, picked.filePaths[0], { ocr, visionModel });
+    if (updated) await embedArchiveItem(itemId).catch(() => false);
+    return { replaced: Boolean(updated), item: updated ?? item };
+  });
+  h('archive:analyzeItem', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    if (item.kind !== 'image' || !isVisionMime(item.mimeType)) return { unsupported: true, description: null };
+    const blob = getItemBlob(itemId);
+    if (!blob) return { unsupported: true, description: null };
+    const settings = getSettings();
+    const model = settings.visionModel ?? settings.extractionModel ?? null;
+    if (!model) throw new Error('No hay un modelo de visión configurado. Elígelo en Ajustes.');
+    const analysis = await analyzeImageBytes(blob, item.mimeType!, model);
+    if (!analysis) return { unsupported: true, description: null };
+    updateItem(itemId, {
+      description: analysis.description || null,
+      extractedText: analysis.text.trim() ? analysis.text : item.extractedText,
+    });
+    await embedArchiveItem(itemId).catch(() => false);
+    return { unsupported: false, description: analysis.description || null };
+  });
+
   h('mcp:status', async () => getMcpStatus());
   h('mcp:regenerateToken', async () => regenerateMcpToken());
   h('copilot:status', async () => getCopilotStatus());
@@ -1242,6 +1679,24 @@ export function registerIpc(
     scanQueue.clear();
     clearDemoData();
   });
+  // Genealogy demo: seeds the Serrano–Vidal family (tree, archive, evidence, open
+  // kinship suggestions) and flips the vault to the genealogy type. Portraits are
+  // generated in the background with the cheap Gemini model when a key is present.
+  h('data:seedGenealogyDemo', async () => {
+    const seeded = seedGenealogyDemoData();
+    const willGeneratePortraits = seeded && hasDemoPortraitKey();
+    if (willGeneratePortraits) {
+      void generateDemoPortraits({
+        onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+      }).catch(() => undefined);
+    }
+    return { seeded, willGeneratePortraits };
+  });
+  h('data:generateDemoPortraits', async () =>
+    generateDemoPortraits({
+      onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
+    })
+  );
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());

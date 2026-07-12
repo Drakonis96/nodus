@@ -474,6 +474,55 @@ body {
   @apply bg-white border-neutral-200;
 }
 
+/* Opaque surface for dialogs/modals: the translucent .card lets the dimmed page
+ * bleed through, which reads as a bug when floated over the scrim. Use this for any
+ * modal panel instead of .card. */
+.card-modal {
+  @apply bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl;
+}
+.light .card-modal {
+  @apply bg-white border-neutral-200;
+}
+
+/* ── Leaflet map (PlacesMap): real OpenStreetMap tiles ───────────────────────
+ * Reset the default white div-icon box (our markers draw their own chip), theme the
+ * popups to match the app, and darken the raster tiles with a CSS filter in dark
+ * mode (OSM has no free no-key dark style). */
+.leaflet-container {
+  background: #0b1220;
+  font: inherit;
+}
+.leaflet-container.pm-dark {
+  background: #0b1220;
+}
+.leaflet-div-icon.pm-marker {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.pm-dark .leaflet-tile {
+  filter: brightness(0.7) invert(1) contrast(1.05) hue-rotate(180deg) saturate(0.8) brightness(0.95);
+}
+.pm-popup-dark .leaflet-popup-content-wrapper,
+.pm-popup-dark .leaflet-popup-tip {
+  background: #18181b;
+  color: #f4f4f5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+.leaflet-popup-content {
+  margin: 8px 10px;
+}
+.leaflet-control-attribution {
+  font-size: 10px;
+}
+.pm-dark .leaflet-control-attribution {
+  background: rgba(24, 24, 27, 0.8);
+  color: #a1a1aa;
+}
+.pm-dark .leaflet-control-attribution a {
+  color: #818cf8;
+}
+
 .btn {
   @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors;
 }
@@ -487,6 +536,58 @@ body {
   @apply hover:bg-neutral-100 text-neutral-700;
 }
 
+/* Genealogy vault → golden accent instead of the indigo/purple default. Remaps the
+   accent utility classes used across the app (the analog of the .light overrides). */
+.genealogy {
+  --tw-ring-color: rgba(202, 138, 4, 0.48);
+}
+.genealogy .btn-primary {
+  background-color: #ca8a04;
+}
+.genealogy .btn-primary:hover {
+  background-color: #eab308;
+}
+.genealogy .text-indigo-100 { color: #fef3c7; }
+.genealogy .text-indigo-200 { color: #fde68a; }
+.genealogy .text-indigo-300 { color: #fcd34d; }
+.genealogy .text-indigo-400 { color: #fbbf24; }
+.genealogy .text-indigo-500 { color: #f59e0b; }
+.genealogy .text-indigo-600 { color: #d97706; }
+.genealogy .text-indigo-700 { color: #b45309; }
+.genealogy .text-indigo-900 { color: #78350f; }
+.genealogy .hover\:text-indigo-300:hover { color: #fcd34d; }
+.genealogy .hover\:text-indigo-400:hover { color: #fbbf24; }
+.genealogy .bg-indigo-400 { background-color: #fbbf24; }
+.genealogy .bg-indigo-500 { background-color: #d4a017; }
+.genealogy .bg-indigo-600 { background-color: #ca8a04; }
+.genealogy .hover\:bg-indigo-500:hover { background-color: #eab308; }
+.genealogy .bg-indigo-50 { background-color: #fffbeb; }
+.genealogy .bg-indigo-100 { background-color: #fef3c7; }
+.genealogy .bg-indigo-900 { background-color: #78350f; }
+.genealogy .bg-indigo-950 { background-color: #451a03; }
+.genealogy .bg-indigo-600\/15 { background-color: rgba(202, 138, 4, 0.15); }
+.genealogy .bg-indigo-600\/20 { background-color: rgba(202, 138, 4, 0.2); }
+.genealogy .bg-indigo-900\/40 { background-color: rgba(120, 53, 15, 0.4); }
+.genealogy .bg-indigo-900\/50 { background-color: rgba(120, 53, 15, 0.5); }
+.genealogy .bg-indigo-950\/20 { background-color: rgba(69, 26, 3, 0.2); }
+.genealogy .bg-indigo-950\/25 { background-color: rgba(69, 26, 3, 0.25); }
+.genealogy .bg-indigo-950\/30 { background-color: rgba(69, 26, 3, 0.3); }
+.genealogy .bg-indigo-950\/40 { background-color: rgba(69, 26, 3, 0.4); }
+.genealogy .border-indigo-200 { border-color: #fde68a; }
+.genealogy .border-indigo-400 { border-color: #fbbf24; }
+.genealogy .border-indigo-500 { border-color: #d4a017; }
+.genealogy .border-indigo-600 { border-color: #ca8a04; }
+.genealogy .border-indigo-700 { border-color: #a16207; }
+.genealogy .border-indigo-800 { border-color: #854d0e; }
+.genealogy .border-indigo-600\/70 { border-color: rgba(202, 138, 4, 0.7); }
+.genealogy .border-indigo-700\/60 { border-color: rgba(161, 98, 7, 0.6); }
+.genealogy .border-indigo-800\/60 { border-color: rgba(133, 77, 14, 0.6); }
+.genealogy .border-indigo-800\/70 { border-color: rgba(133, 77, 14, 0.7); }
+.genealogy .border-indigo-900\/70 { border-color: rgba(120, 53, 15, 0.7); }
+.genealogy .hover\:border-indigo-700\/60:hover { border-color: rgba(161, 98, 7, 0.6); }
+.genealogy .ring-indigo-500 { --tw-ring-color: #d4a017; }
+.genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.4); }
+
 .input {
   @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;
 }
@@ -498,6 +599,31 @@ body {
    leading icon, use this class instead of `pl-*` — its two-class selector wins. */
 .input.input-with-leading-icon {
   padding-left: 2rem;
+}
+
+/* Selects: drop the OS-native control and give every `<select class="input">` the
+   app's own dark styling with a custom chevron, so dropdowns look the same across
+   the whole app (academic and genealogy) instead of falling back to system chrome. */
+select.input {
+  @apply appearance-none cursor-pointer;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1rem;
+}
+select.input option,
+select.input optgroup {
+  background-color: #171717;
+  color: #e5e5e5;
+}
+.light select.input {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.light select.input option,
+.light select.input optgroup {
+  background-color: #ffffff;
+  color: #171717;
 }
 
 .graph-detail-panel {

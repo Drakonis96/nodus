@@ -15,6 +15,8 @@ import type {
 } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { buildGenealogyContext } from './genealogyChatContext';
 import { buildAuthorGraph, buildIdeaGraph, buildReadingPath, getContradictions } from '../graph/graphService';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
@@ -316,7 +318,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   if (compact) messages = messages.slice(-4);
 
   const question = messages[messages.length - 1].content;
-  const system = buildChatSystemPrompt(compact);
+  // In a genealogy vault the assistant is a genealogist working over the records
+  // ontology (people, kinship, events, documents, evidence), not the idea graph.
+  const genealogy = getActiveVault().type === 'genealogy';
+  const system = genealogy ? buildGenealogyChatSystemPrompt(compact) : buildChatSystemPrompt(compact);
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.
@@ -334,6 +339,21 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
     contextBudget = Math.max(LOCAL_MIN_CONTEXT_CHARS, Math.floor(promptChars - reserved));
   }
 
+  if (genealogy) {
+    const context = await buildGenealogyContext(question);
+    const user = JSON.stringify({ contexto_familiar: context, conversacion: messages }, null, 2);
+    const stats: ResearchContextStats = {
+      sections: ['Personas', 'Eventos', 'Documentos', 'Evidencia', 'Parentescos sugeridos'],
+      works: 0,
+      documents: context.documentos.length,
+      summaries: 0,
+      passages: 0,
+      contextChars: JSON.stringify(context).length,
+      truncated: false,
+    };
+    return { system, user, stats, maxTokens, local };
+  }
+
   const { context, stats } = await buildResearchContext(request.selection, question, contextBudget);
 
   const user = JSON.stringify(
@@ -346,6 +366,32 @@ async function buildResearchChatPrompt(request: ResearchChatRequest): Promise<Pr
   );
 
   return { system, user, stats, maxTokens, local };
+}
+
+/** System prompt for the genealogy-mode assistant: an evidence-first family historian. */
+function buildGenealogyChatSystemPrompt(compact: boolean): string {
+  if (compact) {
+    return [
+      'Eres un genealogista experto. Respondes en español usando SOLO el contexto familiar que recibes (personas, parentescos, eventos, documentos y evidencia).',
+      'No inventes personas, fechas ni parentescos que no consten. Si un dato es incierto o contradictorio, dilo. Si el contexto no basta, dilo y sugiere qué fuente lo aportaría.',
+      'Respeta los nombres y fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo y cita el documento y su cita literal cuando lo uses.',
+    ].join('\n');
+  }
+  return [
+    'Eres un genealogista experto que ayuda a reconstruir la historia de una familia.',
+    'Respondes en español, con rigor, y usando ÚNICAMENTE el contexto familiar que recibes: la sección `personas` (con su parentesco), `eventos`, `documentos` (fuentes con su texto), `evidencia` (citas) y `parentescos_sugeridos` (propuestas de la IA aún sin confirmar).',
+    '',
+    'MÉTODO (estándar de prueba genealógico):',
+    '- La identidad y el parentesco son HIPÓTESIS que se prueban con evidencia. Nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental en el contexto.',
+    '- Cuando sostengas un hecho (una fecha, un parentesco, una identidad), cítalo: nombra el documento (`documentos[].titulo`) y, si procede, su cita literal y localización de la sección `evidencia`.',
+    '- Distingue lo que la fuente AFIRMA de lo que se INFIERE. Señala con claridad los datos inciertos, ausentes o contradictorios, y cuando dos fuentes discrepen, explícalo.',
+    '- Los `parentescos_sugeridos` son PROPUESTAS pendientes de confirmación: preséntalos como hipótesis a revisar, con su evidencia, nunca como hechos establecidos.',
+    '',
+    'ESTILO:',
+    '- Respeta los nombres y las fechas tal como constan en época; no los modernices ni normalices las fechas inciertas ("hacia 1850").',
+    '- Nombra a cada persona por su nombre completo tal como aparece en `personas`.',
+    '- No inventes personas, documentos ni datos que no estén en el contexto. Si el contexto no basta para responder, dilo con concreción y sugiere qué registro o fuente podría aportar el dato que falta.',
+  ].join('\n');
 }
 
 /**

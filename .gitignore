@@ -22,3 +22,7 @@ release/
 
 # esbuild smoke-test bundles (generated at repo root)
 .smoke-*.mjs
+
+# Local tooling / caches
+.claude/
+__pycache__/

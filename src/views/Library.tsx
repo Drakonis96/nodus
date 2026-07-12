@@ -10,6 +10,7 @@ import type {
   WorkPassageStatus,
   VaultAnalysisReuseKind,
   VaultAnalysisReuseResult,
+  VaultType,
   ZoteroTag,
   CollectionFacet,
 } from '@shared/types';
@@ -335,16 +336,24 @@ function SortHeader({
 
 export function Library({
   target,
+  vaultType,
   onOpenCollections,
   onOpenGraph,
   onOpenAssistant,
+  onOpenArchive,
 }: {
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
+  vaultType?: VaultType;
   onOpenCollections: () => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  onOpenArchive?: () => void;
 }) {
+  // In records vaults the Library holds SECONDARY / published sources (books,
+  // published genealogies, transcribed record collections) that can also be mined
+  // for records; primary documents live in the Archive.
+  const isRecordsVault = vaultType === 'genealogy' || vaultType === 'primary_sources';
   const [works, setWorks] = useState<WorkView[]>([]);
   const [filter, setFilter] = useState<WorkFilter>({});
   // Local, instantly-responsive text for the search box. It is debounced into
@@ -495,6 +504,43 @@ export function Library({
   const analyzeBoth = async (w: WorkView) => {
     await window.nodus.analyzeBoth(w.nodus_id);
     await load();
+  };
+
+  // Records lens: extract persons/places/events from a work's text into the tree.
+  const scanRecords = async (w: WorkView) => {
+    const r = await window.nodus.scanWorkRecords(w.nodus_id);
+    if (r.noText) {
+      toast(t('Esta obra no tiene texto para extraer registros.'), { tone: 'error' });
+    } else {
+      toast(
+        t('Extraídos {p} personas y {e} eventos.').replace('{p}', String(r.persons)).replace('{e}', String(r.events)) +
+          (r.suggestions ? ` ${t('{n} parentescos sugeridos.').replace('{n}', String(r.suggestions))}` : ''),
+        { tone: 'success' }
+      );
+    }
+  };
+
+  const scanSelectedRecords = async () => {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0) return;
+    toast(tx('Extrayendo registros de {n} obra(s)…', { n: ids.length }));
+    let persons = 0;
+    let events = 0;
+    for (const id of ids) {
+      try {
+        const r = await window.nodus.scanWorkRecords(id);
+        if (!r.noText) {
+          persons += r.persons;
+          events += r.events;
+        }
+      } catch {
+        /* skip a work that can't be resolved; the rest still run */
+      }
+    }
+    toast(
+      t('Extraídos {p} personas y {e} eventos de la Biblioteca.').replace('{p}', String(persons)).replace('{e}', String(events)),
+      { tone: 'success' }
+    );
   };
 
   // Full chain for a single work: themes → ideas → summary → index → relationships.
@@ -1181,6 +1227,17 @@ export function Library({
         </div>
       )}
 
+      {isRecordsVault && (
+        <div className="mb-3 rounded-lg border border-amber-800/50 bg-amber-950/10 px-3 py-2 text-xs text-neutral-400">
+          {t('En este modo la Biblioteca guarda fuentes secundarias o publicadas (libros, genealogías impresas, historias locales, colecciones de registros transcritas) importadas desde Zotero. Puedes extraer de ellas personas y eventos hacia el árbol con «Extraer personas y eventos». Los documentos originales (partidas, censos, cartas, fotos) van en el Archivo.')}
+          {onOpenArchive && (
+            <button className="ml-1 text-amber-400 hover:underline" onClick={onOpenArchive}>
+              {t('Ir al Archivo')}
+            </button>
+          )}
+        </div>
+      )}
+
       {selectedVisibleIds.length > 0 && (
         <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
@@ -1209,6 +1266,15 @@ export function Library({
             <Icon name="compass" /> {t('Procesar todo')}
           </button>
           <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
+          {isRecordsVault && (
+            <button
+              className="btn btn-ghost border border-amber-700/70 text-amber-300"
+              onClick={() => void scanSelectedRecords()}
+              title={t('Extraer personas, lugares y eventos de estas obras hacia el árbol')}
+            >
+              <Icon name="users" /> {t('Extraer personas y eventos')}
+            </button>
+          )}
           <button className="btn btn-ghost border border-neutral-700" onClick={analyzeSelectedThemes}>
             <Icon name="tag" /> {t('Temas')}
           </button>
@@ -1429,6 +1495,14 @@ export function Library({
                       onClick={() => processFullWork(w)}
                     />
                     <RowIconButton title={t('Ver las ideas de esta obra')} icon="list" onClick={() => setIdeasWork({ nodus_id: w.nodus_id, title: w.title })} />
+                    {isRecordsVault && (
+                      <RowIconButton
+                        title={t('Extraer personas, lugares y eventos de esta obra')}
+                        icon="users"
+                        tone="amber"
+                        onClick={() => void scanRecords(w)}
+                      />
+                    )}
                     <RowIconButton title={t('Analizar temas')} icon="tag" onClick={() => analyzeThemes(w)} />
                     <RowIconButton title={w.deep_status === 'done' ? t('Reanalizar ideas') : t('Analizar ideas')} icon="bulb" onClick={() => analyzeIdeas(w)} />
                     <RowIconButton title={t('Analizar temas e ideas')} icon="layers" onClick={() => analyzeBoth(w)} />
@@ -1587,7 +1661,7 @@ function RowIconButton({
 }: {
   title: string;
   icon: string;
-  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet';
+  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet' | 'amber';
   disabled?: boolean;
   onClick: () => void;
 }) {
@@ -1598,7 +1672,9 @@ function RowIconButton({
         ? 'text-cyan-400 hover:text-cyan-300'
         : tone === 'violet'
           ? 'text-violet-400 hover:text-violet-300'
-          : 'text-neutral-400 hover:text-neutral-100';
+          : tone === 'amber'
+            ? 'text-amber-400 hover:text-amber-300'
+            : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
       className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${toneClass}`}

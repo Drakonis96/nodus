@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { VaultSummary } from '@shared/types';
+import type { VaultSummary, VaultType } from '@shared/types';
+import { VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
 import { useDismissableLayer } from '../hooks';
 import { ConfirmModal } from './ConfirmModal';
@@ -25,6 +26,28 @@ function generateFourDigitCode(): string {
   return Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
 }
 
+/** Human label for a vault type. Literal t() calls keep the strings extractable. */
+export function vaultTypeLabel(type: VaultType): string {
+  switch (type) {
+    case 'estudio':
+      return t('Estudio');
+    case 'primary_sources':
+      return t('Fuentes primarias');
+    case 'genealogy':
+      return t('Genealogía');
+    case 'databases':
+      return t('Bases de datos');
+    case 'academic':
+    default:
+      return t('Académico');
+  }
+}
+
+/** Option label for the type picker: unavailable types get a "coming soon" suffix. */
+function vaultTypeOptionLabel(id: VaultType, available: boolean): string {
+  return available ? vaultTypeLabel(id) : `${vaultTypeLabel(id)} (${t('próximamente')})`;
+}
+
 export function VaultSwitcher({
   vaults,
   activeVault,
@@ -35,6 +58,7 @@ export function VaultSwitcher({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [newVaultName, setNewVaultName] = useState('');
+  const [newVaultType, setNewVaultType] = useState<VaultType>('academic');
   const [renameValue, setRenameValue] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
   const [dangerVaultId, setDangerVaultId] = useState('');
@@ -93,16 +117,25 @@ export function VaultSwitcher({
         setMessage(t('Escribe un nombre para la bóveda.'));
         return;
       }
-      const created = await window.nodus.createVault({ name });
+      const created = await window.nodus.createVault({ name, type: newVaultType });
       const result = await window.nodus.switchVault(created.vault.id);
       setMessage(result.message);
       setNewVaultName('');
+      setNewVaultType('academic');
       if (result.ok) {
         await onActiveVaultChanged();
         setOpen(false);
       } else {
         await onVaultsChanged();
       }
+    });
+
+  const changeActiveType = (type: VaultType) =>
+    run(async () => {
+      if (!activeVault || type === activeVault.type) return;
+      await window.nodus.setVaultType(activeVault.id, type);
+      await onVaultsChanged();
+      setMessage(tx('Tipo de bóveda: {type}.', { type: vaultTypeLabel(type) }));
     });
 
   const renameActive = () =>
@@ -249,13 +282,28 @@ export function VaultSwitcher({
               ))}
             </div>
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-              <input
-                className="input h-9 min-w-0 text-sm"
-                value={newVaultName}
-                onChange={(event) => setNewVaultName(event.target.value)}
-                placeholder={t('Nueva bóveda')}
-              />
+            <div className="space-y-2 rounded-md border border-neutral-800 p-2">
+              <div className="text-xs text-neutral-500">{t('Nueva bóveda')}</div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
+                <input
+                  className="input h-9 min-w-0 text-sm"
+                  value={newVaultName}
+                  onChange={(event) => setNewVaultName(event.target.value)}
+                  placeholder={t('Nombre de la bóveda')}
+                />
+                <select
+                  className="input h-9 w-full min-w-0 text-sm"
+                  value={newVaultType}
+                  onChange={(event) => setNewVaultType(event.target.value as VaultType)}
+                  title={t('Tipo de bóveda')}
+                >
+                  {VAULT_TYPES.map((def) => (
+                    <option key={def.id} value={def.id} disabled={!def.available}>
+                      {vaultTypeOptionLabel(def.id, def.available)}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button className="btn btn-primary h-9 w-full gap-1.5" onClick={() => void createAndLoad()} disabled={busy}>
                 <Icon name="plus" /> {t('Crear')}
               </button>
@@ -272,6 +320,26 @@ export function VaultSwitcher({
                   <Icon name="edit" /> {t('Renombrar')}
                 </button>
               </div>
+            )}
+
+            {activeVault && (
+              <label className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
+                <span className="text-xs text-neutral-500">{t('Tipo de bóveda')}</span>
+                <select
+                  className="input h-9 w-full min-w-0 text-sm"
+                  value={activeVault.type}
+                  onChange={(event) => void changeActiveType(event.target.value as VaultType)}
+                  disabled={busy}
+                >
+                  {VAULT_TYPES.map((def) => (
+                    // The vault's own current type stays selectable even if it's
+                    // otherwise gated off (e.g. it was set before this release).
+                    <option key={def.id} value={def.id} disabled={!def.available && def.id !== activeVault.type}>
+                      {vaultTypeOptionLabel(def.id, def.available)}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
 
             {activeVault && (

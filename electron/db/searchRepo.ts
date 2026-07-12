@@ -166,8 +166,66 @@ export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResul
     });
   }
 
+  // ── Records / genealogy (empty and cheap in academic vaults) ────────────────
+  const persons = db
+    .prepare(
+      `SELECT p.person_id, p.display_name, p.birth_date, p.death_date FROM persons p
+        LEFT JOIN person_names n ON n.person_id = p.person_id
+        WHERE p.display_name LIKE ? ESCAPE '\\' OR n.name LIKE ? ESCAPE '\\'
+        GROUP BY p.person_id ORDER BY length(p.display_name) ASC LIMIT ?`
+    )
+    .all(like, like, limitPerKind) as { person_id: string; display_name: string; birth_date: string | null; death_date: string | null }[];
+  for (const r of persons) {
+    const life = [r.birth_date, r.death_date].map((d) => d?.trim()).filter(Boolean).join(' – ');
+    results.push({ kind: 'person', id: r.person_id, title: r.display_name, subtitle: life || null });
+  }
+
+  const events = db
+    .prepare(
+      `SELECT e.event_id, e.type, e.label, e.date, pl.name AS place_name FROM events e
+        LEFT JOIN places pl ON pl.place_id = e.place_id
+        WHERE e.label LIKE ? ESCAPE '\\' OR e.date LIKE ? ESCAPE '\\' OR pl.name LIKE ? ESCAPE '\\'
+        ORDER BY (e.date_sort IS NULL), e.date_sort ASC LIMIT ?`
+    )
+    .all(like, like, like, limitPerKind) as { event_id: string; type: string; label: string | null; date: string | null; place_name: string | null }[];
+  for (const r of events) {
+    const title = r.label?.trim() || [EVENT_TYPE_LABEL[r.type] ?? r.type, r.date?.trim()].filter(Boolean).join(' · ');
+    results.push({ kind: 'event', id: r.event_id, title, subtitle: r.place_name || null });
+  }
+
+  const archive = db
+    .prepare(
+      `SELECT item_id, title, doc_type, extracted_text, description FROM archive_items
+        WHERE title LIKE ? ESCAPE '\\' OR extracted_text LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\'
+        ORDER BY updated_at DESC LIMIT ?`
+    )
+    .all(like, like, like, limitPerKind) as { item_id: string; title: string; doc_type: string | null; extracted_text: string | null; description: string | null }[];
+  for (const r of archive) {
+    results.push({
+      kind: 'archive',
+      id: r.item_id,
+      title: r.title || '(documento sin título)',
+      subtitle: r.doc_type || null,
+      snippet: snippet(r.extracted_text ?? r.description),
+    });
+  }
+
   return results;
 }
+
+// Event-type labels (Spanish source language, like the rest of the records layer).
+const EVENT_TYPE_LABEL: Record<string, string> = {
+  birth: 'Nacimiento',
+  baptism: 'Bautismo',
+  marriage: 'Matrimonio',
+  death: 'Defunción',
+  burial: 'Entierro',
+  census: 'Censo',
+  residence: 'Residencia',
+  migration: 'Migración',
+  occupation: 'Ocupación',
+  other: 'Evento',
+};
 
 function textValue(value: unknown): string | null {
   if (value == null) return null;
@@ -452,5 +510,8 @@ export function getSearchResultDetail(kind: SearchResultKind, id: string): Searc
         sections: [],
       };
     }
+    // Records kinds (person/event/archive) route straight to their view, not a modal.
+    default:
+      return null;
   }
 }

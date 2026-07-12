@@ -44,6 +44,43 @@ export function isBackupDue(lastAt: string | null, intervalHours: number, now = 
   return now.getTime() - last >= intervalHours * 60 * 60 * 1000;
 }
 
+/**
+ * The most recent scheduled backup slot at or before `now`: the latest day whose
+ * weekday is allowed (empty `days` = every day) at `hour:minute`. Returns null only
+ * if no slot exists in the last week (shouldn't happen with a non-empty schedule).
+ */
+export function mostRecentBackupSlot(days: number[], hour: number, minute: number, now = new Date()): Date | null {
+  const allowed = (weekday: number) => days.length === 0 || days.includes(weekday);
+  for (let back = 0; back <= 7; back++) {
+    const slot = new Date(now);
+    slot.setDate(now.getDate() - back);
+    slot.setHours(hour, minute, 0, 0);
+    if (slot.getTime() <= now.getTime() && allowed(slot.getDay())) return slot;
+  }
+  return null;
+}
+
+/**
+ * Schedule-aware "is a backup due?": true when a scheduled slot (a chosen weekday at
+ * the chosen time) has passed since the last successful backup. This is what makes
+ * the startup catch-up work — if the machine was off at the scheduled time, the most
+ * recent slot is still in the past and after `lastAt`, so the next launch backs up.
+ */
+export function isScheduledBackupDue(
+  lastAt: string | null,
+  days: number[],
+  hour: number,
+  minute: number,
+  now = new Date()
+): boolean {
+  const slot = mostRecentBackupSlot(days, hour, minute, now);
+  if (!slot) return false;
+  if (!lastAt) return true;
+  const last = Date.parse(lastAt);
+  if (Number.isNaN(last)) return true;
+  return last < slot.getTime();
+}
+
 interface ParsedBackup {
   file: string;
   date: Date;
@@ -165,11 +202,19 @@ export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupRe
   }
 }
 
-/** Scheduler tick: run only when enabled, configured and overdue. */
+/**
+ * Scheduler tick: run only when enabled, configured and a scheduled slot has passed
+ * since the last backup. Called shortly after launch (startup catch-up for a slot
+ * missed while the machine was off) and periodically; runs in the main process so it
+ * never blocks the UI.
+ */
 export async function maybeRunAutoBackup(appVersion: string): Promise<AutoBackupResult | null> {
   const settings = getSettings();
   if (!settings.autoBackupEnabled) return null;
   if (!settings.autoBackupFolder || !getBackupPassword()) return null;
-  if (!isBackupDue(settings.lastAutoBackupAt, settings.autoBackupIntervalHours)) return null;
+  const days = Array.isArray(settings.autoBackupDays) ? settings.autoBackupDays : [];
+  const hour = Number.isFinite(settings.autoBackupHour) ? settings.autoBackupHour : 3;
+  const minute = Number.isFinite(settings.autoBackupMinute) ? settings.autoBackupMinute : 0;
+  if (!isScheduledBackupDue(settings.lastAutoBackupAt, days, hour, minute)) return null;
   return runAutoBackupNow(appVersion);
 }

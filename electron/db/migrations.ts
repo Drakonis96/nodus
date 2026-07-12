@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 44;
 
 export const migrations: Migration[] = [
   {
@@ -990,6 +990,394 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_content_translations_entity
         ON content_translations(entity_kind, entity_id, updated_at DESC);
+    `,
+  },
+  {
+    version: 33,
+    up: /* sql */ `
+      -- Primary-source / genealogy entity ontology. Parallel to the argumentative
+      -- ideas/themes graph: a "records" lens extracts persons, places and events
+      -- from primary sources instead of ideas. Every fact is backed by evidence
+      -- (record_evidence) pointing at a source passage, so the record layer keeps
+      -- Nodus's citable DNA. Dates are stored twice: a human display form and a
+      -- sortable ISO-ish lower/upper bound so a timeline can order fuzzy dates
+      -- ("c. 1850", "antes de 1880"). Coexists with the ideas ontology and can be
+      -- cross-referenced by it.
+
+      CREATE TABLE persons (
+        person_id       TEXT PRIMARY KEY,
+        display_name    TEXT NOT NULL,
+        sex             TEXT NOT NULL DEFAULT 'unknown',
+        birth_date      TEXT,
+        birth_date_sort TEXT,
+        death_date      TEXT,
+        death_date_sort TEXT,
+        notes           TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_persons_name ON persons(display_name);
+      CREATE INDEX idx_persons_birth_sort ON persons(birth_date_sort);
+
+      -- Name variants / spellings across records (a person's name changes over time).
+      CREATE TABLE person_names (
+        id         TEXT PRIMARY KEY,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        kind       TEXT,
+        UNIQUE (person_id, name)
+      );
+      CREATE INDEX idx_person_names_person ON person_names(person_id);
+
+      -- Places form a hierarchy (parish → municipality → province → country).
+      CREATE TABLE places (
+        place_id    TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        parent_id   TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        kind        TEXT,
+        latitude    REAL,
+        longitude   REAL,
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_places_parent ON places(parent_id);
+      CREATE INDEX idx_places_name ON places(name);
+
+      CREATE TABLE events (
+        event_id      TEXT PRIMARY KEY,
+        type          TEXT NOT NULL,
+        label         TEXT,
+        date          TEXT,
+        date_sort     TEXT,
+        date_end_sort TEXT,
+        place_id      TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        notes         TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_events_sort ON events(date_sort);
+      CREATE INDEX idx_events_type ON events(type);
+      CREATE INDEX idx_events_place ON events(place_id);
+
+      -- Who took part in an event and how (principal, spouse, father, witness…).
+      -- Relationships in the primary-source layer are asserted BY events/sources
+      -- rather than declared abstractly; the genealogy layer (phase C) adds an
+      -- explicit kinship specialisation on top.
+      CREATE TABLE event_participants (
+        id         TEXT PRIMARY KEY,
+        event_id   TEXT NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        role       TEXT NOT NULL DEFAULT 'principal',
+        UNIQUE (event_id, person_id, role)
+      );
+      CREATE INDEX idx_event_participants_person ON event_participants(person_id);
+      CREATE INDEX idx_event_participants_event ON event_participants(event_id);
+
+      -- Polymorphic evidence for any record entity/event/participation. nodus_id is a
+      -- free pointer (a works.nodus_id, or an archive item id when source_kind =
+      -- 'archive'); intentionally not a FK so the evidence archive (also phase B) can
+      -- be introduced without a forward reference.
+      CREATE TABLE record_evidence (
+        id          TEXT PRIMARY KEY,
+        target_kind TEXT NOT NULL,
+        target_id   TEXT NOT NULL,
+        nodus_id    TEXT,
+        source_kind TEXT NOT NULL DEFAULT 'work',
+        quote       TEXT,
+        location    TEXT,
+        confidence  REAL,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_record_evidence_target ON record_evidence(target_kind, target_id);
+    `,
+  },
+  {
+    version: 34,
+    up: /* sql */ `
+      -- Evidence archive: a Nodus-native store for the user's OWN files that Zotero
+      -- doesn't hold or can't index (record photos, census CSV/XLSX exports, scans).
+      -- The file bytes live as a BLOB in SQLite (like decorative_images) so the whole
+      -- archive travels with backups and .nodussync — genealogical evidence is
+      -- irreplaceable and must survive. Extracted text (OCR / CSV / XLSX) is stored
+      -- alongside so items are searchable and can back record entities as evidence
+      -- (record_evidence.source_kind = 'archive', nodus_id = the item_id).
+
+      CREATE TABLE archive_folders (
+        folder_id  TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        parent_id  TEXT REFERENCES archive_folders(folder_id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_folders_parent ON archive_folders(parent_id);
+
+      CREATE TABLE archive_items (
+        item_id        TEXT PRIMARY KEY,
+        folder_id      TEXT REFERENCES archive_folders(folder_id) ON DELETE SET NULL,
+        title          TEXT NOT NULL,
+        kind           TEXT NOT NULL DEFAULT 'other',
+        file_name      TEXT,
+        mime_type      TEXT,
+        bytes          INTEGER NOT NULL DEFAULT 0,
+        blob           BLOB,
+        extracted_text TEXT,
+        description    TEXT,
+        content_hash   TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_items_folder ON archive_items(folder_id);
+      CREATE INDEX idx_archive_items_hash ON archive_items(content_hash);
+
+      CREATE TABLE archive_item_tags (
+        item_id TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        tag     TEXT NOT NULL,
+        PRIMARY KEY (item_id, tag)
+      );
+      CREATE INDEX idx_archive_item_tags_tag ON archive_item_tags(tag);
+    `,
+  },
+  {
+    version: 35,
+    up: /* sql */ `
+      -- Genealogy kinship layer: explicit relationships between persons, the
+      -- specialisation the tree view is built on. In the primary-source layer
+      -- relationships are only asserted by events; here the user (or a confirmed AI
+      -- suggestion) states them directly. Provenance is tracked — 'user_asserted' or
+      -- 'ai_confirmed', never a raw AI write — so every edge in the tree is auditable.
+      --   type 'parent': from_person is the PARENT of to_person (the child).
+      --   type 'spouse': symmetric; stored once, queried in both directions.
+      -- Siblings are derived (persons sharing a parent), never stored.
+      CREATE TABLE relationships (
+        rel_id      TEXT PRIMARY KEY,
+        from_person TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        to_person   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        type        TEXT NOT NULL,
+        provenance  TEXT NOT NULL DEFAULT 'user_asserted',
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        UNIQUE (from_person, to_person, type)
+      );
+      CREATE INDEX idx_relationships_from ON relationships(from_person, type);
+      CREATE INDEX idx_relationships_to ON relationships(to_person, type);
+    `,
+  },
+  {
+    version: 36,
+    up: /* sql */ `
+      -- Person portraits: a photo the user attaches (faces on the tree matter to a
+      -- genealogist). Stored in its own table so person list queries never load the
+      -- blob. The focal point (focus_x/y in 0..1 + scale) is non-destructive framing
+      -- metadata — the original bytes are never cropped. Travels in backups/.nodussync.
+      CREATE TABLE person_portraits (
+        person_id  TEXT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
+        blob       BLOB NOT NULL,
+        mime       TEXT NOT NULL DEFAULT 'image/jpeg',
+        focus_x    REAL NOT NULL DEFAULT 0.5,
+        focus_y    REAL NOT NULL DEFAULT 0.5,
+        scale      REAL NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
+  {
+    version: 37,
+    up: /* sql */ `
+      -- Persistent verdicts over candidate identity matches ("are these two person
+      -- records the same individual?"). Same pattern as edge_feedback: keyed by the
+      -- normalised person pair (person_a < person_b), no foreign keys, so a "these are
+      -- NOT the same person" dismissal outlives rescans and is never re-proposed. An
+      -- accept is a merge (handled separately), so only dismissals are recorded here.
+      CREATE TABLE match_feedback (
+        person_a   TEXT NOT NULL,
+        person_b   TEXT NOT NULL,
+        verdict    TEXT NOT NULL DEFAULT 'dismissed',
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (person_a, person_b)
+      );
+    `,
+  },
+  {
+    version: 38,
+    up: /* sql */ `
+      -- Genealogical/primary-source classification for archive items, separate from
+      -- the file-format kind (image/csv/pdf…). doc_type comes from the taxonomy in
+      -- shared/archiveDocTypes.ts (partida de nacimiento, diario, fotografía…), and
+      -- metadata_json holds the optional type-specific form the user fills in.
+      -- Academic/bibliographic sources are NOT archive items — they live in the
+      -- library via Zotero.
+      ALTER TABLE archive_items ADD COLUMN doc_type TEXT;
+      ALTER TABLE archive_items ADD COLUMN metadata_json TEXT;
+    `,
+  },
+  {
+    version: 39,
+    up: /* sql */ `
+      -- Kinship nuance + tree presentation.
+      --   relationships.subtype: null = biological/default, 'adoptive' for adoptions
+      --   (rendered distinctly on the tree; still a real parent edge for layout).
+      --   persons.frame_style: per-person override of the wooden tree frame design;
+      --   null = use the vault-wide default (a setting).
+      ALTER TABLE relationships ADD COLUMN subtype TEXT;
+      ALTER TABLE persons ADD COLUMN frame_style TEXT;
+    `,
+  },
+  {
+    version: 40,
+    up: /* sql */ `
+      -- Link archive documents to the tree members they concern (a birth record to
+      -- one person, a marriage certificate to two). This lets a person's ficha gather
+      -- every document about them and feeds the AI biography with the right sources.
+      CREATE TABLE archive_item_persons (
+        item_id   TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        person_id TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, person_id)
+      );
+      CREATE INDEX idx_archive_item_persons_person ON archive_item_persons(person_id);
+    `,
+  },
+  {
+    version: 41,
+    up: /* sql */ `
+      -- Optional AI-generated biography of a person, written only on demand from the
+      -- evidence (events, kinship, linked documents). Stored so it persists and travels.
+      ALTER TABLE persons ADD COLUMN biography TEXT;
+      ALTER TABLE persons ADD COLUMN biography_at TEXT;
+    `,
+  },
+  {
+    version: 42,
+    up: /* sql */ `
+      -- Evidence-driven kinship SUGGESTIONS. The cardinal rule of AI-assisted
+      -- genealogy is that the machine must never contaminate the tree: it proposes,
+      -- the user disposes. So structural record roles (a baptism naming the parents,
+      -- a marriage naming the spouses) and explicit textual claims ("mi padre Juan")
+      -- never write to the relationships table — they accumulate here as proposals,
+      -- each carrying its verbatim quote + source. A mere co-mention of two names produces
+      -- NOTHING here; only real evidence does. A suggestion surfaces once its evidence
+      -- crosses a threshold; the user confirms it (→ an ai_confirmed relationship) or
+      -- dismisses it (persistent, like match_feedback — never re-proposed).
+      CREATE TABLE kinship_suggestions (
+        suggestion_id TEXT PRIMARY KEY,
+        from_person   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        to_person     TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        type          TEXT NOT NULL,                 -- 'parent' | 'spouse'
+        subtype       TEXT,                          -- null | 'adoptive'
+        status        TEXT NOT NULL DEFAULT 'open',  -- 'open' | 'confirmed' | 'dismissed'
+        score         REAL NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL,
+        UNIQUE (from_person, to_person, type)
+      );
+      CREATE INDEX idx_kinship_suggestions_status ON kinship_suggestions(status);
+      CREATE INDEX idx_kinship_suggestions_from ON kinship_suggestions(from_person);
+      CREATE INDEX idx_kinship_suggestions_to ON kinship_suggestions(to_person);
+
+      -- One row per piece of evidence backing a suggestion. 'record_role' = implied by
+      -- an event's participant roles (structural); 'explicit_claim' = the source text
+      -- states the relationship outright. Deduplicated by (suggestion, signal, source,
+      -- quote) so re-scanning the same source doesn't inflate a suggestion's score.
+      CREATE TABLE kinship_suggestion_evidence (
+        id            TEXT PRIMARY KEY,
+        suggestion_id TEXT NOT NULL REFERENCES kinship_suggestions(suggestion_id) ON DELETE CASCADE,
+        signal        TEXT NOT NULL,                 -- 'record_role' | 'explicit_claim'
+        source_kind   TEXT NOT NULL DEFAULT 'work',  -- 'work' | 'archive'
+        nodus_id      TEXT,
+        quote         TEXT,
+        location      TEXT,
+        weight        REAL NOT NULL DEFAULT 1,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_kinship_sugg_ev_suggestion ON kinship_suggestion_evidence(suggestion_id);
+      CREATE UNIQUE INDEX idx_kinship_sugg_ev_dedupe
+        ON kinship_suggestion_evidence(suggestion_id, signal, COALESCE(nodus_id, ''), COALESCE(quote, ''));
+
+      -- Semantic index for the evidence archive: embed each item's extracted text so
+      -- documents can be discovered by meaning ("which documents concern this person?"),
+      -- reusing the same float32-BLOB + vec_cosine machinery as ideas. Nullable: an
+      -- item is simply un-indexed until an embedding provider is configured and run.
+      ALTER TABLE archive_items ADD COLUMN embedding BLOB;
+      ALTER TABLE archive_items ADD COLUMN embedding_model TEXT;
+      ALTER TABLE archive_items ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE archive_items ADD COLUMN embedding_text_hash TEXT;
+    `,
+  },
+  {
+    version: 43,
+    up: /* sql */ `
+      -- Social-relations network: a SECOND graph, independent from the kinship tree,
+      -- for the connections a person had beyond family (patrons, friends, employers,
+      -- rivals, correspondents...) — the material a social/prosopographical historian
+      -- works with. A social_contact is a lightweight node for someone who is known
+      -- ONLY through a relation (not themselves a tree member); 'notes' holds whatever
+      -- the user knows about them, free text. Contacts never author relations — only
+      -- persons in the kinship tree do (a relation is recorded from a person's ficha).
+      CREATE TABLE social_contacts (
+        contact_id   TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        notes        TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_social_contacts_name ON social_contacts(display_name);
+
+      -- A directed, typed connection recorded from person_id's ficha ("who they
+      -- knew"). role is free text from person_id's perspective (amigo, patrón,
+      -- socio...). The target is polymorphic (mirrors record_evidence's
+      -- target_kind/target_id pattern): either another tree person or a
+      -- social_contact, so the two graphs can interconnect without merging their
+      -- ontologies. notes is markdown, about the connection itself (distinct from a
+      -- contact's own notes, which describe the person).
+      CREATE TABLE social_relations (
+        relation_id TEXT PRIMARY KEY,
+        person_id   TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        target_kind TEXT NOT NULL,   -- 'contact' | 'person'
+        target_id   TEXT NOT NULL,
+        role        TEXT NOT NULL,
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_social_relations_person ON social_relations(person_id);
+      CREATE INDEX idx_social_relations_target ON social_relations(target_kind, target_id);
+    `,
+  },
+  {
+    version: 44,
+    up: /* sql */ `
+      -- Places gain a gazetteer identity so the map's place picker can resolve a
+      -- typed name to a real, unique populated place (GeoNames): gazetteer_id is the
+      -- stable external id (e.g. 'geonames:2520118'), admin1/country are the
+      -- state/province and country names for display ("municipio, estado, país"),
+      -- country_code is the ISO code. All nullable — a hand-entered place with just
+      -- coordinates still works. A partial unique index keeps one row per gazetteer
+      -- entry so the same city links many people to a single place node.
+      ALTER TABLE places ADD COLUMN gazetteer_id TEXT;
+      ALTER TABLE places ADD COLUMN admin1 TEXT;
+      ALTER TABLE places ADD COLUMN country TEXT;
+      ALTER TABLE places ADD COLUMN country_code TEXT;
+      CREATE UNIQUE INDEX idx_places_gazetteer ON places(gazetteer_id) WHERE gazetteer_id IS NOT NULL;
+
+      -- A person's PLACE RECORD: the log of places associated with a person, which
+      -- drives their individual map and (aggregated) the general map. Independent
+      -- from events — a place can be logged without a full event — though the two
+      -- coexist. label is the kind of association (birth, residence, death, other);
+      -- date is a free-text (possibly fuzzy) date with a sortable key so the map's
+      -- chronological slider and the migration path can order the stops.
+      CREATE TABLE person_places (
+        id         TEXT PRIMARY KEY,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        place_id   TEXT NOT NULL REFERENCES places(place_id) ON DELETE CASCADE,
+        label      TEXT,
+        date       TEXT,
+        date_sort  TEXT,
+        notes      TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_person_places_person ON person_places(person_id);
+      CREATE INDEX idx_person_places_place ON person_places(place_id);
     `,
   },
 ];

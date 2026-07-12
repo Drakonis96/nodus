@@ -3,7 +3,8 @@ import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { VaultSummary } from '@shared/types';
+import type { VaultSummary, VaultType } from '@shared/types';
+import { normalizeVaultType } from '@shared/vaultTypes';
 import { runMigrations } from '../db/migrations';
 
 interface VaultRecord {
@@ -13,6 +14,7 @@ interface VaultRecord {
   createdAt: string;
   lastOpenedAt: string;
   legacy: boolean;
+  type: VaultType;
 }
 
 interface VaultRegistryFile {
@@ -58,6 +60,7 @@ function defaultVaultRecord(): VaultRecord {
     createdAt: now,
     lastOpenedAt: now,
     legacy: true,
+    type: 'academic',
   };
 }
 
@@ -78,6 +81,8 @@ function normalizeRegistry(input: VaultRegistryFile): VaultRegistryFile {
       createdAt: vault.createdAt || nowIso(),
       lastOpenedAt: vault.lastOpenedAt || vault.createdAt || nowIso(),
       legacy: Boolean(vault.legacy),
+      // Pre-existing vaults have no `type`; they default to academic.
+      type: normalizeVaultType(vault.type),
     }))
     .filter((vault) => {
       if (seen.has(vault.id)) return false;
@@ -131,6 +136,7 @@ function writeVaultManifest(vault: VaultRecord): void {
       {
         id: vault.id,
         name: vault.name,
+        type: vault.type,
         createdAt: vault.createdAt,
         lastOpenedAt: vault.lastOpenedAt,
         database: path.basename(vault.path),
@@ -167,6 +173,7 @@ function toSummary(vault: VaultRecord, activeVaultId: string): VaultSummary {
     lastOpenedAt: vault.lastOpenedAt,
     active: vault.id === activeVaultId,
     legacy: vault.legacy,
+    type: vault.type,
     apiKeyProviders: [],
   };
 }
@@ -201,7 +208,7 @@ export function vaultDir(vaultId: string): string | null {
   return vault ? path.dirname(vault.path) : null;
 }
 
-export function createVault(name: string): VaultSummary {
+export function createVault(name: string, type: VaultType = 'academic'): VaultSummary {
   const registry = ensureVaultRegistry();
   const id = randomUUID();
   const createdAt = nowIso();
@@ -213,6 +220,7 @@ export function createVault(name: string): VaultSummary {
     createdAt,
     lastOpenedAt: createdAt,
     legacy: false,
+    type: normalizeVaultType(type),
   };
   initializeDatabase(vault.path);
   writeVaultManifest(vault);
@@ -221,7 +229,51 @@ export function createVault(name: string): VaultSummary {
   return toSummary(vault, registry.activeVaultId);
 }
 
-export function createVaultFromDatabaseFile(sourceFile: string, name: string): VaultSummary {
+/**
+ * Restore a vault's database from a backup, KEYED BY ITS ORIGINAL ID. If a vault with
+ * that id already exists locally its database file is replaced in place; otherwise the
+ * vault is registered (recreating the folder for a non-legacy vault, or the legacy
+ * path for the primary one). The copied file's stale WAL/SHM siblings are cleared so
+ * SQLite never replays an old journal over the restored data. Migrations run lazily
+ * when the vault is next opened. Does NOT touch the live DB connection — the caller
+ * must closeDb() before restoring the active vault and reopen afterwards.
+ */
+export function restoreVaultDatabase(
+  input: { id: string; name: string; type: VaultType; legacy: boolean },
+  sourceFile: string
+): void {
+  const registry = ensureVaultRegistry();
+  let record = registry.vaults.find((v) => v.id === input.id);
+  if (record) {
+    record.name = cleanName(input.name);
+    record.type = normalizeVaultType(input.type);
+    record.lastOpenedAt = nowIso();
+  } else {
+    const legacy = input.legacy || input.id === LEGACY_VAULT_ID;
+    const target = legacy ? legacyDbPath() : path.join(vaultsDir(), input.id, 'nodus.sqlite');
+    record = {
+      id: input.id,
+      name: cleanName(input.name),
+      path: target,
+      createdAt: nowIso(),
+      lastOpenedAt: nowIso(),
+      legacy,
+      type: normalizeVaultType(input.type),
+    };
+    registry.vaults.push(record);
+  }
+  fs.mkdirSync(path.dirname(record.path), { recursive: true });
+  removeSqliteDatabaseFiles(record.path);
+  fs.copyFileSync(sourceFile, record.path);
+  writeVaultManifest(record);
+  writeRegistry(registry);
+}
+
+export function createVaultFromDatabaseFile(
+  sourceFile: string,
+  name: string,
+  type: VaultType = 'academic'
+): VaultSummary {
   const registry = ensureVaultRegistry();
   const id = randomUUID();
   const createdAt = nowIso();
@@ -233,6 +285,7 @@ export function createVaultFromDatabaseFile(sourceFile: string, name: string): V
     createdAt,
     lastOpenedAt: createdAt,
     legacy: false,
+    type: normalizeVaultType(type),
   };
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(sourceFile, vault.path);
@@ -248,6 +301,16 @@ export function renameVault(id: string, name: string): VaultSummary {
   const vault = registry.vaults.find((candidate) => candidate.id === id);
   if (!vault) throw new Error('Bóveda no encontrada.');
   vault.name = cleanName(name);
+  writeVaultManifest(vault);
+  writeRegistry(registry);
+  return toSummary(vault, registry.activeVaultId);
+}
+
+export function setVaultType(id: string, type: VaultType): VaultSummary {
+  const registry = ensureVaultRegistry();
+  const vault = registry.vaults.find((candidate) => candidate.id === id);
+  if (!vault) throw new Error('Bóveda no encontrada.');
+  vault.type = normalizeVaultType(type);
   writeVaultManifest(vault);
   writeRegistry(registry);
   return toSummary(vault, registry.activeVaultId);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GlobalSearchResult, SavedSearch, SearchMode, SearchResultKind } from '@shared/types';
+import type { GlobalSearchResult, SavedSearch, SearchMode, SearchResultKind, VaultType } from '@shared/types';
 import { Icon } from '../components/ui';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
@@ -8,7 +8,7 @@ import { WorkIdeasModal } from './WorkIdeasModal';
 
 // One search box that spans the whole workspace. Two strategies: text (LIKE,
 // matches characters) and semantic (embeddings, matches meaning). Each result
-// links to the surface that owns it (graph node, reading view, gaps, note, …).
+// links to the surface that owns it (graph node, reading view, persons, archive…).
 const KIND_META: Record<SearchResultKind, { label: string; icon: string }> = {
   note: { label: 'Notas', icon: 'notebook' },
   idea: { label: 'Ideas', icon: 'bulb' },
@@ -17,13 +17,24 @@ const KIND_META: Record<SearchResultKind, { label: string; icon: string }> = {
   gap: { label: 'Huecos', icon: 'gap' },
   theme: { label: 'Temas', icon: 'theme' },
   author: { label: 'Autores', icon: 'graduation' },
+  person: { label: 'Personas', icon: 'users' },
+  event: { label: 'Eventos', icon: 'clock' },
+  archive: { label: 'Documentos', icon: 'archive' },
 };
 
-const TEXT_KINDS: SearchResultKind[] = ['note', 'idea', 'work', 'gap', 'theme', 'author'];
+const ACADEMIC_TEXT_KINDS: SearchResultKind[] = ['note', 'idea', 'work', 'gap', 'theme', 'author'];
 const SEMANTIC_KINDS: SearchResultKind[] = ['idea', 'passage', 'work'];
 
-function kindsForMode(mode: SearchMode): SearchResultKind[] {
-  return mode === 'semantic' ? SEMANTIC_KINDS : TEXT_KINDS;
+/** Text-search kinds shown for the active vault type — records vaults surface persons,
+ *  events and archive documents (and drop the argumentative kinds they don't have). */
+function textKinds(vaultType: VaultType | undefined): SearchResultKind[] {
+  if (vaultType === 'genealogy') return ['person', 'event', 'archive', 'work', 'note'];
+  if (vaultType === 'primary_sources') return ['person', 'event', 'archive', 'work', 'idea', 'author', 'note'];
+  return ACADEMIC_TEXT_KINDS;
+}
+
+function kindsForMode(mode: SearchMode, vaultType: VaultType | undefined): SearchResultKind[] {
+  return mode === 'semantic' ? SEMANTIC_KINDS : textKinds(vaultType);
 }
 
 interface SimilarTarget {
@@ -32,17 +43,25 @@ interface SimilarTarget {
 }
 
 export function SearchView({
+  vaultType,
   onOpenGraph,
   onOpenNote,
   onOpenGaps,
+  onOpenPerson,
+  onOpenTimeline,
+  onOpenArchive,
 }: {
+  vaultType?: VaultType;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenNote: (noteId: string) => void;
   onOpenGaps: () => void;
+  onOpenPerson: (personId: string) => void;
+  onOpenTimeline: () => void;
+  onOpenArchive: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<SearchMode>('text');
-  const [activeKinds, setActiveKinds] = useState<Set<SearchResultKind>>(() => new Set(TEXT_KINDS));
+  const [activeKinds, setActiveKinds] = useState<Set<SearchResultKind>>(() => new Set(textKinds(vaultType)));
   const [results, setResults] = useState<GlobalSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -67,7 +86,7 @@ export function SearchView({
   const switchMode = (next: SearchMode) => {
     if (next === mode) return;
     setMode(next);
-    setActiveKinds(new Set(kindsForMode(next)));
+    setActiveKinds(new Set(kindsForMode(next, vaultType)));
     setSimilar(null);
     setUnavailable(false);
   };
@@ -78,7 +97,7 @@ export function SearchView({
       if (next.has(kind)) next.delete(kind);
       else next.add(kind);
       // Never leave the filter empty — that would hide everything.
-      if (next.size === 0) return new Set(kindsForMode(mode));
+      if (next.size === 0) return new Set(kindsForMode(mode, vaultType));
       return next;
     });
   };
@@ -144,7 +163,7 @@ export function SearchView({
   );
 
   const grouped = useMemo(() => {
-    const order = kindsForMode(mode);
+    const order = kindsForMode(mode, vaultType);
     const map = new Map<SearchResultKind, GlobalSearchResult[]>();
     for (const r of visible) {
       const list = map.get(r.kind) ?? [];
@@ -152,7 +171,7 @@ export function SearchView({
       map.set(r.kind, list);
     }
     return order.filter((k) => map.has(k)).map((k) => ({ kind: k, items: map.get(k)! }));
-  }, [visible, mode]);
+  }, [visible, mode, vaultType]);
 
   const locate = (r: GlobalSearchResult) => {
     switch (r.kind) {
@@ -190,6 +209,15 @@ export function SearchView({
       case 'note':
         onOpenNote(r.id);
         break;
+      case 'person':
+        onOpenPerson(r.id);
+        break;
+      case 'event':
+        onOpenTimeline();
+        break;
+      case 'archive':
+        onOpenArchive();
+        break;
     }
   };
 
@@ -210,7 +238,7 @@ export function SearchView({
 
   const clearSimilar = () => {
     setSimilar(null);
-    setActiveKinds(new Set(kindsForMode(mode)));
+    setActiveKinds(new Set(kindsForMode(mode, vaultType)));
   };
 
   const saveCurrent = () => {
@@ -224,7 +252,7 @@ export function SearchView({
   const applySaved = (s: SavedSearch) => {
     setSimilar(null);
     setMode(s.mode);
-    setActiveKinds(new Set(s.kinds.length ? s.kinds : kindsForMode(s.mode)));
+    setActiveKinds(new Set(s.kinds.length ? s.kinds : kindsForMode(s.mode, vaultType)));
     setQuery(s.query);
   };
 
@@ -232,7 +260,7 @@ export function SearchView({
     void window.nodus.deleteSavedSearch(id).then(reloadSaved);
   };
 
-  const availableKinds = kindsForMode(mode);
+  const availableKinds = kindsForMode(mode, vaultType);
   const canSave = query.trim().length >= 2 && !similar;
 
   return (

@@ -1,0 +1,491 @@
+// Evidence archive store: the user's own files (record photos, CSV/XLSX exports,
+// scans) with folders + tags, kept in SQLite so the archive travels with backups
+// and .nodussync. File blobs are stored but never loaded by list queries — fetch
+// them explicitly with getItemBlob so browsing stays light.
+
+import { getDb } from './database';
+import { v4 as uuid } from 'uuid';
+import { encodeEmbedding } from './ideasRepo';
+import { sanitizeDocMetadata, extractItemYear } from '@shared/archiveDocTypes';
+import { applyArchiveFilters, sortArchiveItems } from '@shared/archiveFilters';
+import type {
+  ArchiveFolder,
+  ArchiveItem,
+  ArchiveItemInput,
+  ArchiveItemKind,
+  ArchiveLinkedPerson,
+  ArchiveListOptions,
+} from '@shared/types';
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function newId(prefix: string): string {
+  return `${prefix}_${uuid()}`;
+}
+
+// ── Folders ──────────────────────────────────────────────────────────────────
+
+interface FolderRow {
+  folder_id: string;
+  name: string;
+  parent_id: string | null;
+  created_at: string;
+}
+
+function rowToFolder(row: FolderRow): ArchiveFolder {
+  return { folderId: row.folder_id, name: row.name, parentId: row.parent_id, createdAt: row.created_at };
+}
+
+export function createFolder(name: string, parentId: string | null = null): ArchiveFolder {
+  const id = newId('afd');
+  getDb()
+    .prepare('INSERT INTO archive_folders (folder_id, name, parent_id, created_at) VALUES (?, ?, ?, ?)')
+    .run(id, name.trim() || 'Carpeta', parentId, now());
+  return getFolder(id)!;
+}
+
+export function getFolder(folderId: string): ArchiveFolder | null {
+  const row = getDb().prepare('SELECT * FROM archive_folders WHERE folder_id = ?').get(folderId) as
+    | FolderRow
+    | undefined;
+  return row ? rowToFolder(row) : null;
+}
+
+export function listFolders(): ArchiveFolder[] {
+  return (getDb().prepare('SELECT * FROM archive_folders ORDER BY name').all() as FolderRow[]).map(rowToFolder);
+}
+
+export function renameFolder(folderId: string, name: string): ArchiveFolder | null {
+  getDb().prepare('UPDATE archive_folders SET name = ? WHERE folder_id = ?').run(name.trim() || 'Carpeta', folderId);
+  return getFolder(folderId);
+}
+
+/** Delete a folder; child folders cascade away and items in it become unfiled. */
+export function deleteFolder(folderId: string): void {
+  getDb().prepare('DELETE FROM archive_folders WHERE folder_id = ?').run(folderId);
+}
+
+// ── Items ────────────────────────────────────────────────────────────────────
+
+interface ItemMetaRow {
+  item_id: string;
+  folder_id: string | null;
+  title: string;
+  kind: ArchiveItemKind;
+  file_name: string | null;
+  mime_type: string | null;
+  bytes: number;
+  has_blob: number;
+  extracted_text: string | null;
+  description: string | null;
+  content_hash: string | null;
+  doc_type: string | null;
+  metadata_json: string | null;
+  has_embedding?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+const ITEM_META_COLS = `item_id, folder_id, title, kind, file_name, mime_type, bytes,
+  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, doc_type, metadata_json,
+  (embedding IS NOT NULL) AS has_embedding, created_at, updated_at`;
+
+const ITEM_META_SELECT = `SELECT ${ITEM_META_COLS} FROM archive_items`;
+
+function parseMetadata(json: string | null): Record<string, string> | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function itemTags(itemId: string): string[] {
+  return (
+    getDb().prepare('SELECT tag FROM archive_item_tags WHERE item_id = ? ORDER BY tag').all(itemId) as {
+      tag: string;
+    }[]
+  ).map((r) => r.tag);
+}
+
+function itemLinkedPersons(itemId: string): ArchiveLinkedPerson[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT p.person_id, p.display_name
+         FROM archive_item_persons ap JOIN persons p ON p.person_id = ap.person_id
+         WHERE ap.item_id = ? ORDER BY p.display_name`
+      )
+      .all(itemId) as { person_id: string; display_name: string }[]
+  ).map((r) => ({ personId: r.person_id, displayName: r.display_name }));
+}
+
+function rowToItem(row: ItemMetaRow): ArchiveItem {
+  const metadata = parseMetadata(row.metadata_json);
+  return {
+    itemId: row.item_id,
+    folderId: row.folder_id,
+    title: row.title,
+    kind: row.kind,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    bytes: row.bytes,
+    hasBlob: Boolean(row.has_blob),
+    extractedText: row.extracted_text,
+    description: row.description,
+    contentHash: row.content_hash,
+    docType: row.doc_type,
+    metadata,
+    year: extractItemYear(row.doc_type, metadata),
+    linkedPersons: itemLinkedPersons(row.item_id),
+    tags: itemTags(row.item_id),
+    hasEmbedding: Boolean(row.has_embedding),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Adapt an ArchiveItem to the shape shared/archiveFilters.ts needs for matching. */
+function withLinkedPersonIds(item: ArchiveItem): ArchiveItem & { linkedPersonIds: string[] } {
+  return { ...item, linkedPersonIds: item.linkedPersons.map((p) => p.personId) };
+}
+
+// ── Document ↔ person links ────────────────────────────────────────────────────
+
+export function linkItemPerson(itemId: string, personId: string): void {
+  getDb()
+    .prepare('INSERT OR IGNORE INTO archive_item_persons (item_id, person_id, created_at) VALUES (?, ?, ?)')
+    .run(itemId, personId, now());
+}
+
+export function unlinkItemPerson(itemId: string, personId: string): void {
+  getDb().prepare('DELETE FROM archive_item_persons WHERE item_id = ? AND person_id = ?').run(itemId, personId);
+}
+
+/** Archive items (metadata only) linked to a person, newest first. */
+export function listItemsForPerson(personId: string): ArchiveItem[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
+        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json,
+        (i.embedding IS NOT NULL) AS has_embedding, i.created_at, i.updated_at
+       FROM archive_items i JOIN archive_item_persons ap ON ap.item_id = i.item_id
+       WHERE ap.person_id = ? ORDER BY i.updated_at DESC`
+    )
+    .all(personId) as ItemMetaRow[];
+  return rows.map(rowToItem);
+}
+
+/** Serialise sanitised metadata for a type, or null when empty. */
+function metadataJson(docType: string | null | undefined, metadata: Record<string, string> | null | undefined): string | null {
+  if (!metadata) return null;
+  const clean = sanitizeDocMetadata(docType, metadata);
+  return Object.keys(clean).length ? JSON.stringify(clean) : null;
+}
+
+export function createItem(input: ArchiveItemInput): ArchiveItem {
+  const db = getDb();
+  const id = newId('ait');
+  const ts = now();
+  const blob = input.blob ? Buffer.from(input.blob) : null;
+  const tx = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO archive_items
+        (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      id,
+      input.folderId ?? null,
+      input.title.trim() || 'Sin título',
+      input.kind ?? 'other',
+      input.fileName ?? null,
+      input.mimeType ?? null,
+      input.bytes ?? (blob ? blob.length : 0),
+      blob,
+      input.extractedText ?? null,
+      input.description ?? null,
+      input.contentHash ?? null,
+      input.docType ?? null,
+      metadataJson(input.docType, input.metadata),
+      ts,
+      ts
+    );
+    for (const tag of dedupeTags(input.tags)) addTagInternal(id, tag);
+  });
+  tx();
+  return getItem(id)!;
+}
+
+export function getItem(itemId: string): ArchiveItem | null {
+  const row = getDb().prepare(`${ITEM_META_SELECT} WHERE item_id = ?`).get(itemId) as ItemMetaRow | undefined;
+  return row ? rowToItem(row) : null;
+}
+
+/** Fetch the stored file bytes for an item, or null if it has none. */
+export function getItemBlob(itemId: string): Buffer | null {
+  const row = getDb().prepare('SELECT blob FROM archive_items WHERE item_id = ?').get(itemId) as
+    | { blob: Buffer | null }
+    | undefined;
+  return row?.blob ?? null;
+}
+
+/**
+ * List items for the archive's "upload sources" window, with as many filters and
+ * sortings as the UI offers. Only `folderId` is pushed down to SQL (it cheaply
+ * narrows the scan); everything else — doc type, file kind, tags/persons (with a
+ * Notion-style any/all match mode), year range, and free-text search — runs through
+ * the shared pure filter/sort so the matching logic is unit-tested without a DB.
+ */
+export function listItems(opts: ArchiveListOptions = {}): ArchiveItem[] {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (opts.folderId !== undefined) {
+    if (opts.folderId === null) where.push('folder_id IS NULL');
+    else {
+      where.push('folder_id = ?');
+      params.push(opts.folderId);
+    }
+  }
+  const sql = `${ITEM_META_SELECT}${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`;
+  const items = (getDb().prepare(sql).all(...params) as ItemMetaRow[]).map(rowToItem).map(withLinkedPersonIds);
+  const filtered = applyArchiveFilters(items, {
+    docTypes: opts.docTypes,
+    kinds: opts.kinds,
+    tags: opts.tags,
+    tagsMode: opts.tagsMode,
+    personIds: opts.personIds,
+    personsMode: opts.personsMode,
+    yearFrom: opts.yearFrom,
+    yearTo: opts.yearTo,
+    search: opts.search,
+  });
+  return sortArchiveItems(filtered, opts.sort ?? 'updatedDesc');
+}
+
+export function updateItem(
+  itemId: string,
+  patch: Partial<Pick<ArchiveItemInput, 'title' | 'folderId' | 'description' | 'extractedText' | 'docType' | 'metadata'>>
+): ArchiveItem | null {
+  const existing = getItem(itemId);
+  if (!existing) return null;
+  const title = patch.title?.trim() ?? existing.title;
+  const folderId = patch.folderId !== undefined ? patch.folderId : existing.folderId;
+  const description = patch.description !== undefined ? patch.description : existing.description;
+  const extractedText = patch.extractedText !== undefined ? patch.extractedText : existing.extractedText;
+  const docType = patch.docType !== undefined ? patch.docType : existing.docType;
+  // Re-sanitise against the (possibly changed) type; a type change drops stray fields.
+  const metadata = patch.metadata !== undefined ? patch.metadata : existing.metadata;
+  getDb()
+    .prepare(
+      'UPDATE archive_items SET title = ?, folder_id = ?, description = ?, extracted_text = ?, doc_type = ?, metadata_json = ?, updated_at = ? WHERE item_id = ?'
+    )
+    .run(title, folderId, description, extractedText, docType, metadataJson(docType, metadata), now(), itemId);
+  return getItem(itemId);
+}
+
+export function deleteItem(itemId: string): void {
+  getDb().prepare('DELETE FROM archive_items WHERE item_id = ?').run(itemId);
+}
+
+/**
+ * Replace an item's attached file in place: new bytes, format, extracted text and
+ * hash, keeping its title, folder, classification, tags and person links. The stale
+ * embedding is cleared so the item re-indexes from the new text.
+ */
+export function replaceItemFile(
+  itemId: string,
+  input: {
+    fileName: string | null;
+    mimeType: string | null;
+    bytes: number;
+    blob: Uint8Array;
+    kind: ArchiveItemKind;
+    extractedText: string | null;
+    description: string | null;
+    contentHash: string | null;
+  }
+): ArchiveItem | null {
+  const existing = getItem(itemId);
+  if (!existing) return null;
+  getDb()
+    .prepare(
+      `UPDATE archive_items SET file_name = ?, mime_type = ?, bytes = ?, blob = ?, kind = ?, extracted_text = ?,
+        description = ?, content_hash = ?, embedding = NULL, embedding_model = NULL, embedding_dim = NULL,
+        embedding_text_hash = NULL, updated_at = ? WHERE item_id = ?`
+    )
+    .run(
+      input.fileName,
+      input.mimeType,
+      input.bytes,
+      Buffer.from(input.blob),
+      input.kind,
+      input.extractedText,
+      input.description ?? existing.description,
+      input.contentHash,
+      now(),
+      itemId
+    );
+  return getItem(itemId);
+}
+
+/** Return the item id whose content hash matches, if any (de-dupe on re-import). */
+export function findItemByHash(contentHash: string): string | null {
+  const row = getDb().prepare('SELECT item_id FROM archive_items WHERE content_hash = ? LIMIT 1').get(contentHash) as
+    | { item_id: string }
+    | undefined;
+  return row?.item_id ?? null;
+}
+
+// ── Tags ─────────────────────────────────────────────────────────────────────
+
+function dedupeTags(tags: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags ?? []) {
+    const tag = raw.trim();
+    if (!tag || seen.has(tag.toLowerCase())) continue;
+    seen.add(tag.toLowerCase());
+    out.push(tag);
+  }
+  return out;
+}
+
+function addTagInternal(itemId: string, tag: string): void {
+  getDb().prepare('INSERT OR IGNORE INTO archive_item_tags (item_id, tag) VALUES (?, ?)').run(itemId, tag);
+}
+
+export function addTag(itemId: string, tag: string): void {
+  const trimmed = tag.trim();
+  if (trimmed) addTagInternal(itemId, trimmed);
+}
+
+export function removeTag(itemId: string, tag: string): void {
+  getDb().prepare('DELETE FROM archive_item_tags WHERE item_id = ? AND tag = ?').run(itemId, tag);
+}
+
+/** All distinct tags with their item counts, for a tag filter UI. */
+export function listTags(): { tag: string; count: number }[] {
+  return getDb()
+    .prepare('SELECT tag, COUNT(*) AS count FROM archive_item_tags GROUP BY tag ORDER BY count DESC, tag')
+    .all() as { tag: string; count: number }[];
+}
+
+export function archiveCounts(): { items: number; folders: number } {
+  const db = getDb();
+  return {
+    items: (db.prepare('SELECT COUNT(*) AS c FROM archive_items').get() as { c: number }).c,
+    folders: (db.prepare('SELECT COUNT(*) AS c FROM archive_folders').get() as { c: number }).c,
+  };
+}
+
+// ── Semantic index (embeddings) ────────────────────────────────────────────────
+
+export interface ArchiveEmbeddingRow {
+  itemId: string;
+  title: string;
+  description: string | null;
+  extractedText: string | null;
+  docType: string | null;
+  hasEmbedding: boolean;
+  embeddingModel: string | null;
+  embeddingTextHash: string | null;
+}
+
+/** Text-bearing items with their embedding metadata (no blobs), for the indexer. */
+export function archiveItemsForEmbedding(): ArchiveEmbeddingRow[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT item_id, title, description, extracted_text, doc_type,
+        (embedding IS NOT NULL) AS has_embedding, embedding_model, embedding_text_hash
+       FROM archive_items
+       WHERE COALESCE(extracted_text, '') <> '' OR COALESCE(description, '') <> ''`
+    )
+    .all() as {
+    item_id: string;
+    title: string;
+    description: string | null;
+    extracted_text: string | null;
+    doc_type: string | null;
+    has_embedding: number;
+    embedding_model: string | null;
+    embedding_text_hash: string | null;
+  }[];
+  return rows.map((r) => ({
+    itemId: r.item_id,
+    title: r.title,
+    description: r.description,
+    extractedText: r.extracted_text,
+    docType: r.doc_type,
+    hasEmbedding: Boolean(r.has_embedding),
+    embeddingModel: r.embedding_model,
+    embeddingTextHash: r.embedding_text_hash,
+  }));
+}
+
+export function setItemEmbedding(itemId: string, vec: number[], model: string, textHash: string): void {
+  getDb()
+    .prepare(
+      'UPDATE archive_items SET embedding = ?, embedding_model = ?, embedding_dim = ?, embedding_text_hash = ?, updated_at = ? WHERE item_id = ?'
+    )
+    .run(encodeEmbedding(vec), model, vec.length, textHash, now(), itemId);
+}
+
+export function clearAllArchiveEmbeddings(): void {
+  getDb()
+    .prepare('UPDATE archive_items SET embedding = NULL, embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL')
+    .run();
+}
+
+export function archiveEmbeddingCount(): { indexed: number; total: number } {
+  const db = getDb();
+  return {
+    indexed: (db.prepare('SELECT COUNT(*) AS c FROM archive_items WHERE embedding IS NOT NULL').get() as { c: number }).c,
+    total: (
+      db
+        .prepare("SELECT COUNT(*) AS c FROM archive_items WHERE COALESCE(extracted_text,'') <> '' OR COALESCE(description,'') <> ''")
+        .get() as { c: number }
+    ).c,
+  };
+}
+
+/**
+ * Archive items most similar to a query vector, computed inside SQLite via vec_cosine.
+ * Optionally excludes items already linked to a given person (so discovery only ever
+ * proposes NEW links). Returns metadata items plus their similarity, strongest first.
+ */
+export function findArchiveItemsSimilar(
+  queryVec: number[],
+  opts: { limit?: number; minSimilarity?: number; excludePersonId?: string; excludeItemIds?: string[] } = {}
+): (ArchiveItem & { similarity: number })[] {
+  const limit = opts.limit ?? 8;
+  const minSim = opts.minSimilarity ?? 0.35;
+  const where: string[] = ['embedding IS NOT NULL'];
+  const params: unknown[] = [encodeEmbedding(queryVec)];
+  if (opts.excludePersonId) {
+    where.push('item_id NOT IN (SELECT item_id FROM archive_item_persons WHERE person_id = ?)');
+    params.push(opts.excludePersonId);
+  }
+  if (opts.excludeItemIds?.length) {
+    where.push(`item_id NOT IN (${opts.excludeItemIds.map(() => '?').join(',')})`);
+    params.push(...opts.excludeItemIds);
+  }
+  const rows = getDb()
+    .prepare(
+      `SELECT item_id, vec_cosine(embedding, ?) AS similarity
+       FROM archive_items WHERE ${where.join(' AND ')}
+       ORDER BY similarity DESC LIMIT ?`
+    )
+    .all(...params, limit * 2) as { item_id: string; similarity: number }[];
+  const out: (ArchiveItem & { similarity: number })[] = [];
+  for (const r of rows) {
+    if (r.similarity < minSim) continue;
+    const item = getItem(r.item_id);
+    if (item) out.push({ ...item, similarity: r.similarity });
+    if (out.length >= limit) break;
+  }
+  return out;
+}

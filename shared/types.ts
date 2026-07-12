@@ -1,6 +1,12 @@
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 
+// Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
+import type { VaultType } from './vaultTypes';
+import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
+export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
+export type { VaultType };
+
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
 export type GraphNodeType = IdeaType | 'theme' | 'author';
 
@@ -390,6 +396,9 @@ export interface ModelInfo {
   loaded?: boolean;
   /** Model kind reported by LM Studio: chat/vision vs embeddings. */
   kind?: 'llm' | 'vlm' | 'embeddings' | 'other';
+  /** Whether the model accepts image input. true/false when known (OpenRouter
+   *  modalities, LM Studio vlm), undefined when the provider doesn't expose it. */
+  vision?: boolean;
 }
 
 /** How hard a model should "think" before answering. `off` skips the chain-of-thought
@@ -534,6 +543,9 @@ export interface AppSettings {
   /** @deprecated Legacy global selector, retained only for one-time migration. */
   defaultModel: ModelRef | null;
   extractionModel: ModelRef | null;
+  // Vision model for analysing archive images (visual description + OCR). Falls back
+  // to extractionModel when null. Should be an image-capable model.
+  visionModel: ModelRef | null;
   // General long-form synthesis and initial fallback for feature-local pickers.
   synthesisModel: ModelRef | null;
   // Short orientation summaries of individual works. Falls back to synthesisModel.
@@ -598,6 +610,11 @@ export interface AppSettings {
   // True while the app is showing the seeded sample corpus. Only ever set on an
   // empty database; cleared (and the demo rows wiped) when the user leaves demo mode.
   demoMode: boolean;
+  // The active vault's type before the genealogy demo flipped it, so leaving the demo
+  // restores it. Null when no genealogy demo is active. (KV setting, no migration.)
+  demoPriorVaultType: VaultType | null;
+  // Completion flag for the genealogy-specific guided tour (shown in the genealogy demo).
+  genealogyTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -635,6 +652,16 @@ export interface AppSettings {
    * they can be shown again from Settings.
    */
   sidebarHidden: string[];
+  /**
+   * Whether the user has explicitly chosen sidebar visibility. While false, the
+   * effective hidden set comes from the active vault type's preset (e.g. an
+   * `estudio` vault hides research/authoring views by default). The first time
+   * the user toggles a section, the effective set is materialised into
+   * `sidebarHidden` and this flips true, so their choice is respected thereafter.
+   */
+  sidebarCustomized: boolean;
+  /** Default wooden frame design for the genealogy tree (per-person overrides win). */
+  treeFrame: string;
   // ── Automatic encrypted backups ────────────────────────────────────────────
   // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
   // Google Drive to get off-machine copies for free). Encrypted with the
@@ -643,6 +670,11 @@ export interface AppSettings {
   autoBackupEnabled: boolean;
   autoBackupFolder: string;
   autoBackupIntervalHours: number;
+  /** Days of week the backup runs (0=Sun..6=Sat). Empty = every day. */
+  autoBackupDays: number[];
+  /** Local time of day for the scheduled backup. */
+  autoBackupHour: number;
+  autoBackupMinute: number;
   lastAutoBackupAt: string | null;
   lastAutoBackupStatus: string | null;
 }
@@ -663,11 +695,15 @@ export interface VaultSummary {
   lastOpenedAt: string;
   active: boolean;
   legacy: boolean;
+  /** The vault's mode. Pre-existing vaults default to 'academic'. */
+  type: VaultType;
   apiKeyProviders: AiProvider[];
 }
 
 export interface CreateVaultInput {
   name: string;
+  /** Optional vault type; defaults to 'academic' when omitted. */
+  type?: VaultType;
 }
 
 export interface VaultSwitchOptions {
@@ -715,6 +751,507 @@ export interface VaultCreateResult {
 export interface VaultDuplicateResult {
   vault: VaultSummary;
   copiedProviders: AiProvider[];
+}
+
+// ── Primary-source / genealogy records ontology (phase B) ────────────────────
+
+export type PersonSex = 'male' | 'female' | 'unknown';
+
+export type HistoricalEventType =
+  | 'birth'
+  | 'baptism'
+  | 'marriage'
+  | 'death'
+  | 'burial'
+  | 'census'
+  | 'residence'
+  | 'migration'
+  | 'occupation'
+  | 'other';
+
+export type ParticipantRole =
+  | 'principal'
+  | 'spouse'
+  | 'father'
+  | 'mother'
+  | 'child'
+  | 'witness'
+  | 'officiant'
+  | 'other';
+
+export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participant' | 'relationship';
+export type RecordSourceKind = 'work' | 'archive';
+
+// Kinship (genealogy layer, phase C)
+export type RelationshipType = 'parent' | 'spouse';
+export type RelationshipProvenance = 'user_asserted' | 'ai_confirmed';
+/** Nuance on a parent edge: null = biological/default, 'adoptive' for adoptions. */
+export type RelationshipSubtype = 'adoptive' | null;
+
+export interface Relationship {
+  relId: string;
+  fromPerson: string;
+  toPerson: string;
+  type: RelationshipType;
+  provenance: RelationshipProvenance;
+  subtype: RelationshipSubtype;
+  notes: string | null;
+}
+
+/** A person's immediate kin, resolved for the ficha and the tree. */
+export interface Kin {
+  parents: Person[];
+  children: Person[];
+  spouses: Person[];
+  siblings: Person[];
+}
+
+// Social-relations network (genealogy layer) — a SECOND, independent graph from the
+// kinship tree: the connections a person had beyond family (patrons, friends,
+// employers, rivals, correspondents...), the material a social/prosopographical
+// historian works with. Always recorded from a tree person's ficha ("who they
+// knew"); the target is either another tree person or a lightweight contact who
+// isn't themselves a tree member.
+
+/** A person known only through a social relation, not themselves a tree member. */
+export interface SocialContact {
+  contactId: string;
+  displayName: string;
+  /** Free text (markdown) about who they were — occupation, dates, place... */
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SocialContactInput {
+  displayName: string;
+  notes?: string | null;
+}
+
+export type SocialRelationTargetKind = 'contact' | 'person';
+
+/** A directed, typed connection recorded from `personId`'s ficha. */
+export interface SocialRelation {
+  relationId: string;
+  personId: string;
+  /** personId's display name, resolved for convenience (always a tree person). */
+  personName: string;
+  targetKind: SocialRelationTargetKind;
+  targetId: string;
+  /** The target's display name, resolved for convenience (contact or person). */
+  targetName: string;
+  /** Free text from personId's perspective (amigo, patrón, socio...). */
+  role: string;
+  /** Markdown, about the connection itself (distinct from the contact's own notes). */
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SocialRelationInput {
+  personId: string;
+  targetKind: SocialRelationTargetKind;
+  targetId: string;
+  role: string;
+  notes?: string | null;
+}
+
+/** One node in the social-relations graph: a tree person or a standalone contact. */
+export interface SocialGraphNode {
+  id: string;
+  kind: SocialRelationTargetKind;
+  displayName: string;
+}
+
+export interface SocialGraphEdge {
+  relationId: string;
+  fromId: string;
+  toId: string;
+  role: string;
+}
+
+export interface SocialGraphData {
+  nodes: SocialGraphNode[];
+  edges: SocialGraphEdge[];
+}
+
+export interface GedcomImportResult {
+  persons: number;
+  relationships: number;
+  events: number;
+}
+
+// ── Evidence-driven kinship suggestions (genealogy) ──────────────────────────
+// The AI proposes kinship; it never asserts it. A suggestion accumulates evidence
+// and is confirmed (→ a real ai_confirmed relationship) or dismissed by the user.
+
+/** How a piece of evidence came to back a kinship suggestion. */
+export type KinSignal = 'record_role' | 'explicit_claim';
+
+export type KinSuggestionStatus = 'open' | 'confirmed' | 'dismissed';
+
+/** Qualitative strength of a suggestion, derived from its accumulated score. */
+export type KinStrength = 'alta' | 'media' | 'baja';
+
+/** One evidence item behind a kinship suggestion, with its verbatim quote. */
+export interface KinSuggestionEvidence {
+  id: string;
+  suggestionId: string;
+  signal: KinSignal;
+  sourceKind: RecordSourceKind;
+  nodusId: string | null;
+  quote: string | null;
+  location: string | null;
+  weight: number;
+}
+
+/** A proposed parent/spouse relationship with the evidence and people it concerns. */
+export interface KinSuggestion {
+  suggestionId: string;
+  fromPerson: string;
+  toPerson: string;
+  type: RelationshipType;
+  subtype: RelationshipSubtype;
+  status: KinSuggestionStatus;
+  score: number;
+  strength: KinStrength;
+  fromName: string;
+  toName: string;
+  evidence: KinSuggestionEvidence[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A proposed identity match between two person records, with why. */
+export interface MatchCandidatePair {
+  aId: string;
+  bId: string;
+  score: number;
+  reasons: string[];
+  a: Person;
+  b: Person;
+}
+
+export interface PersonName {
+  name: string;
+  kind: string | null;
+}
+
+/** Non-destructive framing of a person's portrait; the original bytes are untouched. */
+export interface PortraitFocus {
+  focusX: number;
+  focusY: number;
+  scale: number;
+}
+
+export interface Person {
+  personId: string;
+  displayName: string;
+  sex: PersonSex;
+  /** Human display form of the date, e.g. "c. 1850". */
+  birthDate: string | null;
+  deathDate: string | null;
+  notes: string | null;
+  /** Name variants / spellings across records. */
+  names: PersonName[];
+  /** Portrait framing when a photo is attached; null when there is none. */
+  portrait: PortraitFocus | null;
+  /** Per-person wooden tree-frame design override; null = use the vault default. */
+  frameStyle: string | null;
+  /** AI-generated biography from the evidence; null until generated. */
+  biography: string | null;
+  biographyAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonInput {
+  displayName: string;
+  sex?: PersonSex;
+  birthDate?: string | null;
+  deathDate?: string | null;
+  notes?: string | null;
+  names?: PersonName[];
+}
+
+export interface Place {
+  placeId: string;
+  name: string;
+  parentId: string | null;
+  kind: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  notes: string | null;
+  gazetteerId: string | null;
+  admin1: string | null;
+  country: string | null;
+  countryCode: string | null;
+}
+
+export interface PlaceInput {
+  name: string;
+  parentId?: string | null;
+  kind?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
+  /** Stable gazetteer identity (e.g. 'geonames:2520118') when resolved from the picker. */
+  gazetteerId?: string | null;
+  admin1?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+}
+
+/** A candidate place returned by the offline gazetteer search (GeoNames-derived). */
+export interface GazetteerPlace {
+  /** Stable unique id, e.g. 'geonames:2520118'. */
+  gazetteerId: string;
+  name: string;
+  /** State / province / region (admin1). */
+  admin1: string;
+  country: string;
+  countryCode: string;
+  latitude: number;
+  longitude: number;
+  population: number;
+}
+
+/** A place associated with a person (their per-person place record → their map). */
+export interface PersonPlace {
+  id: string;
+  personId: string;
+  placeId: string;
+  /** Kind of association: birth | residence | death | other (free text ok). */
+  label: string | null;
+  date: string | null;
+  sortKey: string | null;
+  notes: string | null;
+  /** Resolved place fields for display/mapping (joined). */
+  placeName: string;
+  admin1: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface PersonPlaceInput {
+  personId: string;
+  placeId: string;
+  label?: string | null;
+  date?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * One located point on the map: a person associated with a place that has
+ * coordinates. Carries the person's identity/dates for the thumbnail and the place's
+ * geography for plotting. The renderer groups points by person (migration routes) and
+ * by place (thumbnails), and filters by the chronological slider using `sortKey`.
+ */
+export interface MapPlacePoint {
+  personPlaceId: string;
+  personId: string;
+  personName: string;
+  birthDate: string | null;
+  deathDate: string | null;
+  hasPortrait: boolean;
+  placeId: string;
+  placeName: string;
+  admin1: string | null;
+  country: string | null;
+  latitude: number;
+  longitude: number;
+  label: string | null;
+  date: string | null;
+  sortKey: string | null;
+}
+
+export interface EventParticipant {
+  personId: string;
+  role: ParticipantRole;
+  /** Convenience for display; filled by read queries. */
+  displayName?: string;
+}
+
+export interface HistoricalEvent {
+  eventId: string;
+  type: HistoricalEventType;
+  label: string | null;
+  /** Human display form of the date. */
+  date: string | null;
+  /** Sortable lower-bound key 'YYYY-MM-DD' for the timeline; null if unknown. */
+  sortKey: string | null;
+  placeId: string | null;
+  placeName: string | null;
+  notes: string | null;
+  participants: EventParticipant[];
+}
+
+export interface EventInput {
+  type: HistoricalEventType;
+  label?: string | null;
+  date?: string | null;
+  placeId?: string | null;
+  notes?: string | null;
+  participants?: EventParticipant[];
+}
+
+export interface RecordEvidence {
+  id: string;
+  targetKind: RecordEvidenceTargetKind;
+  targetId: string;
+  nodusId: string | null;
+  sourceKind: RecordSourceKind;
+  quote: string | null;
+  location: string | null;
+  confidence: number | null;
+}
+
+export interface RecordEvidenceInput {
+  targetKind: RecordEvidenceTargetKind;
+  targetId: string;
+  nodusId?: string | null;
+  sourceKind?: RecordSourceKind;
+  quote?: string | null;
+  location?: string | null;
+  confidence?: number | null;
+}
+
+// ── Evidence archive (phase B) ───────────────────────────────────────────────
+
+export type ArchiveItemKind = 'image' | 'csv' | 'xlsx' | 'pdf' | 'text' | 'other';
+
+/** A tree member a document is linked to. */
+export interface ArchiveLinkedPerson {
+  personId: string;
+  displayName: string;
+}
+
+export interface ArchiveFolder {
+  folderId: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+}
+
+/** Archive item metadata for lists — never carries the file blob. */
+export interface ArchiveItem {
+  itemId: string;
+  folderId: string | null;
+  title: string;
+  kind: ArchiveItemKind;
+  fileName: string | null;
+  mimeType: string | null;
+  bytes: number;
+  /** Whether a file blob is stored (blobs are fetched separately). */
+  hasBlob: boolean;
+  extractedText: string | null;
+  description: string | null;
+  contentHash: string | null;
+  /** Primary-source document type (from shared/archiveDocTypes), or null. */
+  docType: string | null;
+  /** Optional type-specific metadata form values. */
+  metadata: Record<string, string> | null;
+  /** Best-effort year the document concerns, derived from its metadata date field(s). */
+  year: number | null;
+  /** Tree members this document is linked to. */
+  linkedPersons: ArchiveLinkedPerson[];
+  tags: string[];
+  /** Whether the item's text has been embedded for semantic discovery. */
+  hasEmbedding?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** How a document↔person link came to be proposed. */
+export type LinkSuggestionReason = 'name' | 'semantic';
+
+/** A proposed link between an archive document and a person (never auto-applied). */
+export interface DocumentLinkSuggestion {
+  itemId: string;
+  title: string;
+  docType: string | null;
+  reason: LinkSuggestionReason;
+  /** 0..1 semantic similarity when reason === 'semantic'. */
+  score: number;
+  /** The person's name as it appears in the document, when reason === 'name'. */
+  snippet: string | null;
+}
+
+/** A proposed link between a person and an archive document (person side of the pair). */
+export interface PersonLinkSuggestion {
+  personId: string;
+  displayName: string;
+  reason: LinkSuggestionReason;
+  score: number;
+  snippet: string | null;
+}
+
+export interface ArchiveItemInput {
+  folderId?: string | null;
+  title: string;
+  kind?: ArchiveItemKind;
+  fileName?: string | null;
+  mimeType?: string | null;
+  bytes?: number;
+  blob?: Uint8Array | null;
+  extractedText?: string | null;
+  description?: string | null;
+  contentHash?: string | null;
+  docType?: string | null;
+  metadata?: Record<string, string> | null;
+  tags?: string[];
+}
+
+/** Filter + sort options for listArchiveItems ("upload sources" window). Every
+ *  category combines with AND; tags/persons support a Notion-style any/all toggle. */
+export interface ArchiveListOptions {
+  folderId?: string | null;
+  search?: string;
+  docTypes?: string[];
+  kinds?: ArchiveItemKind[];
+  tags?: string[];
+  tagsMode?: ArchiveMatchMode;
+  personIds?: string[];
+  personsMode?: ArchiveMatchMode;
+  yearFrom?: number | null;
+  yearTo?: number | null;
+  sort?: ArchiveSortKey;
+}
+
+export interface RecordCounts {
+  persons: number;
+  places: number;
+  events: number;
+}
+
+export interface ArchiveCounts {
+  items: number;
+  folders: number;
+}
+
+export interface ArchiveTagCount {
+  tag: string;
+  count: number;
+}
+
+export interface ArchiveIngestSummary {
+  added: number;
+  duplicates: number;
+  items: ArchiveItem[];
+}
+
+export interface RecordsScanSummary {
+  persons: number;
+  places: number;
+  events: number;
+  evidence: number;
+  /** Extracted persons linked to an existing record instead of duplicated. */
+  linked?: number;
+  /** Open kinship suggestions across the vault after the scan. */
+  suggestions?: number;
+  /** True when the item had no extracted text to scan. */
+  noText: boolean;
 }
 
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
@@ -1823,7 +2360,18 @@ export interface CitationPreview {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The entity types the global search spans, each of which links elsewhere. */
-export type SearchResultKind = 'note' | 'idea' | 'work' | 'gap' | 'theme' | 'author' | 'passage';
+export type SearchResultKind =
+  | 'note'
+  | 'idea'
+  | 'work'
+  | 'gap'
+  | 'theme'
+  | 'author'
+  | 'passage'
+  // Records/genealogy kinds — only ever populated in primary-source & genealogy vaults.
+  | 'person'
+  | 'event'
+  | 'archive';
 
 /** A single match. `id` and the optional fields carry what the UI needs to route
  * to the right destination (graph node, work, note, gaps view, …). */
@@ -2560,6 +3108,12 @@ export interface DeepResearchRequest {
   sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
   decorativeImage?: DecorativeImageOption;
+  /**
+   * Genealogy vaults only: centre the family-history report on this person — their
+   * documents are guaranteed into the source pool and every section is written to
+   * keep them as the throughline. Ignored outside the genealogy pipeline.
+   */
+  focusPersonId?: string | null;
 }
 
 /** One live progress event emitted while a report is being orchestrated. */
@@ -3266,12 +3820,132 @@ export interface NodusApi {
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
   renameVault(id: string, name: string): Promise<VaultSummary>;
+  setVaultType(id: string, type: VaultType): Promise<VaultSummary>;
   switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
   resetVault(id: string): Promise<VaultSummary>;
   reuseVaultAnalysis(nodusIds: string[]): Promise<VaultAnalysisReuseResult>;
   copyVaultApiKeys(sourceVaultId: string, targetVaultId: string): Promise<{ copiedProviders: AiProvider[] }>;
+  // records ontology (primary sources / genealogy)
+  recordCounts(): Promise<RecordCounts>;
+  listPersons(search?: string): Promise<Person[]>;
+  getPerson(id: string): Promise<Person | null>;
+  createPerson(input: PersonInput): Promise<Person>;
+  updatePerson(id: string, patch: Partial<PersonInput>): Promise<Person | null>;
+  deletePerson(id: string): Promise<void>;
+  addPersonName(id: string, name: string, kind?: string | null): Promise<void>;
+  setPersonPortraitFromFile(personId: string): Promise<Person | null>;
+  getPersonPortrait(personId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  updatePortraitFocus(personId: string, focus: PortraitFocus): Promise<void>;
+  clearPersonPortrait(personId: string): Promise<void>;
+  /** Exceptional: an illustrative (non-photorealistic) reference portrait from a text description. */
+  generatePersonPortraitReference(personId: string, description: string): Promise<Person | null>;
+  listPlaces(): Promise<Place[]>;
+  createPlace(input: PlaceInput): Promise<Place>;
+  findOrCreatePlace(name: string, kind?: string | null): Promise<Place>;
+  updatePlace(id: string, patch: Partial<PlaceInput>): Promise<Place | null>;
+  // offline gazetteer + per-person place records (map)
+  searchGazetteer(query: string, limit?: number): Promise<GazetteerPlace[]>;
+  resolveGazetteerPlace(place: GazetteerPlace): Promise<Place>;
+  listPersonPlaces(personId: string): Promise<PersonPlace[]>;
+  addPersonPlace(input: PersonPlaceInput): Promise<PersonPlace>;
+  updatePersonPlace(id: string, patch: Partial<PersonPlaceInput>): Promise<PersonPlace | null>;
+  deletePersonPlace(id: string): Promise<void>;
+  mapPoints(personIds?: string[]): Promise<MapPlacePoint[]>;
+  listEvents(opts?: {
+    personId?: string;
+    type?: HistoricalEventType;
+    from?: string;
+    to?: string;
+  }): Promise<HistoricalEvent[]>;
+  getEvent(id: string): Promise<HistoricalEvent | null>;
+  createEvent(input: EventInput): Promise<HistoricalEvent>;
+  updateEvent(id: string, patch: Partial<EventInput>): Promise<HistoricalEvent | null>;
+  deleteEvent(id: string): Promise<void>;
+  addParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
+  removeParticipant(eventId: string, personId: string, role: ParticipantRole): Promise<void>;
+  addRecordEvidence(input: RecordEvidenceInput): Promise<RecordEvidence>;
+  listRecordEvidence(targetKind: RecordEvidenceTargetKind, targetId: string): Promise<RecordEvidence[]>;
+  deleteRecordEvidence(id: string): Promise<void>;
+  // kinship (genealogy)
+  addRelationship(
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
+    provenance?: RelationshipProvenance,
+    subtype?: RelationshipSubtype
+  ): Promise<Relationship | null>;
+  setPersonFrame(personId: string, frameStyle: string | null): Promise<void>;
+  generatePersonBiography(personId: string): Promise<{ biography: string | null; noEvidence: boolean }>;
+  removeRelationship(relId: string): Promise<void>;
+  listRelationships(personId: string): Promise<Relationship[]>;
+  allRelationships(): Promise<Relationship[]>;
+  kinOf(personId: string): Promise<Kin>;
+  importGedcom(): Promise<GedcomImportResult | null>;
+  exportGedcom(): Promise<{ path: string } | null>;
+  findMatches(): Promise<MatchCandidatePair[]>;
+  mergePersons(targetId: string, sourceId: string): Promise<Person | null>;
+  dismissMatch(a: string, b: string): Promise<void>;
+  // social-relations network (independent from kinship)
+  listSocialContacts(search?: string): Promise<SocialContact[]>;
+  getSocialContact(contactId: string): Promise<SocialContact | null>;
+  createSocialContact(input: SocialContactInput): Promise<SocialContact>;
+  updateSocialContact(contactId: string, patch: Partial<SocialContactInput>): Promise<SocialContact | null>;
+  deleteSocialContact(contactId: string): Promise<void>;
+  listSocialRelationsForPerson(personId: string): Promise<SocialRelation[]>;
+  listSocialRelationsTargetingPerson(personId: string): Promise<SocialRelation[]>;
+  listSocialRelationsTargetingContact(contactId: string): Promise<SocialRelation[]>;
+  createSocialRelation(input: SocialRelationInput): Promise<SocialRelation>;
+  updateSocialRelation(relationId: string, patch: Partial<SocialRelationInput>): Promise<SocialRelation | null>;
+  deleteSocialRelation(relationId: string): Promise<void>;
+  socialGraph(): Promise<SocialGraphData>;
+  // evidence-driven kinship suggestions (AI proposes, the user disposes)
+  listKinSuggestions(): Promise<KinSuggestion[]>;
+  kinSuggestionsForPerson(personId: string): Promise<KinSuggestion[]>;
+  kinSuggestionCount(): Promise<number>;
+  confirmKinSuggestion(suggestionId: string): Promise<boolean>;
+  dismissKinSuggestion(suggestionId: string): Promise<boolean>;
+  // evidence archive
+  archiveCounts(): Promise<ArchiveCounts>;
+  listArchiveFolders(): Promise<ArchiveFolder[]>;
+  createArchiveFolder(name: string, parentId?: string | null): Promise<ArchiveFolder>;
+  renameArchiveFolder(id: string, name: string): Promise<ArchiveFolder | null>;
+  deleteArchiveFolder(id: string): Promise<void>;
+  listArchiveItems(opts?: ArchiveListOptions): Promise<ArchiveItem[]>;
+  getArchiveItem(id: string): Promise<ArchiveItem | null>;
+  getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
+  createArchiveItem(input: ArchiveItemInput): Promise<ArchiveItem>;
+  updateArchiveItem(id: string, patch: Partial<ArchiveItemInput>): Promise<ArchiveItem | null>;
+  deleteArchiveItem(id: string): Promise<void>;
+  addArchiveTag(id: string, tag: string): Promise<void>;
+  removeArchiveTag(id: string, tag: string): Promise<void>;
+  listArchiveTags(): Promise<ArchiveTagCount[]>;
+  linkArchivePerson(itemId: string, personId: string): Promise<void>;
+  unlinkArchivePerson(itemId: string, personId: string): Promise<void>;
+  listArchiveItemsForPerson(personId: string): Promise<ArchiveItem[]>;
+  pickAndIngestArchive(folderId?: string | null, docType?: string | null): Promise<ArchiveIngestSummary>;
+  createArchiveTextEntry(input: {
+    title: string;
+    content: string;
+    folderId?: string | null;
+    docType?: string | null;
+    metadata?: Record<string, string> | null;
+    tags?: string[];
+  }): Promise<ArchiveItem>;
+  /** Records lens on a Zotero library work: extract persons/places/events from its text. */
+  scanWorkRecords(nodusId: string): Promise<RecordsScanSummary>;
+  scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
+  analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
+  /** Replace an archive item's attached file (re-extracts text; keeps its links/tags). */
+  replaceArchiveFile(itemId: string): Promise<{ replaced: boolean; item: ArchiveItem | null }>;
+  /** Persons whose name appears in a document's text but who are not yet linked. */
+  suggestPersonsForItem(itemId: string): Promise<PersonLinkSuggestion[]>;
+  /** Documents that likely concern a person (lexical + semantic), not yet linked. */
+  suggestDocumentsForPerson(personId: string): Promise<DocumentLinkSuggestion[]>;
+  /** Embed text-bearing archive items for semantic discovery (idempotent). */
+  indexArchive(): Promise<{ indexed: number; skipped: number }>;
+  archiveIndexStatus(): Promise<{ indexed: number; total: number }>;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
@@ -3681,6 +4355,13 @@ export interface NodusApi {
   seedDemoData(): Promise<boolean>;
   /** Remove every demo row and leave demo mode. */
   clearDemoData(): Promise<void>;
+  /** Seed the genealogy demo (Serrano–Vidal family) and flip the vault to genealogy;
+   *  kicks off background portrait generation when a Gemini key is present. */
+  seedGenealogyDemoData(): Promise<{ seeded: boolean; willGeneratePortraits: boolean }>;
+  /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
+  generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
+  /** Progress of demo portrait generation. Returns an unsubscribe function. */
+  onDemoPortraitsProgress(cb: (p: { done: number; total: number }) => void): () => void;
 
   // embedding pipeline
   /** Start embedding generation for the given works (or all non-archived works if empty). */
