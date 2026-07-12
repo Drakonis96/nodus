@@ -12,6 +12,7 @@ import {
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel, PROVIDER_LABELS } from '@shared/providers';
 import type { AiProvider, EmbeddingProvider, LocalProvider, ModelRef, PromptLanguage, ReasoningEffort } from '@shared/types';
 import { vaultTypePromptPack } from '@shared/vaultTypes';
+import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } from '@shared/imageAnalysis';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
@@ -105,6 +106,11 @@ interface CallOpts {
   noRetry?: boolean;
   /** Per-request transport timeout override. */
   timeoutMs?: number;
+  /** Images to attach for vision models (base64 + media type). */
+  images?: VisionImagePart[];
+  /** Skip the vault-type prompt pack (keep only the output-language directive). Used
+   *  for tasks that need consistent output regardless of vault type (image analysis). */
+  plainContext?: boolean;
 }
 
 /** Streaming delta. `kind` distinguishes the final answer (`content`, default) from
@@ -164,9 +170,10 @@ export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
 }
 
 /** Compose both context directives: vault-type persona first, then the language
- *  override last (highest priority). Every public completion entry point uses this. */
-function withPromptContext<T extends { system: string }>(opts: T): T {
-  return withPromptLanguage(withVaultTypeContext(opts));
+ *  override last (highest priority). `plainContext` skips the vault pack so tasks
+ *  that need consistent output (image analysis) aren't steered by the vault type. */
+function withPromptContext<T extends { system: string; plainContext?: boolean }>(opts: T): T {
+  return opts.plainContext ? withPromptLanguage(opts) : withPromptLanguage(withVaultTypeContext(opts));
 }
 
 /** Resolve which model to use: explicit override, else the synthesis workload. */
@@ -241,7 +248,9 @@ async function rawComplete(
         max_tokens: opts.maxTokens ?? 8000,
         temperature: opts.temperature ?? 0.15,
         system: opts.system,
-        messages: [{ role: 'user', content: opts.user }],
+        messages: [
+          { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
+        ],
       });
       const block = res.content.find((b: any) => b.type === 'text');
       return (block as any)?.text ?? '';
@@ -270,7 +279,7 @@ async function rawComplete(
     max_tokens: maxTokens,
     messages: [
       { role: 'system' as const, content: opts.system },
-      { role: 'user' as const, content: opts.user },
+      { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
   };
   const extras = optionalBody(model, jsonMode, reasoning);

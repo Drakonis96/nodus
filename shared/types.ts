@@ -394,6 +394,9 @@ export interface ModelInfo {
   loaded?: boolean;
   /** Model kind reported by LM Studio: chat/vision vs embeddings. */
   kind?: 'llm' | 'vlm' | 'embeddings' | 'other';
+  /** Whether the model accepts image input. true/false when known (OpenRouter
+   *  modalities, LM Studio vlm), undefined when the provider doesn't expose it. */
+  vision?: boolean;
 }
 
 /** How hard a model should "think" before answering. `off` skips the chain-of-thought
@@ -538,6 +541,9 @@ export interface AppSettings {
   /** @deprecated Legacy global selector, retained only for one-time migration. */
   defaultModel: ModelRef | null;
   extractionModel: ModelRef | null;
+  // Vision model for analysing archive images (visual description + OCR). Falls back
+  // to extractionModel when null. Should be an image-capable model.
+  visionModel: ModelRef | null;
   // General long-form synthesis and initial fallback for feature-local pickers.
   synthesisModel: ModelRef | null;
   // Short orientation summaries of individual works. Falls back to synthesisModel.

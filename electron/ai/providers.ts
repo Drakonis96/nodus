@@ -205,13 +205,17 @@ async function listOpenRouter(): Promise<ModelInfo[]> {
   // OpenRouter's model list is public (no key required).
   const res = await fetch('https://openrouter.ai/api/v1/models');
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: { id: string; name?: string; supported_parameters?: string[] }[] };
+  const data = (await res.json()) as {
+    data?: { id: string; name?: string; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
+  };
   const models: ModelInfo[] = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
     // Flag reasoning models so the picker can warn they are slower for scanning.
     reasoning: (m.supported_parameters ?? []).includes('reasoning'),
+    // Modalities let us filter the vision-model picker to image-capable models.
+    vision: m.architecture?.input_modalities ? m.architecture.input_modalities.includes('image') : undefined,
   }));
   // Sort by upstream provider, then model id.
   return models.sort((a, b) => (a.group! === b.group! ? a.id.localeCompare(b.id) : a.group!.localeCompare(b.group!)));
@@ -364,6 +368,8 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
         contextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
         loaded: m.state === 'loaded',
         kind,
+        // LM Studio reports vision models as 'vlm'; text/embeddings can't take images.
+        vision: kind === 'vlm' ? true : kind === 'llm' || kind === 'embeddings' ? false : undefined,
       } as ModelInfo;
     })
     .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));

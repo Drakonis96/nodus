@@ -15,6 +15,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   favorites: [],
   defaultModel: null,
   extractionModel: null,
+  visionModel: null,
   synthesisModel: null,
   summaryModel: null,
   fusionModel: null,
