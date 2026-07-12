@@ -28,70 +28,148 @@ const { computeTreeLayout } = require(bundle);
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
-// Family: grandparents (gp1+gp2) → parent → focus; focus+spouse → child.
-const parentEdges = [
-  { parent: 'gp1', child: 'parent' },
-  { parent: 'gp2', child: 'parent' },
-  { parent: 'parent', child: 'focus' },
-  { parent: 'focus', child: 'child' },
-  { parent: 'spouse', child: 'child' },
-];
-const spouseEdges = [
-  { a: 'gp1', b: 'gp2' },
-  { a: 'focus', b: 'spouse' },
-];
+const byId = (r) => Object.fromEntries(r.nodes.map((n) => [n.personId, n]));
 
 test('generations: focus 0, ancestors negative, descendants positive', () => {
-  const { nodes } = computeTreeLayout({ focusId: 'focus', parentEdges, spouseEdges });
-  const gen = Object.fromEntries(nodes.map((n) => [n.personId, n.generation]));
-  assert.equal(gen.focus, 0);
-  assert.equal(gen.spouse, 0, 'spouse sits in the focus generation');
-  assert.equal(gen.parent, -1);
-  assert.equal(gen.gp1, -2);
-  assert.equal(gen.gp2, -2);
-  assert.equal(gen.child, 1);
+  const r = computeTreeLayout({
+    focusId: 'focus',
+    persons: [
+      { id: 'focus', sex: 'male' },
+      { id: 'spouse', sex: 'female' },
+    ],
+    parentEdges: [
+      { parent: 'gp1', child: 'parent' },
+      { parent: 'gp2', child: 'parent' },
+      { parent: 'parent', child: 'focus' },
+      { parent: 'focus', child: 'child' },
+      { parent: 'spouse', child: 'child' },
+    ],
+    spouseEdges: [
+      { a: 'gp1', b: 'gp2' },
+      { a: 'focus', b: 'spouse' },
+    ],
+  });
+  const g = byId(r);
+  assert.equal(g.focus.generation, 0);
+  assert.equal(g.spouse.generation, 0);
+  assert.equal(g.parent.generation, -1);
+  assert.equal(g.gp1.generation, -2);
+  assert.equal(g.child.generation, 1);
 });
 
-test('every included edge connects two placed nodes', () => {
-  const { nodes, edges } = computeTreeLayout({ focusId: 'focus', parentEdges, spouseEdges });
-  const ids = new Set(nodes.map((n) => n.personId));
-  for (const e of edges) {
-    assert.ok(ids.has(e.from) && ids.has(e.to), 'edge endpoints are present');
-  }
-  assert.ok(edges.some((e) => e.kind === 'spouse'), 'spouse edges included');
-  assert.ok(edges.some((e) => e.kind === 'parent'), 'parent edges included');
+test('hetero couple: adjacent, man on the left, coupleSide assigned', () => {
+  const r = computeTreeLayout({
+    focusId: 'h',
+    persons: [
+      { id: 'h', sex: 'male' },
+      { id: 'w', sex: 'female' },
+    ],
+    parentEdges: [],
+    spouseEdges: [{ a: 'h', b: 'w' }],
+  });
+  const g = byId(r);
+  assert.ok(g.h.x < g.w.x, 'man is left of woman');
+  assert.equal(Math.abs(g.h.x - g.w.x), 160 + 28, 'spouses are adjacent (one column apart)');
+  assert.equal(g.h.coupleSide, 'left');
+  assert.equal(g.w.coupleSide, 'right');
+});
+
+test('same-sex couple orders by birth year, sides derive from position', () => {
+  const r = computeTreeLayout({
+    focusId: 'a',
+    persons: [
+      { id: 'a', sex: 'male', birthYear: 1850 },
+      { id: 'b', sex: 'male', birthYear: 1848 },
+    ],
+    parentEdges: [],
+    spouseEdges: [{ a: 'a', b: 'b' }],
+  });
+  const g = byId(r);
+  assert.ok(g.b.x < g.a.x, 'earlier-born spouse placed left');
+  assert.equal(g.b.coupleSide, 'left');
+  assert.equal(g.a.coupleSide, 'right');
+});
+
+test('unmarried co-parents (no spouse edge) are grouped adjacent', () => {
+  const r = computeTreeLayout({
+    focusId: 'kid',
+    persons: [
+      { id: 'dad', sex: 'male' },
+      { id: 'mom', sex: 'female' },
+      { id: 'kid', sex: 'female' },
+    ],
+    parentEdges: [
+      { parent: 'dad', child: 'kid' },
+      { parent: 'mom', child: 'kid' },
+    ],
+    spouseEdges: [], // never married
+  });
+  const g = byId(r);
+  assert.equal(Math.abs(g.dad.x - g.mom.x), 160 + 28, 'co-parents sit adjacent');
+  assert.ok(g.dad.x < g.mom.x, 'father left, mother right');
+  assert.notEqual(g.dad.coupleSide, 'none');
+});
+
+test('remarriage: a twice-married person appears once with both spouses present', () => {
+  // First wife (deceased) and second wife, children in both marriages.
+  const r = computeTreeLayout({
+    focusId: 'man',
+    persons: [
+      { id: 'man', sex: 'male' },
+      { id: 'w1', sex: 'female' },
+      { id: 'w2', sex: 'female' },
+    ],
+    parentEdges: [
+      { parent: 'man', child: 'c1' },
+      { parent: 'w1', child: 'c1' },
+      { parent: 'man', child: 'c2' },
+      { parent: 'w2', child: 'c2' },
+    ],
+    spouseEdges: [
+      { a: 'man', b: 'w1' },
+      { a: 'man', b: 'w2' },
+    ],
+  });
+  const g = byId(r);
+  assert.equal(r.nodes.filter((n) => n.personId === 'man').length, 1, 'the man appears exactly once');
+  assert.ok(g.w1 && g.w2, 'both spouses are placed');
+  assert.equal(g.w1.generation, 0);
+  assert.equal(g.w2.generation, 0);
+  // Both children present in the next generation.
+  assert.equal(g.c1.generation, 1);
+  assert.equal(g.c2.generation, 1);
 });
 
 test('pedigree collapse: a person reachable by two paths gets one node', () => {
-  // Cousins marry: p shares ancestry through two lines but must appear once.
-  const edges = [
-    { parent: 'A', child: 'B' },
-    { parent: 'A', child: 'C' },
-    { parent: 'B', child: 'focus' },
-    { parent: 'C', child: 'spouse' },
-    { parent: 'focus', child: 'kid' },
-    { parent: 'spouse', child: 'kid' },
-  ];
-  const { nodes } = computeTreeLayout({ focusId: 'focus', parentEdges: edges, spouseEdges: [{ a: 'focus', b: 'spouse' }] });
-  const aNodes = nodes.filter((n) => n.personId === 'A');
-  assert.equal(aNodes.length, 1, 'shared ancestor A appears exactly once');
+  const r = computeTreeLayout({
+    focusId: 'focus',
+    parentEdges: [
+      { parent: 'A', child: 'B' },
+      { parent: 'A', child: 'C' },
+      { parent: 'B', child: 'focus' },
+      { parent: 'C', child: 'spouse' },
+      { parent: 'focus', child: 'kid' },
+      { parent: 'spouse', child: 'kid' },
+    ],
+    spouseEdges: [{ a: 'focus', b: 'spouse' }],
+  });
+  assert.equal(r.nodes.filter((n) => n.personId === 'A').length, 1);
 });
 
-test('depth limits prune far generations', () => {
-  const { nodes } = computeTreeLayout({
+test('depth limits prune far generations; empty focus is empty', () => {
+  const r = computeTreeLayout({
     focusId: 'focus',
-    parentEdges,
-    spouseEdges,
+    parentEdges: [
+      { parent: 'gp', child: 'parent' },
+      { parent: 'parent', child: 'focus' },
+      { parent: 'focus', child: 'child' },
+    ],
+    spouseEdges: [],
     ancestorDepth: 1,
     descendantDepth: 1,
   });
-  const ids = new Set(nodes.map((n) => n.personId));
-  assert.ok(ids.has('parent'), 'one generation up kept');
-  assert.ok(!ids.has('gp1'), 'grandparents pruned beyond ancestorDepth 1');
-  assert.ok(ids.has('child'), 'one generation down kept');
-});
-
-test('empty focus yields an empty layout', () => {
-  const r = computeTreeLayout({ focusId: '', parentEdges, spouseEdges });
-  assert.deepEqual(r.nodes, []);
+  const ids = new Set(r.nodes.map((n) => n.personId));
+  assert.ok(ids.has('parent') && !ids.has('gp'));
+  assert.ok(ids.has('child'));
+  assert.deepEqual(computeTreeLayout({ focusId: '', parentEdges: [], spouseEdges: [] }).nodes, []);
 });

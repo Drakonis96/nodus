@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Person, Relationship, RelationshipType } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
+import { parseHistoricalDate } from '@shared/genealogyDates';
+import { mirrorDefaultPortrait } from '@shared/treePortraits';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { t } from '../i18n';
@@ -42,12 +44,13 @@ export function TreeView() {
     () =>
       computeTreeLayout({
         focusId,
+        persons: persons.map((p) => ({ id: p.personId, sex: p.sex, birthYear: parseHistoricalDate(p.birthDate).year })),
         parentEdges: rels.filter((r) => r.type === 'parent').map((r) => ({ parent: r.fromPerson, child: r.toPerson })),
         spouseEdges: rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
         nodeWidth: NODE_W,
         nodeHeight: NODE_H,
       }),
-    [focusId, rels]
+    [focusId, rels, persons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
