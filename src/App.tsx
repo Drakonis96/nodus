@@ -49,6 +49,7 @@ import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import { effectiveSidebarHidden, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
+import nodusLogoGold from './assets/nodus-logo-gold.svg';
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -117,6 +118,12 @@ export function App() {
   useEffect(() => {
     if (activeVault && !isViewAllowedForVaultType(view, activeVault.type)) setView('home');
   }, [activeVault?.type, view]);
+
+  // Genealogy vaults wear a golden accent + logo instead of the indigo default.
+  const isGenealogy = activeVault?.type === 'genealogy';
+  useEffect(() => {
+    document.documentElement.classList.toggle('genealogy', isGenealogy);
+  }, [isGenealogy]);
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -368,7 +375,7 @@ export function App() {
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <img src={nodusLogo} alt="" className="h-7 w-7" />
+          <img src={isGenealogy ? nodusLogoGold : nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
