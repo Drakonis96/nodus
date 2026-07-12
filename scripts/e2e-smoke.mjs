@@ -208,7 +208,15 @@ try {
       extractedText: 'Juan Pérez jornalero',
       tags: ['censo'],
     });
+    const entry = await window.nodus.createArchiveTextEntry({
+      title: 'Partida',
+      content: 'texto',
+      docType: 'birth_record',
+      metadata: { persona: 'Juan Pérez', inventado: 'x' },
+    });
     return {
+      entryDocType: entry.docType,
+      entryMeta: entry.metadata,
       persons: (await window.nodus.listPersons()).length,
       children: kin.children.length,
       events: (await window.nodus.listEvents({ personId: juan.personId })).length,
@@ -224,6 +232,8 @@ try {
   assert.equal(records.evidence, 1, 'record evidence attached');
   assert.equal(records.placeName, 'Sevilla', 'event resolves its place');
   assert.equal(records.archiveItems, 1, 'archive item created + tag-filtered');
+  assert.equal(records.entryDocType, 'birth_record', 'text entry keeps its document type');
+  assert.deepEqual(records.entryMeta, { persona: 'Juan Pérez' }, 'metadata sanitised to the type (unknown key dropped)');
   console.log('[e2e] records ontology + archive ok over IPC');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────

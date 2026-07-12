@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ArchiveFolder, ArchiveItem, ArchiveItemKind } from '@shared/types';
+import { getArchiveDocType } from '@shared/archiveDocTypes';
 import { Icon } from '../components/ui';
+import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
 import { t } from '../i18n';
 
 const KIND_ICON: Record<ArchiveItemKind, string> = {
@@ -15,7 +17,7 @@ const KIND_ICON: Record<ArchiveItemKind, string> = {
 const ALL = '__all__';
 const UNFILED = '__unfiled__';
 
-export function ArchiveView() {
+export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = {}) {
   const [folders, setFolders] = useState<ArchiveFolder[]>([]);
   const [items, setItems] = useState<ArchiveItem[]>([]);
   const [folderId, setFolderId] = useState<string>(ALL);
@@ -23,6 +25,8 @@ export function ArchiveView() {
   const [selected, setSelected] = useState<ArchiveItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [addDocType, setAddDocType] = useState<string | null>(null);
+  const [textEntry, setTextEntry] = useState(false);
 
   const reload = useCallback(async () => {
     setFolders(await window.nodus.listArchiveFolders());
@@ -42,7 +46,7 @@ export function ArchiveView() {
     setMessage(null);
     try {
       const target = folderId !== ALL && folderId !== UNFILED ? folderId : null;
-      const result = await window.nodus.pickAndIngestArchive(target);
+      const result = await window.nodus.pickAndIngestArchive(target, addDocType);
       if (result.added || result.duplicates) {
         setMessage(
           t('Añadidos: {a} · duplicados omitidos: {d}')
@@ -90,17 +94,38 @@ export function ArchiveView() {
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="shrink-0 space-y-3 border-b border-neutral-800 p-4">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
-              className="input h-9 flex-1 text-sm"
-              placeholder={t('Buscar en títulos y texto extraído…')}
+              className="input h-9 min-w-[12rem] flex-1 text-sm"
+              placeholder={t('Buscar en títulos, texto y metadatos…')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+            />
+            <DocTypeSelect
+              value={addDocType}
+              onChange={setAddDocType}
+              emptyLabel="Tipo de documento"
+              className="input h-9 w-48 text-sm"
             />
             <button className="btn btn-primary h-9 gap-1.5" disabled={busy} onClick={() => void addFiles()}>
               <Icon name="upload" /> {t('Añadir archivos')}
             </button>
+            <button
+              className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+              onClick={() => setTextEntry(true)}
+              title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
+            >
+              <Icon name="edit" /> {t('Nueva entrada')}
+            </button>
           </div>
+          <p className="text-xs text-neutral-500">
+            {t('El Archivo guarda fuentes primarias (documentos, registros, fotografías). La bibliografía académica (libros, artículos, tesis) se gestiona en la Biblioteca importándola desde Zotero.')}
+            {onOpenLibrary && (
+              <button className="ml-1 text-indigo-400 hover:underline" onClick={onOpenLibrary}>
+                {t('Ir a la Biblioteca')}
+              </button>
+            )}
+          </p>
           {message && <p className="text-xs text-neutral-400">{message}</p>}
         </div>
 
@@ -115,6 +140,7 @@ export function ArchiveView() {
                 <thead>
                   <tr className="border-b border-neutral-800 text-left text-xs font-medium text-neutral-500">
                     <th className="py-2 pr-3">{t('Nombre')}</th>
+                    <th className="py-2 pr-3">{t('Tipo')}</th>
                     <th className="py-2 pr-3">{t('Descripción visual')}</th>
                     <th className="py-2 pr-3">{t('Texto detectado')}</th>
                     <th className="py-2 pr-3">{t('Etiquetas')}</th>
@@ -132,6 +158,15 @@ export function ArchiveView() {
                           <Icon name={KIND_ICON[it.kind]} size={15} className="shrink-0 text-neutral-400" />
                           <span className="truncate text-neutral-100">{it.title}</span>
                         </div>
+                      </td>
+                      <td className="py-2 pr-3">
+                        {it.docType ? (
+                          <span className="whitespace-nowrap rounded-full bg-indigo-950/40 px-2 py-0.5 text-[11px] text-indigo-300">
+                            {docTypeLabel(it.docType)}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-700">—</span>
+                        )}
                       </td>
                       <td className="max-w-[24rem] py-2 pr-3">
                         {it.description ? (
@@ -176,6 +211,85 @@ export function ArchiveView() {
           }}
         />
       )}
+      {textEntry && (
+        <TextEntryModal
+          folderId={folderId !== ALL && folderId !== UNFILED ? folderId : null}
+          onClose={() => setTextEntry(false)}
+          onSaved={async () => {
+            setTextEntry(false);
+            await reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Create a typed text entry (diary page, note, memoir) with no file. */
+function TextEntryModal({
+  folderId,
+  onClose,
+  onSaved,
+}: {
+  folderId: string | null;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [title, setTitle] = useState('');
+  const [docType, setDocType] = useState<string | null>('notes');
+  const [content, setContent] = useState('');
+  const [metadata, setMetadata] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!title.trim() && !content.trim()) return;
+    setBusy(true);
+    try {
+      await window.nodus.createArchiveTextEntry({
+        title: title.trim() || t('Entrada sin título'),
+        content,
+        folderId,
+        docType,
+        metadata,
+      });
+      await onSaved();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
+      <div className="card flex max-h-[85vh] w-full max-w-lg flex-col gap-3 p-5" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-semibold">{t('Nueva entrada de texto')}</h2>
+        <input
+          className="input h-9 w-full text-sm"
+          placeholder={t('Título')}
+          value={title}
+          autoFocus
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <DocTypeSelect value={docType} onChange={setDocType} />
+        {getArchiveDocType(docType) && (
+          <div className="rounded-md border border-neutral-800 p-3">
+            <DocTypeForm docType={docType} values={metadata} onChange={(k, v) => setMetadata((m) => ({ ...m, [k]: v }))} />
+          </div>
+        )}
+        <textarea
+          className="input min-h-[9rem] w-full flex-1 text-sm"
+          placeholder={t('Escribe el contenido (se indexa para búsqueda)…')}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
+        <div className="flex justify-end gap-2">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t('Cancelar')}
+          </button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => void save()}>
+            {t('Guardar')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -222,6 +336,15 @@ function ArchiveItemDetail({
   const [description, setDescription] = useState<string | null>(item.description);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
+  const [docType, setDocType] = useState<string | null>(item.docType);
+  const [metadata, setMetadata] = useState<Record<string, string>>(item.metadata ?? {});
+  const [classDirty, setClassDirty] = useState(false);
+
+  const saveClassification = async () => {
+    await window.nodus.updateArchiveItem(item.itemId, { docType, metadata });
+    setClassDirty(false);
+    await onChanged();
+  };
 
   useEffect(() => {
     let revoked: string | null = null;
@@ -375,6 +498,34 @@ function ArchiveItemDetail({
           ) : (
             <p className="mb-3 text-sm italic text-neutral-500">{t('Sin texto extraído.')}</p>
           )}
+
+          <div className="mb-3">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Clasificación')}</h3>
+            <DocTypeSelect
+              value={docType}
+              onChange={(id) => {
+                setDocType(id);
+                setClassDirty(true);
+              }}
+            />
+            {getArchiveDocType(docType) && (
+              <div className="mt-2 rounded-md border border-neutral-800 p-3">
+                <DocTypeForm
+                  docType={docType}
+                  values={metadata}
+                  onChange={(key, value) => {
+                    setMetadata((m) => ({ ...m, [key]: value }));
+                    setClassDirty(true);
+                  }}
+                />
+              </div>
+            )}
+            {classDirty && (
+              <button className="btn btn-primary mt-2 h-8 text-xs" onClick={() => void saveClassification()}>
+                {t('Guardar clasificación')}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="mt-2 border-t border-neutral-800 pt-3">

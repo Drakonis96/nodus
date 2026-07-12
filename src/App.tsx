@@ -516,7 +516,7 @@ export function App() {
           {view === 'timeline' && <TimelineView />}
           {view === 'tree' && <TreeView />}
           {view === 'map' && <MapView />}
-          {view === 'archive' && <ArchiveView />}
+          {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}
