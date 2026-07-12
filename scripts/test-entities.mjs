@@ -25,9 +25,12 @@ installRuntimeHooks(root);
 try {
   const repo = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
+  const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  // Schema migrated to the entity ontology.
-  assert.equal(getDb().pragma('user_version', { simple: true }), 33, 'DB migrated to schema v33');
+  // Schema migrated to the current version (the entity ontology arrived at v33).
+  const version = getDb().pragma('user_version', { simple: true });
+  assert.equal(version, SCHEMA_VERSION, `DB migrated to schema v${SCHEMA_VERSION}`);
+  assert.ok(version >= 33, 'entity ontology present');
 
   // ── Persons with name variants + fuzzy dates ──────────────────────────────
   const juan = repo.createPerson({

@@ -26,8 +26,11 @@ try {
   const repo = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));
   const { ingestArchiveFile } = require(path.join(repoRoot, 'electron/archive/archiveIngest.ts'));
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
+  const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.equal(getDb().pragma('user_version', { simple: true }), 34, 'DB migrated to schema v34');
+  const version = getDb().pragma('user_version', { simple: true });
+  assert.equal(version, SCHEMA_VERSION, `DB migrated to schema v${SCHEMA_VERSION}`);
+  assert.ok(version >= 34, 'archive tables present');
 
   // ── Folders: nesting + cascade ────────────────────────────────────────────
   const censos = repo.createFolder('Censos');
