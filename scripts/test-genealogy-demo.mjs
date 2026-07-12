@@ -134,6 +134,46 @@ try {
   assert.ok(ctx.evidencia.some((e) => e.persona.includes('Tomás')), 'cited evidence for the mentioned person');
   assert.equal(ctx.parentescos_sugeridos.length, 3, 'open kinship suggestions surfaced as hypotheses');
 
+  // ── Genealogy Deep Research: retrieve sources by embedding + write with full text ──
+  const gdr = require(path.join(repoRoot, 'electron/ai/genealogyDeepResearch.ts'));
+  const gsources = await gdr.buildGenealogySourcePool('la partida de bautismo de Tomás Serrano y sus padres');
+  assert.ok(gsources.length > 0 && gsources.some((s) => s.kind === 'document'), 'source pool has documents (fallback works without embeddings)');
+  const family = gdr.buildFamilyFacts();
+  assert.equal(family.personas.length, 14, 'family facts include the whole family');
+
+  const fakeDeps = {
+    planReport: async (input) => ({
+      title: 'Los Serrano–Vidal',
+      abstract: 'Informe de ejemplo.',
+      sections: [
+        { id: 's1', title: 'Orígenes de la familia', purpose: 'Presentar la familia.', keyPoints: ['a'], sourceIds: input.sources.slice(0, 2).map((s) => s.id) },
+        { id: 's2', title: 'Síntesis y fuentes', purpose: 'Cerrar.', keyPoints: [], sourceIds: [] },
+      ],
+    }),
+    writeSection: async (input) => {
+      const first = input.sources[0];
+      const good = first ? `[${first.title}](nodus://archive/${first.id.replace(/^doc:/, '')})` : '';
+      // The section is given the assigned documents' FULL TEXT — assert it arrived.
+      assert.ok(!first || typeof first.texto === 'string', 'assigned source carries full text');
+      return `## ${input.section.title}\n\nDesarrollo ${good}, y una cita inventada [x](nodus://archive/inexistente).`;
+    },
+    finalize: async () => ({ title: 'Los Serrano–Vidal', abstract: 'Resumen final.', limitations: ['Vínculos por probar.'], nextSteps: ['Buscar más partidas.'] }),
+    resolveWorkFullText: async () => '',
+  };
+  const report = await gdr.orchestrateGenealogyDeepResearch(
+    { objective: 'Historia de la familia Serrano', targetLength: 'concise', sectionLimit: 2, language: 'es' },
+    gsources,
+    family,
+    fakeDeps
+  );
+  assert.equal(report.meta.sections, 2, 'both planned sections written');
+  assert.ok(report.draft.draftMarkdown.includes('## Orígenes de la familia'), 'section rendered');
+  assert.ok(report.draft.draftMarkdown.includes('## Fuentes'), 'sources/references section rendered');
+  assert.ok(!report.draft.draftMarkdown.includes('inexistente'), 'a hallucinated citation is stripped');
+  assert.ok(report.draft.bibliography.length > 0, 'cited documents listed in references');
+  assert.ok(report.draft.matrix.length > 0, 'support matrix built from the cited sources');
+  assert.ok(report.draft.draftMarkdown.includes('Limitaciones'), 'genealogical limitations included');
+
   // ── Clear restores everything ──────────────────────────────────────────────
   clearDemoData();
   assert.equal(entities.recordCounts().persons, 0, 'persons cleared');

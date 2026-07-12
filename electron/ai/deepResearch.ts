@@ -1,6 +1,8 @@
 import type { DeepResearchProgress, DeepResearchReport, DeepResearchRequest, ModelRef } from '@shared/types';
 import { completeJson, completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
+import { getActiveVault } from '../vaults/vaultRegistry';
+import { generateGenealogyDeepResearchReport } from './genealogyDeepResearch';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
 import {
   orchestrateDeepResearch,
@@ -23,6 +25,11 @@ export async function generateDeepResearchReport(
   request: DeepResearchRequest,
   onProgress?: (p: DeepResearchProgress) => void
 ): Promise<DeepResearchReport> {
+  // A genealogy vault has no idea graph; its Deep Research writes a family-history
+  // report over the embedding-indexed archive + library instead (own pipeline).
+  if (getActiveVault().type === 'genealogy') {
+    return generateGenealogyDeepResearchReport(request, onProgress);
+  }
   const settings = getSettings();
   const model = request.model ?? settings.deepResearchModel ?? settings.synthesisModel ?? null;
   return orchestrateDeepResearch({ ...request, model }, realDeps(model), onProgress);
