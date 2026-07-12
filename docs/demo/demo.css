@@ -522,7 +522,9 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 }
 @media (max-width: 860px) {
   .sidebar { width: 62px; }
-  .sidebar .nav-item span, .nav-group-label { display: none; }
+  /* Collapse only the SIDEBAR's group labels — content-area labels (e.g. the
+     People view's generation headings, modal section titles) must stay visible. */
+  .sidebar .nav-item span, .sidebar .nav-group-label { display: none; }
   .debate-grid { grid-template-columns: 1fr; }
   .main { padding: 18px 16px 100px; }
 }
@@ -633,6 +635,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 /* social relations rows */
 .gp-rel { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #1d1d1d; font-size: 13px; }
 .gp-rel:last-child { border-bottom: none; }
+.gp-rel > .chip { flex-shrink: 0; }
 .gp-rel b { flex-shrink: 0; }
 .gp-rel .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gp-icon-btn { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; border: 1px solid transparent; background: transparent; color: var(--text-3); }
