@@ -47,11 +47,20 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('only academic + estudio are selectable in phase A', () => {
+test('academic + estudio + primary_sources are selectable; genealogy is not yet', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'estudio']);
-  assert.equal(vt.getVaultTypeDef('primary_sources').available, false);
+  assert.deepEqual(ids, ['academic', 'estudio', 'primary_sources']);
+  assert.equal(vt.getVaultTypeDef('primary_sources').available, true);
   assert.equal(vt.getVaultTypeDef('genealogy').available, false);
+});
+
+test('primary_sources hides argument/study surfaces but keeps ideas/authors', () => {
+  const hidden = vt.defaultHiddenViewsForType('primary_sources');
+  assert.ok(hidden.includes('argument') && hidden.includes('debate') && hidden.includes('study'));
+  for (const kept of ['ideas', 'authors', 'library', 'graph', 'notes']) {
+    assert.ok(!hidden.includes(kept), `${kept} stays visible in primary_sources`);
+  }
+  assert.match(vt.vaultTypePromptPack('primary_sources'), /FUENTES PRIMARIAS/);
 });
 
 test('academic shows the full sidebar; estudio hides research/authoring views', () => {

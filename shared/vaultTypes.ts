@@ -64,9 +64,16 @@ Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Pri
   // presets and prompt packs are filled in by those phases.
   {
     id: 'primary_sources',
-    available: false,
-    defaultHiddenViews: [],
-    promptPack: '',
+    available: true,
+    // A primary-source corpus mixes secondary literature (ideas/authors stay) with
+    // archival records (persons/timeline/archive come in via scoping). Hide the
+    // argument-debate and study surfaces that don't fit source/record work; keep
+    // gaps/coverage/deep-research (reframed by the prompt pack).
+    defaultHiddenViews: ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading'],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO FUENTES PRIMARIAS ═══
+Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padrones, actas, partidas, prensa histórica, correspondencia), no solo con literatura secundaria. Prioriza la fidelidad al documento: extrae hechos, personas, lugares, fechas y eventos tal como constan, cita siempre de forma literal y con su localización, y aplica crítica de fuentes (distingue lo que la fuente afirma de lo que se infiere). No deduzcas parentescos, identidades ni fechas que la fuente no sostenga; si un dato es incierto, dilo. Respeta la ortografía y los nombres de época.`,
   },
   {
     id: 'genealogy',

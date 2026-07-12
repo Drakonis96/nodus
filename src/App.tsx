@@ -17,6 +17,9 @@ import { SearchView } from './views/SearchView';
 import { ArgumentMapView } from './views/ArgumentMapView';
 import { IdeasView } from './views/IdeasView';
 import { AuthorsView } from './views/AuthorsView';
+import { PersonasView } from './views/PersonasView';
+import { TimelineView } from './views/TimelineView';
+import { ArchiveView } from './views/ArchiveView';
 import { StudyGuideView } from './views/StudyGuideView';
 import { ImmersionView } from './views/ImmersionView';
 import { Settings } from './views/Settings';
@@ -41,7 +44,7 @@ import type {
   View,
 } from './navigation';
 import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
-import { effectiveSidebarHidden } from '@shared/vaultTypes';
+import { effectiveSidebarHidden, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 
@@ -93,14 +96,25 @@ export function App() {
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
   // pinned first and Settings last, both outside every group and never hidden.
-  const navGroups = useMemo(
-    () =>
-      groupedNav(
-        settings?.sidebarOrder ?? [],
-        effectiveSidebarHidden(settings?.sidebarHidden ?? [], settings?.sidebarCustomized ?? false, activeVault?.type)
-      ),
-    [settings?.sidebarOrder, settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type]
-  );
+  const navGroups = useMemo(() => {
+    const hidden = effectiveSidebarHidden(
+      settings?.sidebarHidden ?? [],
+      settings?.sidebarCustomized ?? false,
+      activeVault?.type
+    );
+    // Views scoped to other vault types are removed outright (not user-toggleable here).
+    const disallowed = viewsDisallowedForType(
+      NAV_ITEMS.map((n) => n.id),
+      activeVault?.type
+    );
+    return groupedNav(settings?.sidebarOrder ?? [], [...hidden, ...disallowed]);
+  }, [settings?.sidebarOrder, settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type]);
+
+  // If the active vault type doesn't allow the current view (e.g. switching from a
+  // primary-source vault to an academic one while on Personas), fall back to Home.
+  useEffect(() => {
+    if (activeVault && !isViewAllowedForVaultType(view, activeVault.type)) setView('home');
+  }, [activeVault?.type, view]);
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -496,6 +510,9 @@ export function App() {
           {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'persons' && <PersonasView />}
+          {view === 'timeline' && <TimelineView />}
+          {view === 'archive' && <ArchiveView />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}

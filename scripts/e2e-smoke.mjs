@@ -181,6 +181,46 @@ try {
   const authorsGraph = await page.evaluate(() => window.nodus.getGraph('authors'));
   assert.ok(Array.isArray(authorsGraph.nodes), 'authors lens answers too');
 
+  // ── Records ontology + evidence archive over real IPC ───────────────────────
+  const records = await page.evaluate(async () => {
+    const juan = await window.nodus.createPerson({ displayName: 'Juan Pérez', sex: 'male', birthDate: 'c. 1850' });
+    const place = await window.nodus.findOrCreatePlace('Sevilla', 'municipality');
+    const event = await window.nodus.createEvent({
+      type: 'marriage',
+      date: '1875',
+      placeId: place.placeId,
+      participants: [{ personId: juan.personId, role: 'principal' }],
+    });
+    await window.nodus.addRecordEvidence({
+      targetKind: 'person',
+      targetId: juan.personId,
+      quote: 'Juan Pérez, jornalero',
+      location: 'p. 1',
+    });
+    const folder = await window.nodus.createArchiveFolder('Censos', null);
+    const item = await window.nodus.createArchiveItem({
+      folderId: folder.folderId,
+      title: 'Hoja censal',
+      kind: 'image',
+      extractedText: 'Juan Pérez jornalero',
+      tags: ['censo'],
+    });
+    return {
+      persons: (await window.nodus.listPersons()).length,
+      events: (await window.nodus.listEvents({ personId: juan.personId })).length,
+      evidence: (await window.nodus.listRecordEvidence('person', juan.personId)).length,
+      placeName: (await window.nodus.getEvent(event.eventId)).placeName,
+      archiveItems: (await window.nodus.listArchiveItems({ tag: 'censo' })).length,
+      hasBlobFlag: item.hasBlob,
+    };
+  });
+  assert.equal(records.persons, 1, 'person created over IPC');
+  assert.equal(records.events, 1, 'event linked to the person');
+  assert.equal(records.evidence, 1, 'record evidence attached');
+  assert.equal(records.placeName, 'Sevilla', 'event resolves its place');
+  assert.equal(records.archiveItems, 1, 'archive item created + tag-filtered');
+  console.log('[e2e] records ontology + archive ok over IPC');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

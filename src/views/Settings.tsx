@@ -7,6 +7,7 @@ import type {
   ModelInfo,
   UpdateProgressEvent,
   VaultSummary,
+  VaultType,
 } from '@shared/types';
 import { ProvidersSettings } from './ProvidersSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -16,7 +17,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
-import { effectiveSidebarHidden } from '@shared/vaultTypes';
+import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
 
@@ -461,6 +462,7 @@ export function Settings({
             <SidebarOrderEditor
               sidebarOrder={settings.sidebarOrder}
               sidebarHidden={effectiveSidebarHidden(settings.sidebarHidden, settings.sidebarCustomized, activeVault?.type)}
+              vaultType={activeVault?.type}
               onReorder={(ids) => void patch({ sidebarOrder: ids })}
               onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden, sidebarCustomized: true })}
             />
@@ -1234,15 +1236,19 @@ function ConnectionValue({ label, value, copied, onCopy }: { label: string; valu
 function SidebarOrderEditor({
   sidebarOrder,
   sidebarHidden,
+  vaultType,
   onReorder,
   onToggleHidden,
 }: {
   sidebarOrder: string[];
   sidebarHidden: string[];
+  vaultType: VaultType | undefined;
   onReorder: (ids: string[]) => void;
   onToggleHidden: (hidden: string[]) => void;
 }) {
-  const orderedAll = orderedNav(sidebarOrder).filter((n) => n.id !== 'home' && n.id !== 'settings');
+  const orderedAll = orderedNav(sidebarOrder).filter(
+    (n) => n.id !== 'home' && n.id !== 'settings' && isViewAllowedForVaultType(n.id, vaultType)
+  );
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: orderedAll.filter((n) => n.group === g.id) }));
   const hidden = new Set(sidebarHidden);
   const [draggingId, setDraggingId] = useState<string | null>(null);

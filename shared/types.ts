@@ -3517,6 +3517,7 @@ export interface NodusApi {
   listArchiveItems(opts?: { folderId?: string | null; tag?: string; search?: string }): Promise<ArchiveItem[]>;
   getArchiveItem(id: string): Promise<ArchiveItem | null>;
   getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
+  createArchiveItem(input: ArchiveItemInput): Promise<ArchiveItem>;
   updateArchiveItem(id: string, patch: Partial<ArchiveItemInput>): Promise<ArchiveItem | null>;
   deleteArchiveItem(id: string): Promise<void>;
   addArchiveTag(id: string, tag: string): Promise<void>;

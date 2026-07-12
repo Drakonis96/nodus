@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'archive' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -42,6 +42,10 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'argument', label: 'Mapa de argumentos', icon: 'map', group: 'explore' },
   { id: 'ideas', label: 'Ideas', icon: 'bulb', group: 'explore' },
   { id: 'authors', label: 'Autores', icon: 'graduation', group: 'explore' },
+  // Records views — shown only for primary-source / genealogy vaults (see VAULT_TYPE_SCOPED_VIEWS).
+  { id: 'persons', label: 'Personas', icon: 'users', group: 'explore' },
+  { id: 'timeline', label: 'Línea temporal', icon: 'clock', group: 'explore' },
+  { id: 'archive', label: 'Archivo', icon: 'archive', group: 'explore' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },

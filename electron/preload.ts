@@ -62,6 +62,7 @@ const api: NodusApi = {
   listArchiveItems: (opts) => ipcRenderer.invoke('archive:listItems', opts),
   getArchiveItem: (id) => ipcRenderer.invoke('archive:getItem', id),
   getArchiveItemBlob: (id) => ipcRenderer.invoke('archive:getItemBlob', id),
+  createArchiveItem: (input) => ipcRenderer.invoke('archive:createItem', input),
   updateArchiveItem: (id, patch) => ipcRenderer.invoke('archive:updateItem', id, patch),
   deleteArchiveItem: (id) => ipcRenderer.invoke('archive:deleteItem', id).then(() => undefined),
   addArchiveTag: (id, tag) => ipcRenderer.invoke('archive:addTag', id, tag).then(() => undefined),
