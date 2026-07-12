@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 35;
+export const SCHEMA_VERSION = 36;
 
 export const migrations: Migration[] = [
   {
@@ -1160,6 +1160,24 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_relationships_from ON relationships(from_person, type);
       CREATE INDEX idx_relationships_to ON relationships(to_person, type);
+    `,
+  },
+  {
+    version: 36,
+    up: /* sql */ `
+      -- Person portraits: a photo the user attaches (faces on the tree matter to a
+      -- genealogist). Stored in its own table so person list queries never load the
+      -- blob. The focal point (focus_x/y in 0..1 + scale) is non-destructive framing
+      -- metadata — the original bytes are never cropped. Travels in backups/.nodussync.
+      CREATE TABLE person_portraits (
+        person_id  TEXT PRIMARY KEY REFERENCES persons(person_id) ON DELETE CASCADE,
+        blob       BLOB NOT NULL,
+        mime       TEXT NOT NULL DEFAULT 'image/jpeg',
+        focus_x    REAL NOT NULL DEFAULT 0.5,
+        focus_y    REAL NOT NULL DEFAULT 0.5,
+        scale      REAL NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL
+      );
     `,
   },
 ];

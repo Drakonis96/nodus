@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { HistoricalEvent, Person, PersonSex, RecordEvidence } from '@shared/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { HistoricalEvent, Person, PersonSex, PortraitFocus, RecordEvidence } from '@shared/types';
 import { Icon } from '../components/ui';
+import { PersonPortrait } from '../components/PersonPortrait';
 import { t } from '../i18n';
 
 const SEX_LABEL: Record<PersonSex, string> = {
@@ -129,9 +130,7 @@ function PersonDetail({ person, onChanged, onClose }: { person: Person; onChange
   return (
     <div className="space-y-5 p-6">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-neutral-800">
-          <Icon name="user" size={22} className="text-neutral-300" />
-        </div>
+        <PortraitEditor person={person} onChanged={onChanged} />
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-semibold">{person.displayName}</h2>
           <p className="text-sm text-neutral-400">
@@ -213,6 +212,99 @@ export const EVENT_TYPE_LABEL: Record<string, string> = {
   occupation: 'Ocupación',
   other: 'Otro',
 };
+
+/** Portrait with upload, drag-to-focus and zoom. Framing is non-destructive. */
+function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [focus, setFocus] = useState<PortraitFocus>(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
+  const dragging = useRef<{ x: number; y: number } | null>(null);
+  const SIZE = 48;
+
+  useEffect(() => {
+    setFocus(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
+  }, [person.personId, person.portrait?.focusX, person.portrait?.focusY, person.portrait?.scale]);
+
+  const upload = async () => {
+    const updated = await window.nodus.setPersonPortraitFromFile(person.personId);
+    if (updated) {
+      await onChanged();
+      setEditing(true);
+    }
+  };
+
+  const remove = async () => {
+    await window.nodus.clearPersonPortrait(person.personId);
+    setEditing(false);
+    await onChanged();
+  };
+
+  const persistFocus = async (next: PortraitFocus) => {
+    setFocus(next);
+    await window.nodus.updatePortraitFocus(person.personId, next);
+  };
+
+  // Drag the photo: moving right reveals the left side (focusX decreases).
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!person.portrait) return;
+    dragging.current = { x: e.clientX, y: e.clientY };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging.current) return;
+    const dx = (e.clientX - dragging.current.x) / SIZE;
+    const dy = (e.clientY - dragging.current.y) / SIZE;
+    dragging.current = { x: e.clientX, y: e.clientY };
+    setFocus((f) => ({
+      ...f,
+      focusX: Math.min(1, Math.max(0, f.focusX - dx)),
+      focusY: Math.min(1, Math.max(0, f.focusY - dy)),
+    }));
+  };
+  const onPointerUp = () => {
+    if (dragging.current) {
+      dragging.current = null;
+      void window.nodus.updatePortraitFocus(person.personId, focus);
+    }
+  };
+
+  return (
+    <div className="shrink-0">
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        title={person.portrait ? t('Arrastra para encuadrar la cara') : t('Sube una foto')}
+        style={{ cursor: person.portrait ? 'grab' : 'pointer', touchAction: 'none' }}
+        onClick={() => (person.portrait ? setEditing((v) => !v) : void upload())}
+      >
+        {/* Live preview reflects the in-progress focus while dragging. */}
+        <PersonPortrait person={{ ...person, portrait: person.portrait ? focus : null }} size={SIZE} />
+      </div>
+      {editing && person.portrait && (
+        <div className="mt-2 w-40 space-y-1.5 rounded-md border border-neutral-800 bg-neutral-950 p-2 text-xs">
+          <label className="block text-neutral-500">{t('Zoom')}</label>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.05}
+            value={focus.scale}
+            onChange={(e) => void persistFocus({ ...focus, scale: Number(e.target.value) })}
+            className="w-full"
+          />
+          <div className="flex gap-2 pt-1">
+            <button className="btn btn-ghost h-7 flex-1 border border-neutral-700 px-1" onClick={() => void upload()}>
+              {t('Cambiar')}
+            </button>
+            <button className="btn btn-ghost h-7 flex-1 border border-neutral-700 px-1 text-red-300" onClick={() => void remove()}>
+              {t('Quitar')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState('');

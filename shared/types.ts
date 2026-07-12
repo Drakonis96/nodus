@@ -794,6 +794,13 @@ export interface PersonName {
   kind: string | null;
 }
 
+/** Non-destructive framing of a person's portrait; the original bytes are untouched. */
+export interface PortraitFocus {
+  focusX: number;
+  focusY: number;
+  scale: number;
+}
+
 export interface Person {
   personId: string;
   displayName: string;
@@ -804,6 +811,8 @@ export interface Person {
   notes: string | null;
   /** Name variants / spellings across records. */
   names: PersonName[];
+  /** Portrait framing when a photo is attached; null when there is none. */
+  portrait: PortraitFocus | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3526,6 +3535,10 @@ export interface NodusApi {
   updatePerson(id: string, patch: Partial<PersonInput>): Promise<Person | null>;
   deletePerson(id: string): Promise<void>;
   addPersonName(id: string, name: string, kind?: string | null): Promise<void>;
+  setPersonPortraitFromFile(personId: string): Promise<Person | null>;
+  getPersonPortrait(personId: string): Promise<{ blob: Uint8Array; mime: string } | null>;
+  updatePortraitFocus(personId: string, focus: PortraitFocus): Promise<void>;
+  clearPersonPortrait(personId: string): Promise<void>;
   listPlaces(): Promise<Place[]>;
   createPlace(input: PlaceInput): Promise<Place>;
   findOrCreatePlace(name: string, kind?: string | null): Promise<Place>;

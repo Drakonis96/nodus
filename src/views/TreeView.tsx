@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Person, Relationship, RelationshipType } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { Icon } from '../components/ui';
+import { PersonPortrait } from '../components/PersonPortrait';
 import { t } from '../i18n';
 
 const NODE_W = 160;
@@ -147,10 +148,18 @@ export function TreeView() {
                   strokeWidth={isFocus || isSel ? 2 : 1}
                 />
                 <rect width={4} height={NODE_H} rx={2} fill={sexColor} />
-                <text x={14} y={26} fill="#e4e4e7" fontSize={13} fontWeight={600}>
-                  {p.displayName.length > 20 ? `${p.displayName.slice(0, 19)}…` : p.displayName}
+                {p.portrait && (
+                  <foreignObject x={12} y={11} width={42} height={42}>
+                    <PersonPortrait person={p} size={42} />
+                  </foreignObject>
+                )}
+                <text x={p.portrait ? 64 : 14} y={26} fill="#e4e4e7" fontSize={13} fontWeight={600}>
+                  {(() => {
+                    const max = p.portrait ? 12 : 20;
+                    return p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName;
+                  })()}
                 </text>
-                <text x={14} y={46} fill="#a1a1aa" fontSize={11}>
+                <text x={p.portrait ? 64 : 14} y={46} fill="#a1a1aa" fontSize={11}>
                   {dates(p)}
                 </text>
               </g>

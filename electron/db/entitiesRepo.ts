@@ -17,6 +17,7 @@ import type {
   Person,
   PersonInput,
   PersonName,
+  PortraitFocus,
   Place,
   PlaceInput,
   PersonSex,
@@ -43,9 +44,15 @@ interface PersonRow {
   birth_date: string | null;
   death_date: string | null;
   notes: string | null;
+  pf_focus_x: number | null;
+  pf_focus_y: number | null;
+  pf_scale: number | null;
   created_at: string;
   updated_at: string;
 }
+
+const PERSON_SELECT = `SELECT p.*, pp.focus_x AS pf_focus_x, pp.focus_y AS pf_focus_y, pp.scale AS pf_scale
+  FROM persons p LEFT JOIN person_portraits pp ON pp.person_id = p.person_id`;
 
 function personNames(personId: string): PersonName[] {
   return (
@@ -64,6 +71,10 @@ function rowToPerson(row: PersonRow): Person {
     deathDate: row.death_date,
     notes: row.notes,
     names: personNames(row.person_id),
+    portrait:
+      row.pf_focus_x != null
+        ? { focusX: row.pf_focus_x, focusY: row.pf_focus_y ?? 0.5, scale: row.pf_scale ?? 1 }
+        : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -126,7 +137,7 @@ export function updatePerson(personId: string, patch: Partial<PersonInput>): Per
 }
 
 export function getPerson(personId: string): Person | null {
-  const row = getDb().prepare('SELECT * FROM persons WHERE person_id = ?').get(personId) as PersonRow | undefined;
+  const row = getDb().prepare(`${PERSON_SELECT} WHERE p.person_id = ?`).get(personId) as PersonRow | undefined;
   return row ? rowToPerson(row) : null;
 }
 
@@ -136,13 +147,14 @@ export function listPersons(opts: { search?: string } = {}): Person[] {
   const rows = search
     ? (getDb()
         .prepare(
-          `SELECT DISTINCT p.* FROM persons p
+          `${PERSON_SELECT}
            LEFT JOIN person_names n ON n.person_id = p.person_id
            WHERE p.display_name LIKE ? OR n.name LIKE ?
+           GROUP BY p.person_id
            ORDER BY p.display_name`
         )
         .all(`%${search}%`, `%${search}%`) as PersonRow[])
-    : (getDb().prepare('SELECT * FROM persons ORDER BY display_name').all() as PersonRow[]);
+    : (getDb().prepare(`${PERSON_SELECT} ORDER BY p.display_name`).all() as PersonRow[]);
   return rows.map(rowToPerson);
 }
 
@@ -166,6 +178,41 @@ function addPersonNameInternal(personId: string, name: string, kind: string | nu
 
 export function addPersonName(personId: string, name: string, kind: string | null = null): void {
   addPersonNameInternal(personId, name, kind);
+}
+
+// ── Portraits ─────────────────────────────────────────────────────────────────
+
+export function setPersonPortrait(
+  personId: string,
+  blob: Uint8Array,
+  mime = 'image/jpeg',
+  focus: PortraitFocus = { focusX: 0.5, focusY: 0.5, scale: 1 }
+): void {
+  getDb()
+    .prepare(
+      `INSERT INTO person_portraits (person_id, blob, mime, focus_x, focus_y, scale, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(person_id) DO UPDATE SET blob = excluded.blob, mime = excluded.mime,
+         focus_x = excluded.focus_x, focus_y = excluded.focus_y, scale = excluded.scale, updated_at = excluded.updated_at`
+    )
+    .run(personId, Buffer.from(blob), mime, focus.focusX, focus.focusY, focus.scale, now());
+}
+
+export function updatePortraitFocus(personId: string, focus: PortraitFocus): void {
+  getDb()
+    .prepare('UPDATE person_portraits SET focus_x = ?, focus_y = ?, scale = ?, updated_at = ? WHERE person_id = ?')
+    .run(focus.focusX, focus.focusY, focus.scale, now(), personId);
+}
+
+export function getPersonPortrait(personId: string): { blob: Buffer; mime: string } | null {
+  const row = getDb().prepare('SELECT blob, mime FROM person_portraits WHERE person_id = ?').get(personId) as
+    | { blob: Buffer; mime: string }
+    | undefined;
+  return row ? { blob: row.blob, mime: row.mime } : null;
+}
+
+export function clearPersonPortrait(personId: string): void {
+  getDb().prepare('DELETE FROM person_portraits WHERE person_id = ?').run(personId);
 }
 
 // ── Places ───────────────────────────────────────────────────────────────────

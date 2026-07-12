@@ -113,9 +113,21 @@ try {
   const counts = repo.recordCounts();
   assert.deepEqual(counts, { persons: 2, places: 1, events: 4 });
 
+  // ── Portraits (non-destructive framing, stored out of the person row) ──────
+  assert.equal(repo.getPerson(juan.personId).portrait, null, 'no portrait initially');
+  repo.setPersonPortrait(juan.personId, Buffer.from('JPEGDATA'), 'image/jpeg', { focusX: 0.4, focusY: 0.3, scale: 1.5 });
+  const withPortrait = repo.getPerson(juan.personId);
+  assert.deepEqual(withPortrait.portrait, { focusX: 0.4, focusY: 0.3, scale: 1.5 }, 'focus surfaced without the blob');
+  assert.equal(repo.getPersonPortrait(juan.personId).blob.toString(), 'JPEGDATA', 'blob fetched on demand');
+  repo.updatePortraitFocus(juan.personId, { focusX: 0.6, focusY: 0.6, scale: 2 });
+  assert.equal(repo.getPerson(juan.personId).portrait.scale, 2, 'focus updated');
+  // Listing never carries the blob but does carry the focus.
+  assert.ok(repo.listPersons().find((p) => p.personId === juan.personId).portrait, 'list carries portrait focus');
+
   // ── Cascade delete ────────────────────────────────────────────────────────
   repo.deletePerson(juan.personId);
   assert.equal(repo.getPerson(juan.personId), null, 'person removed');
+  assert.equal(repo.getPersonPortrait(juan.personId), null, 'portrait cascades away');
   assert.equal(repo.listEvidenceFor('person', juan.personId).length, 0, 'person evidence removed');
   assert.equal(
     getDb().prepare('SELECT COUNT(*) AS c FROM event_participants WHERE person_id = ?').get(juan.personId).c,

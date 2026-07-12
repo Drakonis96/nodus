@@ -224,6 +224,10 @@ import {
   listPersons,
   deletePerson,
   addPersonName,
+  setPersonPortrait,
+  getPersonPortrait,
+  updatePortraitFocus,
+  clearPersonPortrait,
   createPlace,
   listPlaces,
   findOrCreatePlace,
@@ -478,6 +482,33 @@ export function registerIpc(
   h('entities:addPersonName', async (_e, id: string, name: string, kind?: string | null) =>
     addPersonName(id, name, kind ?? null)
   );
+  // Portraits
+  h('entities:setPersonPortraitFromFile', async (_e, personId: string) => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Elegir retrato',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const filePath = picked.filePaths[0];
+    const bytes = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mime = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.bmp' ? 'image/bmp' : ext === '.tif' || ext === '.tiff' ? 'image/tiff' : 'image/jpeg';
+    setPersonPortrait(personId, bytes, mime);
+    return getPerson(personId);
+  });
+  h('entities:getPersonPortrait', async (_e, personId: string) => getPersonPortrait(personId));
+  h('entities:updatePortraitFocus', async (
+    _e,
+    personId: string,
+    focus: { focusX: number; focusY: number; scale: number }
+  ) => {
+    updatePortraitFocus(personId, focus);
+  });
+  h('entities:clearPersonPortrait', async (_e, personId: string) => {
+    clearPersonPortrait(personId);
+  });
   h('entities:listPlaces', async () => listPlaces());
   h('entities:createPlace', async (_e, input: PlaceInput) => createPlace(input));
   h('entities:findOrCreatePlace', async (_e, name: string, kind?: string | null) => findOrCreatePlace(name, kind ?? null));
