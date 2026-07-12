@@ -495,6 +495,20 @@ export function Settings({
                 <Icon name="route" /> {t('Empezar')}
               </button>
             </div>
+            {activeVault?.type === 'genealogy' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de genealogía')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('El árbol, las fichas con evidencia, los parentescos sugeridos, la línea temporal, el archivo y el mapa.')}</p>
+                </div>
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ genealogyTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de genealogía.')))}
+                >
+                  <Icon name="tree" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>

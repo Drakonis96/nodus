@@ -268,7 +268,7 @@ import {
   unlinkItemPerson,
   listItemsForPerson,
 } from './db/archiveRepo';
-import { ingestArchiveFile } from './archive/archiveIngest';
+import { ingestArchiveFile, replaceArchiveFile } from './archive/archiveIngest';
 import { scanArchiveTextRecords, scanWorkRecords } from './ai/recordsScan';
 import { analyzeImageBytes } from './ai/imageAnalysis';
 import { generatePersonBiography } from './ai/personBiography';
@@ -733,6 +733,27 @@ export function registerIpc(
       tags: input.tags,
     })
   );
+  h('archive:replaceFile', async (_e, itemId: string) => {
+    const item = getItem(itemId);
+    if (!item) throw new Error('Elemento no encontrado.');
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Reemplazar el archivo adjunto',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx'] },
+        { name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff', 'webp', 'bmp'] },
+        { name: 'Todos los archivos', extensions: ['*'] },
+      ],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { replaced: false, item };
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? null;
+    const updated = await replaceArchiveFile(itemId, picked.filePaths[0], { ocr, visionModel });
+    if (updated) await embedArchiveItem(itemId).catch(() => false);
+    return { replaced: Boolean(updated), item: updated ?? item };
+  });
   h('archive:analyzeItem', async (_e, itemId: string) => {
     const item = getItem(itemId);
     if (!item) throw new Error('Elemento no encontrado.');

@@ -101,6 +101,7 @@ const api: NodusApi = {
   scanWorkRecords: (nodusId) => ipcRenderer.invoke('works:scanRecords', nodusId),
   scanArchiveItem: (itemId) => ipcRenderer.invoke('archive:scanItem', itemId),
   analyzeArchiveItem: (itemId) => ipcRenderer.invoke('archive:analyzeItem', itemId),
+  replaceArchiveFile: (itemId) => ipcRenderer.invoke('archive:replaceFile', itemId),
   suggestPersonsForItem: (itemId) => ipcRenderer.invoke('archive:suggestPersonsForItem', itemId),
   suggestDocumentsForPerson: (personId) => ipcRenderer.invoke('archive:suggestDocumentsForPerson', personId),
   indexArchive: () => ipcRenderer.invoke('archive:index'),

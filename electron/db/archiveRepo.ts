@@ -291,6 +291,47 @@ export function deleteItem(itemId: string): void {
   getDb().prepare('DELETE FROM archive_items WHERE item_id = ?').run(itemId);
 }
 
+/**
+ * Replace an item's attached file in place: new bytes, format, extracted text and
+ * hash, keeping its title, folder, classification, tags and person links. The stale
+ * embedding is cleared so the item re-indexes from the new text.
+ */
+export function replaceItemFile(
+  itemId: string,
+  input: {
+    fileName: string | null;
+    mimeType: string | null;
+    bytes: number;
+    blob: Uint8Array;
+    kind: ArchiveItemKind;
+    extractedText: string | null;
+    description: string | null;
+    contentHash: string | null;
+  }
+): ArchiveItem | null {
+  const existing = getItem(itemId);
+  if (!existing) return null;
+  getDb()
+    .prepare(
+      `UPDATE archive_items SET file_name = ?, mime_type = ?, bytes = ?, blob = ?, kind = ?, extracted_text = ?,
+        description = ?, content_hash = ?, embedding = NULL, embedding_model = NULL, embedding_dim = NULL,
+        embedding_text_hash = NULL, updated_at = ? WHERE item_id = ?`
+    )
+    .run(
+      input.fileName,
+      input.mimeType,
+      input.bytes,
+      Buffer.from(input.blob),
+      input.kind,
+      input.extractedText,
+      input.description ?? existing.description,
+      input.contentHash,
+      now(),
+      itemId
+    );
+  return getItem(itemId);
+}
+
 /** Return the item id whose content hash matches, if any (de-dupe on re-import). */
 export function findItemByHash(contentHash: string): string | null {
   const row = getDb().prepare('SELECT item_id FROM archive_items WHERE content_hash = ? LIMIT 1').get(contentHash) as

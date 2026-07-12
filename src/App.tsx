@@ -663,7 +663,7 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && isGenealogy && settings.demoMode && !settings.genealogyTourComplete && (
+      {settings.onboardingComplete && isGenealogy && !settings.genealogyTourComplete && (
         <GenealogyTour
           onNavigate={setView}
           onClose={async () => {

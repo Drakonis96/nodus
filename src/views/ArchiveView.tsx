@@ -14,6 +14,7 @@ import { Icon } from '../components/ui';
 import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
 import { PersonLinkPicker } from '../components/PersonLinkPicker';
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar';
+import { confirm, toast } from '../components/feedback';
 import { t } from '../i18n';
 
 const KIND_ICON: Record<ArchiveItemKind, string> = {
@@ -500,11 +501,41 @@ function ArchiveItemDetail({
     await onChanged();
   };
 
+  const [replacing, setReplacing] = useState(false);
+
   const remove = async () => {
-    if (!window.confirm(t('¿Eliminar este elemento del archivo?'))) return;
+    const ok = await confirm({
+      title: t('Eliminar del archivo'),
+      message: t('¿Eliminar «{title}» y su archivo adjunto? Esta acción no se puede deshacer.').replace('{title}', item.title),
+      confirmLabel: t('Eliminar'),
+      danger: true,
+    });
+    if (!ok) return;
     await window.nodus.deleteArchiveItem(item.itemId);
     onClose();
     await onChanged();
+  };
+
+  const replace = async () => {
+    const ok = await confirm({
+      title: t('Reemplazar el archivo adjunto'),
+      message: t('Se sustituirá el archivo de «{title}» por otro y se volverá a extraer su texto. Se conservan el título, la clasificación, las etiquetas y las personas vinculadas. ¿Continuar?').replace('{title}', item.title),
+      confirmLabel: t('Elegir archivo…'),
+    });
+    if (!ok) return;
+    setReplacing(true);
+    try {
+      const r = await window.nodus.replaceArchiveFile(item.itemId);
+      if (r.replaced) {
+        toast(t('Archivo reemplazado.'), { tone: 'success' });
+        await onChanged();
+        onClose();
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : String(err), { tone: 'error' });
+    } finally {
+      setReplacing(false);
+    }
   };
 
   const analyze = async () => {
@@ -594,6 +625,16 @@ function ArchiveItemDetail({
               title={t('Extraer personas, lugares y eventos de este documento')}
             >
               <Icon name="users" size={13} /> {scanning ? t('Analizando…') : t('Extraer personas y eventos')}
+            </button>
+          )}
+          {item.hasBlob && (
+            <button
+              className="btn btn-ghost h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
+              disabled={replacing}
+              onClick={() => void replace()}
+              title={t('Sustituir el archivo adjunto por otro (se vuelve a extraer su texto)')}
+            >
+              <Icon name="upload" size={13} /> {replacing ? t('Reemplazando…') : t('Reemplazar archivo')}
             </button>
           )}
           {(scanMsg || analyzeMsg) && <span className="text-xs text-neutral-400">{scanMsg ?? analyzeMsg}</span>}

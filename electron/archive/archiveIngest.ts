@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { extractFromPath, type OcrOptions } from '../extraction/textExtractor';
-import { createItem, findItemByHash, getItem } from '../db/archiveRepo';
+import { createItem, findItemByHash, getItem, replaceItemFile } from '../db/archiveRepo';
 import { analyzeImageBytes } from '../ai/imageAnalysis';
 import { isVisionMime } from '@shared/imageAnalysis';
 import type { ArchiveItem, ArchiveItemKind, ModelRef } from '@shared/types';
@@ -58,16 +58,19 @@ export interface IngestResult {
   duplicate: boolean;
 }
 
-/** Ingest a single file into the archive, extracting searchable text where possible. */
-export async function ingestArchiveFile(filePath: string, opts: IngestOptions = {}): Promise<IngestResult> {
+interface ExtractedFile {
+  bytes: Buffer;
+  hash: string;
+  kind: ArchiveItemKind;
+  mime: string | null;
+  extractedText: string | null;
+  description: string | null;
+}
+
+/** Read a file, extract its searchable text (and, for images, a vision description). */
+async function readAndExtract(filePath: string, opts: IngestOptions): Promise<ExtractedFile> {
   const bytes = fs.readFileSync(filePath);
   const hash = crypto.createHash('sha256').update(bytes).digest('hex');
-
-  const existingId = findItemByHash(hash);
-  if (existingId) {
-    const existing = getItem(existingId);
-    if (existing) return { item: existing, duplicate: true };
-  }
 
   let extractedText = '';
   try {
@@ -93,19 +96,52 @@ export async function ingestArchiveFile(filePath: string, opts: IngestOptions = 
     }
   }
 
+  return { bytes, hash, kind, mime, extractedText: extractedText.trim() ? extractedText : null, description };
+}
+
+/** Ingest a single file into the archive, extracting searchable text where possible. */
+export async function ingestArchiveFile(filePath: string, opts: IngestOptions = {}): Promise<IngestResult> {
+  const bytes = fs.readFileSync(filePath);
+  const hash = crypto.createHash('sha256').update(bytes).digest('hex');
+
+  const existingId = findItemByHash(hash);
+  if (existingId) {
+    const existing = getItem(existingId);
+    if (existing) return { item: existing, duplicate: true };
+  }
+
+  const extracted = await readAndExtract(filePath, opts);
   const item = createItem({
     folderId: opts.folderId ?? null,
     title: opts.title?.trim() || path.basename(filePath),
-    kind,
+    kind: extracted.kind,
     fileName: path.basename(filePath),
-    mimeType: mime,
-    bytes: bytes.length,
-    blob: bytes,
-    extractedText: extractedText.trim() ? extractedText : null,
-    description,
-    contentHash: hash,
+    mimeType: extracted.mime,
+    bytes: extracted.bytes.length,
+    blob: extracted.bytes,
+    extractedText: extracted.extractedText,
+    description: extracted.description,
+    contentHash: extracted.hash,
     docType: opts.docType ?? null,
     tags: opts.tags,
   });
   return { item, duplicate: false };
+}
+
+/**
+ * Replace the file attached to an existing item: new bytes, format and freshly
+ * extracted text, keeping the item's title, classification, tags and person links.
+ */
+export async function replaceArchiveFile(itemId: string, filePath: string, opts: IngestOptions = {}): Promise<ArchiveItem | null> {
+  const extracted = await readAndExtract(filePath, opts);
+  return replaceItemFile(itemId, {
+    fileName: path.basename(filePath),
+    mimeType: extracted.mime,
+    bytes: extracted.bytes.length,
+    blob: extracted.bytes,
+    kind: extracted.kind,
+    extractedText: extracted.extractedText,
+    description: extracted.description,
+    contentHash: extracted.hash,
+  });
 }

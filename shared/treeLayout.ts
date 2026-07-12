@@ -54,7 +54,16 @@ export interface TreeLayoutResult {
   height: number;
 }
 
-const DEFAULTS = { ancestorDepth: 3, descendantDepth: 3, nodeWidth: 160, nodeHeight: 64, hGap: 28, vGap: 88 };
+// Ancestor/descendant depth is UNLIMITED by default — a family tree should show every
+// generation it has, however deep. A caller may still pass a finite depth to focus.
+const DEFAULTS = {
+  ancestorDepth: Number.POSITIVE_INFINITY,
+  descendantDepth: Number.POSITIVE_INFINITY,
+  nodeWidth: 160,
+  nodeHeight: 64,
+  hGap: 28,
+  vGap: 88,
+};
 
 function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;

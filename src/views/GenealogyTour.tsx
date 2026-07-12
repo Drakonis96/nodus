@@ -12,7 +12,7 @@ import { TourOverlay, type TourStep } from './tourEngine';
 const STEPS: TourStep[] = [
   {
     title: 'Bienvenido al modo genealogía',
-    body: 'Estás viendo Nodus con una familia de ejemplo, los Serrano–Vidal (Andalucía, siglo XIX). Todo está poblado: árbol, personas, documentos, evidencia y sugerencias de la IA. En un minuto te enseño cada pieza. Puedes salir cuando quieras.',
+    body: 'Este es el modo genealogía de Nodus. En un minuto te enseño sus piezas: el árbol, las fichas de persona con su evidencia, las sugerencias de parentesco de la IA, la línea temporal, el archivo de documentos y el mapa. Puedes salir cuando quieras y volver a verlo desde Ajustes.',
   },
   {
     target: 'nav-tree',
@@ -62,7 +62,7 @@ const STEPS: TourStep[] = [
   },
   {
     title: 'La IA propone; tú decides',
-    body: 'Recuerda: ninguna relación entra en el árbol sin tu confirmación, cada dato lleva su evidencia y la IA nunca inventa parentescos. Cuando quieras empezar con tu propia familia, sal del modo demo desde la cabecera: se borrarán los datos de ejemplo.',
+    body: 'Recuerda: ninguna relación entra en el árbol sin tu confirmación, cada dato lleva su evidencia y la IA nunca inventa parentescos. Para empezar con tu propia familia, importa un GEDCOM desde Personas o sube tus documentos al Archivo y extrae de ellos personas y eventos.',
   },
 ];
 

@@ -3761,6 +3761,8 @@ export interface NodusApi {
   scanWorkRecords(nodusId: string): Promise<RecordsScanSummary>;
   scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
   analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
+  /** Replace an archive item's attached file (re-extracts text; keeps its links/tags). */
+  replaceArchiveFile(itemId: string): Promise<{ replaced: boolean; item: ArchiveItem | null }>;
   /** Persons whose name appears in a document's text but who are not yet linked. */
   suggestPersonsForItem(itemId: string): Promise<PersonLinkSuggestion[]>;
   /** Documents that likely concern a person (lexical + semantic), not yet linked. */

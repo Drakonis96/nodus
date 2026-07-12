@@ -57,6 +57,17 @@ test('generations: focus 0, ancestors negative, descendants positive', () => {
   assert.equal(g.child.generation, 1);
 });
 
+test('no generation limit: a deep ancestor chain is fully laid out', () => {
+  // Six generations up + six down from the focus; nothing may be pruned by default.
+  const parentEdges = [];
+  for (let i = 1; i <= 6; i++) parentEdges.push({ parent: `a${i}`, child: i === 1 ? 'focus' : `a${i - 1}` });
+  for (let i = 1; i <= 6; i++) parentEdges.push({ parent: i === 1 ? 'focus' : `d${i - 1}`, child: `d${i}` });
+  const r = computeTreeLayout({ focusId: 'focus', parentEdges, spouseEdges: [] });
+  const g = byId(r);
+  assert.equal(g.a6.generation, -6, 'sixth-generation ancestor is present, unpruned');
+  assert.equal(g.d6.generation, 6, 'sixth-generation descendant is present, unpruned');
+});
+
 test('hetero couple: adjacent, man on the left, coupleSide assigned', () => {
   const r = computeTreeLayout({
     focusId: 'h',
