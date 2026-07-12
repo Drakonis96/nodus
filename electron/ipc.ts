@@ -790,7 +790,7 @@ export function registerIpc(
   // A typed text entry (diary page, note, memoir) with no file to upload.
   h('archive:createTextEntry', async (
     _e,
-    input: { title: string; content: string; folderId?: string | null; docType?: string | null; metadata?: Record<string, string> | null; tags?: string[] }
+    input: { title: string; content: string; folderId?: string | null; docType?: string | null; metadata?: Record<string, string> | null; source?: string | null; tags?: string[] }
   ) =>
     createItem({
       title: input.title,
@@ -799,6 +799,7 @@ export function registerIpc(
       extractedText: input.content?.trim() ? input.content : null,
       docType: input.docType ?? null,
       metadata: input.metadata ?? null,
+      source: input.source ?? null,
       tags: input.tags,
     })
   );

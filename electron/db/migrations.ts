@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 44;
+export const SCHEMA_VERSION = 45;
 
 export const migrations: Migration[] = [
   {
@@ -1378,6 +1378,16 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_person_places_person ON person_places(person_id);
       CREATE INDEX idx_person_places_place ON person_places(place_id);
+    `,
+  },
+  {
+    version: 45,
+    up: /* sql */ `
+      -- Archive documents gain a free-text "source" (provenance): where the
+      -- document came from — the archive/repository, a citation, a URL, or how it
+      -- was obtained. Central to the genealogical proof standard (cite your source),
+      -- but useful for any primary-source vault. Nullable; existing rows stay null.
+      ALTER TABLE archive_items ADD COLUMN source TEXT;
     `,
   },
 ];

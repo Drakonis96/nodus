@@ -271,6 +271,20 @@ const ARCHIVE_ITEMS: DemoArchiveItem[] = [
   },
 ];
 
+// The provenance of each archive item — the "Source" field. Proper nouns, so they
+// read the same in either UI language; a repository, a fonds, or a private holding.
+const ARCHIVE_SOURCES: Record<string, string> = {
+  'demo-ait1': 'Archivo Parroquial de Santa María, Carmona · Libro de bautismos',
+  'demo-ait2': 'Archivo Parroquial de Santa María, Carmona · Libro de matrimonios',
+  'demo-ait3': 'Archivo Municipal de Carmona · Padrón municipal de 1900',
+  'demo-ait4': 'Colección familiar Serrano (documento privado)',
+  'demo-ait5': 'Colección familiar Serrano (documento privado)',
+  'demo-ait6': 'Registro Civil de Sevilla · Sección de defunciones',
+  'demo-ait7': 'Álbum fotográfico de la familia Serrano',
+  'demo-ait8': 'Archivo Parroquial de Santa María, Carmona · Libro de matrimonios',
+  'demo-ait9': 'Archivo Parroquial de Santa María, Carmona · Libro de bautismos',
+};
+
 interface DemoPersonEvidence {
   personId: string;
   itemId: string;
@@ -468,8 +482,8 @@ export function seedGenealogyDemoData(): boolean {
       now
     );
     const insItem = db.prepare(
-      `INSERT INTO archive_items (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, ?, ?)`
+      `INSERT INTO archive_items (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, source, content_hash, doc_type, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?)`
     );
     const insItemTag = db.prepare('INSERT OR IGNORE INTO archive_item_tags (item_id, tag) VALUES (?, ?)');
     const insItemPerson = db.prepare('INSERT OR IGNORE INTO archive_item_persons (item_id, person_id, created_at) VALUES (?, ?, ?)');
@@ -482,6 +496,7 @@ export function seedGenealogyDemoData(): boolean {
         it.text.length,
         it.text,
         it.description ?? null,
+        ARCHIVE_SOURCES[it.id] ?? null,
         it.docType,
         JSON.stringify(it.metadata),
         now,

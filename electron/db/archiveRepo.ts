@@ -80,6 +80,7 @@ interface ItemMetaRow {
   has_blob: number;
   extracted_text: string | null;
   description: string | null;
+  source: string | null;
   content_hash: string | null;
   doc_type: string | null;
   metadata_json: string | null;
@@ -89,7 +90,7 @@ interface ItemMetaRow {
 }
 
 const ITEM_META_COLS = `item_id, folder_id, title, kind, file_name, mime_type, bytes,
-  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, doc_type, metadata_json,
+  (blob IS NOT NULL) AS has_blob, extracted_text, description, source, content_hash, doc_type, metadata_json,
   (embedding IS NOT NULL) AS has_embedding, created_at, updated_at`;
 
 const ITEM_META_SELECT = `SELECT ${ITEM_META_COLS} FROM archive_items`;
@@ -137,6 +138,7 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     hasBlob: Boolean(row.has_blob),
     extractedText: row.extracted_text,
     description: row.description,
+    source: row.source,
     contentHash: row.content_hash,
     docType: row.doc_type,
     metadata,
@@ -171,7 +173,7 @@ export function listItemsForPerson(personId: string): ArchiveItem[] {
   const rows = getDb()
     .prepare(
       `SELECT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
-        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json,
+        (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.source, i.content_hash, i.doc_type, i.metadata_json,
         (i.embedding IS NOT NULL) AS has_embedding, i.created_at, i.updated_at
        FROM archive_items i JOIN archive_item_persons ap ON ap.item_id = i.item_id
        WHERE ap.person_id = ? ORDER BY i.updated_at DESC`
@@ -195,8 +197,8 @@ export function createItem(input: ArchiveItemInput): ArchiveItem {
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO archive_items
-        (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, source, content_hash, doc_type, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.folderId ?? null,
@@ -208,6 +210,7 @@ export function createItem(input: ArchiveItemInput): ArchiveItem {
       blob,
       input.extractedText ?? null,
       input.description ?? null,
+      input.source?.trim() || null,
       input.contentHash ?? null,
       input.docType ?? null,
       metadataJson(input.docType, input.metadata),
@@ -268,22 +271,23 @@ export function listItems(opts: ArchiveListOptions = {}): ArchiveItem[] {
 
 export function updateItem(
   itemId: string,
-  patch: Partial<Pick<ArchiveItemInput, 'title' | 'folderId' | 'description' | 'extractedText' | 'docType' | 'metadata'>>
+  patch: Partial<Pick<ArchiveItemInput, 'title' | 'folderId' | 'description' | 'source' | 'extractedText' | 'docType' | 'metadata'>>
 ): ArchiveItem | null {
   const existing = getItem(itemId);
   if (!existing) return null;
   const title = patch.title?.trim() ?? existing.title;
   const folderId = patch.folderId !== undefined ? patch.folderId : existing.folderId;
   const description = patch.description !== undefined ? patch.description : existing.description;
+  const source = patch.source !== undefined ? (patch.source?.trim() || null) : existing.source;
   const extractedText = patch.extractedText !== undefined ? patch.extractedText : existing.extractedText;
   const docType = patch.docType !== undefined ? patch.docType : existing.docType;
   // Re-sanitise against the (possibly changed) type; a type change drops stray fields.
   const metadata = patch.metadata !== undefined ? patch.metadata : existing.metadata;
   getDb()
     .prepare(
-      'UPDATE archive_items SET title = ?, folder_id = ?, description = ?, extracted_text = ?, doc_type = ?, metadata_json = ?, updated_at = ? WHERE item_id = ?'
+      'UPDATE archive_items SET title = ?, folder_id = ?, description = ?, source = ?, extracted_text = ?, doc_type = ?, metadata_json = ?, updated_at = ? WHERE item_id = ?'
     )
-    .run(title, folderId, description, extractedText, docType, metadataJson(docType, metadata), now(), itemId);
+    .run(title, folderId, description, source, extractedText, docType, metadataJson(docType, metadata), now(), itemId);
   return getItem(itemId);
 }
 

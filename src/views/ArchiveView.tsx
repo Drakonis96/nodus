@@ -349,6 +349,7 @@ function TextEntryModal({
   const [docType, setDocType] = useState<string | null>('notes');
   const [content, setContent] = useState('');
   const [metadata, setMetadata] = useState<Record<string, string>>({});
+  const [source, setSource] = useState('');
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
@@ -361,6 +362,7 @@ function TextEntryModal({
         folderId,
         docType,
         metadata,
+        source: source.trim() || null,
       });
       await onSaved();
     } finally {
@@ -385,6 +387,12 @@ function TextEntryModal({
             <DocTypeForm docType={docType} values={metadata} onChange={(k, v) => setMetadata((m) => ({ ...m, [k]: v }))} />
           </div>
         )}
+        <input
+          className="input h-9 w-full text-sm"
+          placeholder={t('Fuente (opcional): archivo, repositorio, cita, URL…')}
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+        />
         <textarea
           className="input min-h-[9rem] w-full flex-1 text-sm"
           placeholder={t('Escribe el contenido (se indexa para búsqueda)…')}
@@ -444,6 +452,7 @@ function ArchiveItemDetail({
   const [scanning, setScanning] = useState(false);
   const [scanMsg, setScanMsg] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(item.description);
+  const [source, setSource] = useState(item.source ?? '');
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState(false);
@@ -486,6 +495,14 @@ function ArchiveItemDetail({
   const saveTitle = async () => {
     if (title.trim() && title.trim() !== item.title) {
       await window.nodus.updateArchiveItem(item.itemId, { title: title.trim() });
+      await onChanged();
+    }
+  };
+
+  const saveSource = async () => {
+    const next = source.trim();
+    if (next !== (item.source ?? '')) {
+      await window.nodus.updateArchiveItem(item.itemId, { source: next || null });
       await onChanged();
     }
   };
@@ -726,6 +743,19 @@ function ArchiveItemDetail({
               )}
             </>
           )}
+
+          <div className="mb-3">
+            <h3 className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+              <Icon name="link" size={12} /> {t('Fuente')}
+            </h3>
+            <input
+              className="input h-9 w-full text-sm"
+              placeholder={t('¿De dónde procede? Archivo, repositorio, cita, URL…')}
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              onBlur={() => void saveSource()}
+            />
+          </div>
 
           <div className="mb-3">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Clasificación')}</h3>

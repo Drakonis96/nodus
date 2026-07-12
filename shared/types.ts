@@ -1147,6 +1147,9 @@ export interface ArchiveItem {
   hasBlob: boolean;
   extractedText: string | null;
   description: string | null;
+  /** Provenance of the document: where it came from — the archive/repository,
+   *  a citation, a URL, or how it was obtained. Free text; null when unrecorded. */
+  source: string | null;
   contentHash: string | null;
   /** Primary-source document type (from shared/archiveDocTypes), or null. */
   docType: string | null;
@@ -1197,6 +1200,8 @@ export interface ArchiveItemInput {
   blob?: Uint8Array | null;
   extractedText?: string | null;
   description?: string | null;
+  /** Provenance of the document (archive/repository, citation, URL…). */
+  source?: string | null;
   contentHash?: string | null;
   docType?: string | null;
   metadata?: Record<string, string> | null;
@@ -3931,6 +3936,7 @@ export interface NodusApi {
     folderId?: string | null;
     docType?: string | null;
     metadata?: Record<string, string> | null;
+    source?: string | null;
     tags?: string[];
   }): Promise<ArchiveItem>;
   /** Records lens on a Zotero library work: extract persons/places/events from its text. */

@@ -2814,6 +2814,8 @@ export const EN: Record<string, string> = {
   'Reemplazar archivo': 'Replace file',
   'Texto extraído': 'Extracted text',
   'Sin texto extraído.': 'No extracted text.',
+  '¿De dónde procede? Archivo, repositorio, cita, URL…': 'Where is it from? Archive, repository, citation, URL…',
+  'Fuente (opcional): archivo, repositorio, cita, URL…': 'Source (optional): archive, repository, citation, URL…',
   'Clasificación': 'Classification',
   'Guardar clasificación': 'Save classification',
   'Personas mencionadas en este documento': 'People mentioned in this document',

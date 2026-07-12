@@ -12,6 +12,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.0.2',
+    date: '2026-07-12',
+    highlights: [
+      {
+        es: 'El Archivo estrena un campo «Fuente» para cada documento: anota de dónde procede (el archivo o repositorio, una cita o una URL). Es la base de una buena cita genealógica y viaja con las copias de seguridad como el resto del documento.',
+        en: 'The Archive gains a “Source” field on every document: record where it came from (the archive or repository, a citation, or a URL). It’s the backbone of a good genealogical citation, and it travels with your backups like the rest of the document.',
+      },
+    ],
+  },
+  {
     version: '2.0.1',
     date: '2026-07-12',
     highlights: [
