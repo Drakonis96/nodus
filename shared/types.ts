@@ -860,6 +860,50 @@ export interface RecordEvidenceInput {
   confidence?: number | null;
 }
 
+// ── Evidence archive (phase B) ───────────────────────────────────────────────
+
+export type ArchiveItemKind = 'image' | 'csv' | 'xlsx' | 'pdf' | 'text' | 'other';
+
+export interface ArchiveFolder {
+  folderId: string;
+  name: string;
+  parentId: string | null;
+  createdAt: string;
+}
+
+/** Archive item metadata for lists — never carries the file blob. */
+export interface ArchiveItem {
+  itemId: string;
+  folderId: string | null;
+  title: string;
+  kind: ArchiveItemKind;
+  fileName: string | null;
+  mimeType: string | null;
+  bytes: number;
+  /** Whether a file blob is stored (blobs are fetched separately). */
+  hasBlob: boolean;
+  extractedText: string | null;
+  description: string | null;
+  contentHash: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ArchiveItemInput {
+  folderId?: string | null;
+  title: string;
+  kind?: ArchiveItemKind;
+  fileName?: string | null;
+  mimeType?: string | null;
+  bytes?: number;
+  blob?: Uint8Array | null;
+  extractedText?: string | null;
+  description?: string | null;
+  contentHash?: string | null;
+  tags?: string[];
+}
+
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
 export interface McpServerStatus {
   running: boolean;

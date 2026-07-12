@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 33;
+export const SCHEMA_VERSION = 34;
 
 export const migrations: Migration[] = [
   {
@@ -1090,6 +1090,51 @@ export const migrations: Migration[] = [
         created_at  TEXT NOT NULL
       );
       CREATE INDEX idx_record_evidence_target ON record_evidence(target_kind, target_id);
+    `,
+  },
+  {
+    version: 34,
+    up: /* sql */ `
+      -- Evidence archive: a Nodus-native store for the user's OWN files that Zotero
+      -- doesn't hold or can't index (record photos, census CSV/XLSX exports, scans).
+      -- The file bytes live as a BLOB in SQLite (like decorative_images) so the whole
+      -- archive travels with backups and .nodussync — genealogical evidence is
+      -- irreplaceable and must survive. Extracted text (OCR / CSV / XLSX) is stored
+      -- alongside so items are searchable and can back record entities as evidence
+      -- (record_evidence.source_kind = 'archive', nodus_id = the item_id).
+
+      CREATE TABLE archive_folders (
+        folder_id  TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        parent_id  TEXT REFERENCES archive_folders(folder_id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_folders_parent ON archive_folders(parent_id);
+
+      CREATE TABLE archive_items (
+        item_id        TEXT PRIMARY KEY,
+        folder_id      TEXT REFERENCES archive_folders(folder_id) ON DELETE SET NULL,
+        title          TEXT NOT NULL,
+        kind           TEXT NOT NULL DEFAULT 'other',
+        file_name      TEXT,
+        mime_type      TEXT,
+        bytes          INTEGER NOT NULL DEFAULT 0,
+        blob           BLOB,
+        extracted_text TEXT,
+        description    TEXT,
+        content_hash   TEXT,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_archive_items_folder ON archive_items(folder_id);
+      CREATE INDEX idx_archive_items_hash ON archive_items(content_hash);
+
+      CREATE TABLE archive_item_tags (
+        item_id TEXT NOT NULL REFERENCES archive_items(item_id) ON DELETE CASCADE,
+        tag     TEXT NOT NULL,
+        PRIMARY KEY (item_id, tag)
+      );
+      CREATE INDEX idx_archive_item_tags_tag ON archive_item_tags(tag);
     `,
   },
 ];
