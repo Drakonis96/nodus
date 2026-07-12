@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
-import { HomeView } from './views/HomeView';
+import { HomeView, GenealogyHome } from './views/HomeView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -90,6 +90,8 @@ export function App() {
   // A note the user opened from global search; the nonce re-triggers even if the
   // same note is chosen twice.
   const [noteTarget, setNoteTarget] = useState<{ id: string; nonce: number } | null>(null);
+  // A person opened from global search, to preselect in the Personas view.
+  const [personsTarget, setPersonsTarget] = useState<{ id: string; nonce: number } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -510,7 +512,18 @@ export function App() {
               recovery card here instead of blanking the whole window. key={view}
               clears the error automatically when the user switches sections. */}
           <AppErrorBoundary key={view}>
-          {view === 'home' && (
+          {view === 'home' && isGenealogy && (
+            <GenealogyHome
+              settings={settings}
+              onNavigate={(target) => navigate(target)}
+              onOpenAssistant={() => openAssistant()}
+              showDemoOffer={hasData === false && !settings.demoMode}
+              demoBusy={demoBusy}
+              onLoadDemo={loadDemo}
+              onLoadGenealogyDemo={loadGenealogyDemo}
+            />
+          )}
+          {view === 'home' && !isGenealogy && (
             <HomeView
               settings={settings}
               lastSync={lastSync}
@@ -528,16 +541,18 @@ export function App() {
           {view === 'library' && (
             <Library
               target={libraryTarget}
+              vaultType={activeVault?.type}
               onOpenCollections={() => setCollectionsOpen(true)}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
+              onOpenArchive={() => setView('archive')}
             />
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} />}
           {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
           {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
-          {view === 'persons' && <PersonasView />}
+          {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
           {view === 'timeline' && <TimelineView />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'map' && <MapView />}
@@ -584,9 +599,16 @@ export function App() {
           {view === 'projects' && <ProjectsView settings={settings} />}
           {view === 'search' && (
             <SearchView
+              vaultType={activeVault?.type}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenNote={openNoteFromSearch}
               onOpenGaps={() => setView('gaps')}
+              onOpenPerson={(id) => {
+                setPersonsTarget({ id, nonce: Date.now() });
+                setView('persons');
+              }}
+              onOpenTimeline={() => setView('timeline')}
+              onOpenArchive={() => setView('archive')}
             />
           )}
           {view === 'notes' && (

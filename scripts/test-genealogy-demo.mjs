@@ -110,6 +110,17 @@ try {
   assert.match(promptSample, /black-and-white/i, 'monochrome portrait');
   assert.match(promptSample, /No text/i, 'no-text guardrail present');
 
+  // ── Global search adapts: persons, events and archive documents are findable ──
+  const { globalSearch } = require(path.join(repoRoot, 'electron/db/searchRepo.ts'));
+  const byName = globalSearch('Serrano', 8);
+  assert.ok(byName.some((r) => r.kind === 'person'), 'search finds persons by name');
+  assert.ok(byName.some((r) => r.kind === 'person' && r.title.includes('Serrano')), 'person result carries the name');
+  const byPlace = globalSearch('Carmona', 8);
+  assert.ok(byPlace.some((r) => r.kind === 'event'), 'search finds events by place');
+  assert.ok(byPlace.some((r) => r.kind === 'archive'), 'search finds archive documents by text');
+  // A name variant is searchable too (Encarna → Encarnación).
+  assert.ok(globalSearch('Encarna', 8).some((r) => r.kind === 'person'), 'search matches a person name variant');
+
   // ── Clear restores everything ──────────────────────────────────────────────
   clearDemoData();
   assert.equal(entities.recordCounts().persons, 0, 'persons cleared');

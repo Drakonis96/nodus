@@ -16,7 +16,19 @@ import { Badge, Icon, Spinner } from '../components/ui';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { t, tx } from '../i18n';
 
-type HomeTarget = 'library' | 'graph' | 'ideas' | 'gaps' | 'reading' | 'writing' | 'settings';
+type HomeTarget =
+  | 'library'
+  | 'graph'
+  | 'ideas'
+  | 'gaps'
+  | 'reading'
+  | 'writing'
+  | 'settings'
+  | 'persons'
+  | 'tree'
+  | 'timeline'
+  | 'archive'
+  | 'map';
 
 interface HomeViewProps {
   settings: AppSettings;
@@ -140,34 +152,7 @@ export function HomeView({
       </div>
 
       {showDemoOffer && (
-        <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
-          <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
-          <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div className="flex flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-              <div className="text-sm font-medium">{t('Demo académica')}</div>
-              <p className="text-xs text-neutral-400 mt-1 flex-1">
-                {t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.')}
-              </p>
-              <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void onLoadDemo()} disabled={demoBusy}>
-                <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo académica')}
-              </button>
-            </div>
-            <div className="flex flex-col rounded-lg border border-amber-800/50 bg-amber-950/10 p-3">
-              <div className="text-sm font-medium text-amber-200">{t('Demo de genealogía')}</div>
-              <p className="text-xs text-neutral-400 mt-1 flex-1">
-                {t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.')}
-              </p>
-              <button
-                className="btn gap-1.5 mt-3 self-start border border-amber-500/50 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
-                onClick={() => void onLoadGenealogyDemo()}
-                disabled={demoBusy}
-              >
-                <Icon name="tree" /> {demoBusy ? t('Cargando…') : t('Cargar demo de genealogía')}
-              </button>
-            </div>
-          </div>
-        </section>
+        <DemoOfferCard demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} />
       )}
 
       {error && (
@@ -804,6 +789,298 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
     <div className="rounded-lg border border-neutral-800 px-3 py-2">
       <div className="text-xs text-neutral-500">{label}</div>
       <div className="text-lg font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+/** The empty-vault "load sample data" card, shared by the academic and genealogy homes. */
+export function DemoOfferCard({
+  demoBusy,
+  onLoadDemo,
+  onLoadGenealogyDemo,
+}: {
+  demoBusy: boolean;
+  onLoadDemo: () => Promise<void>;
+  onLoadGenealogyDemo: () => Promise<void>;
+}) {
+  return (
+    <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
+      <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
+      <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <div className="flex flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
+          <div className="text-sm font-medium">{t('Demo académica')}</div>
+          <p className="text-xs text-neutral-400 mt-1 flex-1">
+            {t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.')}
+          </p>
+          <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void onLoadDemo()} disabled={demoBusy}>
+            <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo académica')}
+          </button>
+        </div>
+        <div className="flex flex-col rounded-lg border border-amber-800/50 bg-amber-950/10 p-3">
+          <div className="text-sm font-medium text-amber-200">{t('Demo de genealogía')}</div>
+          <p className="text-xs text-neutral-400 mt-1 flex-1">
+            {t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.')}
+          </p>
+          <button
+            className="btn gap-1.5 mt-3 self-start border border-amber-500/50 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
+            onClick={() => void onLoadGenealogyDemo()}
+            disabled={demoBusy}
+          >
+            <Icon name="tree" /> {demoBusy ? t('Cargando…') : t('Cargar demo de genealogía')}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface GenealogyStats {
+  persons: number;
+  places: number;
+  events: number;
+  relationships: number;
+  archiveItems: number;
+  folders: number;
+  suggestions: number;
+  indexed: number;
+  indexTotal: number;
+}
+
+/**
+ * The Home dashboard for a genealogy vault. Replaces the Zotero/graph/idea status of
+ * the academic home with the family-history workflow: people, the tree, the timeline,
+ * the evidence archive and the AI's pending kinship suggestions, each linking to its
+ * view, plus a next-step recommendation shaped for genealogists.
+ */
+export function GenealogyHome({
+  settings,
+  onNavigate,
+  onOpenAssistant,
+  showDemoOffer,
+  demoBusy,
+  onLoadDemo,
+  onLoadGenealogyDemo,
+}: {
+  settings: AppSettings;
+  onNavigate: (target: HomeTarget) => void;
+  onOpenAssistant: () => void;
+  showDemoOffer: boolean;
+  demoBusy: boolean;
+  onLoadDemo: () => Promise<void>;
+  onLoadGenealogyDemo: () => Promise<void>;
+}) {
+  const [stats, setStats] = useState<GenealogyStats | null>(null);
+
+  const reload = useCallback(async () => {
+    const [counts, archive, relationships, suggestions, index] = await Promise.all([
+      window.nodus.recordCounts(),
+      window.nodus.archiveCounts(),
+      window.nodus.allRelationships(),
+      window.nodus.kinSuggestionCount(),
+      window.nodus.archiveIndexStatus(),
+    ]);
+    setStats({
+      persons: counts.persons,
+      places: counts.places,
+      events: counts.events,
+      relationships: relationships.length,
+      archiveItems: archive.items,
+      folders: archive.folders,
+      suggestions,
+      indexed: index.indexed,
+      indexTotal: index.total,
+    });
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+  useDataRefresh(reload);
+
+  const s = stats;
+  const empty = !!s && s.persons === 0 && s.archiveItems === 0;
+  const recommendation = ((): { title: string; body: string; target: HomeTarget; icon: string; label: string; secondary?: { target: HomeTarget; icon: string; label: string } } => {
+    if (!s || empty) {
+      return {
+        title: t('Empieza tu árbol genealógico'),
+        body: t('Importa un árbol GEDCOM (desde Gramps, Ancestry…) en Personas, o sube tus documentos —partidas, censos, cartas— al Archivo y extrae de ellos personas y eventos.'),
+        target: 'persons',
+        icon: 'users',
+        label: t('Ir a Personas'),
+        secondary: { target: 'archive', icon: 'archive', label: t('Abrir Archivo') },
+      };
+    }
+    if (s.suggestions > 0) {
+      return {
+        title: tx('Revisa {n} parentesco(s) sugerido(s)', { n: s.suggestions }),
+        body: t('La IA ha propuesto vínculos de parentesco a partir de la evidencia de tus fuentes. Confírmalos o descártalos: nada entra en el árbol sin tu visto bueno.'),
+        target: 'persons',
+        icon: 'tree',
+        label: t('Revisar parentescos'),
+        secondary: { target: 'tree', icon: 'tree', label: t('Ver árbol') },
+      };
+    }
+    if (s.indexTotal > 0 && s.indexed < s.indexTotal) {
+      return {
+        title: t('Indexa el archivo para descubrir vínculos'),
+        body: t('Hay documentos sin indexar. Indexarlos permite descubrir qué fuente trata sobre qué persona, también por significado y no solo por nombre.'),
+        target: 'archive',
+        icon: 'archive',
+        label: t('Abrir Archivo'),
+        secondary: { target: 'tree', icon: 'tree', label: t('Ver árbol') },
+      };
+    }
+    return {
+      title: t('Explora tu árbol y su línea temporal'),
+      body: t('Recorre el árbol, abre la ficha de cada persona con su evidencia citada, sigue la línea temporal de la familia o pregúntale al asistente por un antepasado.'),
+      target: 'tree',
+      icon: 'tree',
+      label: t('Ver árbol'),
+      secondary: { target: 'timeline', icon: 'clock', label: t('Línea temporal') },
+    };
+  })();
+
+  return (
+    <div className="h-full overflow-y-auto p-6">
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
+        <p className="text-sm text-neutral-400 mt-1">
+          {t('Tu historia familiar: personas, árbol, línea temporal y archivo de evidencias.')}
+        </p>
+      </div>
+
+      {showDemoOffer && (
+        <DemoOfferCard demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} />
+      )}
+
+      <section className="card p-4 mb-4">
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="flex-1 min-w-[18rem]">
+            <div className="text-xs uppercase text-neutral-500 mb-1">{t('Siguiente paso recomendado')}</div>
+            <h2 className="text-lg font-semibold">{recommendation.title}</h2>
+            <p className="text-sm text-neutral-400 mt-1 max-w-2xl">{recommendation.body}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onOpenAssistant}>
+              <Icon name="chat" /> {t('Asistente')}
+            </button>
+            {recommendation.secondary && (
+              <button
+                className="btn btn-ghost border border-neutral-700 gap-1.5"
+                onClick={() => onNavigate(recommendation.secondary!.target)}
+              >
+                <Icon name={recommendation.secondary.icon} /> {recommendation.secondary.label}
+              </button>
+            )}
+            <button className="btn btn-primary gap-1.5" onClick={() => onNavigate(recommendation.target)}>
+              <Icon name={recommendation.icon} /> {recommendation.label}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <StatusCard
+          title={t('Personas')}
+          icon="users"
+          tone="indigo"
+          metric={s?.persons ?? 0}
+          metricLabel={t('personas')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Abrir')}</button>}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <MiniMetric label={t('vínculos')} value={s?.relationships ?? 0} />
+            <MiniMetric label={t('lugares')} value={s?.places ?? 0} />
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">
+            {t('Cada persona reúne su parentesco, eventos, documentos y la evidencia que la respalda.')}
+          </p>
+        </StatusCard>
+
+        <StatusCard
+          title={t('Árbol genealógico')}
+          icon="tree"
+          tone="amber"
+          metric={s?.relationships ?? 0}
+          metricLabel={t('vínculos de parentesco')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('tree')}>{t('Ver árbol')}</button>}
+        >
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            <Badge>{tx('{n} personas', { n: s?.persons ?? 0 })}</Badge>
+            {s && s.suggestions > 0 ? (
+              <Badge color="amber">{tx('{n} parentescos sugeridos', { n: s.suggestions })}</Badge>
+            ) : (
+              <Badge color="green">{t('sin sugerencias pendientes')}</Badge>
+            )}
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">
+            {t('Importa o exporta GEDCOM para ir y venir de Gramps o Ancestry.')}
+          </p>
+        </StatusCard>
+
+        <StatusCard
+          title={t('Parentescos sugeridos')}
+          icon="bulb"
+          tone={s && s.suggestions > 0 ? 'amber' : 'green'}
+          metric={s?.suggestions ?? 0}
+          metricLabel={t('por revisar')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('persons')}>{t('Revisar')}</button>}
+        >
+          <p className="text-xs text-neutral-500 mt-1">
+            {s && s.suggestions > 0
+              ? t('La IA propone vínculos a partir de la evidencia; tú confirmas o descartas. Nada se añade solo.')
+              : t('La IA propondrá vínculos aquí a medida que extraigas personas y eventos de tus fuentes.')}
+          </p>
+        </StatusCard>
+
+        <StatusCard
+          title={t('Línea temporal')}
+          icon="clock"
+          tone="cyan"
+          metric={s?.events ?? 0}
+          metricLabel={t('eventos')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('timeline')}>{t('Abrir')}</button>}
+        >
+          <div className="grid grid-cols-2 gap-2">
+            <MiniMetric label={t('lugares')} value={s?.places ?? 0} />
+            <MiniMetric label={t('personas')} value={s?.persons ?? 0} />
+          </div>
+          <button className="btn btn-ghost border border-neutral-700 mt-3 w-full" onClick={() => onNavigate('map')}>
+            <Icon name="map" /> {t('Ver mapa')}
+          </button>
+        </StatusCard>
+
+        <StatusCard
+          title={t('Archivo')}
+          icon="archive"
+          tone="indigo"
+          metric={s?.archiveItems ?? 0}
+          metricLabel={t('documentos')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('archive')}>{t('Abrir')}</button>}
+        >
+          <ProgressLine label={t('indexados')} value={s?.indexed ?? 0} total={s?.indexTotal ?? 0} />
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            <Badge>{tx('{n} carpetas', { n: s?.folders ?? 0 })}</Badge>
+          </div>
+          <p className="text-xs text-neutral-500 mt-3">
+            {t('Tus fuentes primarias (partidas, censos, cartas, fotos) vinculadas a las personas.')}
+          </p>
+        </StatusCard>
+
+        <StatusCard
+          title={t('Configuración IA')}
+          icon={settings.extractionModel ? 'check' : 'alert'}
+          tone={settings.extractionModel ? 'green' : 'red'}
+          metric={settings.extractionModel ? t('lista') : t('pendiente')}
+          metricLabel={t('modelo de extracción')}
+          action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
+        >
+          <p className="text-xs text-neutral-500 mt-1">
+            {t('La IA extrae personas y eventos de tus documentos, sugiere parentescos, redacta biografías y genera retratos. Configura los modelos en Ajustes.')}
+          </p>
+        </StatusCard>
+      </div>
     </div>
   );
 }

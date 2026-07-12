@@ -20,7 +20,7 @@ function lifeSpan(p: Person): string {
   return '';
 }
 
-export function PersonasView() {
+export function PersonasView({ initialPersonId }: { initialPersonId?: { id: string; nonce: number } | null }) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -38,6 +38,14 @@ export function PersonasView() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // Preselect a person opened from global search (clears the search filter so it shows).
+  useEffect(() => {
+    if (initialPersonId?.id) {
+      setSearch('');
+      setSelectedId(initialPersonId.id);
+    }
+  }, [initialPersonId?.id, initialPersonId?.nonce]);
 
   const selected = useMemo(() => persons.find((p) => p.personId === selectedId) ?? null, [persons, selectedId]);
 
@@ -59,25 +67,28 @@ export function PersonasView() {
           <button className="btn btn-primary h-9 w-full gap-1.5" onClick={() => setAdding(true)}>
             <Icon name="plus" /> {t('Añadir persona')}
           </button>
-          <div className="flex gap-2">
-            <button
-              className="btn btn-ghost h-8 flex-1 gap-1.5 border border-neutral-700 text-xs"
-              title={t('Importar un árbol GEDCOM (Gramps, Ancestry…)')}
-              onClick={() =>
-                void window.nodus.importGedcom().then((r) => {
-                  if (r) void reload();
-                })
-              }
-            >
-              <Icon name="upload" size={13} /> {t('Importar GEDCOM')}
-            </button>
-            <button
-              className="btn btn-ghost h-8 flex-1 gap-1.5 border border-neutral-700 text-xs"
-              title={t('Exportar a GEDCOM para Gramps / Ancestry')}
-              onClick={() => void window.nodus.exportGedcom()}
-            >
-              <Icon name="download" size={13} /> {t('Exportar')}
-            </button>
+          <div className="space-y-1">
+            <div className="px-0.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">GEDCOM</div>
+            <div className="flex gap-2">
+              <button
+                className="btn btn-ghost h-8 flex-1 justify-center gap-1.5 border border-neutral-700 text-xs"
+                title={t('Importar un árbol GEDCOM (Gramps, Ancestry…)')}
+                onClick={() =>
+                  void window.nodus.importGedcom().then((r) => {
+                    if (r) void reload();
+                  })
+                }
+              >
+                <Icon name="upload" size={13} /> {t('Importar')}
+              </button>
+              <button
+                className="btn btn-ghost h-8 flex-1 justify-center gap-1.5 border border-neutral-700 text-xs"
+                title={t('Exportar a GEDCOM para Gramps / Ancestry')}
+                onClick={() => void window.nodus.exportGedcom()}
+              >
+                <Icon name="download" size={13} /> {t('Exportar')}
+              </button>
+            </div>
           </div>
           <button
             className="btn btn-ghost h-8 w-full gap-1.5 border border-neutral-700 text-xs"

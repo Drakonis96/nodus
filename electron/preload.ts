@@ -98,6 +98,7 @@ const api: NodusApi = {
   listArchiveItemsForPerson: (personId) => ipcRenderer.invoke('archive:listItemsForPerson', personId),
   pickAndIngestArchive: (folderId, docType) => ipcRenderer.invoke('archive:pickAndIngest', folderId, docType),
   createArchiveTextEntry: (input) => ipcRenderer.invoke('archive:createTextEntry', input),
+  scanWorkRecords: (nodusId) => ipcRenderer.invoke('works:scanRecords', nodusId),
   scanArchiveItem: (itemId) => ipcRenderer.invoke('archive:scanItem', itemId),
   analyzeArchiveItem: (itemId) => ipcRenderer.invoke('archive:analyzeItem', itemId),
   suggestPersonsForItem: (itemId) => ipcRenderer.invoke('archive:suggestPersonsForItem', itemId),

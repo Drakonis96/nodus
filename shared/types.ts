@@ -2213,7 +2213,18 @@ export interface CitationPreview {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The entity types the global search spans, each of which links elsewhere. */
-export type SearchResultKind = 'note' | 'idea' | 'work' | 'gap' | 'theme' | 'author' | 'passage';
+export type SearchResultKind =
+  | 'note'
+  | 'idea'
+  | 'work'
+  | 'gap'
+  | 'theme'
+  | 'author'
+  | 'passage'
+  // Records/genealogy kinds — only ever populated in primary-source & genealogy vaults.
+  | 'person'
+  | 'event'
+  | 'archive';
 
 /** A single match. `id` and the optional fields carry what the UI needs to route
  * to the right destination (graph node, work, note, gaps view, …). */
@@ -3746,6 +3757,8 @@ export interface NodusApi {
     metadata?: Record<string, string> | null;
     tags?: string[];
   }): Promise<ArchiveItem>;
+  /** Records lens on a Zotero library work: extract persons/places/events from its text. */
+  scanWorkRecords(nodusId: string): Promise<RecordsScanSummary>;
   scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
   analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
   /** Persons whose name appears in a document's text but who are not yet linked. */

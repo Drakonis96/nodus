@@ -163,7 +163,7 @@ import { getCorpusHealth } from './db/corpusHealthRepo';
 import { analyzeChapterRelations, getChapterRelations, onChapterRelationsProgress } from './ai/chapterIdeas';
 import { applyManuscriptCitation, verifyManuscriptCitations } from './ai/manuscriptVerifier';
 import { suggestGapSearch } from './ai/gapSearch';
-import { extractFromPath } from './extraction/textExtractor';
+import { extractFromPath, resolveWorkText } from './extraction/textExtractor';
 import { runDeepScan } from './ai/deepScan';
 import { summaryContentHash } from './ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from './ai/researchAssistant';
@@ -269,7 +269,7 @@ import {
   listItemsForPerson,
 } from './db/archiveRepo';
 import { ingestArchiveFile } from './archive/archiveIngest';
-import { scanArchiveTextRecords } from './ai/recordsScan';
+import { scanArchiveTextRecords, scanWorkRecords } from './ai/recordsScan';
 import { analyzeImageBytes } from './ai/imageAnalysis';
 import { generatePersonBiography } from './ai/personBiography';
 import { isVisionMime } from '@shared/imageAnalysis';
@@ -594,6 +594,31 @@ export function registerIpc(
   h('kinship:suggestionCount', async () => openSuggestionCount());
   h('kinship:confirmSuggestion', async (_e, suggestionId: string) => confirmSuggestion(suggestionId));
   h('kinship:dismissSuggestion', async (_e, suggestionId: string) => dismissSuggestion(suggestionId));
+  // Records lens on a Zotero library work (genealogy/primary-source vaults): resolve
+  // the work's text like a deep scan, then extract persons/places/events from it, so
+  // published/secondary sources feed the same tree as the evidence archive.
+  h('works:scanRecords', async (_e, nodusId: string) => {
+    const work = works.getWork(nodusId);
+    if (!work) throw new Error('Obra no encontrada.');
+    const settings = getSettings();
+    const doc = await resolveWorkText(
+      settings.zoteroUserId,
+      work.zotero_key,
+      settings.zoteroStoragePath,
+      null,
+      work.doi ?? null,
+      {
+        unpaywallEmail: settings.unpaywallEmail,
+        preferZoteroFulltext: settings.preferZoteroFulltext,
+        ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
+      },
+      work.item_type
+    );
+    if (!doc.text || !doc.text.trim()) return { persons: 0, places: 0, events: 0, evidence: 0, linked: 0, suggestions: 0, noText: true };
+    const model = settings.extractionModel ?? undefined;
+    const result = await scanWorkRecords(nodusId, doc.text, model);
+    return { ...result, noText: false };
+  });
   // Archive → person link discovery (proposals only)
   h('archive:suggestPersonsForItem', async (_e, itemId: string) => suggestPersonsForItem(itemId));
   h('archive:suggestDocumentsForPerson', async (_e, personId: string) => suggestDocumentsForPerson(personId));
