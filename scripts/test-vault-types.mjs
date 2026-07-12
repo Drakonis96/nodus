@@ -66,6 +66,22 @@ test('the tree view is scoped to genealogy only', () => {
   assert.equal(vt.isViewAllowedForVaultType('map', 'academic'), false);
 });
 
+test('genealogy hides coverage/gaps + argumentative views, keeps deep research', () => {
+  const hidden = vt.defaultHiddenViewsForType('genealogy');
+  for (const h of ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading', 'research', 'gaps', 'ideas', 'authors', 'graph']) {
+    assert.ok(hidden.includes(h), `${h} hidden in genealogy`);
+  }
+  assert.ok(!hidden.includes('deepResearch'), 'deep research stays available in genealogy');
+  assert.match(vt.vaultTypePromptPack('genealogy'), /MODO GENEALOGÍA/);
+});
+
+test('vaultTypeImagePrompt steers image aesthetics by type', () => {
+  assert.match(vt.vaultTypeImagePrompt('genealogy'), /family archive|heritage/i);
+  assert.match(vt.vaultTypeImagePrompt('primary_sources'), /archival|documentary/i);
+  assert.equal(vt.vaultTypeImagePrompt('academic'), '');
+  assert.equal(vt.vaultTypeImagePrompt('estudio'), '');
+});
+
 test('primary_sources hides argument/study surfaces but keeps ideas/authors', () => {
   const hidden = vt.defaultHiddenViewsForType('primary_sources');
   assert.ok(hidden.includes('argument') && hidden.includes('debate') && hidden.includes('study'));

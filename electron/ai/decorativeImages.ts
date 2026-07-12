@@ -10,6 +10,8 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { buildDecorativeImagePrompt, DEFAULT_DECORATIVE_IMAGE_STYLE } from '@shared/imageStyles';
+import { vaultTypeImagePrompt } from '@shared/vaultTypes';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { completeText } from './aiClient';
 import { getSettings } from '../db/settingsRepo';
 import { getApiKey } from '../secrets/secretStore';
@@ -249,7 +251,7 @@ async function runGeneration(
     if (!prompt) {
       const context = pending.visualContext || await visualContextFor(imageSource(request.entityKind, request.entityId));
       if (active.get(key) !== token) return;
-      prompt = buildDecorativeImagePrompt(pending.style, context);
+      prompt = buildDecorativeImagePrompt(pending.style, context, vaultTypeImagePrompt(getActiveVault().type));
       saveDecorativeImagePrompt(request.entityKind, request.entityId, context, prompt);
     }
     if (active.get(key) !== token) return;

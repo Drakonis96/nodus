@@ -78,13 +78,27 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
   {
     id: 'genealogy',
     available: true,
-    // Genealogy is record- and kinship-focused; hide the argumentative surfaces and
-    // the idea graph. The tree/persons/timeline/archive views come in via scoping.
-    defaultHiddenViews: ['argument', 'debate', 'ideas', 'authors', 'graph', 'study', 'immersion', 'hypothesis', 'reading'],
+    // Genealogy is record- and kinship-focused; hide the argumentative surfaces, the
+    // idea graph, and the coverage/gaps analysis. Deep Research stays (useful to trace
+    // a person across the corpus). The tree/persons/timeline/archive/map come in via
+    // scoping.
+    defaultHiddenViews: [
+      'argument',
+      'debate',
+      'ideas',
+      'authors',
+      'graph',
+      'study',
+      'immersion',
+      'hypothesis',
+      'reading',
+      'research',
+      'gaps',
+    ],
     promptPack: `
 
 ═══ CONTEXTO DEL VAULT — MODO GENEALOGÍA ═══
-Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas). Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; expón la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas.`,
+Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas, correspondencia). Tu tarea es ayudar a IDENTIFICAR personas, reconstruir su biografía y trazar vínculos de parentesco y su rastro a través del corpus. Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; cita la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas. Cuando falte un dato, dilo y sugiere qué fuente podría aportarlo.`,
   },
 ];
 
@@ -131,6 +145,18 @@ export function defaultHiddenViewsForType(value: unknown): string[] {
 
 export function vaultTypePromptPack(value: unknown): string {
   return getVaultTypeDef(value).promptPack;
+}
+
+/** A style modifier appended to generated decorative-image prompts, by vault type. */
+export function vaultTypeImagePrompt(value: unknown): string {
+  switch (normalizeVaultType(value)) {
+    case 'genealogy':
+      return 'in the atmosphere of a historical family archive, period-authentic heritage aesthetic, aged paper and restrained sepia tones';
+    case 'primary_sources':
+      return 'archival and documentary atmosphere, period-authentic, aged materials';
+    default:
+      return '';
+  }
 }
 
 /**
