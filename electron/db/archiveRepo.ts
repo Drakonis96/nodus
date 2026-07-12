@@ -5,6 +5,7 @@
 
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
+import { sanitizeDocMetadata } from '@shared/archiveDocTypes';
 import type { ArchiveFolder, ArchiveItem, ArchiveItemInput, ArchiveItemKind } from '@shared/types';
 
 function now(): string {
@@ -71,13 +72,26 @@ interface ItemMetaRow {
   extracted_text: string | null;
   description: string | null;
   content_hash: string | null;
+  doc_type: string | null;
+  metadata_json: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const ITEM_META_SELECT = `SELECT item_id, folder_id, title, kind, file_name, mime_type, bytes,
-  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, created_at, updated_at
-  FROM archive_items`;
+const ITEM_META_COLS = `item_id, folder_id, title, kind, file_name, mime_type, bytes,
+  (blob IS NOT NULL) AS has_blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at`;
+
+const ITEM_META_SELECT = `SELECT ${ITEM_META_COLS} FROM archive_items`;
+
+function parseMetadata(json: string | null): Record<string, string> | null {
+  if (!json) return null;
+  try {
+    const parsed = JSON.parse(json);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, string>) : null;
+  } catch {
+    return null;
+  }
+}
 
 function itemTags(itemId: string): string[] {
   return (
@@ -100,10 +114,19 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     extractedText: row.extracted_text,
     description: row.description,
     contentHash: row.content_hash,
+    docType: row.doc_type,
+    metadata: parseMetadata(row.metadata_json),
     tags: itemTags(row.item_id),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** Serialise sanitised metadata for a type, or null when empty. */
+function metadataJson(docType: string | null | undefined, metadata: Record<string, string> | null | undefined): string | null {
+  if (!metadata) return null;
+  const clean = sanitizeDocMetadata(docType, metadata);
+  return Object.keys(clean).length ? JSON.stringify(clean) : null;
 }
 
 export function createItem(input: ArchiveItemInput): ArchiveItem {
@@ -114,8 +137,8 @@ export function createItem(input: ArchiveItemInput): ArchiveItem {
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO archive_items
-        (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, content_hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (item_id, folder_id, title, kind, file_name, mime_type, bytes, blob, extracted_text, description, content_hash, doc_type, metadata_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.folderId ?? null,
@@ -128,6 +151,8 @@ export function createItem(input: ArchiveItemInput): ArchiveItem {
       input.extractedText ?? null,
       input.description ?? null,
       input.contentHash ?? null,
+      input.docType ?? null,
+      metadataJson(input.docType, input.metadata),
       ts,
       ts
     );
@@ -170,11 +195,11 @@ export function listItems(opts: { folderId?: string | null; tag?: string; search
   }
   const search = (opts.search ?? '').trim();
   if (search) {
-    where.push('(i.title LIKE ? OR i.extracted_text LIKE ? OR i.description LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    where.push('(i.title LIKE ? OR i.extracted_text LIKE ? OR i.description LIKE ? OR i.metadata_json LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   const sql = `SELECT DISTINCT i.item_id, i.folder_id, i.title, i.kind, i.file_name, i.mime_type, i.bytes,
-      (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.created_at, i.updated_at
+      (i.blob IS NOT NULL) AS has_blob, i.extracted_text, i.description, i.content_hash, i.doc_type, i.metadata_json, i.created_at, i.updated_at
     FROM archive_items i${join}
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
     ORDER BY i.updated_at DESC`;
@@ -183,7 +208,7 @@ export function listItems(opts: { folderId?: string | null; tag?: string; search
 
 export function updateItem(
   itemId: string,
-  patch: Partial<Pick<ArchiveItemInput, 'title' | 'folderId' | 'description' | 'extractedText'>>
+  patch: Partial<Pick<ArchiveItemInput, 'title' | 'folderId' | 'description' | 'extractedText' | 'docType' | 'metadata'>>
 ): ArchiveItem | null {
   const existing = getItem(itemId);
   if (!existing) return null;
@@ -191,9 +216,14 @@ export function updateItem(
   const folderId = patch.folderId !== undefined ? patch.folderId : existing.folderId;
   const description = patch.description !== undefined ? patch.description : existing.description;
   const extractedText = patch.extractedText !== undefined ? patch.extractedText : existing.extractedText;
+  const docType = patch.docType !== undefined ? patch.docType : existing.docType;
+  // Re-sanitise against the (possibly changed) type; a type change drops stray fields.
+  const metadata = patch.metadata !== undefined ? patch.metadata : existing.metadata;
   getDb()
-    .prepare('UPDATE archive_items SET title = ?, folder_id = ?, description = ?, extracted_text = ?, updated_at = ? WHERE item_id = ?')
-    .run(title, folderId, description, extractedText, now(), itemId);
+    .prepare(
+      'UPDATE archive_items SET title = ?, folder_id = ?, description = ?, extracted_text = ?, doc_type = ?, metadata_json = ?, updated_at = ? WHERE item_id = ?'
+    )
+    .run(title, folderId, description, extractedText, docType, metadataJson(docType, metadata), now(), itemId);
   return getItem(itemId);
 }
 

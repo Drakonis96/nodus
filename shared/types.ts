@@ -937,6 +937,10 @@ export interface ArchiveItem {
   extractedText: string | null;
   description: string | null;
   contentHash: string | null;
+  /** Primary-source document type (from shared/archiveDocTypes), or null. */
+  docType: string | null;
+  /** Optional type-specific metadata form values. */
+  metadata: Record<string, string> | null;
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -953,6 +957,8 @@ export interface ArchiveItemInput {
   extractedText?: string | null;
   description?: string | null;
   contentHash?: string | null;
+  docType?: string | null;
+  metadata?: Record<string, string> | null;
   tags?: string[];
 }
 
@@ -3605,7 +3611,15 @@ export interface NodusApi {
   addArchiveTag(id: string, tag: string): Promise<void>;
   removeArchiveTag(id: string, tag: string): Promise<void>;
   listArchiveTags(): Promise<ArchiveTagCount[]>;
-  pickAndIngestArchive(folderId?: string | null): Promise<ArchiveIngestSummary>;
+  pickAndIngestArchive(folderId?: string | null, docType?: string | null): Promise<ArchiveIngestSummary>;
+  createArchiveTextEntry(input: {
+    title: string;
+    content: string;
+    folderId?: string | null;
+    docType?: string | null;
+    metadata?: Record<string, string> | null;
+    tags?: string[];
+  }): Promise<ArchiveItem>;
   scanArchiveItem(itemId: string): Promise<RecordsScanSummary>;
   analyzeArchiveItem(itemId: string): Promise<{ unsupported: boolean; description: string | null }>;
   getMcpStatus(): Promise<McpServerStatus>;

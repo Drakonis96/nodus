@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
 
 export const migrations: Migration[] = [
   {
@@ -1195,6 +1195,19 @@ export const migrations: Migration[] = [
         created_at TEXT NOT NULL,
         PRIMARY KEY (person_a, person_b)
       );
+    `,
+  },
+  {
+    version: 38,
+    up: /* sql */ `
+      -- Genealogical/primary-source classification for archive items, separate from
+      -- the file-format kind (image/csv/pdf…). doc_type comes from the taxonomy in
+      -- shared/archiveDocTypes.ts (partida de nacimiento, diario, fotografía…), and
+      -- metadata_json holds the optional type-specific form the user fills in.
+      -- Academic/bibliographic sources are NOT archive items — they live in the
+      -- library via Zotero.
+      ALTER TABLE archive_items ADD COLUMN doc_type TEXT;
+      ALTER TABLE archive_items ADD COLUMN metadata_json TEXT;
     `,
   },
 ];

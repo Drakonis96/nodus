@@ -89,8 +89,23 @@ try {
   assert.equal(second.duplicate, true, 're-ingesting the same bytes de-dupes');
   assert.equal(second.item.itemId, first.item.itemId, 'returns the existing item');
 
+  // ── Document type + metadata form ─────────────────────────────────────────
+  const partida = repo.createItem({
+    title: 'Partida de Juan',
+    kind: 'image',
+    docType: 'birth_record',
+    metadata: { persona: 'Juan Pérez', padre: 'Pedro Pérez', inventado: 'x' }, // unknown key dropped
+  });
+  const gotPartida = repo.getItem(partida.itemId);
+  assert.equal(gotPartida.docType, 'birth_record');
+  assert.deepEqual(gotPartida.metadata, { persona: 'Juan Pérez', padre: 'Pedro Pérez' }, 'metadata sanitised to the type');
+  assert.equal(repo.listItems({ search: 'Pedro Pérez' }).length, 1, 'search hits a metadata value');
+  // Changing the type re-sanitises the metadata against the new field set.
+  repo.updateItem(partida.itemId, { docType: 'photograph' });
+  assert.equal(repo.getItem(partida.itemId).docType, 'photograph');
+
   const counts = repo.archiveCounts();
-  assert.equal(counts.items, 2, 'the image item + one CSV (dedupe prevented a third)');
+  assert.equal(counts.items, 3, 'image + CSV + partida (dedupe prevented a 4th)');
 
   // ── Cleanup path ──────────────────────────────────────────────────────────
   repo.deleteItem(item.itemId);

@@ -619,7 +619,7 @@ export function registerIpc(
     const result = await scanArchiveTextRecords(itemId, item.extractedText, model);
     return { ...result, noText: false };
   });
-  h('archive:pickAndIngest', async (_e, folderId?: string | null) => {
+  h('archive:pickAndIngest', async (_e, folderId?: string | null, docType?: string | null) => {
     const win = getWindow();
     const picked = await dialog.showOpenDialog(win ?? undefined!, {
       title: 'Añadir al archivo de evidencias',
@@ -638,13 +638,28 @@ export function registerIpc(
     let duplicates = 0;
     const items = [];
     for (const filePath of picked.filePaths) {
-      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr, visionModel });
+      const result = await ingestArchiveFile(filePath, { folderId: folderId ?? null, ocr, visionModel, docType: docType ?? null });
       if (result.duplicate) duplicates++;
       else added++;
       items.push(result.item);
     }
     return { added, duplicates, items };
   });
+  // A typed text entry (diary page, note, memoir) with no file to upload.
+  h('archive:createTextEntry', async (
+    _e,
+    input: { title: string; content: string; folderId?: string | null; docType?: string | null; metadata?: Record<string, string> | null; tags?: string[] }
+  ) =>
+    createItem({
+      title: input.title,
+      kind: 'text',
+      folderId: input.folderId ?? null,
+      extractedText: input.content?.trim() ? input.content : null,
+      docType: input.docType ?? null,
+      metadata: input.metadata ?? null,
+      tags: input.tags,
+    })
+  );
   h('archive:analyzeItem', async (_e, itemId: string) => {
     const item = getItem(itemId);
     if (!item) throw new Error('Elemento no encontrado.');

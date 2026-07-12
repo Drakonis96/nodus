@@ -46,6 +46,8 @@ export interface IngestOptions {
   title?: string;
   tags?: string[];
   ocr?: OcrOptions;
+  /** Primary-source document type applied to the ingested item. */
+  docType?: string | null;
   /** Vision model for analysing images (description + OCR). Null/undefined skips it. */
   visionModel?: ModelRef | null;
 }
@@ -102,6 +104,7 @@ export async function ingestArchiveFile(filePath: string, opts: IngestOptions = 
     extractedText: extractedText.trim() ? extractedText : null,
     description,
     contentHash: hash,
+    docType: opts.docType ?? null,
     tags: opts.tags,
   });
   return { item, duplicate: false };
