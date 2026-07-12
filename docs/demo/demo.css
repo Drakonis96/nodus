@@ -779,3 +779,9 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
   .gp-people, .gp-archive { grid-template-columns: 1fr; }
   .gen .main > .gp-viewroot > * { margin-left: 14px; margin-right: 14px; }
 }
+
+/* home card title icons (keep the bulb etc. from blowing up) */
+.gp-cardt { display: flex; align-items: center; gap: 8px; font-size: 14.5px; }
+.gp-cardt svg { width: 16px; height: 16px; flex-shrink: 0; }
+/* genealogy settings tabs use inline icons like the academic demo */
+.gen .set-tab svg { width: 14px; height: 14px; flex-shrink: 0; }

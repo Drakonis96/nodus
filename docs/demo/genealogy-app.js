@@ -163,6 +163,12 @@
     link: I('<path d="M10 14a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 10a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/>'),
     alert: I('<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/>'),
     file: I('<path d="M6 2h8l5 5v15H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v5h5"/>'),
+    key: I('<circle cx="8" cy="14" r="4.5"/><path d="m11.5 10.5 8-8M18 4l2.5 2.5M15 7l2 2"/>'),
+    palette: I('<path d="M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3 3h-2a2 2 0 0 0-1.5 3.3c.4.5.5 1.7-2.5 2.7Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>'),
+    shield: I('<path d="M12 2 4 5.5v6C4 16.5 7.5 20.6 12 22c4.5-1.4 8-5.5 8-10.5v-6L12 2Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'),
+    trash: I('<path d="M4 7h16M10 4h4M6 7l1 13h10l1-13M10 11v6M14 11v6"/>'),
+    word: I('<path d="M6 2h8l5 5v15H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"/><path d="M14 2v5h5"/><path d="m8 12 1.5 6L11 13l1.5 5L14 12"/>'),
+    sync: I('<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/>'),
   };
 
   const NAV = [
@@ -184,7 +190,77 @@
     { id: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  const state = { view: 'home', focus: 'p9', zoom: 1, person: null, note: 'n1', archiveFolder: 'all', settingsTab: 'providers' };
+  const state = { view: 'home', focus: 'p9', zoom: 1, person: null, note: 'n1', archiveFolder: 'all', settingsTab: 'providers',
+    toggles: { autoAnalyze: false, readTag: true, animations: true, ocr: true, mcp: true, word: true, autoBackup: true, prerelease: false } };
+  const sw = (key) => `<button class="switch${state.toggles[key] ? ' on' : ''}" onclick="GUI.sw('${key}',this)" role="switch" aria-checked="${!!state.toggles[key]}"></button>`;
+  const SET_TABS = [
+    ['providers', 'Providers', 'key'], ['models', 'AI models', 'wand'], ['library', 'Library', 'book'],
+    ['extraction', 'Text & OCR', 'search'], ['interface', 'Interface', 'palette'], ['integrations', 'Integrations', 'link'],
+    ['system', 'System', 'settings'], ['data', 'Data', 'download'],
+  ];
+  const SET_PANELS = {
+    providers: () => `
+      <div class="card"><h3>${ICONS.key} AI providers</h3>
+        <p class="muted small" style="margin:2px 0 10px">Bring your own key, or run fully offline with a local model. Keys are stored encrypted in your system keychain.</p>
+        ${G.settings.providers.map((p) => { const local = p.desc.includes('offline'); return `<div class="set-row">
+          <div class="set-prov"><span class="prov-badge" style="background:${local ? 'rgba(52,211,153,0.15)' : 'rgba(99,102,241,0.16)'};color:${local ? 'var(--green)' : '#a5b4fc'}">${p.name[0]}</span>
+            <div class="lbl"><b>${p.name}</b><span>${p.desc}${p.key ? ` · <span class="keymask">${p.key}</span>` : ''}</span></div></div>
+          ${p.on ? `<span class="chip"><span class="dot" style="background:var(--green)"></span>configured</span>` : `<button class="btn ghost small" onclick="GUI.toast('In the app: paste your API key (or base URL for local providers); it is validated and stored in the keychain.')">Configure</button>`}
+        </div>`; }).join('')}
+      </div>`,
+    models: () => `
+      <div class="card"><h3>${ICONS.wand} Model per task</h3>
+        <p class="muted small" style="margin:2px 0 8px">Each pipeline step can use a different model, mixing cloud and local freely. Prompts auto-size to each model's real context window.</p>
+        ${G.settings.models.map(([task, model]) => `<div class="set-row"><div class="lbl"><b>${task}</b></div><select class="select" onchange="GUI.toast('Model preference saved (demo).')"><option>${model}</option><option>claude-sonnet-5</option><option>qwen3:8b · Ollama</option><option>gpt-5.2</option><option>gemini-3-flash</option></select></div>`).join('')}
+      </div>`,
+    library: () => `
+      <div class="card"><h3>${ICONS.book} Zotero sync</h3>
+        <div class="set-row"><div class="lbl"><b>Monitored collections</b><span>Family history · Local historiography</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: a tree of your Zotero collections with per-collection monitoring.')">Choose</button></div>
+        <div class="set-row"><div class="lbl"><b>Auto-analyze new works</b><span>Off by default: sync only brings metadata until you opt in.</span></div>${sw('autoAnalyze')}</div>
+        <div class="set-row"><div class="lbl"><b>Read tag</b><span>Mark works as read via a Zotero tag ("leído").</span></div>${sw('readTag')}</div>
+      </div>`,
+    extraction: () => `
+      <div class="card"><h3>${ICONS.search} Text & OCR</h3>
+        <div class="set-row"><div class="lbl"><b>Read attached files directly</b><span>PDF, EPUB and DOCX are parsed locally — no Zotero full-text index needed.</span></div><span class="chip"><span class="dot" style="background:var(--green)"></span>always on</span></div>
+        <div class="set-row"><div class="lbl"><b>OCR for scanned records</b><span>Tesseract, local. Languages: English, Spanish.</span></div>${sw('ocr')}</div>
+        <div class="set-row"><div class="lbl"><b>Degraded-scan recovery</b><span>Auto-retry documents that only yielded an abstract.</span></div><span class="chip"><span class="dot" style="background:var(--green)"></span>automatic</span></div>
+      </div>`,
+    interface: () => `
+      <div class="card"><h3>${ICONS.palette} Interface</h3>
+        <div class="set-row"><div class="lbl"><b>Language</b><span>UI in English or Spanish.</span></div><select class="select"><option>English</option><option>Español</option></select></div>
+        <div class="set-row"><div class="lbl"><b>Theme</b></div><select class="select" onchange="GUI.toast('The desktop app switches instantly between dark and light.')"><option>Dark</option><option>Light</option></select></div>
+        <div class="set-row"><div class="lbl"><b>Tree frame</b><span>Wooden portrait frame for the whole tree.</span></div><select class="select"><option>Classic oak</option><option>Dark walnut</option><option>Gilded</option><option>Rustic</option></select></div>
+        <div class="set-row"><div class="lbl"><b>Animations</b></div>${sw('animations')}</div>
+      </div>`,
+    integrations: () => `
+      <div class="card"><h3>${ICONS.link} MCP server</h3>
+        <p class="muted small" style="margin:2px 0 8px">Query your vault from Claude or any MCP client — locally.</p>
+        <div class="set-row"><div class="lbl"><b>Enable MCP server</b><span>stdio · read tools + writing tools</span></div>${sw('mcp')}</div>
+        <div class="set-row"><div class="lbl"><b>Connection</b></div><span class="keymask">npx nodus-mcp --vault "Serrano family"</span></div>
+      </div>
+      <div class="card"><h3>Word writing copilot <span class="chip" style="margin-left:6px">beta</span></h3>
+        <p class="muted small" style="margin:2px 0 8px">A task pane inside Microsoft Word that matches each paragraph you type against the vault, live.</p>
+        <div class="set-row"><div class="lbl"><b>Local HTTPS bridge</b><span>Port 4320 · own CA, auto-renewing certificate</span></div>${sw('word')}</div>
+        <div class="set-row"><div class="lbl"><b>Install add-in</b></div><button class="btn ghost small" onclick="GUI.toast('In the app: one click drops the manifest into Word and opens the pane.')">${ICONS.word} Install in Word</button></div>
+      </div>`,
+    system: () => `
+      <div class="card"><h3>${ICONS.settings} System</h3>
+        <div class="set-row"><div class="lbl"><b>Version</b><span>Nodus 2.0.3 — up to date</span></div><button class="btn ghost small" onclick="GUI.toast('Checking… you are on the latest release (demo).')">${ICONS.sync} Check for updates</button></div>
+        <div class="set-row"><div class="lbl"><b>Pre-release channel</b></div>${sw('prerelease')}</div>
+        <div class="set-row"><div class="lbl"><b>Guided tour</b><span>Replay the onboarding walkthrough.</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: replays the interactive tour across every section.')">Replay tour</button></div>
+      </div>`,
+    data: () => `
+      <div class="card"><h3 style="display:flex;align-items:center;gap:8px">${ICONS.shield} Backups</h3>
+        <p class="muted small" style="margin:2px 0 8px">Automatic encrypted backups with grandfather-father-son rotation. Master password lives in your system keychain.</p>
+        <div class="set-row"><div class="lbl"><b>Automatic backups</b><span>Daily · keep 7 daily / 4 weekly / 6 monthly</span></div>${sw('autoBackup')}</div>
+        <div class="set-row"><div class="lbl"><b>Last backup</b><span>Today 09:12 · 3.1 MB · encrypted</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: creates an encrypted backup right now.')">Back up now</button></div>
+        <div class="set-row"><div class="lbl"><b>Sync package</b><span>Export a merge-ready .nodussync to move between machines.</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: exports a package that merges losslessly into another vault.')">Export</button></div>
+        <div class="set-row"><div class="lbl"><b>Audit ledger</b><span>Tamper-evident log of every change to the vault.</span></div><button class="btn ghost small" onclick="GUI.toast('In the app: opens the full audit trail.')">View ledger</button></div>
+      </div>
+      <div class="card danger-zone"><h3 style="color:var(--red)">Danger zone</h3>
+        <div class="set-row"><div class="lbl"><b>Reset the vault</b><span>People, events and relations are rebuilt on the next analysis.</span></div><button class="btn ghost small danger" onclick="GUI.toast('Relax — nothing is deleted in the demo. In the app this asks twice and makes a backup first.')">${ICONS.trash} Reset</button></div>
+      </div>`,
+  };
 
   // ---------- modal ----------
   function openModal(html, wide) {
@@ -234,7 +310,9 @@
       const p = personById(n.personId); if (!p) return '';
       const x = n.x + PAD, y = n.y + PAD, frameX = x + (NODE_W - FRAME_W) / 2;
       const isFocus = n.personId === state.focus;
-      const mirror = (p.sex === 'male' && n.coupleSide === 'left') || (p.sex === 'female' && n.coupleSide === 'right');
+      // Face INWARD in a couple: man's silhouette natively faces right, woman's left,
+      // so mirror the one on the "wrong" side (man on the right, woman on the left).
+      const mirror = (p.sex === 'male' && n.coupleSide === 'right') || (p.sex === 'female' && n.coupleSide === 'left');
       const nm = p.name.length > 16 ? p.name.slice(0, 15) + '…' : p.name;
       return `<g class="gp-tnode" onclick="GUI.person('${n.personId}')" ondblclick="GUI.focusTree('${n.personId}')">
         ${isFocus ? `<rect x="${frameX - 4}" y="${y - 4}" width="${FRAME_W + 8}" height="${FRAME_H + 8}" rx="16" fill="none" stroke="#818cf8" stroke-width="2.5"/>` : ''}
@@ -304,7 +382,7 @@
   const VIEWS = {
     home() {
       const links = G.relationships.length, places = 4, evc = G.events.length, docs = G.archive.length, sug = G.suggestions.length;
-      const card = (icon, title, big, unit, body, btn, extra) => `<div class="card"><div class="list-title" style="justify-content:space-between"><b style="display:flex;align-items:center;gap:8px;font-size:14.5px">${ICONS[icon]} ${title}</b><button class="btn ghost small" onclick="${btn[1]}">${btn[0]}</button></div><div class="stat" style="margin-top:8px">${big} <span class="muted" style="font-size:13px;font-weight:400">${unit}</span></div>${extra || ''}<p class="muted small" style="margin-top:8px">${body}</p></div>`;
+      const card = (icon, title, big, unit, body, btn, extra) => `<div class="card"><div class="list-title" style="justify-content:space-between"><b class="gp-cardt">${ICONS[icon]} ${title}</b><button class="btn ghost small" onclick="${btn[1]}">${btn[0]}</button></div><div class="stat" style="margin-top:8px">${big} <span class="muted" style="font-size:13px;font-weight:400">${unit}</span></div>${extra || ''}<p class="muted small" style="margin-top:8px">${body}</p></div>`;
       return `
         <h1 class="view-title" style="font-size:22px">Home</h1>
         <p class="view-sub">Your family history: people, tree, timeline and evidence archive.</p>
@@ -449,12 +527,11 @@
     },
 
     settings() {
-      const tabs = [['providers', 'AI Providers'], ['vault', 'Vault']];
-      const panel = state.settingsTab === 'vault'
-        ? `<div class="card"><h3>${ICONS.archive} Vault</h3><div class="set-row"><div class="lbl"><b>Type</b><span>Tailors the sidebar and the assistant persona</span></div><span class="chip"><span class="dot" style="background:var(--amber)"></span>Genealogy</span></div><div class="set-row"><div class="lbl"><b>Assistant persona</b><span>A genealogist: proposes kinship from evidence, following the proof standard</span></div><span class="chip">on</span></div></div>`
-        : `<div class="card"><h3>${ICONS.settings} Providers</h3>${[['Anthropic', 'Claude models · cloud', true], ['OpenAI', 'GPT models · cloud', false], ['Ollama', 'Local models · fully offline', true]].map(([n, d, on]) => `<div class="set-row"><div class="set-prov"><span class="prov-badge" style="background:${on ? 'rgba(202,138,4,0.18)' : 'var(--bg-soft)'};color:${on ? '#fde68a' : 'var(--text-3)'}">${n[0]}</span><div class="lbl"><b>${n}</b><span>${d}</span></div></div><span class="chip"><span class="dot" style="background:${on ? 'var(--green)' : 'var(--text-3)'}"></span>${on ? 'active' : 'off'}</span></div>`).join('')}</div>`;
-      return `${viewHead('settings', 'Settings', 'Everything runs locally; AI is your own key or fully offline. This is a static preview.')}
-        <div class="settings-grid"><div class="set-tabs">${tabs.map((t) => `<button class="set-tab ${state.settingsTab === t[0] ? 'active' : ''}" onclick="GUI.setTab('${t[0]}')">${ICONS.settings}<span>${t[1]}</span></button>`).join('')}</div><div>${panel}</div></div>`;
+      return `${viewHead('settings', 'Settings', 'Providers, models, Zotero, integrations, backups — everything local-first.')}
+        <div class="settings-grid">
+          <div class="set-tabs">${SET_TABS.map(([id, label, ic]) => `<button class="set-tab${state.settingsTab === id ? ' active' : ''}" onclick="GUI.setTab('${id}')">${ICONS[ic]} ${label}</button>`).join('')}</div>
+          <div id="set-panel">${(SET_PANELS[state.settingsTab] || SET_PANELS.providers)()}</div>
+        </div>`;
     },
   };
 
@@ -464,7 +541,7 @@
       <div style="display:flex;gap:16px;align-items:flex-start">
         <div class="gp-ficha-portrait">${treeFichaSVG(p)}</div>
         <div><h2 style="font-size:20px;margin:0">${esc(p.name)}</h2><p class="muted small" style="margin:2px 0 6px">${p.sex === 'female' ? 'Female' : 'Male'} · ${esc(datesOf(p))}</p><span class="chip">${esc(p.occupation || '—')}</span></div>
-        <button class="btn ghost" style="margin-left:auto;border:1px solid var(--border-soft)" onclick="GUI.person('${p.id}')">${ICONS.external} Full ficha</button>
+        <button class="btn ghost" style="margin-left:auto;border:1px solid var(--border-soft)" onclick="GUI.person('${p.id}')">${ICONS.external} Full record</button>
       </div>
       <div class="nav-group-label" style="padding-left:0;margin-top:14px">Life events (${evs.length})</div>
       ${evs.map((e) => `<div class="gp-event" ${e.source ? `onclick="GUI.archive('${e.source}')"` : ''}><span class="gp-event-dot" style="background:${EVC[e.type]}"></span><div style="flex:1;min-width:0"><div class="list-title"><b>${EVENT_LABEL[e.type] || e.type}</b> <span class="muted small">· ${esc(e.date)} · ${esc((placeById(e.placeId) || {}).name || '')}</span></div></div>${e.source ? `<span class="gp-src">${ICONS.archive}</span>` : ''}</div>`).join('') || '<p class="muted small">No events recorded.</p>'}
@@ -607,6 +684,7 @@
     setFolder(f) { state.archiveFolder = f; window.go('archive'); },
     note(id) { state.note = id; window.go('notes'); },
     setTab(id) { state.settingsTab = id; window.go('settings'); },
+    sw(key, el) { state.toggles[key] = !state.toggles[key]; el.classList.toggle('on', state.toggles[key]); el.setAttribute('aria-checked', String(state.toggles[key])); },
     relayout() { initRelations(); },
     placeToast(id) { const pl = placeById(id); toast(`${pl.name} — ${pl.region}`); },
     chat() { chat.open = true; renderChat(); },

@@ -167,6 +167,25 @@ window.GEN = {
     { id: 'n1', folder: 'Threads to chase', title: 'The Écija branch (Reyes)', body: 'Dolores Serrano (Tomás’s sister) married into Écija. The Casimiro↔Dolores marriage and their daughter Lucía are strong suggestions from the 1890 marriage + 1892 baptism — confirm and pull the full Écija parish books.\n\nLinks: [person: Dolores Serrano Campos] · [person: Lucía Reyes Serrano]', updated: '2 days ago' },
     { id: 'n2', folder: 'Threads to chase', title: '1918 — the flu', body: 'Vicente died in the 1918 epidemic in Sevilla, aged 22. Cross-check the Sevilla civil death register against the parish burial book.\n\nLinks: [person: Vicente Serrano Vidal]', updated: 'yesterday' },
   ],
+
+  settings: {
+    providers: [
+      { name: 'Anthropic', desc: 'Claude models · cloud', key: 'sk-ant-················7Kq2', on: true },
+      { name: 'OpenAI', desc: 'GPT models · cloud', key: null, on: false },
+      { name: 'Google', desc: 'Gemini models · cloud', key: null, on: false },
+      { name: 'OpenRouter', desc: 'Multi-provider gateway · cloud', key: null, on: false },
+      { name: 'DeepSeek', desc: 'DeepSeek models · cloud', key: null, on: false },
+      { name: 'Ollama', desc: 'Local models · fully offline', key: 'http://127.0.0.1:11434', on: true },
+      { name: 'LM Studio', desc: 'Local models · fully offline', key: 'http://127.0.0.1:1234', on: false },
+    ],
+    models: [
+      ['Record analysis (persons & events)', 'claude-sonnet-5'],
+      ['Family-history report', 'claude-sonnet-5'],
+      ['Biographies & summaries', 'qwen3:8b · Ollama'],
+      ['Portraits (vision)', 'gemini-3-flash'],
+      ['Embeddings (archive index)', 'nomic-embed-text · Ollama'],
+    ],
+  },
 };
 
 window.GEN_EVENT_COLORS = {
