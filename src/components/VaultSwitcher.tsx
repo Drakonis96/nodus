@@ -264,11 +264,16 @@ export function VaultSwitcher({
                   className="grid min-w-0 grid-cols-[minmax(0,1fr)_5.75rem] items-center gap-2 rounded-md border border-neutral-800 px-2 py-2"
                 >
                   <div className="min-w-0">
-                    <div className="truncate text-sm text-neutral-200">{vault.name}</div>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-sm text-neutral-200">{vault.name}</span>
+                      <span className="shrink-0 rounded-full border border-neutral-700 bg-neutral-800/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400">
+                        {vaultTypeLabel(vault.type)}
+                      </span>
+                    </div>
                     <div className="truncate text-xs text-neutral-500">{providerList(vault)}</div>
                   </div>
                   {vault.active ? (
-                    <span className="inline-flex h-8 w-full items-center justify-center rounded-md bg-indigo-600 px-2 text-xs text-white">{t('Activa')}</span>
+                    <span className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-indigo-600 px-3 text-xs font-medium text-white">{t('Activa')}</span>
                   ) : (
                     <button
                       className="btn btn-primary h-8 w-full py-1 text-xs"

@@ -21,6 +21,7 @@ import { MarkdownNotesEditor } from './MarkdownNotesEditor';
 import { RelationsSection } from './RelationsSection';
 import { PersonPlacesSection } from './PersonPlacesSection';
 import { confirm } from './feedback';
+import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
 
 const STRENGTH_STYLE: Record<string, string> = {
@@ -808,8 +809,19 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
 
   const hasPortrait = !!person.portrait;
 
+  // Dismiss the zoom / AI-generate popovers on an outside click or Escape, and
+  // when another dismissable layer opens — otherwise the little panel lingered.
+  const editorRef = useDismissableLayer<HTMLDivElement>({
+    open: adjusting || showGenerate,
+    onDismiss: () => {
+      setAdjusting(false);
+      setShowGenerate(false);
+    },
+    group: 'portrait-editor',
+  });
+
   return (
-    <div className="relative w-32 shrink-0">
+    <div className="relative w-36 shrink-0" ref={editorRef}>
       <div
         className="flex justify-center"
         onPointerDown={onPointerDown}
@@ -837,7 +849,7 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
         ) : (
           <>
             <button
-              className={`btn h-7 w-full justify-center gap-1.5 whitespace-nowrap border px-2 text-xs ${adjusting ? 'border-indigo-600 bg-indigo-900/30 text-indigo-200' : 'btn-ghost border-neutral-700'}`}
+              className={`btn min-h-7 w-full justify-center gap-1.5 border px-2 py-1 text-center text-xs leading-tight ${adjusting ? 'border-indigo-600 bg-indigo-900/30 text-indigo-200' : 'btn-ghost border-neutral-700'}`}
               onClick={() => setAdjusting((v) => !v)}
             >
               <Icon name="fit" size={12} /> {t('Ajustar encuadre')}

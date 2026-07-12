@@ -475,6 +475,44 @@
     .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
     .faq-answer { padding-left: 16px; padding-right: 16px; }
   }
+
+  /* ---------- vault modes ---------- */
+  .modes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 42px; }
+  .mode-card { display: block; padding: 24px; border-radius: 18px; border: 1px solid var(--border); background: var(--card); transition: transform .2s, border-color .2s, background .2s; }
+  .mode-card.live { cursor: pointer; }
+  .mode-card.live:hover { border-color: rgba(167,139,250,0.5); transform: translateY(-3px); background: rgba(255,255,255,0.05); }
+  .mode-card.gen.live:hover { border-color: rgba(202,138,4,0.55); }
+  .mode-card.soon { opacity: 0.7; }
+  .mode-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .mode-ic { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; background: rgba(139,92,246,0.14); color: var(--violet-2); }
+  .mode-ic svg { width: 23px; height: 23px; }
+  .mode-ic.gen { background: rgba(202,138,4,0.16); color: #fbbf24; }
+  .mode-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .mode-badge.live { color: #6ee7b7; background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.32); }
+  .mode-badge.soon { color: var(--text-2); background: rgba(255,255,255,0.05); border: 1px solid var(--border); }
+  .mode-card h3 { font-family: var(--serif); font-size: 21px; margin: 0 0 8px; font-weight: 700; }
+  .mode-card p { color: var(--text-2); font-size: 14px; margin: 0 0 14px; line-height: 1.6; }
+  .mode-try { font-size: 13.5px; font-weight: 600; color: var(--violet-2); }
+  .mode-card.gen .mode-try { color: #fbbf24; }
+
+  /* ---------- contributing ---------- */
+  .contrib-wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 52px; align-items: center; }
+  .contrib-copy .lead { margin: 0; }
+  .contrib-actions { display: flex; gap: 12px; flex-wrap: wrap; margin: 28px 0 30px; }
+  .contrib-builders-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); margin-bottom: 12px; }
+  .contrib-people { display: flex; flex-wrap: wrap; gap: 10px; min-height: 40px; }
+  .contrib-chip { display: inline-flex; align-items: center; gap: 9px; padding: 5px 14px 5px 5px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); transition: border-color .2s, transform .2s; }
+  .contrib-chip:hover { border-color: rgba(167,139,250,0.5); transform: translateY(-1px); }
+  .contrib-chip img { width: 30px; height: 30px; border-radius: 50%; background: var(--bg2); }
+  .contrib-chip .cc-t { display: flex; flex-direction: column; line-height: 1.15; }
+  .contrib-chip .cc-t b { font-size: 13px; font-weight: 600; }
+  .contrib-chip .cc-t span { font-size: 11px; color: var(--text-2); }
+  .contrib-chip.owner { border-color: rgba(167,139,250,0.5); background: rgba(139,92,246,0.08); }
+  .contrib-loading { color: var(--text-2); font-size: 13.5px; }
+  .contrib-viz { position: relative; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, rgba(139,92,246,0.05), rgba(255,255,255,0.015)); overflow: hidden; padding: 8px 8px 4px; }
+  #sand { width: 100%; height: 320px; display: block; }
+  .contrib-viz-cap { text-align: center; font-size: 12.5px; color: var(--text-2); font-style: italic; padding: 2px 0 8px; }
+  @media (max-width: 860px) { .contrib-wrap { grid-template-columns: 1fr; gap: 32px; } }
 </style>
 </head>
 <body>
@@ -483,8 +521,9 @@
   <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
   <div class="links">
     <a href="#story" class="hideS" data-i18n="nav.how">How it works</a>
+    <a href="#modes" class="hideS" data-i18n="nav.modes">Modes</a>
     <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
-    <a href="#listen" class="hideS" data-i18n="nav.listen">Listen</a>
+    <a href="#contrib" class="hideS" data-i18n="nav.contrib">Contribute</a>
     <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
     <select class="lang-select" id="lang-select" aria-label="Language"></select>
     <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
@@ -577,6 +616,44 @@
 </section>
 
 <!-- ---------- animated views ---------- -->
+<!-- ---------- vault modes ---------- -->
+<section id="modes" style="border-top:1px solid var(--border)">
+  <div class="wrap">
+    <span class="kicker" data-i18n="modes.kicker">Vault modes · new in 2.0</span>
+    <h2 class="title" data-i18n="modes.title">One engine. A mode for every kind of corpus.</h2>
+    <p class="lead" data-i18n="modes.lead">Every vault has a mode that tailors its sidebar and the AI assistant’s persona — the same graph engine underneath. Two ship today; three more are on the way. Try each shipped mode right in the demo.</p>
+    <div class="modes-grid">
+      <a class="mode-card live" href="demo/index.html">
+        <div class="mode-top"><span class="mode-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg></span><span class="mode-badge live" data-i18n="modes.available">Available</span></div>
+        <h3 data-i18n="modes.academic.t">Academic</h3>
+        <p data-i18n="modes.academic.b">Turn a Zotero library into a graph of ideas, authors, debates and gaps — then write with citations you can actually verify.</p>
+        <span class="mode-try" data-i18n="modes.academic.cta">Open the academic demo →</span>
+      </a>
+      <a class="mode-card live gen" href="demo/genealogy.html">
+        <div class="mode-top"><span class="mode-ic gen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span><span class="mode-badge live" data-i18n="modes.available">Available</span></div>
+        <h3 data-i18n="modes.genealogy.t">Genealogy</h3>
+        <p data-i18n="modes.genealogy.b">Reconstruct a family from primary sources: persons, a family tree, a timeline, an evidence archive, a real map — and an AI genealogist that proposes kinship from the evidence.</p>
+        <span class="mode-try" data-i18n="modes.genealogy.cta">Open the genealogy demo →</span>
+      </a>
+      <div class="mode-card soon">
+        <div class="mode-top"><span class="mode-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span><span class="mode-badge soon" data-i18n="modes.soon">Coming soon</span></div>
+        <h3 data-i18n="modes.primary.t">Primary Sources</h3>
+        <p data-i18n="modes.primary.b">Archival records alongside secondary literature, with source-critical extraction that stays faithful to the document.</p>
+      </div>
+      <div class="mode-card soon">
+        <div class="mode-top"><span class="mode-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><span class="mode-badge soon" data-i18n="modes.soon">Coming soon</span></div>
+        <h3 data-i18n="modes.databases.t">Databases</h3>
+        <p data-i18n="modes.databases.b">Structured datasets as first-class citizens of the graph, queryable alongside your literature.</p>
+      </div>
+      <div class="mode-card soon">
+        <div class="mode-top"><span class="mode-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg></span><span class="mode-badge soon" data-i18n="modes.soon">Coming soon</span></div>
+        <h3 data-i18n="modes.study.t">Study</h3>
+        <p data-i18n="modes.study.b">A learner’s workspace: the graph, flashcards, guided routes and self-testing, tuned for understanding over original research.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="views" style="background:var(--bg2);border-top:1px solid var(--border)">
   <div class="wrap">
     <span class="kicker" data-i18n="views.kicker">The views</span>
@@ -820,6 +897,27 @@
     <span class="kicker" data-i18n="feat.kicker">Everything inside</span>
     <h2 class="title" data-i18n="feat.title">One app. The whole research loop.</h2>
     <div class="feat-grid" id="featgrid"></div>
+  </div>
+</section>
+
+<!-- ---------- contributing ---------- -->
+<section id="contrib" style="background:var(--bg2);border-top:1px solid var(--border)">
+  <div class="wrap contrib-wrap">
+    <div class="contrib-copy">
+      <span class="kicker" data-i18n="contrib.kicker">Open source, together</span>
+      <h2 class="title" data-i18n="contrib.title">Every node counts.</h2>
+      <p class="lead" data-i18n="contrib.lead">Nodus grows one contribution at a time — like grains of sand, each one adds to the whole. A single builder started it; anyone can add the next grain.</p>
+      <div class="contrib-actions">
+        <a class="btn primary" href="https://github.com/Drakonis96/nodus/pulls" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M6 8.6v6.8M18 15.4V12a3 3 0 0 0-3-3h-3l2.4-2.4M11.4 11.4 9 9"/></svg> <span data-i18n="contrib.prs">See the pull requests</span></a>
+        <a class="btn" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg> <span data-i18n="contrib.repo">Browse the code</span></a>
+      </div>
+      <div class="contrib-builders-label" data-i18n="contrib.builders">The people building Nodus</div>
+      <div id="contrib-people" class="contrib-people"><span class="contrib-loading" data-i18n="contrib.loading">Loading contributors…</span></div>
+    </div>
+    <div class="contrib-viz">
+      <canvas id="sand" aria-hidden="true"></canvas>
+      <div class="contrib-viz-cap" data-i18n="contrib.cap">Each grain a contribution.</div>
+    </div>
   </div>
 </section>
 
@@ -1075,19 +1173,32 @@ function openDl() { dlOverlay.classList.add('open'); document.body.style.overflo
 function closeDl() { dlOverlay.classList.remove('open'); document.body.style.overflow = ''; }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDl(); });
 
-// Shields caches the public GitHub count and avoids the very small anonymous
-// GitHub API quota. Keep the current count in the HTML as a first-paint and
-// offline fallback, then refresh it here.
-fetch('https://img.shields.io/github/stars/Drakonis96/nodus.json')
-  .then((r) => r.ok ? r.json() : null)
+// Live star count. The GitHub API returns the exact current value with no CDN
+// caching, and `cache: 'no-store'` also bypasses the browser's HTTP cache — the
+// two layers that made the number look "stuck" between reloads. shields.io is
+// kept only as an offline / rate-limited fallback (it caches aggressively, so it
+// is second choice, not first). The number baked into the HTML is the first
+// paint if both fail.
+function paintStars(n) {
+  if (!Number.isFinite(n)) return;
+  document.querySelectorAll('#star-count, #site-stars').forEach((el) => {
+    el.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+    el.setAttribute('aria-label', `${n} stars on GitHub`);
+  });
+}
+fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
+  .then((r) => (r.ok ? r.json() : null))
   .then((j) => {
-    if (!j) return;
-    const n = Number(j.value);
-    if (!Number.isFinite(n)) return;
-    const count = document.getElementById('star-count');
-    count.textContent = n >= 1000 ? (n / 1000).toFixed(1) + 'k' : n;
-    count.setAttribute('aria-label', `${n} stars on GitHub`);
-  }).catch(() => {});
+    const n = j && Number(j.stargazers_count);
+    if (Number.isFinite(n)) { paintStars(n); return; }
+    throw new Error('stars unavailable');
+  })
+  .catch(() =>
+    fetch('https://img.shields.io/github/stars/Drakonis96/nodus.json?cacheSeconds=300&_=' + Date.now())
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (j) paintStars(Number(j.value)); })
+      .catch(() => {})
+  );
 
 // The download modal resolves the newest release live from the GitHub API and
 // matches assets by suffix (…-mac-arm64.dmg / …-win-x64.exe), so a new release
@@ -1403,6 +1514,110 @@ const I18N = {
   },
 };
 
+// v2.0 additions — vault modes + contributing. English lives in the HTML as the
+// default/fallback, so it needs no entry here; these are merged into the dicts above.
+const I18N_V2 = {
+  es: {
+    'nav.modes': `Modos`, 'nav.contrib': `Contribuir`,
+    'modes.kicker': `Modos de bóveda · nuevo en 2.0`, 'modes.title': `Un solo motor. Un modo para cada tipo de corpus.`,
+    'modes.lead': `Cada bóveda tiene un modo que adapta su barra lateral y la personalidad del asistente de IA — el mismo motor de grafo por debajo. Dos ya están disponibles; llegan tres más. Prueba cada modo disponible en la demo.`,
+    'modes.available': `Disponible`, 'modes.soon': `Próximamente`,
+    'modes.academic.t': `Académico`, 'modes.academic.b': `Convierte una biblioteca de Zotero en un grafo de ideas, autores, debates y huecos — y luego escribe con citas que puedes verificar de verdad.`, 'modes.academic.cta': `Abrir la demo académica →`,
+    'modes.genealogy.t': `Genealogía`, 'modes.genealogy.b': `Reconstruye una familia a partir de fuentes primarias: personas, árbol genealógico, cronología, archivo de evidencia, un mapa real — y un genealogista de IA que propone parentescos a partir de la evidencia.`, 'modes.genealogy.cta': `Abrir la demo de genealogía →`,
+    'modes.primary.t': `Fuentes primarias`, 'modes.primary.b': `Documentos de archivo junto a la literatura secundaria, con una extracción crítica de fuentes fiel al documento.`,
+    'modes.databases.t': `Bases de datos`, 'modes.databases.b': `Conjuntos de datos estructurados como ciudadanos de primera del grafo, consultables junto a tu literatura.`,
+    'modes.study.t': `Estudio`, 'modes.study.b': `El espacio del que aprende: el grafo, tarjetas, rutas guiadas y autoevaluación, pensado para comprender más que para investigar.`,
+    'contrib.kicker': `Código abierto, juntos`, 'contrib.title': `Cada nodo cuenta.`,
+    'contrib.lead': `Nodus crece de contribución en contribución — como granos de arena, cada uno suma al conjunto. Lo empezó una sola persona; cualquiera puede añadir el siguiente grano.`,
+    'contrib.prs': `Ver los pull requests`, 'contrib.repo': `Explorar el código`, 'contrib.builders': `Las personas que construyen Nodus`, 'contrib.loading': `Cargando colaboradores…`, 'contrib.cap': `Cada grano, una contribución.`, 'contrib.commits': `aportes`,
+  },
+  fr: {
+    'nav.modes': `Modes`, 'nav.contrib': `Contribuer`,
+    'modes.kicker': `Modes de coffre · nouveau en 2.0`, 'modes.title': `Un seul moteur. Un mode pour chaque type de corpus.`,
+    'modes.lead': `Chaque coffre a un mode qui adapte sa barre latérale et la personnalité de l'assistant IA — le même moteur de graphe en dessous. Deux sont disponibles ; trois autres arrivent. Essayez chaque mode disponible dans la démo.`,
+    'modes.available': `Disponible`, 'modes.soon': `Bientôt`,
+    'modes.academic.t': `Académique`, 'modes.academic.b': `Transformez une bibliothèque Zotero en un graphe d'idées, d'auteurs, de débats et de lacunes — puis écrivez avec des citations réellement vérifiables.`, 'modes.academic.cta': `Ouvrir la démo académique →`,
+    'modes.genealogy.t': `Généalogie`, 'modes.genealogy.b': `Reconstruisez une famille à partir de sources primaires : personnes, arbre généalogique, chronologie, archive de preuves, une vraie carte — et un généalogiste IA qui propose des liens de parenté à partir des preuves.`, 'modes.genealogy.cta': `Ouvrir la démo de généalogie →`,
+    'modes.primary.t': `Sources primaires`, 'modes.primary.b': `Des documents d'archives aux côtés de la littérature secondaire, avec une extraction critique des sources fidèle au document.`,
+    'modes.databases.t': `Bases de données`, 'modes.databases.b': `Des jeux de données structurés comme citoyens de plein droit du graphe, interrogeables avec votre littérature.`,
+    'modes.study.t': `Étude`, 'modes.study.b': `L'espace de l'apprenant : le graphe, des cartes mémoire, des parcours guidés et l'auto-évaluation, pensés pour comprendre plutôt que pour la recherche originale.`,
+    'contrib.kicker': `Open source, ensemble`, 'contrib.title': `Chaque nœud compte.`,
+    'contrib.lead': `Nodus grandit une contribution à la fois — comme des grains de sable, chacun s'ajoute à l'ensemble. Une seule personne l'a lancé ; chacun peut ajouter le grain suivant.`,
+    'contrib.prs': `Voir les pull requests`, 'contrib.repo': `Parcourir le code`, 'contrib.builders': `Les personnes qui construisent Nodus`, 'contrib.loading': `Chargement des contributeurs…`, 'contrib.cap': `Chaque grain, une contribution.`, 'contrib.commits': `contributions`,
+  },
+  it: {
+    'nav.modes': `Modalità`, 'nav.contrib': `Contribuisci`,
+    'modes.kicker': `Modalità del vault · novità nella 2.0`, 'modes.title': `Un solo motore. Una modalità per ogni tipo di corpus.`,
+    'modes.lead': `Ogni vault ha una modalità che adatta la barra laterale e la personalità dell'assistente IA — con lo stesso motore a grafo sotto. Due sono già disponibili; altre tre in arrivo. Prova ogni modalità disponibile nella demo.`,
+    'modes.available': `Disponibile`, 'modes.soon': `In arrivo`,
+    'modes.academic.t': `Accademico`, 'modes.academic.b': `Trasforma una libreria Zotero in un grafo di idee, autori, dibattiti e lacune — poi scrivi con citazioni davvero verificabili.`, 'modes.academic.cta': `Apri la demo accademica →`,
+    'modes.genealogy.t': `Genealogia`, 'modes.genealogy.b': `Ricostruisci una famiglia dalle fonti primarie: persone, albero genealogico, cronologia, archivio di prove, una mappa reale — e un genealogista IA che propone parentele a partire dalle prove.`, 'modes.genealogy.cta': `Apri la demo di genealogia →`,
+    'modes.primary.t': `Fonti primarie`, 'modes.primary.b': `Documenti d'archivio accanto alla letteratura secondaria, con un'estrazione critica delle fonti fedele al documento.`,
+    'modes.databases.t': `Database`, 'modes.databases.b': `Dataset strutturati come cittadini di prima classe del grafo, interrogabili insieme alla tua letteratura.`,
+    'modes.study.t': `Studio`, 'modes.study.b': `Lo spazio di chi impara: il grafo, flashcard, percorsi guidati e autovalutazione, pensati per capire più che per la ricerca originale.`,
+    'contrib.kicker': `Open source, insieme`, 'contrib.title': `Ogni nodo conta.`,
+    'contrib.lead': `Nodus cresce una contribuzione alla volta — come granelli di sabbia, ognuno si aggiunge all'insieme. L'ha iniziato una sola persona; chiunque può aggiungere il prossimo granello.`,
+    'contrib.prs': `Guarda le pull request`, 'contrib.repo': `Sfoglia il codice`, 'contrib.builders': `Le persone che costruiscono Nodus`, 'contrib.loading': `Caricamento contributori…`, 'contrib.cap': `Ogni granello, una contribuzione.`, 'contrib.commits': `contributi`,
+  },
+  de: {
+    'nav.modes': `Modi`, 'nav.contrib': `Mitmachen`,
+    'modes.kicker': `Tresor-Modi · neu in 2.0`, 'modes.title': `Eine Engine. Ein Modus für jede Art von Korpus.`,
+    'modes.lead': `Jeder Tresor hat einen Modus, der die Seitenleiste und die Persönlichkeit des KI-Assistenten anpasst — mit derselben Graph-Engine darunter. Zwei sind verfügbar; drei weitere sind unterwegs. Probiere jeden verfügbaren Modus direkt in der Demo.`,
+    'modes.available': `Verfügbar`, 'modes.soon': `Demnächst`,
+    'modes.academic.t': `Akademisch`, 'modes.academic.b': `Verwandle eine Zotero-Bibliothek in einen Graphen aus Ideen, Autoren, Debatten und Lücken — und schreibe dann mit wirklich überprüfbaren Zitaten.`, 'modes.academic.cta': `Akademische Demo öffnen →`,
+    'modes.genealogy.t': `Genealogie`, 'modes.genealogy.b': `Rekonstruiere eine Familie aus Primärquellen: Personen, Stammbaum, Zeitleiste, Belegarchiv, eine echte Karte — und ein KI-Genealoge, der Verwandtschaft aus den Belegen vorschlägt.`, 'modes.genealogy.cta': `Genealogie-Demo öffnen →`,
+    'modes.primary.t': `Primärquellen`, 'modes.primary.b': `Archivalien neben der Sekundärliteratur, mit quellenkritischer Extraktion, die dem Dokument treu bleibt.`,
+    'modes.databases.t': `Datenbanken`, 'modes.databases.b': `Strukturierte Datensätze als vollwertige Bürger des Graphen, abfragbar neben deiner Literatur.`,
+    'modes.study.t': `Lernen`, 'modes.study.b': `Der Arbeitsplatz für Lernende: der Graph, Karteikarten, geführte Routen und Selbsttests — auf Verstehen statt eigene Forschung ausgelegt.`,
+    'contrib.kicker': `Open Source, gemeinsam`, 'contrib.title': `Jeder Knoten zählt.`,
+    'contrib.lead': `Nodus wächst mit jedem Beitrag — wie Sandkörner fügt sich jedes dem Ganzen hinzu. Eine einzelne Person hat es begonnen; jeder kann das nächste Korn beitragen.`,
+    'contrib.prs': `Die Pull Requests ansehen`, 'contrib.repo': `Den Code durchstöbern`, 'contrib.builders': `Die Menschen, die Nodus bauen`, 'contrib.loading': `Mitwirkende werden geladen…`, 'contrib.cap': `Jedes Korn ein Beitrag.`, 'contrib.commits': `Beiträge`,
+  },
+  pt: {
+    'nav.modes': `Modos`, 'nav.contrib': `Contribuir`,
+    'modes.kicker': `Modos de cofre · novo na 2.0`, 'modes.title': `Um só motor. Um modo para cada tipo de corpus.`,
+    'modes.lead': `Cada cofre tem um modo que adapta a barra lateral e a personalidade do assistente de IA — o mesmo motor de grafo por baixo. Dois já estão disponíveis; mais três a caminho. Experimente cada modo disponível na demo.`,
+    'modes.available': `Disponível`, 'modes.soon': `Em breve`,
+    'modes.academic.t': `Acadêmico`, 'modes.academic.b': `Transforme uma biblioteca do Zotero num grafo de ideias, autores, debates e lacunas — e depois escreva com citações que dá mesmo para verificar.`, 'modes.academic.cta': `Abrir a demo acadêmica →`,
+    'modes.genealogy.t': `Genealogia`, 'modes.genealogy.b': `Reconstrua uma família a partir de fontes primárias: pessoas, árvore genealógica, cronologia, arquivo de evidências, um mapa real — e um genealogista de IA que propõe parentescos a partir das evidências.`, 'modes.genealogy.cta': `Abrir a demo de genealogia →`,
+    'modes.primary.t': `Fontes primárias`, 'modes.primary.b': `Documentos de arquivo ao lado da literatura secundária, com uma extração crítica de fontes fiel ao documento.`,
+    'modes.databases.t': `Bases de dados`, 'modes.databases.b': `Conjuntos de dados estruturados como cidadãos de primeira classe do grafo, consultáveis junto da sua literatura.`,
+    'modes.study.t': `Estudo`, 'modes.study.b': `O espaço de quem aprende: o grafo, flashcards, rotas guiadas e autoavaliação, pensado para compreender mais do que para pesquisa original.`,
+    'contrib.kicker': `Código aberto, juntos`, 'contrib.title': `Cada nó conta.`,
+    'contrib.lead': `O Nodus cresce uma contribuição de cada vez — como grãos de areia, cada um soma ao todo. Uma só pessoa começou; qualquer um pode juntar o próximo grão.`,
+    'contrib.prs': `Ver os pull requests`, 'contrib.repo': `Explorar o código`, 'contrib.builders': `As pessoas que constroem o Nodus`, 'contrib.loading': `A carregar colaboradores…`, 'contrib.cap': `Cada grão, uma contribuição.`, 'contrib.commits': `contribuições`,
+  },
+  tr: {
+    'nav.modes': `Modlar`, 'nav.contrib': `Katkıda bulun`,
+    'modes.kicker': `Kasa modları · 2.0'da yeni`, 'modes.title': `Tek bir motor. Her korpus türü için bir mod.`,
+    'modes.lead': `Her kasanın, kenar çubuğunu ve yapay zekâ asistanının kişiliğini uyarlayan bir modu vardır — altta aynı grafik motoru. İkisi bugün hazır; üçü daha yolda. Hazır olan her modu demoda hemen deneyin.`,
+    'modes.available': `Kullanılabilir`, 'modes.soon': `Yakında`,
+    'modes.academic.t': `Akademik`, 'modes.academic.b': `Bir Zotero kütüphanesini fikirler, yazarlar, tartışmalar ve boşluklardan oluşan bir grafiğe dönüştürün — sonra gerçekten doğrulanabilir kaynaklarla yazın.`, 'modes.academic.cta': `Akademik demoyu aç →`,
+    'modes.genealogy.t': `Soybilim`, 'modes.genealogy.b': `Bir aileyi birincil kaynaklardan yeniden kurun: kişiler, soy ağacı, zaman çizelgesi, kanıt arşivi, gerçek bir harita — ve kanıtlardan akrabalık öneren bir yapay zekâ soybilimcisi.`, 'modes.genealogy.cta': `Soybilim demosunu aç →`,
+    'modes.primary.t': `Birincil Kaynaklar`, 'modes.primary.b': `İkincil literatürün yanında arşiv belgeleri; belgeye sadık kalan kaynak-eleştirel çıkarımla.`,
+    'modes.databases.t': `Veritabanları`, 'modes.databases.b': `Yapılandırılmış veri kümeleri grafiğin birinci sınıf üyeleri olarak, literatürünüzle birlikte sorgulanabilir.`,
+    'modes.study.t': `Çalışma`, 'modes.study.b': `Öğrenenin çalışma alanı: grafik, bilgi kartları, rehberli rotalar ve kendini sınama — özgün araştırmadan çok anlamaya göre ayarlı.`,
+    'contrib.kicker': `Açık kaynak, birlikte`, 'contrib.title': `Her düğüm önemlidir.`,
+    'contrib.lead': `Nodus her seferinde bir katkıyla büyür — kum taneleri gibi, her biri bütüne eklenir. Onu tek bir kişi başlattı; bir sonraki taneyi herkes ekleyebilir.`,
+    'contrib.prs': `Pull request'leri gör`, 'contrib.repo': `Kodu incele`, 'contrib.builders': `Nodus'u inşa edenler`, 'contrib.loading': `Katkıda bulunanlar yükleniyor…`, 'contrib.cap': `Her tane bir katkı.`, 'contrib.commits': `katkı`,
+  },
+  zh: {
+    'nav.modes': `模式`, 'nav.contrib': `参与贡献`,
+    'modes.kicker': `保险库模式 · 2.0 新增`, 'modes.title': `同一引擎，为每种语料提供一种模式。`,
+    'modes.lead': `每个保险库都有一个模式，用来调整侧边栏和 AI 助手的角色——底层是同一套图谱引擎。两种现已可用，另有三种即将推出。在演示中即可体验每一种可用模式。`,
+    'modes.available': `可用`, 'modes.soon': `即将推出`,
+    'modes.academic.t': `学术`, 'modes.academic.b': `把 Zotero 书库变成一张由观点、作者、争论与空白构成的图谱——然后用真正可核实的引用来写作。`, 'modes.academic.cta': `打开学术演示 →`,
+    'modes.genealogy.t': `家谱`, 'modes.genealogy.b': `从原始档案重建一个家族：人物、家谱树、时间线、证据档案、真实地图——以及一位从证据中提出亲属关系的 AI 家谱学家。`, 'modes.genealogy.cta': `打开家谱演示 →`,
+    'modes.primary.t': `原始档案`, 'modes.primary.b': `档案记录与二手文献并列，采用忠于文献的来源批判式抽取。`,
+    'modes.databases.t': `数据库`, 'modes.databases.b': `结构化数据集作为图谱的一等公民，可与你的文献一同查询。`,
+    'modes.study.t': `学习`, 'modes.study.b': `学习者的工作台：图谱、闪卡、引导路线与自测，为理解而非原创研究而调校。`,
+    'contrib.kicker': `开源，携手同行`, 'contrib.title': `每个节点都重要。`,
+    'contrib.lead': `Nodus 每次一个贡献地成长——就像一粒粒沙子，每一粒都汇入整体。它由一个人起步；任何人都能添上下一粒沙。`,
+    'contrib.prs': `查看 Pull Request`, 'contrib.repo': `浏览代码`, 'contrib.builders': `参与建设 Nodus 的人`, 'contrib.loading': `正在加载贡献者…`, 'contrib.cap': `每一粒，都是一次贡献。`, 'contrib.commits': `次提交`,
+  },
+};
+Object.keys(I18N_V2).forEach((l) => { I18N[l] = Object.assign(I18N[l] || {}, I18N_V2[l]); });
+
 const _orig = new Map();
 document.querySelectorAll('[data-i18n]').forEach((el) => _orig.set(el, el.innerHTML));
 const _vigOrig = [];
@@ -1454,6 +1669,117 @@ function setLang(lang) {
     else { const n = (navigator.language || 'en').slice(0, 2); if (LANGS.some((l) => l.c === n)) lang = n; }
   } catch (e) {}
   setLang(lang);
+})();
+
+// ---------- Contributing: humans-only contributor list ----------
+(function () {
+  const box = document.getElementById('contrib-people');
+  if (!box) return;
+  // Exclude AI/automation accounts — this section is for the human builders only.
+  const BOT = /(\[bot\]|-bot$|^bot[-\d]|copilot|codex|chatgpt|gpt-|openai|claude|anthropic|dependabot|github-actions|actions-user|renovate|greenkeeper|semantic-release|allcontributors|imgbot|snyk-bot|mergify|sonarcloud)/i;
+  const OWNER = 'drakonis96';
+  const FALLBACK = [
+    { login: 'Drakonis96', html_url: 'https://github.com/Drakonis96', avatar_url: 'https://github.com/Drakonis96.png?size=64', contributions: null },
+    { login: 'oguzkarayemis', html_url: 'https://github.com/oguzkarayemis', avatar_url: 'https://github.com/oguzkarayemis.png?size=64', contributions: null },
+  ];
+  const commitIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="width:11px;height:11px;vertical-align:-1px"><circle cx="12" cy="12" r="3.2"/><path d="M2 12h6.8M15.2 12H22"/></svg>';
+  function render(list) {
+    if (!list.length) { box.innerHTML = ''; return; }
+    box.innerHTML = list.map((u) => {
+      const owner = (u.login || '').toLowerCase() === OWNER;
+      const count = u.contributions != null
+        ? `<span>${commitIcon} ${u.contributions}</span>`
+        : (owner ? '<span>Creator</span>' : '<span>Contributor</span>');
+      return `<a class="contrib-chip${owner ? ' owner' : ''}" href="${u.html_url}" target="_blank" rel="noopener">
+        <img src="${u.avatar_url}" alt="" width="30" height="30" loading="lazy"/>
+        <span class="cc-t"><b>${u.login}</b>${count}</span></a>`;
+    }).join('');
+  }
+  fetch('https://api.github.com/repos/Drakonis96/nodus/contributors?per_page=100', { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((list) => {
+      if (!Array.isArray(list)) throw new Error('no list');
+      const people = list.filter((u) => u && u.type !== 'Bot' && !BOT.test(u.login || ''));
+      render(people.length ? people : FALLBACK);
+    })
+    .catch(() => render(FALLBACK));
+})();
+
+// ---------- Contributing: "grains of sand" node-drip animation ----------
+(function () {
+  const cv = document.getElementById('sand');
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const R = 3.1, COLW = 5, MAX = 260, COLORS = ['#a78bfa', '#8b5cf6', '#c4b5fd', '#7c3aed'];
+  let W = 0, H = 0, cols = 0, heights = [], settled = [], falling = [], total = 0, running = false, raf = 0, last = 0, spawnAcc = 0;
+  function resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight || 320;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const nc = Math.max(8, Math.ceil(W / COLW));
+    if (nc !== cols) { cols = nc; heights = new Array(cols).fill(0); settled = []; falling = []; total = 0; }
+  }
+  function spawn() {
+    if (total >= MAX) return;
+    const x = W * (0.18 + 0.64 * Math.random());
+    falling.push({ x, y: -4, vy: 18 + Math.random() * 22, c: COLORS[(Math.random() * COLORS.length) | 0] });
+    total++;
+  }
+  function step(dt) {
+    for (let i = falling.length - 1; i >= 0; i--) {
+      const g = falling[i];
+      g.vy += 150 * dt; g.y += g.vy * dt;
+      let c = Math.max(0, Math.min(cols - 1, Math.floor(g.x / COLW)));
+      const floor = H - heights[c] - R;
+      if (g.y >= floor) {
+        // angle-of-repose: roll toward a markedly lower neighbour, so it heaps
+        for (let k = 0; k < 4; k++) {
+          const l = c - 1, r = c + 1;
+          const dl = l >= 0 ? heights[c] - heights[l] : -1;
+          const dr = r < cols ? heights[c] - heights[r] : -1;
+          if (dl > R * 5 && dl >= dr) c = l;
+          else if (dr > R * 5) c = r;
+          else break;
+        }
+        heights[c] += R * 1.7;
+        settled.push({ x: c * COLW + COLW / 2, y: H - heights[c] + R * 0.6, c: g.c });
+        falling.splice(i, 1);
+      }
+    }
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = 0.92;
+    for (let i = 0; i < settled.length; i++) {
+      const g = settled[i]; ctx.fillStyle = g.c;
+      ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, 6.29); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < falling.length; i++) {
+      const g = falling[i]; ctx.fillStyle = g.c;
+      ctx.shadowColor = g.c; ctx.shadowBlur = 9;
+      ctx.beginPath(); ctx.arc(g.x, g.y, R, 0, 6.29); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+  }
+  function loop(t) {
+    if (!running) return;
+    const dt = Math.min(0.05, last ? (t - last) / 1000 : 0.016); last = t;
+    spawnAcc += dt;
+    while (spawnAcc > 0.05) { spawnAcc -= 0.05; spawn(); }
+    step(dt); draw();
+    raf = requestAnimationFrame(loop);
+  }
+  function start() { if (running) return; running = true; last = 0; raf = requestAnimationFrame(loop); }
+  function stop() { running = false; cancelAnimationFrame(raf); }
+  resize();
+  let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(resize, 200); });
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) start(); else stop(); });
+    }, { threshold: 0.15 }).observe(cv);
+  } else { start(); }
 })();
 </script>
 </body>

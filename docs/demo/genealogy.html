@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Nodus — Live demo</title>
-  <meta name="description" content="Interactive demo of Nodus: a free, open-source, local-first desktop app that turns your Zotero library into a navigable graph of ideas."/>
+  <title>Nodus — Genealogy demo</title>
+  <meta name="description" content="Interactive demo of Nodus in Genealogy mode: reconstruct a family from primary sources — persons, family tree, timeline, evidence archive, map and a family-history report."/>
   <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="demo.css?v=20260712-v201"/>
 </head>
-<body class="demo-page">
+<body class="demo-page gen">
   <nav class="site-nav">
     <a class="site-logo" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</a>
     <div class="site-links">
       <a href="../index.html#story" class="hideS">How it works</a>
+      <a href="../index.html#modes" class="hideS">Modes</a>
       <a href="../index.html#views" class="hideS">Views</a>
-      <a href="../index.html#listen" class="hideS">Listen</a>
       <a class="site-gh" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
         <span class="lbl">Star</span><span class="stars"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .67.42l1.88 3.8 4.2.62c.61.09.86.84.41 1.28l-3.04 2.96.72 4.18a.75.75 0 0 1-1.09.79L8 12.35l-3.76 1.97a.75.75 0 0 1-1.08-.79l.72-4.18L.83 6.37a.75.75 0 0 1 .41-1.28l4.2-.61L7.32.67A.75.75 0 0 1 8 .25Z"/></svg><span id="site-stars" aria-label="6 stars on GitHub">6</span></span>
@@ -27,9 +27,9 @@
   <div class="demo-frame">
     <div class="mac-titlebar">
       <span class="mac-dots"><i></i><i></i><i></i></span>
-      <span class="mac-title">Nodus — Live demo</span>
+      <span class="mac-title">Nodus — Genealogy demo</span>
     </div>
-    <div class="shell">
+    <div class="shell gen">
     <header class="topbar">
       <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
         <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
@@ -37,14 +37,14 @@
       <div class="vault-switch" id="vault-switch">
         <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
-          <span class="vault-name">Learning science</span>
-          <span class="vault-mode academic">Academic</span>
+          <span class="vault-name">Herrera–Sotomayor</span>
+          <span class="vault-mode gen">Genealogy</span>
           <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="vault-menu" id="vault-menu" role="menu">
           <div class="vault-menu-label">Switch demo mode</div>
-          <a class="vault-opt active" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-tag">Active</span></a>
-          <a class="vault-opt" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Herrera–Sotomayor family</span></span><span class="vm-load">Open</span></a>
+          <a class="vault-opt active" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Herrera–Sotomayor family</span></span><span class="vm-tag">Active</span></a>
+          <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
           <div class="vault-menu-label">Coming soon</div>
           <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
           <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Databases</b><span>Structured datasets</span></span><span class="vm-soon">Soon</span></button>
@@ -52,18 +52,18 @@
         </div>
       </div>
       <div class="spacer"></div>
-      <button class="tb-btn" onclick="UI.chat()">
+      <button class="tb-btn" onclick="GUI.chat()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/></svg>
         Assistant</button>
-      <button class="tb-btn" onclick="UI.toast('In the app: pick which Zotero collections to monitor.')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
-        Collections</button>
-      <button class="tb-btn primary" onclick="UI.toast('In the app: pulls new and changed items from Zotero.')">
+      <button class="tb-btn" onclick="GUI.toast('In the app: add a primary source — a scan, PDF or transcript — to the evidence archive.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
+        Add source</button>
+      <button class="tb-btn primary" onclick="GUI.toast('In the app: re-indexes the archive and re-extracts people, dates and facts.')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
-        Refresh</button>
+        Sync</button>
     </header>
     <div class="demo-banner">
-      <span><b>Web demo</b> — a static sample corpus, free to explore. Every view is real; the AI, Zotero sync and file analysis run only in the desktop app (100% free &amp; open source).</span>
+      <span><b>Web demo · Genealogy mode</b> — a static sample family, free to explore. Every view is real; the AI, record analysis and archive indexing run only in the desktop app (100% free &amp; open source).</span>
       <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">Get the desktop app →</a>
     </div>
     <div class="body">
@@ -74,15 +74,11 @@
   </div>
   <div id="chat-root"></div>
   <div id="modal-root"></div>
-  <div id="bottom-player"></div>
   <div id="toast" role="status"></div>
-  <script src="data.js?v=201"></script>
-  <script src="app.js?v=201"></script>
+  <script src="genealogy-data.js?v=201"></script>
+  <script src="genealogy-app.js?v=201"></script>
   <script src="vault-switch.js?v=201"></script>
   <script>
-    // Live star count via the GitHub API (no CDN cache; cache:no-store also skips
-    // the browser HTTP cache, which is what made the number look "stuck").
-    // shields.io is only the rate-limited fallback.
     (function () {
       function paintStars(n) {
         if (!Number.isFinite(n)) return;
@@ -93,16 +89,11 @@
       }
       fetch('https://api.github.com/repos/Drakonis96/nodus', { cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) {
-          var n = j && Number(j.stargazers_count);
-          if (Number.isFinite(n)) { paintStars(n); return; }
-          throw new Error('stars unavailable');
-        })
+        .then(function (j) { var n = j && Number(j.stargazers_count); if (Number.isFinite(n)) { paintStars(n); return; } throw new Error('x'); })
         .catch(function () {
           return fetch('https://img.shields.io/github/stars/Drakonis96/nodus.json?cacheSeconds=300&_=' + Date.now())
             .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) { if (j) paintStars(Number(j.value)); })
-            .catch(function () {});
+            .then(function (j) { if (j) paintStars(Number(j.value)); }).catch(function () {});
         });
     })();
   </script>

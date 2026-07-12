@@ -90,18 +90,20 @@ export function RelationsSection({
                 {r.targetKind === 'contact' && (
                   <span className="shrink-0 text-[10px] text-neutral-600">{t('contacto')}</span>
                 )}
-                <div className="ml-auto flex shrink-0 gap-1">
+                <div className="ml-auto flex shrink-0 gap-0.5">
                   <button
-                    className="btn btn-ghost h-6 px-1.5 text-[11px] text-neutral-400"
+                    className={`btn h-7 w-7 p-0 ${editingId === r.relationId ? 'border border-indigo-600 bg-indigo-900/30 text-indigo-200' : 'btn-ghost text-neutral-400 hover:text-neutral-200'}`}
+                    title={t('Editar')}
                     onClick={() => setEditingId((id) => (id === r.relationId ? null : r.relationId))}
                   >
-                    {t('Editar')}
+                    <Icon name="edit" size={14} />
                   </button>
                   <button
-                    className="btn btn-ghost h-6 px-1.5 text-[11px] text-red-300"
+                    className="btn btn-ghost h-7 w-7 p-0 text-red-300 hover:text-red-200"
+                    title={t('Eliminar')}
                     onClick={() => void removeRelation(r)}
                   >
-                    {t('Eliminar')}
+                    <Icon name="trash" size={14} />
                   </button>
                 </div>
               </div>
