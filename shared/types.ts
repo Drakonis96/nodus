@@ -733,6 +733,133 @@ export interface VaultDuplicateResult {
   copiedProviders: AiProvider[];
 }
 
+// ── Primary-source / genealogy records ontology (phase B) ────────────────────
+
+export type PersonSex = 'male' | 'female' | 'unknown';
+
+export type HistoricalEventType =
+  | 'birth'
+  | 'baptism'
+  | 'marriage'
+  | 'death'
+  | 'burial'
+  | 'census'
+  | 'residence'
+  | 'migration'
+  | 'occupation'
+  | 'other';
+
+export type ParticipantRole =
+  | 'principal'
+  | 'spouse'
+  | 'father'
+  | 'mother'
+  | 'child'
+  | 'witness'
+  | 'officiant'
+  | 'other';
+
+export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participant';
+export type RecordSourceKind = 'work' | 'archive';
+
+export interface PersonName {
+  name: string;
+  kind: string | null;
+}
+
+export interface Person {
+  personId: string;
+  displayName: string;
+  sex: PersonSex;
+  /** Human display form of the date, e.g. "c. 1850". */
+  birthDate: string | null;
+  deathDate: string | null;
+  notes: string | null;
+  /** Name variants / spellings across records. */
+  names: PersonName[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PersonInput {
+  displayName: string;
+  sex?: PersonSex;
+  birthDate?: string | null;
+  deathDate?: string | null;
+  notes?: string | null;
+  names?: PersonName[];
+}
+
+export interface Place {
+  placeId: string;
+  name: string;
+  parentId: string | null;
+  kind: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  notes: string | null;
+}
+
+export interface PlaceInput {
+  name: string;
+  parentId?: string | null;
+  kind?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string | null;
+}
+
+export interface EventParticipant {
+  personId: string;
+  role: ParticipantRole;
+  /** Convenience for display; filled by read queries. */
+  displayName?: string;
+}
+
+export interface HistoricalEvent {
+  eventId: string;
+  type: HistoricalEventType;
+  label: string | null;
+  /** Human display form of the date. */
+  date: string | null;
+  /** Sortable lower-bound key 'YYYY-MM-DD' for the timeline; null if unknown. */
+  sortKey: string | null;
+  placeId: string | null;
+  placeName: string | null;
+  notes: string | null;
+  participants: EventParticipant[];
+}
+
+export interface EventInput {
+  type: HistoricalEventType;
+  label?: string | null;
+  date?: string | null;
+  placeId?: string | null;
+  notes?: string | null;
+  participants?: EventParticipant[];
+}
+
+export interface RecordEvidence {
+  id: string;
+  targetKind: RecordEvidenceTargetKind;
+  targetId: string;
+  nodusId: string | null;
+  sourceKind: RecordSourceKind;
+  quote: string | null;
+  location: string | null;
+  confidence: number | null;
+}
+
+export interface RecordEvidenceInput {
+  targetKind: RecordEvidenceTargetKind;
+  targetId: string;
+  nodusId?: string | null;
+  sourceKind?: RecordSourceKind;
+  quote?: string | null;
+  location?: string | null;
+  confidence?: number | null;
+}
+
 /** Runtime state of the opt-in localhost MCP server. Never includes the bearer token. */
 export interface McpServerStatus {
   running: boolean;

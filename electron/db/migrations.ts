@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 export const migrations: Migration[] = [
   {
@@ -990,6 +990,106 @@ export const migrations: Migration[] = [
       );
       CREATE INDEX idx_content_translations_entity
         ON content_translations(entity_kind, entity_id, updated_at DESC);
+    `,
+  },
+  {
+    version: 33,
+    up: /* sql */ `
+      -- Primary-source / genealogy entity ontology. Parallel to the argumentative
+      -- ideas/themes graph: a "records" lens extracts persons, places and events
+      -- from primary sources instead of ideas. Every fact is backed by evidence
+      -- (record_evidence) pointing at a source passage, so the record layer keeps
+      -- Nodus's citable DNA. Dates are stored twice: a human display form and a
+      -- sortable ISO-ish lower/upper bound so a timeline can order fuzzy dates
+      -- ("c. 1850", "antes de 1880"). Coexists with the ideas ontology and can be
+      -- cross-referenced by it.
+
+      CREATE TABLE persons (
+        person_id       TEXT PRIMARY KEY,
+        display_name    TEXT NOT NULL,
+        sex             TEXT NOT NULL DEFAULT 'unknown',
+        birth_date      TEXT,
+        birth_date_sort TEXT,
+        death_date      TEXT,
+        death_date_sort TEXT,
+        notes           TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX idx_persons_name ON persons(display_name);
+      CREATE INDEX idx_persons_birth_sort ON persons(birth_date_sort);
+
+      -- Name variants / spellings across records (a person's name changes over time).
+      CREATE TABLE person_names (
+        id         TEXT PRIMARY KEY,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        kind       TEXT,
+        UNIQUE (person_id, name)
+      );
+      CREATE INDEX idx_person_names_person ON person_names(person_id);
+
+      -- Places form a hierarchy (parish → municipality → province → country).
+      CREATE TABLE places (
+        place_id    TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        parent_id   TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        kind        TEXT,
+        latitude    REAL,
+        longitude   REAL,
+        notes       TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_places_parent ON places(parent_id);
+      CREATE INDEX idx_places_name ON places(name);
+
+      CREATE TABLE events (
+        event_id      TEXT PRIMARY KEY,
+        type          TEXT NOT NULL,
+        label         TEXT,
+        date          TEXT,
+        date_sort     TEXT,
+        date_end_sort TEXT,
+        place_id      TEXT REFERENCES places(place_id) ON DELETE SET NULL,
+        notes         TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_events_sort ON events(date_sort);
+      CREATE INDEX idx_events_type ON events(type);
+      CREATE INDEX idx_events_place ON events(place_id);
+
+      -- Who took part in an event and how (principal, spouse, father, witness…).
+      -- Relationships in the primary-source layer are asserted BY events/sources
+      -- rather than declared abstractly; the genealogy layer (phase C) adds an
+      -- explicit kinship specialisation on top.
+      CREATE TABLE event_participants (
+        id         TEXT PRIMARY KEY,
+        event_id   TEXT NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+        person_id  TEXT NOT NULL REFERENCES persons(person_id) ON DELETE CASCADE,
+        role       TEXT NOT NULL DEFAULT 'principal',
+        UNIQUE (event_id, person_id, role)
+      );
+      CREATE INDEX idx_event_participants_person ON event_participants(person_id);
+      CREATE INDEX idx_event_participants_event ON event_participants(event_id);
+
+      -- Polymorphic evidence for any record entity/event/participation. nodus_id is a
+      -- free pointer (a works.nodus_id, or an archive item id when source_kind =
+      -- 'archive'); intentionally not a FK so the evidence archive (also phase B) can
+      -- be introduced without a forward reference.
+      CREATE TABLE record_evidence (
+        id          TEXT PRIMARY KEY,
+        target_kind TEXT NOT NULL,
+        target_id   TEXT NOT NULL,
+        nodus_id    TEXT,
+        source_kind TEXT NOT NULL DEFAULT 'work',
+        quote       TEXT,
+        location    TEXT,
+        confidence  REAL,
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_record_evidence_target ON record_evidence(target_kind, target_id);
     `,
   },
 ];
