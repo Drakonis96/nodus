@@ -230,6 +230,7 @@ import {
   clearPersonPortrait,
   createPlace,
   listPlaces,
+  updatePlace,
   findOrCreatePlace,
   createEvent,
   updateEvent,
@@ -513,6 +514,7 @@ export function registerIpc(
   h('entities:listPlaces', async () => listPlaces());
   h('entities:createPlace', async (_e, input: PlaceInput) => createPlace(input));
   h('entities:findOrCreatePlace', async (_e, name: string, kind?: string | null) => findOrCreatePlace(name, kind ?? null));
+  h('entities:updatePlace', async (_e, id: string, patch: Partial<PlaceInput>) => updatePlace(id, patch));
   h('entities:listEvents', async (
     _e,
     opts?: { personId?: string; type?: HistoricalEventType; from?: string; to?: string }

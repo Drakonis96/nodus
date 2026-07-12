@@ -20,6 +20,7 @@ import { AuthorsView } from './views/AuthorsView';
 import { PersonasView } from './views/PersonasView';
 import { TimelineView } from './views/TimelineView';
 import { TreeView } from './views/TreeView';
+import { MapView } from './views/MapView';
 import { ArchiveView } from './views/ArchiveView';
 import { StudyGuideView } from './views/StudyGuideView';
 import { ImmersionView } from './views/ImmersionView';
@@ -514,6 +515,7 @@ export function App() {
           {view === 'persons' && <PersonasView />}
           {view === 'timeline' && <TimelineView />}
           {view === 'tree' && <TreeView />}
+          {view === 'map' && <MapView />}
           {view === 'archive' && <ArchiveView />}
           {view === 'study' && (
             <StudyGuideView

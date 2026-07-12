@@ -3552,6 +3552,7 @@ export interface NodusApi {
   listPlaces(): Promise<Place[]>;
   createPlace(input: PlaceInput): Promise<Place>;
   findOrCreatePlace(name: string, kind?: string | null): Promise<Place>;
+  updatePlace(id: string, patch: Partial<PlaceInput>): Promise<Place | null>;
   listEvents(opts?: {
     personId?: string;
     type?: HistoricalEventType;

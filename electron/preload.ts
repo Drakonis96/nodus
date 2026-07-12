@@ -46,6 +46,7 @@ const api: NodusApi = {
   listPlaces: () => ipcRenderer.invoke('entities:listPlaces'),
   createPlace: (input) => ipcRenderer.invoke('entities:createPlace', input),
   findOrCreatePlace: (name, kind) => ipcRenderer.invoke('entities:findOrCreatePlace', name, kind),
+  updatePlace: (id, patch) => ipcRenderer.invoke('entities:updatePlace', id, patch),
   listEvents: (opts) => ipcRenderer.invoke('entities:listEvents', opts),
   getEvent: (id) => ipcRenderer.invoke('entities:getEvent', id),
   createEvent: (input) => ipcRenderer.invoke('entities:createEvent', input),

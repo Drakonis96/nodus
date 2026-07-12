@@ -57,10 +57,13 @@ test('the tree view is scoped to genealogy only', () => {
   assert.equal(vt.isViewAllowedForVaultType('tree', 'genealogy'), true);
   assert.equal(vt.isViewAllowedForVaultType('tree', 'primary_sources'), false);
   assert.equal(vt.isViewAllowedForVaultType('tree', 'academic'), false);
-  // Genealogy also gets the shared records views.
-  for (const v of ['persons', 'timeline', 'archive']) {
+  // Genealogy also gets the shared records views + map.
+  for (const v of ['persons', 'timeline', 'archive', 'map']) {
     assert.equal(vt.isViewAllowedForVaultType(v, 'genealogy'), true);
   }
+  // Map is shared with primary_sources; tree is not.
+  assert.equal(vt.isViewAllowedForVaultType('map', 'primary_sources'), true);
+  assert.equal(vt.isViewAllowedForVaultType('map', 'academic'), false);
 });
 
 test('primary_sources hides argument/study surfaces but keeps ideas/authors', () => {

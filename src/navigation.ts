@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'archive' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'map' | 'archive' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -46,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'persons', label: 'Personas', icon: 'users', group: 'explore' },
   { id: 'timeline', label: 'Línea temporal', icon: 'clock', group: 'explore' },
   { id: 'tree', label: 'Árbol genealógico', icon: 'tree', group: 'explore' },
+  { id: 'map', label: 'Mapa', icon: 'map', group: 'explore' },
   { id: 'archive', label: 'Archivo', icon: 'archive', group: 'explore' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },

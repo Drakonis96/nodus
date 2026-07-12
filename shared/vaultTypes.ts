@@ -100,6 +100,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   persons: ['primary_sources', 'genealogy'],
   timeline: ['primary_sources', 'genealogy'],
   archive: ['primary_sources', 'genealogy'],
+  map: ['primary_sources', 'genealogy'],
   tree: ['genealogy'],
 };
 

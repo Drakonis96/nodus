@@ -270,6 +270,20 @@ export function listPlaces(): Place[] {
   return (getDb().prepare('SELECT * FROM places ORDER BY name').all() as PlaceRow[]).map(rowToPlace);
 }
 
+export function updatePlace(placeId: string, patch: Partial<PlaceInput>): Place | null {
+  const existing = getPlace(placeId);
+  if (!existing) return null;
+  const name = patch.name?.trim() ?? existing.name;
+  const kind = patch.kind !== undefined ? patch.kind : existing.kind;
+  const latitude = patch.latitude !== undefined ? patch.latitude : existing.latitude;
+  const longitude = patch.longitude !== undefined ? patch.longitude : existing.longitude;
+  const notes = patch.notes !== undefined ? patch.notes : existing.notes;
+  getDb()
+    .prepare('UPDATE places SET name = ?, kind = ?, latitude = ?, longitude = ?, notes = ?, updated_at = ? WHERE place_id = ?')
+    .run(name, kind, latitude, longitude, notes, now(), placeId);
+  return getPlace(placeId);
+}
+
 /** Find a place by exact name (case-insensitive), or create it. Used by extraction to de-dupe. */
 export function findOrCreatePlace(name: string, kind: string | null = null): Place {
   const trimmed = name.trim();
