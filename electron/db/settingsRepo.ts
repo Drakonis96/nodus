@@ -71,6 +71,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   copilotToken: '',
   sidebarOrder: [],
   sidebarHidden: [],
+  sidebarCustomized: false,
   autoBackupEnabled: false,
   autoBackupFolder: '',
   autoBackupIntervalHours: 24,

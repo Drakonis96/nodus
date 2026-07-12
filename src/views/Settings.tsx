@@ -16,6 +16,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t } from '../i18n';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
+import { effectiveSidebarHidden } from '@shared/vaultTypes';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
 
@@ -459,9 +460,9 @@ export function Settings({
             </p>
             <SidebarOrderEditor
               sidebarOrder={settings.sidebarOrder}
-              sidebarHidden={settings.sidebarHidden}
+              sidebarHidden={effectiveSidebarHidden(settings.sidebarHidden, settings.sidebarCustomized, activeVault?.type)}
               onReorder={(ids) => void patch({ sidebarOrder: ids })}
-              onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden })}
+              onToggleHidden={(hidden) => void patch({ sidebarHidden: hidden, sidebarCustomized: true })}
             />
           </Section>
       )}

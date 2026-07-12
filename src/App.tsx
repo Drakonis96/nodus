@@ -41,6 +41,7 @@ import type {
   View,
 } from './navigation';
 import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { effectiveSidebarHidden } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 
@@ -93,8 +94,12 @@ export function App() {
   // each group in the user's chosen order, minus any hidden sections. Home is
   // pinned first and Settings last, both outside every group and never hidden.
   const navGroups = useMemo(
-    () => groupedNav(settings?.sidebarOrder ?? [], settings?.sidebarHidden ?? []),
-    [settings?.sidebarOrder, settings?.sidebarHidden]
+    () =>
+      groupedNav(
+        settings?.sidebarOrder ?? [],
+        effectiveSidebarHidden(settings?.sidebarHidden ?? [], settings?.sidebarCustomized ?? false, activeVault?.type)
+      ),
+    [settings?.sidebarOrder, settings?.sidebarHidden, settings?.sidebarCustomized, activeVault?.type]
   );
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;

@@ -639,6 +639,14 @@ export interface AppSettings {
    * they can be shown again from Settings.
    */
   sidebarHidden: string[];
+  /**
+   * Whether the user has explicitly chosen sidebar visibility. While false, the
+   * effective hidden set comes from the active vault type's preset (e.g. an
+   * `estudio` vault hides research/authoring views by default). The first time
+   * the user toggles a section, the effective set is materialised into
+   * `sidebarHidden` and this flips true, so their choice is respected thereafter.
+   */
+  sidebarCustomized: boolean;
   // ── Automatic encrypted backups ────────────────────────────────────────────
   // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
   // Google Drive to get off-machine copies for free). Encrypted with the
