@@ -7,6 +7,7 @@ import { effectiveFrame, TREE_FRAMES } from '@shared/treeFrames';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
+import { PersonDossier } from '../components/PersonDossier';
 import { t } from '../i18n';
 
 const NODE_W = 128;
@@ -35,6 +36,7 @@ export function TreeView({
   const [rels, setRels] = useState<Relationship[]>([]);
   const [focusId, setFocusId] = useState<string>('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [dossierId, setDossierId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const vaultFrame = settings?.treeFrame ?? 'oak';
 
@@ -214,8 +216,23 @@ export function TreeView({
             await onSettingsChange?.();
             await reload();
           }}
+          onOpenDossier={() => setDossierId(selected)}
           onChanged={reload}
         />
+      )}
+
+      {dossierId && personById.get(dossierId) && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-6" onClick={() => setDossierId(null)}>
+          <div className="card my-6 w-full max-w-2xl" onClick={(e) => e.stopPropagation()}>
+            <PersonDossier
+              key={dossierId}
+              person={personById.get(dossierId)!}
+              onChanged={reload}
+              onClose={() => setDossierId(null)}
+              onNavigate={(id) => setDossierId(id)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
@@ -228,6 +245,7 @@ function NodePanel({
   onClose,
   onFocus,
   onApplyFrameToAll,
+  onOpenDossier,
   onChanged,
 }: {
   person: Person;
@@ -236,6 +254,7 @@ function NodePanel({
   onClose: () => void;
   onFocus: () => void;
   onApplyFrameToAll: (frame: string) => Promise<void>;
+  onOpenDossier: () => void;
   onChanged: () => Promise<void>;
 }) {
   const [relType, setRelType] = useState<'father' | 'mother' | 'child' | 'spouse'>('child');
@@ -289,6 +308,9 @@ function NodePanel({
         </button>
       </div>
 
+      <button className="btn btn-primary mb-2 w-full gap-1.5 text-sm" onClick={onOpenDossier}>
+        <Icon name="user" size={14} /> {t('Ver ficha completa')}
+      </button>
       <button className="btn btn-ghost mb-4 w-full gap-1.5 border border-neutral-700 text-sm" onClick={onFocus}>
         <Icon name="target" size={14} /> {t('Centrar el árbol aquí')}
       </button>

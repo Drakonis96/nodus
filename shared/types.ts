@@ -836,6 +836,9 @@ export interface Person {
   portrait: PortraitFocus | null;
   /** Per-person wooden tree-frame design override; null = use the vault default. */
   frameStyle: string | null;
+  /** AI-generated biography from the evidence; null until generated. */
+  biography: string | null;
+  biographyAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -3604,6 +3607,7 @@ export interface NodusApi {
     subtype?: RelationshipSubtype
   ): Promise<Relationship | null>;
   setPersonFrame(personId: string, frameStyle: string | null): Promise<void>;
+  generatePersonBiography(personId: string): Promise<{ biography: string | null; noEvidence: boolean }>;
   removeRelationship(relId: string): Promise<void>;
   listRelationships(personId: string): Promise<Relationship[]>;
   allRelationships(): Promise<Relationship[]>;

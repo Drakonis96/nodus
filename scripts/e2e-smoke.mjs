@@ -224,6 +224,7 @@ try {
       entryDocType: entry.docType,
       entryMeta: entry.metadata,
       frameStyle: juanReloaded.frameStyle,
+      biographyField: juanReloaded.biography, // null until generated; confirms the v41 column
       persons: (await window.nodus.listPersons()).length,
       children: kin.children.length,
       events: (await window.nodus.listEvents({ personId: juan.personId })).length,
@@ -238,6 +239,7 @@ try {
   assert.equal(records.frameStyle, 'walnut', 'per-person tree frame stored over IPC');
   assert.equal(records.linkedDocs, 1, 'document linked to the person over IPC');
   assert.equal(records.linkedName, 'Juan Pérez', 'linked person surfaces on the item over IPC');
+  assert.equal(records.biographyField, null, 'biography column present (null until generated)');
   assert.equal(records.events, 1, 'event linked to the person');
   assert.equal(records.evidence, 1, 'record evidence attached');
   assert.equal(records.placeName, 'Sevilla', 'event resolves its place');

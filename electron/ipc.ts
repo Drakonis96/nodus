@@ -268,6 +268,7 @@ import {
 import { ingestArchiveFile } from './archive/archiveIngest';
 import { scanArchiveTextRecords } from './ai/recordsScan';
 import { analyzeImageBytes } from './ai/imageAnalysis';
+import { generatePersonBiography } from './ai/personBiography';
 import { isVisionMime } from '@shared/imageAnalysis';
 import {
   addRelationship,
@@ -557,6 +558,7 @@ export function registerIpc(
   h('entities:setPersonFrame', async (_e, personId: string, frameStyle: string | null) => {
     setPersonFrame(personId, frameStyle);
   });
+  h('entities:generateBiography', async (_e, personId: string) => generatePersonBiography(personId));
   h('entities:removeRelationship', async (_e, relId: string) => {
     removeRelationship(relId);
   });

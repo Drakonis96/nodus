@@ -62,6 +62,7 @@ const api: NodusApi = {
     ipcRenderer.invoke('entities:addRelationship', fromPerson, toPerson, type, provenance, subtype),
   setPersonFrame: (personId, frameStyle) =>
     ipcRenderer.invoke('entities:setPersonFrame', personId, frameStyle).then(() => undefined),
+  generatePersonBiography: (personId) => ipcRenderer.invoke('entities:generateBiography', personId),
   removeRelationship: (relId) => ipcRenderer.invoke('entities:removeRelationship', relId).then(() => undefined),
   listRelationships: (personId) => ipcRenderer.invoke('entities:listRelationships', personId),
   allRelationships: () => ipcRenderer.invoke('entities:allRelationships'),

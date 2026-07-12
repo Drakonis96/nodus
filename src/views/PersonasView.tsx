@@ -1,17 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { HistoricalEvent, MatchCandidatePair, Person, PersonSex, PortraitFocus, RecordEvidence } from '@shared/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { MatchCandidatePair, Person, PersonSex } from '@shared/types';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
-import { detectPersonConflicts } from '@shared/conflictDetection';
+import { PersonDossier } from '../components/PersonDossier';
 import { t, tx } from '../i18n';
-
-const FACT_LABEL: Record<string, string> = { birth: 'nacimiento', death: 'defunción' };
-
-const SEX_LABEL: Record<PersonSex, string> = {
-  male: 'Hombre',
-  female: 'Mujer',
-  unknown: 'Sin determinar',
-};
 
 function lifeSpan(p: Person): string {
   const b = p.birthDate?.trim();
@@ -109,7 +101,13 @@ export function PersonasView() {
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {selected ? (
-          <PersonDetail key={selected.personId} person={selected} onChanged={reload} onClose={() => setSelectedId(null)} />
+          <PersonDossier
+            key={selected.personId}
+            person={selected}
+            onChanged={reload}
+            onClose={() => setSelectedId(null)}
+            onNavigate={(id) => setSelectedId(id)}
+          />
         ) : (
           <div className="flex h-full items-center justify-center p-8 text-center text-sm text-neutral-500">
             {t('Selecciona una persona para ver su ficha, sus eventos y la evidencia que la respalda.')}
@@ -235,237 +233,6 @@ function PairPerson({ person }: { person: Person }) {
   );
 }
 
-function PersonDetail({ person, onChanged, onClose }: { person: Person; onChanged: () => Promise<void>; onClose: () => void }) {
-  const [events, setEvents] = useState<HistoricalEvent[]>([]);
-  const [evidence, setEvidence] = useState<RecordEvidence[]>([]);
-
-  useEffect(() => {
-    void window.nodus.listEvents({ personId: person.personId }).then(setEvents);
-    void window.nodus.listRecordEvidence('person', person.personId).then(setEvidence);
-  }, [person.personId]);
-
-  const conflicts = useMemo(
-    () =>
-      detectPersonConflicts({
-        birthDate: person.birthDate,
-        deathDate: person.deathDate,
-        events: events.map((e) => ({ type: e.type, date: e.date })),
-      }),
-    [person.birthDate, person.deathDate, events]
-  );
-
-  const remove = async () => {
-    if (!window.confirm(t('¿Eliminar esta persona y su evidencia? Los eventos en que participa se conservan.'))) return;
-    await window.nodus.deletePerson(person.personId);
-    onClose();
-    await onChanged();
-  };
-
-  return (
-    <div className="space-y-5 p-6">
-      <div className="flex items-start gap-3">
-        <PortraitEditor person={person} onChanged={onChanged} />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-semibold">{person.displayName}</h2>
-          <p className="text-sm text-neutral-400">
-            {SEX_LABEL[person.sex]}
-            {lifeSpan(person) ? ` · ${lifeSpan(person)}` : ''}
-          </p>
-        </div>
-        <button className="btn btn-ghost gap-1.5 text-red-300" onClick={() => void remove()}>
-          <Icon name="trash" size={14} /> {t('Eliminar')}
-        </button>
-      </div>
-
-      {conflicts.length > 0 && (
-        <section className="rounded-md border border-amber-900/60 bg-amber-950/20 p-3">
-          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-300">
-            <Icon name="alert" size={14} /> {t('Hechos en conflicto')}
-          </h3>
-          <ul className="space-y-2">
-            {conflicts.map((c) => (
-              <li key={c.fact} className="text-sm">
-                <span className="text-neutral-300">
-                  {tx('Fechas de {fact} discrepantes ({span} años):', {
-                    fact: t(FACT_LABEL[c.fact] ?? c.fact),
-                    span: String(c.spanYears),
-                  })}
-                </span>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {c.values.map((v, i) => (
-                    <span key={i} className="rounded-full bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300">
-                      {v.date} <span className="text-neutral-500">· {t(v.label)}</span>
-                    </span>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {person.names.length > 0 && (
-        <section>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Variantes del nombre')}</h3>
-          <div className="flex flex-wrap gap-1.5">
-            {person.names.map((n) => (
-              <span key={n.name} className="rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300">
-                {n.name}
-                {n.kind ? <span className="text-neutral-500"> · {n.kind}</span> : null}
-              </span>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          {t('Eventos de su vida')} <span className="text-neutral-600">({events.length})</span>
-        </h3>
-        {events.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t('Sin eventos registrados.')}</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {events.map((e) => (
-              <li key={e.eventId} className="rounded-md border border-neutral-800 px-3 py-2 text-sm">
-                <span className="font-medium text-neutral-200">{t(EVENT_TYPE_LABEL[e.type] ?? e.type)}</span>
-                {e.date ? <span className="text-neutral-400"> · {e.date}</span> : null}
-                {e.placeName ? <span className="text-neutral-500"> · {e.placeName}</span> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-          {t('Evidencia')} <span className="text-neutral-600">({evidence.length})</span>
-        </h3>
-        {evidence.length === 0 ? (
-          <p className="text-sm text-neutral-500">{t('Sin evidencia adjunta.')}</p>
-        ) : (
-          <ul className="space-y-2">
-            {evidence.map((ev) => (
-              <li key={ev.id} className="rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2">
-                {ev.quote ? <p className="text-sm italic text-neutral-300">“{ev.quote}”</p> : null}
-                <p className="mt-1 text-xs text-neutral-500">
-                  {ev.sourceKind === 'archive' ? t('Archivo') : t('Fuente')}
-                  {ev.location ? ` · ${ev.location}` : ''}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
-  );
-}
-
-export const EVENT_TYPE_LABEL: Record<string, string> = {
-  birth: 'Nacimiento',
-  baptism: 'Bautismo',
-  marriage: 'Matrimonio',
-  death: 'Defunción',
-  burial: 'Entierro',
-  census: 'Censo',
-  residence: 'Residencia',
-  migration: 'Migración',
-  occupation: 'Ocupación',
-  other: 'Otro',
-};
-
-/** Portrait with upload, drag-to-focus and zoom. Framing is non-destructive. */
-function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () => Promise<void> }) {
-  const [editing, setEditing] = useState(false);
-  const [focus, setFocus] = useState<PortraitFocus>(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
-  const dragging = useRef<{ x: number; y: number } | null>(null);
-  const SIZE = 48;
-
-  useEffect(() => {
-    setFocus(person.portrait ?? { focusX: 0.5, focusY: 0.5, scale: 1 });
-  }, [person.personId, person.portrait?.focusX, person.portrait?.focusY, person.portrait?.scale]);
-
-  const upload = async () => {
-    const updated = await window.nodus.setPersonPortraitFromFile(person.personId);
-    if (updated) {
-      await onChanged();
-      setEditing(true);
-    }
-  };
-
-  const remove = async () => {
-    await window.nodus.clearPersonPortrait(person.personId);
-    setEditing(false);
-    await onChanged();
-  };
-
-  const persistFocus = async (next: PortraitFocus) => {
-    setFocus(next);
-    await window.nodus.updatePortraitFocus(person.personId, next);
-  };
-
-  // Drag the photo: moving right reveals the left side (focusX decreases).
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (!person.portrait) return;
-    dragging.current = { x: e.clientX, y: e.clientY };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const dx = (e.clientX - dragging.current.x) / SIZE;
-    const dy = (e.clientY - dragging.current.y) / SIZE;
-    dragging.current = { x: e.clientX, y: e.clientY };
-    setFocus((f) => ({
-      ...f,
-      focusX: Math.min(1, Math.max(0, f.focusX - dx)),
-      focusY: Math.min(1, Math.max(0, f.focusY - dy)),
-    }));
-  };
-  const onPointerUp = () => {
-    if (dragging.current) {
-      dragging.current = null;
-      void window.nodus.updatePortraitFocus(person.personId, focus);
-    }
-  };
-
-  return (
-    <div className="shrink-0">
-      <div
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        title={person.portrait ? t('Arrastra para encuadrar la cara') : t('Sube una foto')}
-        style={{ cursor: person.portrait ? 'grab' : 'pointer', touchAction: 'none' }}
-        onClick={() => (person.portrait ? setEditing((v) => !v) : void upload())}
-      >
-        {/* Live preview reflects the in-progress focus while dragging. */}
-        <PersonPortrait person={{ ...person, portrait: person.portrait ? focus : null }} size={SIZE} />
-      </div>
-      {editing && person.portrait && (
-        <div className="mt-2 w-40 space-y-1.5 rounded-md border border-neutral-800 bg-neutral-950 p-2 text-xs">
-          <label className="block text-neutral-500">{t('Zoom')}</label>
-          <input
-            type="range"
-            min={1}
-            max={3}
-            step={0.05}
-            value={focus.scale}
-            onChange={(e) => void persistFocus({ ...focus, scale: Number(e.target.value) })}
-            className="w-full"
-          />
-          <div className="flex gap-2 pt-1">
-            <button className="btn btn-ghost h-7 flex-1 border border-neutral-700 px-1" onClick={() => void upload()}>
-              {t('Cambiar')}
-            </button>
-            <button className="btn btn-ghost h-7 flex-1 border border-neutral-700 px-1 text-red-300" onClick={() => void remove()}>
-              {t('Quitar')}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => Promise<void> }) {
   const [name, setName] = useState('');

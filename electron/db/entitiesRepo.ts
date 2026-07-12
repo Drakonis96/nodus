@@ -45,6 +45,8 @@ interface PersonRow {
   death_date: string | null;
   notes: string | null;
   frame_style: string | null;
+  biography: string | null;
+  biography_at: string | null;
   pf_focus_x: number | null;
   pf_focus_y: number | null;
   pf_scale: number | null;
@@ -77,6 +79,8 @@ function rowToPerson(row: PersonRow): Person {
         ? { focusX: row.pf_focus_x, focusY: row.pf_focus_y ?? 0.5, scale: row.pf_scale ?? 1 }
         : null,
     frameStyle: row.frame_style ?? null,
+    biography: row.biography ?? null,
+    biographyAt: row.biography_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -85,6 +89,12 @@ function rowToPerson(row: PersonRow): Person {
 /** Set (or clear with null) a person's wooden tree-frame override. */
 export function setPersonFrame(personId: string, frameStyle: string | null): void {
   getDb().prepare('UPDATE persons SET frame_style = ?, updated_at = ? WHERE person_id = ?').run(frameStyle, now(), personId);
+}
+
+export function setPersonBiography(personId: string, biography: string | null): void {
+  getDb()
+    .prepare('UPDATE persons SET biography = ?, biography_at = ?, updated_at = ? WHERE person_id = ?')
+    .run(biography, biography ? now() : null, now(), personId);
 }
 
 export function createPerson(input: PersonInput): Person {

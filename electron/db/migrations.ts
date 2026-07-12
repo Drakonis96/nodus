@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 40;
+export const SCHEMA_VERSION = 41;
 
 export const migrations: Migration[] = [
   {
@@ -1235,6 +1235,15 @@ export const migrations: Migration[] = [
         PRIMARY KEY (item_id, person_id)
       );
       CREATE INDEX idx_archive_item_persons_person ON archive_item_persons(person_id);
+    `,
+  },
+  {
+    version: 41,
+    up: /* sql */ `
+      -- Optional AI-generated biography of a person, written only on demand from the
+      -- evidence (events, kinship, linked documents). Stored so it persists and travels.
+      ALTER TABLE persons ADD COLUMN biography TEXT;
+      ALTER TABLE persons ADD COLUMN biography_at TEXT;
     `,
   },
 ];

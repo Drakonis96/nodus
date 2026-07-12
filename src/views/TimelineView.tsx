@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { HistoricalEvent, HistoricalEventType, Person, RecordEvidence } from '@shared/types';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
-import { EVENT_TYPE_LABEL } from './PersonasView';
+import { EVENT_TYPE_LABEL } from '../components/personLabels';
 
 const EVENT_TYPES: HistoricalEventType[] = [
   'birth',
