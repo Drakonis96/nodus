@@ -27,7 +27,7 @@ function generateFourDigitCode(): string {
 }
 
 /** Human label for a vault type. Literal t() calls keep the strings extractable. */
-function vaultTypeLabel(type: VaultType): string {
+export function vaultTypeLabel(type: VaultType): string {
   switch (type) {
     case 'estudio':
       return t('Estudio');

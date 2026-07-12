@@ -30,7 +30,7 @@ import { ResearchAssistantModal } from './views/ResearchAssistantModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
-import { VaultSwitcher } from './components/VaultSwitcher';
+import { VaultSwitcher, vaultTypeLabel } from './components/VaultSwitcher';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
@@ -388,7 +388,17 @@ export function App() {
   return (
     <div className="h-full flex flex-col">
       {/* Top bar */}
-      <header className="flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
+      <header className="relative flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
+        {/* Vault mode, centered, in the vault's accent colour (gold in genealogy via the
+            `.genealogy` remap of the indigo utilities, indigo otherwise). */}
+        {activeVault && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 xl:block">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200">
+              <Icon name={isGenealogy ? 'tree' : 'network'} size={13} />
+              {vaultTypeLabel(activeVault.type)}
+            </span>
+          </div>
+        )}
         <button
           className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
           onClick={toggleNav}
