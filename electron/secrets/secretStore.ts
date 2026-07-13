@@ -1,12 +1,15 @@
-import { safeStorage } from 'electron';
+import { app, safeStorage } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
 import { AI_PROVIDERS as PROVIDERS } from '@shared/providers';
-import { activeVaultDir, vaultDir } from '../vaults/vaultRegistry';
+import { activeVaultDir } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
+// Keys are SHARED GLOBALLY across every vault (a single encrypted file per provider in
+// userData/secrets), so configuring a provider once makes it available in all vaults.
+// Legacy per-vault keys are migrated up to the shared store on first read.
 // Local providers (ollama, lmstudio) are included so an optional access token for
 // a secured instance is stored/cleared through the same encrypted-at-rest path.
 
@@ -14,8 +17,12 @@ function keyFileInDir(dir: string, provider: AiProvider): string {
   return path.join(dir, `ai_key_${provider}.bin`);
 }
 
+function globalSecretsDir(): string {
+  return path.join(app.getPath('userData'), 'secrets');
+}
+
 function keyFile(provider: AiProvider): string {
-  return keyFileInDir(activeVaultDir(), provider);
+  return keyFileInDir(globalSecretsDir(), provider);
 }
 
 function readKeyFile(file: string): string | null {
@@ -46,7 +53,19 @@ export function setApiKey(provider: AiProvider, key: string): void {
 }
 
 export function getApiKey(provider: AiProvider): string | null {
-  return readKeyFile(keyFile(provider));
+  const fromGlobal = readKeyFile(keyFile(provider));
+  if (fromGlobal !== null) return fromGlobal;
+  // One-time migration: an older per-vault key is promoted to the shared store.
+  try {
+    const legacy = readKeyFile(keyFileInDir(activeVaultDir(), provider));
+    if (legacy !== null) {
+      setApiKey(provider, legacy);
+      return legacy;
+    }
+  } catch {
+    /* no active vault (headless) */
+  }
+  return null;
 }
 
 export function hasApiKey(provider: AiProvider): boolean {
@@ -137,23 +156,14 @@ export function providerKeyMap(): Record<AiProvider, boolean> {
   return Object.fromEntries(PROVIDERS.map((p) => [p, hasApiKey(p)])) as Record<AiProvider, boolean>;
 }
 
-export function listApiKeyProvidersForVault(vaultId: string): AiProvider[] {
-  const dir = vaultDir(vaultId);
-  if (!dir) return [];
-  return PROVIDERS.filter((provider) => readKeyFile(keyFileInDir(dir, provider)) !== null);
+/** Providers with a configured key. Keys are shared globally, so the vault id is
+ *  ignored — every vault sees the same providers. */
+export function listApiKeyProvidersForVault(_vaultId?: string): AiProvider[] {
+  return PROVIDERS.filter((provider) => getApiKey(provider) !== null);
 }
 
-export function copyApiKeysBetweenVaults(sourceVaultId: string, targetVaultId: string): AiProvider[] {
-  const sourceDir = vaultDir(sourceVaultId);
-  const targetDir = vaultDir(targetVaultId);
-  if (!sourceDir || !targetDir) throw new Error('Bóveda no encontrada.');
-  fs.mkdirSync(targetDir, { recursive: true });
-  const copied: AiProvider[] = [];
-  for (const provider of PROVIDERS) {
-    const source = keyFileInDir(sourceDir, provider);
-    if (!fs.existsSync(source) || readKeyFile(source) === null) continue;
-    fs.copyFileSync(source, keyFileInDir(targetDir, provider));
-    copied.push(provider);
-  }
-  return copied;
+/** No-op kept for compatibility: keys are already shared across every vault, so there
+ *  is nothing to copy. Returns the providers available to both. */
+export function copyApiKeysBetweenVaults(_sourceVaultId: string, _targetVaultId: string): AiProvider[] {
+  return listApiKeyProvidersForVault();
 }

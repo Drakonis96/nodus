@@ -1,15 +1,25 @@
 import AdmZip from 'adm-zip';
 import type { SyncMergeSummary, SyncTableCounts } from '@shared/types';
 import { getDb, SCHEMA_VERSION } from '../db/database';
+import {
+  serializeDatabasesForSync,
+  replaceDatabaseFromSync,
+  getDatabaseUpdatedAt,
+  type DbSyncUnit,
+} from '../db/databasesRepo';
 
 /**
  * Portable sync package for the USER layer: notes (+ folders), saved writing
- * drafts, saved searches and edge-audit verdicts. Unlike the encrypted full
- * backup (which REPLACES the whole database), importing a sync package MERGES:
- * rows are matched by stable id (or pair key for edge feedback), the newer
- * side wins per row, and nothing local is ever deleted. This is the piece that
- * makes working on two machines survivable — Zotero already syncs the library;
- * this carries the layer Nodus derives nothing from: what the user wrote.
+ * drafts, saved searches, edge-audit verdicts and structured databases (the
+ * Databases vault — whole db_* trees incl. attachment blobs). Unlike the
+ * encrypted full backup (which REPLACES the whole database), importing a sync
+ * package MERGES: rows are matched by stable id (or pair key for edge
+ * feedback), the newer side wins per row, and nothing local is ever deleted.
+ * Databases merge as atomic units (newest-wins by db_databases.updated_at):
+ * unknown databases are inserted whole, and a newer incoming copy replaces the
+ * whole local tree. This is the piece that makes working on two machines
+ * survivable — Zotero already syncs the library; this carries the layer Nodus
+ * derives nothing from: what the user wrote.
  *
  * Core functions are dialog-free so they can run headless (tests, MCP).
  */
@@ -32,6 +42,7 @@ interface SyncPayload {
   writing_saved_drafts: DraftRow[];
   saved_searches: SearchRow[];
   edge_feedback: FeedbackRow[];
+  databases: DbSyncUnit[];
 }
 
 interface FolderRow {
@@ -93,6 +104,7 @@ export function buildSyncPackage(appVersion: string): { buffer: Buffer; counts: 
       .all() as DraftRow[],
     saved_searches: db.prepare('SELECT id, name, query, mode, kinds_json, created_at FROM saved_searches').all() as SearchRow[],
     edge_feedback: db.prepare('SELECT from_id, to_id, type, verdict, note, created_at FROM edge_feedback').all() as FeedbackRow[],
+    databases: serializeDatabasesForSync(),
   };
   const counts = Object.fromEntries(Object.entries(payload).map(([table, rows]) => [table, rows.length]));
   const manifest: SyncManifest = {
@@ -146,6 +158,7 @@ export function mergeSyncPackage(buffer: Buffer): SyncMergeSummary {
     writingDrafts: zeroCounts(),
     savedSearches: zeroCounts(),
     edgeFeedback: zeroCounts(),
+    databases: zeroCounts(),
   };
 
   const tx = db.transaction(() => {
@@ -154,6 +167,7 @@ export function mergeSyncPackage(buffer: Buffer): SyncMergeSummary {
     mergeDrafts(payload.writing_saved_drafts ?? [], summary.writingDrafts);
     mergeSearches(payload.saved_searches ?? [], summary.savedSearches);
     mergeFeedback(payload.edge_feedback ?? [], summary.edgeFeedback);
+    mergeDatabases(payload.databases ?? [], summary.databases);
   });
   tx();
   return summary;
@@ -302,6 +316,28 @@ function mergeFeedback(incoming: FeedbackRow[], counts: SyncTableCounts): void {
         local.to_id,
         fb.type
       );
+      counts.updated += 1;
+    } else {
+      counts.skipped += 1;
+    }
+  }
+}
+
+/**
+ * Databases merge as atomic units. Absent locally → insert the whole tree.
+ * Present on both → the newer `updated_at` wins: a newer incoming copy replaces
+ * the entire local tree (columns, rows, cells, attachment blobs, relations,
+ * views); an older-or-equal one is skipped. Nothing local is deleted unless a
+ * strictly newer replacement arrives for the same database id.
+ */
+function mergeDatabases(incoming: DbSyncUnit[], counts: SyncTableCounts): void {
+  for (const unit of incoming) {
+    const localUpdatedAt = getDatabaseUpdatedAt(unit.database.id);
+    if (localUpdatedAt === null) {
+      replaceDatabaseFromSync(unit);
+      counts.inserted += 1;
+    } else if (unit.database.updated_at > localUpdatedAt) {
+      replaceDatabaseFromSync(unit);
       counts.updated += 1;
     } else {
       counts.skipped += 1;

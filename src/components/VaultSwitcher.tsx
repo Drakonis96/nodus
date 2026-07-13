@@ -1,26 +1,43 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
-import { VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
-import { useDismissableLayer } from '../hooks';
 import { ConfirmModal } from './ConfirmModal';
-import { Icon, PROVIDER_LABELS } from './ui';
+import { Icon } from './ui';
 
 interface VaultSwitcherProps {
+  /** Trigger element the panel anchors under (centre badge or right-rail icon);
+   *  null when the panel is closed. */
+  anchorEl: HTMLElement | null;
+  onClose: () => void;
   vaults: VaultSummary[];
-  activeVault: VaultSummary | null;
   onVaultsChanged: () => Promise<unknown>;
   onActiveVaultChanged: () => Promise<unknown>;
 }
 
 type DestructiveKind = 'delete' | 'reset';
 type DestructiveStep = 'intro' | 'code' | 'final';
+type SortKey = 'recent' | 'created' | 'name';
 
 interface PendingDestructiveAction {
   kind: DestructiveKind;
   vault: VaultSummary;
 }
+
+/** Vault types offered when creating a vault, each with its accent colour. */
+const NEW_VAULT_TYPES: VaultType[] = ['academic', 'genealogy', 'databases'];
+/** Shown in the create grid but not yet selectable — flagged "Próximamente". */
+const COMING_SOON_VAULT_TYPES: VaultType[] = ['primary_sources', 'estudio'];
+const CREATE_VAULT_TYPES: VaultType[] = [...NEW_VAULT_TYPES, ...COMING_SOON_VAULT_TYPES];
+const isComingSoonVaultType = (type: VaultType) => COMING_SOON_VAULT_TYPES.includes(type);
+const VAULT_TYPE_COLOR: Record<string, string> = {
+  academic: '#6366f1',
+  estudio: '#6366f1',
+  primary_sources: '#6366f1',
+  genealogy: '#ca8a04',
+  databases: '#b30333',
+};
 
 function generateFourDigitCode(): string {
   return Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
@@ -43,48 +60,88 @@ export function vaultTypeLabel(type: VaultType): string {
   }
 }
 
-/** Option label for the type picker: unavailable types get a "coming soon" suffix. */
-function vaultTypeOptionLabel(id: VaultType, available: boolean): string {
-  return available ? vaultTypeLabel(id) : `${vaultTypeLabel(id)} (${t('próximamente')})`;
+/** Genealogy and databases are newer modes → they wear a "Beta" badge. */
+function isBetaVaultType(type: VaultType): boolean {
+  return type === 'genealogy' || type === 'databases';
 }
 
-export function VaultSwitcher({
-  vaults,
-  activeVault,
-  onVaultsChanged,
-  onActiveVaultChanged,
-}: VaultSwitcherProps) {
-  const [open, setOpen] = useState(false);
+export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onActiveVaultChanged }: VaultSwitcherProps) {
+  const open = anchorEl != null;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [newVaultName, setNewVaultName] = useState('');
-  const [newVaultType, setNewVaultType] = useState<VaultType>('academic');
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Fixed-position placement computed from the trigger's rect so the panel unfolds
+  // directly under whichever trigger opened it (centre badge or right-rail icon).
+  const [pos, setPos] = useState<{ left: number; top: number; width: number; originX: number } | null>(null);
+
+  // Panel filters.
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<VaultType | 'all'>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('recent');
+
+  // Add-vault modal.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addType, setAddType] = useState<VaultType>('academic');
+
+  // Rename / duplicate modals.
+  const [renameTarget, setRenameTarget] = useState<VaultSummary | null>(null);
   const [renameValue, setRenameValue] = useState('');
-  const [duplicateName, setDuplicateName] = useState('');
-  const [dangerVaultId, setDangerVaultId] = useState('');
+  const [dupTarget, setDupTarget] = useState<VaultSummary | null>(null);
+  const [dupName, setDupName] = useState('');
+
+  // Delete / reset (two-step confirmation + manual code).
   const [pendingAction, setPendingAction] = useState<PendingDestructiveAction | null>(null);
   const [destructiveStep, setDestructiveStep] = useState<DestructiveStep>('intro');
   const [destructiveCode, setDestructiveCode] = useState('');
   const [destructiveEntry, setDestructiveEntry] = useState('');
   const [destructiveError, setDestructiveError] = useState<string | null>(null);
 
-  const dangerVault = useMemo(
-    () => vaults.find((vault) => vault.id === dangerVaultId) ?? activeVault ?? vaults[0] ?? null,
-    [activeVault, dangerVaultId, vaults]
-  );
-
-  useEffect(() => {
-    if (!activeVault) return;
-    setRenameValue(activeVault.name);
-    setDuplicateName(`${activeVault.name} copia`);
-  }, [activeVault?.id, activeVault?.name]);
-
-  useEffect(() => {
-    if (!activeVault && vaults[0]) setDangerVaultId(vaults[0].id);
-    if (activeVault && (!dangerVaultId || !vaults.some((vault) => vault.id === dangerVaultId))) {
-      setDangerVaultId(activeVault.id);
+  // Position the popover under its anchor, clamped to the viewport, and keep it
+  // pinned on resize/scroll. `originX` points the unfold animation at the anchor.
+  useLayoutEffect(() => {
+    if (!open || !anchorEl) {
+      setPos(null);
+      return;
     }
-  }, [activeVault, dangerVaultId, vaults]);
+    const compute = () => {
+      const r = anchorEl.getBoundingClientRect();
+      const width = Math.min(520, window.innerWidth - 32);
+      const rawLeft = r.left + r.width / 2 - width / 2;
+      const left = Math.max(16, Math.min(rawLeft, window.innerWidth - width - 16));
+      setPos({ left, top: r.bottom + 8, width, originX: r.left + r.width / 2 - left });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+    };
+  }, [open, anchorEl]);
+
+  // Dismiss on outside click / Escape. Clicks on a trigger (`data-vault-trigger`)
+  // or inside an open child modal (`[role="dialog"]`) are ignored so they can
+  // toggle or interact without the panel yanking closed underneath them.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (panelRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-vault-trigger],[role="dialog"]')) return;
+      onClose();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('mousedown', onDown, true);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open, onClose]);
 
   const run = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -98,98 +155,99 @@ export function VaultSwitcher({
     }
   };
 
+  // Filtered + sorted vault list for the panel.
+  const shownVaults = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = vaults.filter(
+      (v) => (typeFilter === 'all' || v.type === typeFilter) && (!q || v.name.toLowerCase().includes(q))
+    );
+    const byRecent = (a: VaultSummary, b: VaultSummary) => (b.lastOpenedAt || '').localeCompare(a.lastOpenedAt || '');
+    const byCreated = (a: VaultSummary, b: VaultSummary) => (b.createdAt || '').localeCompare(a.createdAt || '');
+    const byName = (a: VaultSummary, b: VaultSummary) => a.name.localeCompare(b.name);
+    return [...filtered].sort(sortKey === 'created' ? byCreated : sortKey === 'name' ? byName : byRecent);
+  }, [vaults, query, typeFilter, sortKey]);
+
   const loadVault = (vaultId: string) =>
     run(async () => {
       const result = await window.nodus.switchVault(vaultId);
       setMessage(result.message);
       if (result.ok) {
         await onActiveVaultChanged();
-        setOpen(false);
+        onClose();
       } else {
         await onVaultsChanged();
       }
     });
 
-  const createAndLoad = () =>
+  const createVault = () =>
     run(async () => {
-      const name = newVaultName.trim();
+      const name = addName.trim();
       if (!name) {
         setMessage(t('Escribe un nombre para la bóveda.'));
         return;
       }
-      const created = await window.nodus.createVault({ name, type: newVaultType });
+      const created = await window.nodus.createVault({ name, type: addType });
       const result = await window.nodus.switchVault(created.vault.id);
+      setAddOpen(false);
+      setAddName('');
+      setAddType('academic');
       setMessage(result.message);
-      setNewVaultName('');
-      setNewVaultType('academic');
       if (result.ok) {
         await onActiveVaultChanged();
-        setOpen(false);
+        onClose();
       } else {
         await onVaultsChanged();
       }
     });
 
-  const changeActiveType = (type: VaultType) =>
+  const confirmRename = () =>
     run(async () => {
-      if (!activeVault || type === activeVault.type) return;
-      await window.nodus.setVaultType(activeVault.id, type);
-      await onVaultsChanged();
-      setMessage(tx('Tipo de bóveda: {type}.', { type: vaultTypeLabel(type) }));
-    });
-
-  const renameActive = () =>
-    run(async () => {
-      if (!activeVault) return;
+      if (!renameTarget) return;
       const name = renameValue.trim();
       if (!name) {
         setMessage(t('Escribe un nombre para la bóveda.'));
         return;
       }
-      await window.nodus.renameVault(activeVault.id, name);
+      await window.nodus.renameVault(renameTarget.id, name);
+      setRenameTarget(null);
       await onVaultsChanged();
       setMessage(t('Bóveda renombrada.'));
     });
 
-  const duplicateActive = () =>
+  const confirmDuplicate = () =>
     run(async () => {
-      if (!activeVault) return;
-      const name = duplicateName.trim();
+      if (!dupTarget) return;
+      const name = dupName.trim();
       if (!name) {
         setMessage(t('Escribe un nombre para la bóveda.'));
         return;
       }
-      await window.nodus.duplicateVault(activeVault.id, name);
+      await window.nodus.duplicateVault(dupTarget.id, name);
+      setDupTarget(null);
       await onVaultsChanged();
-      setMessage(t('Bóveda duplicada con sus datos y claves API.'));
+      setMessage(t('Bóveda duplicada.'));
     });
 
-  const startDestructiveAction = (kind: DestructiveKind) => {
-    if (!dangerVault) return;
-    setPendingAction({ kind, vault: dangerVault });
+  const startDestructiveAction = (kind: DestructiveKind, vault: VaultSummary) => {
+    setPendingAction({ kind, vault });
     setDestructiveStep('intro');
     setDestructiveCode(generateFourDigitCode());
     setDestructiveEntry('');
     setDestructiveError(null);
   };
-
   const closeDestructiveAction = () => {
     setPendingAction(null);
     setDestructiveEntry('');
     setDestructiveError(null);
   };
-
   const confirmDestructiveCode = () => {
     if (destructiveEntry !== destructiveCode) {
-      setDestructiveError(
-        destructiveEntry.length === 4 ? t('Código incorrecto.') : t('Escribe las cuatro cifras para continuar.')
-      );
+      setDestructiveError(destructiveEntry.length === 4 ? t('Código incorrecto.') : t('Escribe las cuatro cifras para continuar.'));
       return;
     }
     setDestructiveError(null);
     setDestructiveStep('final');
   };
-
   const executeDestructiveAction = () => {
     if (!pendingAction) return;
     const action = pendingAction;
@@ -201,11 +259,10 @@ export function VaultSwitcher({
         setMessage(t('Bóveda eliminada.'));
         return;
       }
-
       await window.nodus.resetVault(action.vault.id);
       if (action.vault.active) {
         await onActiveVaultChanged();
-        setOpen(false);
+        onClose();
       } else {
         await onVaultsChanged();
       }
@@ -213,195 +270,253 @@ export function VaultSwitcher({
     });
   };
 
-  const providerList = (vault: VaultSummary) =>
-    vault.apiKeyProviders.length
-      ? vault.apiKeyProviders.map((provider) => PROVIDER_LABELS[provider]).join(', ')
-      : t('sin claves');
-
-  const deleteDisabledReason =
-    dangerVault?.active
+  const deleteDisabledReason = (v: VaultSummary) =>
+    v.active
       ? t('La bóveda activa no se puede eliminar. Carga otra bóveda antes.')
-      : dangerVault?.legacy
+      : v.legacy
         ? t('La bóveda principal no se puede eliminar; puedes reinicializarla.')
         : null;
-  const switcherRef = useDismissableLayer<HTMLDivElement>({
-    open,
-    onDismiss: () => setOpen(false),
-  });
 
   return (
-    <div className="relative min-w-0" ref={switcherRef}>
-      <button
-        data-tour="vaults"
-        className="btn btn-ghost min-w-0 max-w-[260px] gap-1.5"
-        title={t('Bóveda activa')}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon name="archive" />
-        <span className="min-w-0 truncate">{activeVault?.name ?? t('Bóveda')}</span>
-        <Icon name="chevronDown" size={14} />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl">
-          <div className="max-h-[78vh] space-y-3 overflow-y-auto overflow-x-hidden p-3">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-neutral-200">{t('Bóvedas')}</div>
-                <div className="truncate text-xs text-neutral-500">
-                  {activeVault ? `${t('Activa')}: ${activeVault.name}` : t('Sin bóveda activa')}
-                </div>
-              </div>
-              <button className="btn btn-ghost shrink-0 px-2 py-1" onClick={() => setOpen(false)} title={t('Cerrar')}>
+    <>
+      {createPortal(
+        <AnimatePresence>
+          {open && pos && (
+            <motion.div
+              ref={panelRef}
+              key="vault-panel"
+              initial={{ opacity: 0, scaleY: 0.8, y: -8 }}
+              animate={{ opacity: 1, scaleY: 1, y: 0 }}
+              exit={{ opacity: 0, scaleY: 0.85, y: -8 }}
+              transition={{ duration: 0.16, ease: 'easeOut' }}
+              style={{
+                position: 'fixed',
+                left: pos.left,
+                top: pos.top,
+                width: pos.width,
+                transformOrigin: `${pos.originX}px top`,
+                zIndex: 55,
+              }}
+              className="overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
+            >
+          <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
+            <div className="text-sm font-semibold text-neutral-200">{tx('Bóvedas ({n})', { n: vaults.length })}</div>
+            <div className="flex items-center gap-1">
+              <button className="btn btn-primary gap-1.5 px-2 py-1 text-xs" onClick={() => setAddOpen(true)} title={t('Añadir bóveda')}>
+                <Icon name="plus" size={14} /> {t('Añadir')}
+              </button>
+              <button className="btn btn-ghost px-2 py-1" onClick={() => onClose()} title={t('Cerrar')}>
                 <Icon name="x" />
               </button>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              {vaults.map((vault) => (
-                <div
-                  key={vault.id}
-                  className="grid min-w-0 grid-cols-[minmax(0,1fr)_5.75rem] items-center gap-2 rounded-md border border-neutral-800 px-2 py-2"
-                >
-                  <div className="min-w-0">
+          {/* Search + type filter + sort */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-neutral-800 px-3 py-2">
+            <div className="relative min-w-0 flex-1">
+              <Icon name="search" size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <input
+                className="input input-with-leading-icon h-8 w-full py-1 text-xs"
+                placeholder={t('Buscar bóvedas…')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <select
+              className="input h-8 w-auto min-w-0 py-1 text-xs"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as VaultType | 'all')}
+              title={t('Filtrar por tipo')}
+            >
+              <option value="all">{t('Todos los tipos')}</option>
+              {NEW_VAULT_TYPES.map((tp) => (
+                <option key={tp} value={tp}>
+                  {vaultTypeLabel(tp)}
+                </option>
+              ))}
+            </select>
+            <select
+              className="input h-8 w-auto min-w-0 py-1 text-xs"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              title={t('Ordenar')}
+            >
+              <option value="recent">{t('Último uso')}</option>
+              <option value="created">{t('Fecha de creación')}</option>
+              <option value="name">{t('Nombre')}</option>
+            </select>
+          </div>
+
+          <div className="max-h-[62vh] space-y-1.5 overflow-y-auto p-3">
+            {shownVaults.length === 0 && <p className="px-1 py-2 text-xs text-neutral-500">{t('Sin coincidencias.')}</p>}
+            {shownVaults.map((vault) => {
+              const delReason = deleteDisabledReason(vault);
+              return (
+                <div key={vault.id} className="flex min-w-0 items-center gap-2 rounded-md border border-neutral-800 px-2 py-2">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: VAULT_TYPE_COLOR[vault.type] ?? '#6366f1' }} />
+                  <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-sm text-neutral-200">{vault.name}</span>
-                      <span className="shrink-0 rounded-full border border-neutral-700 bg-neutral-800/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400">
-                        {vaultTypeLabel(vault.type)}
-                      </span>
+                      {vault.active && <span className="shrink-0 rounded bg-indigo-600 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">{t('Activa')}</span>}
                     </div>
-                    <div className="truncate text-xs text-neutral-500">{providerList(vault)}</div>
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+                      <span className="truncate">{vaultTypeLabel(vault.type)}</span>
+                      {isBetaVaultType(vault.type) && (
+                        <span className="shrink-0 rounded border border-amber-600/50 bg-amber-500/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-amber-400">Beta</span>
+                      )}
+                    </div>
                   </div>
-                  {vault.active ? (
-                    <span className="inline-flex h-8 w-full items-center justify-center rounded-lg bg-indigo-600 px-3 text-xs font-medium text-white">{t('Activa')}</span>
-                  ) : (
-                    <button
-                      className="btn btn-primary h-8 w-full py-1 text-xs"
-                      onClick={() => void loadVault(vault.id)}
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <IconBtn
+                      icon={vault.active ? 'check' : 'play'}
+                      title={vault.active ? t('Bóveda activa') : t('Cargar')}
+                      onClick={() => !vault.active && void loadVault(vault.id)}
+                      disabled={busy || vault.active}
+                    />
+                    <IconBtn
+                      icon="edit"
+                      title={t('Renombrar')}
+                      onClick={() => {
+                        setRenameTarget(vault);
+                        setRenameValue(vault.name);
+                      }}
                       disabled={busy}
-                    >
-                      {t('Cargar')}
-                    </button>
-                  )}
+                    />
+                    <IconBtn
+                      icon="copy"
+                      title={t('Duplicar')}
+                      onClick={() => {
+                        setDupTarget(vault);
+                        setDupName(tx('{name} copia', { name: vault.name }));
+                      }}
+                      disabled={busy}
+                    />
+                    <IconBtn
+                      icon="trash"
+                      title={delReason ?? t('Eliminar')}
+                      danger
+                      onClick={() => startDestructiveAction('delete', vault)}
+                      disabled={busy || Boolean(delReason)}
+                    />
+                  </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="space-y-2 rounded-md border border-neutral-800 p-2">
-              <div className="text-xs text-neutral-500">{t('Nueva bóveda')}</div>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-                <input
-                  className="input h-9 min-w-0 text-sm"
-                  value={newVaultName}
-                  onChange={(event) => setNewVaultName(event.target.value)}
-                  placeholder={t('Nombre de la bóveda')}
-                />
-                <select
-                  className="input h-9 w-full min-w-0 text-sm"
-                  value={newVaultType}
-                  onChange={(event) => setNewVaultType(event.target.value as VaultType)}
-                  title={t('Tipo de bóveda')}
-                >
-                  {VAULT_TYPES.map((def) => (
-                    <option key={def.id} value={def.id} disabled={!def.available}>
-                      {vaultTypeOptionLabel(def.id, def.available)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button className="btn btn-primary h-9 w-full gap-1.5" onClick={() => void createAndLoad()} disabled={busy}>
-                <Icon name="plus" /> {t('Crear')}
-              </button>
-            </div>
-
-            {activeVault && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-                <input
-                  className="input h-9 min-w-0 text-sm"
-                  value={renameValue}
-                  onChange={(event) => setRenameValue(event.target.value)}
-                />
-                <button className="btn btn-ghost h-9 w-full gap-1.5 border border-neutral-700" onClick={() => void renameActive()} disabled={busy}>
-                  <Icon name="edit" /> {t('Renombrar')}
-                </button>
-              </div>
-            )}
-
-            {activeVault && (
-              <label className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-                <span className="text-xs text-neutral-500">{t('Tipo de bóveda')}</span>
-                <select
-                  className="input h-9 w-full min-w-0 text-sm"
-                  value={activeVault.type}
-                  onChange={(event) => void changeActiveType(event.target.value as VaultType)}
-                  disabled={busy}
-                >
-                  {VAULT_TYPES.map((def) => (
-                    // The vault's own current type stays selectable even if it's
-                    // otherwise gated off (e.g. it was set before this release).
-                    <option key={def.id} value={def.id} disabled={!def.available && def.id !== activeVault.type}>
-                      {vaultTypeOptionLabel(def.id, def.available)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {activeVault && (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_8.75rem]">
-                <input
-                  className="input h-9 min-w-0 text-sm"
-                  value={duplicateName}
-                  onChange={(event) => setDuplicateName(event.target.value)}
-                />
-                <button className="btn btn-ghost h-9 w-full gap-1.5 border border-neutral-700" onClick={() => void duplicateActive()} disabled={busy}>
-                  <Icon name="copy" /> {t('Duplicar')}
-                </button>
-              </div>
-            )}
-
-            {dangerVault && (
-              <div className="vault-danger-panel space-y-2 rounded-md border border-red-200 bg-red-50 p-2 dark:border-red-900/60 dark:bg-red-950/20">
-                <div className="vault-danger-title text-xs font-medium text-red-700 dark:text-red-300">{t('Zona peligrosa')}</div>
-                <label className="block space-y-1">
-                  <span className="text-xs text-neutral-500">{t('Vault objetivo')}</span>
-                  <select
-                    className="input w-full min-w-0 text-sm"
-                    value={dangerVault.id}
-                    onChange={(event) => setDangerVaultId(event.target.value)}
-                  >
-                    {vaults.map((vault) => (
-                      <option key={vault.id} value={vault.id}>
-                        {vault.active ? `${vault.name} · ${t('Activa')}` : vault.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <button
-                    className="vault-danger-button btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50"
-                    onClick={() => startDestructiveAction('reset')}
-                    disabled={busy}
-                  >
-                    <Icon name="refresh" /> {t('Reinicializar')}
-                  </button>
-                  <button
-                    className="vault-danger-button btn w-full gap-1.5 border border-red-800 text-red-300 hover:bg-red-950/50 disabled:cursor-not-allowed disabled:opacity-45"
-                    onClick={() => startDestructiveAction('delete')}
-                    disabled={busy || Boolean(deleteDisabledReason)}
-                    title={deleteDisabledReason ?? undefined}
-                  >
-                    <Icon name="trash" /> {t('Eliminar')}
-                  </button>
-                </div>
-                {deleteDisabledReason && <p className="text-xs leading-5 text-neutral-500">{deleteDisabledReason}</p>}
-              </div>
-            )}
+              );
+            })}
 
             {message && <div className="rounded-md border border-neutral-800 px-2 py-1 text-xs text-neutral-300">{message}</div>}
           </div>
-        </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
       )}
+
+      {/* Add-vault modal */}
+      {addOpen &&
+        createPortal(
+          <ModalShell title={t('Añadir bóveda')} onCancel={() => setAddOpen(false)}>
+            <label className="block text-sm">
+              {t('Nombre de la bóveda')}
+              <input className="input mt-1 w-full" autoFocus value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={t('Nombre de la bóveda')} />
+            </label>
+            <div className="mt-3">
+              <div className="mb-1.5 text-xs text-neutral-500">{t('Tipo de bóveda')}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {CREATE_VAULT_TYPES.map((tp) => {
+                  const soon = isComingSoonVaultType(tp);
+                  return (
+                    <button
+                      key={tp}
+                      type="button"
+                      disabled={soon}
+                      title={soon ? t('Próximamente') : undefined}
+                      className={`relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors ${
+                        soon
+                          ? 'cursor-not-allowed border-neutral-800/70 opacity-50'
+                          : addType === tp
+                            ? 'border-transparent ring-2'
+                            : 'border-neutral-800 hover:border-neutral-600'
+                      }`}
+                      style={!soon && addType === tp ? { boxShadow: `inset 0 0 0 1px ${VAULT_TYPE_COLOR[tp]}`, ['--tw-ring-color' as string]: VAULT_TYPE_COLOR[tp] } : undefined}
+                      onClick={() => !soon && setAddType(tp)}
+                    >
+                      {soon ? (
+                        <span className="absolute right-1 top-1 rounded border border-neutral-600/60 bg-neutral-500/10 px-1 text-[9px] font-semibold uppercase text-neutral-400">
+                          {t('Pronto')}
+                        </span>
+                      ) : (
+                        isBetaVaultType(tp) && (
+                          <span className="absolute right-1 top-1 rounded border border-amber-600/50 bg-amber-500/10 px-1 text-[9px] font-semibold uppercase text-amber-400">Beta</span>
+                        )
+                      )}
+                      <span className="h-6 w-6 rounded-full" style={{ backgroundColor: VAULT_TYPE_COLOR[tp] }} />
+                      <span className="text-xs font-medium text-neutral-200">{vaultTypeLabel(tp)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-neutral-500">{t('Las claves de IA se comparten entre todas las bóvedas: no hace falta reconfigurarlas.')}</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setAddOpen(false)}>
+                {t('Cancelar')}
+              </button>
+              <button className="btn btn-primary gap-1.5" onClick={() => void createVault()} disabled={busy}>
+                <Icon name="plus" /> {t('Crear')}
+              </button>
+            </div>
+          </ModalShell>,
+          document.body
+        )}
+
+      {/* Rename modal */}
+      {renameTarget &&
+        createPortal(
+          <ModalShell title={t('Renombrar bóveda')} onCancel={() => setRenameTarget(null)}>
+            <input
+              className="input w-full"
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void confirmRename();
+                if (e.key === 'Escape') setRenameTarget(null);
+              }}
+            />
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setRenameTarget(null)}>
+                {t('Cancelar')}
+              </button>
+              <button className="btn btn-primary" onClick={() => void confirmRename()} disabled={busy}>
+                {t('Renombrar')}
+              </button>
+            </div>
+          </ModalShell>,
+          document.body
+        )}
+
+      {/* Duplicate modal (with confirmation) */}
+      {dupTarget &&
+        createPortal(
+          <ModalShell title={t('Duplicar bóveda')} onCancel={() => setDupTarget(null)}>
+            <p className="mb-3 text-sm text-neutral-400">
+              {tx('Se creará una copia de «{name}» con todos sus datos.', { name: dupTarget.name })}
+            </p>
+            <label className="block text-sm">
+              {t('Nombre de la copia')}
+              <input className="input mt-1 w-full" autoFocus value={dupName} onChange={(e) => setDupName(e.target.value)} />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={() => setDupTarget(null)}>
+                {t('Cancelar')}
+              </button>
+              <button className="btn btn-primary gap-1.5" onClick={() => void confirmDuplicate()} disabled={busy}>
+                <Icon name="copy" /> {t('Duplicar')}
+              </button>
+            </div>
+          </ModalShell>,
+          document.body
+        )}
 
       {renderDestructiveModal({
         pendingAction,
@@ -416,6 +531,33 @@ export function VaultSwitcher({
         onCodeConfirm: confirmDestructiveCode,
         onFinalConfirm: executeDestructiveAction,
       })}
+    </>
+  );
+}
+
+function IconBtn({ icon, title, onClick, disabled, danger }: { icon: string; title: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  return (
+    <button
+      className={`rounded p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
+        danger ? 'text-neutral-400 hover:bg-red-950/40 hover:text-red-400' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+      }`}
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Icon name={icon} size={15} />
+    </button>
+  );
+}
+
+/** A small centered modal shell used by the add / rename / duplicate dialogs. */
+function ModalShell({ title, children, onCancel }: { title: string; children: React.ReactNode; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6" onClick={onCancel}>
+      <div className="card w-full max-w-md p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <h2 className="mb-3 text-base font-semibold">{title}</h2>
+        {children}
+      </div>
     </div>
   );
 }
@@ -450,26 +592,12 @@ function renderDestructiveModal({
   const title = pendingAction.kind === 'delete' ? t('Eliminar bóveda') : t('Reinicializar bóveda');
   const introMessage =
     pendingAction.kind === 'delete'
-      ? tx('Esta acción eliminará la bóveda "{name}" y sus archivos locales. No afecta a otras bóvedas.', {
-          name: pendingAction.vault.name,
-        })
-      : tx('Esta acción borrará el contenido de "{name}" y recreará su base de datos vacía. No afecta a otras bóvedas.', {
-          name: pendingAction.vault.name,
-        });
-  const finalLabel =
-    pendingAction.kind === 'delete' ? t('Eliminar definitivamente') : t('Reinicializar definitivamente');
+      ? tx('Esta acción eliminará la bóveda "{name}" y sus archivos locales. No afecta a otras bóvedas.', { name: pendingAction.vault.name })
+      : tx('Esta acción borrará el contenido de "{name}" y recreará su base de datos vacía. No afecta a otras bóvedas.', { name: pendingAction.vault.name });
+  const finalLabel = pendingAction.kind === 'delete' ? t('Eliminar definitivamente') : t('Reinicializar definitivamente');
 
   if (step === 'intro') {
-    return (
-      <ConfirmModal
-        title={title}
-        message={introMessage}
-        confirmLabel={t('Continuar')}
-        danger
-        onConfirm={onIntroConfirm}
-        onCancel={onCancel}
-      />
-    );
+    return <ConfirmModal title={title} message={introMessage} confirmLabel={t('Continuar')} danger onConfirm={onIntroConfirm} onCancel={onCancel} />;
   }
 
   if (step === 'final') {
@@ -487,18 +615,10 @@ function renderDestructiveModal({
 
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6" onClick={onCancel}>
-      <div
-        className="card w-full max-w-sm p-5"
-        role="dialog"
-        aria-modal="true"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <div className="card w-full max-w-sm p-5" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <h2 className="mb-2 font-semibold">{t('Código de seguridad')}</h2>
         <p className="mb-4 text-sm text-neutral-400">{t('Introduce este código manualmente')}</p>
-        <div
-          className="mb-4 flex select-none justify-center gap-2 text-2xl font-semibold tracking-[0.25em] text-neutral-100"
-          onCopy={(event) => event.preventDefault()}
-        >
+        <div className="mb-4 flex select-none justify-center gap-2 text-2xl font-semibold tracking-[0.25em] text-neutral-100" onCopy={(event) => event.preventDefault()}>
           {code.split('').map((digit, index) => (
             <span key={`${digit}-${index}`} className="rounded-md border border-neutral-700 px-3 py-2">
               {digit}

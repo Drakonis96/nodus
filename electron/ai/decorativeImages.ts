@@ -39,7 +39,7 @@ interface ImageSource {
   textModel: ModelRef | null;
 }
 
-interface GeneratedImageBytes {
+export interface GeneratedImageBytes {
   bytes: Buffer;
   mimeType: string;
 }
@@ -190,7 +190,7 @@ function generateOpenRouter(model: string, prompt: string, key: string): Promise
   return postBase64Image('https://openrouter.ai/api/v1/images', { model, prompt, n: 1 }, key);
 }
 
-async function callImageProvider(provider: ImageProvider, model: string, prompt: string): Promise<GeneratedImageBytes> {
+export async function callImageProvider(provider: ImageProvider, model: string, prompt: string): Promise<GeneratedImageBytes> {
   const key = providerKey(provider);
   if (!key) throw new Error(`Falta la clave de ${provider === 'google' ? 'Google' : provider === 'openai' ? 'OpenAI' : 'OpenRouter'}.`);
   switch (provider) {
@@ -203,7 +203,7 @@ async function callImageProvider(provider: ImageProvider, model: string, prompt:
   }
 }
 
-async function optimizedJpegs(generated: GeneratedImageBytes): Promise<{ image: Buffer; thumbnail: Buffer }> {
+export async function optimizedJpegs(generated: GeneratedImageBytes): Promise<{ image: Buffer; thumbnail: Buffer }> {
   const source = nativeImage.createFromBuffer(generated.bytes);
   if (!source.isEmpty()) {
     const size = source.getSize();
@@ -398,7 +398,7 @@ export async function generatePersonPortraitFromDescription(personId: string, de
   const prompt = buildReferencePortraitPrompt(trimmed);
   const generated = await callImageProvider(settings.imageProvider, settings.imageModel, prompt);
   const optimized = await optimizedJpegs(generated);
-  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 });
+  setPersonPortrait(personId, optimized.image, 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
 }
 
 function buildReferencePortraitPrompt(description: string): string {

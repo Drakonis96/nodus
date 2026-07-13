@@ -5,6 +5,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The top bar is a window drag region (so the frameless/hiddenInset window can be
+   moved by its empty areas), while every interactive child stays clickable. */
+.app-titlebar {
+  -webkit-app-region: drag;
+}
+.app-titlebar button,
+.app-titlebar a,
+.app-titlebar input,
+.app-titlebar select,
+.app-titlebar textarea,
+.app-titlebar [role='button'],
+.app-titlebar [data-no-drag] {
+  -webkit-app-region: no-drag;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -157,10 +172,12 @@ body {
 .light .hover\:bg-indigo-900\/60:hover {
   background-color: #c7d2fe;
 }
-.light .bg-emerald-900\/50 {
+.light .bg-emerald-900\/50,
+.light .bg-emerald-900\/40 {
   background-color: #d1fae5;
 }
-.light .bg-amber-900\/50 {
+.light .bg-amber-900\/50,
+.light .bg-amber-900\/40 {
   background-color: #fef3c7;
 }
 .light .bg-red-900\/50,
@@ -188,6 +205,9 @@ body {
 .light .bg-indigo-950\/20 {
   background-color: #e0e7ff;
 }
+.light .bg-indigo-950\/10 {
+  background-color: #eef2ff;
+}
 .light .bg-indigo-900\/20 {
   background-color: #eef2ff;
 }
@@ -212,6 +232,10 @@ body {
 .light .border-indigo-900\/70 {
   border-color: rgba(129, 140, 248, 0.45);
 }
+.light .border-indigo-900\/50,
+.light .border-indigo-900\/40 {
+  border-color: rgba(129, 140, 248, 0.35);
+}
 .light .border-indigo-700,
 .light .border-indigo-700\/60 {
   border-color: #a5b4fc;
@@ -235,6 +259,8 @@ body {
   color: #4338ca;
 }
 .light .hover\:bg-neutral-900:hover,
+.light .hover\:bg-neutral-900\/30:hover,
+.light .hover\:bg-neutral-900\/40:hover,
 .light .hover\:bg-neutral-900\/50:hover,
 .light .hover\:bg-neutral-900\/60:hover,
 .light .hover\:bg-neutral-900\/70:hover,
@@ -242,7 +268,9 @@ body {
   background-color: #f5f5f5;
 }
 .light .hover\:bg-neutral-800:hover,
+.light .hover\:bg-neutral-800\/40:hover,
 .light .hover\:bg-neutral-800\/50:hover,
+.light .hover\:bg-neutral-800\/60:hover,
 .light .hover\:bg-neutral-800\/80:hover {
   background-color: #e5e7eb;
 }
@@ -413,6 +441,16 @@ body {
 }
 .light .bg-amber-950\/50 {
   background-color: #fef3c7;
+}
+.light .bg-amber-950\/10 {
+  background-color: #fffbeb;
+}
+.light .bg-amber-950\/20 {
+  background-color: #fef3c7;
+}
+.light .border-amber-900\/50,
+.light .border-amber-900\/60 {
+  border-color: rgba(217, 119, 6, 0.35);
 }
 .light .bg-neutral-950\/45 {
   background-color: rgba(248, 250, 252, 0.86);
@@ -587,6 +625,111 @@ body {
 .genealogy .hover\:border-indigo-700\/60:hover { border-color: rgba(161, 98, 7, 0.6); }
 .genealogy .ring-indigo-500 { --tw-ring-color: #d4a017; }
 .genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.4); }
+
+/* Genealogy mode in the LIGHT theme. Like .light.databases: the .genealogy rules
+   above remap indigo→gold but keep the DARK shades (950/900), so a light window shows
+   dark gold surfaces (the GENEALOGÍA header pill, home icons, search facets, library
+   notice). These compound rules win on specificity and lighten those to gold tints,
+   and darken the gold TEXT so it stays legible on a light gold ground. */
+.light.genealogy .bg-indigo-950,
+.light.genealogy .bg-indigo-950\/20,
+.light.genealogy .bg-indigo-950\/25,
+.light.genealogy .bg-indigo-950\/30,
+.light.genealogy .bg-indigo-950\/40 { background-color: #fef3c7; }
+.light.genealogy .bg-indigo-900,
+.light.genealogy .bg-indigo-900\/40,
+.light.genealogy .bg-indigo-900\/50 { background-color: #fde68a; }
+.light.genealogy .bg-indigo-600\/15 { background-color: rgba(202, 138, 4, 0.12); }
+.light.genealogy .bg-indigo-600\/20 { background-color: rgba(202, 138, 4, 0.16); }
+.light.genealogy .text-indigo-100,
+.light.genealogy .text-indigo-200 { color: #78350f; }
+.light.genealogy .text-indigo-300 { color: #92400e; }
+.light.genealogy .text-indigo-400 { color: #a16207; }
+.light.genealogy .border-indigo-700,
+.light.genealogy .border-indigo-700\/60 { border-color: rgba(202, 138, 4, 0.5); }
+.light.genealogy .border-indigo-800\/60,
+.light.genealogy .border-indigo-800\/70,
+.light.genealogy .border-indigo-900\/70 { border-color: rgba(202, 138, 4, 0.32); }
+.light.genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.35); }
+
+/* Databases vault → Nodus crimson (#B30333) accent instead of the indigo default.
+   Same remap strategy as .genealogy: override the accent utility classes used
+   across the app with the crimson scale and its lighter/darker gradient shades. */
+.databases {
+  --tw-ring-color: rgba(179, 3, 51, 0.48);
+}
+.databases .btn-primary {
+  background-color: #b30333;
+}
+.databases .btn-primary:hover {
+  background-color: #cc0a3a;
+}
+.databases .text-indigo-100 { color: #ffe4ec; }
+.databases .text-indigo-200 { color: #f9b4c4; }
+.databases .text-indigo-300 { color: #f27a97; }
+.databases .text-indigo-400 { color: #e23a63; }
+.databases .text-indigo-500 { color: #cc0a3a; }
+.databases .text-indigo-600 { color: #b30333; }
+.databases .text-indigo-700 { color: #8a0227; }
+.databases .text-indigo-900 { color: #4d0116; }
+.databases .hover\:text-indigo-300:hover { color: #f27a97; }
+.databases .hover\:text-indigo-400:hover { color: #e23a63; }
+.databases .bg-indigo-400 { background-color: #e23a63; }
+.databases .bg-indigo-500 { background-color: #cc0a3a; }
+.databases .bg-indigo-600 { background-color: #b30333; }
+.databases .hover\:bg-indigo-500:hover { background-color: #d40a3f; }
+.databases .bg-indigo-50 { background-color: #fff1f4; }
+.databases .bg-indigo-100 { background-color: #ffe4ec; }
+.databases .bg-indigo-900 { background-color: #4d0116; }
+.databases .bg-indigo-950 { background-color: #2b0010; }
+.databases .bg-indigo-600\/15 { background-color: rgba(179, 3, 51, 0.15); }
+.databases .bg-indigo-600\/20 { background-color: rgba(179, 3, 51, 0.2); }
+.databases .bg-indigo-900\/40 { background-color: rgba(77, 1, 22, 0.4); }
+.databases .bg-indigo-900\/50 { background-color: rgba(77, 1, 22, 0.5); }
+.databases .bg-indigo-950\/20 { background-color: rgba(43, 0, 16, 0.2); }
+.databases .bg-indigo-950\/25 { background-color: rgba(43, 0, 16, 0.25); }
+.databases .bg-indigo-950\/30 { background-color: rgba(43, 0, 16, 0.3); }
+.databases .bg-indigo-950\/40 { background-color: rgba(43, 0, 16, 0.4); }
+.databases .border-indigo-200 { border-color: #f9b4c4; }
+.databases .border-indigo-400 { border-color: #e23a63; }
+.databases .border-indigo-500 { border-color: #cc0a3a; }
+.databases .border-indigo-600 { border-color: #b30333; }
+.databases .border-indigo-700 { border-color: #8a0227; }
+.databases .border-indigo-800 { border-color: #6b011e; }
+.databases .border-indigo-600\/70 { border-color: rgba(179, 3, 51, 0.7); }
+.databases .border-indigo-700\/60 { border-color: rgba(138, 2, 39, 0.6); }
+.databases .border-indigo-800\/60 { border-color: rgba(107, 1, 30, 0.6); }
+.databases .border-indigo-800\/70 { border-color: rgba(107, 1, 30, 0.7); }
+.databases .border-indigo-900\/70 { border-color: rgba(77, 1, 22, 0.7); }
+.databases .hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
+.databases .ring-indigo-500 { --tw-ring-color: #cc0a3a; }
+.databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.4); }
+
+/* Databases mode in the LIGHT theme. The plain `.databases` rules above remap the
+   indigo hue to crimson but keep the DARK shades (950/900), so a light-theme window
+   still shows dark crimson surfaces. These compound `.light.databases` rules win on
+   specificity and lighten those surfaces to crimson tints (mirrors the default
+   `.light` remap). Solid accents (bg-indigo-600 = the primary button / active item)
+   deliberately stay crimson in both themes. */
+.light.databases .bg-indigo-950,
+.light.databases .bg-indigo-950\/20,
+.light.databases .bg-indigo-950\/25,
+.light.databases .bg-indigo-950\/30,
+.light.databases .bg-indigo-950\/40 { background-color: #ffe4ec; }
+.light.databases .bg-indigo-900,
+.light.databases .bg-indigo-900\/40,
+.light.databases .bg-indigo-900\/50 { background-color: #ffd6e1; }
+.light.databases .bg-indigo-600\/15 { background-color: rgba(179, 3, 51, 0.10); }
+.light.databases .bg-indigo-600\/20 { background-color: rgba(179, 3, 51, 0.14); }
+.light.databases .text-indigo-100,
+.light.databases .text-indigo-200 { color: #8a0227; }
+.light.databases .text-indigo-300 { color: #a30530; }
+.light.databases .border-indigo-700,
+.light.databases .border-indigo-700\/60 { border-color: rgba(179, 3, 51, 0.45); }
+.light.databases .border-indigo-800\/60,
+.light.databases .border-indigo-800\/70,
+.light.databases .border-indigo-900\/70 { border-color: rgba(179, 3, 51, 0.28); }
+.light.databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.35); }
 
 .input {
   @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;

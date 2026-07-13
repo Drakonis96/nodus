@@ -14,6 +14,7 @@ import type {
 // can abort it without the renderer having to juggle request ids. Only one chat
 // stream runs at a time (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
+let activeDbChatRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -107,6 +108,8 @@ const api: NodusApi = {
   createArchiveFolder: (name, parentId) => ipcRenderer.invoke('archive:createFolder', name, parentId),
   renameArchiveFolder: (id, name) => ipcRenderer.invoke('archive:renameFolder', id, name),
   deleteArchiveFolder: (id) => ipcRenderer.invoke('archive:deleteFolder', id).then(() => undefined),
+  listArchiveItemFolders: (itemId) => ipcRenderer.invoke('archive:listItemFolders', itemId),
+  setArchiveItemFolders: (itemId, folderIds) => ipcRenderer.invoke('archive:setItemFolders', itemId, folderIds),
   listArchiveItems: (opts) => ipcRenderer.invoke('archive:listItems', opts),
   getArchiveItem: (id) => ipcRenderer.invoke('archive:getItem', id),
   getArchiveItemBlob: (id) => ipcRenderer.invoke('archive:getItemBlob', id),
@@ -129,6 +132,91 @@ const api: NodusApi = {
   suggestDocumentsForPerson: (personId) => ipcRenderer.invoke('archive:suggestDocumentsForPerson', personId),
   indexArchive: () => ipcRenderer.invoke('archive:index'),
   archiveIndexStatus: () => ipcRenderer.invoke('archive:indexStatus'),
+  // databases mode
+  listDatabases: () => ipcRenderer.invoke('db:list'),
+  searchDatabases: (query, includeContent) => ipcRenderer.invoke('db:search', query, includeContent),
+  searchDatabaseRows: (query, limit) => ipcRenderer.invoke('db:searchRows', query, limit),
+  getDatabase: (id) => ipcRenderer.invoke('db:get', id),
+  getDatabaseDetail: (id) => ipcRenderer.invoke('db:detail', id),
+  databaseStats: (id) => ipcRenderer.invoke('db:stats', id),
+  createDatabase: (name, icon) => ipcRenderer.invoke('db:create', name, icon),
+  renameDatabase: (id, name) => ipcRenderer.invoke('db:rename', id, name),
+  setDatabaseIcon: (id, icon) => ipcRenderer.invoke('db:setIcon', id, icon),
+  deleteDatabase: (id) => ipcRenderer.invoke('db:delete', id).then(() => undefined),
+  reorderDatabases: (ids) => ipcRenderer.invoke('db:reorder', ids).then(() => undefined),
+  createDatabaseColumn: (databaseId, name, type, config) =>
+    ipcRenderer.invoke('db:createColumn', databaseId, name, type, config),
+  updateDatabaseColumn: (id, patch) => ipcRenderer.invoke('db:updateColumn', id, patch),
+  deleteDatabaseColumn: (id) => ipcRenderer.invoke('db:deleteColumn', id).then(() => undefined),
+  reorderDatabaseColumns: (databaseId, ids) => ipcRenderer.invoke('db:reorderColumns', databaseId, ids).then(() => undefined),
+  addDatabaseOption: (columnId, label, color) => ipcRenderer.invoke('db:addOption', columnId, label, color),
+  updateDatabaseOption: (id, patch) => ipcRenderer.invoke('db:updateOption', id, patch).then(() => undefined),
+  deleteDatabaseOption: (id) => ipcRenderer.invoke('db:deleteOption', id).then(() => undefined),
+  reorderDatabaseOptions: (columnId, ids) => ipcRenderer.invoke('db:reorderOptions', columnId, ids).then(() => undefined),
+  listDatabaseRows: (databaseId, opts) => ipcRenderer.invoke('db:listRows', databaseId, opts),
+  getDatabaseRow: (id) => ipcRenderer.invoke('db:getRow', id),
+  createDatabaseRow: (databaseId) => ipcRenderer.invoke('db:createRow', databaseId),
+  deleteDatabaseRow: (id) => ipcRenderer.invoke('db:deleteRow', id).then(() => undefined),
+  setDatabaseCell: (rowId, columnId, raw) => ipcRenderer.invoke('db:setCell', rowId, columnId, raw),
+  listDatabaseAttachments: (rowId, columnId) => ipcRenderer.invoke('db:listAttachments', rowId, columnId),
+  getDatabaseAttachmentBlob: (id) => ipcRenderer.invoke('db:getAttachmentBlob', id),
+  deleteDatabaseAttachment: (id) => ipcRenderer.invoke('db:deleteAttachment', id).then(() => undefined),
+  downloadDatabaseAttachment: (id) => ipcRenderer.invoke('db:downloadAttachment', id),
+  pickAndAttachDatabaseFiles: (rowId, columnId) => ipcRenderer.invoke('db:pickAndAttach', rowId, columnId),
+  runDatabaseAiCell: (rowId, columnId) => ipcRenderer.invoke('db:runAiCell', rowId, columnId),
+  runDatabaseAiColumn: (databaseId, columnId) => ipcRenderer.invoke('db:runAiColumn', databaseId, columnId),
+  generateDatabaseAiImage: (rowId, columnId) => ipcRenderer.invoke('db:generateAiImage', rowId, columnId),
+  generateDatabaseAiImageColumn: (databaseId, columnId) => ipcRenderer.invoke('db:generateAiImageColumn', databaseId, columnId),
+  onDatabaseAiProgress: (cb) => {
+    const listener = (_e: unknown, payload: { columnId: string; done: number; total: number }) => cb(payload);
+    ipcRenderer.on('db:aiProgress', listener);
+    return () => ipcRenderer.removeListener('db:aiProgress', listener);
+  },
+  listDatabaseRelations: (rowId, columnId) => ipcRenderer.invoke('db:listRelations', rowId, columnId),
+  addDatabaseRelation: (rowId, columnId, targetKind, targetId, targetVaultId) =>
+    ipcRenderer.invoke('db:addRelation', rowId, columnId, targetKind, targetId, targetVaultId),
+  removeDatabaseRelation: (id) => ipcRenderer.invoke('db:removeRelation', id).then(() => undefined),
+  searchDatabaseRelationTargets: (kind, query, databaseId) => ipcRenderer.invoke('db:searchRelationTargets', kind, query, databaseId),
+  parseCsvForImport: () => ipcRenderer.invoke('db:parseCsvForImport'),
+  createDatabaseFromCsv: (name, headers, rows, types) => ipcRenderer.invoke('db:createFromCsv', name, headers, rows, types),
+  exportDatabase: (databaseId, format) => ipcRenderer.invoke('db:export', databaseId, format),
+  getDatabaseProfile: (databaseId) => ipcRenderer.invoke('db:profile', databaseId),
+  analyzeDatabaseReport: (databaseId) => ipcRenderer.invoke('db:analyzeReport', databaseId),
+  suggestDatabaseAnalyses: (databaseId) => ipcRenderer.invoke('db:suggestAnalyses', databaseId),
+  runDatabaseAnalysis: (databaseId, request) => ipcRenderer.invoke('db:runAnalysis', databaseId, request),
+  narrateDatabaseAnalysis: (result) => ipcRenderer.invoke('db:narrateAnalysis', result),
+  dbChatStream: async (request, handlers) => {
+    const requestId = `db-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('db:chatStream:delta', onDelta);
+    activeDbChatRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('db:chatStream', requestId, request);
+    } finally {
+      if (activeDbChatRequestId === requestId) activeDbChatRequestId = null;
+      ipcRenderer.removeListener('db:chatStream:delta', onDelta);
+    }
+  },
+  cancelDbChat: async () => {
+    if (activeDbChatRequestId) await ipcRenderer.invoke('db:chatStream:cancel', activeDbChatRequestId);
+  },
+  listDatabaseViews: (databaseId) => ipcRenderer.invoke('db:listViews', databaseId),
+  createDatabaseView: (databaseId, input) => ipcRenderer.invoke('db:createView', databaseId, input),
+  updateDatabaseView: (id, patch) => ipcRenderer.invoke('db:updateView', id, patch),
+  deleteDatabaseView: (id) => ipcRenderer.invoke('db:deleteView', id).then(() => undefined),
+  pickBulkDatabaseFiles: () => ipcRenderer.invoke('db:pickBulkFiles'),
+  bulkAttachDatabaseFiles: (databaseId, refColumnId, attachmentColumnId, files) =>
+    ipcRenderer.invoke('db:bulkAttach', databaseId, refColumnId, attachmentColumnId, files),
+  onDatabaseBulkProgress: (cb) => {
+    const listener = (
+      _e: unknown,
+      payload: { databaseId: string; done: number; total: number; attached: number; matched: number; finished: boolean }
+    ) => cb(payload);
+    ipcRenderer.on('db:bulkProgress', listener);
+    return () => ipcRenderer.removeListener('db:bulkProgress', listener);
+  },
   getMcpStatus: () => ipcRenderer.invoke('mcp:status'),
   regenerateMcpToken: () => ipcRenderer.invoke('mcp:regenerateToken'),
   getCopilotStatus: () => ipcRenderer.invoke('copilot:status'),
@@ -136,6 +224,7 @@ const api: NodusApi = {
   ensureCopilotCert: () => ipcRenderer.invoke('copilot:ensureCert'),
   installCopilotAddin: () => ipcRenderer.invoke('copilot:installAddin'),
   installLibreOfficeCopilot: () => ipcRenderer.invoke('copilot:installLibreOffice'),
+  getAppInfo: () => ipcRenderer.invoke('app:info'),
   onCopilotOpenIdea: (cb) => {
     const listener = (_e: unknown, target: import('@shared/types').CopilotOpenIdeaTarget) => cb(target);
     ipcRenderer.on('copilot:openIdea', listener);
@@ -505,6 +594,7 @@ const api: NodusApi = {
   seedDemoData: () => ipcRenderer.invoke('data:seedDemo'),
   clearDemoData: () => ipcRenderer.invoke('data:clearDemo').then(() => undefined),
   seedGenealogyDemoData: () => ipcRenderer.invoke('data:seedGenealogyDemo'),
+  seedDatabasesDemoData: () => ipcRenderer.invoke('data:seedDatabasesDemo'),
   generateDemoPortraits: () => ipcRenderer.invoke('data:generateDemoPortraits'),
   onDemoPortraitsProgress: (cb) => {
     const listener = (_e: unknown, p: { done: number; total: number }) => cb(p);
@@ -555,6 +645,8 @@ const api: NodusApi = {
     ipcRenderer.on('updates:progress', listener);
     return () => ipcRenderer.removeListener('updates:progress', listener);
   },
+
+  setDockIcon: (pngDataUrl) => ipcRenderer.invoke('dock:setIcon', pngDataUrl),
 };
 
 contextBridge.exposeInMainWorld('nodus', api);

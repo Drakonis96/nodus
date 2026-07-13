@@ -10,10 +10,18 @@ import type {
   PersonLinkSuggestion,
 } from '@shared/types';
 import { getArchiveDocType } from '@shared/archiveDocTypes';
+import { countActiveFacets } from '@shared/archiveFilters';
 import { Icon } from '../components/ui';
-import { DocTypeForm, DocTypeSelect, docTypeLabel } from '../components/DocTypeForm';
+import { DocTypeForm, DocTypePicker, DocTypeSelect } from '../components/DocTypeForm';
 import { PersonLinkPicker } from '../components/PersonLinkPicker';
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar';
+import {
+  ChipSelectCell,
+  GUTTER_WIDTH,
+  LongTextCell,
+  TextCell,
+  type ChipOption,
+} from '../components/dbGrid';
 import { confirm, toast } from '../components/feedback';
 import { t } from '../i18n';
 
@@ -26,14 +34,31 @@ const KIND_ICON: Record<ArchiveItemKind, string> = {
   other: 'folder',
 };
 
-const ALL = '__all__';
-const UNFILED = '__unfiled__';
+// Fixed, preconfigured column schema for the genealogy Archive. The user does not
+// add/remove properties — these mirror the archive_items model (see archiveRepo). The
+// grid mimics Databases mode; per-cell editing writes straight back to the archive.
+interface ArchiveColumn {
+  id: string;
+  label: string;
+  width: number;
+}
+const ARCHIVE_COLUMNS: ArchiveColumn[] = [
+  { id: 'title', label: 'Título', width: 240 },
+  { id: 'file', label: 'Archivo', width: 84 },
+  { id: 'docType', label: 'Tipo de documento', width: 190 },
+  { id: 'persons', label: 'Personas', width: 230 },
+  { id: 'source', label: 'Fuente', width: 200 },
+  { id: 'tags', label: 'Etiquetas', width: 200 },
+  { id: 'folders', label: 'Carpeta', width: 180 },
+  { id: 'year', label: 'Año', width: 84 },
+  { id: 'description', label: 'Descripción', width: 260 },
+  { id: 'text', label: 'Texto detectado', width: 220 },
+];
 
-export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = {}) {
+export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibrary?: () => void; isGenealogy?: boolean } = {}) {
   const [folders, setFolders] = useState<ArchiveFolder[]>([]);
   const [items, setItems] = useState<ArchiveItem[]>([]);
   const [treePersons, setTreePersons] = useState<Person[]>([]);
-  const [folderId, setFolderId] = useState<string>(ALL);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ArchiveItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -43,24 +68,33 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
 
   // ── Filters (Notion-style) + sorting ────────────────────────────────────────
   const [availableTags, setAvailableTags] = useState<ArchiveTagCount[]>([]);
-  const [fDocTypes, setFDocTypes] = useState<string[]>([]);
   const [fKinds, setFKinds] = useState<ArchiveItemKind[]>([]);
   const [fTags, setFTags] = useState<string[]>([]);
   const [fTagsMode, setFTagsMode] = useState<ArchiveMatchMode>('all');
   const [fPersonIds, setFPersonIds] = useState<string[]>([]);
   const [fPersonsMode, setFPersonsMode] = useState<ArchiveMatchMode>('any');
+  const [fFolderIds, setFFolderIds] = useState<string[]>([]);
+  // Heritage-dimension facets. In a genealogy vault the Genealogy facet is ON by
+  // default (the user can clear it); the guard makes it a one-time initial value.
+  const [fFacets, setFFacets] = useState<Record<string, string[]>>(() => {
+    const init: Record<string, string[]> = {};
+    if (isGenealogy) init.genealogia = ['si'];
+    return init;
+  });
   const [fYearFrom, setFYearFrom] = useState('');
   const [fYearTo, setFYearTo] = useState('');
   const [sort, setSort] = useState<ArchiveSortKey>('updatedDesc');
 
   const activeFilterCount =
-    fDocTypes.length + fKinds.length + fTags.length + fPersonIds.length + (fYearFrom.trim() || fYearTo.trim() ? 1 : 0);
+    fKinds.length + fTags.length + fPersonIds.length + fFolderIds.length + countActiveFacets(fFacets) +
+    (fYearFrom.trim() || fYearTo.trim() ? 1 : 0);
 
   const clearFilters = () => {
-    setFDocTypes([]);
     setFKinds([]);
     setFTags([]);
     setFPersonIds([]);
+    setFFolderIds([]);
+    setFFacets({});
     setFYearFrom('');
     setFYearTo('');
   };
@@ -75,20 +109,20 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
     };
     setItems(
       await window.nodus.listArchiveItems({
-        folderId: folderId === UNFILED ? null : folderId === ALL ? undefined : folderId,
+        folderIds: fFolderIds.length ? fFolderIds : undefined,
         search: search.trim() || undefined,
-        docTypes: fDocTypes.length ? fDocTypes : undefined,
         kinds: fKinds.length ? fKinds : undefined,
         tags: fTags.length ? fTags : undefined,
         tagsMode: fTagsMode,
         personIds: fPersonIds.length ? fPersonIds : undefined,
         personsMode: fPersonsMode,
+        facets: fFacets,
         yearFrom: parseYear(fYearFrom),
         yearTo: parseYear(fYearTo),
         sort,
       })
     );
-  }, [folderId, search, fDocTypes, fKinds, fTags, fTagsMode, fPersonIds, fPersonsMode, fYearFrom, fYearTo, sort]);
+  }, [search, fKinds, fTags, fTagsMode, fPersonIds, fPersonsMode, fFolderIds, fFacets, fYearFrom, fYearTo, sort]);
 
   useEffect(() => {
     void reload();
@@ -98,7 +132,9 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
     setBusy(true);
     setMessage(null);
     try {
-      const target = folderId !== ALL && folderId !== UNFILED ? folderId : null;
+      // A single active folder facet is used as the ingest target so new files land
+      // where the user is looking; otherwise they are unfiled.
+      const target = fFolderIds.length === 1 ? fFolderIds[0] : null;
       const result = await window.nodus.pickAndIngestArchive(target, addDocType);
       if (result.added || result.duplicates) {
         setMessage(
@@ -113,100 +149,96 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
     }
   };
 
-  const newFolder = async () => {
-    const name = window.prompt(t('Nombre de la carpeta'));
-    if (!name?.trim()) return;
-    await window.nodus.createArchiveFolder(name.trim(), null);
+  // ── Option lists for the fixed chip columns ─────────────────────────────────
+  const tagOptions: ChipOption[] = availableTags.map((t) => ({ id: t.tag, label: t.tag }));
+  const folderOptions: ChipOption[] = folders.map((f) => ({ id: f.folderId, label: f.name }));
+
+  // ── Per-cell mutations (write straight back to the archive, then refresh) ────
+  const setItemTags = async (item: ArchiveItem, nextTags: string[]) => {
+    const current = new Set(item.tags);
+    const next = new Set(nextTags);
+    for (const tag of nextTags) if (!current.has(tag)) await window.nodus.addArchiveTag(item.itemId, tag);
+    for (const tag of item.tags) if (!next.has(tag)) await window.nodus.removeArchiveTag(item.itemId, tag);
+    await reload();
+  };
+  const setItemFolders = async (item: ArchiveItem, nextIds: string[]) => {
+    await window.nodus.setArchiveItemFolders(item.itemId, nextIds);
+    await reload();
+  };
+  const patchItem = async (item: ArchiveItem, patch: Parameters<typeof window.nodus.updateArchiveItem>[1]) => {
+    await window.nodus.updateArchiveItem(item.itemId, patch);
     await reload();
   };
 
+  const gridMinWidth = GUTTER_WIDTH + ARCHIVE_COLUMNS.reduce((s, c) => s + c.width, 0);
+
   return (
-    <div className="h-full flex min-h-0">
-      <div className="flex w-60 shrink-0 flex-col border-r border-neutral-800 p-3 min-h-0">
-        <div className="mb-3 flex items-center gap-2">
-          <Icon name="archive" size={18} className="text-indigo-300" />
-          <h1 className="text-sm font-semibold">{t('Archivo')}</h1>
-          <button className="btn btn-ghost ml-auto px-1.5 py-1" title={t('Nueva carpeta')} onClick={() => void newFolder()}>
-            <Icon name="folderPlus" size={16} />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 space-y-3 border-b border-neutral-800 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Icon name="archive" size={18} className="shrink-0 text-indigo-300" />
+          <h1 className="mr-1 shrink-0 text-sm font-semibold">{t('Archivo')}</h1>
+          <input
+            className="input h-9 min-w-[12rem] flex-1 text-sm"
+            placeholder={t('Buscar en títulos, texto y metadatos…')}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <DocTypeSelect
+            value={addDocType}
+            onChange={setAddDocType}
+            emptyLabel="Tipo de documento"
+            className="input h-9 w-48 text-sm"
+            genealogyFilter={isGenealogy}
+          />
+          <button className="btn btn-primary h-9 gap-1.5" disabled={busy} onClick={() => void addFiles()}>
+            <Icon name="upload" /> {t('Añadir archivos')}
+          </button>
+          <button
+            className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+            onClick={() => setTextEntry(true)}
+            title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
+          >
+            <Icon name="edit" /> {t('Nueva entrada')}
+          </button>
+          <button
+            className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+            disabled={busy}
+            title={t('Indexar el texto de los documentos para descubrir relaciones semánticas con las personas')}
+            onClick={async () => {
+              setBusy(true);
+              setMessage(t('Indexando el archivo…'));
+              try {
+                const r = await window.nodus.indexArchive();
+                setMessage(
+                  r.indexed > 0
+                    ? t('Indexados {n} documentos para la búsqueda semántica.').replace('{n}', String(r.indexed))
+                    : t('El archivo ya está indexado (o no hay proveedor de embeddings configurado).')
+                );
+              } catch (err) {
+                setMessage(err instanceof Error ? err.message : String(err));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Icon name="wand" size={15} /> {t('Indexar')}
           </button>
         </div>
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto text-sm">
-          <FolderRow label={t('Todo')} icon="layers" active={folderId === ALL} onClick={() => setFolderId(ALL)} />
-          {folders.map((f) => (
-            <FolderRow
-              key={f.folderId}
-              label={f.name}
-              icon="folder"
-              active={folderId === f.folderId}
-              onClick={() => setFolderId(f.folderId)}
-            />
-          ))}
-          <FolderRow label={t('Sin carpeta')} icon="folder" active={folderId === UNFILED} onClick={() => setFolderId(UNFILED)} />
-        </nav>
-      </div>
+        <p className="text-xs text-neutral-500">
+          {t('El Archivo guarda fuentes primarias (documentos, registros, fotografías). La bibliografía académica (libros, artículos, tesis) se gestiona en la Biblioteca importándola desde Zotero.')}
+          {onOpenLibrary && (
+            <button className="ml-1 text-indigo-400 hover:underline" onClick={onOpenLibrary}>
+              {t('Ir a la Biblioteca')}
+            </button>
+          )}
+        </p>
+        {message && <p className="text-xs text-neutral-400">{message}</p>}
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="shrink-0 space-y-3 border-b border-neutral-800 p-4">
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="input h-9 min-w-[12rem] flex-1 text-sm"
-              placeholder={t('Buscar en títulos, texto y metadatos…')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <DocTypeSelect
-              value={addDocType}
-              onChange={setAddDocType}
-              emptyLabel="Tipo de documento"
-              className="input h-9 w-48 text-sm"
-            />
-            <button className="btn btn-primary h-9 gap-1.5" disabled={busy} onClick={() => void addFiles()}>
-              <Icon name="upload" /> {t('Añadir archivos')}
-            </button>
-            <button
-              className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
-              onClick={() => setTextEntry(true)}
-              title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
-            >
-              <Icon name="edit" /> {t('Nueva entrada')}
-            </button>
-            <button
-              className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
-              disabled={busy}
-              title={t('Indexar el texto de los documentos para descubrir relaciones semánticas con las personas')}
-              onClick={async () => {
-                setBusy(true);
-                setMessage(t('Indexando el archivo…'));
-                try {
-                  const r = await window.nodus.indexArchive();
-                  setMessage(
-                    r.indexed > 0
-                      ? t('Indexados {n} documentos para la búsqueda semántica.').replace('{n}', String(r.indexed))
-                      : t('El archivo ya está indexado (o no hay proveedor de embeddings configurado).')
-                  );
-                } catch (err) {
-                  setMessage(err instanceof Error ? err.message : String(err));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <Icon name="wand" size={15} /> {t('Indexar')}
-            </button>
-          </div>
-          <p className="text-xs text-neutral-500">
-            {t('El Archivo guarda fuentes primarias (documentos, registros, fotografías). La bibliografía académica (libros, artículos, tesis) se gestiona en la Biblioteca importándola desde Zotero.')}
-            {onOpenLibrary && (
-              <button className="ml-1 text-indigo-400 hover:underline" onClick={onOpenLibrary}>
-                {t('Ir a la Biblioteca')}
-              </button>
-            )}
-          </p>
-          {message && <p className="text-xs text-neutral-400">{message}</p>}
-
+        <div className="flex flex-wrap items-center gap-2">
           <ArchiveFilterBar
-            docTypes={fDocTypes}
-            onDocTypesChange={setFDocTypes}
+            facets={fFacets}
+            onFacetsChange={setFFacets}
             kinds={fKinds}
             onKindsChange={setFKinds}
             tags={fTags}
@@ -228,12 +260,36 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
             activeCount={activeFilterCount}
             onClear={clearFilters}
           />
+          {folderOptions.length > 0 && (
+            <div className="flex h-8 items-center overflow-hidden rounded-md border border-neutral-700 bg-neutral-900" style={{ width: 200 }}>
+              <ChipSelectCell
+                values={fFolderIds}
+                options={folderOptions}
+                multi
+                onChange={setFFolderIds}
+                placeholder={t('Carpeta…')}
+              />
+            </div>
+          )}
         </div>
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <p className="mb-2 text-xs text-neutral-600">
-            {t('{n} documentos').replace('{n}', String(items.length))}
-          </p>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div style={{ minWidth: gridMinWidth }} className="text-sm">
+          {/* Header row */}
+          <div className="sticky top-0 z-10 flex border-b border-neutral-800 bg-neutral-950/95 backdrop-blur">
+            <div className="shrink-0 border-r border-neutral-900" style={{ width: GUTTER_WIDTH }} />
+            {ARCHIVE_COLUMNS.map((col) => (
+              <div
+                key={col.id}
+                className="shrink-0 truncate border-r border-neutral-900 px-2 py-2 text-xs font-medium text-neutral-500"
+                style={{ width: col.width }}
+              >
+                {t(col.label)}
+              </div>
+            ))}
+          </div>
+
           {items.length === 0 ? (
             <p className="py-10 text-center text-sm text-neutral-500">
               {activeFilterCount > 0 || search.trim()
@@ -241,80 +297,33 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
                 : t('Este archivo está vacío. Añade fotos de registros, CSV/XLSX o escaneos; Nodus extraerá su texto (y una descripción visual de las imágenes) para poder buscarlos y citarlos.')}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[54rem] text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-800 text-left text-xs font-medium text-neutral-500">
-                    <th className="py-2 pr-3">{t('Nombre')}</th>
-                    <th className="py-2 pr-3">{t('Tipo')}</th>
-                    <th className="py-2 pr-3">{t('Personas')}</th>
-                    <th className="py-2 pr-3">{t('Descripción visual')}</th>
-                    <th className="py-2 pr-3">{t('Texto detectado')}</th>
-                    <th className="py-2 pr-3">{t('Etiquetas')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((it) => (
-                    <tr
-                      key={it.itemId}
-                      onClick={() => setSelected(it)}
-                      className="cursor-pointer border-b border-neutral-900 align-top hover:bg-neutral-800/40"
-                    >
-                      <td className="py-2 pr-3">
-                        <div className="flex min-w-[9rem] items-center gap-2">
-                          <Icon name={KIND_ICON[it.kind]} size={15} className="shrink-0 text-neutral-400" />
-                          <span className="truncate text-neutral-100">{it.title}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-3">
-                        {it.docType ? (
-                          <span className="whitespace-nowrap rounded-full bg-indigo-950/40 px-2 py-0.5 text-[11px] text-indigo-300">
-                            {docTypeLabel(it.docType)}
-                          </span>
-                        ) : (
-                          <span className="text-neutral-700">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <PersonLinkPicker item={it} persons={treePersons} onChanged={reload} />
-                      </td>
-                      <td className="max-w-[24rem] py-2 pr-3">
-                        {it.description ? (
-                          <span className="line-clamp-2 text-neutral-400">{it.description}</span>
-                        ) : it.kind === 'image' ? (
-                          <span className="text-xs italic text-neutral-600">{t('sin analizar')}</span>
-                        ) : (
-                          <span className="text-neutral-700">—</span>
-                        )}
-                      </td>
-                      <td className="max-w-[20rem] py-2 pr-3">
-                        {it.extractedText ? (
-                          <span className="line-clamp-2 text-neutral-500">{it.extractedText.slice(0, 160)}</span>
-                        ) : (
-                          <span className="text-neutral-700">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <div className="flex flex-wrap gap-1">
-                          {it.tags.slice(0, 3).map((tag) => (
-                            <span key={tag} className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-400">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            items.map((it) => (
+              <ArchiveRow
+                key={it.itemId}
+                item={it}
+                persons={treePersons}
+                tagOptions={tagOptions}
+                folderOptions={folderOptions}
+                isGenealogy={isGenealogy}
+                onOpen={() => setSelected(it)}
+                onReload={reload}
+                onSetTags={(next) => setItemTags(it, next)}
+                onSetFolders={(next) => setItemFolders(it, next)}
+                onPatch={(patch) => patchItem(it, patch)}
+              />
+            ))
           )}
         </div>
+      </div>
+
+      <div className="shrink-0 border-t border-neutral-800 px-4 py-1.5 text-xs text-neutral-600">
+        {t('{n} documentos').replace('{n}', String(items.length))}
       </div>
 
       {selected && (
         <ArchiveItemDetail
           item={selected}
+          isGenealogy={isGenealogy}
           onClose={() => setSelected(null)}
           onChanged={async () => {
             await reload();
@@ -323,7 +332,8 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
       )}
       {textEntry && (
         <TextEntryModal
-          folderId={folderId !== ALL && folderId !== UNFILED ? folderId : null}
+          folderId={fFolderIds.length === 1 ? fFolderIds[0] : null}
+          isGenealogy={isGenealogy}
           onClose={() => setTextEntry(false)}
           onSaved={async () => {
             setTextEntry(false);
@@ -335,18 +345,114 @@ export function ArchiveView({ onOpenLibrary }: { onOpenLibrary?: () => void } = 
   );
 }
 
+/** One database-style row in the Archive grid: fixed cells with inline editing. */
+function ArchiveRow({
+  item,
+  persons,
+  tagOptions,
+  folderOptions,
+  isGenealogy,
+  onOpen,
+  onReload,
+  onSetTags,
+  onSetFolders,
+  onPatch,
+}: {
+  item: ArchiveItem;
+  persons: Person[];
+  tagOptions: ChipOption[];
+  folderOptions: ChipOption[];
+  isGenealogy: boolean;
+  onOpen: () => void;
+  onReload: () => Promise<void>;
+  onSetTags: (next: string[]) => void;
+  onSetFolders: (next: string[]) => void;
+  onPatch: (patch: Parameters<typeof window.nodus.updateArchiveItem>[1]) => void;
+}) {
+  const col = (id: string) => ARCHIVE_COLUMNS.find((c) => c.id === id)!.width;
+  return (
+    <div className="flex min-h-[40px] items-stretch border-b border-neutral-900 hover:bg-neutral-900/30">
+      {/* Gutter: expand into the full-record modal. */}
+      <div className="flex shrink-0 items-center justify-center border-r border-neutral-900" style={{ width: GUTTER_WIDTH }}>
+        <button
+          className="rounded p-1 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
+          title={t('Abrir ficha')}
+          onClick={onOpen}
+        >
+          <Icon name="external" size={14} />
+        </button>
+      </div>
+      {/* Nombre */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('title') }}>
+        <LongTextCell value={item.title} markdown={false} onChange={(v) => onPatch({ title: v ?? t('Sin título') })} />
+      </div>
+      {/* Archivo (kind) */}
+      <div className="flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-neutral-900 px-2" style={{ width: col('file') }}>
+        <Icon name={KIND_ICON[item.kind]} size={15} className="shrink-0 text-neutral-400" />
+        <span className="text-[11px] uppercase text-neutral-500">{item.kind}</span>
+      </div>
+      {/* Tipo de documento */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('docType') }}>
+        <DocTypePicker value={item.docType} onChange={(id) => onPatch({ docType: id })} placeholder={t('Sin tipo')} fill genealogyFilter={isGenealogy} />
+      </div>
+      {/* Personas */}
+      <div className="flex shrink-0 items-center overflow-x-auto border-r border-neutral-900 px-2 py-1" style={{ width: col('persons') }}>
+        <PersonLinkPicker item={item} persons={persons} onChanged={onReload} />
+      </div>
+      {/* Fuente */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('source') }}>
+        <TextCell value={item.source} inputType="text" onChange={(v) => onPatch({ source: v })} />
+      </div>
+      {/* Etiquetas */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('tags') }}>
+        <ChipSelectCell values={item.tags} options={tagOptions} multi onChange={onSetTags} allowCreate onCreate={(label) => onSetTags([...item.tags, label])} placeholder={t('Etiquetas…')} />
+      </div>
+      {/* Carpeta */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('folders') }}>
+        <ChipSelectCell values={item.folderIds} options={folderOptions} multi onChange={onSetFolders} placeholder={t('Carpeta…')} />
+      </div>
+      {/* Año (derived, read-only) */}
+      <div className="flex shrink-0 items-center overflow-hidden border-r border-neutral-900 px-2 text-neutral-400" style={{ width: col('year') }}>
+        {item.year ?? <span className="text-neutral-700">—</span>}
+      </div>
+      {/* Descripción */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('description') }}>
+        <LongTextCell value={item.description} markdown={false} onChange={(v) => onPatch({ description: v })} />
+      </div>
+      {/* Texto detectado (read-only preview → opens the record) */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('text') }}>
+        <button
+          className="h-full w-full px-2 py-1 text-left text-xs text-neutral-500 hover:bg-neutral-800/40"
+          onClick={onOpen}
+          title={item.extractedText ?? ''}
+        >
+          {item.extractedText ? (
+            <span className="line-clamp-2">{item.extractedText.slice(0, 160)}</span>
+          ) : (
+            <span className="text-neutral-700">—</span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Create a typed text entry (diary page, note, memoir) with no file. */
 function TextEntryModal({
   folderId,
+  isGenealogy,
   onClose,
   onSaved,
 }: {
   folderId: string | null;
+  isGenealogy: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const [title, setTitle] = useState('');
-  const [docType, setDocType] = useState<string | null>('notes');
+  // Start unclassified so the picker reads as a clear "choose a type" prompt rather
+  // than silently defaulting to "Notas".
+  const [docType, setDocType] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [metadata, setMetadata] = useState<Record<string, string>>({});
   const [source, setSource] = useState('');
@@ -370,36 +476,66 @@ function TextEntryModal({
     }
   };
 
+  const fieldLabel = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}>
-      <div className="card-modal flex max-h-[85vh] w-full max-w-lg flex-col gap-3 p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-semibold">{t('Nueva entrada de texto')}</h2>
-        <input
-          className="input h-9 w-full text-sm"
-          placeholder={t('Título')}
-          value={title}
-          autoFocus
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <DocTypeSelect value={docType} onChange={setDocType} />
-        {getArchiveDocType(docType) && (
-          <div className="rounded-md border border-neutral-800 p-3">
-            <DocTypeForm docType={docType} values={metadata} onChange={(k, v) => setMetadata((m) => ({ ...m, [k]: v }))} />
+      <div className="card-modal flex max-h-[85vh] w-full max-w-lg flex-col p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex shrink-0 items-center gap-2">
+          <Icon name="edit" size={16} className="text-indigo-300" />
+          <h2 className="font-semibold">{t('Nueva entrada de texto')}</h2>
+          <button className="btn btn-ghost ml-auto px-2 py-1" onClick={onClose}>
+            <Icon name="x" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div>
+            <label className={fieldLabel}>{t('Título')}</label>
+            <input
+              className="input h-9 w-full text-sm"
+              placeholder={t('Título de la entrada')}
+              value={title}
+              autoFocus
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
-        )}
-        <input
-          className="input h-9 w-full text-sm"
-          placeholder={t('Fuente (opcional): archivo, repositorio, cita, URL…')}
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-        />
-        <textarea
-          className="input min-h-[9rem] w-full flex-1 text-sm"
-          placeholder={t('Escribe el contenido (se indexa para búsqueda)…')}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
-        <div className="flex justify-end gap-2">
+
+          <div>
+            <label className={fieldLabel}>{t('Tipo de documento')}</label>
+            <DocTypeSelect
+              value={docType}
+              onChange={setDocType}
+              emptyLabel="Elegir tipo de documento…"
+              genealogyFilter={isGenealogy}
+            />
+            {getArchiveDocType(docType) && (
+              <div className="mt-2 rounded-md border border-neutral-800 p-3">
+                <DocTypeForm docType={docType} values={metadata} onChange={(k, v) => setMetadata((m) => ({ ...m, [k]: v }))} />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className={fieldLabel}>{t('Fuente')}</label>
+            <input
+              className="input h-9 w-full text-sm"
+              placeholder={t('Opcional: archivo, repositorio, cita, URL…')}
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className={fieldLabel}>{t('Contenido')}</label>
+            <textarea
+              className="input min-h-[9rem] w-full resize-y text-sm"
+              placeholder={t('Escribe el contenido (se indexa para búsqueda)…')}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex shrink-0 justify-end gap-2 border-t border-neutral-800 pt-3">
           <button className="btn btn-ghost" onClick={onClose}>
             {t('Cancelar')}
           </button>
@@ -412,36 +548,14 @@ function TextEntryModal({
   );
 }
 
-function FolderRow({
-  label,
-  icon,
-  active,
-  onClick,
-}: {
-  label: string;
-  icon: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left ${
-        active ? 'bg-indigo-600/20 text-indigo-100' : 'text-neutral-300 hover:bg-neutral-800/60'
-      }`}
-    >
-      <Icon name={icon} size={15} className="shrink-0 opacity-70" />
-      <span className="truncate">{label}</span>
-    </button>
-  );
-}
-
 function ArchiveItemDetail({
   item,
+  isGenealogy,
   onClose,
   onChanged,
 }: {
   item: ArchiveItem;
+  isGenealogy: boolean;
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
@@ -765,6 +879,7 @@ function ArchiveItemDetail({
                 setDocType(id);
                 setClassDirty(true);
               }}
+              genealogyFilter={isGenealogy}
             />
             {getArchiveDocType(docType) && (
               <div className="mt-2 rounded-md border border-neutral-800 p-3">

@@ -35,7 +35,7 @@ export function ConfirmModal({
   }, [onCancel]);
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={onCancel}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[120] p-6" onClick={onCancel}>
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}

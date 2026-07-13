@@ -10,7 +10,14 @@
  * match more than one selection. Every filter category combines with AND.
  */
 
+import { docTypeFacets, type FacetDimensionId } from './archiveDocTypes';
+
 export type ArchiveMatchMode = 'any' | 'all';
+
+/** Heritage-dimension facets: OR within a dimension, AND across dimensions. Resolved
+ *  from the item's document TYPE (not the item itself), so an item matches a facet
+ *  filter when its doc type carries the selected value. */
+export type ArchiveFacetFilter = Partial<Record<FacetDimensionId, string[]>>;
 
 export interface ArchiveFilterState {
   docTypes?: string[];
@@ -19,6 +26,7 @@ export interface ArchiveFilterState {
   tagsMode?: ArchiveMatchMode;
   personIds?: string[];
   personsMode?: ArchiveMatchMode;
+  facets?: ArchiveFacetFilter;
   yearFrom?: number | null;
   yearTo?: number | null;
   search?: string;
@@ -49,6 +57,30 @@ function matchesSingle(value: string | null, selected: string[] | undefined): bo
   return value != null && selected.includes(value);
 }
 
+/** Total selected facet VALUES across all dimensions (for the active-filter count). */
+export function countActiveFacets(facets: ArchiveFacetFilter | undefined): number {
+  if (!facets) return 0;
+  return Object.values(facets).reduce((n, sel) => n + (sel?.length ?? 0), 0);
+}
+
+/** Whether the item's document type satisfies every selected facet dimension. */
+function matchesFacets(docType: string | null, facets: ArchiveFacetFilter | undefined): boolean {
+  if (!facets) return true;
+  const active = Object.entries(facets).filter(([, sel]) => sel && sel.length > 0) as [FacetDimensionId, string[]][];
+  if (active.length === 0) return true;
+  const f = docTypeFacets(docType);
+  if (!f) return false; // unclassified items can't match a facet filter
+  for (const [dim, sel] of active) {
+    if (dim === 'genealogia') {
+      if (!f.genealogia) return false;
+      continue;
+    }
+    const owned = f[dim] as string[];
+    if (!sel.some((v) => owned.includes(v))) return false;
+  }
+  return true;
+}
+
 function matchesSearch(item: FilterableArchiveItem, search: string | undefined): boolean {
   const q = (search ?? '').trim().toLowerCase();
   if (!q) return true;
@@ -61,6 +93,7 @@ export function matchesArchiveFilter(item: FilterableArchiveItem, filter: Archiv
   if (!matchesSingle(item.kind, filter.kinds)) return false;
   if (!matchesMulti(item.tags, filter.tags, filter.tagsMode)) return false;
   if (!matchesMulti(item.linkedPersonIds, filter.personIds, filter.personsMode)) return false;
+  if (!matchesFacets(item.docType, filter.facets)) return false;
   if (filter.yearFrom != null && (item.year == null || item.year < filter.yearFrom)) return false;
   if (filter.yearTo != null && (item.year == null || item.year > filter.yearTo)) return false;
   if (!matchesSearch(item, filter.search)) return false;
@@ -78,6 +111,7 @@ export function isArchiveFilterActive(filter: ArchiveFilterState): boolean {
       filter.kinds?.length ||
       filter.tags?.length ||
       filter.personIds?.length ||
+      countActiveFacets(filter.facets) > 0 ||
       filter.yearFrom != null ||
       filter.yearTo != null ||
       filter.search?.trim()

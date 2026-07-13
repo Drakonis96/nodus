@@ -83,6 +83,10 @@ try {
     'nodus_list_persons',
     'nodus_get_person',
     'nodus_list_kin_suggestions',
+    'nodus_list_databases',
+    'nodus_get_database_schema',
+    'nodus_query_database',
+    'nodus_get_database_row',
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
 
@@ -103,6 +107,7 @@ try {
   assert.equal(capabilities.counts.notes, 1);
   assert.equal(capabilities.counts.themes, 1);
   assert.equal(capabilities.counts.passages, 2);
+  assert.equal(capabilities.counts.databases, 0, 'capabilities reports the databases count');
   assert.ok(capabilities.vault.active.type, 'capabilities exposes the active vault type');
 
   // Read-only genealogy tools are wired and safe on a non-genealogy corpus.
@@ -110,6 +115,29 @@ try {
   assert.deepEqual(personList, { persons: [], total: 0 }, 'nodus_list_persons callable, empty without a records layer');
   const kinList = await callTool(server, 'nodus_list_kin_suggestions', { limit: 10, offset: 0 });
   assert.deepEqual(kinList, { suggestions: [], total: 0 }, 'nodus_list_kin_suggestions callable, empty');
+
+  // Read-only databases-mode tools: list, schema, query (decoded values), get row.
+  const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
+  const mdb = dbmode.createDatabase('MCP DB');
+  const mName = dbmode.createColumn(mdb.id, 'Nombre', 'title');
+  const mSel = dbmode.createColumn(mdb.id, 'Estado', 'select');
+  const mVivo = dbmode.addOption(mSel.id, 'vivo');
+  const mRow = dbmode.createRow(mdb.id);
+  dbmode.setCell(mRow.id, mName.id, 'Gato');
+  dbmode.setCell(mRow.id, mSel.id, mVivo.id);
+  const dbList = await callTool(server, 'nodus_list_databases');
+  assert.ok(dbList.databases.some((d) => d.name === 'MCP DB' && d.rows === 1), 'nodus_list_databases returns the database');
+  const schema = await callTool(server, 'nodus_get_database_schema', { databaseId: mdb.id });
+  assert.equal(schema.columns.length, 2, 'schema returns columns');
+  assert.deepEqual(schema.columns.find((c) => c.type === 'select').options, ['vivo'], 'schema exposes option labels');
+  const q = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, limit: 10, offset: 0 });
+  assert.equal(q.total, 1);
+  assert.equal(q.rows[0].fields.Nombre, 'Gato');
+  assert.equal(q.rows[0].fields.Estado, 'vivo', 'query decodes select to its label');
+  const qFiltered = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, query: 'perro', limit: 10, offset: 0 });
+  assert.equal(qFiltered.total, 0, 'query filters by text');
+  const gotRow = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
+  assert.equal(gotRow.fields.Nombre, 'Gato', 'nodus_get_database_row decodes the row');
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);

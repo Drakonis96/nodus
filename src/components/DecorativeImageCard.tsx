@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DecorativeImage, DecorativeImageEntityKind, DecorativeImageStyle } from '@shared/types';
 import { confirm } from './feedback';
-import { Icon } from './ui';
+import { AiBadge, Icon } from './ui';
 import { t } from '../i18n';
 import { DecorativeImageModal, type DecorativeImageQueueAction } from './DecorativeImageModal';
 
@@ -189,7 +189,12 @@ export function DecorativeImageCard({
 
   if (thumbnail) {
     if (current?.status !== 'ready' || !dataUrl) return null;
-    return <img src={dataUrl} alt="" loading="lazy" decoding="async" className={`h-24 w-full rounded-lg object-cover ${className}`} />;
+    return (
+      <div className={`relative ${className}`}>
+        <img src={dataUrl} alt="" loading="lazy" decoding="async" className="h-24 w-full rounded-lg object-cover" />
+        {current.source === 'ai' && <AiBadge size="sm" />}
+      </div>
+    );
   }
 
   const status = current?.status ?? 'not_requested';
@@ -214,6 +219,7 @@ export function DecorativeImageCard({
       <>
         <figure className={`group relative overflow-hidden rounded-2xl border border-neutral-200 shadow-xl shadow-black/10 ring-1 ring-black/5 dark:border-neutral-800 dark:shadow-black/40 ${className}`}>
           <img src={dataUrl} alt="" decoding="async" className="aspect-[16/9] max-h-[26rem] w-full object-cover" />
+          {current?.source === 'ai' && <AiBadge corner="bottom-left" />}
           {interactive && <DesignPill floating onClick={() => setModalOpen(true)} />}
         </figure>
         {modal}

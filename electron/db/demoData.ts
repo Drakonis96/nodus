@@ -1,6 +1,7 @@
 import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
 import { clearGenealogyDemoData } from './genealogyDemoData';
+import { clearDatabasesDemoData } from './databasesDemoData';
 
 // A small, self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
@@ -367,7 +368,9 @@ export function hasAnyData(): boolean {
     // Genealogy content (the records-lens demo lives here, not in works/ideas).
     count('persons') > 0 ||
     count('archive_items') > 0 ||
-    count('events') > 0
+    count('events') > 0 ||
+    // Databases-mode content.
+    count('db_databases') > 0
   );
 }
 
@@ -458,8 +461,10 @@ export function seedDemoData(): boolean {
  * Guarded by the flag, so it never touches a real library even if called twice.
  */
 export function clearDemoData(): void {
-  // The genealogy demo lives in separate tables and also restores the vault type.
+  // The genealogy + databases demos live in separate tables and also restore the
+  // vault type (whichever the demo flipped away from).
   clearGenealogyDemoData();
+  clearDatabasesDemoData();
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`

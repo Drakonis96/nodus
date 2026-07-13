@@ -71,6 +71,29 @@ try {
   assert.deepEqual(repo.getItem(item.itemId).tags, ['censo', 'padrón']);
   assert.ok(repo.listTags().some((t) => t.tag === 'censo' && t.count === 1));
 
+  // ── "Carpeta" multi-select: item ↔ folder memberships ─────────────────────
+  // On creation, folderId seeds a single membership so nothing is lost.
+  assert.deepEqual(repo.listItemFolders(item.itemId), [sub.folderId], 'creation seeds one folder membership');
+  assert.deepEqual(repo.getItem(item.itemId).folderIds, [sub.folderId], 'folderIds surfaces on the item');
+  // An item can belong to SEVERAL folders at once.
+  repo.setItemFolders(item.itemId, [sub.folderId, censos.folderId]);
+  assert.deepEqual(
+    repo.getItem(item.itemId).folderIds.slice().sort(),
+    [censos.folderId, sub.folderId].sort(),
+    'multi-folder membership stored'
+  );
+  // The legacy single folder_id tracks the first membership for backward compat.
+  assert.equal(repo.getItem(item.itemId).folderId, sub.folderId, 'legacy folder_id follows first membership');
+  // The Carpeta facet keeps items belonging to ANY of the requested folders.
+  assert.equal(repo.listItems({ folderIds: [censos.folderId] }).length, 1, 'folder facet matches membership');
+  assert.equal(repo.listItems({ folderIds: ['nope'] }).length, 0, 'folder facet excludes non-members');
+  // Removing memberships is wholesale replace; empty clears folder_id too.
+  repo.setItemFolders(item.itemId, []);
+  assert.deepEqual(repo.getItem(item.itemId).folderIds, [], 'memberships cleared');
+  assert.equal(repo.getItem(item.itemId).folderId, null, 'legacy folder_id cleared with memberships');
+  // Restore a membership for the cascade test below.
+  repo.setItemFolders(item.itemId, [sub.folderId]);
+
   // ── Folder delete unfiles its items (SET NULL), subfolders cascade ────────
   repo.deleteFolder(censos.folderId);
   assert.equal(repo.getFolder(sub.folderId), null, 'subfolder cascades away');

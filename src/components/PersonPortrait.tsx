@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Person } from '@shared/types';
 import { defaultPortraitKind } from '@shared/treePortraits';
-import { Icon } from './ui';
+import { AiBadge, Icon } from './ui';
 import manPortrait from '../assets/man-portrait.webp';
 import womanPortrait from '../assets/woman-portrait.webp';
 
@@ -57,10 +57,11 @@ export function PersonPortrait({
   const radius = rounded === 'full' ? '9999px' : rounded === 'md' ? '8px' : '0';
   const focus = person.portrait;
 
-  // Real user photo — framed by its focal point, never mirrored.
+  // Real user photo — framed by its focal point, never mirrored. AI-generated
+  // reference likenesses carry a badge so they are never mistaken for a real photo.
   if (url && focus) {
     return (
-      <div className="shrink-0 overflow-hidden bg-neutral-900" style={{ ...box, borderRadius: radius }}>
+      <div className="relative shrink-0 overflow-hidden bg-neutral-900" style={{ ...box, borderRadius: radius }}>
         <img
           src={url}
           alt=""
@@ -73,6 +74,7 @@ export function PersonPortrait({
             transform: `scale(${focus.scale})`,
           }}
         />
+        {focus.generated && size >= 40 && <AiBadge size="sm" />}
       </div>
     );
   }

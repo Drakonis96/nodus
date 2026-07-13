@@ -67,6 +67,38 @@ export function deleteFolder(folderId: string): void {
   getDb().prepare('DELETE FROM archive_folders WHERE folder_id = ?').run(folderId);
 }
 
+// ── Item ↔ folder memberships ("Carpeta" multi-select) ─────────────────────────
+// An item may belong to several folders (archive_item_folders). The legacy single
+// archive_items.folder_id is kept in sync with the FIRST membership so older code
+// paths and backups stay coherent.
+
+/** Folder ids an item currently belongs to. */
+export function listItemFolders(itemId: string): string[] {
+  return itemFolderIds(itemId);
+}
+
+/** Replace an item's folder memberships wholesale (add/remove in one call). */
+export function setItemFolders(itemId: string, folderIds: string[]): ArchiveItem | null {
+  const db = getDb();
+  if (!getItem(itemId)) return null;
+  const clean = Array.from(new Set(folderIds.map((id) => id.trim()).filter(Boolean)));
+  const tx = db.transaction(() => {
+    db.prepare('DELETE FROM archive_item_folders WHERE item_id = ?').run(itemId);
+    const ins = db.prepare(
+      'INSERT OR IGNORE INTO archive_item_folders (item_id, folder_id, created_at) VALUES (?, ?, ?)'
+    );
+    for (const folderId of clean) ins.run(itemId, folderId, now());
+    // Keep the legacy single-folder column pointing at the first membership.
+    db.prepare('UPDATE archive_items SET folder_id = ?, updated_at = ? WHERE item_id = ?').run(
+      clean[0] ?? null,
+      now(),
+      itemId
+    );
+  });
+  tx();
+  return getItem(itemId);
+}
+
 // ── Items ────────────────────────────────────────────────────────────────────
 
 interface ItemMetaRow {
@@ -113,6 +145,14 @@ function itemTags(itemId: string): string[] {
   ).map((r) => r.tag);
 }
 
+function itemFolderIds(itemId: string): string[] {
+  return (
+    getDb()
+      .prepare('SELECT folder_id FROM archive_item_folders WHERE item_id = ? ORDER BY folder_id')
+      .all(itemId) as { folder_id: string }[]
+  ).map((r) => r.folder_id);
+}
+
 function itemLinkedPersons(itemId: string): ArchiveLinkedPerson[] {
   return (
     getDb()
@@ -145,6 +185,7 @@ function rowToItem(row: ItemMetaRow): ArchiveItem {
     year: extractItemYear(row.doc_type, metadata),
     linkedPersons: itemLinkedPersons(row.item_id),
     tags: itemTags(row.item_id),
+    folderIds: itemFolderIds(row.item_id),
     hasEmbedding: Boolean(row.has_embedding),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -218,6 +259,15 @@ export function createItem(input: ArchiveItemInput): ArchiveItem {
       ts
     );
     for (const tag of dedupeTags(input.tags)) addTagInternal(id, tag);
+    // Seed the "Carpeta" multi-select membership so a filed item is filed under the
+    // new model too (the migration backfills existing rows; new rows seed here).
+    if (input.folderId) {
+      db.prepare('INSERT OR IGNORE INTO archive_item_folders (item_id, folder_id, created_at) VALUES (?, ?, ?)').run(
+        id,
+        input.folderId,
+        ts
+      );
+    }
   });
   tx();
   return getItem(id)!;
@@ -254,7 +304,12 @@ export function listItems(opts: ArchiveListOptions = {}): ArchiveItem[] {
     }
   }
   const sql = `${ITEM_META_SELECT}${where.length ? ` WHERE ${where.join(' AND ')}` : ''}`;
-  const items = (getDb().prepare(sql).all(...params) as ItemMetaRow[]).map(rowToItem).map(withLinkedPersonIds);
+  let items = (getDb().prepare(sql).all(...params) as ItemMetaRow[]).map(rowToItem).map(withLinkedPersonIds);
+  // "Carpeta" facet: keep items that belong to ANY of the requested folders.
+  if (opts.folderIds && opts.folderIds.length) {
+    const wanted = new Set(opts.folderIds);
+    items = items.filter((it) => it.folderIds.some((id) => wanted.has(id)));
+  }
   const filtered = applyArchiveFilters(items, {
     docTypes: opts.docTypes,
     kinds: opts.kinds,
@@ -262,6 +317,7 @@ export function listItems(opts: ArchiveListOptions = {}): ArchiveItem[] {
     tagsMode: opts.tagsMode,
     personIds: opts.personIds,
     personsMode: opts.personsMode,
+    facets: opts.facets,
     yearFrom: opts.yearFrom,
     yearTo: opts.yearTo,
     search: opts.search,

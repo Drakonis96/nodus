@@ -50,11 +50,13 @@ interface PersonRow {
   pf_focus_x: number | null;
   pf_focus_y: number | null;
   pf_scale: number | null;
+  pf_generated: number | null;
   created_at: string;
   updated_at: string;
 }
 
-const PERSON_SELECT = `SELECT p.*, pp.focus_x AS pf_focus_x, pp.focus_y AS pf_focus_y, pp.scale AS pf_scale
+const PERSON_SELECT = `SELECT p.*, pp.focus_x AS pf_focus_x, pp.focus_y AS pf_focus_y, pp.scale AS pf_scale,
+    pp.generated AS pf_generated
   FROM persons p LEFT JOIN person_portraits pp ON pp.person_id = p.person_id`;
 
 function personNames(personId: string): PersonName[] {
@@ -76,7 +78,7 @@ function rowToPerson(row: PersonRow): Person {
     names: personNames(row.person_id),
     portrait:
       row.pf_focus_x != null
-        ? { focusX: row.pf_focus_x, focusY: row.pf_focus_y ?? 0.5, scale: row.pf_scale ?? 1 }
+        ? { focusX: row.pf_focus_x, focusY: row.pf_focus_y ?? 0.5, scale: row.pf_scale ?? 1, generated: !!row.pf_generated }
         : null,
     frameStyle: row.frame_style ?? null,
     biography: row.biography ?? null,
@@ -206,16 +208,18 @@ export function setPersonPortrait(
   personId: string,
   blob: Uint8Array,
   mime = 'image/jpeg',
-  focus: PortraitFocus = { focusX: 0.5, focusY: 0.5, scale: 1 }
+  focus: PortraitFocus = { focusX: 0.5, focusY: 0.5, scale: 1 },
+  generated = false
 ): void {
   getDb()
     .prepare(
-      `INSERT INTO person_portraits (person_id, blob, mime, focus_x, focus_y, scale, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO person_portraits (person_id, blob, mime, focus_x, focus_y, scale, generated, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(person_id) DO UPDATE SET blob = excluded.blob, mime = excluded.mime,
-         focus_x = excluded.focus_x, focus_y = excluded.focus_y, scale = excluded.scale, updated_at = excluded.updated_at`
+         focus_x = excluded.focus_x, focus_y = excluded.focus_y, scale = excluded.scale,
+         generated = excluded.generated, updated_at = excluded.updated_at`
     )
-    .run(personId, Buffer.from(blob), mime, focus.focusX, focus.focusY, focus.scale, now());
+    .run(personId, Buffer.from(blob), mime, focus.focusX, focus.focusY, focus.scale, generated ? 1 : 0, now());
 }
 
 export function updatePortraitFocus(personId: string, focus: PortraitFocus): void {

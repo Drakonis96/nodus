@@ -854,6 +854,12 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
             >
               <Icon name="fit" size={12} /> {t('Ajustar encuadre')}
             </button>
+            <button
+              className="btn btn-ghost h-7 w-full justify-center gap-1.5 whitespace-nowrap border border-neutral-700 px-2 text-xs"
+              onClick={() => setShowGenerate((v) => !v)}
+            >
+              <Icon name="wand" size={12} /> {t('Regenerar con IA')}
+            </button>
             <div className="flex gap-1">
               <button className="btn btn-ghost h-7 flex-1 justify-center border border-neutral-700 px-1 text-xs" onClick={() => void upload()}>
                 {t('Cambiar')}

@@ -47,15 +47,30 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('academic + genealogy are selectable this release; estudio/primary_sources/databases are declared but gated', () => {
+test('academic + genealogy + databases are selectable; estudio/primary_sources are declared but gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'databases']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
-  for (const gated of ['estudio', 'primary_sources', 'databases']) {
+  assert.equal(vt.getVaultTypeDef('databases').available, true);
+  for (const gated of ['estudio', 'primary_sources']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   // Order shown in the picker: shipped types first, then the coming-soon ones.
   assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases']);
+});
+
+test('databases mode: table/analysis/chat views scoped to it + data-analyst prompt pack', () => {
+  for (const v of ['databases', 'dbAnalysis', 'dbChat']) {
+    assert.equal(vt.isViewAllowedForVaultType(v, 'databases'), true, `${v} allowed for databases`);
+    assert.equal(vt.isViewAllowedForVaultType(v, 'academic'), false, `${v} hidden for academic`);
+    assert.equal(vt.isViewAllowedForVaultType(v, 'genealogy'), false, `${v} hidden for genealogy`);
+  }
+  const hidden = vt.defaultHiddenViewsForType('databases');
+  for (const h of ['search', 'library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch']) {
+    assert.ok(hidden.includes(h), `${h} hidden in databases mode`);
+  }
+  assert.ok(!hidden.includes('notes'), 'notes stays visible in databases mode');
+  assert.match(vt.vaultTypePromptPack('databases'), /MODO BASES DE DATOS/);
 });
 
 test('the tree view is scoped to genealogy only', () => {

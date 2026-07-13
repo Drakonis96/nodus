@@ -22,6 +22,7 @@ if (!process.argv.includes('--electron-vaults-test')) {
         `export * as analysisReuse from ${JSON.stringify(path.join(repoRoot, 'electron/vaults/vaultAnalysisImport.ts'))};`,
         `export * as database from ${JSON.stringify(path.join(repoRoot, 'electron/db/database.ts'))};`,
         `export * as secrets from ${JSON.stringify(path.join(repoRoot, 'electron/secrets/secretStore.ts'))};`,
+        `export * as settingsRepo from ${JSON.stringify(path.join(repoRoot, 'electron/db/settingsRepo.ts'))};`,
       ].join('\n'),
       'utf8'
     );
@@ -60,7 +61,7 @@ const [, , , bundle, userData] = process.argv;
 process.env.NODE_PATH = [path.join(repoRoot, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module._initPaths();
 const require = createRequire(import.meta.url);
-const { registry, analysisReuse, database, secrets } = require(bundle);
+const { registry, analysisReuse, database, secrets, settingsRepo } = require(bundle);
 
 assert.equal(registry.getActiveVault().id, 'default');
 assert.equal(registry.getActiveVault().type, 'academic', 'pre-existing/legacy vault defaults to academic type');
@@ -104,6 +105,21 @@ assert.equal(database.dbPath(), researchVault.path);
 assert.equal(secrets.getApiKey('openai'), 'sk-default');
 db = database.getDb();
 assert.equal(countWorks(db), 0, 'new vault starts with an empty library');
+
+// App-wide preferences (theme/language) are shared globally: set them in this vault,
+// then a per-vault setting, and confirm the prefs survive a switch while the per-vault
+// one does not.
+settingsRepo.updateSettings({ theme: 'light', uiLanguage: 'en', readTag: 'research-only' });
+assert.equal(settingsRepo.getSettings().theme, 'light', 'theme applied in the active vault');
+database.closeDb();
+registry.setActiveVault('default');
+database.getDb();
+assert.equal(settingsRepo.getSettings().theme, 'light', 'theme persists across vaults (global preference)');
+assert.equal(settingsRepo.getSettings().uiLanguage, 'en', 'uiLanguage persists across vaults (global preference)');
+assert.notEqual(settingsRepo.getSettings().readTag, 'research-only', 'per-vault settings do NOT leak across vaults');
+database.closeDb();
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
 db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run('work-research', 'ZOT-RESEARCH', 'Research work');
 db.prepare('INSERT INTO works (nodus_id, zotero_key, title) VALUES (?, ?, ?)').run(
   'work-reused',

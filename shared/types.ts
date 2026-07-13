@@ -6,6 +6,82 @@ import type { VaultType } from './vaultTypes';
 import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { VaultType };
+import type {
+  DatabaseAttachment,
+  DatabaseColumn,
+  DatabaseColumnConfig,
+  DatabaseColumnType,
+  DatabaseDetail,
+  DatabaseRelation,
+  DatabaseRow,
+  DatabaseRowHit,
+  DatabaseRowSort,
+  DatabaseSearchHit,
+  DatabaseSelectOption,
+  DatabaseSummary,
+  RelationTarget,
+  RelationTargetKind,
+} from './databases';
+export type {
+  DatabaseAttachment,
+  DatabaseColumn,
+  DatabaseColumnConfig,
+  DatabaseColumnType,
+  DatabaseDetail,
+  DatabaseRelation,
+  DatabaseRow,
+  DatabaseRowHit,
+  DatabaseRowSort,
+  DatabaseSearchHit,
+  DatabaseSelectOption,
+  DatabaseSummary,
+  RelationTarget,
+  RelationTargetKind,
+} from './databases';
+import type { DatabaseSavedView, SavedViewInput } from './databaseFilters';
+export type {
+  DatabaseFilterState,
+  DatabaseSavedView,
+  FilterCondition,
+  FilterGroup,
+  SavedViewInput,
+  SortRule,
+} from './databaseFilters';
+import type { DatabaseProfile } from './dataProfile';
+export type { ColumnProfile, DatabaseProfile, DistributionSlice, NumberStats } from './dataProfile';
+import type { DbChatTurn } from './databaseChat';
+export type { DbChatTurn } from './databaseChat';
+export type { ChartSpec, ChatSegment } from './chartSpec';
+import type { AnalysisRequest, AnalysisResult, AnalysisSuggestion } from './analysisSpec';
+export type {
+  AnalysisKind,
+  AnalysisOptions,
+  AnalysisRequest,
+  AnalysisResult,
+  AnalysisSuggestion,
+  ScatterPoint,
+  DescriptiveColumn,
+  DescriptiveResult,
+  CorrelationResultOut,
+  CorrelationMatrixResult,
+  CovarianceMatrixResult,
+  ChiSquareResultOut,
+  CrosstabResult,
+  GroupMetric,
+  GroupCompareResult,
+  TopValuesResult,
+  SeriesLine,
+  TimeSeriesResult,
+  DataQualityColumn,
+  DataQualityResult,
+} from './analysisSpec';
+export type { ColumnRole, ColumnRoles, KindMeta, RoleColumn } from './analysisCatalog';
+
+export interface DatabaseChatRequest {
+  question: string;
+  databaseIds: string[];
+  history?: DbChatTurn[];
+}
 
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
 export type GraphNodeType = IdeaType | 'theme' | 'author';
@@ -615,6 +691,8 @@ export interface AppSettings {
   demoPriorVaultType: VaultType | null;
   // Completion flag for the genealogy-specific guided tour (shown in the genealogy demo).
   genealogyTourComplete: boolean;
+  // Completion flag for the databases-mode guided tour (shown once per databases vault).
+  databasesTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -942,6 +1020,8 @@ export interface PortraitFocus {
   focusX: number;
   focusY: number;
   scale: number;
+  /** True when the portrait is an AI-generated reference likeness, not a real photo. */
+  generated?: boolean;
 }
 
 export interface Person {
@@ -1160,6 +1240,9 @@ export interface ArchiveItem {
   /** Tree members this document is linked to. */
   linkedPersons: ArchiveLinkedPerson[];
   tags: string[];
+  /** Folder memberships (archive_item_folders). A "Carpeta" multi-select in the UI —
+   *  an item may belong to several folders; the option list is the archive_folders. */
+  folderIds: string[];
   /** Whether the item's text has been embedded for semantic discovery. */
   hasEmbedding?: boolean;
   createdAt: string;
@@ -1212,6 +1295,8 @@ export interface ArchiveItemInput {
  *  category combines with AND; tags/persons support a Notion-style any/all toggle. */
 export interface ArchiveListOptions {
   folderId?: string | null;
+  /** Filter to items belonging to ANY of these folders (Carpeta multi-select facet). */
+  folderIds?: string[];
   search?: string;
   docTypes?: string[];
   kinds?: ArchiveItemKind[];
@@ -1219,6 +1304,8 @@ export interface ArchiveListOptions {
   tagsMode?: ArchiveMatchMode;
   personIds?: string[];
   personsMode?: ArchiveMatchMode;
+  /** Heritage-dimension facets (OR within a dimension, AND across). Keyed by dimension id. */
+  facets?: Record<string, string[]>;
   yearFrom?: number | null;
   yearTo?: number | null;
   sort?: ArchiveSortKey;
@@ -1512,6 +1599,7 @@ export interface SyncMergeSummary {
   writingDrafts: SyncTableCounts;
   savedSearches: SyncTableCounts;
   edgeFeedback: SyncTableCounts;
+  databases: SyncTableCounts;
 }
 
 export interface GraphData {
@@ -3813,6 +3901,23 @@ export interface ImmersionAnswerResult {
   progress: ImmersionProgress;
 }
 
+/** Runtime environment info, surfaced in the feedback/PR form so every report
+ *  carries the exact Nodus build and platform it came from. */
+export interface AppInfo {
+  /** Nodus version (package.json / app.getVersion()), e.g. "2.0.3". */
+  version: string;
+  /** Raw Node platform: 'darwin' | 'win32' | 'linux' | … */
+  platform: string;
+  /** Friendly OS label, e.g. "macOS", "Windows", "Linux". */
+  osName: string;
+  /** os.release() string. */
+  osVersion: string;
+  /** CPU architecture, e.g. "arm64" | "x64". */
+  arch: string;
+  /** Bundled Electron version. */
+  electron: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3917,6 +4022,8 @@ export interface NodusApi {
   createArchiveFolder(name: string, parentId?: string | null): Promise<ArchiveFolder>;
   renameArchiveFolder(id: string, name: string): Promise<ArchiveFolder | null>;
   deleteArchiveFolder(id: string): Promise<void>;
+  listArchiveItemFolders(itemId: string): Promise<string[]>;
+  setArchiveItemFolders(itemId: string, folderIds: string[]): Promise<ArchiveItem | null>;
   listArchiveItems(opts?: ArchiveListOptions): Promise<ArchiveItem[]>;
   getArchiveItem(id: string): Promise<ArchiveItem | null>;
   getArchiveItemBlob(id: string): Promise<Uint8Array | null>;
@@ -3952,6 +4059,100 @@ export interface NodusApi {
   /** Embed text-bearing archive items for semantic discovery (idempotent). */
   indexArchive(): Promise<{ indexed: number; skipped: number }>;
   archiveIndexStatus(): Promise<{ indexed: number; total: number }>;
+  // databases mode (Notion-like structured data)
+  listDatabases(): Promise<DatabaseSummary[]>;
+  searchDatabases(query: string, includeContent: boolean): Promise<DatabaseSearchHit[]>;
+  searchDatabaseRows(query: string, limit?: number): Promise<DatabaseRowHit[]>;
+  getDatabase(id: string): Promise<DatabaseSummary | null>;
+  getDatabaseDetail(id: string): Promise<DatabaseDetail | null>;
+  databaseStats(id: string): Promise<{ rowCount: number; vaultTotal: number; percent: number }>;
+  createDatabase(name: string, icon?: string | null): Promise<DatabaseSummary>;
+  renameDatabase(id: string, name: string): Promise<DatabaseSummary | null>;
+  setDatabaseIcon(id: string, icon: string | null): Promise<DatabaseSummary | null>;
+  deleteDatabase(id: string): Promise<void>;
+  reorderDatabases(ids: string[]): Promise<void>;
+  createDatabaseColumn(
+    databaseId: string,
+    name: string,
+    type: DatabaseColumnType,
+    config?: DatabaseColumnConfig
+  ): Promise<DatabaseColumn>;
+  updateDatabaseColumn(
+    id: string,
+    patch: { name?: string; type?: DatabaseColumnType; config?: DatabaseColumnConfig }
+  ): Promise<DatabaseColumn | null>;
+  deleteDatabaseColumn(id: string): Promise<void>;
+  reorderDatabaseColumns(databaseId: string, ids: string[]): Promise<void>;
+  addDatabaseOption(columnId: string, label: string, color?: string | null): Promise<DatabaseSelectOption>;
+  updateDatabaseOption(id: string, patch: { label?: string; color?: string | null }): Promise<void>;
+  deleteDatabaseOption(id: string): Promise<void>;
+  reorderDatabaseOptions(columnId: string, ids: string[]): Promise<void>;
+  listDatabaseRows(
+    databaseId: string,
+    opts?: { sort?: DatabaseRowSort; limit?: number; offset?: number }
+  ): Promise<DatabaseRow[]>;
+  getDatabaseRow(id: string): Promise<DatabaseRow | null>;
+  createDatabaseRow(databaseId: string): Promise<DatabaseRow>;
+  deleteDatabaseRow(id: string): Promise<void>;
+  setDatabaseCell(rowId: string, columnId: string, raw: string | null): Promise<DatabaseRow | null>;
+  listDatabaseAttachments(rowId: string, columnId: string): Promise<DatabaseAttachment[]>;
+  getDatabaseAttachmentBlob(id: string): Promise<Uint8Array | null>;
+  deleteDatabaseAttachment(id: string): Promise<void>;
+  downloadDatabaseAttachment(id: string): Promise<{ canceled: boolean; path: string | null }>;
+  pickAndAttachDatabaseFiles(
+    rowId: string,
+    columnId: string
+  ): Promise<{ added: number; attachments: DatabaseAttachment[] }>;
+  runDatabaseAiCell(rowId: string, columnId: string): Promise<string>;
+  runDatabaseAiColumn(databaseId: string, columnId: string): Promise<{ done: number; failed: number }>;
+  generateDatabaseAiImage(rowId: string, columnId: string): Promise<DatabaseAttachment>;
+  generateDatabaseAiImageColumn(databaseId: string, columnId: string): Promise<{ done: number; failed: number }>;
+  onDatabaseAiProgress(cb: (payload: { columnId: string; done: number; total: number }) => void): () => void;
+  listDatabaseRelations(rowId: string, columnId: string): Promise<DatabaseRelation[]>;
+  addDatabaseRelation(
+    rowId: string,
+    columnId: string,
+    targetKind: RelationTargetKind,
+    targetId: string,
+    targetVaultId?: string | null
+  ): Promise<DatabaseRelation>;
+  removeDatabaseRelation(id: string): Promise<void>;
+  searchDatabaseRelationTargets(
+    kind: RelationTargetKind,
+    query: string,
+    databaseId?: string
+  ): Promise<RelationTarget[]>;
+  parseCsvForImport(): Promise<
+    { fileName: string; headers: string[]; rows: string[][]; suggestedTypes: DatabaseColumnType[] } | null
+  >;
+  createDatabaseFromCsv(
+    name: string,
+    headers: string[],
+    rows: string[][],
+    types: DatabaseColumnType[]
+  ): Promise<DatabaseSummary>;
+  exportDatabase(databaseId: string, format: 'csv' | 'json' | 'xlsx'): Promise<{ canceled: boolean; path?: string }>;
+  getDatabaseProfile(databaseId: string): Promise<{ databaseName: string; profile: DatabaseProfile } | null>;
+  analyzeDatabaseReport(databaseId: string): Promise<{ databaseName: string; profileText: string; report: string }>;
+  suggestDatabaseAnalyses(databaseId: string): Promise<{ databaseName: string; suggestions: AnalysisSuggestion[] }>;
+  runDatabaseAnalysis(databaseId: string, request: AnalysisRequest): Promise<{ databaseName: string; request: AnalysisRequest; result: AnalysisResult }>;
+  narrateDatabaseAnalysis(result: AnalysisResult): Promise<string>;
+  dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string }>;
+  cancelDbChat(): Promise<void>;
+  listDatabaseViews(databaseId: string): Promise<DatabaseSavedView[]>;
+  createDatabaseView(databaseId: string, input: SavedViewInput): Promise<DatabaseSavedView>;
+  updateDatabaseView(id: string, patch: Partial<SavedViewInput>): Promise<DatabaseSavedView | null>;
+  deleteDatabaseView(id: string): Promise<void>;
+  pickBulkDatabaseFiles(): Promise<{ name: string; path: string }[]>;
+  bulkAttachDatabaseFiles(
+    databaseId: string,
+    refColumnId: string,
+    attachmentColumnId: string,
+    files: { name: string; path: string }[]
+  ): Promise<{ attached: number; matched: number; unmatched: number }>;
+  onDatabaseBulkProgress(
+    cb: (payload: { databaseId: string; done: number; total: number; attached: number; matched: number; finished: boolean }) => void
+  ): () => void;
   getMcpStatus(): Promise<McpServerStatus>;
   regenerateMcpToken(): Promise<string>;
   getCopilotStatus(): Promise<CopilotServerStatus>;
@@ -3960,6 +4161,8 @@ export interface NodusApi {
   ensureCopilotCert(): Promise<{ ok: boolean; message: string }>;
   /** Copy a port-aware Nodus Copilot manifest into Word's local add-in catalog. */
   installCopilotAddin(): Promise<CopilotInstallResult>;
+  /** Runtime version + platform info for the feedback / PR form. */
+  getAppInfo(): Promise<AppInfo>;
   /** Copy the Nodus Copilot macro into LibreOffice's user script directory. */
   installLibreOfficeCopilot(): Promise<CopilotInstallResult>;
   /** Fired when the Word add-in asks Nodus to open an idea in the graph. */
@@ -4364,6 +4567,7 @@ export interface NodusApi {
   /** Seed the genealogy demo (Serrano–Vidal family) and flip the vault to genealogy;
    *  kicks off background portrait generation when a Gemini key is present. */
   seedGenealogyDemoData(): Promise<{ seeded: boolean; willGeneratePortraits: boolean }>;
+  seedDatabasesDemoData(): Promise<boolean>;
   /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
   generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
   /** Progress of demo portrait generation. Returns an unsubscribe function. */
@@ -4405,6 +4609,9 @@ export interface NodusApi {
   checkForUpdates(): Promise<UpdateCheckResponse>;
   installUpdate(): Promise<UpdateCheckResponse>;
   onUpdateProgress(cb: (event: UpdateProgressEvent) => void): () => void;
+
+  // macOS dock icon (dynamic: follows theme + active vault). No-op elsewhere.
+  setDockIcon(pngDataUrl: string): Promise<void>;
 }
 
 export interface WorkFilter {

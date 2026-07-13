@@ -31,6 +31,7 @@ try {
   const vaults = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const entities = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
+  const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
   const { createBackupArchive, restoreBackupArchive } = require(path.join(repoRoot, 'electron/export/exportImport.ts'));
 
   const switchTo = (id) => {
@@ -50,13 +51,38 @@ try {
   const bob = entities.createPerson({ displayName: 'Bob Genealógico' });
   assert.ok(entities.getPerson(bob.personId), 'person seeded in vault B');
 
-  // Back up the WHOLE app (both vaults) while the genealogy vault is active.
+  // A third vault in databases mode with a database, column, row and cell — proving
+  // the db_* tables travel in the whole-app backup like any other vault data.
+  const dataVault = vaults.createVault('Datos', 'databases');
+  switchTo(dataVault.id);
+  assert.equal(vaults.getActiveVault().type, 'databases', 'active vault is now the databases one');
+  const database = dbmode.createDatabase('Muestras');
+  const col = dbmode.createColumn(database.id, 'Nombre', 'title');
+  const dbRow = dbmode.createRow(database.id);
+  dbmode.setCell(dbRow.id, col.id, 'Muestra 1');
+  // Also seed an attachment (BLOB), a relation and a saved view so the backup is proven
+  // to carry every db_* table, including binary attachments.
+  const attCol = dbmode.createColumn(database.id, 'Foto', 'attachment');
+  const att = dbmode.addAttachment({ rowId: dbRow.id, columnId: attCol.id, fileName: 'x.png', mimeType: 'image/png', bytes: 3, blob: Buffer.from('PNG'), contentHash: 'h1' });
+  const dbRow2 = dbmode.createRow(database.id);
+  dbmode.setCell(dbRow2.id, col.id, 'Muestra 2');
+  const relCol = dbmode.createColumn(database.id, 'Vínculo', 'relation', { relationTargetKind: 'db_row', relationTargetDatabaseId: database.id });
+  dbmode.addRelation(dbRow.id, relCol.id, 'db_row', dbRow2.id);
+  dbmode.createView(database.id, { name: 'Vista X', layout: 'gallery', filter: { conjunction: 'and', conditions: [] }, sorts: [] });
+  assert.equal(dbmode.databaseStats(database.id).rowCount, 2, 'rows seeded in databases vault');
+  // Restore the genealogy vault as active so the backup's active matches the assertion below.
+  switchTo(gene.id);
+
+  // Back up the WHOLE app (all vaults) while the genealogy vault is active.
   const archive = await createBackupArchive({ password: 'clave-larga-de-prueba', includeSecrets: false, appVersion: '9.9.9-test' });
   assert.ok(Buffer.isBuffer(archive) && archive.length > 0, 'archive produced');
 
   // ── Wipe both vaults' data ──────────────────────────────────────────────────
   entities.deletePerson(bob.personId); // vault B (active)
   assert.equal(entities.getPerson(bob.personId), null, 'Bob deleted from vault B');
+  switchTo(dataVault.id);
+  dbmode.deleteDatabase(database.id); // databases vault
+  assert.equal(dbmode.listDatabases().length, 0, 'database wiped from the databases vault');
   switchTo(legacy.id);
   entities.deletePerson(alice.personId); // vault A
   assert.equal(entities.getPerson(alice.personId), null, 'Alice deleted from vault A');
@@ -71,6 +97,19 @@ try {
   assert.ok(ids.includes(legacy.id) && ids.includes(gene.id), 'both vaults present after restore');
   assert.equal(vaults.getActiveVault().id, gene.id, 'active vault restored to the backed-up active (genealogy)');
   assert.ok(entities.getPerson(bob.personId), 'Bob restored in the genealogy vault');
+
+  switchTo(dataVault.id);
+  const restoredDbs = dbmode.listDatabases();
+  assert.equal(restoredDbs.length, 1, 'database restored in the databases vault');
+  assert.equal(restoredDbs[0].name, 'Muestras');
+  const restoredRows = dbmode.listRows(restoredDbs[0].id);
+  assert.equal(restoredRows.length, 2, 'rows restored');
+  assert.equal(restoredRows[0].cells[col.id], 'Muestra 1', 'cell value restored');
+  // Attachment blob, relation and saved view survive (ids are preserved by a full-DB backup).
+  const restoredBlob = dbmode.getAttachmentBlob(att.id);
+  assert.ok(restoredBlob && restoredBlob.toString() === 'PNG', 'attachment blob restored from the backup');
+  assert.equal(dbmode.listRelations(dbRow.id, relCol.id).length, 1, 'relation restored from the backup');
+  assert.equal(dbmode.listViews(database.id).length, 1, 'saved view restored from the backup');
 
   switchTo(legacy.id);
   assert.ok(entities.getPerson(alice.personId), 'Alice restored in the academic vault');
