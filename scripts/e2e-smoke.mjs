@@ -402,6 +402,40 @@ try {
   assert.match(await page.locator('body').innerText(), /Cursos y asignaturas/, 'study-specific sidebar is rendered');
   console.log('[e2e] study vault hierarchy + material view ok over IPC and renderer');
 
+  await page.getByText('Apunte smoke', { exact: true }).last().click();
+  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-doc-favorite').click();
+  await page.getByTestId('study-doc-style').click();
+  await page.getByTestId('study-doc-kind').selectOption('manual');
+  await page.getByTestId('study-doc-color').fill('#22c55e');
+  await page.waitForFunction(async () => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
+    return document?.favorite === true && document.kind === 'manual' && document.color === '#22c55e';
+  }, { timeout: 30_000 });
+  await page.getByRole('button', { name: /Markdown crudo/ }).click();
+  const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
+  await page.locator('.study-editor-shell textarea').fill(editorMarkdown);
+  await page.getByRole('button', { name: /^Guardar$/ }).click();
+  await page.waitForFunction(() => document.body.textContent?.includes('Guardado'), { timeout: 30_000 });
+  const editorRoundTrip = await page.evaluate(async () => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
+    if (!document) return null;
+    const data = await window.nodus.getStudyDocEditorData(document.id);
+    return { content: document.contentMarkdown, versions: data.versions.length };
+  });
+  assert.equal(editorRoundTrip?.content, editorMarkdown, 'raw Markdown round-trips exactly through the editor');
+  assert.ok((editorRoundTrip?.versions ?? 0) >= 1, 'editor save creates a recoverable version');
+  await page.getByRole('button', { name: /Markdown crudo/ }).click();
+  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .katex').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown table.children').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: /^Dividir$/ }).click();
+  await page.locator('.study-editor-shell .md .katex').waitFor({ timeout: 30_000 });
+  assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
+  console.log('[e2e] study Milkdown editor + metadata + raw Markdown + versioning ok');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import type { CitationPreview, CitationRef } from '@shared/types';
 import { t } from '../i18n';
 
@@ -25,11 +28,13 @@ export function Markdown({
   content,
   className = '',
   onCitation,
+  onStudyDocument,
   verify = true,
 }: {
   content: string;
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
+  onStudyDocument?: (documentId: string) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
   verify?: boolean;
 }) {
@@ -56,10 +61,15 @@ export function Markdown({
   return (
     <div className={`md ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         urlTransform={nodusUrlTransform}
         components={{
           a: ({ href, children }) => {
+            const studyDocument = href?.match(/^nodus:\/\/study\/doc\/(.+)$/);
+            if (studyDocument && onStudyDocument) {
+              return <button className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300" onClick={() => onStudyDocument(decodeURIComponent(studyDocument[1]))}>{children}</button>;
+            }
             const citation = parseCitation(href);
             if (citation && onCitation) {
               const key = `${citation.kind}:${citation.id}`;

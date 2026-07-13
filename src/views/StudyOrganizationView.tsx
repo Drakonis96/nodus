@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import type { StudyDocument, StudyDocumentKind, StudyWorkspace } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
 import { t } from '../i18n';
+
+const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
 const KIND_LABEL: Record<StudyDocumentKind, string> = {
   apunte: 'Apunte', manual: 'Manual', libro: 'Libro', articulo: 'Artículo', presentacion: 'Presentación',
@@ -42,13 +44,13 @@ export function StudyOrganizationView({
   const [kind, setKind] = useState<StudyDocumentKind | 'all'>('all');
   const [tagId, setTagId] = useState<string>('all');
   const [editing, setEditing] = useState<StudyDocument | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [openDocumentIds, setOpenDocumentIds] = useState<string[]>([]);
 
   const reload = useCallback(async () => {
     const next = await window.nodus.getStudyWorkspace();
     setWorkspace(next);
-    if (editing) setEditing(next.documents.find((document) => document.id === editing.id) ?? null);
-  }, [editing?.id]);
+    setEditing((current) => current ? next.documents.find((document) => document.id === current.id) ?? null : null);
+  }, []);
 
   useEffect(() => {
     void reload();
@@ -57,8 +59,20 @@ export function StudyOrganizationView({
   }, [reload]);
 
   useEffect(() => {
-    if (target?.kind === 'document' && workspace) setEditing(workspace.documents.find((document) => document.id === target.id) ?? null);
+    if (target?.kind === 'document' && workspace) {
+      const document = workspace.documents.find((candidate) => candidate.id === target.id) ?? null;
+      if (document) {
+        setEditing(document);
+        setOpenDocumentIds((current) => current.includes(document.id) ? current : [...current, document.id]);
+      }
+    }
   }, [target?.kind, target?.id, workspace]);
+
+  const openDocument = (document: StudyDocument) => {
+    setEditing(document);
+    setOpenDocumentIds((current) => current.includes(document.id) ? current : [...current, document.id]);
+    onTargetChange({ kind: 'document', id: document.id });
+  };
 
   const placementForTarget = () => {
     if (!target || target.kind === 'document') return null;
@@ -76,9 +90,9 @@ export function StudyOrganizationView({
   };
 
   const change = async (operation: () => Promise<unknown>) => {
-    setBusy(true);
-    try { await operation(); announceStudyWorkspaceChanged(); await reload(); }
-    finally { setBusy(false); }
+    await operation();
+    announceStudyWorkspaceChanged();
+    await reload();
   };
 
   const createCourse = () => {
@@ -107,7 +121,7 @@ export function StudyOrganizationView({
     if (!title) return;
     void change(async () => {
       const item = await window.nodus.createStudyDocument({ title, placement: placementForTarget() });
-      setEditing(item); onTargetChange({ kind: 'document', id: item.id });
+      openDocument(item);
     });
   };
 
@@ -124,6 +138,76 @@ export function StudyOrganizationView({
 
   if (!workspace) return <div className="flex h-full items-center justify-center"><Spinner label={t('Cargando vault de estudio…')} /></div>;
   const selectedTitle = targetTitle(workspace, target);
+  const openDocuments = openDocumentIds.map((id) => workspace.documents.find((document) => document.id === id)).filter((document): document is StudyDocument => Boolean(document));
+
+  if (editing) {
+    return (
+      <Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
+      <StudyEditor
+        documents={openDocuments.length ? openDocuments : [editing]}
+        tags={workspace.tags}
+        activeTagIds={workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => link.tagId)}
+        activeId={editing.id}
+        onActivate={(id) => {
+          const document = workspace.documents.find((candidate) => candidate.id === id);
+          if (document) { setEditing(document); onTargetChange({ kind: 'document', id }); }
+        }}
+        onClose={(id) => {
+          const remaining = openDocumentIds.filter((candidate) => candidate !== id);
+          setOpenDocumentIds(remaining);
+          const next = workspace.documents.find((document) => document.id === remaining.at(-1));
+          setEditing(next ?? null);
+          onTargetChange(next ? { kind: 'document', id: next.id } : null);
+        }}
+        onSaved={(updated) => {
+          setWorkspace((current) => current ? { ...current, documents: current.documents.map((document) => document.id === updated.id ? updated : document) } : current);
+          setEditing(updated);
+          announceStudyWorkspaceChanged();
+        }}
+        onUpdateMetadata={async (patch) => {
+          const updated = await window.nodus.updateStudyEntity('document', editing.id, patch);
+          if (updated && 'title' in updated) {
+            setWorkspace((current) => current ? { ...current, documents: current.documents.map((document) => document.id === updated.id ? updated : document) } : current);
+            setEditing(updated);
+            announceStudyWorkspaceChanged();
+          }
+        }}
+        onSetTags={async (tagIds) => {
+          await window.nodus.setStudyDocumentTags(editing.id, tagIds);
+          announceStudyWorkspaceChanged();
+          await reload();
+        }}
+        onCreateTag={async (name) => {
+          const tag = await window.nodus.createStudyTag({ name });
+          const current = workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => link.tagId);
+          await window.nodus.setStudyDocumentTags(editing.id, [...current, tag.id]);
+          announceStudyWorkspaceChanged();
+          await reload();
+        }}
+        onDuplicate={async () => {
+          const duplicate = await window.nodus.duplicateStudyTree('document', editing.id);
+          if ('title' in duplicate) openDocument(duplicate);
+          announceStudyWorkspaceChanged();
+          await reload();
+        }}
+        onTrash={async () => {
+          await window.nodus.setStudyLifecycle('document', editing.id, 'trash');
+          const remaining = openDocumentIds.filter((candidate) => candidate !== editing.id);
+          setOpenDocumentIds(remaining);
+          const next = workspace.documents.find((document) => document.id === remaining.at(-1));
+          setEditing(next ?? null);
+          onTargetChange(next ? { kind: 'document', id: next.id } : null);
+          announceStudyWorkspaceChanged();
+          await reload();
+        }}
+        onOpenLinkedDocument={(id) => {
+          const document = workspace.documents.find((candidate) => candidate.id === id);
+          if (document) openDocument(document);
+        }}
+      />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -163,8 +247,8 @@ export function StudyOrganizationView({
             {documents.map((document) => (
               <button key={document.id} draggable
                 onDragStart={(event) => event.dataTransfer.setData('application/x-nodus-study-doc', document.id)}
-                onClick={() => { setEditing(document); onTargetChange({ kind: 'document', id: document.id }); }}
-                className={`group rounded-xl border p-4 text-left transition-colors ${editing?.id === document.id ? 'border-indigo-600 bg-indigo-950/25' : 'border-neutral-800 bg-neutral-900/40 hover:border-indigo-800'}`}>
+                onClick={() => openDocument(document)}
+                className="group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 text-left transition-colors hover:border-indigo-800">
                 <div className="flex items-start gap-2">
                   <span className="rounded-lg bg-indigo-600/15 p-2 text-indigo-300"><Icon name={document.icon || 'notebook'} /></span>
                   <span className="min-w-0 flex-1">
@@ -184,56 +268,6 @@ export function StudyOrganizationView({
           </div>
         </section>
 
-        {editing && (
-          <aside className="flex w-[min(38vw,460px)] min-w-[320px] flex-col border-l border-neutral-800 bg-neutral-950/40">
-            <div className="flex items-center gap-2 border-b border-neutral-800 p-3">
-              <input className="input min-w-0 flex-1 font-semibold" value={editing.title}
-                onChange={(event) => setEditing({ ...editing, title: event.target.value })} />
-              <button className="btn btn-ghost px-2" title={t('Favorito')} onClick={() => setEditing({ ...editing, favorite: !editing.favorite })}>
-                <Icon name="star" className={editing.favorite ? 'text-amber-400' : ''} />
-              </button>
-              <button className="btn btn-ghost px-2" title={t('Cerrar')} onClick={() => setEditing(null)}><Icon name="x" /></button>
-            </div>
-            <div className="flex gap-2 border-b border-neutral-800 p-3">
-              <select className="input flex-1" value={editing.kind} onChange={(event) => setEditing({ ...editing, kind: event.target.value as StudyDocumentKind })}>
-                {STUDY_DOCUMENT_KINDS.map((value) => <option key={value} value={value}>{t(KIND_LABEL[value])}</option>)}
-              </select>
-              <input type="color" className="h-9 w-10 rounded border border-neutral-700 bg-transparent p-1" value={editing.color || '#0f766e'}
-                onChange={(event) => setEditing({ ...editing, color: event.target.value })} title={t('Color')} />
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5 border-b border-neutral-800 px-3 py-2">
-              {workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => {
-                const tag = workspace.tags.find((candidate) => candidate.id === link.tagId);
-                return tag ? <span key={tag.id} className="rounded-full bg-indigo-900/40 px-2 py-1 text-[10px] text-indigo-300">{tag.name}</span> : null;
-              })}
-              <button className="rounded-full border border-dashed border-neutral-700 px-2 py-1 text-[10px] text-neutral-500 hover:border-indigo-700 hover:text-indigo-300"
-                onClick={() => {
-                  const name = window.prompt(t('Nueva etiqueta'));
-                  if (!name) return;
-                  void change(async () => {
-                    const tag = await window.nodus.createStudyTag({ name });
-                    const current = workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => link.tagId);
-                    await window.nodus.setStudyDocumentTags(editing.id, [...current, tag.id]);
-                  });
-                }}>+ {t('Etiqueta')}</button>
-            </div>
-            <textarea className="min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-6 text-neutral-300 outline-none"
-              value={editing.contentMarkdown} onChange={(event) => setEditing({ ...editing, contentMarkdown: event.target.value })}
-              placeholder={t('Escribe en Markdown…')} />
-            <div className="flex items-center gap-2 border-t border-neutral-800 p-3">
-              <button disabled={busy} className="btn btn-primary flex-1" onClick={() => void change(async () => {
-                await window.nodus.updateStudyEntity('document', editing.id, {
-                  title: editing.title, kind: editing.kind, contentMarkdown: editing.contentMarkdown,
-                  color: editing.color, favorite: editing.favorite,
-                });
-              })}><Icon name="save" /> {busy ? t('Guardando…') : t('Guardar')}</button>
-              <button className="btn btn-ghost" title={t('Duplicar')} onClick={() => void change(() => window.nodus.duplicateStudyTree('document', editing.id))}><Icon name="copy" /></button>
-              <button className="btn btn-ghost text-red-400" title={t('Mover a la papelera')} onClick={() => void change(async () => {
-                await window.nodus.setStudyLifecycle('document', editing.id, 'trash'); setEditing(null); onTargetChange(null);
-              })}><Icon name="trash" /></button>
-            </div>
-          </aside>
-        )}
       </div>
     </div>
   );

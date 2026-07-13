@@ -4,6 +4,28 @@
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
 import type {
+  StudyAnnotation,
+  StudyAnnotationInput,
+  StudyDocEditorData,
+  StudyDocUpdateInput,
+} from './studyEditor';
+export type {
+  ParsedStudyDocLink,
+  StudyAnnotation,
+  StudyAnnotationInput,
+  StudyDocEditorData,
+  StudyDocLink,
+  StudyDocStyle,
+  StudyDocUpdateInput,
+  StudyDocVersion,
+  StudyDocumentStats,
+  StudyEditorAlignment,
+  StudyEditorCommand,
+  StudyEditorSaveReason,
+  StudyEditorTheme,
+  StudyOutlineItem,
+} from './studyEditor';
+import type {
   CreateStudyCourseInput,
   CreateStudyDocumentInput,
   CreateStudyFolderInput,
@@ -4445,6 +4467,12 @@ export interface NodusApi {
   updateStudyTemplate(id: string, patch: Partial<CreateStudyTemplateInput> & { favorite?: boolean; position?: number }): Promise<StudyTemplate | null>;
   deleteStudyTemplate(id: string): Promise<void>;
   applyStudyTemplate(id: string, name?: string): Promise<StudyCourse | StudySubject | StudyDocument>;
+  getStudyDocEditorData(documentId: string): Promise<StudyDocEditorData>;
+  updateStudyDoc(documentId: string, input: StudyDocUpdateInput): Promise<StudyDocument>;
+  restoreStudyDocVersion(documentId: string, versionId: string): Promise<StudyDocument>;
+  createStudyAnnotation(documentId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
+  updateStudyAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
+  deleteStudyAnnotation(id: string): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

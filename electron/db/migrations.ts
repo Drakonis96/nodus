@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 53;
+export const SCHEMA_VERSION = 54;
 
 export const migrations: Migration[] = [
   {
@@ -1732,6 +1732,75 @@ export const migrations: Migration[] = [
         updated_at   TEXT NOT NULL
       );
       CREATE INDEX idx_study_templates_kind ON study_templates(kind, position);
+    `,
+  },
+  {
+    version: 54,
+    up: /* sql */ `
+      -- Study vault phase 2: lossless Markdown editing, recoverable versions,
+      -- anchored comments and internal links/backlinks.
+      ALTER TABLE study_docs ADD COLUMN style_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE study_docs ADD COLUMN spellcheck_language TEXT NOT NULL DEFAULT 'es-ES';
+      ALTER TABLE study_docs ADD COLUMN custom_dictionary_json TEXT NOT NULL DEFAULT '[]';
+
+      CREATE TABLE study_doc_versions (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT NOT NULL UNIQUE,
+        document_id      TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        version_no       INTEGER NOT NULL,
+        title            TEXT NOT NULL,
+        content_markdown TEXT NOT NULL,
+        style_json       TEXT NOT NULL DEFAULT '{}',
+        reason           TEXT NOT NULL DEFAULT 'manual',
+        content_hash     TEXT NOT NULL,
+        position         INTEGER NOT NULL DEFAULT 0,
+        archived_at      TEXT,
+        deleted_at       TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL,
+        UNIQUE(document_id, version_no)
+      );
+      CREATE INDEX idx_study_doc_versions_doc ON study_doc_versions(document_id, version_no DESC);
+      CREATE INDEX idx_study_doc_versions_hash ON study_doc_versions(document_id, content_hash);
+
+      CREATE TABLE study_annotations (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        document_id   TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        from_pos      INTEGER NOT NULL DEFAULT 0,
+        to_pos        INTEGER NOT NULL DEFAULT 0,
+        selected_text TEXT NOT NULL DEFAULT '',
+        comment       TEXT NOT NULL DEFAULT '',
+        color         TEXT,
+        resolved_at   TEXT,
+        locked        INTEGER NOT NULL DEFAULT 0,
+        pinned        INTEGER NOT NULL DEFAULT 0,
+        position      INTEGER NOT NULL DEFAULT 0,
+        archived_at   TEXT,
+        deleted_at    TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_annotations_doc ON study_annotations(document_id, resolved_at, position);
+
+      CREATE TABLE study_doc_links (
+        id                 TEXT PRIMARY KEY,
+        short_id           TEXT NOT NULL UNIQUE,
+        source_document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        target_document_id TEXT REFERENCES study_docs(id) ON DELETE CASCADE,
+        target_ref         TEXT NOT NULL,
+        target_title       TEXT,
+        link_text          TEXT,
+        position           INTEGER NOT NULL DEFAULT 0,
+        archived_at        TEXT,
+        deleted_at         TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_doc_links_source ON study_doc_links(source_document_id, position);
+      CREATE INDEX idx_study_doc_links_target ON study_doc_links(target_document_id, position);
+      CREATE UNIQUE INDEX idx_study_doc_links_unique
+        ON study_doc_links(source_document_id, target_ref, IFNULL(link_text, ''));
     `,
   },
 ];

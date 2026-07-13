@@ -103,6 +103,8 @@ import type {
   StudyLifecycleAction,
   StudyPlacementInput,
   StudyWorkspaceOptions,
+  StudyAnnotationInput,
+  StudyDocUpdateInput,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -207,6 +209,7 @@ import * as immersionRepo from './db/immersionRepo';
 import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import * as studyOrg from './db/studyOrgRepo';
+import * as studyEditor from './db/studyEditorRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1638,6 +1641,13 @@ export function registerIpc(
     studyOrg.updateStudyTemplate(id, patch));
   h('study:template:delete', async (_e, id: string) => studyOrg.deleteStudyTemplate(id));
   h('study:template:apply', async (_e, id: string, name?: string) => studyOrg.applyStudyTemplate(id, name));
+  h('study:editor:data', async (_e, documentId: string) => studyEditor.getStudyDocEditorData(documentId));
+  h('study:editor:update', async (_e, documentId: string, input: StudyDocUpdateInput) => studyEditor.updateStudyDoc(documentId, input));
+  h('study:editor:restore', async (_e, documentId: string, versionId: string) => studyEditor.restoreStudyDocVersion(documentId, versionId));
+  h('study:annotation:create', async (_e, documentId: string, input: StudyAnnotationInput) => studyEditor.createStudyAnnotation(documentId, input));
+  h('study:annotation:update', async (_e, id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }) =>
+    studyEditor.updateStudyAnnotation(id, patch));
+  h('study:annotation:delete', async (_e, id: string) => studyEditor.deleteStudyAnnotation(id));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

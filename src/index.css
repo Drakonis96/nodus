@@ -1348,3 +1348,58 @@ select.input optgroup {
   background-color: #facc15;
   color: #111827;
 }
+
+/* Study editor: Milkdown owns document structure; these variables keep visual
+   preferences outside the Markdown so typography never mutates content. */
+.study-editor-shell .study-milkdown { min-height: 100%; background: transparent; }
+.study-editor-shell .milkdown { min-height: 100%; background: transparent; color: inherit; }
+.study-editor-shell .milkdown .ProseMirror {
+  box-sizing: border-box;
+  width: min(100%, var(--study-editor-width));
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 48px var(--study-editor-margin) 120px;
+  font-family: var(--study-editor-font);
+  font-size: var(--study-editor-size);
+  line-height: var(--study-editor-line);
+  text-align: var(--study-editor-align);
+  color: #d4d4d4;
+  outline: none;
+}
+.study-editor-shell .milkdown .ProseMirror p { margin-block: var(--study-editor-spacing); text-indent: var(--study-editor-indent); }
+.study-editor-shell .milkdown .ProseMirror li > p,
+.study-editor-shell .milkdown .ProseMirror blockquote p,
+.study-editor-shell .milkdown .ProseMirror td p { text-indent: 0; }
+.study-editor-shell .milkdown .ProseMirror h1,
+.study-editor-shell .milkdown .ProseMirror h2,
+.study-editor-shell .milkdown .ProseMirror h3,
+.study-editor-shell .milkdown .ProseMirror h4 { scroll-margin-top: 100px; text-align: left; color: #f5f5f5; }
+.study-editor-shell.study-theme-paper .milkdown .ProseMirror {
+  background: #171717;
+  box-shadow: 0 0 0 1px rgb(64 64 64 / 0.55), 0 18px 50px rgb(0 0 0 / 0.22);
+}
+.study-editor-shell.study-theme-soft .milkdown .ProseMirror { background: #13201f; }
+.study-editor-shell.study-theme-contrast .milkdown .ProseMirror { background: #050505; color: #fff; }
+.study-editor-shell .milkdown .ProseMirror table { width: 100%; border-collapse: collapse; }
+.study-editor-shell .milkdown .ProseMirror th,
+.study-editor-shell .milkdown .ProseMirror td { border: 1px solid #404040; padding: 0.45rem 0.6rem; text-align: left; }
+.study-editor-shell .milkdown .ProseMirror blockquote { border-left: 3px solid #0d9488; padding-left: 1rem; color: #a3a3a3; }
+.study-editor-shell .milkdown .ProseMirror pre { overflow-x: auto; border-radius: 0.5rem; background: #0a0a0a; padding: 1rem; text-align: left; }
+.light .study-editor-shell { background: #f5f5f4; }
+.light .study-editor-shell .milkdown .ProseMirror { color: #292524; }
+.light .study-editor-shell .milkdown .ProseMirror h1,
+.light .study-editor-shell .milkdown .ProseMirror h2,
+.light .study-editor-shell .milkdown .ProseMirror h3,
+.light .study-editor-shell .milkdown .ProseMirror h4 { color: #0c0a09; }
+.light .study-editor-shell.study-theme-paper .milkdown .ProseMirror { background: #fffefb; box-shadow: 0 0 0 1px #e7e5e4, 0 18px 50px rgb(120 113 108 / 0.12); }
+.light .study-editor-shell.study-theme-soft .milkdown .ProseMirror { background: #f0fdfa; }
+.light .study-editor-shell.study-theme-contrast .milkdown .ProseMirror { background: white; color: black; box-shadow: 0 0 0 2px #111827; }
+.light .study-editor-shell .milkdown .ProseMirror pre { background: #f5f5f4; }
+
+@media print {
+  body * { visibility: hidden; }
+  .study-editor-shell .study-milkdown,
+  .study-editor-shell .study-milkdown * { visibility: visible; }
+  .study-editor-shell .study-milkdown { position: fixed; inset: 0; background: white; }
+  .study-editor-shell .milkdown .ProseMirror { color: black; background: white; box-shadow: none; }
+}

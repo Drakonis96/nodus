@@ -408,6 +408,12 @@ const api: NodusApi = {
   updateStudyTemplate: (id, patch) => ipcRenderer.invoke('study:template:update', id, patch),
   deleteStudyTemplate: (id) => ipcRenderer.invoke('study:template:delete', id).then(() => undefined),
   applyStudyTemplate: (id, name) => ipcRenderer.invoke('study:template:apply', id, name),
+  getStudyDocEditorData: (documentId) => ipcRenderer.invoke('study:editor:data', documentId),
+  updateStudyDoc: (documentId, input) => ipcRenderer.invoke('study:editor:update', documentId, input),
+  restoreStudyDocVersion: (documentId, versionId) => ipcRenderer.invoke('study:editor:restore', documentId, versionId),
+  createStudyAnnotation: (documentId, input) => ipcRenderer.invoke('study:annotation:create', documentId, input),
+  updateStudyAnnotation: (id, patch) => ipcRenderer.invoke('study:annotation:update', id, patch),
+  deleteStudyAnnotation: (id) => ipcRenderer.invoke('study:annotation:delete', id).then(() => undefined),
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

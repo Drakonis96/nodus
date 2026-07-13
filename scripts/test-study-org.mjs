@@ -33,8 +33,8 @@ try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.equal(SCHEMA_VERSION, 53, 'phase 1 owns schema v53');
-  assert.equal(getDb().pragma('user_version', { simple: true }), 53, 'fresh vault migrates to v53');
+  assert.ok(SCHEMA_VERSION >= 53, 'phase 1 requires schema v53 or later');
+  assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION, `fresh vault migrates through v${SCHEMA_VERSION}`);
   for (const table of ['study_courses', 'study_subjects', 'study_topics', 'study_folders', 'study_docs', 'study_placements', 'study_tags', 'study_doc_tags', 'study_templates']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
   }
@@ -119,7 +119,7 @@ try {
   legacy.prepare('CREATE TABLE phase53_sentinel (value TEXT NOT NULL)').run();
   legacy.prepare('INSERT INTO phase53_sentinel (value) VALUES (?)').run('preserved');
   runMigrations(legacy);
-  assert.equal(legacy.pragma('user_version', { simple: true }), 53);
+  assert.equal(legacy.pragma('user_version', { simple: true }), SCHEMA_VERSION);
   assert.equal(legacy.prepare('SELECT value FROM phase53_sentinel').get().value, 'preserved', 'v52 data preserved');
   assert.ok(legacy.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='study_docs'").get());
   legacy.close();
