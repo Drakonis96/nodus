@@ -901,6 +901,7 @@ textarea.search-input { resize: vertical; min-height: 74px; line-height: 1.5; }
 .db-pfill { font-size: 12px; color: var(--text-2); }
 .db-psub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .db-dist { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.db-dist > .card { margin-top: 0; }
 .db-barcard { padding: 14px 16px; }
 .db-bars { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
 .db-bar { display: flex; align-items: center; gap: 10px; font-size: 12px; }
