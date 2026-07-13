@@ -7,27 +7,19 @@ import type {
   LocalProviderTestResult,
   ModelInfo,
   ModelRef,
-  VaultSummary,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
-import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
 import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
 import { t, tx } from '../i18n';
 
 export function ProvidersSettings({
   settings,
-  vaults,
-  activeVault,
   onChange,
-  onVaultsChanged,
 }: {
   settings: AppSettings;
-  vaults: VaultSummary[];
-  activeVault: VaultSummary | null;
   onChange: () => Promise<unknown>;
-  onVaultsChanged: () => Promise<unknown>;
 }) {
   const [open, setOpen] = useState<AiProvider | null>(null);
 
@@ -45,15 +37,9 @@ export function ProvidersSettings({
     <>
     <section className="card p-4 mb-4">
       <h2 className="text-sm font-semibold text-neutral-400 uppercase tracking-wide mb-3">{t('Proveedores de IA y modelos')}</h2>
-      <VaultApiKeyImporter
-        vaults={vaults}
-        activeVault={activeVault}
-        onImported={async () => {
-          await onVaultsChanged();
-          await onChange();
-        }}
-        className="mb-4"
-      />
+      <p className="mb-4 text-xs leading-5 text-neutral-500">
+        {t('Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.')}
+      </p>
 
       {/* Favorites feed every independent workload/feature selector. */}
       <div className="mb-4 text-sm">

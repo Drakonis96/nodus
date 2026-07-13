@@ -2,7 +2,14 @@ import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { providerKeyMap } from '../secrets/secretStore';
-import { GLOBAL_PREF_KEYS, readGlobalPrefs, splitGlobalPatch, writeGlobalPrefs } from './appPrefs';
+import {
+  GLOBAL_PREF_KEYS,
+  SHARED_MODEL_KEYS,
+  readGlobalPrefs,
+  splitGlobalPatch,
+  writeGlobalPrefs,
+  type SharedModelKey,
+} from './appPrefs';
 
 const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
   ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama },
@@ -88,6 +95,16 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   lastAutoBackupStatus: null,
 };
 
+/** A shared model key counts as "configured" when it differs from its factory default,
+ *  i.e. the user actually chose something. Only such values are allowed to seed the
+ *  shared store, so a fresh vault never locks in empty defaults for the others. */
+function isConfiguredModelPref(key: SharedModelKey, value: unknown): boolean {
+  if (value == null) return false;
+  const fallback = (DEFAULTS as Record<string, unknown>)[key];
+  if (typeof value === 'string') return value.trim().length > 0 && value !== fallback;
+  return JSON.stringify(value) !== JSON.stringify(fallback);
+}
+
 function readRaw(key: string): string | undefined {
   const row = getDb().prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
   return row?.value;
@@ -139,18 +156,28 @@ export function getSettings(): AppSettings {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
+  // AI model configuration is shared too (API keys already are). Overlay the shared
+  // store when present; otherwise seed it — but ONLY from a vault that has actually
+  // changed a key away from its default, so an unconfigured vault opened first can
+  // never overwrite a configured one with empty values.
+  for (const key of SHARED_MODEL_KEYS) {
+    if (globalPrefs[key] !== undefined) (merged as Record<string, unknown>)[key] = globalPrefs[key];
+    else if (isConfiguredModelPref(key, merged[key])) seed[key] = merged[key];
+  }
   if (Object.keys(seed).length) writeGlobalPrefs(seed);
   return { ...merged, providerKeys: providerKeyMap() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const current = getSettings();
-  // Global preferences go to the shared store; everything else stays per-vault.
+  // Shared keys (theme/language + the AI model configuration) go to the global store;
+  // everything else stays per-vault. Model keys are also kept in the per-vault blob as a
+  // fallback, so switching vaults never loses a value.
   const { global, local } = splitGlobalPatch(patch);
   if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
   const { providerKeys: _ignore, ...rest } = { ...current, ...local };
-  // Never persist the global-only keys into the per-vault blob (they'd shadow the
+  // Never persist the theme/language keys into the per-vault blob (they'd shadow the
   // shared store and drift), so keep them exclusively in the global prefs file.
   for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];
   writeRaw('app', JSON.stringify(rest));

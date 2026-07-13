@@ -339,10 +339,7 @@ export function Settings({
       {visibleSettingsSection('providers', 'Proveedores de IA y modelos', 'api claves proveedor favoritos predeterminado vault boveda cargar claves') && (
         <ProvidersSettings
             settings={settings}
-            vaults={vaults}
-            activeVault={activeVault}
             onChange={onChange}
-            onVaultsChanged={onVaultsChanged}
           />
       )}
 

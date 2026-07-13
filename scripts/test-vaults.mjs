@@ -106,16 +106,33 @@ assert.equal(secrets.getApiKey('openai'), 'sk-default');
 db = database.getDb();
 assert.equal(countWorks(db), 0, 'new vault starts with an empty library');
 
-// App-wide preferences (theme/language) are shared globally: set them in this vault,
-// then a per-vault setting, and confirm the prefs survive a switch while the per-vault
-// one does not.
-settingsRepo.updateSettings({ theme: 'light', uiLanguage: 'en', readTag: 'research-only' });
+// App-wide preferences (theme/language) and the AI model configuration are shared
+// globally: set them in this vault, plus a per-vault setting, and confirm the shared
+// ones survive a switch while the per-vault one does not.
+settingsRepo.updateSettings({
+  theme: 'light',
+  uiLanguage: 'en',
+  readTag: 'research-only',
+  chatModel: 'openrouter/anthropic/claude-3',
+  favorites: [{ provider: 'openai', model: 'gpt-4o' }],
+});
 assert.equal(settingsRepo.getSettings().theme, 'light', 'theme applied in the active vault');
+assert.equal(settingsRepo.getSettings().chatModel, 'openrouter/anthropic/claude-3', 'model applied in the active vault');
 database.closeDb();
 registry.setActiveVault('default');
 database.getDb();
 assert.equal(settingsRepo.getSettings().theme, 'light', 'theme persists across vaults (global preference)');
 assert.equal(settingsRepo.getSettings().uiLanguage, 'en', 'uiLanguage persists across vaults (global preference)');
+assert.equal(
+  settingsRepo.getSettings().chatModel,
+  'openrouter/anthropic/claude-3',
+  'AI model configuration is shared across vaults'
+);
+assert.deepEqual(
+  settingsRepo.getSettings().favorites,
+  [{ provider: 'openai', model: 'gpt-4o' }],
+  'favorite models are shared across vaults'
+);
 assert.notEqual(settingsRepo.getSettings().readTag, 'research-only', 'per-vault settings do NOT leak across vaults');
 database.closeDb();
 registry.setActiveVault(researchVault.id);

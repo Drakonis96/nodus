@@ -12,6 +12,20 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.1.1',
+    date: '2026-07-13',
+    highlights: [
+      {
+        es: 'Los modelos que eliges para cada proveedor y para cada tarea de IA ahora se comparten entre todas tus bóvedas, igual que ya ocurría con las claves de API. Configúralos una vez y estarán listos en cualquier bóveda.',
+        en: 'The models you pick for each provider and for each AI task are now shared across all your vaults, just like your API keys already were. Set them up once and they’re ready in every vault.',
+      },
+      {
+        es: 'Como las bóvedas comparten claves y modelos, hemos retirado el aviso de «cargar claves de API desde otra bóveda»: ya no hacía falta.',
+        en: 'Since vaults share keys and models, we removed the “load API keys from another vault” prompt — it was no longer needed.',
+      },
+    ],
+  },
+  {
     version: '2.1.0',
     date: '2026-07-13',
     highlights: [

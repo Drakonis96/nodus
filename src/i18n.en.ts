@@ -285,12 +285,9 @@ export const EN: Record<string, string> = {
   'Se creará una copia de «{name}» con todos sus datos.': 'A copy of “{name}” with all its data will be created.',
   'Nombre de la copia': 'Copy name',
   'Bóveda duplicada con sus datos y claves API.': 'Vault duplicated with its data and API keys.',
-  'La bóveda seleccionada no tiene claves API guardadas.': 'The selected vault has no saved API keys.',
   'sin claves': 'no keys',
-  'Claves API cargadas en la bóveda activa.': 'API keys loaded into the active vault.',
-  '¿Deseas cargar claves API desde otra bóveda?': 'Do you want to load API keys from another vault?',
-  'Elige una bóveda previa para traer sus claves cifradas a la bóveda activa.':
-    'Choose a previous vault to bring its encrypted keys into the active vault.',
+  'Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.':
+    'API keys and the models you configure are shared across all your vaults.',
   // ── Settings ───────────────────────────────────────────────────────────────
   'Lo básico queda separado de los parámetros técnicos de análisis y extracción.':
     'The essentials are kept separate from the technical analysis and extraction parameters.',

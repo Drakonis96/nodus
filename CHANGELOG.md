@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.1 — 2026-07-13
+
+### Changed
+
+- **AI model configuration is now shared across vaults.** API keys were already
+  global; the models you select — favorites per provider, every workload/feature
+  selector, local-provider base URLs and the image model — now travel with them,
+  so configuring a provider once makes it usable in every vault. The shared store
+  is seeded only from a vault that actually configured a value, so opening an
+  unconfigured vault first can never overwrite a configured one.
+- **Removed the "load API keys from another vault" prompt.** Keys and models are
+  already shared between vaults, so the importer block in Settings → Providers is
+  no longer necessary and has been retired.
+
+### Notes
+
+- No database migration; settings persistence only. The shared model
+  configuration lives in `userData/app-prefs.json` alongside theme/language.
+
 ## 1.7.2 — 2026-07-11
 
 ### Changed
