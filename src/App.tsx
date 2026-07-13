@@ -44,6 +44,7 @@ import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
 import { DatabasesTour } from './views/DatabasesTour';
 import { WhatsNewModal } from './components/WhatsNewModal';
+import { NodiMascot } from './components/nodi/NodiMascot';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
@@ -1028,6 +1029,8 @@ export function App() {
         (!isDatabases || settings.databasesTourComplete) && (
           <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
         )}
+
+      <NodiMascot settings={settings} />
     </div>
   );
 }

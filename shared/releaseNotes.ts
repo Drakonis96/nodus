@@ -12,6 +12,24 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.2.0',
+    date: '2026-07-13',
+    highlights: [
+      {
+        es: 'Te presentamos a Nodi, la nueva mascota de Nodus: un nodo de luz que te acompaña flotando abajo a la derecha. Puedes arrastrarlo por la ventana y activarlo o desactivarlo desde Ajustes → Interfaz.',
+        en: 'Meet Nodi, Nodus’s new mascot: a little node of light that keeps you company, floating at the bottom right. Drag it around the window, and switch it on or off in Settings → Interface.',
+      },
+      {
+        es: 'Haz clic en Nodi para abrir su menú: un chat con la IA que conoce Nodus y tu configuración, un centro de notificaciones (te avisa con un punto rojo y levantando la mano) y una ayuda rápida. Además, Nodi cambia de traje según el modo de la bóveda (académico, genealogía, bases de datos), algo que puedes desactivar si prefieres el Nodi de siempre.',
+        en: 'Click Nodi to open its menu: a chat with an AI that knows Nodus and your setup, a notification center (it flags unread items with a red dot and a raised hand) and quick help. Nodi even changes outfit to match the vault mode (academic, genealogy, databases) — which you can turn off if you prefer the plain Nodi.',
+      },
+      {
+        es: 'Si quieres, Nodi puede vivir en una pequeña ventana flotante del escritorio, siempre por encima del resto de aplicaciones —incluso a pantalla completa—, para tenerlo a mano sin cambiar de app.',
+        en: 'If you like, Nodi can live in a small floating desktop window, always on top of your other apps — even in fullscreen — so it’s always within reach without switching apps.',
+      },
+    ],
+  },
+  {
     version: '2.1.1',
     date: '2026-07-13',
     highlights: [

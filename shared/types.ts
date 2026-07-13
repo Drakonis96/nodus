@@ -670,6 +670,15 @@ export interface AppSettings {
   // Language injected into AI prompts → language of generated ideas/themes/answers.
   promptLanguage: PromptLanguage;
   animationSpeed: number; // 0..1
+  // Nodi mascot: show the floating companion (visual/animation only for now — no wired
+  // behaviour yet). App-wide preference, on by default.
+  mascotEnabled: boolean;
+  // Keep Nodi pinned on top of every application in a floating desktop window, on the
+  // operating systems that allow it. When off, Nodi lives inside the app window only.
+  mascotAlwaysOnTop: boolean;
+  // Whether Nodi wears a per-vault accessory (cap / sprout / study glasses). When off,
+  // the plain Nodi is shown in every vault.
+  mascotVaultCostumes: boolean;
   concurrency: number;
   // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
   // Scans always run with reasoning off for speed, regardless of this value.
@@ -3919,6 +3928,31 @@ export interface AppInfo {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Nodi companion (mascot): notifications + chat.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface NodiNotification {
+  id: string;
+  title: string;
+  body: string;
+  kind: 'info' | 'success' | 'warning';
+  createdAt: number;
+  read: boolean;
+}
+
+export interface NodiChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface NodiChatRequest {
+  messages: NodiChatMessage[];
+  /** When true, the assistant is told about every vault (cross-vault awareness),
+   *  not only the active one. */
+  allVaults: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -3927,6 +3961,18 @@ export interface NodusApi {
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   listVaults(): Promise<VaultSummary[]>;
+  // Nodi companion
+  listNotifications(): Promise<NodiNotification[]>;
+  markNotificationsRead(): Promise<NodiNotification[]>;
+  clearNotifications(): Promise<NodiNotification[]>;
+  onNotificationsChanged(cb: (list: NodiNotification[]) => void): () => void;
+  nodiChatStream(request: NodiChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<string>;
+  cancelNodiChat(): Promise<void>;
+  nodiSetMouseIgnore(ignore: boolean): Promise<void>;
+  nodiOpenMainWindow(): Promise<void>;
+  nodiMoveWindow(dx: number, dy: number): Promise<void>;
+  onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
+  onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;
   createVault(input: CreateVaultInput): Promise<VaultCreateResult>;
   renameVault(id: string, name: string): Promise<VaultSummary>;

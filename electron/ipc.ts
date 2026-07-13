@@ -101,6 +101,15 @@ const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
+import { applyMascotWindow } from './mascotWindow';
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  clearNotifications,
+  setNotificationsNotifier,
+} from './notifications';
+import { streamNodiChat } from './ai/nodiChat';
+import type { NodiChatRequest } from '@shared/types';
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword } from './secrets/secretStore';
@@ -424,9 +433,15 @@ export function registerIpc(
   // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
   // button (`research:chatStream:cancel`) can abort the provider mid-answer.
   const chatAborters = new Map<string, AbortController>();
+  const nodiChatAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
-    getWindow()?.webContents.send('vaults:changed', withVaultKeyProviders(getActiveVault()));
+    const payload = withVaultKeyProviders(getActiveVault());
+    // Broadcast to every window (main + the Nodi overlay) so Nodi's per-vault look
+    // updates live wherever it is shown.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('vaults:changed', payload);
+    }
   };
 
   const switchVaultSafely = async (id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult> => {
@@ -506,7 +521,63 @@ export function registerIpc(
       if (next.copilotEnabled) await restartCopilotServer();
       else await stopCopilotServer();
     }
+    if (patch.mascotEnabled !== undefined || patch.mascotAlwaysOnTop !== undefined) {
+      applyMascotWindow();
+    }
+    // Let other windows (the Nodi overlay) react to setting changes, e.g. costumes.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('settings:changed', next);
+    }
     return next;
+  });
+
+  // Nodi companion: notifications, chat, and overlay-window helpers.
+  setNotificationsNotifier(() => {
+    const list = listNotifications();
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('nodi:notifications:changed', list);
+    }
+  });
+  h('nodi:notifications:list', async () => listNotifications());
+  h('nodi:notifications:markRead', async () => {
+    markAllNotificationsRead();
+    return listNotifications();
+  });
+  h('nodi:notifications:clear', async () => {
+    clearNotifications();
+    return listNotifications();
+  });
+  h('nodi:chatStream', async (e, requestId: string, request: NodiChatRequest) => {
+    const controller = new AbortController();
+    nodiChatAborters.set(requestId, controller);
+    try {
+      return await streamNodiChat(request, (delta) => e.sender.send('nodi:chatStream:delta', requestId, delta), controller.signal);
+    } finally {
+      nodiChatAborters.delete(requestId);
+    }
+  });
+  h('nodi:chatStream:cancel', async (_e, requestId: string) => {
+    nodiChatAborters.get(requestId)?.abort();
+  });
+  // The transparent always-on-top overlay forwards mouse events except where Nodi
+  // (or an open panel) sits, so clicks pass through to the apps behind it.
+  h('nodi:setMouseIgnore', async (e, ignore: boolean) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
+  });
+  h('nodi:openMainWindow', async () => {
+    const win = getWindow();
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+  h('nodi:moveWindow', async (e, dx: number, dy: number) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) return;
+    const [x, y] = win.getPosition();
+    win.setPosition(Math.round(x + dx), Math.round(y + dy));
   });
   h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
   h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));

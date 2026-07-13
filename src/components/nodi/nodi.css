@@ -1,0 +1,139 @@
+.nodi-svg {
+  height: 200px;
+  width: auto;
+  overflow: visible;
+  display: block;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.nodi-svg.nodi-draggable { cursor: grab; touch-action: none; }
+.nodi-svg.nodi-draggable.dragging { cursor: grabbing; }
+
+.nodi-svg .thread { fill: none; stroke: #16294a; stroke-width: 4.5; stroke-linecap: round; }
+.nodi-svg .hoverwrap { transform-box: view-box; transform-origin: 130px 142px; transition: transform .3s ease; }
+.nodi-svg .deco,
+.nodi-svg .role,
+.nodi-svg .eyes-happy,
+.nodi-svg .eyes-sleep,
+.nodi-svg .eyes-surprised,
+.nodi-svg .mouth-open,
+.nodi-svg .mouth-surprised { display: none; }
+.nodi-svg .sweatdrop { transform-box: fill-box; transform-origin: center; animation: nodi-sweat 1.1s ease-in-out infinite; }
+
+.nodi-svg .nodi-core { animation: nodi-floaty 5s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 152px; }
+.nodi-svg .halo { animation: nodi-halo 5s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 140px; }
+.nodi-svg .eyes-open { animation: nodi-blink 5.4s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 139px; }
+.nodi-svg .arm-l .hand { transform: translate(64px, 214px); }
+.nodi-svg .arm-r .hand { transform: translate(196px, 214px); }
+.nodi-svg .leg-l .hand { transform: translate(96px, 266px); }
+.nodi-svg .leg-r .hand { transform: translate(170px, 276px); }
+.nodi-svg .chinarm .hand { transform: translate(117px, 163px); }
+.nodi-svg .arm-r { animation: nodi-swayR 4.4s ease-in-out infinite; transform-box: view-box; transform-origin: 168px 150px; }
+/* Right arm raised (e.g. an unread notification): held up with a gentle attention wave. */
+.nodi-svg.arm-up .arm-r { animation: nodi-raisewave 1.6s ease-in-out infinite; transform-origin: 168px 150px; }
+.nodi-svg.arm-up .arm-r .thread { d: path("M168 150 C 190 120 206 90 214 68"); }
+.nodi-svg.arm-up .arm-r .hand { transform: translate(216px, 66px); }
+.nodi-svg .arm-l { animation: nodi-swayL 5s ease-in-out infinite; transform-box: view-box; transform-origin: 94px 150px; }
+.nodi-svg .leg-l { animation: nodi-legA 4.6s ease-in-out infinite; transform-box: view-box; transform-origin: 114px 190px; }
+.nodi-svg .leg-r { animation: nodi-legB 4.9s ease-in-out infinite; transform-box: view-box; transform-origin: 150px 192px; }
+.nodi-svg .mspark { animation: nodi-twinkle 2.4s ease-in-out infinite; }
+.nodi-svg .orbitring { animation: nodi-orbit 12s linear infinite; transform-box: view-box; transform-origin: 130px 140px; }
+.nodi-svg .thinkdot { animation: nodi-thinkdot 1.6s ease-in-out infinite; }
+.nodi-svg .chinarm { animation: nodi-tap 2.6s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 184px; }
+.nodi-svg .lline { stroke: #c9a24a; stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; opacity: .6; animation: nodi-dash 1s linear infinite; }
+.nodi-svg .lnode { animation: nodi-nodein 1.8s ease-in-out infinite; }
+.nodi-svg .cline { fill: none; stroke: #16294a; stroke-width: 1.6; opacity: .6; stroke-dasharray: 5 5; animation: nodi-dash 1.1s linear infinite; }
+.nodi-svg .spark { animation: nodi-pop .55s cubic-bezier(.2,1.5,.4,1) both; transform-box: fill-box; transform-origin: center; }
+.nodi-svg .twinkle { animation: nodi-twinkle 1.5s ease-in-out infinite; }
+.nodi-svg .waveline { opacity: 0; animation: nodi-waveline 1.6s ease-in-out infinite; }
+.nodi-svg .zzz { fill: none; stroke: #1a2c4d; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; animation: nodi-zrise 3s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+
+.nodi-svg.nodi-draggable:hover .hoverwrap { transform: scale(1.045); }
+.nodi-svg.nodi-draggable:hover .halo { opacity: .92; }
+.nodi-svg.dragging .hoverwrap { transform: scaleY(1.06) scaleX(.96); }
+.nodi-svg.dragging .arm-r { animation: none; transform: rotate(-26deg); }
+.nodi-svg.dragging .arm-l { animation: none; transform: rotate(24deg); }
+.nodi-svg.dragging .leg-l,
+.nodi-svg.dragging .leg-r { animation: nodi-dangle .6s ease-in-out infinite; }
+/* Surprised, sweating face while being dragged */
+.nodi-svg.dragging .eyes-open,
+.nodi-svg.dragging .mouth-smile { display: none; }
+.nodi-svg.dragging .eyes-surprised,
+.nodi-svg.dragging .mouth-surprised,
+.nodi-svg.dragging .deco-sweat { display: inline; }
+
+.nodi-svg[data-state="discovering"] .eyes-open,
+.nodi-svg[data-state="discovering"] .mouth-smile { display: none; }
+.nodi-svg[data-state="discovering"] .eyes-happy,
+.nodi-svg[data-state="discovering"] .mouth-open { display: inline; }
+.nodi-svg[data-state="discovering"] .halo { animation: nodi-haloBright 1.4s ease-in-out infinite; }
+.nodi-svg[data-state="discovering"] .nodi-core { animation: nodi-hop 1.6s ease-in-out infinite; }
+.nodi-svg[data-state="discovering"] .deco-discover { display: inline; }
+.nodi-svg[data-state="discovering"] .arm-r { animation: none; }
+.nodi-svg[data-state="discovering"] .arm-r .thread { d: path("M172 116 C 196 122 212 138 228 152"); }
+.nodi-svg[data-state="discovering"] .arm-r .hand { transform: translate(228px, 152px); }
+
+.nodi-svg[data-state="thinking"] .deco-think { display: inline; }
+.nodi-svg[data-state="thinking"] .arm-l { display: none; }
+.nodi-svg[data-state="thinking"] .headwrap { animation: nodi-tilt 3.6s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 158px; }
+
+.nodi-svg[data-state="connecting"] .deco-connect { display: inline; }
+
+.nodi-svg[data-state="waving"] .deco-wave { display: inline; }
+.nodi-svg[data-state="waving"] .nodi-core { animation: nodi-leanfloat 5s ease-in-out infinite; }
+.nodi-svg[data-state="waving"] .arm-r { animation: nodi-wave .78s ease-in-out infinite; transform-origin: 168px 150px; }
+.nodi-svg[data-state="waving"] .arm-r .thread { d: path("M168 150 C 190 120 206 90 214 68"); }
+.nodi-svg[data-state="waving"] .arm-r .hand { transform: translate(216px, 66px); }
+
+.nodi-svg[data-state="loading"] .limbs { animation: nodi-spin 1.9s cubic-bezier(.6,.15,.4,.85) infinite; transform-box: view-box; transform-origin: 130px 140px; }
+.nodi-svg[data-state="loading"] .limb { animation: none; }
+.nodi-svg[data-state="loading"] .halo { animation: nodi-halo 1.4s ease-in-out infinite; }
+
+.nodi-svg[data-state="sleeping"] .eyes-open { display: none; }
+.nodi-svg[data-state="sleeping"] .eyes-sleep { display: inline; }
+.nodi-svg[data-state="sleeping"] .deco-sleep { display: inline; }
+.nodi-svg[data-state="sleeping"] .nodi-core { animation: nodi-breathe 4.6s ease-in-out infinite; }
+.nodi-svg[data-state="sleeping"] .halo { opacity: .42; animation: none; }
+.nodi-svg[data-state="sleeping"] .arm-r,
+.nodi-svg[data-state="sleeping"] .arm-l,
+.nodi-svg[data-state="sleeping"] .leg-l,
+.nodi-svg[data-state="sleeping"] .leg-r { animation: none; }
+
+.nodi-svg[data-role="academic"] .role-academic { display: inline; }
+.nodi-svg[data-role="genealogy"] .role-genealogy { display: inline; }
+.nodi-svg[data-role="study"] .role-study { display: inline; }
+.nodi-svg[data-role="study"] .arm-l { animation: none; }
+.nodi-svg[data-role="study"] .arm-l .thread { d: path("M94 156 C 96 172 96 184 100 194"); }
+.nodi-svg[data-role="study"] .arm-l .hand { transform: translate(100px, 198px); }
+.nodi-svg[data-role="study"] .mouth-smile { transform: translateY(2px); }
+
+@keyframes nodi-floaty { 0%,100%{transform:translateY(0) rotate(0deg)} 25%{transform:translateY(-6px) rotate(-1.2deg)} 50%{transform:translateY(-11px) rotate(0deg)} 75%{transform:translateY(-6px) rotate(1.2deg)} }
+@keyframes nodi-leanfloat { 0%,100%{transform:translateY(0) rotate(3deg)} 50%{transform:translateY(-8px) rotate(5deg)} }
+@keyframes nodi-hop { 0%{transform:translateY(0)} 30%{transform:translateY(-20px)} 55%{transform:translateY(-4px)} 75%{transform:translateY(-12px)} 100%{transform:translateY(0)} }
+@keyframes nodi-breathe { 0%,100%{transform:translateY(8px) scale(1.012)} 50%{transform:translateY(13px) scale(.998)} }
+@keyframes nodi-halo { 0%,100%{opacity:.55;transform:scale(1)} 50%{opacity:.85;transform:scale(1.05)} }
+@keyframes nodi-haloBright { 0%,100%{opacity:.8;transform:scale(1.04)} 50%{opacity:1;transform:scale(1.13)} }
+@keyframes nodi-blink { 0%,88%,100%{transform:scaleY(1)} 92%{transform:scaleY(.07)} 95%{transform:scaleY(1)} }
+@keyframes nodi-swayR { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(7deg)} }
+@keyframes nodi-swayL { 0%,100%{transform:rotate(2deg)} 50%{transform:rotate(-6deg)} }
+@keyframes nodi-legA { 0%,100%{transform:rotate(-4deg)} 50%{transform:rotate(5deg)} }
+@keyframes nodi-legB { 0%,100%{transform:rotate(5deg)} 50%{transform:rotate(-4deg)} }
+@keyframes nodi-dangle { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(8deg)} }
+@keyframes nodi-wave { 0%,100%{transform:rotate(-12deg)} 50%{transform:rotate(30deg)} }
+@keyframes nodi-raisewave { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(10deg)} }
+@keyframes nodi-tap { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-4deg)} }
+@keyframes nodi-tilt { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-6deg)} }
+@keyframes nodi-orbit { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes nodi-spin { to{transform:rotate(360deg)} }
+@keyframes nodi-dash { from{stroke-dashoffset:20} to{stroke-dashoffset:0} }
+@keyframes nodi-thinkdot { 0%,100%{opacity:.2;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
+@keyframes nodi-nodein { 0%,100%{opacity:.2} 50%{opacity:1} }
+@keyframes nodi-pop { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.25)} 100%{transform:scale(1);opacity:1} }
+@keyframes nodi-twinkle { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
+@keyframes nodi-waveline { 0%,100%{opacity:0} 50%{opacity:.75} }
+@keyframes nodi-zrise { 0%{opacity:0;transform:translateY(0) scale(.6)} 25%{opacity:.9} 100%{opacity:0;transform:translateY(-16px) scale(1.05)} }
+@keyframes nodi-sweat { 0%{opacity:0;transform:translateY(-2px) scale(.5)} 25%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(11px) scale(.9)} }
+
+@media (prefers-reduced-motion: reduce) {
+  .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+}

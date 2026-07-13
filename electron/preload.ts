@@ -15,12 +15,53 @@ import type {
 // stream runs at a time (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
 let activeDbChatRequestId: string | null = null;
+let activeNodiChatRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   listVaults: () => ipcRenderer.invoke('vaults:list'),
+  // Nodi companion: notifications
+  listNotifications: () => ipcRenderer.invoke('nodi:notifications:list'),
+  markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
+  clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
+  onNotificationsChanged: (cb) => {
+    const listener = (_e: unknown, list: Parameters<typeof cb>[0]) => cb(list);
+    ipcRenderer.on('nodi:notifications:changed', listener);
+    return () => ipcRenderer.removeListener('nodi:notifications:changed', listener);
+  },
+  // Nodi companion: chat (streaming) + overlay-window helpers
+  nodiChatStream: async (request, handlers) => {
+    const requestId = `nodi-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('nodi:chatStream:delta', onDelta);
+    activeNodiChatRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('nodi:chatStream', requestId, request);
+    } finally {
+      if (activeNodiChatRequestId === requestId) activeNodiChatRequestId = null;
+      ipcRenderer.removeListener('nodi:chatStream:delta', onDelta);
+    }
+  },
+  cancelNodiChat: async () => {
+    if (activeNodiChatRequestId) await ipcRenderer.invoke('nodi:chatStream:cancel', activeNodiChatRequestId);
+  },
+  nodiSetMouseIgnore: (ignore) => ipcRenderer.invoke('nodi:setMouseIgnore', ignore),
+  nodiOpenMainWindow: () => ipcRenderer.invoke('nodi:openMainWindow'),
+  nodiMoveWindow: (dx, dy) => ipcRenderer.invoke('nodi:moveWindow', dx, dy),
+  onVaultChanged: (cb) => {
+    const listener = (_e: unknown, vault: Parameters<typeof cb>[0]) => cb(vault);
+    ipcRenderer.on('vaults:changed', listener);
+    return () => ipcRenderer.removeListener('vaults:changed', listener);
+  },
+  onSettingsChanged: (cb) => {
+    const listener = (_e: unknown, settings: Parameters<typeof cb>[0]) => cb(settings);
+    ipcRenderer.on('settings:changed', listener);
+    return () => ipcRenderer.removeListener('settings:changed', listener);
+  },
   getActiveVault: () => ipcRenderer.invoke('vaults:getActive'),
   createVault: (input) => ipcRenderer.invoke('vaults:create', input),
   renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),

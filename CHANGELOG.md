@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.2.0 — 2026-07-13
+
+### Added
+
+- **Nodi, the Nodus mascot.** A small node-of-light companion floats at the
+  bottom right of the window. It can be dragged around, follows the corner when
+  the window is resized or maximized, and is toggled from Settings → Interface.
+- **Nodi companion menu.** Clicking Nodi opens a radial menu: a streaming chat
+  with an AI that is given a compact, Nodus-aware system prompt (active vault,
+  models, language) with an optional cross-vault mode; a notification center
+  (app-wide store; unread items are flagged with a red badge and Nodi raising an
+  arm until read); and a quick help bubble.
+- **Per-vault look.** Nodi wears a small accessory that matches the vault mode
+  (academic cap, genealogy sprout, study glasses), with a brief animation when
+  the vault changes. This can be disabled to show the plain Nodi everywhere.
+- **Always-on-top desktop mode.** Optionally, Nodi lives in a transparent,
+  click-through desktop window that stays above other applications — including
+  apps in macOS fullscreen (via a non-activating panel window).
+
 ## 2.1.1 — 2026-07-13
 
 ### Changed
