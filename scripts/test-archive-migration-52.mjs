@@ -30,7 +30,7 @@ installTsHook();
 try {
   const Database = require('better-sqlite3');
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
-  assert.equal(SCHEMA_VERSION, 52, 'this test targets schema v52');
+  assert.ok(SCHEMA_VERSION >= 52, 'this test requires schema v52 or later');
 
   const dbPath = path.join(root, 'v51.sqlite');
   const db = new Database(dbPath);
@@ -56,9 +56,9 @@ try {
   insItem.run('i_2', 'f_b', 'Partida de Juan', now, now);
   insItem.run('i_3', null, 'Nota suelta', now, now); // unfiled
 
-  // Apply the pending migration (52).
+  // Apply migration 52 and every later append-only migration.
   runMigrations(db);
-  assert.equal(db.pragma('user_version', { simple: true }), 52, 'DB migrated to v52');
+  assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION, `DB migrated through v${SCHEMA_VERSION}`);
   assert.equal(hasTable(db, 'archive_item_folders'), true, 'join table created');
 
   // Every filed item keeps its folder; the unfiled item gets no membership.

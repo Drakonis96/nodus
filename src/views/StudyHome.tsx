@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import type { View } from '../navigation';
+import type { StudyWorkspace } from '@shared/studyOrg';
 import { t } from '../i18n';
 import { Icon } from '../components/ui';
 
@@ -11,7 +13,16 @@ const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; descr
   { view: 'studyProgress', icon: 'chartBar', title: 'Progreso', description: 'Sigue tu dominio, fortalezas y temas débiles.' },
 ];
 
-export function StudyHome({ onNavigate }: { onNavigate: (view: View) => void }) {
+export function StudyHome({ onNavigate, onOpenDocument }: { onNavigate: (view: View) => void; onOpenDocument?: (id: string) => void }) {
+  const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
+  useEffect(() => {
+    let active = true;
+    void window.nodus.getStudyWorkspace().then((next) => { if (active) setWorkspace(next); });
+    return () => { active = false; };
+  }, []);
+  const recent = [...(workspace?.documents ?? [])]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 5);
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -25,6 +36,20 @@ export function StudyHome({ onNavigate }: { onNavigate: (view: View) => void }) 
             {t('Organiza materiales y apuntes, practica lo aprendido y planifica el siguiente paso desde un espacio local y privado.')}
           </p>
         </header>
+
+        <section className="grid gap-3 sm:grid-cols-3">
+          {[
+            { label: 'Cursos activos', value: workspace?.courses.length ?? 0, icon: 'graduation' },
+            { label: 'Asignaturas', value: workspace?.subjects.length ?? 0, icon: 'book' },
+            { label: 'Materiales', value: workspace?.documents.length ?? 0, icon: 'notebook' },
+          ].map((metric) => (
+            <button key={metric.label} onClick={() => onNavigate(metric.label === 'Materiales' ? 'studyLibrary' : 'studyCourses')}
+              className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/35 p-4 text-left hover:border-indigo-700/60">
+              <span className="rounded-lg bg-indigo-600/15 p-2 text-indigo-300"><Icon name={metric.icon} /></span>
+              <span><span className="block text-xl font-semibold text-neutral-100">{metric.value}</span><span className="text-xs text-neutral-500">{t(metric.label)}</span></span>
+            </button>
+          ))}
+        </section>
 
         <section>
           <h2 className="mb-3 text-sm font-semibold text-neutral-300">{t('Empezar')}</h2>
@@ -43,6 +68,23 @@ export function StudyHome({ onNavigate }: { onNavigate: (view: View) => void }) 
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="rounded-xl border border-neutral-800 bg-neutral-900/25">
+          <div className="flex items-center justify-between border-b border-neutral-800 px-4 py-3">
+            <h2 className="text-sm font-semibold text-neutral-300">{t('Actividad reciente')}</h2>
+            <button className="text-xs text-indigo-400 hover:text-indigo-300" onClick={() => onNavigate('studyLibrary')}>{t('Ver materiales')}</button>
+          </div>
+          {recent.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-neutral-600">{t('Los materiales que abras o edites aparecerán aquí.')}</p>
+          ) : recent.map((document) => (
+            <button key={document.id} className="flex w-full items-center gap-3 border-b border-neutral-800/60 px-4 py-3 text-left last:border-b-0 hover:bg-neutral-900/60"
+              onClick={() => onOpenDocument ? onOpenDocument(document.id) : onNavigate('studyLibrary')}>
+              <Icon name="notebook" className="text-indigo-300" />
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm text-neutral-300">{document.title}</span><span className="text-[10px] uppercase tracking-wider text-neutral-600">{document.kind} · {document.shortId}</span></span>
+              <span className="text-xs text-neutral-600">{new Date(document.updatedAt).toLocaleDateString()}</span>
+            </button>
+          ))}
         </section>
 
         <button

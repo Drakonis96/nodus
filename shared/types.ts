@@ -3,6 +3,51 @@
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type {
+  CreateStudyCourseInput,
+  CreateStudyDocumentInput,
+  CreateStudyFolderInput,
+  CreateStudySubjectInput,
+  CreateStudyTagInput,
+  CreateStudyTemplateInput,
+  CreateStudyTopicInput,
+  StudyCourse,
+  StudyDocument,
+  StudyEntityKind,
+  StudyFolder,
+  StudyLifecycleAction,
+  StudyPlacement,
+  StudyPlacementInput,
+  StudySubject,
+  StudyTag,
+  StudyTemplate,
+  StudyTopic,
+  StudyWorkspace,
+  StudyWorkspaceOptions,
+} from './studyOrg';
+export type {
+  CreateStudyCourseInput,
+  CreateStudyDocumentInput,
+  CreateStudyFolderInput,
+  CreateStudySubjectInput,
+  CreateStudyTagInput,
+  CreateStudyTemplateInput,
+  CreateStudyTopicInput,
+  StudyCourse,
+  StudyDocument,
+  StudyDocumentKind,
+  StudyEntityKind,
+  StudyFolder,
+  StudyLifecycleAction,
+  StudyPlacement,
+  StudyPlacementInput,
+  StudySubject,
+  StudyTag,
+  StudyTemplate,
+  StudyTopic,
+  StudyWorkspace,
+  StudyWorkspaceOptions,
+} from './studyOrg';
 import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { VaultType };
@@ -4379,6 +4424,28 @@ export interface NodusApi {
   exportAuthorSyntheses(request: AuthorSynthesisExportRequest): Promise<{ path: string } | null>;
 
   // study guide
+  /** Complete local organization snapshot for the active study vault. */
+  getStudyWorkspace(options?: StudyWorkspaceOptions): Promise<StudyWorkspace>;
+  createStudyCourse(input: CreateStudyCourseInput): Promise<StudyCourse>;
+  createStudySubject(input: CreateStudySubjectInput): Promise<StudySubject>;
+  createStudyTopic(input: CreateStudyTopicInput): Promise<StudyTopic>;
+  createStudyFolder(input: CreateStudyFolderInput): Promise<StudyFolder>;
+  createStudyDocument(input: CreateStudyDocumentInput): Promise<StudyDocument>;
+  updateStudyEntity(kind: StudyEntityKind, id: string, patch: Record<string, unknown>): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument | null>;
+  addStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
+  setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
+  removeStudyPlacement(id: string): Promise<void>;
+  setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction): Promise<void>;
+  duplicateStudyTree(kind: StudyEntityKind, id: string): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument>;
+  createStudyTag(input: CreateStudyTagInput): Promise<StudyTag>;
+  updateStudyTag(id: string, patch: Partial<CreateStudyTagInput> & { favorite?: boolean; position?: number }): Promise<StudyTag | null>;
+  deleteStudyTag(id: string): Promise<void>;
+  setStudyDocumentTags(documentId: string, tagIds: string[]): Promise<void>;
+  createStudyTemplate(input: CreateStudyTemplateInput): Promise<StudyTemplate>;
+  updateStudyTemplate(id: string, patch: Partial<CreateStudyTemplateInput> & { favorite?: boolean; position?: number }): Promise<StudyTemplate | null>;
+  deleteStudyTemplate(id: string): Promise<void>;
+  applyStudyTemplate(id: string, name?: string): Promise<StudyCourse | StudySubject | StudyDocument>;
+
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;
   /** Persist study progress for an author/work/idea/theme. */

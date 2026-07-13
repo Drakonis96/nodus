@@ -7,6 +7,7 @@ import { DatabasesAnalysisView } from './views/DatabasesAnalysisView';
 import { DatabasesChatView } from './views/DatabasesChatView';
 import { DatabasesSearchView } from './views/DatabasesSearchView';
 import { StudyHome, StudyScaffoldView } from './views/StudyHome';
+import { StudyOrganizationView } from './views/StudyOrganizationView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -39,6 +40,7 @@ import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeLabel } from './components/VaultSwitcher';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
+import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
@@ -65,8 +67,6 @@ import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const STUDY_SCAFFOLD_VIEWS = new Set<View>([
-  'studyCourses',
-  'studyLibrary',
   'studyQuestions',
   'studyTests',
   'studyExams',
@@ -184,6 +184,7 @@ export function App() {
   const [noteTarget, setNoteTarget] = useState<{ id: string; nonce: number } | null>(null);
   // A person opened from global search, to preselect in the Personas view.
   const [personsTarget, setPersonsTarget] = useState<{ id: string; nonce: number } | null>(null);
+  const [studyTarget, setStudyTarget] = useState<StudyNavigationTarget | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -793,6 +794,21 @@ export function App() {
                   </>
                 );
               }
+              if (isEstudio) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <StudySidebar
+                      activeTarget={studyTarget}
+                      activeView={view}
+                      onOpen={(target) => { setStudyTarget(target); setView(target.kind === 'document' ? 'studyLibrary' : 'studyCourses'); }}
+                      onNavigate={(targetView) => setView(targetView)}
+                    />
+                    {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
               return (
                 <>
                   {navButton(homeItem)}
@@ -837,7 +853,12 @@ export function App() {
               onLoadDatabasesDemo={loadDatabasesDemo}
             />
           )}
-          {view === 'home' && isEstudio && <StudyHome onNavigate={setView} />}
+          {view === 'home' && isEstudio && (
+            <StudyHome
+              onNavigate={setView}
+              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyLibrary'); }}
+            />
+          )}
           {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && (
             <HomeView
               settings={settings}
@@ -894,6 +915,8 @@ export function App() {
           )}
           {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
+          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} />}
+          {view === 'studyLibrary' && <StudyOrganizationView target={studyTarget} mode="library" onTargetChange={setStudyTarget} />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView

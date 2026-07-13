@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 52;
+export const SCHEMA_VERSION = 53;
 
 export const migrations: Migration[] = [
   {
@@ -1559,6 +1559,179 @@ export const migrations: Migration[] = [
         SELECT item_id, folder_id, COALESCE(created_at, datetime('now'))
         FROM archive_items
         WHERE folder_id IS NOT NULL;
+    `,
+  },
+  {
+    version: 53,
+    up: /* sql */ `
+      -- Study vault phase 1: local-first organization. Documents are independent
+      -- entities and placements are many-to-many so one source can appear in
+      -- several courses/topics without duplicating its content.
+      CREATE TABLE study_courses (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE study_subjects (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        course_id   TEXT NOT NULL REFERENCES study_courses(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_subjects_course ON study_subjects(course_id, position);
+
+      CREATE TABLE study_topics (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        subject_id  TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        parent_id   TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_topics_subject ON study_topics(subject_id, parent_id, position);
+
+      CREATE TABLE study_folders (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        parent_id   TEXT REFERENCES study_folders(id) ON DELETE SET NULL,
+        course_id   TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id  TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_folders_parent ON study_folders(parent_id, position);
+      CREATE INDEX idx_study_folders_scope ON study_folders(course_id, subject_id, position);
+
+      CREATE TABLE study_docs (
+        id                  TEXT PRIMARY KEY,
+        short_id            TEXT NOT NULL UNIQUE,
+        title               TEXT NOT NULL,
+        kind                TEXT NOT NULL DEFAULT 'apunte',
+        content_markdown    TEXT NOT NULL DEFAULT '',
+        description         TEXT,
+        color               TEXT,
+        icon                TEXT,
+        favorite            INTEGER NOT NULL DEFAULT 0,
+        pinned              INTEGER NOT NULL DEFAULT 0,
+        locked              INTEGER NOT NULL DEFAULT 0,
+        position            INTEGER NOT NULL DEFAULT 0,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        archived_at         TEXT,
+        deleted_at          TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_docs_kind ON study_docs(kind, position);
+      CREATE INDEX idx_study_docs_recent ON study_docs(updated_at DESC);
+
+      CREATE TABLE study_placements (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        course_id   TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id  TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id    TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        folder_id   TEXT REFERENCES study_folders(id) ON DELETE SET NULL,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        CHECK (course_id IS NOT NULL OR subject_id IS NOT NULL OR topic_id IS NOT NULL OR folder_id IS NOT NULL)
+      );
+      CREATE INDEX idx_study_placements_doc ON study_placements(document_id, position);
+      CREATE INDEX idx_study_placements_course ON study_placements(course_id, position);
+      CREATE INDEX idx_study_placements_subject ON study_placements(subject_id, position);
+      CREATE INDEX idx_study_placements_topic ON study_placements(topic_id, position);
+      CREATE INDEX idx_study_placements_folder ON study_placements(folder_id, position);
+      CREATE UNIQUE INDEX idx_study_placements_unique
+        ON study_placements(document_id, IFNULL(course_id, ''), IFNULL(subject_id, ''), IFNULL(topic_id, ''), IFNULL(folder_id, ''));
+
+      CREATE TABLE study_tags (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE study_doc_tags (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        tag_id      TEXT NOT NULL REFERENCES study_tags(id) ON DELETE CASCADE,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE(document_id, tag_id)
+      );
+      CREATE INDEX idx_study_doc_tags_tag ON study_doc_tags(tag_id, document_id);
+
+      CREATE TABLE study_templates (
+        id           TEXT PRIMARY KEY,
+        short_id     TEXT NOT NULL UNIQUE,
+        kind         TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        description  TEXT,
+        content_json TEXT NOT NULL DEFAULT '{}',
+        color        TEXT,
+        icon         TEXT,
+        favorite     INTEGER NOT NULL DEFAULT 0,
+        position     INTEGER NOT NULL DEFAULT 0,
+        archived_at  TEXT,
+        deleted_at   TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_templates_kind ON study_templates(kind, position);
     `,
   },
 ];

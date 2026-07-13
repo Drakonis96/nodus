@@ -92,6 +92,17 @@ import type {
   DecorativeImageEntityKind,
   DecorativeImageStyle,
   SearchResultKind,
+  CreateStudyCourseInput,
+  CreateStudyDocumentInput,
+  CreateStudyFolderInput,
+  CreateStudySubjectInput,
+  CreateStudyTagInput,
+  CreateStudyTemplateInput,
+  CreateStudyTopicInput,
+  StudyEntityKind,
+  StudyLifecycleAction,
+  StudyPlacementInput,
+  StudyWorkspaceOptions,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -195,6 +206,7 @@ import { buildImmersionScope, evaluateImmersionAnswer, generateImmersionSession 
 import * as immersionRepo from './db/immersionRepo';
 import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
+import * as studyOrg from './db/studyOrgRepo';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1599,6 +1611,34 @@ export function registerIpc(
   h('authors:exportSyntheses', async (_e, request: AuthorSynthesisExportRequest) => exportAuthorSyntheses(request));
 
   // study guide
+  h('study:workspace', async (_e, options?: StudyWorkspaceOptions) => studyOrg.getStudyWorkspace(options));
+  h('study:course:create', async (_e, input: CreateStudyCourseInput) => studyOrg.createStudyCourse(input));
+  h('study:subject:create', async (_e, input: CreateStudySubjectInput) => studyOrg.createStudySubject(input));
+  h('study:topic:create', async (_e, input: CreateStudyTopicInput) => studyOrg.createStudyTopic(input));
+  h('study:folder:create', async (_e, input: CreateStudyFolderInput) => studyOrg.createStudyFolder(input));
+  h('study:document:create', async (_e, input: CreateStudyDocumentInput) => studyOrg.createStudyDocument(input));
+  h('study:entity:update', async (_e, kind: StudyEntityKind, id: string, patch: Record<string, unknown>) =>
+    studyOrg.updateStudyEntity(kind, id, patch));
+  h('study:placement:add', async (_e, documentId: string, input: StudyPlacementInput) =>
+    studyOrg.addStudyPlacement(documentId, input));
+  h('study:placement:setPrimary', async (_e, documentId: string, input: StudyPlacementInput) =>
+    studyOrg.setPrimaryStudyPlacement(documentId, input));
+  h('study:placement:remove', async (_e, id: string) => studyOrg.removeStudyPlacement(id));
+  h('study:lifecycle:set', async (_e, kind: StudyEntityKind, id: string, action: StudyLifecycleAction) =>
+    studyOrg.setStudyLifecycle(kind, id, action));
+  h('study:tree:duplicate', async (_e, kind: StudyEntityKind, id: string) => studyOrg.duplicateStudyTree(kind, id));
+  h('study:tag:create', async (_e, input: CreateStudyTagInput) => studyOrg.createStudyTag(input));
+  h('study:tag:update', async (_e, id: string, patch: Partial<CreateStudyTagInput> & { favorite?: boolean; position?: number }) =>
+    studyOrg.updateStudyTag(id, patch));
+  h('study:tag:delete', async (_e, id: string) => studyOrg.deleteStudyTag(id));
+  h('study:document:setTags', async (_e, documentId: string, tagIds: string[]) =>
+    studyOrg.setStudyDocumentTags(documentId, tagIds));
+  h('study:template:create', async (_e, input: CreateStudyTemplateInput) => studyOrg.createStudyTemplate(input));
+  h('study:template:update', async (_e, id: string, patch: Partial<CreateStudyTemplateInput> & { favorite?: boolean; position?: number }) =>
+    studyOrg.updateStudyTemplate(id, patch));
+  h('study:template:delete', async (_e, id: string) => studyOrg.deleteStudyTemplate(id));
+  h('study:template:apply', async (_e, id: string, name?: string) => studyOrg.applyStudyTemplate(id, name));
+
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {
     targetKind: 'author' | 'work' | 'idea' | 'theme';

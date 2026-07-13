@@ -372,6 +372,36 @@ try {
   assert.equal(dbmode.profileNumberMean, 5.75, 'analysis profile computes numeric mean over IPC');
   console.log('[e2e] databases mode (CSV import + relations + views + analysis) ok over IPC');
 
+  // ── Study vault phase 1: real vault switch + IPC + renderer hierarchy ──────
+  const study = await page.evaluate(async () => {
+    const created = await window.nodus.createVault({ name: 'Study smoke', type: 'estudio' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true });
+    const course = await window.nodus.createStudyCourse({ name: 'Curso smoke' });
+    const subject = await window.nodus.createStudySubject({ courseId: course.id, name: 'Asignatura smoke' });
+    const topic = await window.nodus.createStudyTopic({ subjectId: subject.id, name: 'Tema smoke' });
+    const document = await window.nodus.createStudyDocument({
+      title: 'Apunte smoke',
+      contentMarkdown: '# Contenido',
+      placement: { topicId: topic.id },
+    });
+    const workspace = await window.nodus.getStudyWorkspace();
+    return {
+      courseId: course.id,
+      counts: [workspace.courses.length, workspace.subjects.length, workspace.topics.length, workspace.documents.length],
+      placement: workspace.placements.find((item) => item.documentId === document.id),
+    };
+  });
+  assert.deepEqual(study.counts, [1, 1, 1, 1], 'study organization CRUD crosses the real IPC bridge');
+  assert.ok(study.placement?.courseId && study.placement?.subjectId && study.placement?.topicId, 'topic placement indexes every hierarchy level');
+  await page.reload();
+  await page.waitForFunction(() => document.body.textContent?.includes('Curso smoke'), { timeout: 30_000 });
+  await page.getByText('Curso smoke', { exact: true }).first().click();
+  await page.waitForFunction(() => document.body.textContent?.includes('Apunte smoke'), { timeout: 30_000 });
+  assert.match(await page.locator('body').innerText(), /Cursos y asignaturas/, 'study-specific sidebar is rendered');
+  console.log('[e2e] study vault hierarchy + material view ok over IPC and renderer');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),
