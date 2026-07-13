@@ -82,17 +82,32 @@ export const VAULT_TYPES: VaultTypeDef[] = [
 ═══ CONTEXTO DEL VAULT — MODO GENEALOGÍA ═══
 Este vault reconstruye historia familiar a partir de fuentes primarias (censos, padrones, partidas de bautismo/matrimonio/defunción, actas, correspondencia). Tu tarea es ayudar a IDENTIFICAR personas, reconstruir su biografía y trazar vínculos de parentesco y su rastro a través del corpus. Trata la identidad y el parentesco como HIPÓTESIS que se prueban con evidencia, siguiendo el estándar de prueba genealógico: nunca afirmes que dos registros son la misma persona, ni un vínculo de parentesco, sin apoyo documental; cita la evidencia y su localización, y señala cuando un dato es incierto o contradictorio. Copia los nombres y fechas tal como constan en época; no modernices ortografías ni normalices fechas inciertas. Cuando falte un dato, dilo y sugiere qué fuente podría aportarlo.`,
   },
-  // estudio and primary_sources are fully built (presets + prompt packs work for any
-  // vault already stored with that type) but kept off the picker for this release —
-  // shown greyed out with a "coming soon" badge instead of a selectable option, until
-  // they get their own release pass. databases hasn't been built yet at all.
+  // Study mode ships as a first-class local workspace. primary_sources remains
+  // declared but gated until its own product surface is complete.
   {
     id: 'estudio',
-    available: false,
-    // A learner doesn't need the research-debate and authoring surfaces; keep
-    // search, library, graph, ideas, study, immersion, coverage (self-testing),
-    // reading path, writing and notes. Everything stays reachable from Settings.
-    defaultHiddenViews: ['argument', 'authors', 'gaps', 'debate', 'hypothesis', 'deepResearch', 'projects'],
+    available: true,
+    // The dedicated study surfaces replace the research and authoring workspace in
+    // this mode. Keep the existing guided study route as a corpus-learning tool.
+    // Users can still opt universal sections back in from Settings.
+    defaultHiddenViews: [
+      'search',
+      'library',
+      'graph',
+      'argument',
+      'ideas',
+      'authors',
+      'immersion',
+      'gaps',
+      'debate',
+      'research',
+      'hypothesis',
+      'reading',
+      'deepResearch',
+      'writing',
+      'projects',
+      'notes',
+    ],
     promptPack: `
 
 ═══ CONTEXTO DEL VAULT — MODO ESTUDIO ═══
@@ -167,6 +182,17 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   dbSearch: ['databases'],
   dbAnalysis: ['databases'],
   dbChat: ['databases'],
+  // Study mode owns its academic organisation, materials, assessment and
+  // planning surfaces. They must never leak into research/records/database vaults.
+  studyCourses: ['estudio'],
+  studyLibrary: ['estudio'],
+  studyQuestions: ['estudio'],
+  studyTests: ['estudio'],
+  studyExams: ['estudio'],
+  studyPlanner: ['estudio'],
+  studyReview: ['estudio'],
+  studyProgress: ['estudio'],
+  studyChat: ['estudio'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

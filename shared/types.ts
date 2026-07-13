@@ -641,6 +641,15 @@ export interface AppSettings {
   studyModel: ModelRef | null;
   tutorModel: ModelRef | null;
   hypothesisModel: ModelRef | null;
+  // Study-vault task routing. Each workflow persists independently so choosing a
+  // fast model for questions never retargets grading or text improvement.
+  improveModel: ModelRef | null;
+  questionGenModel: ModelRef | null;
+  gradingModel: ModelRef | null;
+  flashcardModel: ModelRef | null;
+  transcriptionModel: ModelRef | null;
+  /** Speech-to-text backend. Local is the privacy-preserving factory default. */
+  sttProvider: 'local' | 'openai';
   /** Provider/model used only for optional decorative image generation. */
   imageProvider: ImageProvider;
   imageModel: string;

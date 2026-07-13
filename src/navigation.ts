@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studyLibrary' | 'studyQuestions' | 'studyTests' | 'studyExams' | 'studyPlanner' | 'studyReview' | 'studyProgress' | 'studyChat' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -56,6 +56,17 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'dbSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'dbAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
   { id: 'dbChat', label: 'Chat de datos', icon: 'chat', group: 'analyze' },
+  // Study mode — scoped to the 'estudio' vault type. The existing `study` route
+  // remains the corpus-guided study tool and complements this local workspace.
+  { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
+  { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
+  { id: 'studyQuestions', label: 'Banco de preguntas', icon: 'help', group: 'analyze' },
+  { id: 'studyTests', label: 'Tests', icon: 'check', group: 'analyze' },
+  { id: 'studyExams', label: 'Exámenes', icon: 'edit', group: 'analyze' },
+  { id: 'studyReview', label: 'Repaso', icon: 'refresh', group: 'analyze' },
+  { id: 'studyProgress', label: 'Progreso', icon: 'chartBar', group: 'analyze' },
+  { id: 'studyPlanner', label: 'Planificador', icon: 'calendar', group: 'analyze' },
+  { id: 'studyChat', label: 'Chat de estudio', icon: 'chat', group: 'analyze' },
   // Analizar — superficies derivadas del grafo y síntesis.
   { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },

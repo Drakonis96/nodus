@@ -41,6 +41,19 @@ const hook = await source('src/hooks/useFeatureModel.ts');
 assert.ok(hook.includes("window.nodus.updateSettings({ [key]: next }"), 'feature choices must persist in vault settings');
 assert.ok(hook.includes('settings[key] ?? settings.synthesisModel'), 'unselected features may seed from synthesis only');
 
+const studyModelKeys = ['improveModel', 'questionGenModel', 'gradingModel', 'flashcardModel', 'transcriptionModel'];
+const settingsTypes = await source('shared/types.ts');
+const settingsRepo = await source('electron/db/settingsRepo.ts');
+const appPrefs = await source('electron/db/appPrefs.ts');
+for (const key of studyModelKeys) {
+  assert.ok(settingsTypes.includes(`${key}: ModelRef | null`), `${key} must be typed independently`);
+  assert.ok(settingsRepo.includes(`${key}: null`), `${key} must have a backwards-compatible default`);
+  assert.ok(appPrefs.includes(`'${key}'`), `${key} must follow shared model preferences across vaults`);
+  assert.ok(hook.includes(`'${key}'`), `${key} must be accepted by the feature-model hook`);
+}
+assert.ok(settingsTypes.includes("sttProvider: 'local' | 'openai'"), 'STT backend must be explicit');
+assert.ok(settingsRepo.includes("sttProvider: 'local'"), 'STT must default to local processing');
+
 const light = await source('electron/ai/lightScan.ts');
 const deep = await source('electron/ai/deepScan.ts');
 const summary = await source('electron/ai/summaryScan.ts');

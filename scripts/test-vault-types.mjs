@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,16 +47,23 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('academic + genealogy + databases are selectable; estudio/primary_sources are declared but gated', () => {
+test('academic + genealogy + estudio + databases are selectable; primary_sources remains gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy', 'databases']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'estudio', 'databases']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
+  assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
-  for (const gated of ['estudio', 'primary_sources']) {
+  for (const gated of ['primary_sources']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   // Order shown in the picker: shipped types first, then the coming-soon ones.
   assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases']);
+});
+
+test('the vault picker derives selectable modes from the canonical registry', async () => {
+  const picker = await readFile(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
+  assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
+  assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
 });
 
 test('databases mode: table/analysis/chat views scoped to it + data-analyst prompt pack', () => {
@@ -117,14 +124,35 @@ test('primary_sources hides argument/study surfaces but keeps ideas/authors', ()
   assert.match(vt.vaultTypePromptPack('primary_sources'), /FUENTES PRIMARIAS/);
 });
 
-test('academic shows the full sidebar; estudio hides research/authoring views', () => {
+test('academic shows the full sidebar; estudio uses its dedicated learning workspace', () => {
   assert.deepEqual(vt.defaultHiddenViewsForType('academic'), []);
   const estudioHidden = vt.defaultHiddenViewsForType('estudio');
-  assert.ok(estudioHidden.includes('debate'));
-  assert.ok(estudioHidden.includes('deepResearch'));
-  // Core learning surfaces must stay visible.
-  for (const kept of ['search', 'library', 'ideas', 'study', 'reading', 'notes']) {
+  for (const hidden of ['search', 'library', 'graph', 'debate', 'deepResearch', 'writing', 'notes']) {
+    assert.ok(estudioHidden.includes(hidden), `${hidden} replaced by a study-specific surface`);
+  }
+  // The pre-existing deterministic guide remains integrated as a learning tool.
+  for (const kept of ['study', 'studyCourses', 'studyLibrary', 'studyReview', 'studyPlanner']) {
     assert.ok(!estudioHidden.includes(kept), `${kept} stays visible in estudio`);
+  }
+});
+
+test('all dedicated study views are scoped to estudio', () => {
+  const studyViews = [
+    'studyCourses',
+    'studyLibrary',
+    'studyQuestions',
+    'studyTests',
+    'studyExams',
+    'studyPlanner',
+    'studyReview',
+    'studyProgress',
+    'studyChat',
+  ];
+  for (const view of studyViews) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
+    for (const other of ['academic', 'genealogy', 'primary_sources', 'databases']) {
+      assert.equal(vt.isViewAllowedForVaultType(view, other), false, `${view} hidden in ${other}`);
+    }
   }
 });
 

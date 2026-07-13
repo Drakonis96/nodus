@@ -652,6 +652,59 @@ body {
 .light.genealogy .border-indigo-900\/70 { border-color: rgba(202, 138, 4, 0.32); }
 .light.genealogy .ring-indigo-600\/40 { --tw-ring-color: rgba(202, 138, 4, 0.35); }
 
+/* Study vault → calm teal accent. The mode class is toggled from App so the
+   workspace reads as a distinct learning surface without changing component APIs. */
+.estudio { --tw-ring-color: rgba(15, 118, 110, 0.48); }
+.estudio .btn-primary { background-color: #0f766e; }
+.estudio .btn-primary:hover { background-color: #0d9488; }
+.estudio .text-indigo-100 { color: #ccfbf1; }
+.estudio .text-indigo-200 { color: #99f6e4; }
+.estudio .text-indigo-300 { color: #5eead4; }
+.estudio .text-indigo-400 { color: #2dd4bf; }
+.estudio .text-indigo-500 { color: #14b8a6; }
+.estudio .text-indigo-600 { color: #0d9488; }
+.estudio .text-indigo-700 { color: #0f766e; }
+.estudio .text-indigo-900 { color: #134e4a; }
+.estudio .hover\:text-indigo-300:hover { color: #5eead4; }
+.estudio .hover\:text-indigo-400:hover { color: #2dd4bf; }
+.estudio .bg-indigo-400 { background-color: #2dd4bf; }
+.estudio .bg-indigo-500 { background-color: #14b8a6; }
+.estudio .bg-indigo-600 { background-color: #0f766e; }
+.estudio .hover\:bg-indigo-500:hover { background-color: #0d9488; }
+.estudio .bg-indigo-50 { background-color: #f0fdfa; }
+.estudio .bg-indigo-100 { background-color: #ccfbf1; }
+.estudio .bg-indigo-900 { background-color: #134e4a; }
+.estudio .bg-indigo-950 { background-color: #042f2e; }
+.estudio .bg-indigo-600\/15 { background-color: rgba(15, 118, 110, 0.15); }
+.estudio .bg-indigo-600\/20 { background-color: rgba(15, 118, 110, 0.2); }
+.estudio .bg-indigo-900\/40 { background-color: rgba(19, 78, 74, 0.4); }
+.estudio .bg-indigo-900\/50 { background-color: rgba(19, 78, 74, 0.5); }
+.estudio .bg-indigo-950\/20 { background-color: rgba(4, 47, 46, 0.2); }
+.estudio .bg-indigo-950\/25 { background-color: rgba(4, 47, 46, 0.25); }
+.estudio .bg-indigo-950\/30 { background-color: rgba(4, 47, 46, 0.3); }
+.estudio .bg-indigo-950\/40 { background-color: rgba(4, 47, 46, 0.4); }
+.estudio .border-indigo-500 { border-color: #14b8a6; }
+.estudio .border-indigo-600 { border-color: #0d9488; }
+.estudio .border-indigo-700 { border-color: #0f766e; }
+.estudio .border-indigo-800 { border-color: #115e59; }
+.estudio .border-indigo-700\/60 { border-color: rgba(15, 118, 110, 0.6); }
+.estudio .border-indigo-800\/60 { border-color: rgba(17, 94, 89, 0.6); }
+.estudio .hover\:border-indigo-700\/60:hover { border-color: rgba(15, 118, 110, 0.6); }
+.estudio .ring-indigo-500 { --tw-ring-color: #14b8a6; }
+
+.light.estudio .bg-indigo-950,
+.light.estudio .bg-indigo-950\/20,
+.light.estudio .bg-indigo-950\/25,
+.light.estudio .bg-indigo-950\/30,
+.light.estudio .bg-indigo-950\/40 { background-color: #ccfbf1; }
+.light.estudio .bg-indigo-900,
+.light.estudio .bg-indigo-900\/40,
+.light.estudio .bg-indigo-900\/50 { background-color: #99f6e4; }
+.light.estudio .text-indigo-100,
+.light.estudio .text-indigo-200 { color: #134e4a; }
+.light.estudio .text-indigo-300 { color: #0f766e; }
+.light.estudio .text-indigo-400 { color: #0d9488; }
+
 /* Databases vault → Nodus crimson (#B30333) accent instead of the indigo default.
    Same remap strategy as .genealogy: override the accent utility classes used
    across the app with the crimson scale and its lighter/darker gradient shades. */

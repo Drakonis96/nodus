@@ -6,6 +6,7 @@ import { DatabasesView, CsvImportModal, type CsvImportPlanData } from './views/D
 import { DatabasesAnalysisView } from './views/DatabasesAnalysisView';
 import { DatabasesChatView } from './views/DatabasesChatView';
 import { DatabasesSearchView } from './views/DatabasesSearchView';
+import { StudyHome, StudyScaffoldView } from './views/StudyHome';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -62,6 +63,18 @@ import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
+
+const STUDY_SCAFFOLD_VIEWS = new Set<View>([
+  'studyCourses',
+  'studyLibrary',
+  'studyQuestions',
+  'studyTests',
+  'studyExams',
+  'studyPlanner',
+  'studyReview',
+  'studyProgress',
+  'studyChat',
+]);
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -211,6 +224,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('databases', isDatabases);
   }, [isDatabases]);
+  // Study vaults use a calm teal accent and expose only their local learning tools.
+  const isEstudio = activeVault?.type === 'estudio';
+  useEffect(() => {
+    document.documentElement.classList.toggle('estudio', isEstudio);
+  }, [isEstudio]);
 
   // The user's databases (sidebar list) + the one currently open in the workspace.
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
@@ -515,7 +533,7 @@ export function App() {
     const bySection = [
       ...NAV_ITEMS.filter((n) => !n.group),
       ...NAV_GROUPS.flatMap((g) => NAV_ITEMS.filter((n) => n.group === g.id)),
-    ];
+    ].filter((n) => isViewAllowedForVaultType(n.id, activeVault?.type));
     const navCommands: Command[] = bySection.map((n) => ({
       id: `nav:${n.id}`,
       label: t(n.label),
@@ -524,13 +542,17 @@ export function App() {
       run: () => setView(n.id),
     }));
     const actions: Command[] = [
-      { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
       { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
-      { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
     ];
+    if (!isGenealogy && !isDatabases && !isEstudio) {
+      actions.unshift(
+        { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
+        { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+      );
+    }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, onSync, openAssistant]);
+  }, [settings?.uiLanguage, activeVault?.type, isGenealogy, isDatabases, isEstudio, onSync, openAssistant]);
 
   if (loadError) {
     return (
@@ -591,7 +613,7 @@ export function App() {
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           >
-            <Icon name={isGenealogy ? 'tree' : isDatabases ? 'table' : 'network'} size={13} />
+            <Icon name={isGenealogy ? 'tree' : isDatabases ? 'table' : isEstudio ? 'graduation' : 'network'} size={13} />
             {vaultTypeLabel(activeVault.type)}
             <Icon name="chevronDown" size={12} className={`transition-transform ${vaultAnchor ? 'rotate-180' : ''}`} />
           </button>
@@ -635,7 +657,7 @@ export function App() {
           />
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía y bases de datos no sincronizan con Zotero. */}
-          {!isGenealogy && !isDatabases && (
+          {!isGenealogy && !isDatabases && !isEstudio && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -649,7 +671,7 @@ export function App() {
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && (
+          {!isGenealogy && !isDatabases && !isEstudio && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -815,7 +837,8 @@ export function App() {
               onLoadDatabasesDemo={loadDatabasesDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && (
+          {view === 'home' && isEstudio && <StudyHome onNavigate={setView} />}
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && (
             <HomeView
               settings={settings}
               lastSync={lastSync}
@@ -871,6 +894,7 @@ export function App() {
           )}
           {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
+          {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}
@@ -969,7 +993,7 @@ export function App() {
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
 
-      {settings.onboardingComplete && !settings.tourComplete && !isGenealogy && !isDatabases && (
+      {settings.onboardingComplete && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
@@ -1023,7 +1047,7 @@ export function App() {
       )}
 
       {settings.onboardingComplete &&
-        (isGenealogy || isDatabases || settings.tourComplete) &&
+        (isGenealogy || isDatabases || isEstudio || settings.tourComplete) &&
         settings.advancedTourComplete &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) && (

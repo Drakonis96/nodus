@@ -36,6 +36,12 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   studyModel: null,
   tutorModel: null,
   hypothesisModel: null,
+  improveModel: null,
+  questionGenModel: null,
+  gradingModel: null,
+  flashcardModel: null,
+  transcriptionModel: null,
+  sttProvider: 'local',
   imageProvider: 'google',
   imageModel: 'gemini-3.1-flash-lite-image',
   imageStyle: 'antique_book',
@@ -191,4 +197,3 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
 }
-

@@ -10,7 +10,12 @@ export type FeatureModelSettingKey =
   | 'authorModel'
   | 'studyModel'
   | 'tutorModel'
-  | 'hypothesisModel';
+  | 'hypothesisModel'
+  | 'improveModel'
+  | 'questionGenModel'
+  | 'gradingModel'
+  | 'flashcardModel'
+  | 'transcriptionModel';
 
 function resolveFeatureModel(settings: AppSettings, key: FeatureModelSettingKey): ModelRef | null {
   return settings[key] ?? settings.synthesisModel ?? null;

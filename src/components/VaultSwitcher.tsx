@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
+import { VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
@@ -26,14 +27,14 @@ interface PendingDestructiveAction {
 }
 
 /** Vault types offered when creating a vault, each with its accent colour. */
-const NEW_VAULT_TYPES: VaultType[] = ['academic', 'genealogy', 'databases'];
+const NEW_VAULT_TYPES: VaultType[] = VAULT_TYPES.filter((type) => type.available).map((type) => type.id);
 /** Shown in the create grid but not yet selectable — flagged "Próximamente". */
-const COMING_SOON_VAULT_TYPES: VaultType[] = ['primary_sources', 'estudio'];
+const COMING_SOON_VAULT_TYPES: VaultType[] = VAULT_TYPES.filter((type) => !type.available).map((type) => type.id);
 const CREATE_VAULT_TYPES: VaultType[] = [...NEW_VAULT_TYPES, ...COMING_SOON_VAULT_TYPES];
 const isComingSoonVaultType = (type: VaultType) => COMING_SOON_VAULT_TYPES.includes(type);
 const VAULT_TYPE_COLOR: Record<string, string> = {
   academic: '#6366f1',
-  estudio: '#6366f1',
+  estudio: '#0f766e',
   primary_sources: '#6366f1',
   genealogy: '#ca8a04',
   databases: '#b30333',
@@ -60,9 +61,9 @@ export function vaultTypeLabel(type: VaultType): string {
   }
 }
 
-/** Genealogy and databases are newer modes → they wear a "Beta" badge. */
+/** Newer product modes wear a "Beta" badge while their surface evolves. */
 function isBetaVaultType(type: VaultType): boolean {
-  return type === 'genealogy' || type === 'databases';
+  return type === 'genealogy' || type === 'databases' || type === 'estudio';
 }
 
 export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onActiveVaultChanged }: VaultSwitcherProps) {

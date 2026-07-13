@@ -83,6 +83,7 @@ interface BackupInventory {
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'imageProvider' | 'imageModel' | 'imageStyle'
   >;
   apiKeyProviders: AiProvider[];
@@ -484,6 +485,7 @@ function modelSettings(
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
     | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
+    | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
     | 'imageProvider' | 'imageModel' | 'imageStyle'
   >
 ): BackupInventory['modelSettings'] {
@@ -505,6 +507,12 @@ function modelSettings(
     studyModel: settings.studyModel,
     tutorModel: settings.tutorModel,
     hypothesisModel: settings.hypothesisModel,
+    improveModel: settings.improveModel,
+    questionGenModel: settings.questionGenModel,
+    gradingModel: settings.gradingModel,
+    flashcardModel: settings.flashcardModel,
+    transcriptionModel: settings.transcriptionModel,
+    sttProvider: settings.sttProvider,
     imageProvider: settings.imageProvider,
     imageModel: settings.imageModel,
     imageStyle: settings.imageStyle,
