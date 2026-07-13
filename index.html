@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      Local text-to-speech (Piper via onnxruntime-web) runs in the renderer:
+      Local text-to-speech (Piper) and speech-to-text (Whisper) run in the renderer:
       'wasm-unsafe-eval' lets the WASM runtime compile, and the onnxruntime-web
       runtime + the Piper voice models are fetched on demand from their CDNs /
       Hugging Face (voices are then cached locally in OPFS and reused offline).
-      media-src blob: lets generated clips play back from object URLs.
+      media-src blob: lets generated and recorded clips play back from object URLs.
     -->
     <meta
       http-equiv="Content-Security-Policy"

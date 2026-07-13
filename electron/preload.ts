@@ -414,6 +414,7 @@ const api: NodusApi = {
   createStudyAnnotation: (documentId, input) => ipcRenderer.invoke('study:annotation:create', documentId, input),
   updateStudyAnnotation: (id, patch) => ipcRenderer.invoke('study:annotation:update', id, patch),
   deleteStudyAnnotation: (id) => ipcRenderer.invoke('study:annotation:delete', id).then(() => undefined),
+  transcribeStudyAudio: (request) => ipcRenderer.invoke('study:stt:transcribe', request),
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent } from 'react';
 import { Crepe } from '@milkdown/crepe';
+import { editorViewCtx } from '@milkdown/core';
 import '@milkdown/crepe/theme/classic.css';
 import TurndownService from 'turndown';
 import { diffWordsWithSpace } from 'diff';
@@ -13,12 +14,14 @@ import type {
   StudyOutlineItem,
 } from '@shared/studyEditor';
 import { DEFAULT_STUDY_DOC_STYLE, studyCommandMarkdown, studyDocumentStats } from '@shared/studyEditor';
+import { deleteLastStudySentence } from '@shared/sttModels';
 import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Markdown } from '../Markdown';
 import { Icon, Spinner } from '../ui';
 import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
+import { StudyDictation } from './StudyDictation';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -27,14 +30,19 @@ const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
   grabacion: 'Grabación', transcripcion: 'Transcripción', banco: 'Banco de preguntas', test: 'Test', examen: 'Examen',
 };
 
-function MilkdownCanvas({ documentId, value, spellcheck, language, onChange }: {
+interface MilkdownCanvasHandle {
+  insertText: (text: string, replaceSelection: boolean) => void;
+}
+
+const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
   documentId: string;
   value: string;
   spellcheck: boolean;
   language: string;
   onChange: (markdown: string) => void;
-}) {
+}>(({ documentId, value, spellcheck, language, onChange }, ref) => {
   const rootRef = useRef<HTMLDivElement>(null);
+  const crepeRef = useRef<Crepe | null>(null);
   const initialValueRef = useRef(value);
   const changeRef = useRef(onChange);
   changeRef.current = onChange;
@@ -50,6 +58,7 @@ function MilkdownCanvas({ documentId, value, spellcheck, language, onChange }: {
         [Crepe.Feature.Placeholder]: { text: t('Empieza a escribir o usa / para insertar un bloque…') },
       },
     });
+    crepeRef.current = crepe;
     crepe.on((listener) => listener.markdownUpdated((_ctx, markdown) => changeRef.current(markdown)));
     let disposed = false;
     void crepe.create().then(() => {
@@ -59,11 +68,23 @@ function MilkdownCanvas({ documentId, value, spellcheck, language, onChange }: {
       editable?.setAttribute('lang', language);
       editable?.setAttribute('aria-label', t('Editor del apunte'));
     });
-    return () => { disposed = true; void crepe.destroy(); };
+    return () => { disposed = true; crepeRef.current = null; void crepe.destroy(); };
   }, [documentId, spellcheck, language]);
 
+  useImperativeHandle(ref, () => ({
+    insertText(text, replaceSelection) {
+      crepeRef.current?.editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        const { from, to } = view.state.selection;
+        view.dispatch(view.state.tr.insertText(text, from, replaceSelection ? to : from).scrollIntoView());
+        view.focus();
+      });
+    },
+  }), []);
+
   return <div ref={rootRef} className="study-milkdown min-h-full" />;
-}
+});
+MilkdownCanvas.displayName = 'MilkdownCanvas';
 
 function VersionDiff({ version, current }: { version: StudyDocVersion; current: string }) {
   const pieces = useMemo(() => diffWordsWithSpace(version.contentMarkdown, current), [version.id, current]);
@@ -120,12 +141,15 @@ export function StudyEditor({
   const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
+  const [showDictation, setShowDictation] = useState(false);
   const [search, setSearch] = useState('');
   const [replacement, setReplacement] = useState('');
   const [dictionaryWord, setDictionaryWord] = useState('');
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   const baselineRef = useRef('');
+  const milkdownRef = useRef<MilkdownCanvasHandle>(null);
+  const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
   const turndown = useMemo(() => new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' }), []);
 
   const loadData = useCallback(async (documentId: string) => {
@@ -275,6 +299,7 @@ export function StudyEditor({
         <button className={`btn btn-ghost h-8 px-2 ${split ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setSplit(!split)}><Icon name="columns" size={13} /> {t('Dividir')}</button>
         <button className="btn btn-ghost h-8 px-2" onClick={() => setShowSearch(!showSearch)}><Icon name="search" size={13} /></button>
         <button className="btn btn-ghost h-8 px-2" onClick={() => void addComment()} title={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
+        <button data-testid="study-dictation-toggle" className={`btn btn-ghost h-8 px-2 ${showDictation ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setShowDictation(!showDictation)} title={t('Dictado por voz')}><Icon name="microphone" size={13} /></button>
         <button data-testid="study-doc-style" className={`btn btn-ghost h-8 px-2 ${showStyle ? 'bg-indigo-900/50' : ''}`} title={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={13} /></button>
         <button className={`btn btn-ghost h-8 px-2 ${showHistory ? 'bg-indigo-900/50' : ''}`} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
         <button className={`btn btn-ghost h-8 px-2 ${focusMode ? 'bg-indigo-900/50' : ''}`} onClick={() => setFocusMode(!focusMode)} title={t('Modo concentración')}><Icon name="eye" size={13} /></button>
@@ -301,6 +326,45 @@ export function StudyEditor({
           <button disabled={!search} className="btn btn-ghost h-8" onClick={() => setDraft(draft.split(search).join(replacement))}>{t('Reemplazar todo')}</button>
         </div>
       )}
+      {showDictation && <StudyDictation
+        documentId={active.id}
+        language={data.spellcheckLanguage}
+        vocabulary={[active.title, ...documents.map((document) => document.title), ...draft.match(/\b[A-ZÁÉÍÓÚÑ][\p{L}-]{3,}\b/gu) ?? []]}
+        customDictionary={data.customDictionary}
+        onInsert={(text, scope) => {
+          if (!raw) {
+            milkdownRef.current?.insertText(text, scope === 'selection');
+            return;
+          }
+          const textarea = rawTextareaRef.current;
+          const cursor = textarea?.selectionStart ?? draft.length;
+          let from = cursor;
+          let to = cursor;
+          if (scope === 'selection') {
+            from = textarea?.selectionStart ?? cursor;
+            to = textarea?.selectionEnd ?? cursor;
+            if (from === to) {
+              from = draft.lastIndexOf('\n', Math.max(0, cursor - 1)) + 1;
+              const nextLine = draft.indexOf('\n', cursor);
+              to = nextLine === -1 ? draft.length : nextLine;
+            }
+          }
+          const prefix = from > 0 && !/\s/.test(draft[from - 1]) && !/^[,.;:!?]/.test(text) ? ' ' : '';
+          const suffix = to < draft.length && !/\s/.test(draft[to]) && !/[\s\n]$/.test(text) ? ' ' : '';
+          setDraft(`${draft.slice(0, from)}${prefix}${text}${suffix}${draft.slice(to)}`);
+          window.setTimeout(() => {
+            const nextCursor = from + prefix.length + text.length + suffix.length;
+            rawTextareaRef.current?.setSelectionRange(nextCursor, nextCursor);
+            rawTextareaRef.current?.focus();
+          });
+          return { from: from + prefix.length, to: from + prefix.length + text.length };
+        }}
+        onAction={(action) => {
+          if (action === 'undo') document.execCommand('undo');
+          if (action === 'delete_last_sentence') { setDraft(deleteLastStudySentence(draft)); setRaw(true); }
+          if (action === 'finish') setShowDictation(false);
+        }}
+      />}
       {showStyle && (
         <div className="grid grid-cols-2 gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
           <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>
@@ -346,7 +410,7 @@ export function StudyEditor({
         <div className={`min-w-0 flex-1 overflow-y-auto ${split ? 'grid grid-cols-2 divide-x divide-neutral-800' : ''}`}>
           <div className="min-h-full overflow-y-auto">
             {raw ? (
-              <textarea className="h-full min-h-[560px] w-full resize-none bg-neutral-950 p-6 font-mono text-sm leading-6 text-neutral-300 outline-none"
+              <textarea ref={rawTextareaRef} className="h-full min-h-[560px] w-full resize-none bg-neutral-950 p-6 font-mono text-sm leading-6 text-neutral-300 outline-none"
                 spellCheck lang={data.spellcheckLanguage} value={draft} onChange={(event) => setDraft(event.target.value)}
                 onPaste={(event) => {
                   const html = event.clipboardData.getData('text/html');
@@ -357,7 +421,7 @@ export function StudyEditor({
                   setDraft(`${draft.slice(0, start)}${markdown}${draft.slice(end)}`);
                 }} />
             ) : (
-              <MilkdownCanvas key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft}
+              <MilkdownCanvas ref={milkdownRef} key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft}
                 spellcheck language={data.spellcheckLanguage} onChange={setDraft} />
             )}
           </div>

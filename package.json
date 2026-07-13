@@ -25,6 +25,7 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@diffusionstudio/vits-web": "^1.0.3",
     "@google/genai": "^2.11.0",
+    "@huggingface/transformers": "^3.8.1",
     "@milkdown/core": "^7.21.3",
     "@milkdown/crepe": "^7.21.3",
     "@milkdown/plugin-history": "^7.21.3",
@@ -118,6 +119,9 @@
     ],
     "afterPack": "build/afterPack.cjs",
     "mac": {
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio."
+      },
       "target": [
         {
           "target": "dmg",

@@ -9,6 +9,17 @@ import type {
   StudyDocEditorData,
   StudyDocUpdateInput,
 } from './studyEditor';
+import type { StudySttRequest, StudySttResult } from './sttModels';
+export type {
+  StudyDictationAction,
+  StudyDictationTransform,
+  StudyDictationTransformOptions,
+  StudySttDeviceProfile,
+  StudySttModel,
+  StudySttProvider,
+  StudySttRequest,
+  StudySttResult,
+} from './sttModels';
 export type {
   ParsedStudyDocLink,
   StudyAnnotation,
@@ -4473,6 +4484,7 @@ export interface NodusApi {
   createStudyAnnotation(documentId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
   updateStudyAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
   deleteStudyAnnotation(id: string): Promise<void>;
+  transcribeStudyAudio(request: StudySttRequest): Promise<StudySttResult>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

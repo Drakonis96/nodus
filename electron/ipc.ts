@@ -105,6 +105,7 @@ import type {
   StudyWorkspaceOptions,
   StudyAnnotationInput,
   StudyDocUpdateInput,
+  StudySttRequest,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -210,6 +211,7 @@ import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import * as studyOrg from './db/studyOrgRepo';
 import * as studyEditor from './db/studyEditorRepo';
+import { transcribeStudyAudio } from './ai/studyTranscription';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1648,6 +1650,7 @@ export function registerIpc(
   h('study:annotation:update', async (_e, id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }) =>
     studyEditor.updateStudyAnnotation(id, patch));
   h('study:annotation:delete', async (_e, id: string) => studyEditor.deleteStudyAnnotation(id));
+  h('study:stt:transcribe', async (_e, request: StudySttRequest) => transcribeStudyAudio(request));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

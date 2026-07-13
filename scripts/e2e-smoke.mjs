@@ -43,7 +43,7 @@ try {
   delete childEnv.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({
     executablePath: require('electron'),
-    args: [repoRoot],
+    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', repoRoot],
     env: childEnv,
   });
 
@@ -71,6 +71,7 @@ try {
     hasImageModels: typeof window.nodus?.listImageModels === 'function',
     hasImageQueue: typeof window.nodus?.queueDecorativeImage === 'function',
     hasSearchDetail: typeof window.nodus?.getSearchResultDetail === 'function',
+    hasStudyStt: typeof window.nodus?.transcribeStudyAudio === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -78,6 +79,7 @@ try {
   assert.equal(bridge.hasImageModels, true, 'image model catalog available');
   assert.equal(bridge.hasImageQueue, true, 'decorative image queue available');
   assert.equal(bridge.hasSearchDetail, true, 'search detail modal bridge available');
+  assert.equal(bridge.hasStudyStt, true, 'study speech-to-text bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -404,6 +406,15 @@ try {
 
   await page.getByText('Apunte smoke', { exact: true }).last().click();
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-dictation-toggle').click();
+  await page.getByTestId('study-dictation').waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('study-dictation').innerText(), /Local|offline/i, 'dictation panel defaults to the offline backend');
+  await page.getByTestId('study-dictation-start').click();
+  await page.getByTestId('study-dictation-discard').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-dictation-discard').click();
+  await page.getByTestId('study-dictation-start').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-dictation-toggle').click();
+  console.log('[e2e] study dictation panel + fake microphone capture ok');
   await page.getByTestId('study-doc-favorite').click();
   await page.getByTestId('study-doc-style').click();
   await page.getByTestId('study-doc-kind').selectOption('manual');
