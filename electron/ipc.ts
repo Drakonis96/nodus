@@ -1,6 +1,8 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
+import os from 'node:os';
+import crypto from 'node:crypto';
+import { ipcMain, shell, BrowserWindow, dialog, app, nativeImage } from 'electron';
 import type {
   AppSettings,
   AudioEntityKind,
@@ -156,6 +158,7 @@ import { buildSyncPackage, mergeSyncPackage } from './export/syncPackage';
 import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/pageLocation';
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { seedGenealogyDemoData } from './db/genealogyDemoData';
+import { seedDatabasesDemoData } from './db/databasesDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -260,6 +263,8 @@ import {
   listFolders,
   renameFolder,
   deleteFolder,
+  listItemFolders,
+  setItemFolders,
   createItem,
   getItem,
   getItemBlob,
@@ -275,6 +280,20 @@ import {
   listItemsForPerson,
 } from './db/archiveRepo';
 import { ingestArchiveFile, replaceArchiveFile } from './archive/archiveIngest';
+import * as dbMode from './db/databasesRepo';
+import { closeCrossVaultConnections } from './db/crossVault';
+import { runAiCell, runAiColumn } from './ai/databaseAiColumn';
+import { runAiImageCell, runAiImageColumn } from './ai/databaseAiImageColumn';
+import { getDatabaseProfile, generateAnalysisReport, suggestDatabaseAnalyses, runDatabaseAnalysis, narrateAnalysisResult } from './ai/databaseAnalysis';
+import type { AnalysisRequest, AnalysisResult } from '@shared/analysisSpec';
+import { streamDatabaseChat, type DatabaseChatRequest } from './ai/databaseChat';
+import { exportDatabase } from './export/databaseExport';
+import type { ExportFormat } from '@shared/databaseExport';
+import { parseCsv, detectDelimiter } from './extraction/tabular';
+import { buildCsvImportPlan } from '@shared/databaseCsv';
+import { matchFilesToRows } from '@shared/databaseBulk';
+import type { DatabaseColumnConfig, DatabaseColumnType, RelationTargetKind } from '@shared/databases';
+import type { SavedViewInput } from '@shared/databaseFilters';
 import { scanArchiveTextRecords, scanWorkRecords } from './ai/recordsScan';
 import { analyzeImageBytes } from './ai/imageAnalysis';
 import { generatePersonBiography } from './ai/personBiography';
@@ -369,6 +388,31 @@ function vaultSwitchMessage(base: string, copiedProviders: VaultSwitchResult['co
   return parts.join(' ');
 }
 
+/** Best-effort MIME type from a file extension, for database attachments. */
+function dbGuessMime(ext: string): string | null {
+  const map: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.tif': 'image/tiff',
+    '.tiff': 'image/tiff',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.epub': 'application/epub+zip',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.markdown': 'text/markdown',
+    '.csv': 'text/csv',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.json': 'application/json',
+  };
+  return map[ext.toLowerCase()] ?? null;
+}
+
 /** Register every IPC channel backing the window.nodus API. */
 export function registerIpc(
   getWindow: () => BrowserWindow | null,
@@ -425,6 +469,7 @@ export function registerIpc(
     await stopMcpServer();
     await stopCopilotServer();
     interruptDecorativeImageGenerations();
+    closeCrossVaultConnections(); // drop read-only handles to sibling vaults before switching
     closeDb();
     setActiveVault(id);
     getDb();
@@ -725,6 +770,8 @@ export function registerIpc(
   h('archive:deleteFolder', async (_e, id: string) => {
     deleteFolder(id);
   });
+  h('archive:listItemFolders', async (_e, itemId: string) => listItemFolders(itemId));
+  h('archive:setItemFolders', async (_e, itemId: string, folderIds: string[]) => setItemFolders(itemId, folderIds));
   h('archive:listItems', async (_e, opts?: ArchiveListOptions) => listItems(opts ?? {}));
   h('archive:getItem', async (_e, id: string) => getItem(id));
   h('archive:getItemBlob', async (_e, id: string) => getItemBlob(id));
@@ -843,6 +890,241 @@ export function registerIpc(
     return { unsupported: false, description: analysis.description || null };
   });
 
+  // ── Databases mode (Notion-like structured data) ───────────────────────────
+  h('db:list', async () => dbMode.listDatabases());
+  h('db:search', async (_e, query: string, includeContent: boolean) => dbMode.searchDatabases(query, includeContent));
+  h('db:searchRows', async (_e, query: string, limit?: number) => dbMode.searchDatabaseRows(query, limit));
+  h('db:get', async (_e, id: string) => dbMode.getDatabase(id));
+  h('db:detail', async (_e, id: string) => dbMode.getDatabaseDetail(id));
+  h('db:stats', async (_e, id: string) => dbMode.databaseStats(id));
+  h('db:create', async (_e, name: string, icon?: string | null) => dbMode.createDatabase(name, icon ?? null));
+  h('db:rename', async (_e, id: string, name: string) => dbMode.renameDatabase(id, name));
+  h('db:setIcon', async (_e, id: string, icon: string | null) => dbMode.setDatabaseIcon(id, icon));
+  h('db:delete', async (_e, id: string) => {
+    dbMode.deleteDatabase(id);
+  });
+  h('db:reorder', async (_e, ids: string[]) => {
+    dbMode.reorderDatabases(ids);
+  });
+  h('db:createColumn', async (_e, databaseId: string, name: string, type: DatabaseColumnType, config?: DatabaseColumnConfig) =>
+    dbMode.createColumn(databaseId, name, type, config ?? {})
+  );
+  h('db:updateColumn', async (_e, id: string, patch: { name?: string; type?: DatabaseColumnType; config?: DatabaseColumnConfig }) =>
+    dbMode.updateColumn(id, patch)
+  );
+  h('db:deleteColumn', async (_e, id: string) => {
+    dbMode.deleteColumn(id);
+  });
+  h('db:reorderColumns', async (_e, databaseId: string, ids: string[]) => {
+    dbMode.reorderColumns(databaseId, ids);
+  });
+  h('db:addOption', async (_e, columnId: string, label: string, color?: string | null) =>
+    dbMode.addOption(columnId, label, color ?? null)
+  );
+  h('db:updateOption', async (_e, id: string, patch: { label?: string; color?: string | null }) => {
+    dbMode.updateOption(id, patch);
+  });
+  h('db:deleteOption', async (_e, id: string) => {
+    dbMode.deleteOption(id);
+  });
+  h('db:reorderOptions', async (_e, columnId: string, ids: string[]) => {
+    dbMode.reorderOptions(columnId, ids);
+  });
+  h('db:listRows', async (_e, databaseId: string, opts?: { sort?: dbMode.DatabaseRowSort; limit?: number; offset?: number }) =>
+    dbMode.listRows(databaseId, opts ?? {})
+  );
+  h('db:getRow', async (_e, id: string) => dbMode.getRow(id));
+  h('db:createRow', async (_e, databaseId: string) => dbMode.createRow(databaseId));
+  h('db:deleteRow', async (_e, id: string) => {
+    dbMode.deleteRow(id);
+  });
+  h('db:setCell', async (_e, rowId: string, columnId: string, raw: string | null) => dbMode.setCell(rowId, columnId, raw));
+  h('db:listAttachments', async (_e, rowId: string, columnId: string) => dbMode.listAttachments(rowId, columnId));
+  h('db:getAttachmentBlob', async (_e, id: string) => dbMode.getAttachmentBlob(id));
+  h('db:deleteAttachment', async (_e, id: string) => {
+    dbMode.deleteAttachment(id);
+  });
+  h('db:downloadAttachment', async (_e, id: string) => {
+    const att = dbMode.getAttachment(id);
+    const blob = dbMode.getAttachmentBlob(id);
+    if (!att || !blob) return { canceled: true, path: null };
+    const win = getWindow();
+    const picked = await dialog.showSaveDialog(win ?? undefined!, {
+      title: 'Descargar adjunto',
+      defaultPath: att.fileName ?? 'adjunto',
+    });
+    if (picked.canceled || !picked.filePath) return { canceled: true, path: null };
+    fs.writeFileSync(picked.filePath, blob);
+    return { canceled: false, path: picked.filePath };
+  });
+  h('db:runAiCell', async (_e, rowId: string, columnId: string) => runAiCell(rowId, columnId));
+  h('db:runAiColumn', async (_e, databaseId: string, columnId: string) =>
+    runAiColumn(databaseId, columnId, (done, total) =>
+      getWindow()?.webContents.send('db:aiProgress', { columnId, done, total })
+    )
+  );
+  h('db:generateAiImage', async (_e, rowId: string, columnId: string) => runAiImageCell(rowId, columnId));
+  h('db:generateAiImageColumn', async (_e, databaseId: string, columnId: string) =>
+    runAiImageColumn(databaseId, columnId, (done, total) =>
+      getWindow()?.webContents.send('db:aiProgress', { columnId, done, total })
+    )
+  );
+  h('db:pickBulkFiles', async () => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Elegir archivos para subida masiva',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Todos los archivos', extensions: ['*'] }],
+    });
+    if (picked.canceled) return [];
+    return picked.filePaths.map((p) => ({ name: path.basename(p), path: p }));
+  });
+  h('db:bulkAttach', async (_e, databaseId: string, refColumnId: string, attachmentColumnId: string, files: { name: string; path: string }[]) => {
+    const rows = dbMode.listRows(databaseId).map((r) => ({ rowId: r.id, refValue: r.cells[refColumnId] ?? null }));
+    const matches = matchFilesToRows(files.map((f) => f.name), rows);
+    const rowByFile = new Map(matches.map((m) => [m.fileName, m.rowId]));
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const total = files.length;
+    let attached = 0;
+    let matched = 0;
+    let done = 0;
+    for (const f of files) {
+      const rowId = rowByFile.get(f.name) ?? null;
+      if (rowId) {
+        matched++;
+        try {
+          const buf = fs.readFileSync(f.path);
+          const contentHash = crypto.createHash('sha256').update(buf).digest('hex');
+          if (!dbMode.attachmentExists(rowId, attachmentColumnId, contentHash)) {
+            let extractedText: string | null = null;
+            try {
+              const doc = await extractFromPath(f.path, { ocr });
+              extractedText = doc.text && doc.text.trim() ? doc.text : null;
+            } catch {
+              /* keep the blob even if extraction fails */
+            }
+            dbMode.addAttachment({
+              rowId,
+              columnId: attachmentColumnId,
+              fileName: f.name,
+              mimeType: dbGuessMime(path.extname(f.path)),
+              bytes: buf.length,
+              blob: buf,
+              contentHash,
+              extractedText,
+            });
+            attached++;
+          }
+        } catch {
+          /* unreadable file — skip */
+        }
+      }
+      done++;
+      getWindow()?.webContents.send('db:bulkProgress', { databaseId, done, total, attached, matched, finished: false });
+    }
+    getWindow()?.webContents.send('db:bulkProgress', { databaseId, done: total, total, attached, matched, finished: true });
+    return { attached, matched, unmatched: total - matched };
+  });
+  h('db:parseCsvForImport', async () => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Importar CSV',
+      properties: ['openFile'],
+      filters: [{ name: 'CSV', extensions: ['csv', 'tsv', 'txt'] }],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return null;
+    const filePath = picked.filePaths[0];
+    const text = fs.readFileSync(filePath, 'utf8');
+    const parsed = parseCsv(text, detectDelimiter(text));
+    return { fileName: path.basename(filePath), ...buildCsvImportPlan(parsed) };
+  });
+  h('db:createFromCsv', async (_e, name: string, headers: string[], rows: string[][], types: DatabaseColumnType[]) =>
+    dbMode.createDatabaseFromCsv(name, headers, rows, types)
+  );
+  h('db:export', async (_e, databaseId: string, format: ExportFormat) => {
+    const result = exportDatabase(databaseId, format);
+    if (!result) return { canceled: true };
+    const win = getWindow();
+    const picked = await dialog.showSaveDialog(win ?? undefined!, { title: 'Exportar base de datos', defaultPath: result.fileName });
+    if (picked.canceled || !picked.filePath) return { canceled: true };
+    fs.writeFileSync(picked.filePath, result.content);
+    return { canceled: false, path: picked.filePath };
+  });
+  h('db:profile', async (_e, databaseId: string) => getDatabaseProfile(databaseId));
+  h('db:analyzeReport', async (_e, databaseId: string) => generateAnalysisReport(databaseId));
+  h('db:suggestAnalyses', async (_e, databaseId: string) => suggestDatabaseAnalyses(databaseId));
+  h('db:runAnalysis', async (_e, databaseId: string, request: AnalysisRequest) => runDatabaseAnalysis(databaseId, request));
+  h('db:narrateAnalysis', async (_e, result: AnalysisResult) => narrateAnalysisResult(result));
+  h('db:chatStream', async (e, requestId: string, request: DatabaseChatRequest) => {
+    const controller = new AbortController();
+    chatAborters.set(requestId, controller);
+    try {
+      return await streamDatabaseChat(request, (delta) => e.sender.send('db:chatStream:delta', requestId, delta), controller.signal);
+    } finally {
+      chatAborters.delete(requestId);
+    }
+  });
+  h('db:chatStream:cancel', async (_e, requestId: string) => {
+    chatAborters.get(requestId)?.abort();
+  });
+  h('db:listViews', async (_e, databaseId: string) => dbMode.listViews(databaseId));
+  h('db:createView', async (_e, databaseId: string, input: SavedViewInput) => dbMode.createView(databaseId, input));
+  h('db:updateView', async (_e, id: string, patch: Partial<SavedViewInput>) => dbMode.updateView(id, patch));
+  h('db:deleteView', async (_e, id: string) => {
+    dbMode.deleteView(id);
+  });
+  h('db:listRelations', async (_e, rowId: string, columnId: string) => dbMode.listRelations(rowId, columnId));
+  h('db:addRelation', async (_e, rowId: string, columnId: string, targetKind: RelationTargetKind, targetId: string, targetVaultId?: string | null) =>
+    dbMode.addRelation(rowId, columnId, targetKind, targetId, targetVaultId ?? null)
+  );
+  h('db:removeRelation', async (_e, id: string) => {
+    dbMode.removeRelation(id);
+  });
+  h('db:searchRelationTargets', async (_e, kind: RelationTargetKind, query: string, databaseId?: string) =>
+    dbMode.searchRelationTargets(kind, query, { databaseId })
+  );
+  h('db:pickAndAttach', async (_e, rowId: string, columnId: string) => {
+    const win = getWindow();
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Adjuntar archivos',
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Todos los archivos', extensions: ['*'] },
+        { name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'gif', 'tif', 'tiff', 'webp', 'bmp'] },
+        { name: 'Documentos y datos', extensions: ['pdf', 'epub', 'txt', 'md', 'csv', 'xlsx', 'docx'] },
+      ],
+    });
+    if (picked.canceled || picked.filePaths.length === 0) return { added: 0, attachments: dbMode.listAttachments(rowId, columnId) };
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    let added = 0;
+    for (const filePath of picked.filePaths) {
+      const buf = fs.readFileSync(filePath);
+      const contentHash = crypto.createHash('sha256').update(buf).digest('hex');
+      if (dbMode.attachmentExists(rowId, columnId, contentHash)) continue;
+      let extractedText: string | null = null;
+      try {
+        const doc = await extractFromPath(filePath, { ocr });
+        extractedText = doc.text && doc.text.trim() ? doc.text : null;
+      } catch {
+        /* non-extractable file (e.g. an image with OCR off) — keep the blob anyway */
+      }
+      dbMode.addAttachment({
+        rowId,
+        columnId,
+        fileName: path.basename(filePath),
+        mimeType: dbGuessMime(path.extname(filePath)),
+        bytes: buf.length,
+        blob: buf,
+        contentHash,
+        extractedText,
+      });
+      added++;
+    }
+    return { added, attachments: dbMode.listAttachments(rowId, columnId) };
+  });
+
   h('mcp:status', async () => getMcpStatus());
   h('mcp:regenerateToken', async () => regenerateMcpToken());
   h('copilot:status', async () => getCopilotStatus());
@@ -854,6 +1136,18 @@ export function registerIpc(
   });
   h('copilot:installAddin', async () => installCopilotAddin(app.getAppPath(), app.getVersion()));
   h('copilot:installLibreOffice', async () => installLibreOfficeCopilot(app.getAppPath()));
+  h('app:info', async () => {
+    const osName =
+      process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : process.platform === 'linux' ? 'Linux' : process.platform;
+    return {
+      version: app.getVersion(),
+      platform: process.platform,
+      osName,
+      osVersion: os.release(),
+      arch: process.arch,
+      electron: process.versions.electron ?? '',
+    };
+  });
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
 
@@ -1698,9 +1992,23 @@ export function registerIpc(
       onProgress: (done, total) => getWindow()?.webContents.send('demo:portraits', { done, total }),
     })
   );
+  // Databases demo: seeds three sample databases covering every column type and flips
+  // the vault to the databases type.
+  h('data:seedDatabasesDemo', async () => seedDatabasesDemoData());
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());
+
+  // Dynamic macOS dock icon. The renderer rasterises a themed, vault-coloured
+  // Nodus mark to a PNG data URL and pushes it here; only macOS exposes
+  // app.dock. No-op (and never throws) on Windows/Linux.
+  h('dock:setIcon', async (_e, pngDataUrl: string) => {
+    if (process.platform !== 'darwin' || !app.dock) return;
+    if (typeof pngDataUrl !== 'string' || !pngDataUrl.startsWith('data:image/')) return;
+    const image = nativeImage.createFromDataURL(pngDataUrl);
+    if (image.isEmpty()) return;
+    app.dock.setIcon(image);
+  });
 
   // Stream queue progress to the renderer.
   scanQueue.onProgress((p) => {

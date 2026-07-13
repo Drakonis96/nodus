@@ -509,6 +509,20 @@ export function Settings({
                 </button>
               </div>
             )}
+            {activeVault?.type === 'databases' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de bases de datos')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('La lista de bases de datos, la tabla con columnas tipadas, la edición de celdas y las secciones de análisis y chat.')}</p>
+                </div>
+                <button
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ databasesTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de bases de datos.')))}
+                >
+                  <Icon name="table" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>
@@ -752,7 +766,12 @@ export function Settings({
                       if (!summary) return;
                       const total = (c: { inserted: number; updated: number }) => c.inserted + c.updated;
                       const applied =
-                        total(summary.notes) + total(summary.noteFolders) + total(summary.writingDrafts) + total(summary.savedSearches) + total(summary.edgeFeedback);
+                        total(summary.notes) +
+                        total(summary.noteFolders) +
+                        total(summary.writingDrafts) +
+                        total(summary.savedSearches) +
+                        total(summary.edgeFeedback) +
+                        total(summary.databases);
                       flash(`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`);
                     } catch (e) {
                       flash(e instanceof Error ? e.message : String(e));
@@ -763,7 +782,7 @@ export function Settings({
                 </button>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
-                {t('Lleva tus notas, borradores, búsquedas guardadas y auditorías de relaciones a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
+                {t('Lleva tus notas, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
               </p>
             </div>
             <div className="mt-2 border-t border-neutral-800 pt-3">

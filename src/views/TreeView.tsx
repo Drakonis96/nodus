@@ -8,6 +8,7 @@ import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
 import { PersonDossier } from '../components/PersonDossier';
+import { useIsLightTheme } from '../hooks';
 import { t } from '../i18n';
 
 const NODE_W = 128;
@@ -38,6 +39,11 @@ export function TreeView({
   const [selected, setSelected] = useState<string | null>(null);
   const [dossierId, setDossierId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const light = useIsLightTheme();
+  // SVG <text> fills can't inherit the .light utility remaps (they're not utility
+  // classes), so pick readable ink colours for the active theme explicitly.
+  const nameFill = light ? '#27272a' : '#e4e4e7';
+  const dateFill = light ? '#52525b' : '#a1a1aa';
   const vaultFrame = settings?.treeFrame ?? 'oak';
 
   const reload = useCallback(async () => {
@@ -189,10 +195,10 @@ export function TreeView({
                   sex={p.sex}
                   portrait={<PersonPortrait person={p} fill mirror={mirror} rounded="none" />}
                 />
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill="#e4e4e7" fontSize={13} fontWeight={600}>
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill={nameFill} fontSize={13} fontWeight={600}>
                   {p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName}
                 </text>
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill="#a1a1aa" fontSize={11}>
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={dateFill} fontSize={11}>
                   {dates(p)}
                 </text>
               </g>

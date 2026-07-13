@@ -12,6 +12,28 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.1.0',
+    date: '2026-07-13',
+    highlights: [
+      {
+        es: 'Nodus estrena el modo Bases de datos: un gestor de bases de datos al estilo Notion dentro de tu bóveda. Crea tablas con columnas de muchos tipos (texto, número, selección, fecha, relación, rollup, imagen…), organiza los datos en varias vistas con filtros y ordenaciones, y edítalo todo directamente en la cuadrícula. Importa y exporta en CSV cuando lo necesites.',
+        en: 'Nodus introduces Databases mode: a Notion-style database manager inside your vault. Build tables with many column types (text, number, select, date, relation, rollup, image…), organize data across several views with filters and sorting, and edit everything right in the grid. Import and export CSV whenever you need it.',
+      },
+      {
+        es: 'Columnas con IA: deja que la IA rellene una columna entera a partir del resto de la fila, ya sea con texto (resúmenes, clasificaciones, traducciones) o con imágenes generadas. Y un chat integrado responde preguntas sobre los datos de tu tabla.',
+        en: 'AI columns: let the AI fill an entire column from the rest of the row — either with text (summaries, classifications, translations) or with generated images. And a built-in chat answers questions about your table’s data.',
+      },
+      {
+        es: 'Análisis estadístico honesto: la IA propone los análisis adecuados sobre tus columnas reales (correlaciones, chi-cuadrado, ANOVA, regresión) y la app los calcula de forma determinista, con gráficos nativos —mapas de calor, dispersión y diagramas de caja—. La IA planifica; el motor calcula, sin inventar cifras.',
+        en: 'Honest statistical analysis: the AI proposes the right analyses over your real columns (correlations, chi-square, ANOVA, regression) and the app computes them deterministically, with native charts — heatmaps, scatter plots and box plots. The AI plans; the engine computes, with no made-up numbers.',
+      },
+      {
+        es: 'El Archivo de Genealogía se reconstruye como una cuadrícula editable al estilo de las bases de datos: edita cada celda al momento, asigna documentos a varias carpetas a la vez y clasifícalos con una taxonomía de más de 190 tipos de documento patrimonial, con búsqueda inteligente y filtros por faceta.',
+        en: 'The Genealogy Archive is rebuilt as an editable database-style grid: edit each cell inline, file documents into several folders at once, and classify them with a taxonomy of 190+ heritage document types, complete with smart search and facet filters.',
+      },
+    ],
+  },
+  {
     version: '2.0.2',
     date: '2026-07-12',
     highlights: [

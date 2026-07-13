@@ -487,6 +487,8 @@ export function seedGenealogyDemoData(): boolean {
     );
     const insItemTag = db.prepare('INSERT OR IGNORE INTO archive_item_tags (item_id, tag) VALUES (?, ?)');
     const insItemPerson = db.prepare('INSERT OR IGNORE INTO archive_item_persons (item_id, person_id, created_at) VALUES (?, ?, ?)');
+    // "Carpeta" multi-select membership (mirrors the legacy folder_id above).
+    const insItemFolder = db.prepare('INSERT OR IGNORE INTO archive_item_folders (item_id, folder_id, created_at) VALUES (?, ?, ?)');
     for (const it of ARCHIVE_ITEMS) {
       insItem.run(
         it.id,
@@ -504,6 +506,7 @@ export function seedGenealogyDemoData(): boolean {
       );
       for (const tag of it.tags) insItemTag.run(it.id, tag);
       for (const pid of it.persons) insItemPerson.run(it.id, pid, now);
+      insItemFolder.run(it.id, FOLDER.id, now);
     }
 
     // Event + person evidence, pointing back at the archive items that back them.
@@ -579,6 +582,7 @@ export function clearGenealogyDemoData(): void {
       DELETE FROM kinship_suggestions WHERE suggestion_id LIKE 'demo-%';
       DELETE FROM archive_item_persons WHERE item_id LIKE 'demo-%';
       DELETE FROM archive_item_tags WHERE item_id LIKE 'demo-%';
+      DELETE FROM archive_item_folders WHERE item_id LIKE 'demo-%';
       DELETE FROM archive_items WHERE item_id LIKE 'demo-%';
       DELETE FROM archive_folders WHERE folder_id LIKE 'demo-%';
       DELETE FROM record_evidence WHERE id LIKE 'demo-%';

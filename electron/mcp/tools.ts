@@ -34,6 +34,9 @@ import * as themes from '../db/themesRepo';
 import * as tutorRoutes from '../db/tutorRepo';
 import * as workSummaries from '../db/workSummariesRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
+import * as dbMode from '../db/databasesRepo';
+import { decodeCheckbox, decodeMultiSelect, decodeNumber } from '@shared/databases';
+import type { DatabaseColumn, DatabaseRow } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
 import * as writingDrafts from '../db/writingDraftsRepo';
@@ -318,6 +321,48 @@ function vaultContext() {
   };
 }
 
+// ── Databases mode (read-only) decode helpers ────────────────────────────────
+
+/** Decode a cell to a human-readable value for MCP (resolves option labels, counts). */
+function dbCellValue(col: DatabaseColumn, row: DatabaseRow): unknown {
+  const raw = row.cells[col.id] ?? null;
+  switch (col.type) {
+    case 'select':
+      return col.options.find((o) => o.id === raw)?.label ?? null;
+    case 'multi_select':
+      return decodeMultiSelect(raw).map((id) => col.options.find((o) => o.id === id)?.label ?? id);
+    case 'checkbox':
+      return decodeCheckbox(raw);
+    case 'number':
+      return decodeNumber(raw);
+    case 'attachment':
+      return (row.attachments?.[col.id] ?? []).map((a) => a.fileName);
+    case 'relation':
+      return { links: row.relationCounts?.[col.id] ?? 0 };
+    default:
+      return raw;
+  }
+}
+
+function dbRowRecord(columns: DatabaseColumn[], row: DatabaseRow): { id: string; fields: Record<string, unknown> } {
+  const fields: Record<string, unknown> = {};
+  for (const col of columns) fields[col.name] = dbCellValue(col, row);
+  return { id: row.id, fields };
+}
+
+function dbRowSearchText(columns: DatabaseColumn[], row: DatabaseRow): string {
+  return columns
+    .map((col) => {
+      const v = dbCellValue(col, row);
+      if (v == null) return '';
+      if (Array.isArray(v)) return v.join(' ');
+      if (typeof v === 'object') return JSON.stringify(v);
+      return String(v);
+    })
+    .join(' ')
+    .toLowerCase();
+}
+
 function workCounts(nodusId: string) {
   const db = getDb();
   const scalar = (sql: string) => (db.prepare(sql).get(nodusId) as { n: number }).n;
@@ -450,6 +495,7 @@ export function registerTools(server: McpServer): void {
         authors: count('authors'),
         passages: count('passages'),
         notes: count('notes'),
+        databases: dbMode.listDatabases().length,
       },
       enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS },
     }))
@@ -1586,6 +1632,89 @@ export function registerTools(server: McpServer): void {
           evidence: s.evidence.filter((ev) => ev.quote).map((ev) => ({ quote: ev.quote, location: ev.location, signal: ev.signal })),
         }));
         return { suggestions: all.slice(offset, offset + limit), total: all.length };
+      })()
+  );
+
+  // ── Databases mode (read-only) ──────────────────────────────────────────────
+  server.registerTool(
+    'nodus_list_databases',
+    {
+      title: 'List databases',
+      description:
+        'Lists the structured databases in a "databases"-mode vault (Notion-like tables the user built). Returns each database\'s id, short id, name and row count. Read-only; use nodus_get_database_schema for columns and nodus_query_database for rows.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({
+      databases: dbMode.listDatabases().map((d) => ({ id: d.id, shortId: d.shortId, name: d.name, rows: d.rowCount })),
+    }))
+  );
+
+  server.registerTool(
+    'nodus_get_database_schema',
+    {
+      title: 'Get database schema',
+      description:
+        'Gets a database\'s columns: each column\'s id, name and type (title|text|number|date|time|select|multi_select|checkbox|attachment|ai|relation) plus the option labels for select/multi-select columns. Read-only.',
+      inputSchema: { databaseId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId }) =>
+      tool(() => {
+        const detail = dbMode.getDatabaseDetail(databaseId);
+        if (!detail) throw notFound('database', databaseId);
+        return {
+          database: { id: detail.database.id, shortId: detail.database.shortId, name: detail.database.name, rows: detail.database.rowCount },
+          columns: detail.columns.map((c) => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            options: c.options.length ? c.options.map((o) => o.label) : undefined,
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_query_database',
+    {
+      title: 'Query database rows',
+      description:
+        'Lists a database\'s rows with human-readable field values (select/multi-select resolved to labels, checkboxes to booleans, attachments to file names, relations to a link count). Optional `query` filters to rows whose text contains it. Read-only; paginated.',
+      inputSchema: {
+        databaseId: z.string().trim().min(1),
+        query: querySchema,
+        limit: z.number().int().min(1).max(200).default(50),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ databaseId, query, limit, offset }) =>
+      tool(() => {
+        const detail = dbMode.getDatabaseDetail(databaseId);
+        if (!detail) throw notFound('database', databaseId);
+        let rows = dbMode.listRows(databaseId, { sort: 'position' });
+        const q = query?.trim().toLowerCase();
+        if (q) rows = rows.filter((r) => dbRowSearchText(detail.columns, r).includes(q));
+        const total = rows.length;
+        return { rows: rows.slice(offset, offset + limit).map((r) => dbRowRecord(detail.columns, r)), total };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_database_row',
+    {
+      title: 'Get a database row',
+      description: 'Gets one database row by id, with its field values decoded to human-readable form. Read-only.',
+      inputSchema: { rowId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ rowId }) =>
+      tool(() => {
+        const row = dbMode.getRow(rowId);
+        if (!row) throw notFound('row', rowId);
+        const detail = dbMode.getDatabaseDetail(row.databaseId);
+        return dbRowRecord(detail?.columns ?? [], row);
       })()
   );
 }

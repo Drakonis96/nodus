@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ArchiveItem, Person } from '@shared/types';
 import { Icon } from './ui';
 import { t } from '../i18n';
@@ -21,7 +21,26 @@ export function PersonLinkPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
   const linkedIds = useMemo(() => new Set(item.linkedPersons.map((p) => p.personId)), [item.linkedPersons]);
+
+  // Close the picker when clicking outside it or pressing Escape. Without this the
+  // popover stayed open when the user clicked elsewhere or another button.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -41,7 +60,7 @@ export function PersonLinkPicker({
   };
 
   return (
-    <div onClick={(e) => e.stopPropagation()} className="min-w-[10rem]">
+    <div ref={rootRef} onClick={(e) => e.stopPropagation()} className="min-w-[10rem]">
       <div className="flex flex-wrap items-center gap-1">
         {item.linkedPersons.map((p) => (
           <span key={p.personId} className="flex items-center gap-1 rounded-full bg-indigo-950/40 px-2 py-0.5 text-[11px] text-indigo-200">

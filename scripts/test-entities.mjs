@@ -158,12 +158,15 @@ try {
   assert.equal(repo.getPerson(juan.personId).portrait, null, 'no portrait initially');
   repo.setPersonPortrait(juan.personId, Buffer.from('JPEGDATA'), 'image/jpeg', { focusX: 0.4, focusY: 0.3, scale: 1.5 });
   const withPortrait = repo.getPerson(juan.personId);
-  assert.deepEqual(withPortrait.portrait, { focusX: 0.4, focusY: 0.3, scale: 1.5 }, 'focus surfaced without the blob');
+  assert.deepEqual(withPortrait.portrait, { focusX: 0.4, focusY: 0.3, scale: 1.5, generated: false }, 'focus surfaced without the blob');
   assert.equal(repo.getPersonPortrait(juan.personId).blob.toString(), 'JPEGDATA', 'blob fetched on demand');
   repo.updatePortraitFocus(juan.personId, { focusX: 0.6, focusY: 0.6, scale: 2 });
   assert.equal(repo.getPerson(juan.personId).portrait.scale, 2, 'focus updated');
   // Listing never carries the blob but does carry the focus.
   assert.ok(repo.listPersons().find((p) => p.personId === juan.personId).portrait, 'list carries portrait focus');
+  // AI-generated reference portraits surface the `generated` flag for the badge.
+  repo.setPersonPortrait(juan.personId, Buffer.from('AIJPEG'), 'image/jpeg', { focusX: 0.5, focusY: 0.42, scale: 1 }, true);
+  assert.equal(repo.getPerson(juan.personId).portrait.generated, true, 'AI-generated portrait flagged');
 
   // ── Cascade delete ────────────────────────────────────────────────────────
   repo.deletePerson(juan.personId);

@@ -289,6 +289,89 @@ try {
   assert.equal(records.mapPointCount, 1, 'a resolved gazetteer place becomes a located map point over IPC');
   console.log('[e2e] map: gazetteer + per-person places ok over IPC');
 
+  // ── Databases mode over real IPC ────────────────────────────────────────────
+  // The db_* tables exist in every vault DB (the vault-type gate is UI-only), so the
+  // engine round-trips here even though the e2e profile is an academic vault.
+  const dbmode = await page.evaluate(async () => {
+    const database = await window.nodus.createDatabase('Fotos', null);
+    const title = await window.nodus.createDatabaseColumn(database.id, 'Nombre', 'title');
+    const sel = await window.nodus.createDatabaseColumn(database.id, 'Estado', 'select');
+    const opt = await window.nodus.addDatabaseOption(sel.id, 'Nuevo', '#ef4444');
+    const row = await window.nodus.createDatabaseRow(database.id);
+    await window.nodus.setDatabaseCell(row.id, title.id, 'Gato');
+    await window.nodus.setDatabaseCell(row.id, sel.id, opt.id);
+    const rows = await window.nodus.listDatabaseRows(database.id, { sort: 'position' });
+    const stats = await window.nodus.databaseStats(database.id);
+    const detail = await window.nodus.getDatabaseDetail(database.id);
+
+    // CSV import over IPC (no dialog: createDatabaseFromCsv takes the rows directly).
+    const imported = await window.nodus.createDatabaseFromCsv(
+      'CSV',
+      ['Nombre', 'Peso', 'Estado'],
+      [['Gato', '3.5', 'vivo'], ['Perro', '8', 'muerto']],
+      ['title', 'number', 'select']
+    );
+    const importedDetail = await window.nodus.getDatabaseDetail(imported.id);
+    const importedRows = await window.nodus.listDatabaseRows(imported.id, { sort: 'position' });
+
+    // Relation column → link the first table's row to an imported row.
+    const relCol = await window.nodus.createDatabaseColumn(database.id, 'Vínculo', 'relation', {
+      relationTargetKind: 'db_row',
+      relationTargetDatabaseId: imported.id,
+    });
+    const relation = await window.nodus.addDatabaseRelation(row.id, relCol.id, 'db_row', importedRows[0].id);
+    const relations = await window.nodus.listDatabaseRelations(row.id, relCol.id);
+
+    // Saved view over IPC.
+    const view = await window.nodus.createDatabaseView(imported.id, {
+      name: 'Vivos',
+      layout: 'gallery',
+      filter: { conjunction: 'and', conditions: [{ id: 'c', columnId: importedDetail.columns[2].id, op: 'isNoneOf', value: [] }] },
+      sorts: [],
+    });
+    const viewList = await window.nodus.listDatabaseViews(imported.id);
+
+    // Analysis profile (deterministic stats) over IPC.
+    const prof = await window.nodus.getDatabaseProfile(imported.id);
+    const numProfile = prof.profile.columns.find((c) => c.type === 'number');
+
+    return {
+      list: (await window.nodus.listDatabases()).length,
+      shortId: database.shortId,
+      columns: detail.columns.length,
+      titleCell: rows[0]?.cells[title.id],
+      selCell: rows[0]?.cells[sel.id],
+      optId: opt.id,
+      rowCount: stats.rowCount,
+      percent: stats.percent,
+      importedCols: importedDetail.columns.length,
+      importedSelectOptions: importedDetail.columns[2].options.length,
+      importedRows: importedRows.length,
+      relationLabel: relation.label,
+      relationCount: relations.length,
+      viewLayout: view.layout,
+      viewCount: viewList.length,
+      profileRows: prof.profile.rowCount,
+      profileNumberMean: numProfile ? numProfile.number.mean : null,
+    };
+  });
+  assert.ok(dbmode.list >= 1, 'database created over IPC');
+  assert.match(dbmode.shortId, /^DB-[A-Z0-9]{4}$/, 'database gets a unique short id over IPC');
+  assert.equal(dbmode.columns, 2, 'typed columns created over IPC');
+  assert.equal(dbmode.titleCell, 'Gato', 'title cell round-trips over IPC');
+  assert.equal(dbmode.selCell, dbmode.optId, 'select cell stores the option id over IPC');
+  assert.equal(dbmode.rowCount, 1, 'row counted in database stats over IPC');
+  assert.equal(dbmode.importedCols, 3, 'CSV import created typed columns over IPC');
+  assert.equal(dbmode.importedSelectOptions, 2, 'CSV import built select options from distinct values');
+  assert.equal(dbmode.importedRows, 2, 'CSV import created rows over IPC');
+  assert.equal(dbmode.relationLabel, 'Gato', 'relation resolves the target row title over IPC');
+  assert.equal(dbmode.relationCount, 1, 'relation stored over IPC');
+  assert.equal(dbmode.viewLayout, 'gallery', 'saved view stored its layout over IPC');
+  assert.equal(dbmode.viewCount, 1, 'saved view listed over IPC');
+  assert.equal(dbmode.profileRows, 2, 'analysis profile counts rows over IPC');
+  assert.equal(dbmode.profileNumberMean, 5.75, 'analysis profile computes numeric mean over IPC');
+  console.log('[e2e] databases mode (CSV import + relations + views + analysis) ok over IPC');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

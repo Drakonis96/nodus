@@ -113,10 +113,34 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
   },
   {
     id: 'databases',
-    available: false,
-    // Not built yet: reserved slot in the taxonomy, no preset or prompt pack.
-    defaultHiddenViews: [],
-    promptPack: '',
+    available: true,
+    // A structured-data workspace: a Notion-like manager of typed tables. None of the
+    // argumentative/records surfaces apply — the sidebar shows the user's databases
+    // (rendered dynamically) plus the fixed Analysis and Chat sections, and keeps
+    // Notes. Everything else is hidden by default (re-enableable for mixed corpora).
+    // The records views (persons/timeline/tree/…) are already excluded by scoping.
+    defaultHiddenViews: [
+      'search',
+      'library',
+      'graph',
+      'argument',
+      'ideas',
+      'authors',
+      'study',
+      'immersion',
+      'gaps',
+      'debate',
+      'research',
+      'hypothesis',
+      'reading',
+      'deepResearch',
+      'writing',
+      'projects',
+    ],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO BASES DE DATOS ═══
+Este vault es un gestor de bases de datos estructuradas (tablas con columnas tipadas: texto, número, fecha, selección, adjuntos, etc.). Tu tarea es ayudar a ANALIZAR, RESUMIR, CLASIFICAR y CONSULTAR datos tabulares. Sé riguroso con números y categorías: no inventes valores, filas ni columnas que no estén en los datos; cuando falte un dato o el conjunto no permita responder, dilo. Cuando produzcas análisis o gráficos, básate únicamente en los datos proporcionados y explica de forma reproducible qué cálculo o criterio has aplicado (para qué columnas, con qué filtro), de modo que el usuario pueda verificarlo.`,
   },
 ];
 
@@ -137,6 +161,12 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // The social-relations graph is independent from the kinship tree but needs the
   // same Person entities, so it's available wherever persons/timeline/archive are.
   relations: ['primary_sources', 'genealogy'],
+  // Databases mode: the table workspace and its Analysis + Chat sections only exist
+  // in a 'databases' vault.
+  databases: ['databases'],
+  dbSearch: ['databases'],
+  dbAnalysis: ['databases'],
+  dbChat: ['databases'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

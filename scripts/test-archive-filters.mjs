@@ -72,10 +72,32 @@ test('every category combines with AND', () => {
   assert.equal(af.matchesArchiveFilter(it, { docTypes: ['birth_record'], tags: ['censo'], yearFrom: 1900 }), false);
 });
 
+test('heritage facets: resolved from the doc TYPE (OR within, AND across dimensions)', () => {
+  // birth_record = documental / civil / registro_vital / genealogía Sí.
+  const birth = item({ docType: 'birth_record' });
+  const castle = item({ docType: 'castillo_fortaleza' }); // monumental / militar / no genealogía
+  // OR within a dimension.
+  assert.equal(af.matchesArchiveFilter(birth, { facets: { naturaleza: ['documental', 'monumental'] } }), true);
+  assert.equal(af.matchesArchiveFilter(castle, { facets: { naturaleza: ['documental'] } }), false);
+  // AND across dimensions.
+  assert.equal(af.matchesArchiveFilter(birth, { facets: { naturaleza: ['documental'], ambito: ['civil'] } }), true);
+  assert.equal(af.matchesArchiveFilter(birth, { facets: { naturaleza: ['documental'], ambito: ['militar'] } }), false);
+  // Genealogy facet (default-on in genealogy vaults).
+  assert.equal(af.matchesArchiveFilter(birth, { facets: { genealogia: ['si'] } }), true);
+  assert.equal(af.matchesArchiveFilter(castle, { facets: { genealogia: ['si'] } }), false);
+  // Unclassified items never match a facet filter; empty selection never filters.
+  assert.equal(af.matchesArchiveFilter(item({ docType: null }), { facets: { naturaleza: ['documental'] } }), false);
+  assert.equal(af.matchesArchiveFilter(item({ docType: null }), { facets: { naturaleza: [] } }), true);
+  // countActiveFacets sums selected values.
+  assert.equal(af.countActiveFacets({ naturaleza: ['documental'], ambito: ['civil', 'militar'] }), 3);
+});
+
 test('isArchiveFilterActive detects any narrowing', () => {
   assert.equal(af.isArchiveFilterActive({}), false);
   assert.equal(af.isArchiveFilterActive({ tags: [] }), false);
   assert.equal(af.isArchiveFilterActive({ tags: ['x'] }), true);
+  assert.equal(af.isArchiveFilterActive({ facets: { naturaleza: [] } }), false);
+  assert.equal(af.isArchiveFilterActive({ facets: { naturaleza: ['documental'] } }), true);
   assert.equal(af.isArchiveFilterActive({ yearFrom: 1850 }), true);
   assert.equal(af.isArchiveFilterActive({ search: '  ' }), false);
 });

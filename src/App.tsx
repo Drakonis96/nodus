@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, CorpusHealthBucketId, SyncLogEntry, VaultSummary } from '@shared/types';
+import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
-import { HomeView, GenealogyHome } from './views/HomeView';
+import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
+import { DatabasesView, CsvImportModal, type CsvImportPlanData } from './views/DatabasesView';
+import { DatabasesAnalysisView } from './views/DatabasesAnalysisView';
+import { DatabasesChatView } from './views/DatabasesChatView';
+import { DatabasesSearchView } from './views/DatabasesSearchView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -28,14 +32,17 @@ import { ImmersionView } from './views/ImmersionView';
 import { Settings } from './views/Settings';
 import { CollectionsModal } from './views/CollectionsModal';
 import { ResearchAssistantModal } from './views/ResearchAssistantModal';
+import { FeedbackModal } from './views/FeedbackModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeLabel } from './components/VaultSwitcher';
+import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
+import { DatabasesTour } from './views/DatabasesTour';
 import { WhatsNewModal } from './components/WhatsNewModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
@@ -52,6 +59,8 @@ import { effectiveSidebarHidden, isViewAllowedForVaultType, viewsDisallowedForTy
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
+import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
+import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -60,18 +69,78 @@ const PALETTE_HINT = IS_MAC ? '⌘K' : 'Ctrl K';
 /** Apply the light/dark root classes for a theme mode. 'system' resolves to the
  *  OS preference at call time; the App re-invokes this when that preference
  *  changes so the "system" mode tracks the OS live. */
-function applyThemeClasses(theme: import('@shared/types').ThemeMode): void {
+function applyThemeClasses(theme: import('@shared/types').ThemeMode): boolean {
   const dark = theme === 'system'
     ? window.matchMedia('(prefers-color-scheme: dark)').matches
     : theme === 'dark';
   document.documentElement.classList.toggle('light', !dark);
   document.documentElement.classList.toggle('dark', dark);
+  return dark;
+}
+
+/** Header action rendered as an icon that reveals its label on hover/focus, so the
+ *  top bar's action rail stays a clean row of icons. Pass `showLabel` to keep the
+ *  text pinned open (e.g. the primary action, or an alert that must be noticed). */
+function HeaderAction({
+  icon,
+  label,
+  onClick,
+  title,
+  primary = false,
+  tone = '',
+  spinning = false,
+  showLabel = false,
+  disabled = false,
+  dataTour,
+  kbd,
+  vaultTrigger = false,
+}: {
+  icon: string;
+  label: string;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  title?: string;
+  primary?: boolean;
+  tone?: string;
+  spinning?: boolean;
+  showLabel?: boolean;
+  disabled?: boolean;
+  dataTour?: string;
+  kbd?: string;
+  vaultTrigger?: boolean;
+}) {
+  return (
+    <button
+      data-tour={dataTour}
+      data-vault-trigger={vaultTrigger ? '' : undefined}
+      onClick={onClick}
+      disabled={disabled}
+      title={title ?? label}
+      aria-label={label}
+      className={`group btn ${primary ? 'btn-primary' : 'btn-ghost'} h-9 min-h-9 justify-center gap-0 px-2.5 py-0 leading-none ${tone}`}
+    >
+      <Icon name={icon} className={`shrink-0 ${spinning ? 'animate-spin' : ''}`} />
+      <span
+        className={`flex items-center overflow-hidden whitespace-nowrap transition-all duration-200 ${
+          showLabel
+            ? 'ml-1.5 max-w-[14rem] opacity-100'
+            : 'ml-0 max-w-0 opacity-0 group-hover:ml-1.5 group-hover:max-w-[14rem] group-hover:opacity-100 group-focus-visible:ml-1.5 group-focus-visible:max-w-[14rem] group-focus-visible:opacity-100'
+        }`}
+      >
+        {label}
+        {kbd && <kbd className="composer-kbd ml-1.5">{kbd}</kbd>}
+      </span>
+    </button>
+  );
 }
 
 export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
+  // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
   const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
   // Per-group collapse state for the sidebar (Explorar · Analizar · Escribir),
@@ -85,6 +154,14 @@ export function App() {
   });
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // The trigger element that opened the vault panel (the centre badge or the
+  // right-rail vaults icon), or null when closed. The panel anchors under it.
+  const [vaultAnchor, setVaultAnchor] = useState<HTMLElement | null>(null);
+  const toggleVaults = useCallback(
+    (el: HTMLElement) => setVaultAnchor((cur) => (cur === el ? null : el)),
+    []
+  );
   const [graphTarget, setGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [libraryTarget, setLibraryTarget] = useState<PendingLibraryNavigationTarget & { nonce: number } | null>(null);
   const [assistantTarget, setAssistantTarget] = useState<PendingAssistantNavigationTarget & { nonce: number } | null>(null);
@@ -128,8 +205,61 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('genealogy', isGenealogy);
   }, [isGenealogy]);
+  // Databases vaults wear the Nodus crimson (#B30333) accent.
+  const isDatabases = activeVault?.type === 'databases';
+  useEffect(() => {
+    document.documentElement.classList.toggle('databases', isDatabases);
+  }, [isDatabases]);
+
+  // The user's databases (sidebar list) + the one currently open in the workspace.
+  const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
+  const [activeDatabaseId, setActiveDatabaseId] = useState<string | null>(null);
+  // A row to open in the record modal after navigating to its database (from search).
+  const [pendingRecordId, setPendingRecordId] = useState<string | null>(null);
+  const reloadDatabases = useCallback(async () => {
+    if (!window.nodus) return [];
+    const list = await window.nodus.listDatabases();
+    setDatabases(list);
+    return list;
+  }, []);
+  useEffect(() => {
+    if (isDatabases) void reloadDatabases();
+    else {
+      setDatabases([]);
+      setActiveDatabaseId(null);
+    }
+  }, [isDatabases, activeVault?.id, reloadDatabases]);
+  // Keep a valid database selected: default to the first, and recover if the open
+  // one was deleted.
+  useEffect(() => {
+    if (!isDatabases) return;
+    if (databases.length === 0) {
+      if (activeDatabaseId !== null) setActiveDatabaseId(null);
+      return;
+    }
+    if (!activeDatabaseId || !databases.some((d) => d.id === activeDatabaseId)) {
+      setActiveDatabaseId(databases[0].id);
+    }
+  }, [isDatabases, databases, activeDatabaseId]);
+  const createDatabase = useCallback(async () => {
+    if (!window.nodus) return;
+    const created = await window.nodus.createDatabase(t('Base de datos nueva'), null);
+    // Seed a starter title column so the table is usable immediately.
+    await window.nodus.createDatabaseColumn(created.id, t('Nombre'), 'title');
+    await reloadDatabases();
+    setActiveDatabaseId(created.id);
+    setView('databases');
+  }, [reloadDatabases]);
+  const [csvPlan, setCsvPlan] = useState<CsvImportPlanData | null>(null);
+  const importCsv = useCallback(async () => {
+    if (!window.nodus) return;
+    const plan = await window.nodus.parseCsvForImport();
+    if (plan) setCsvPlan(plan);
+  }, []);
+
   const homeItem = NAV_ITEMS.find((n) => n.id === 'home')!;
   const settingsItem = NAV_ITEMS.find((n) => n.id === 'settings')!;
+  const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const reloadSettings = useCallback(async () => {
@@ -142,7 +272,7 @@ export function App() {
       setSettings(s);
       setActiveLang(s.uiLanguage);
       document.documentElement.lang = s.uiLanguage;
-      applyThemeClasses(s.theme);
+      setIsDark(applyThemeClasses(s.theme));
       return s;
     } catch (e) {
       setLoadError(tx('No se pudieron cargar los ajustes: {msg}', { msg: (e as Error).message }));
@@ -158,10 +288,24 @@ export function App() {
   useEffect(() => {
     if (settings?.theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => applyThemeClasses('system');
+    const onChange = () => setIsDark(applyThemeClasses('system'));
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, [settings?.theme]);
+
+  // Repaint the macOS dock icon whenever the theme or the active vault changes:
+  // white/near-black plate for light/dark, "N" tinted with the vault accent.
+  // No-op on non-mac (main guards app.dock too).
+  useEffect(() => {
+    if (!IS_MAC || !window.nodus?.setDockIcon) return;
+    let cancelled = false;
+    void buildDockIconDataUrl(dockColorForVaultType(activeVault?.type), isDark).then((url) => {
+      if (!cancelled && url) void window.nodus.setDockIcon(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVault?.type, isDark]);
 
   const reloadVaults = useCallback(async () => {
     if (!window.nodus) return [];
@@ -215,6 +359,38 @@ export function App() {
       setDemoBusy(false);
     }
   }, [reloadSettings, reloadVaults, refreshHasData]);
+
+  const loadDatabasesDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      await window.nodus.seedDatabasesDemoData();
+      await reloadSettings();
+      await reloadVaults();
+      await reloadDatabases();
+      await refreshHasData();
+      notifyDataChanged();
+      setView('home');
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, reloadVaults, reloadDatabases, refreshHasData]);
+
+  // Cancel the onboarding wizard. If it is running for a freshly-created (non-main)
+  // vault, discard that vault and fall back to another one; for the first-run main
+  // vault there is nothing to discard, so just skip the wizard.
+  const onboardingDiscardsVault = Boolean(activeVault && !activeVault.legacy && vaults.length > 1);
+  const cancelOnboarding = useCallback(async () => {
+    const other = vaults.find((v) => v.id !== activeVault?.id);
+    if (activeVault && !activeVault.legacy && other) {
+      await window.nodus.deleteVault(activeVault.id, true);
+      await window.nodus.switchVault(other.id);
+      await reloadVaults();
+    } else {
+      await window.nodus.updateSettings({ onboardingComplete: true });
+    }
+    await reloadSettings();
+    setView('home');
+  }, [vaults, activeVault, reloadVaults, reloadSettings]);
 
   const exitDemo = useCallback(async () => {
     setDemoBusy(true);
@@ -350,6 +526,7 @@ export function App() {
       { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
       { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
+      { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
     ];
     return [...navCommands, ...actions];
   }, [settings?.uiLanguage, onSync, openAssistant]);
@@ -377,79 +554,121 @@ export function App() {
   if (!settings.onboardingComplete) {
     return (
       <Onboarding
-        vaults={vaults}
         activeVault={activeVault}
-        onVaultsChanged={reloadVaults}
+        providerKeys={settings.providerKeys}
         onLanguageChosen={reloadSettings}
         onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
+        onCancel={cancelOnboarding}
+        discardsVault={onboardingDiscardsVault}
       />
     );
   }
 
   return (
     <div className="h-full flex flex-col">
-      {/* Top bar */}
-      <header className="relative flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
-        {/* Vault mode, centered, in the vault's accent colour (gold in genealogy via the
-            `.genealogy` remap of the indigo utilities, indigo otherwise). */}
-        {activeVault && (
-          <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 xl:block">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200">
-              <Icon name={isGenealogy ? 'tree' : 'network'} size={13} />
-              {vaultTypeLabel(activeVault.type)}
-            </span>
-          </div>
-        )}
+      {/* Top bar. `app-titlebar` makes the empty header area a drag region so the
+          window can be moved (its interactive children are auto-marked no-drag in
+          index.css). On macOS the traffic lights sit at the very top-left. */}
+      <header className="app-titlebar relative flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
         <button
           className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <img src={isGenealogy ? nodusLogoGold : nodusLogo} alt="" className="h-7 w-7" />
+          <img src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : nodusLogo} alt="" className="h-7 w-7" />
           <span>Nodus</span>
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
+
+        {/* Vault mode, centered, in the vault's accent colour (gold in genealogy /
+            crimson in databases via the accent-utility remaps). Clicking it opens
+            the vault panel right under the badge (see VaultSwitcher). */}
+        {activeVault && (
+          <button
+            data-vault-trigger
+            className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
+            title={t('Bóveda activa')}
+            onClick={(e) => toggleVaults(e.currentTarget)}
+          >
+            <Icon name={isGenealogy ? 'tree' : isDatabases ? 'table' : 'network'} size={13} />
+            {vaultTypeLabel(activeVault.type)}
+            <Icon name="chevronDown" size={12} className={`transition-transform ${vaultAnchor ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+
+        <div className="flex-1" />
+        {/* Right-side action rail: icon-only by default, each button reveals its
+            label on hover/focus so the header reads as a clean row of icons. */}
+        <div className="flex items-center gap-0.5">
+          <HeaderAction
+            dataTour="vaults"
+            vaultTrigger
+            icon="archive"
+            label={activeVault?.name ?? t('Bóveda')}
+            title={t('Bóveda activa')}
+            onClick={(e) => toggleVaults(e.currentTarget)}
+          />
+          <HeaderAction
+            icon="search"
+            label={t('Comandos')}
+            title={t('Paleta de comandos')}
+            kbd={PALETTE_HINT}
+            tone="text-neutral-400"
+            onClick={() => setPaletteOpen(true)}
+          />
+          {(!settings.extractionModel || !settings.synthesisModel) && (
+            <HeaderAction
+              dataTour="model"
+              icon="alert"
+              label={t('Configura un modelo de IA')}
+              tone="text-amber-500 dark:text-amber-400"
+              showLabel
+              onClick={() => setView('settings')}
+            />
+          )}
+          <HeaderAction
+            icon="chat"
+            label={t('Asistente')}
+            title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
+            onClick={() => openAssistant()}
+          />
+          {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
+              académicas; genealogía y bases de datos no sincronizan con Zotero. */}
+          {!isGenealogy && !isDatabases && (
+            <HeaderAction
+              dataTour="collections"
+              icon="folder"
+              label={t('Colecciones')}
+              onClick={() => setCollectionsOpen(true)}
+            />
+          )}
+          <HeaderAction
+            icon="gitPr"
+            label={t('Sugerir / Reportar')}
+            title={t('Enviar una propuesta o reporte a GitHub')}
+            onClick={() => setFeedbackOpen(true)}
+          />
+          {!isGenealogy && !isDatabases && (
+            <HeaderAction
+              dataTour="sync"
+              icon="refresh"
+              label={syncing ? t('Actualizando…') : t('Actualizar')}
+              primary
+              spinning={syncing}
+              showLabel={syncing}
+              disabled={syncing}
+              onClick={onSync}
+            />
+          )}
+        </div>
+
         <VaultSwitcher
+          anchorEl={vaultAnchor}
+          onClose={() => setVaultAnchor(null)}
           vaults={vaults}
-          activeVault={activeVault}
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
         />
-        {/* Command-palette launcher: advertises the ⌘K/Ctrl+K shortcut and gives
-            mouse users a way in. Opens the same palette as the keyboard shortcut. */}
-        <button
-          className="btn btn-ghost gap-2 text-neutral-400"
-          onClick={() => setPaletteOpen(true)}
-          title={t('Paleta de comandos')}
-        >
-          <Icon name="search" />
-          <span className="hidden lg:inline">{t('Comandos')}</span>
-          <kbd className="composer-kbd">{PALETTE_HINT}</kbd>
-        </button>
-        <div className="flex-1" />
-        {lastSync && (
-          <span className="text-xs text-neutral-500 truncate max-w-[14rem]" title={lastSync.summary}>
-            {lastSync.summary}
-          </span>
-        )}
-        {(!settings.extractionModel || !settings.synthesisModel) && (
-          <button data-tour="model" className="btn btn-ghost text-amber-400 gap-1.5" onClick={() => setView('settings')}>
-            <Icon name="alert" /> {t('Configura un modelo de IA')}
-          </button>
-        )}
-        <button
-          className="btn btn-ghost gap-1.5"
-          title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
-          onClick={() => openAssistant()}
-        >
-          <Icon name="chat" /> {t('Asistente')}
-        </button>
-        <button data-tour="collections" className="btn btn-ghost gap-1.5" onClick={() => setCollectionsOpen(true)}>
-          <Icon name="folder" /> {t('Colecciones')}
-        </button>
-        <button data-tour="sync" className="btn btn-primary gap-1.5" onClick={onSync} disabled={syncing}>
-          <Icon name="sync" className={syncing ? 'animate-spin' : ''} /> {syncing ? t('Actualizando…') : t('Actualizar')}
-        </button>
       </header>
 
       {settings.demoMode && (
@@ -483,33 +702,78 @@ export function App() {
                   {t(n.label)}
                 </button>
               );
+              // A collapsible group header (chevron + label), optionally with a control
+              // on the right (e.g. the "new database" +).
+              const groupHeaderButton = (groupId: string, label: string, collapsed: boolean, hasActive: boolean) => (
+                <button
+                  onClick={() => toggleGroup(groupId)}
+                  aria-expanded={!collapsed}
+                  title={collapsed ? t('Mostrar grupo') : t('Plegar grupo')}
+                  className={`flex items-center gap-1 flex-1 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-left transition-colors ${
+                    collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
+                  }`}
+                >
+                  <Icon
+                    name="chevronRight"
+                    size={11}
+                    className={`transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-90'}`}
+                  />
+                  {t(label)}
+                </button>
+              );
+              const renderGroup = (group: (typeof navGroups)[number]) => {
+                const collapsed = collapsedGroups.has(group.id);
+                const hasActive = group.items.some((n) => n.id === view);
+                return (
+                  <div key={group.id} className="mt-2 flex flex-col gap-1">
+                    <div className="flex items-center px-3">{groupHeaderButton(group.id, group.label, collapsed, hasActive)}</div>
+                    {!collapsed && group.items.map((n) => navButton(n))}
+                  </div>
+                );
+              };
+              if (isDatabases) {
+                // A databases vault keeps the same Explorar · Analizar · Escribir
+                // structure as every other vault: the user's databases are the
+                // Explorar content (rendered dynamically), then the Analysis + Chat
+                // (Analizar) and Notes (Escribir) groups come through groupedNav.
+                const exploreCollapsed = collapsedGroups.has('explore');
+                const exploreLabel = NAV_GROUPS.find((g) => g.id === 'explore')?.label ?? 'Explorar';
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <div className="mt-2 flex flex-col gap-1" data-tour="db-list">
+                      <div className="flex items-center px-3">
+                        {groupHeaderButton('explore', exploreLabel, exploreCollapsed, view === 'databases')}
+                        <button
+                          onClick={() => void createDatabase()}
+                          title={t('Nueva base de datos')}
+                          className="text-neutral-500 hover:text-neutral-300"
+                        >
+                          <Icon name="plus" size={14} />
+                        </button>
+                      </div>
+                      {!exploreCollapsed && navButton(dbSearchItem)}
+                      {!exploreCollapsed && (
+                        <DatabasesSidebarExplore
+                          databases={databases}
+                          activeId={activeDatabaseId}
+                          isActiveView={view === 'databases'}
+                          onOpen={(id) => {
+                            setActiveDatabaseId(id);
+                            setView('databases');
+                          }}
+                        />
+                      )}
+                    </div>
+                    {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
               return (
                 <>
                   {navButton(homeItem)}
-                  {navGroups.map((group) => {
-                    const collapsed = collapsedGroups.has(group.id);
-                    const hasActive = group.items.some((n) => n.id === view);
-                    return (
-                      <div key={group.id} className="mt-2 flex flex-col gap-1">
-                        <button
-                          onClick={() => toggleGroup(group.id)}
-                          aria-expanded={!collapsed}
-                          title={collapsed ? t('Mostrar grupo') : t('Plegar grupo')}
-                          className={`flex items-center gap-1 px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-left transition-colors ${
-                            collapsed && hasActive ? 'text-indigo-400' : 'text-neutral-600 hover:text-neutral-400'
-                          }`}
-                        >
-                          <Icon
-                            name="chevronRight"
-                            size={11}
-                            className={`transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-90'}`}
-                          />
-                          {t(group.label)}
-                        </button>
-                        {!collapsed && group.items.map((n) => navButton(n))}
-                      </div>
-                    );
-                  })}
+                  {navGroups.map((group) => renderGroup(group))}
                   <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                 </>
               );
@@ -532,9 +796,25 @@ export function App() {
               demoBusy={demoBusy}
               onLoadDemo={loadDemo}
               onLoadGenealogyDemo={loadGenealogyDemo}
+              onLoadDatabasesDemo={loadDatabasesDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && (
+          {view === 'home' && isDatabases && (
+            <DatabasesHome
+              databases={databases}
+              onOpenDatabase={(id) => {
+                setActiveDatabaseId(id);
+                setView('databases');
+              }}
+              onNewDatabase={() => void createDatabase()}
+              onImportCsv={() => void importCsv()}
+              onOpenAnalysis={() => setView('dbAnalysis')}
+              onOpenChat={() => setView('dbChat')}
+              demoBusy={demoBusy}
+              onLoadDatabasesDemo={loadDatabasesDemo}
+            />
+          )}
+          {view === 'home' && !isGenealogy && !isDatabases && (
             <HomeView
               settings={settings}
               lastSync={lastSync}
@@ -547,6 +827,7 @@ export function App() {
               demoBusy={demoBusy}
               onLoadDemo={loadDemo}
               onLoadGenealogyDemo={loadGenealogyDemo}
+              onLoadDatabasesDemo={loadDatabasesDemo}
             />
           )}
           {view === 'library' && (
@@ -568,7 +849,27 @@ export function App() {
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
           {view === 'relations' && <RelationsView onOpenPersons={() => setView('persons')} />}
           {view === 'map' && <MapView />}
-          {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} />}
+          {view === 'archive' && <ArchiveView onOpenLibrary={() => setView('library')} isGenealogy={isGenealogy} />}
+          {view === 'databases' && (
+            <DatabasesView
+              databaseId={activeDatabaseId}
+              onDatabasesChanged={reloadDatabases}
+              onCreateDatabase={() => void createDatabase()}
+              initialRowId={pendingRecordId}
+              onConsumeInitialRow={() => setPendingRecordId(null)}
+            />
+          )}
+          {view === 'dbSearch' && (
+            <DatabasesSearchView
+              onOpenDatabase={(id, rowId) => {
+                setActiveDatabaseId(id);
+                setPendingRecordId(rowId ?? null);
+                setView('databases');
+              }}
+            />
+          )}
+          {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
+          {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}
@@ -665,8 +966,9 @@ export function App() {
           onOpenGraph={openGraphFromAssistant}
         />
       )}
+      {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
 
-      {settings.onboardingComplete && !settings.tourComplete && !(isGenealogy && settings.demoMode) && (
+      {settings.onboardingComplete && !settings.tourComplete && !isGenealogy && !isDatabases && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
@@ -686,6 +988,29 @@ export function App() {
         />
       )}
 
+      {settings.onboardingComplete && isDatabases && !settings.databasesTourComplete && (
+        <DatabasesTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ databasesTourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {csvPlan && (
+        <CsvImportModal
+          plan={csvPlan}
+          onClose={() => setCsvPlan(null)}
+          onImported={(id) => {
+            setCsvPlan(null);
+            void reloadDatabases();
+            setActiveDatabaseId(id);
+            setView('databases');
+          }}
+        />
+      )}
+
       {settings.onboardingComplete && settings.tourComplete && !settings.advancedTourComplete && (
         <AdvancedTour
           onNavigate={setView}
@@ -696,9 +1021,13 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && settings.tourComplete && (
-        <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
-      )}
+      {settings.onboardingComplete &&
+        (isGenealogy || isDatabases || settings.tourComplete) &&
+        settings.advancedTourComplete &&
+        (!isGenealogy || settings.genealogyTourComplete) &&
+        (!isDatabases || settings.databasesTourComplete) && (
+          <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
+        )}
     </div>
   );
 }

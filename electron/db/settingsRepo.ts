@@ -2,6 +2,7 @@ import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { providerKeyMap } from '../secrets/secretStore';
+import { GLOBAL_PREF_KEYS, readGlobalPrefs, splitGlobalPatch, writeGlobalPrefs } from './appPrefs';
 
 const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
   ollama: { baseUrl: DEFAULT_LOCAL_BASE_URLS.ollama },
@@ -58,6 +59,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   demoMode: false,
   demoPriorVaultType: null,
   genealogyTourComplete: false,
+  databasesTourComplete: false,
   preferZoteroFulltext: true,
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',
@@ -128,13 +130,29 @@ export function getSettings(): AppSettings {
     merged.defaultModel = null;
     writeRaw('app', JSON.stringify(merged));
   }
+  // App-wide preferences (theme, language) are shared across every vault: overlay the
+  // global store, seeding it once from this vault's value so existing users keep their
+  // current theme/language when the first new vault is created.
+  const globalPrefs = readGlobalPrefs();
+  const seed: Record<string, unknown> = {};
+  for (const key of GLOBAL_PREF_KEYS) {
+    if (globalPrefs[key] === undefined) seed[key] = merged[key];
+    else (merged as Record<string, unknown>)[key] = globalPrefs[key];
+  }
+  if (Object.keys(seed).length) writeGlobalPrefs(seed);
   return { ...merged, providerKeys: providerKeyMap() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const current = getSettings();
+  // Global preferences go to the shared store; everything else stays per-vault.
+  const { global, local } = splitGlobalPatch(patch);
+  if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
-  const { providerKeys: _ignore, ...rest } = { ...current, ...patch };
+  const { providerKeys: _ignore, ...rest } = { ...current, ...local };
+  // Never persist the global-only keys into the per-vault blob (they'd shadow the
+  // shared store and drift), so keep them exclusively in the global prefs file.
+  for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];
   writeRaw('app', JSON.stringify(rest));
   return getSettings();
 }

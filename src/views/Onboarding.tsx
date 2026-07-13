@@ -1,25 +1,28 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import type { AiProvider, ZoteroCollection, ModelInfo, VaultSummary } from '@shared/types';
-import { VaultApiKeyImporter } from '../components/VaultApiKeyImporter';
-import { AI_PROVIDERS, PROVIDER_LABELS, Spinner } from '../components/ui';
+import { AI_PROVIDERS, PROVIDER_LABELS, Spinner, Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
 
 export function Onboarding({
-  vaults,
   activeVault,
-  onVaultsChanged,
+  providerKeys,
   onLanguageChosen,
   onDone,
+  onCancel,
+  discardsVault,
 }: {
-  vaults: VaultSummary[];
   activeVault: VaultSummary | null;
-  onVaultsChanged: () => Promise<unknown>;
+  /** Which providers already have a (globally shared) key configured. */
+  providerKeys?: Partial<Record<AiProvider, boolean>>;
   /** Reload settings so the interface language switches once the user picks it. */
   onLanguageChosen: () => Promise<unknown>;
   onDone: (view?: OnboardingExit) => void;
+  /** Cancel the wizard (discards a freshly-created vault when `discardsVault`). */
+  onCancel?: () => void | Promise<unknown>;
+  discardsVault?: boolean;
 }) {
   // The very first thing a new user does is pick the interface language. Until
   // then the wizard is shown in English (this screen is intentionally not
@@ -41,6 +44,17 @@ export function Onboarding({
   const [finishError, setFinishError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<string | null>(null);
   const [syncedWorks, setSyncedWorks] = useState<number | null>(null);
+
+  const [confirmExit, setConfirmExit] = useState(false);
+
+  // The onboarding adapts to the active vault: academic vaults get the Zotero flow;
+  // genealogy / databases vaults skip Zotero and get a short intro → AI → done flow.
+  const vaultType = activeVault?.type ?? 'academic';
+  const simple = vaultType === 'genealogy' || vaultType === 'databases';
+  const aiStep = simple ? 1 : 3; // the "AI provider" step index
+  const doneStep = simple ? 2 : 4; // the final step index
+  // Providers already configured (keys are shared across all vaults).
+  const configuredProviders = providerKeys ? AI_PROVIDERS.filter((p) => providerKeys[p]) : [];
 
   const checkZotero = async () => {
     const res = await window.nodus.zoteroPing();
@@ -89,24 +103,24 @@ export function Onboarding({
       if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
       const ref = selectedModel ? { provider, model: selectedModel } : null;
       await window.nodus.updateSettings({
-        monitoredCollections: Array.from(selected),
-        readTag,
+        ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
         favorites: ref ? [ref] : [],
         extractionModel: ref,
         synthesisModel: ref,
         summaryModel: ref,
         fusionModel: ref,
-        zoteroStoragePath: storagePath,
         onboardingComplete: true,
       });
-      setStep(4);
-      // With automatic analysis disabled by default, the first sync only ingests Zotero metadata.
-      const sync = await window.nodus.syncNow();
-      const works = await window.nodus.listWorks();
-      setSyncSummary(sync.summary);
-      setSyncedWorks(works.length);
+      setStep(doneStep);
+      // Only academic vaults ingest Zotero; genealogy/databases have nothing to sync here.
+      if (!simple) {
+        const sync = await window.nodus.syncNow();
+        const works = await window.nodus.listWorks();
+        setSyncSummary(sync.summary);
+        setSyncedWorks(works.length);
+      }
     } catch (e) {
-      setStep(4);
+      setStep(doneStep);
       setFinishError(e instanceof Error ? e.message : String(e));
     } finally {
       setFinishing(false);
@@ -143,7 +157,21 @@ export function Onboarding({
     );
   }
 
-  const steps = [t('Conectar Zotero'), t('Colecciones'), t('Lecturas'), t('Proveedor de IA'), t('Primer resultado')];
+  const steps = simple
+    ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
+    : [t('Conectar Zotero'), t('Colecciones'), t('Lecturas'), t('Proveedor de IA'), t('Primer resultado')];
+  const intro =
+    vaultType === 'genealogy'
+      ? {
+          subtitle: t('Reconstruye tu historia familiar en un árbol navegable, con evidencias citadas y parentescos sugeridos por la IA. Todo es local.'),
+          body: t('Añade personas y sus vínculos, documenta cada dato con su fuente y explora el árbol, la línea temporal y el archivo de evidencias. Configura un modelo de IA para las sugerencias de parentesco.'),
+        }
+      : vaultType === 'databases'
+        ? {
+            subtitle: t('Organiza tus datos en tablas tipo Notion con columnas tipadas, relaciones, rollups y análisis con IA. Todo es local.'),
+            body: t('Crea bases de datos con columnas de texto, número, selección, adjuntos, relaciones y rollups; impórtalas desde CSV y analízalas o conversa con ellas. Configura un modelo de IA para las columnas y el chat.'),
+          }
+        : { subtitle: '', body: '' };
 
   return (
     <div className="h-full flex items-center justify-center p-8">
@@ -152,10 +180,37 @@ export function Onboarding({
         animate={{ opacity: 1, y: 0 }}
         className="card w-full max-w-2xl p-8"
       >
-        <div className="text-2xl font-semibold mb-1">{t('Bienvenido a Nodus')}</div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-2xl font-semibold mb-1">{t('Bienvenido a Nodus')}</div>
+          {onCancel && (
+            <button
+              className="btn btn-ghost shrink-0 gap-1 text-xs text-neutral-400"
+              onClick={() => (discardsVault ? setConfirmExit(true) : void onCancel())}
+              title={t('Salir del asistente')}
+            >
+              <Icon name="x" size={14} /> {t('Salir')}
+            </button>
+          )}
+        </div>
         <p className="text-neutral-400 text-sm mb-6">
-          {t('Teje tu biblioteca de Zotero en un grafo navegable de ideas y autores. Todo es local.')}
+          {simple ? intro.subtitle : t('Teje tu biblioteca de Zotero en un grafo navegable de ideas y autores. Todo es local.')}
         </p>
+
+        {confirmExit && (
+          <div className="mb-5 rounded-lg border border-amber-700/60 bg-amber-950/20 p-3 text-sm">
+            <p className="text-amber-200">
+              {tx('Si sales ahora, se descartará la bóveda «{name}» que acabas de crear. ¿Continuar?', { name: activeVault?.name ?? '' })}
+            </p>
+            <div className="mt-2 flex justify-end gap-2">
+              <button className="btn btn-ghost text-xs" onClick={() => setConfirmExit(false)}>
+                {t('Seguir configurando')}
+              </button>
+              <button className="btn bg-red-600 text-xs text-white hover:bg-red-500" onClick={() => void onCancel?.()}>
+                {t('Salir y descartar')}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-2 mb-6">
           {steps.map((s, i) => (
@@ -170,7 +225,14 @@ export function Onboarding({
           ))}
         </div>
 
-        {step === 0 && (
+        {step === 0 && simple && (
+          <div className="space-y-3">
+            <p className="text-sm text-neutral-300">{intro.body}</p>
+            <p className="text-xs text-neutral-500">{t('Solo queda elegir un modelo de IA (opcional) para empezar.')}</p>
+          </div>
+        )}
+
+        {step === 0 && !simple && (
           <div className="space-y-4">
             <p className="text-sm">
               {t('Nodus usa la API local de Zotero 7 (solo lectura). Abre Zotero y verifica la conexión.')}
@@ -186,7 +248,7 @@ export function Onboarding({
           </div>
         )}
 
-        {step === 1 && (
+        {step === 1 && !simple && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-400">
               {t('Elige las colecciones a monitorizar. Despliega cualquier colección para elegir subcolecciones concretas si una es demasiado grande. Se incorporan metadatos; los análisis se lanzan manualmente salvo que actives automatización en Ajustes.')}
@@ -203,7 +265,7 @@ export function Onboarding({
           </div>
         )}
 
-        {step === 2 && (
+        {step === 2 && !simple && (
           <div className="space-y-4">
             <label className="block text-sm">
               {t('Tag de lectura')}
@@ -221,9 +283,19 @@ export function Onboarding({
           </div>
         )}
 
-        {step === 3 && (
+        {step === aiStep && (
           <div className="space-y-4">
-            <VaultApiKeyImporter vaults={vaults} activeVault={activeVault} onImported={onVaultsChanged} />
+            {/* Billing notice — shown for every vault mode. */}
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200">
+              {t('El uso de IA se factura según tu proveedor (OpenAI, Anthropic, Google, OpenRouter…), no por Nodus. Revisa el precio por token y, si quieres evitar sorpresas, establece un límite de gasto (spend limit) desde el panel del proveedor antes de empezar.')}
+            </div>
+            {configuredProviders.length > 0 && (
+              <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/20 dark:text-emerald-300">
+                {tx('Ya tienes claves configuradas ({list}). Las claves se comparten entre todas tus bóvedas, así que puedes continuar sin volver a introducirlas.', {
+                  list: configuredProviders.map((p) => PROVIDER_LABELS[p]).join(', '),
+                })}
+              </div>
+            )}
             <label className="block text-sm">
               {t('Proveedor')}
               <select
@@ -288,25 +360,27 @@ export function Onboarding({
           </div>
         )}
 
-        {step === 4 && (
+        {step === doneStep && (
           <div className="space-y-4">
             <div>
-              <div className="text-lg font-semibold">{t('Primer resultado')}</div>
+              <div className="text-lg font-semibold">{simple ? t('Listo') : t('Primer resultado')}</div>
               <p className="text-sm text-neutral-400 mt-1">
-                {finishing
-                  ? t('Sincronizando Zotero para preparar el panel inicial...')
-                  : finishError
-                    ? t('No se pudo completar la primera sincronización, pero puedes entrar y corregirlo desde Inicio o Ajustes.')
-                    : t('La biblioteca local ya está preparada. El panel de Inicio te dirá qué conviene hacer después.')}
+                {simple
+                  ? t('Tu bóveda está lista. El panel de Inicio te guiará en los primeros pasos.')
+                  : finishing
+                    ? t('Sincronizando Zotero para preparar el panel inicial...')
+                    : finishError
+                      ? t('No se pudo completar la primera sincronización, pero puedes entrar y corregirlo desde Inicio o Ajustes.')
+                      : t('La biblioteca local ya está preparada. El panel de Inicio te dirá qué conviene hacer después.')}
               </p>
             </div>
-            {finishing && <Spinner label={t('Sincronizando metadatos...')} />}
+            {!simple && finishing && <Spinner label={t('Sincronizando metadatos...')} />}
             {finishError && (
               <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-300">
                 {finishError}
               </div>
             )}
-            {!finishing && !finishError && (
+            {!simple && !finishing && !finishError && (
               <div className="grid grid-cols-2 gap-3">
                 <ResultMetric label={t('Obras locales')} value={syncedWorks ?? 0} />
                 <ResultMetric label={t('Colecciones')} value={selected.size} />
@@ -329,11 +403,11 @@ export function Onboarding({
           <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || finishing}>
             {t('Atrás')}
           </button>
-          {step < 3 ? (
+          {step < aiStep ? (
             <button className="btn btn-primary" onClick={() => setStep((s) => s + 1)}>
               {t('Siguiente')}
             </button>
-          ) : step === 3 ? (
+          ) : step === aiStep ? (
             <button className="btn btn-primary" onClick={finish} disabled={finishing}>
               {finishing ? t('Preparando...') : t('Empezar')}
             </button>
@@ -344,9 +418,11 @@ export function Onboarding({
                   {t('Reintentar')}
                 </button>
               )}
-              <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(selectedModel ? 'library' : 'settings')} disabled={finishing}>
-                {selectedModel ? t('Ir a Biblioteca') : t('Configurar IA')}
-              </button>
+              {!simple && (
+                <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(selectedModel ? 'library' : 'settings')} disabled={finishing}>
+                  {selectedModel ? t('Ir a Biblioteca') : t('Configurar IA')}
+                </button>
+              )}
               <button className="btn btn-primary" onClick={() => onDone('home')} disabled={finishing}>
                 {t('Abrir Inicio')}
               </button>

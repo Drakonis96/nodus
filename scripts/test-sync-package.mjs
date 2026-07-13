@@ -54,6 +54,47 @@ try {
       verdict TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
       PRIMARY KEY (from_id, to_id, type)
     );
+    CREATE TABLE db_databases (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+      icon TEXT, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE db_columns (
+      id TEXT PRIMARY KEY, database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, type TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0,
+      config_json TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE db_select_options (
+      id TEXT PRIMARY KEY, column_id TEXT NOT NULL REFERENCES db_columns(id) ON DELETE CASCADE,
+      label TEXT NOT NULL, color TEXT, position INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE db_rows (
+      id TEXT PRIMARY KEY, database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE db_cells (
+      row_id TEXT NOT NULL REFERENCES db_rows(id) ON DELETE CASCADE,
+      column_id TEXT NOT NULL REFERENCES db_columns(id) ON DELETE CASCADE,
+      value_text TEXT, PRIMARY KEY (row_id, column_id)
+    );
+    CREATE TABLE db_attachments (
+      id TEXT PRIMARY KEY, row_id TEXT NOT NULL REFERENCES db_rows(id) ON DELETE CASCADE,
+      column_id TEXT NOT NULL REFERENCES db_columns(id) ON DELETE CASCADE,
+      file_name TEXT, mime_type TEXT, bytes INTEGER NOT NULL DEFAULT 0, blob BLOB,
+      content_hash TEXT, extracted_text TEXT, description TEXT,
+      ai_generated INTEGER NOT NULL DEFAULT 0, ai_prompt TEXT,
+      position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    );
+    CREATE TABLE db_relations (
+      id TEXT PRIMARY KEY, row_id TEXT NOT NULL REFERENCES db_rows(id) ON DELETE CASCADE,
+      column_id TEXT NOT NULL REFERENCES db_columns(id) ON DELETE CASCADE,
+      target_kind TEXT NOT NULL, target_id TEXT NOT NULL, target_vault_id TEXT,
+      position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    );
+    CREATE TABLE db_views (
+      id TEXT PRIMARY KEY, database_id TEXT NOT NULL REFERENCES db_databases(id) ON DELETE CASCADE,
+      name TEXT NOT NULL, layout TEXT NOT NULL DEFAULT 'table', filter_json TEXT, sort_json TEXT,
+      position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    );
   `;
   const dbA = new Database(path.join(root, 'machine-a.sqlite'));
   const dbB = new Database(path.join(root, 'machine-b.sqlite'));
@@ -81,16 +122,43 @@ try {
   dbA.prepare("INSERT INTO saved_searches VALUES ('s1', 'Memoria', 'memoria', 'semantic', '[]', ?)").run(T0);
   dbA.prepare("INSERT INTO edge_feedback VALUES ('iA', 'iB', 'contradicts', 'rejected', '', ?)").run(T2);
 
+  // ── Machine A: a whole Databases-vault database (columns, options, cell,
+  //    attachment blob, relation, saved view) — an atomic sync unit at T1 ──────
+  dbA.prepare('INSERT INTO db_databases VALUES (?, ?, ?, NULL, 0, ?, ?)').run('dbShared', 'DB-A001', 'Muestras', T0, T1);
+  dbA.prepare("INSERT INTO db_columns VALUES ('colA', 'dbShared', 'Título', 'title', 0, NULL, ?)").run(T0);
+  dbA.prepare("INSERT INTO db_columns VALUES ('colS', 'dbShared', 'Estado', 'select', 1, NULL, ?)").run(T0);
+  dbA.prepare("INSERT INTO db_select_options VALUES ('optS', 'colS', 'Activo', 'crimson', 0)").run();
+  dbA.prepare('INSERT INTO db_rows VALUES (?, ?, 0, ?, ?)').run('rowA', 'dbShared', T0, T1);
+  dbA.prepare("INSERT INTO db_cells VALUES ('rowA', 'colA', 'from A')").run();
+  dbA.prepare("INSERT INTO db_cells VALUES ('rowA', 'colS', 'optS')").run();
+  dbA.prepare('INSERT INTO db_attachments VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 0, NULL, 0, ?)').run(
+    'attA', 'rowA', 'colA', 'muestra.png', 'image/png', 7, Buffer.from('PNGDATA'), 'h1', T0
+  );
+  dbA.prepare("INSERT INTO db_relations VALUES ('relA', 'rowA', 'colA', 'db_row', 'other-row', NULL, 0, ?)").run(T0);
+  dbA.prepare("INSERT INTO db_views VALUES ('viewA', 'dbShared', 'Todo', 'table', NULL, NULL, 0, ?)").run(T0);
+
   // ── Machine B: its own note, a NEWER copy of n2, an OLDER verdict ──────────
   dbB.prepare('INSERT INTO notes VALUES (?, NULL, ?, ?, ?, NULL, 0, ?, ?)').run('n2', 'Compartida', 'markdown', 'versión nueva de B', T0, T1);
   dbB.prepare('INSERT INTO notes VALUES (?, NULL, ?, ?, ?, NULL, 0, ?, ?)').run('n3', 'Solo B', 'markdown', 'local de B', T0, T0);
   dbB.prepare("INSERT INTO edge_feedback VALUES ('iB', 'iA', 'contradicts', 'confirmed', '', ?)").run(T0);
+
+  // ── Machine B: an OLDER copy of the same database (must be replaced whole),
+  //    plus a B-only database (must never be touched by A's package) ──────────
+  dbB.prepare('INSERT INTO db_databases VALUES (?, ?, ?, NULL, 0, ?, ?)').run('dbShared', 'DB-A001', 'Muestras (viejo)', T0, T0);
+  dbB.prepare("INSERT INTO db_columns VALUES ('colBold', 'dbShared', 'X', 'title', 0, NULL, ?)").run(T0);
+  dbB.prepare('INSERT INTO db_rows VALUES (?, ?, 0, ?, ?)').run('rowBold', 'dbShared', T0, T0);
+  dbB.prepare("INSERT INTO db_cells VALUES ('rowBold', 'colBold', 'old B')").run();
+  dbB.prepare('INSERT INTO db_databases VALUES (?, ?, ?, NULL, 1, ?, ?)').run('dbLocalB', 'DB-B999', 'Solo B', T0, T0);
+  dbB.prepare("INSERT INTO db_columns VALUES ('colLB', 'dbLocalB', 'Y', 'title', 0, NULL, ?)").run(T0);
+  dbB.prepare('INSERT INTO db_rows VALUES (?, ?, 0, ?, ?)').run('rowLB', 'dbLocalB', T0, T0);
+  dbB.prepare("INSERT INTO db_cells VALUES ('rowLB', 'colLB', 'local only')").run();
 
   // ── Export from A, merge into B ─────────────────────────────────────────────
   useDb(dbA);
   const pkg = sync.buildSyncPackage('test');
   assert.equal(pkg.counts.notes, 2, 'A exports its two notes');
   assert.equal(pkg.counts.note_folders, 2);
+  assert.equal(pkg.counts.databases, 1, 'A exports its one database as a unit');
 
   useDb(dbB);
   const summary = sync.mergeSyncPackage(pkg.buffer);
@@ -99,6 +167,20 @@ try {
   assert.deepEqual(summary.writingDrafts, { inserted: 1, updated: 0, skipped: 0 });
   assert.deepEqual(summary.savedSearches, { inserted: 1, updated: 0, skipped: 0 });
   assert.deepEqual(summary.edgeFeedback, { inserted: 0, updated: 1, skipped: 0 }, 'newer rejection overrides older confirm (direction-agnostic)');
+  assert.deepEqual(summary.databases, { inserted: 0, updated: 1, skipped: 0 }, 'newer database replaces the whole older local tree');
+
+  // The shared database is now A's newer copy, whole (columns, options, cell, blob, relation, view).
+  assert.equal(dbB.prepare("SELECT name FROM db_databases WHERE id = 'dbShared'").get().name, 'Muestras', 'database name adopted from A');
+  assert.equal(dbB.prepare("SELECT updated_at FROM db_databases WHERE id = 'dbShared'").get().updated_at, T1, 'database updated_at adopted from A');
+  assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM db_columns WHERE database_id = 'dbShared'").get().n, 2, 'both A columns present (old B column gone)');
+  assert.equal(dbB.prepare("SELECT label FROM db_select_options WHERE id = 'optS'").get().label, 'Activo', 'select option survived');
+  assert.equal(dbB.prepare("SELECT value_text FROM db_cells WHERE row_id = 'rowA' AND column_id = 'colA'").get().value_text, 'from A', 'cell value from A');
+  assert.equal(dbB.prepare("SELECT blob FROM db_attachments WHERE id = 'attA'").get().blob.toString(), 'PNGDATA', 'attachment blob restored byte-for-byte');
+  assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM db_relations WHERE row_id = 'rowA'").get().n, 1, 'relation survived');
+  assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM db_views WHERE database_id = 'dbShared'").get().n, 1, 'saved view survived');
+  assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM db_rows WHERE id = 'rowBold'").get().n, 0, 'stale B row replaced away');
+  // B's own database is untouched — nothing local deleted.
+  assert.equal(dbB.prepare("SELECT name FROM db_databases WHERE id = 'dbLocalB'").get().name, 'Solo B', 'B-only database left intact');
 
   assert.equal(dbB.prepare("SELECT content FROM notes WHERE id = 'n2'").get().content, 'versión nueva de B', 'local newer content preserved');
   assert.equal(dbB.prepare("SELECT folder_id FROM notes WHERE id = 'n1'").get().folder_id, 'f2', 'note keeps its folder');
@@ -110,7 +192,9 @@ try {
   const again = sync.mergeSyncPackage(pkg.buffer);
   assert.equal(again.notes.inserted + again.notes.updated, 0, 'second merge is a no-op for notes');
   assert.equal(again.edgeFeedback.updated, 0, 'second merge is a no-op for feedback');
+  assert.deepEqual(again.databases, { inserted: 0, updated: 0, skipped: 1 }, 'equal-timestamp database skipped on re-merge');
   assert.equal(dbB.prepare('SELECT COUNT(*) AS n FROM notes').get().n, 3, 'row counts stable');
+  assert.equal(dbB.prepare('SELECT COUNT(*) AS n FROM db_databases').get().n, 2, 'database count stable (shared + B-only)');
 
   // ── Reverse direction: B's layer flows back to A ────────────────────────────
   useDb(dbB);
@@ -121,6 +205,9 @@ try {
   assert.equal(back.notes.updated, 1, 'A adopts B’s newer n2');
   assert.equal(dbA.prepare("SELECT content FROM notes WHERE id = 'n2'").get().content, 'versión nueva de B', 'A converges to newest n2');
   assert.equal(back.edgeFeedback.skipped, 1, 'verdict already newest on A');
+  assert.deepEqual(back.databases, { inserted: 1, updated: 0, skipped: 1 }, 'B-only database flows to A; shared one already newest');
+  assert.equal(dbA.prepare("SELECT name FROM db_databases WHERE id = 'dbLocalB'").get().name, 'Solo B', 'A now has B’s database');
+  assert.equal(dbA.prepare("SELECT value_text FROM db_cells WHERE row_id = 'rowLB'").get().value_text, 'local only', 'B-only database arrived whole');
 
   // ── Tampered packages are refused ───────────────────────────────────────────
   const AdmZip = require('adm-zip');
@@ -145,6 +232,16 @@ async function bundleSyncPackage() {
     stub,
     'export function getDb() { return globalThis.__syncTestDb; }\nexport const SCHEMA_VERSION = 28;\n'
   );
+  // databasesRepo imports ./crossVault (better-sqlite3 + the vault registry / electron).
+  // The sync package never exercises cross-vault relations, so stub it out to keep the
+  // bundle free of native/electron deps.
+  const crossVaultStub = path.join(root, 'stub-crossvault.js');
+  await writeFile(
+    crossVaultStub,
+    'export function searchEntitiesAcrossVaults() { return []; }\n' +
+      'export function resolveEntityLabel(_k, id) { return { label: id, broken: true }; }\n' +
+      'export function closeCrossVaultConnections() {}\n'
+  );
   const out = path.join(root, 'syncPackage.cjs');
   await build({
     entryPoints: [path.join(repoRoot, 'electron/export/syncPackage.ts')],
@@ -157,7 +254,10 @@ async function bundleSyncPackage() {
       {
         name: 'stub-db',
         setup(api) {
-          api.onResolve({ filter: /\.\.\/db\/database$/ }, () => ({ path: stub }));
+          // syncPackage imports '../db/database'; databasesRepo (pulled in transitively)
+          // imports './database' — both resolve to the switchable test DB stub.
+          api.onResolve({ filter: /\/database$/ }, () => ({ path: stub }));
+          api.onResolve({ filter: /\/crossVault$/ }, () => ({ path: crossVaultStub }));
         },
       },
     ],

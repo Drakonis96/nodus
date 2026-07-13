@@ -4,6 +4,7 @@ import type {
   CorpusHealth,
   CorpusHealthBucket,
   CorpusHealthBucketId,
+  DatabaseSummary,
   EdgeDetail,
   GapAggregate,
   GraphData,
@@ -44,6 +45,7 @@ interface HomeViewProps {
   demoBusy: boolean;
   onLoadDemo: () => Promise<void>;
   onLoadGenealogyDemo: () => Promise<void>;
+  onLoadDatabasesDemo: () => Promise<void>;
 }
 
 interface HomeSnapshot {
@@ -69,6 +71,7 @@ export function HomeView({
   demoBusy,
   onLoadDemo,
   onLoadGenealogyDemo,
+  onLoadDatabasesDemo,
 }: HomeViewProps) {
   const [snapshot, setSnapshot] = useState<HomeSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -98,8 +101,20 @@ export function HomeView({
     }
   }, []);
 
+  // Defer the (potentially heavy) snapshot load until after the home shell has painted,
+  // so switching into this vault / view stays responsive instead of freezing behind the
+  // idea-graph + corpus-health queries.
   useEffect(() => {
-    void reload();
+    let cancelled = false;
+    const id = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        if (!cancelled) void reload();
+      })
+    );
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(id);
+    };
   }, [reload]);
   useDataRefresh(reload);
 
@@ -152,7 +167,7 @@ export function HomeView({
       </div>
 
       {showDemoOffer && (
-        <DemoOfferCard demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} />
+        <DemoOfferCard variant="academic" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
       )}
 
       {error && (
@@ -796,43 +811,56 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
 }
 
 /** The empty-vault "load sample data" card, shared by the academic and genealogy homes. */
+/**
+ * The "load sample data" card for a vault's Home. Each vault only offers ITS OWN demo
+ * (academic / genealogy / databases) — a genealogy home never offers the academic demo,
+ * etc. `variant` picks which one; the matching onLoad… handler seeds it.
+ */
 export function DemoOfferCard({
+  variant = 'academic',
   demoBusy,
   onLoadDemo,
   onLoadGenealogyDemo,
+  onLoadDatabasesDemo,
 }: {
+  variant?: 'academic' | 'genealogy' | 'databases';
   demoBusy: boolean;
   onLoadDemo: () => Promise<void>;
   onLoadGenealogyDemo: () => Promise<void>;
+  onLoadDatabasesDemo?: () => Promise<void>;
 }) {
+  const card =
+    variant === 'genealogy'
+      ? {
+          title: t('Demo de genealogía'),
+          desc: t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.'),
+          icon: 'tree',
+          label: t('Cargar demo de genealogía'),
+          onClick: onLoadGenealogyDemo,
+        }
+      : variant === 'databases'
+        ? {
+            title: t('Demo de bases de datos'),
+            desc: t('Tres tablas de investigación (muestras, experimentos y lecturas) con columnas de todo tipo, opciones de color y decenas de registros. Incluye un tutorial guiado.'),
+            icon: 'table',
+            label: t('Cargar demo de bases de datos'),
+            onClick: onLoadDatabasesDemo ?? (async () => {}),
+          }
+        : {
+            title: t('Demo académica'),
+            desc: t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.'),
+            icon: 'play',
+            label: t('Cargar demo académica'),
+            onClick: onLoadDemo,
+          };
   return (
     <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
       <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
       <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <div className="flex flex-col rounded-lg border border-neutral-800 bg-neutral-900/40 p-3">
-          <div className="text-sm font-medium">{t('Demo académica')}</div>
-          <p className="text-xs text-neutral-400 mt-1 flex-1">
-            {t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.')}
-          </p>
-          <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void onLoadDemo()} disabled={demoBusy}>
-            <Icon name="play" /> {demoBusy ? t('Cargando…') : t('Cargar demo académica')}
-          </button>
-        </div>
-        <div className="flex flex-col rounded-lg border border-amber-800/50 bg-amber-950/10 p-3">
-          <div className="text-sm font-medium text-amber-200">{t('Demo de genealogía')}</div>
-          <p className="text-xs text-neutral-400 mt-1 flex-1">
-            {t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.')}
-          </p>
-          <button
-            className="btn gap-1.5 mt-3 self-start border border-amber-500/50 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
-            onClick={() => void onLoadGenealogyDemo()}
-            disabled={demoBusy}
-          >
-            <Icon name="tree" /> {demoBusy ? t('Cargando…') : t('Cargar demo de genealogía')}
-          </button>
-        </div>
-      </div>
+      <p className="text-xs text-neutral-400 mt-1 max-w-2xl">{card.desc}</p>
+      <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void card.onClick()} disabled={demoBusy}>
+        <Icon name={card.icon} /> {demoBusy ? t('Cargando…') : card.label}
+      </button>
     </section>
   );
 }
@@ -863,6 +891,7 @@ export function GenealogyHome({
   demoBusy,
   onLoadDemo,
   onLoadGenealogyDemo,
+  onLoadDatabasesDemo,
 }: {
   settings: AppSettings;
   onNavigate: (target: HomeTarget) => void;
@@ -871,6 +900,7 @@ export function GenealogyHome({
   demoBusy: boolean;
   onLoadDemo: () => Promise<void>;
   onLoadGenealogyDemo: () => Promise<void>;
+  onLoadDatabasesDemo: () => Promise<void>;
 }) {
   const [stats, setStats] = useState<GenealogyStats | null>(null);
 
@@ -953,7 +983,7 @@ export function GenealogyHome({
       </div>
 
       {showDemoOffer && (
-        <DemoOfferCard demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} />
+        <DemoOfferCard variant="genealogy" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
       )}
 
       <section className="card p-4 mb-4">
@@ -1083,6 +1113,114 @@ export function GenealogyHome({
           </p>
         </StatusCard>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Home screen for a Databases-mode vault: a launcher for the user's databases plus
+ * the Analysis and Chat sections. Mirrors GenealogyHome's role for its vault type.
+ */
+export function DatabasesHome({
+  databases,
+  onOpenDatabase,
+  onNewDatabase,
+  onImportCsv,
+  onOpenAnalysis,
+  onOpenChat,
+  demoBusy = false,
+  onLoadDatabasesDemo,
+}: {
+  databases: DatabaseSummary[];
+  onOpenDatabase: (id: string) => void;
+  onNewDatabase: () => void;
+  onImportCsv?: () => void;
+  onOpenAnalysis: () => void;
+  onOpenChat: () => void;
+  demoBusy?: boolean;
+  onLoadDatabasesDemo?: () => Promise<void>;
+}) {
+  const totalRows = databases.reduce((sum, d) => sum + d.rowCount, 0);
+  return (
+    <div className="h-full overflow-y-auto">
+     <div className="max-w-6xl mx-auto p-6">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
+          <p className="text-sm text-neutral-400 mt-1">
+            {t('Tus datos estructurados: tablas con columnas tipadas, análisis y chat.')}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {onImportCsv && (
+            <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onImportCsv}>
+              <Icon name="upload" /> {t('Importar CSV')}
+            </button>
+          )}
+          <button className="btn btn-primary gap-1.5" onClick={onNewDatabase}>
+            <Icon name="plus" /> {t('Nueva base de datos')}
+          </button>
+        </div>
+      </div>
+
+      <section className="mb-5">
+        <div className="text-xs uppercase text-neutral-500 mb-2">{t('Bases de datos')}</div>
+        {databases.length === 0 ? (
+          <div className="card p-6 text-center">
+            <Icon name="table" size={32} className="text-neutral-600 mx-auto mb-2" />
+            <p className="text-sm text-neutral-400">{t('Aún no hay bases de datos.')}</p>
+            <div className="flex flex-wrap gap-2 justify-center mt-3">
+              <button className="btn btn-primary gap-1.5" onClick={onNewDatabase}>
+                <Icon name="plus" /> {t('Crear la primera')}
+              </button>
+              {onLoadDatabasesDemo && (
+                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => void onLoadDatabasesDemo()} disabled={demoBusy}>
+                  <Icon name="table" /> {demoBusy ? t('Cargando…') : t('Cargar demo de bases de datos')}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {databases.map((db) => (
+              <button
+                key={db.id}
+                className="card p-4 text-left hover:border-indigo-600/70 transition-colors"
+                onClick={() => onOpenDatabase(db.id)}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon name={db.icon || 'table'} className="text-indigo-400" />
+                  <span className="font-medium truncate flex-1">{db.name}</span>
+                  <span className="text-[10px] font-mono text-neutral-500">{db.shortId}</span>
+                </div>
+                <div className="text-xs text-neutral-500 mt-2">
+                  {tx('{n} entradas', { n: db.rowCount.toLocaleString() })}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <button className="card p-4 text-left hover:border-indigo-600/70 transition-colors" onClick={onOpenAnalysis}>
+          <div className="flex items-center gap-2 font-medium">
+            <Icon name="chartBar" className="text-indigo-400" /> {t('Análisis')}
+          </div>
+          <p className="text-xs text-neutral-500 mt-1">
+            {t('Estadísticas e informes con IA sobre una base de datos.')}
+          </p>
+        </button>
+        <button className="card p-4 text-left hover:border-indigo-600/70 transition-colors" onClick={onOpenChat}>
+          <div className="flex items-center gap-2 font-medium">
+            <Icon name="chat" className="text-indigo-400" /> {t('Chat de datos')}
+          </div>
+          <p className="text-xs text-neutral-500 mt-1">
+            {tx('Pregunta a tus datos ({n} entradas en total).', { n: totalRows.toLocaleString() })}
+          </p>
+        </button>
+      </section>
+     </div>
     </div>
   );
 }

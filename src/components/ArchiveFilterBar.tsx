@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import type { ArchiveItemKind, ArchiveMatchMode, ArchiveSortKey, Person } from '@shared/types';
-import { archiveDocTypesByCategory } from '@shared/archiveDocTypes';
+import { DOC_FACET_DIMENSIONS, type FacetValue } from '@shared/archiveDocTypes';
 import { ARCHIVE_SORT_OPTIONS } from '@shared/archiveFilters';
 import { Icon } from './ui';
 import { useDismissableLayer } from '../hooks';
-import { t } from '../i18n';
+import { t, getActiveLang } from '../i18n';
+
+const facetLabel = (v: FacetValue): string => (getActiveLang() === 'en' ? v.en : v.es);
 
 const KIND_OPTIONS: { id: ArchiveItemKind; label: string }[] = [
   { id: 'image', label: 'Imagen' },
@@ -16,8 +18,8 @@ const KIND_OPTIONS: { id: ArchiveItemKind; label: string }[] = [
 ];
 
 export interface ArchiveFilterBarProps {
-  docTypes: string[];
-  onDocTypesChange: (v: string[]) => void;
+  facets: Record<string, string[]>;
+  onFacetsChange: (v: Record<string, string[]>) => void;
   kinds: ArchiveItemKind[];
   onKindsChange: (v: ArchiveItemKind[]) => void;
   tags: string[];
@@ -43,9 +45,26 @@ export interface ArchiveFilterBarProps {
 /** Notion-style filter bar for the archive: multi-select filters (with an any/all
  *  toggle for the two multi-valued properties), a year range, and a sort picker. */
 export function ArchiveFilterBar(props: ArchiveFilterBarProps) {
+  const setFacet = (dim: string, values: string[]) => {
+    const next = { ...props.facets };
+    if (values.length) next[dim] = values;
+    else delete next[dim];
+    props.onFacetsChange(next);
+  };
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <DocTypeFilterDropdown value={props.docTypes} onChange={props.onDocTypesChange} />
+      {/* Heritage-dimension facets — several may be active at once. */}
+      {DOC_FACET_DIMENSIONS.map((dim) => (
+        <SimpleFilterDropdown
+          key={dim.id}
+          label={t(dim.label)}
+          icon={dim.id === 'genealogia' ? 'tree' : 'folder'}
+          options={dim.values.map((v) => ({ value: v.id, label: facetLabel(v) }))}
+          selected={props.facets[dim.id] ?? []}
+          onChange={(v) => setFacet(dim.id, v)}
+          searchable={dim.values.length > 8}
+        />
+      ))}
       <SimpleFilterDropdown
         label={t('Formato')}
         icon="grid"
@@ -217,45 +236,6 @@ function SimpleFilterDropdown({
             )}
           </div>
           {selected.length > 0 && (
-            <button className="mt-1.5 text-[11px] text-neutral-500 hover:underline" onClick={() => onChange([])}>
-              {t('Limpiar')}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Grouped-by-category checkbox dropdown for the primary-source document types. */
-function DocTypeFilterDropdown({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissableLayer<HTMLDivElement>({ open, onDismiss: () => setOpen(false) });
-  const groups = archiveDocTypesByCategory();
-
-  const toggle = (id: string) => {
-    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
-  };
-
-  return (
-    <div className="relative" ref={ref}>
-      <DropdownButton label={t('Tipo de documento')} icon="folder" count={value.length} active={value.length > 0} onClick={() => setOpen((o) => !o)} />
-      {open && (
-        <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
-          <div className="max-h-72 space-y-2 overflow-y-auto">
-            {groups.map((g) => (
-              <div key={g.category}>
-                <div className="px-1 py-0.5 text-[10px] uppercase tracking-wide text-neutral-600">{t(g.label)}</div>
-                {g.types.map((def) => (
-                  <label key={def.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-neutral-900">
-                    <input type="checkbox" checked={value.includes(def.id)} onChange={() => toggle(def.id)} />
-                    <span className="truncate text-neutral-200">{t(def.label)}</span>
-                  </label>
-                ))}
-              </div>
-            ))}
-          </div>
-          {value.length > 0 && (
             <button className="mt-1.5 text-[11px] text-neutral-500 hover:underline" onClick={() => onChange([])}>
               {t('Limpiar')}
             </button>

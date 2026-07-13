@@ -54,13 +54,15 @@ function collectTranslatableStrings() {
       if (val && /[a-zA-Z]/.test(val) && !found.has(val)) found.set(val, path.relative(repoRoot, f));
     }
   }
-  // GenealogyTour steps are plain object literals fed through t() by the tour engine.
-  const tour = fs.readFileSync(path.join(repoRoot, 'src/views/GenealogyTour.tsx'), 'utf8');
-  const tre = /(?:title|body):\s*(["'`])((?:\\.|(?!\1).)*?)\1/g;
-  let tm;
-  while ((tm = tre.exec(tour))) {
-    const val = tm[2];
-    if (!found.has(val)) found.set(val, 'src/views/GenealogyTour.tsx');
+  // Tour steps are plain object literals fed through t() by the tour engine.
+  for (const tourFile of ['src/views/GenealogyTour.tsx', 'src/views/DatabasesTour.tsx']) {
+    const tour = fs.readFileSync(path.join(repoRoot, tourFile), 'utf8');
+    const tre = /(?:title|body):\s*(["'`])((?:\\.|(?!\1).)*?)\1/g;
+    let tm;
+    while ((tm = tre.exec(tour))) {
+      const val = tm[2];
+      if (!found.has(val)) found.set(val, tourFile);
+    }
   }
   return found;
 }

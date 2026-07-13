@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nodus">
+  <defs>
+    <linearGradient id="nodusMarkCrimson" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f9b4c4"/>
+      <stop offset="0.45" stop-color="#cc0a3a"/>
+      <stop offset="1" stop-color="#8a0227"/>
+    </linearGradient>
+    <filter id="nodusShadowCrimson" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.8" flood-color="#1a0208" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#nodusShadowCrimson)">
+    <path d="M18 48V16L46 48V16" fill="none" stroke="url(#nodusMarkCrimson)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="18" cy="16" r="6.5" fill="#f9b4c4"/>
+    <circle cx="18" cy="48" r="6.5" fill="#cc0a3a"/>
+    <circle cx="46" cy="48" r="6.5" fill="#b30333"/>
+    <circle cx="46" cy="16" r="6.5" fill="#8a0227"/>
+  </g>
+</svg>
