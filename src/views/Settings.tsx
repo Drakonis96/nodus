@@ -277,6 +277,7 @@ export function Settings({
     visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar'),
     visibleSettingsSection('interface', 'Idioma', 'interfaz prompts idioma español english citas'),
     visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad'),
+    visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante'),
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion'),
@@ -448,6 +449,46 @@ export function Settings({
                 onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
               />
             </Row>
+          </Section>
+      )}
+
+      {visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante') && (
+          <Section title={t('Mascota Nodi')}>
+            <p className="text-xs text-neutral-500 -mt-1">
+              {t('Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.')}
+            </p>
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm text-neutral-300">{t('Mostrar a Nodi')}</label>
+              <input type="checkbox" checked={settings.mascotEnabled} onChange={(e) => void patch({ mascotEnabled: e.target.checked })} />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <label className="text-sm text-neutral-300">{t('Mantener siempre visible sobre otras apps')}</label>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {t('Abre a Nodi en una pequeña ventana flotante del escritorio, por encima del resto de aplicaciones (en los sistemas operativos que lo permiten). Puedes arrastrarla para moverla.')}
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.mascotAlwaysOnTop}
+                disabled={!settings.mascotEnabled}
+                onChange={(e) => void patch({ mascotAlwaysOnTop: e.target.checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <label className="text-sm text-neutral-300">{t('Trajes de Nodi según la bóveda')}</label>
+                <p className="mt-0.5 text-xs text-neutral-500">
+                  {t('Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.')}
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.mascotVaultCostumes}
+                disabled={!settings.mascotEnabled}
+                onChange={(e) => void patch({ mascotVaultCostumes: e.target.checked })}
+              />
+            </div>
           </Section>
       )}
 

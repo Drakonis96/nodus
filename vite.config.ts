@@ -43,6 +43,16 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  // Two renderer entries: the main app (index.html) and the standalone Nodi
+  // overlay window (mascot.html) used for the always-on-top desktop mascot.
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        mascot: path.resolve(__dirname, 'mascot.html'),
+      },
+    },
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),

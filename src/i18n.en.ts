@@ -4,6 +4,17 @@
  * partial coverage never breaks the UI.
  */
 export const EN: Record<string, string> = {
+  // ── Nodi mascot (settings) ─────────────────────────────────────────────────
+  'Mascota Nodi': 'Nodi mascot',
+  'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
+    'Nodi is the node that accompanies the app, floating at the bottom right. Click Nodi to open chat, your notifications, and help.',
+  'Mostrar a Nodi': 'Show Nodi',
+  'Mantener siempre visible sobre otras apps': 'Keep on top of other apps',
+  'Trajes de Nodi según la bóveda': 'Nodi costumes per vault',
+  'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
+    'Nodi wears a small accessory based on the vault mode (cap, sprout, study glasses). Turn it off to see the plain Nodi in every vault.',
+  'Abre a Nodi en una pequeña ventana flotante del escritorio, por encima del resto de aplicaciones (en los sistemas operativos que lo permiten). Puedes arrastrarla para moverla.':
+    'Opens Nodi in a small floating desktop window, on top of your other applications (on the operating systems that allow it). Drag it to move it around.',
   // ── App shell · navigation · header ────────────────────────────────────────
   Inicio: 'Home',
   Grafo: 'Graph',

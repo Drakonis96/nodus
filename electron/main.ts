@@ -17,6 +17,8 @@ import { interruptDecorativeImageGenerations } from './ai/decorativeImages';
 import { startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import { startMcpServer, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
+import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
+import { seedWelcomeNotification } from './notifications';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 
 const require = createRequire(__filename);
@@ -147,6 +149,9 @@ function createWindow(): void {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    // Don't let the always-on-top mascot window keep the app alive after the main
+    // window closes (matters on Windows/Linux, where window-all-closed quits).
+    destroyMascotWindow();
   });
 }
 
@@ -382,6 +387,9 @@ app.whenReady().then(() => {
   if (settings.syncMode === 'realtime') startRealtimeSync();
   if (settings.mcpEnabled) void startMcpServer();
   if (settings.copilotEnabled) void startCopilotServer();
+  // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
+  seedWelcomeNotification();
+  applyMascotWindow();
   setupAutoUpdates();
 
   // Genealogy demo: fill in the daguerreotype portraits in the background if this
