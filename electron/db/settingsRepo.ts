@@ -160,12 +160,17 @@ export function getSettings(): AppSettings {
     else (merged as Record<string, unknown>)[key] = globalPrefs[key];
   }
   // AI model configuration is shared too (API keys already are). Overlay the shared
-  // store when present; otherwise seed it — but ONLY from a vault that has actually
-  // changed a key away from its default, so an unconfigured vault opened first can
-  // never overwrite a configured one with empty values.
+  // store when it holds a real value; otherwise seed it — but ONLY from a vault that has
+  // actually changed a key away from its default, so an unconfigured vault opened first
+  // can never overwrite a configured one with empty values. A stored `null` counts as
+  // "unset" (not an overlay): otherwise a per-vault value just seeded by the legacy
+  // defaultModel migration would be clobbered back to null by the shared store.
   for (const key of SHARED_MODEL_KEYS) {
-    if (globalPrefs[key] !== undefined) (merged as Record<string, unknown>)[key] = globalPrefs[key];
-    else if (isConfiguredModelPref(key, merged[key])) seed[key] = merged[key];
+    if (globalPrefs[key] !== undefined && globalPrefs[key] !== null) {
+      (merged as Record<string, unknown>)[key] = globalPrefs[key];
+    } else if (isConfiguredModelPref(key, merged[key])) {
+      seed[key] = merged[key];
+    }
   }
   if (Object.keys(seed).length) writeGlobalPrefs(seed);
   return { ...merged, providerKeys: providerKeyMap() };

@@ -268,7 +268,6 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     ];
     if (isOverlay) base.push({ id: 'open', label: 'Abrir Nodus', icon: <IconOpen />, onClick: () => window.nodus.nodiOpenMainWindow() });
     return base;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOverlay, unread, panel]);
 
   const send = async () => {
