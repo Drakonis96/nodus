@@ -4098,5 +4098,28 @@ export const EN: Record<string, string> = {
   Entregado: 'Submitted',
   'Selecciona o crea un simulacro.': 'Select or create a mock exam.',
 
+  // ── Study vault · rubrics and grading ─────────────────────────────────────
+  'Revisar corrección': 'Review grading',
+  'Corregir con IA': 'Grade with AI',
+  Rúbrica: 'Rubric',
+  Exigencia: 'Strictness',
+  Formativa: 'Supportive',
+  Equilibrada: 'Balanced',
+  Estricta: 'Strict',
+  Analizando: 'Analysing',
+  'Preparando corrección…': 'Preparing grading…',
+  estimación: 'estimate',
+  Omisiones: 'Omissions',
+  Incertidumbre: 'Uncertainty',
+  'Ver respuesta corregida': 'View corrected answer',
+  'Nota final': 'Final score',
+  'Comentario manual': 'Manual comment',
+  'Confirmar nota': 'Confirm score',
+  'Nota confirmada manualmente': 'Score manually confirmed',
+  Rúbricas: 'Rubrics',
+  'Nombre de la rúbrica': 'Rubric name',
+  'Crear rúbrica': 'Create rubric',
+  Integrada: 'Built-in',
+
   // <<END_EN>>
 };

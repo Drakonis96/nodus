@@ -75,6 +75,7 @@ try {
     hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
+    hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -86,6 +87,7 @@ try {
   assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
+  assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -754,6 +756,15 @@ try {
   assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending auditable grading');
   assert.match(examFixture.attempt.answers[0].response.text, /evidencia verificable/);
   console.log('[e2e] written exam + autosave + pending-grading delivery ok');
+
+  // ── Study grading: rubric UI and safe no-provider failure ─────────────────
+  await page.getByTestId('study-grade-open').click();
+  await page.getByTestId('study-grading-panel').waitFor({ timeout: 30_000 });
+  assert.ok(await page.getByTestId('study-grading-panel').locator('select').first().locator('option').count() >= 2, 'built-in weighted rubrics are available');
+  await page.getByTestId('study-grade-run').click();
+  await page.getByText(/Falta la clave de IA/, { exact: false }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('study-grading-result').count(), 0, 'provider failure never fabricates a grading result');
+  console.log('[e2e] rubric grading UI + safe provider-failure preservation ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

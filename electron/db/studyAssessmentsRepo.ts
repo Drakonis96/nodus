@@ -126,6 +126,14 @@ export function getStudyAttempt(id: string): StudyAttempt | null {
   const row = getDb().prepare('SELECT * FROM study_attempts WHERE id=?').get(id) as Row | undefined; return row ? toAttempt(row) : null;
 }
 
+export function getStudyAttemptAnswerContext(answerId: string) {
+  const row = getDb().prepare('SELECT * FROM study_attempt_answers WHERE id=?').get(answerId) as Row | undefined;
+  if (!row) return null;
+  const answer = toAnswer(row); const attempt = getStudyAttempt(answer.attemptId);
+  const item = attempt?.assessment?.items.find((candidate) => candidate.id === answer.assessmentItemId);
+  return attempt && item ? { answer, attempt, assessment: attempt.assessment!, item, question: item.question } : null;
+}
+
 export function listStudyAttempts(assessmentId?: string): StudyAttempt[] {
   const rows = (assessmentId
     ? getDb().prepare('SELECT * FROM study_attempts WHERE assessment_id=? ORDER BY started_at DESC').all(assessmentId)

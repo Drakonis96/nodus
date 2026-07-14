@@ -84,6 +84,13 @@ import type {
   StudyAttemptStartInput,
   StudyTestBuildRequest,
 } from './studyAssessments';
+import type {
+  StudyGradingRequest,
+  StudyGradingRun,
+  StudyGradingStreamHandlers,
+  StudyRubric,
+  StudyRubricInput,
+} from './studyGrading';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -193,6 +200,22 @@ export type {
   StudyQuestionResponse,
   StudyTestBuildRequest,
 } from './studyAssessments';
+export type {
+  StudyCriterionGrade,
+  StudyGradingAnnotation,
+  StudyGradingAnnotationInput,
+  StudyGradingAnnotationKind,
+  StudyGradingAnnotationSeverity,
+  StudyGradingRequest,
+  StudyGradingResult,
+  StudyGradingRun,
+  StudyGradingSeverity,
+  StudyGradingSource,
+  StudyGradingStreamHandlers,
+  StudyRubric,
+  StudyRubricCriterion,
+  StudyRubricInput,
+} from './studyGrading';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4824,6 +4847,15 @@ export interface NodusApi {
   submitStudyAttempt(id: string, expired?: boolean): Promise<StudyAttempt>;
   abandonStudyAttempt(id: string): Promise<StudyAttempt>;
   exportStudyAssessment(id: string, includeAnswers?: boolean): Promise<{ path: string } | null>;
+  listStudyRubrics(includeArchived?: boolean): Promise<StudyRubric[]>;
+  createStudyRubric(input: StudyRubricInput): Promise<StudyRubric>;
+  updateStudyRubric(id: string, patch: Partial<StudyRubricInput> & { archived?: boolean }): Promise<StudyRubric>;
+  duplicateStudyRubric(id: string): Promise<StudyRubric>;
+  deleteStudyRubric(id: string): Promise<void>;
+  listStudyGradingRuns(attemptAnswerId?: string): Promise<StudyGradingRun[]>;
+  gradeStudyAnswer(request: StudyGradingRequest, handlers: StudyGradingStreamHandlers): Promise<StudyGradingRun>;
+  cancelStudyGrading(): Promise<void>;
+  setStudyGradingManualScore(id: string, score: number, comment?: string): Promise<StudyGradingRun>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

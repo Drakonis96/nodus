@@ -134,6 +134,8 @@ import type {
   StudyAttemptAnswerInput,
   StudyAttemptStartInput,
   StudyTestBuildRequest,
+  StudyGradingRequest,
+  StudyRubricInput,
   StudyPronunciationEntry,
 } from '@shared/types';
 
@@ -258,6 +260,8 @@ import * as studyQuestions from './db/studyQuestionsRepo';
 import { generateStudyQuestions } from './ai/studyQuestions';
 import * as studyAssessments from './db/studyAssessmentsRepo';
 import { buildStudyTest } from './ai/studyTests';
+import * as studyGrading from './db/studyGradingRepo';
+import { gradeStudyAnswer } from './ai/studyGrading';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -499,6 +503,7 @@ export function registerIpc(
   const nodiChatAborters = new Map<string, AbortController>();
   const studyImproveAborters = new Map<string, AbortController>();
   const studyAssistantAborters = new Map<string, AbortController>();
+  const studyGradingAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
     const payload = withVaultKeyProviders(getActiveVault());
@@ -1898,6 +1903,19 @@ export function registerIpc(
     fs.writeFileSync(picked.filePath, studyAssessments.renderStudyAssessmentMarkdown(assessment, Boolean(includeAnswers)), 'utf8');
     return { path: picked.filePath };
   });
+  h('study:grading:rubrics:list', async (_e, includeArchived?: boolean) => studyGrading.listStudyRubrics(includeArchived));
+  h('study:grading:rubrics:create', async (_e, input: StudyRubricInput) => studyGrading.createStudyRubric(input));
+  h('study:grading:rubrics:update', async (_e, id: string, patch: Partial<StudyRubricInput> & { archived?: boolean }) => studyGrading.updateStudyRubric(id, patch));
+  h('study:grading:rubrics:duplicate', async (_e, id: string) => studyGrading.duplicateStudyRubric(id));
+  h('study:grading:rubrics:delete', async (_e, id: string) => studyGrading.deleteStudyRubric(id));
+  h('study:grading:runs:list', async (_e, attemptAnswerId?: string) => studyGrading.listStudyGradingRuns(attemptAnswerId));
+  h('study:grading:run', async (e, requestId: string, request: StudyGradingRequest) => {
+    const controller = new AbortController(); studyGradingAborters.set(requestId, controller);
+    try { return await gradeStudyAnswer(request, (delta, kind) => { if (!e.sender.isDestroyed()) e.sender.send(kind === 'reasoning' ? 'study:grading:reasoning' : 'study:grading:delta', requestId, delta); }, controller.signal); }
+    finally { studyGradingAborters.delete(requestId); }
+  });
+  h('study:grading:cancel', async (_e, requestId: string) => studyGradingAborters.get(requestId)?.abort());
+  h('study:grading:manual', async (_e, id: string, score: number, comment?: string) => studyGrading.setStudyGradingManualScore(id, score, comment));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {
