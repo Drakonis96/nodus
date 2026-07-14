@@ -93,6 +93,9 @@ import type {
   StudyRubric,
   StudyRubricInput,
 } from './studyGrading';
+import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+import type { StudyProgressDashboard } from './studyStats';
+import type { StudyCalendarEvent, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -220,6 +223,10 @@ export type {
   StudyRubricCriterion,
   StudyRubricInput,
 } from './studyGrading';
+export type { StudyFlashcard, StudyFlashcardInput, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './studySrs';
+export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
+export type { StudyCalendarEvent, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4862,6 +4869,22 @@ export interface NodusApi {
   gradeStudyAnswer(request: StudyGradingRequest, handlers: StudyGradingStreamHandlers): Promise<StudyGradingRun>;
   cancelStudyGrading(): Promise<void>;
   setStudyGradingManualScore(id: string, score: number, comment?: string): Promise<StudyGradingRun>;
+  listStudyFlashcards(options?: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string }): Promise<StudyFlashcard[]>;
+  createStudyFlashcard(input: StudyFlashcardInput): Promise<StudyFlashcard>;
+  updateStudyFlashcard(id: string, patch: Partial<StudyFlashcardInput>): Promise<StudyFlashcard>;
+  createStudyFlashcardsFromQuestions(questionIds: string[]): Promise<StudyFlashcard[]>;
+  reviewStudyFlashcard(input: StudyReviewInput): Promise<{ card: StudyFlashcard; review: StudyReviewRecord }>;
+  setStudyFlashcardState(id: string, action: 'master' | 'reset' | 'exclude' | 'include' | 'archive' | 'delete'): Promise<void>;
+  getStudyProgressDashboard(): Promise<StudyProgressDashboard>;
+  getStudyPlanner(): Promise<StudyPlannerSnapshot>;
+  createStudyPlan(input: { title: string; description?: string; courseId?: string | null; subjectId?: string | null; examAt?: string | null; availableMinutes?: number; config?: Record<string, unknown> }): Promise<StudyPlan>;
+  createStudyPlanBlock(input: { planId?: string | null; title: string; type?: string; courseId?: string | null; subjectId?: string | null; topicId?: string | null; startsAt: string; durationMinutes?: number; priority?: number; notes?: string }): Promise<StudyPlanBlock>;
+  createStudyCalendarEvent(input: { title: string; type?: StudyCalendarEvent['type']; startsAt: string; endsAt?: string | null; allDay?: boolean; courseId?: string | null; subjectId?: string | null; topicId?: string | null; notes?: string; reminderMinutes?: number | null }): Promise<StudyCalendarEvent>;
+  createStudyGoal(input: { title: string; period?: StudyGoal['period']; targetValue?: number; unit?: string; startsAt?: string; endsAt?: string | null; subjectId?: string | null }): Promise<StudyGoal>;
+  updateStudyPlannerItem(kind: 'block' | 'event' | 'goal', id: string, patch: Record<string, unknown>): Promise<void>;
+  startStudySession(input: { planBlockId?: string | null; subjectId?: string | null; topicId?: string | null; mode?: string; plannedMinutes?: number }): Promise<StudyStudySession>;
+  finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): Promise<StudyStudySession>;
+  exportStudyPlannerIcs(): Promise<{ path: string } | null>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

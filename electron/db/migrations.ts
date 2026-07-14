@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 60;
+export const SCHEMA_VERSION = 62;
 
 export const migrations: Migration[] = [
   {
@@ -2287,6 +2287,91 @@ export const migrations: Migration[] = [
         created_at     TEXT NOT NULL
       );
       CREATE INDEX idx_study_grading_annotations_run ON study_grading_annotations(grading_run_id, from_pos);
+    `,
+  },
+  {
+    version: 61,
+    up: /* sql */ `
+      -- Study vault phase 11a-11c: flashcards, spaced repetition and mastery.
+      CREATE TABLE study_flashcards (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, card_type TEXT NOT NULL DEFAULT 'front_back',
+        front TEXT NOT NULL, back TEXT NOT NULL, hint TEXT NOT NULL DEFAULT '', media_json TEXT NOT NULL DEFAULT '{}',
+        tags_json TEXT NOT NULL DEFAULT '[]', course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        document_id TEXT REFERENCES study_docs(id) ON DELETE SET NULL, material_id TEXT REFERENCES study_materials(id) ON DELETE SET NULL,
+        transcript_id TEXT REFERENCES study_transcripts(id) ON DELETE SET NULL, question_id TEXT REFERENCES study_questions(id) ON DELETE SET NULL,
+        source_excerpt TEXT NOT NULL DEFAULT '', difficulty TEXT NOT NULL DEFAULT 'medium', favorite INTEGER NOT NULL DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_flashcards_scope ON study_flashcards(subject_id, topic_id, archived_at, favorite DESC);
+
+      CREATE TABLE study_srs_state (
+        card_id TEXT PRIMARY KEY REFERENCES study_flashcards(id) ON DELETE CASCADE, ease_factor REAL NOT NULL DEFAULT 2.5,
+        interval_days REAL NOT NULL DEFAULT 0, due_at TEXT NOT NULL, repetitions INTEGER NOT NULL DEFAULT 0,
+        lapses INTEGER NOT NULL DEFAULT 0, last_rating INTEGER, last_reviewed_at TEXT, confidence REAL,
+        mastered INTEGER NOT NULL DEFAULT 0, excluded INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_srs_due ON study_srs_state(excluded, mastered, due_at);
+
+      CREATE TABLE study_reviews (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, card_id TEXT NOT NULL REFERENCES study_flashcards(id) ON DELETE CASCADE,
+        rating INTEGER NOT NULL, confidence INTEGER, correct INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL DEFAULT 0,
+        previous_interval_days REAL NOT NULL DEFAULT 0, next_interval_days REAL NOT NULL DEFAULT 0,
+        scheduled_at TEXT, created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_reviews_card ON study_reviews(card_id, created_at DESC);
+
+      CREATE TABLE study_mastery (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, scope_kind TEXT NOT NULL, scope_id TEXT NOT NULL,
+        mastery REAL NOT NULL DEFAULT 0, confidence REAL NOT NULL DEFAULT 0, evidence_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'learning', last_activity_at TEXT, updated_at TEXT NOT NULL,
+        UNIQUE(scope_kind, scope_id)
+      );
+      CREATE INDEX idx_study_mastery_level ON study_mastery(scope_kind, mastery, updated_at DESC);
+    `,
+  },
+  {
+    version: 62,
+    up: /* sql */ `
+      -- Study vault phase 11d: local academic planning and actual study time.
+      CREATE TABLE study_plans (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        exam_at TEXT, available_minutes INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1,
+        config_json TEXT NOT NULL DEFAULT '{}', position INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE study_plan_blocks (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, plan_id TEXT REFERENCES study_plans(id) ON DELETE CASCADE,
+        title TEXT NOT NULL, block_type TEXT NOT NULL DEFAULT 'study', course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        starts_at TEXT NOT NULL, duration_minutes INTEGER NOT NULL DEFAULT 25, status TEXT NOT NULL DEFAULT 'planned',
+        priority INTEGER NOT NULL DEFAULT 0, notes TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_plan_blocks_time ON study_plan_blocks(starts_at, status, subject_id);
+      CREATE TABLE study_calendar_events (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, event_type TEXT NOT NULL DEFAULT 'session',
+        starts_at TEXT NOT NULL, ends_at TEXT, all_day INTEGER NOT NULL DEFAULT 0,
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL, notes TEXT NOT NULL DEFAULT '', reminder_minutes INTEGER,
+        completed INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_calendar_events_time ON study_calendar_events(starts_at, event_type);
+      CREATE TABLE study_goals (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, period TEXT NOT NULL DEFAULT 'weekly',
+        target_value REAL NOT NULL DEFAULT 1, current_value REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'sesiones',
+        starts_at TEXT NOT NULL, ends_at TEXT, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        completed INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE study_study_sessions (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, plan_block_id TEXT REFERENCES study_plan_blocks(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        mode TEXT NOT NULL DEFAULT 'focus', planned_minutes INTEGER NOT NULL DEFAULT 25, actual_seconds INTEGER NOT NULL DEFAULT 0,
+        interruptions INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL, ended_at TEXT, notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_sessions_time ON study_study_sessions(started_at, subject_id);
     `,
   },
 ];

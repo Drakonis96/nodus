@@ -76,6 +76,7 @@ try {
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
     hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
+    hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -88,6 +89,7 @@ try {
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
+  assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -765,6 +767,38 @@ try {
   await page.getByText(/Falta la clave de IA/, { exact: false }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByTestId('study-grading-result').count(), 0, 'provider failure never fabricates a grading result');
   console.log('[e2e] rubric grading UI + safe provider-failure preservation ok');
+
+  // ── Study learning: flashcard review, SM-2 evidence, planner and progress ──
+  await page.getByRole('button', { name: 'Repaso', exact: true }).click();
+  await page.getByTestId('study-review-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-flashcard-new').click();
+  const flashcardEditor = page.getByTestId('study-flashcard-editor');
+  await page.getByTestId('study-flashcard-front').fill('¿Qué conserva la procedencia local?');
+  await flashcardEditor.locator('textarea').nth(1).fill('Fragmentos exactos y enlaces verificables.');
+  await page.getByTestId('study-flashcard-save').click();
+  await page.getByText('¿Qué conserva la procedencia local?', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-review-start').click();
+  await page.getByTestId('study-review-session').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-review-session').locator('button').first().click();
+  await page.getByTestId('study-review-rate-4').click();
+  await page.waitForFunction(async () => (await window.nodus.listStudyFlashcards()).some((card) => card.front.includes('procedencia local') && card.srs.repetitions === 1), { timeout: 30_000 });
+  console.log('[e2e] flashcard authoring + real SM-2 review persistence ok');
+
+  await page.getByRole('button', { name: 'Planificador', exact: true }).click();
+  await page.getByTestId('study-planner-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-planner-title').fill('Repaso smoke de procedencia');
+  await page.getByTestId('study-planner-save').click();
+  await page.getByText('Repaso smoke de procedencia', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Iniciar', exact: true }).click();
+  await page.getByTestId('study-pomodoro-active').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Finalizar y registrar', exact: true }).click();
+  await page.waitForFunction(async () => (await window.nodus.getStudyPlanner()).sessions.some((session) => session.endedAt), { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Progreso', exact: true }).click();
+  await page.getByTestId('study-progress-view').waitFor({ timeout: 30_000 });
+  const learningFixture = await page.evaluate(async () => ({ planner: await window.nodus.getStudyPlanner(), progress: await window.nodus.getStudyProgressDashboard() }));
+  assert.ok(learningFixture.planner.blocks.some((block) => block.title === 'Repaso smoke de procedencia'));
+  assert.ok(learningFixture.progress.overall.reviews >= 1, 'progress dashboard is backed by review evidence');
+  console.log('[e2e] planner, Pomodoro registration and evidence-backed progress ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

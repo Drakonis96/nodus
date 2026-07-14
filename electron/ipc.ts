@@ -257,6 +257,7 @@ import { improveStudyText } from './ai/studyImprove';
 import * as studySearch from './ai/studySearch';
 import * as studyAssistant from './ai/studyAssistant';
 import * as studyQuestions from './db/studyQuestionsRepo';
+import * as studyLearning from './db/studyLearningRepo';
 import { generateStudyQuestions } from './ai/studyQuestions';
 import * as studyAssessments from './db/studyAssessmentsRepo';
 import { buildStudyTest } from './ai/studyTests';
@@ -1918,6 +1919,26 @@ export function registerIpc(
   });
   h('study:grading:cancel', async (_e, requestId: string) => studyGradingAborters.get(requestId)?.abort());
   h('study:grading:manual', async (_e, id: string, score: number, comment?: string) => studyGrading.setStudyGradingManualScore(id, score, comment));
+  h('study:flashcards:list', async (_e, options) => studyLearning.listStudyFlashcards(options));
+  h('study:flashcards:create', async (_e, input) => studyLearning.createStudyFlashcard(input));
+  h('study:flashcards:update', async (_e, id: string, patch) => studyLearning.updateStudyFlashcard(id, patch));
+  h('study:flashcards:fromQuestions', async (_e, ids: string[]) => studyLearning.createStudyFlashcardsFromQuestions(ids));
+  h('study:flashcards:review', async (_e, input) => studyLearning.reviewStudyFlashcard(input));
+  h('study:flashcards:state', async (_e, id: string, action) => studyLearning.setStudyFlashcardState(id, action));
+  h('study:learning:progress', async () => studyLearning.getStudyProgressDashboard());
+  h('study:planner:get', async () => studyLearning.getStudyPlanner());
+  h('study:planner:create', async (_e, input) => studyLearning.createStudyPlan(input));
+  h('study:planner:block:create', async (_e, input) => studyLearning.createStudyPlanBlock(input));
+  h('study:planner:event:create', async (_e, input) => studyLearning.createStudyCalendarEvent(input));
+  h('study:planner:goal:create', async (_e, input) => studyLearning.createStudyGoal(input));
+  h('study:planner:item:update', async (_e, kind, id: string, patch) => studyLearning.updateStudyPlannerItem(kind, id, patch));
+  h('study:planner:session:start', async (_e, input) => studyLearning.startStudySession(input));
+  h('study:planner:session:finish', async (_e, id: string, input) => studyLearning.finishStudySession(id, input));
+  h('study:planner:exportIcs', async () => {
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Exportar calendario de estudio', defaultPath: 'nodus-estudio.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, studyLearning.renderStudyPlannerIcs(), 'utf8'); return { path: picked.filePath };
+  });
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

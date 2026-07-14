@@ -6,7 +6,7 @@ import { DatabasesView, CsvImportModal, type CsvImportPlanData } from './views/D
 import { DatabasesAnalysisView } from './views/DatabasesAnalysisView';
 import { DatabasesChatView } from './views/DatabasesChatView';
 import { DatabasesSearchView } from './views/DatabasesSearchView';
-import { StudyHome, StudyScaffoldView } from './views/StudyHome';
+import { StudyHome } from './views/StudyHome';
 import { StudyOrganizationView } from './views/StudyOrganizationView';
 import { StudyMaterialsView } from './views/StudyMaterialsView';
 import { StudyRecordingsView } from './views/StudyRecordingsView';
@@ -15,6 +15,9 @@ import { StudyChatView } from './views/StudyChatView';
 import { StudyBankView } from './views/StudyBankView';
 import { StudyTestView } from './views/StudyTestView';
 import { StudyExamView } from './views/StudyExamView';
+import { StudyReviewView } from './views/StudyReviewView';
+import { StudyProgressView } from './views/StudyProgressView';
+import { StudyPlannerView } from './views/StudyPlannerView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -73,12 +76,6 @@ import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
-
-const STUDY_SCAFFOLD_VIEWS = new Set<View>([
-  'studyPlanner',
-  'studyReview',
-  'studyProgress',
-]);
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -950,7 +947,9 @@ export function App() {
           />}
           {view === 'studyTests' && <StudyTestView onOpenQuestionBank={() => setView('studyQuestions')} />}
           {view === 'studyExams' && <StudyExamView onOpenQuestionBank={() => setView('studyQuestions')} />}
-          {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
+          {view === 'studyReview' && <StudyReviewView />}
+          {view === 'studyProgress' && <StudyProgressView onOpenReview={() => setView('studyReview')} onOpenPlanner={() => setView('studyPlanner')} />}
+          {view === 'studyPlanner' && <StudyPlannerView />}
           {view === 'study' && (
             <StudyGuideView
               settings={settings}
