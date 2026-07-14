@@ -1,0 +1,14 @@
+import crypto from 'node:crypto';
+import type { ModelRef } from '@shared/types';
+import type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from '@shared/studyAi';
+import { studyAiBudgetState } from '@shared/studyAi';
+import { createStudyShortId } from '@shared/studyOrg';
+import { getSettings } from './settingsRepo';
+import { getDb } from './database';
+
+type Row = Record<string, unknown>;
+function toUsage(row: Row): StudyAiUsage { return { id: String(row.id), shortId: String(row.short_id), task: String(row.task) as StudyAiTask, model: { provider: String(row.provider), model: String(row.model) } as ModelRef, inputChars: Number(row.input_chars), outputChars: Number(row.output_chars), estimatedCostUsd: row.estimated_cost_usd == null ? null : Number(row.estimated_cost_usd), status: String(row.status) as StudyAiUsage['status'], fallbackUsed: Number(row.fallback_used) === 1, error: row.error ? String(row.error) : null, startedAt: String(row.started_at), finishedAt: String(row.finished_at) }; }
+export function recordStudyAiUsage(input: { task: StudyAiTask; model: ModelRef; inputChars: number; outputChars: number; estimatedCostUsd?: number | null; status: StudyAiUsage['status']; fallbackUsed?: boolean; error?: string | null; startedAt: string }): StudyAiUsage { const id=crypto.randomUUID();const shortId=createStudyShortId('AIU',id);const finishedAt=new Date().toISOString();getDb().prepare('INSERT INTO study_ai_usage (id,short_id,task,provider,model,input_chars,output_chars,estimated_cost_usd,status,fallback_used,error,started_at,finished_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,shortId,input.task,input.model.provider,input.model.model,Math.max(0,input.inputChars),Math.max(0,input.outputChars),input.estimatedCostUsd??null,input.status,input.fallbackUsed?1:0,input.error??null,input.startedAt,finishedAt);return listStudyAiUsage(1)[0]; }
+export function listStudyAiUsage(limit=100): StudyAiUsage[] { return (getDb().prepare('SELECT * FROM study_ai_usage ORDER BY started_at DESC LIMIT ?').all(Math.max(1,Math.min(1000,limit))) as Row[]).map(toUsage); }
+export function getStudyAiUsageSummary(at=new Date()): StudyAiUsageSummary { const month=at.toISOString().slice(0,7);const row=getDb().prepare("SELECT COUNT(*) calls,SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) failed,SUM(CASE WHEN estimated_cost_usd IS NULL THEN 1 ELSE 0 END) unknown_cost,SUM(COALESCE(estimated_cost_usd,0)) known_cost FROM study_ai_usage WHERE substr(started_at,1,7)=?").get(month) as Row;const budgetUsd=getSettings().studyAiMonthlyBudgetUsd;const knownCostUsd=Number(row.known_cost??0);return {month,knownCostUsd,unknownCostCalls:Number(row.unknown_cost??0),calls:Number(row.calls??0),failedCalls:Number(row.failed??0),budgetUsd,percentUsed:studyAiBudgetState(knownCostUsd,budgetUsd).percent}; }
+export function clearStudyAiUsage(): void { getDb().prepare('DELETE FROM study_ai_usage').run(); }

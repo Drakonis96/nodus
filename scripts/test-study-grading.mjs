@@ -37,7 +37,7 @@ try {
   const prompt = grading.buildStudyGradingPrompt({ question: question.prompt, answer: answer.response.text, modelAnswer: question.answer.text, rubric, sources: [{ title: question.source.title, excerpt: question.source.excerpt }], severity: 'strict', maxScore: 10 });
   assert.match(prompt.system, /únicamente/); assert.match(prompt.system, /ESTIMACIÓN/); assert.match(prompt.user, /Manual local/);
   let streamed = '';
-  const run = await grading.gradeStudyAnswer({ attemptAnswerId: answer.id, rubricId: rubric.id, severity: 'balanced' }, (delta) => { streamed += delta; });
+  const run = await grading.gradeStudyAnswer({ attemptAnswerId: answer.id, rubricId: rubric.id, severity: 'balanced', model: { provider: 'ollama', model: 'grading-verifier' } }, (delta) => { streamed += delta; });
   assert.ok(streamed.length > 20, 'structured grading is delivered through the streaming path'); assert.equal(run.estimatedScore, 8.05); assert.equal(run.result.maxScore, 10);
   assert.equal(run.sources[0].excerpt, question.source.excerpt, 'stored provenance is the exact local source excerpt'); assert.match(run.result.uncertainty, /fuente local/); assert.equal(run.annotations.length, 2); assert.equal(run.annotations.find((annotation) => annotation.kind === 'omission').to, answer.response.text.length, 'annotation ranges are clamped to the submitted response');
   assert.equal(gradingRepo.listStudyGradingRuns(answer.id).length, 1); assert.equal(run.manualScore, null);

@@ -5,6 +5,10 @@ import type {
   EmbeddingProvider,
   McpServerStatus,
   ModelInfo,
+  ModelRef,
+  StudyAiTask,
+  StudyAiUsageSummary,
+  StudySubject,
   UpdateProgressEvent,
   VaultSummary,
   VaultType,
@@ -1030,6 +1034,7 @@ export function Settings({
                 </button>
               </div>
             </Row>
+            <StudyAiModelSettings settings={settings} patch={patch} />
             <Row label={t('Llamadas simultáneas')}>
               <input
                 type="number"
@@ -1491,6 +1496,29 @@ function SidebarOrderEditor({
       ))}
     </div>
   );
+}
+
+const STUDY_TASK_MODELS: Array<{ task: StudyAiTask; label: string; key: 'chatModel' | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' }> = [
+  { task: 'chat', label: 'Chat con el corpus', key: 'chatModel' },
+  { task: 'improve', label: 'Mejora de texto', key: 'improveModel' },
+  { task: 'questions', label: 'Generación de preguntas', key: 'questionGenModel' },
+  { task: 'grading', label: 'Corrección de exámenes', key: 'gradingModel' },
+  { task: 'flashcards', label: 'Generación de flashcards', key: 'flashcardModel' },
+];
+
+function StudyAiModelSettings({ settings, patch }: { settings: AppSettings; patch: (value: Partial<AppSettings>) => Promise<void> }) {
+  const [summary, setSummary] = useState<StudyAiUsageSummary | null>(null); const [subjects, setSubjects] = useState<StudySubject[]>([]); const [subjectId, setSubjectId] = useState('');
+  const refreshUsage = () => window.nodus.getStudyAiUsageSummary().then(setSummary);
+  useEffect(() => { void refreshUsage(); void window.nodus.getStudyWorkspace().then((workspace) => setSubjects(workspace.subjects)); }, []);
+  const setPrimary = (key: typeof STUDY_TASK_MODELS[number]['key'], model: ModelRef | null) => patch({ [key]: model });
+  const setFallback = (task: StudyAiTask, model: ModelRef | null) => patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [task]: model } });
+  const setSubjectModel = (task: StudyAiTask, model: ModelRef | null) => { if (!subjectId) return; void patch({ studyAiSubjectModels: { ...settings.studyAiSubjectModels, [subjectId]: { ...settings.studyAiSubjectModels[subjectId], [task]: model } } }); };
+  return <div className="my-5 rounded-xl border border-teal-900/50 bg-teal-950/10 p-4" data-testid="study-ai-settings"><div className="flex flex-wrap items-start gap-2"><div className="mr-auto"><h3 className="text-sm font-semibold text-teal-200">{t('Modelos del vault de estudio')}</h3><p className="mt-1 text-xs text-neutral-500">{t('Cada tarea conserva un modelo principal y un alternativo independiente. Los estilos personalizados pueden seguir fijando su propio modelo.')}</p></div><span className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500">{summary?.calls ?? 0} {t('llamadas este mes')}</span></div>
+    <div className="mt-4 grid grid-cols-[minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(11rem,1fr)] gap-2 text-xs"><b className="text-neutral-600">{t('Tarea')}</b><b className="text-neutral-600">{t('Principal')}</b><b className="text-neutral-600">{t('Alternativo ante error')}</b>{STUDY_TASK_MODELS.map((item) => <div key={item.task} className="contents"><span className="self-center text-neutral-300">{t(item.label)}</span><ModelPicker compact settings={settings} value={settings[item.key]} onChange={(model) => void setPrimary(item.key, model)} emptyLabel="Usar modelo de estudio/síntesis" /><ModelPicker compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void setFallback(item.task, model)} emptyLabel="Sin modelo alternativo" /></div>)}</div>
+    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Transcripción externa')}<div className="mt-1 flex gap-2"><select className="input" value={settings.sttProvider} onChange={(event) => void patch({ sttProvider: event.target.value as AppSettings['sttProvider'] })}><option value="local">{t('Whisper local (offline)')}</option><option value="openai">OpenAI</option></select><ModelPicker compact settings={settings} value={settings.transcriptionModel} onChange={(model) => void patch({ transcriptionModel: model })} emptyLabel="Modelo del proveedor" /></div></label><label className="text-xs text-neutral-500">{t('Modelo por asignatura')}<select className="input mt-1 w-full" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">{t('Selecciona una asignatura')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>{subjectId && STUDY_TASK_MODELS.map((item) => <label key={item.task} className="text-xs text-neutral-500">{t(item.label)}<ModelPicker compact settings={settings} value={settings.studyAiSubjectModels[subjectId]?.[item.task] ?? null} onChange={(model) => setSubjectModel(item.task, model)} emptyLabel="Heredar modelo principal" /></label>)}</div>
+    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-3"><label className="text-xs text-neutral-500">{t('Presupuesto mensual (USD)')}<input data-testid="study-ai-budget" className="input mt-1 w-full" type="number" min="0" step="1" value={settings.studyAiMonthlyBudgetUsd} onChange={(event) => void patch({ studyAiMonthlyBudgetUsd: Math.max(0, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Avisar al porcentaje')}<input className="input mt-1 w-full" type="number" min="1" max="100" value={settings.studyAiBudgetWarningPercent} onChange={(event) => void patch({ studyAiBudgetWarningPercent: Math.max(1, Math.min(100, Number(event.target.value))) })} /></label><div className="rounded-lg bg-neutral-900 p-3 text-xs"><span className="text-neutral-500">{t('Coste conocido del mes')}</span><b className="mt-1 block text-lg">${(summary?.knownCostUsd ?? 0).toFixed(4)}</b><span className="text-[10px] text-neutral-600">{summary?.unknownCostCalls ?? 0} {t('llamadas sin precio publicado; no se estiman')}</span></div><label className="text-xs text-neutral-500">{t('Máx. caracteres de entrada')}<input className="input mt-1 w-full" type="number" min="1000" value={settings.studyAiMaxInputChars} onChange={(event) => void patch({ studyAiMaxInputChars: Math.max(1000, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Máx. tokens de salida')}<input className="input mt-1 w-full" type="number" min="128" value={settings.studyAiMaxOutputTokens} onChange={(event) => void patch({ studyAiMaxOutputTokens: Math.max(128, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Reintentos antes del alternativo')}<input className="input mt-1 w-full" type="number" min="0" max="2" value={settings.studyAiRetryCount} onChange={(event) => void patch({ studyAiRetryCount: Math.max(0, Math.min(2, Number(event.target.value))) })} /></label></div>
+    <div className="mt-3 flex flex-wrap gap-4 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiLocalOnly} onChange={(event) => void patch({ studyAiLocalOnly: event.target.checked })} />{t('Usar solo modelos locales')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiConfirmExternal} onChange={(event) => void patch({ studyAiConfirmExternal: event.target.checked })} />{t('Confirmar antes de enviar datos fuera del dispositivo')}</label><button className="ml-auto text-red-400 hover:text-red-300" onClick={() => void window.nodus.clearStudyAiUsage().then(refreshUsage)}>{t('Borrar historial de consumo')}</button></div>
+  </div>;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

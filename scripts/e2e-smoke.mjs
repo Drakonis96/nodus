@@ -77,6 +77,7 @@ try {
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
     hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
     hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
+    hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -90,6 +91,7 @@ try {
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
   assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
+  assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -799,6 +801,17 @@ try {
   assert.ok(learningFixture.planner.blocks.some((block) => block.title === 'Repaso smoke de procedencia'));
   assert.ok(learningFixture.progress.overall.reviews >= 1, 'progress dashboard is backed by review evidence');
   console.log('[e2e] planner, Pomodoro registration and evidence-backed progress ok');
+
+  await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+  await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
+  await page.getByTestId('study-ai-settings').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-ai-budget').fill('12');
+  await page.waitForFunction(async () => (await window.nodus.getSettings()).studyAiMonthlyBudgetUsd === 12, { timeout: 30_000 });
+  const aiPolicyFixture = await page.evaluate(async () => ({ settings: await window.nodus.getSettings(), usage: await window.nodus.getStudyAiUsageSummary() }));
+  assert.equal(aiPolicyFixture.settings.studyAiMonthlyBudgetUsd, 12);
+  assert.ok(aiPolicyFixture.usage.failedCalls >= 1, 'failed grading request is auditable in task usage');
+  assert.equal(aiPolicyFixture.usage.knownCostUsd, 0, 'unknown provider price is never guessed');
+  console.log('[e2e] independent study AI policy, budget and truthful usage accounting ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

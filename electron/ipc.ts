@@ -258,6 +258,7 @@ import * as studySearch from './ai/studySearch';
 import * as studyAssistant from './ai/studyAssistant';
 import * as studyQuestions from './db/studyQuestionsRepo';
 import * as studyLearning from './db/studyLearningRepo';
+import * as studyAiUsage from './db/studyAiUsageRepo';
 import { generateStudyQuestions } from './ai/studyQuestions';
 import * as studyAssessments from './db/studyAssessmentsRepo';
 import { buildStudyTest } from './ai/studyTests';
@@ -1939,6 +1940,9 @@ export function registerIpc(
     if (picked.canceled || !picked.filePath) return null;
     fs.writeFileSync(picked.filePath, studyLearning.renderStudyPlannerIcs(), 'utf8'); return { path: picked.filePath };
   });
+  h('study:ai:usage:list', async (_e, limit?: number) => studyAiUsage.listStudyAiUsage(limit));
+  h('study:ai:usage:summary', async () => studyAiUsage.getStudyAiUsageSummary());
+  h('study:ai:usage:clear', async () => studyAiUsage.clearStudyAiUsage());
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

@@ -45,6 +45,7 @@ export const SHARED_MODEL_KEYS = [
   'gradingModel',
   'flashcardModel',
   'transcriptionModel',
+  'studyAiFallbackModels',
   'sttProvider',
   'imageProvider',
   'imageModel',

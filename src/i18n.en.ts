@@ -4182,5 +4182,32 @@ export const EN: Record<string, string> = {
   'Añade una sesión, un examen o un objetivo para empezar.': 'Add a session, exam, or goal to get started.',
   'Tiempo registrado': 'Recorded time',
 
+  // ── Study vault · AI task policy ──────────────────────────────────────────
+  'Modelos del vault de estudio': 'Study vault models',
+  'Cada tarea conserva un modelo principal y un alternativo independiente. Los estilos personalizados pueden seguir fijando su propio modelo.': 'Each task keeps an independent primary and fallback model. Custom styles can still specify their own model.',
+  'llamadas este mes': 'calls this month',
+  Tarea: 'Task',
+  Principal: 'Primary',
+  'Alternativo ante error': 'Fallback on error',
+  'Transcripción externa': 'External transcription',
+  'Modelo por asignatura': 'Model by subject',
+  'Presupuesto mensual (USD)': 'Monthly budget (USD)',
+  'Avisar al porcentaje': 'Warn at percentage',
+  'Coste conocido del mes': 'Known cost this month',
+  'llamadas sin precio publicado; no se estiman': 'calls without published pricing; no estimate is made',
+  'Máx. caracteres de entrada': 'Max input characters',
+  'Máx. tokens de salida': 'Max output tokens',
+  'Reintentos antes del alternativo': 'Retries before fallback',
+  'Usar solo modelos locales': 'Use local models only',
+  'Confirmar antes de enviar datos fuera del dispositivo': 'Confirm before sending data off device',
+  'Borrar historial de consumo': 'Clear usage history',
+  'Generación de preguntas': 'Question generation',
+  'Corrección de exámenes': 'Exam grading',
+  'Generación de flashcards': 'Flashcard generation',
+  'Usar modelo de estudio/síntesis': 'Use study/synthesis model',
+  'Sin modelo alternativo': 'No fallback model',
+  'Modelo del proveedor': 'Provider model',
+  'Heredar modelo principal': 'Inherit primary model',
+
   // <<END_EN>>
 };

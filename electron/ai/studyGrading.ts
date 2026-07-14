@@ -8,10 +8,11 @@ import type {
   StudyRubric,
 } from '@shared/studyGrading';
 import { calculateStudyGradingScore } from '@shared/studyGrading';
-import { getSettings } from '../db/settingsRepo';
 import { getStudyAttemptAnswerContext } from '../db/studyAssessmentsRepo';
 import { getStudyRubric, saveStudyGradingRun } from '../db/studyGradingRepo';
-import { completeTextStream, resolveModelRef } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { completeTextStream } from './aiClient';
+import { runStudyAiTask } from './studyAiPolicy';
 
 type Raw = Record<string, unknown>;
 
@@ -73,8 +74,11 @@ export async function gradeStudyAnswer(
   const source: StudyGradingSource = { title: context.question.source.title || 'Fuente de la pregunta', excerpt: context.question.source.excerpt, location: context.question.source.location as Record<string, unknown> };
   if (!source.excerpt.trim()) throw new Error('La pregunta no tiene evidencia local suficiente para una corrección fundamentada.');
   const sources = [source]; const prompt = buildStudyGradingPrompt({ question: context.question.prompt, answer, modelAnswer: context.question.answer.text ?? '', rubric, sources, severity: request.severity, maxScore: context.item.points });
-  const settings = getSettings(); const model = resolveModelRef(request.model ?? settings.studyModel ?? settings.questionGenModel ?? settings.synthesisModel);
-  const text = await completeTextStream({ system: prompt.system, user: prompt.user, temperature: 0.08, maxTokens: 4000, reasoning: 'off' }, (delta, kind) => onDelta(delta, kind ?? 'content'), model, signal);
+  const aiSettings = getSettings();
+  let streamed = false;
+  const completed = await runStudyAiTask<string>({ task: 'grading', explicitModel: request.model, subjectId: context.question.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed },
+    (model) => completeTextStream({ system: prompt.system, user: prompt.user, temperature: Math.min(0.2, aiSettings.studyAiTemperature), maxTokens: Math.min(4000, aiSettings.studyAiMaxOutputTokens), reasoning: 'off' }, (delta, kind) => { if (kind !== 'reasoning' && delta) streamed = true; onDelta(delta, kind ?? 'content'); }, model, signal));
+  const text = completed.value; const model = completed.model;
   const result = normalizeResult(parseJson(text), rubric, answer, context.item.points);
   return saveStudyGradingRun({ attemptAnswerId: request.attemptAnswerId, rubricId: rubric.id, severity: request.severity, model, sources, result });
 }

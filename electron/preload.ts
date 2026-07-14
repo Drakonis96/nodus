@@ -588,6 +588,9 @@ const api: NodusApi = {
   startStudySession: (input) => ipcRenderer.invoke('study:planner:session:start', input),
   finishStudySession: (id, input) => ipcRenderer.invoke('study:planner:session:finish', id, input),
   exportStudyPlannerIcs: () => ipcRenderer.invoke('study:planner:exportIcs'),
+  listStudyAiUsage: (limit) => ipcRenderer.invoke('study:ai:usage:list', limit),
+  getStudyAiUsageSummary: () => ipcRenderer.invoke('study:ai:usage:summary'),
+  clearStudyAiUsage: () => ipcRenderer.invoke('study:ai:usage:clear').then(() => undefined),
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

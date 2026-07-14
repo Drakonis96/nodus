@@ -96,6 +96,7 @@ import type {
 import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
 import type { StudyProgressDashboard } from './studyStats';
 import type { StudyCalendarEvent, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
+import type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -227,6 +228,7 @@ export type { StudyFlashcard, StudyFlashcardInput, StudyFlashcardType, StudyRevi
 export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './studySrs';
 export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
 export type { StudyCalendarEvent, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
+export type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -995,6 +997,18 @@ export interface AppSettings {
   gradingModel: ModelRef | null;
   flashcardModel: ModelRef | null;
   transcriptionModel: ModelRef | null;
+  /** Optional second choice, used only when the primary task model fails before producing output. */
+  studyAiFallbackModels: Partial<Record<StudyAiTask, ModelRef | null>>;
+  /** Per-subject overrides; styles keep their own existing model override. */
+  studyAiSubjectModels: Record<string, Partial<Record<StudyAiTask, ModelRef | null>>>;
+  studyAiMonthlyBudgetUsd: number;
+  studyAiBudgetWarningPercent: number;
+  studyAiLocalOnly: boolean;
+  studyAiConfirmExternal: boolean;
+  studyAiMaxInputChars: number;
+  studyAiMaxOutputTokens: number;
+  studyAiTemperature: number;
+  studyAiRetryCount: number;
   /** Speech-to-text backend. Local is the privacy-preserving factory default. */
   sttProvider: 'local' | 'openai';
   /** Provider/model used only for optional decorative image generation. */
@@ -4885,6 +4899,9 @@ export interface NodusApi {
   startStudySession(input: { planBlockId?: string | null; subjectId?: string | null; topicId?: string | null; mode?: string; plannedMinutes?: number }): Promise<StudyStudySession>;
   finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): Promise<StudyStudySession>;
   exportStudyPlannerIcs(): Promise<{ path: string } | null>;
+  listStudyAiUsage(limit?: number): Promise<StudyAiUsage[]>;
+  getStudyAiUsageSummary(): Promise<StudyAiUsageSummary>;
+  clearStudyAiUsage(): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

@@ -9,9 +9,10 @@ import {
   restoreProtectedSpans,
   studyImprovementWarnings,
 } from '@shared/studyImprove';
-import { getSettings } from '../db/settingsRepo';
 import { getStudyStyle, recordStudyImprovement } from '../db/studyStylesRepo';
-import { completeTextStream, resolveModelRef } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { completeTextStream } from './aiClient';
+import { runStudyAiTask } from './studyAiPolicy';
 
 const MAX_SELECTION_CHARS = 48_000;
 
@@ -77,11 +78,10 @@ function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function modelFor(request: StudyImproveRequest, style: StudyStyle): ModelRef {
+function modelFor(request: StudyImproveRequest, style: StudyStyle): ModelRef | null {
   if (request.model?.provider && request.model.model) return request.model as ModelRef;
   if (style.modelProvider && style.modelName) return { provider: style.modelProvider, model: style.modelName } as ModelRef;
-  const settings = getSettings();
-  return resolveModelRef(settings.improveModel ?? settings.synthesisModel);
+  return null;
 }
 
 export async function improveStudyText(
@@ -96,14 +96,15 @@ export async function improveStudyText(
   if (!style || !style.active || style.archivedAt) throw new Error('El estilo seleccionado no está disponible.');
   const protectedValue = protectStudyText(original, request.protectedTerms ?? []);
   const prompt = buildStudyImprovePrompt(request, style, protectedValue.text);
-  const model = modelFor(request, style);
+  const requestedModel = modelFor(request, style);
+  const aiSettings = getSettings();
   let streamed = '';
   let visibleStreamed = '';
-  const raw = await completeTextStream({
+  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => completeTextStream({
     system: prompt.system,
     user: prompt.user,
     temperature: request.mode === 'free' ? Math.max(style.temperature, style.creativity) : Math.min(style.temperature, 0.45),
-    maxTokens: style.maxOutputTokens,
+    maxTokens: Math.min(style.maxOutputTokens, aiSettings.studyAiMaxOutputTokens),
     plainContext: true,
   }, (delta, kind) => {
     if (kind !== 'content') return;
@@ -117,7 +118,8 @@ export async function improveStudyText(
       visibleStreamed = visiblePrefix;
       if (visibleDelta) onDelta(visibleDelta);
     }
-  }, model, signal);
+  }, model, signal));
+  const raw = completed.value; const model = completed.model;
   const protectedResult = stripWrappingFence(raw || streamed);
   const missing = missingProtectedSpans(protectedResult, protectedValue.spans);
   if (missing.length) {

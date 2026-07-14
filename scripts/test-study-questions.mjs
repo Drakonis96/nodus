@@ -30,8 +30,8 @@ try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.equal(SCHEMA_VERSION, 62);
-  assert.equal(getDb().pragma('user_version', { simple: true }), 62);
+  assert.equal(SCHEMA_VERSION, 63);
+  assert.equal(getDb().pragma('user_version', { simple: true }), 63);
   for (const table of ['study_questions', 'study_question_versions', 'study_question_collections', 'study_assessments', 'study_attempts', 'study_rubrics', 'study_grading_runs']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
   }
@@ -82,7 +82,7 @@ try {
   }];
   const prompt = ai.buildStudyQuestionPrompt({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['short', 'single_choice'] }, [{ id: 'S1', title: document.title, type: 'document', location: {}, exactFragment: mockStudyEntries[0].text }]);
   assert.match(prompt.system, /exclusivamente los fragmentos exactos/);
-  const generated = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['short', 'single_choice'], subjectId: subject.id });
+  const generated = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['short', 'single_choice'], subjectId: subject.id, model: { provider: 'ollama', model: 'question-verifier' } });
   assert.equal(generated.questions.length, 2, 'near-identical generated question is rejected');
   assert.equal(generated.rejectedDuplicates, 1);
   assert.equal(generated.questions[0].documentId, document.id);
@@ -96,7 +96,7 @@ try {
   legacy.prepare("INSERT INTO study_docs (id, short_id, title, kind, content_markdown, position, created_at, updated_at) VALUES (?, ?, ?, 'apunte', ?, 0, ?, ?)")
     .run('legacy-question-doc', 'DOC-LEGACY-Q', 'Documento v57', '# Se conserva', timestamp, timestamp);
   runMigrations(legacy);
-  assert.equal(legacy.pragma('user_version', { simple: true }), 62);
+  assert.equal(legacy.pragma('user_version', { simple: true }), 63);
   assert.equal(legacy.prepare('SELECT content_markdown FROM study_docs WHERE id=?').get('legacy-question-doc').content_markdown, '# Se conserva');
   legacy.close();
 

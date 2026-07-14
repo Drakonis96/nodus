@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 62;
+export const SCHEMA_VERSION = 63;
 
 export const migrations: Migration[] = [
   {
@@ -2372,6 +2372,19 @@ export const migrations: Migration[] = [
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE INDEX idx_study_sessions_time ON study_study_sessions(started_at, subject_id);
+    `,
+  },
+  {
+    version: 63,
+    up: /* sql */ `
+      -- Study vault phase 12: auditable per-task AI usage without invented pricing.
+      CREATE TABLE study_ai_usage (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, task TEXT NOT NULL,
+        provider TEXT NOT NULL, model TEXT NOT NULL, input_chars INTEGER NOT NULL DEFAULT 0,
+        output_chars INTEGER NOT NULL DEFAULT 0, estimated_cost_usd REAL, status TEXT NOT NULL,
+        fallback_used INTEGER NOT NULL DEFAULT 0, error TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_ai_usage_month ON study_ai_usage(started_at, task, status);
     `,
   },
 ];

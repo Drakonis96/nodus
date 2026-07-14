@@ -6,9 +6,10 @@ import type {
 import { findSimilarStudyQuestion, normalizeGeneratedStudyQuestions } from '@shared/studyQuestions';
 import { compressStudyAssistantEvidence, studyAssistantSourceKey } from '@shared/studyAssistant';
 import type { StudySearchIndexEntry, StudySearchOptions } from '@shared/studySearch';
-import { getSettings } from '../db/settingsRepo';
 import { listStudyQuestions } from '../db/studyQuestionsRepo';
-import { completeJson, resolveModelRef } from './aiClient';
+import { getSettings } from '../db/settingsRepo';
+import { completeJson } from './aiClient';
+import { runStudyAiTask } from './studyAiPolicy';
 import { retrieveStudyAssistantEntries } from './studySearch';
 
 type RawQuestion = Record<string, unknown> & { prompt?: unknown; sourceId?: unknown };
@@ -87,9 +88,10 @@ export async function generateStudyQuestions(request: StudyQuestionGenerationReq
   if (!entries.length && !request.selection?.trim()) throw new Error('No hay fuentes de estudio disponibles para generar preguntas.');
   const sources = sourcePayload(entries, request.selection);
   const prompt = buildStudyQuestionPrompt(request, sources);
-  const settings = getSettings();
-  const model = resolveModelRef(request.model ?? settings.questionGenModel ?? settings.studyModel ?? settings.synthesisModel);
-  const raw = await completeJson<RawQuestionResult>({ system: prompt.system, user: prompt.user, temperature: 0.18, maxTokens: Math.max(1600, prompt.count * 420) }, isRawQuestionResult, model);
+  const aiSettings = getSettings();
+  const completed = await runStudyAiTask<RawQuestionResult>({ task: 'questions', explicitModel: request.model, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length },
+    (model) => completeJson<RawQuestionResult>({ system: prompt.system, user: prompt.user, temperature: aiSettings.studyAiTemperature, maxTokens: Math.min(aiSettings.studyAiMaxOutputTokens, Math.max(1600, prompt.count * 420)) }, isRawQuestionResult, model));
+  const raw = completed.value; const model = completed.model;
   const existing = listStudyQuestions({ archived: true }); const accepted: StudyQuestionInput[] = []; let rejectedDuplicates = 0;
   for (const item of raw.questions) {
     const normalized = normalizeGeneratedStudyQuestions({ questions: [item] })[0];
