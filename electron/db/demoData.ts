@@ -2,6 +2,7 @@ import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
 import { clearGenealogyDemoData } from './genealogyDemoData';
 import { clearDatabasesDemoData } from './databasesDemoData';
+import { clearStudyDemoData } from './studyDemoData';
 
 // A small, self-consistent corpus on the science of learning. It exists so a
 // first-time user can see every static view (graph, ideas, debates, gaps, notes,
@@ -370,7 +371,14 @@ export function hasAnyData(): boolean {
     count('archive_items') > 0 ||
     count('events') > 0 ||
     // Databases-mode content.
-    count('db_databases') > 0
+    count('db_databases') > 0 ||
+    // Study-vault content is first-class data too; without these checks an
+    // existing study workspace could incorrectly be offered another demo.
+    count('study_courses') > 0 ||
+    count('study_docs') > 0 ||
+    count('study_materials') > 0 ||
+    count('study_recordings') > 0 ||
+    count('study_questions') > 0
   );
 }
 
@@ -465,6 +473,7 @@ export function clearDemoData(): void {
   // vault type (whichever the demo flipped away from).
   clearGenealogyDemoData();
   clearDatabasesDemoData();
+  clearStudyDemoData();
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`

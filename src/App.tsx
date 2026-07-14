@@ -234,6 +234,20 @@ export function App() {
     document.documentElement.classList.toggle('estudio', isEstudio);
   }, [isEstudio]);
 
+  // Accessibility preferences are applied at the document root so dialogs,
+  // floating panels and every vault inherit them consistently.
+  useEffect(() => {
+    if (!settings) return;
+    const root = document.documentElement;
+    const scale = Math.max(0.85, Math.min(1.3, settings.interfaceScale || 1));
+    root.style.setProperty('--interface-scale', String(scale));
+    root.style.setProperty('--animation-speed', String(Math.max(0, Math.min(1, settings.animationSpeed))));
+    root.classList.toggle('accessible-font', settings.accessibleFont);
+    root.classList.toggle('high-contrast', settings.highContrast);
+    root.classList.toggle('reduce-motion', settings.reduceMotion);
+    root.classList.toggle('reading-focus', Boolean(isEstudio && settings.readingFocusMode));
+  }, [settings, isEstudio]);
+
   // The user's databases (sidebar list) + the one currently open in the workspace.
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
   const [activeDatabaseId, setActiveDatabaseId] = useState<string | null>(null);
@@ -398,6 +412,21 @@ export function App() {
     }
   }, [reloadSettings, reloadVaults, reloadDatabases, refreshHasData]);
 
+  const loadStudyDemo = useCallback(async () => {
+    setDemoBusy(true);
+    try {
+      const seeded = await window.nodus.seedStudyDemoData();
+      if (seeded) {
+        await reloadSettings();
+        await refreshHasData();
+        notifyDataChanged();
+        setView('home');
+      }
+    } finally {
+      setDemoBusy(false);
+    }
+  }, [reloadSettings, refreshHasData]);
+
   // Cancel the onboarding wizard. If it is running for a freshly-created (non-main)
   // vault, discard that vault and fall back to another one; for the first-run main
   // vault there is nothing to discard, so just skip the wizard.
@@ -548,7 +577,12 @@ export function App() {
     const actions: Command[] = [
       { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
+      { id: 'act:theme', label: isDark ? t('Usar tema claro') : t('Usar tema oscuro'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme claro oscuro', run: () => void window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' }).then(reloadSettings) },
+      { id: 'act:motion', label: settings?.reduceMotion ? t('Activar animaciones') : t('Reducir animaciones'), section: t('Acciones'), icon: 'settings', keywords: 'accesibilidad movimiento animaciones motion', run: () => void window.nodus.updateSettings({ reduceMotion: !settings?.reduceMotion }).then(reloadSettings) },
     ];
+    if (isEstudio) {
+      actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
+    }
     if (!isGenealogy && !isDatabases && !isEstudio) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
@@ -556,7 +590,7 @@ export function App() {
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, activeVault?.type, isGenealogy, isDatabases, isEstudio, onSync, openAssistant]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -592,7 +626,14 @@ export function App() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div
+      className="h-full flex flex-col"
+      data-testid="app-shell"
+      data-interface-scale={settings.interfaceScale}
+      data-high-contrast={settings.highContrast ? 'true' : 'false'}
+      data-reduce-motion={settings.reduceMotion ? 'true' : 'false'}
+      data-reading-focus={isEstudio && settings.readingFocusMode ? 'true' : 'false'}
+    >
       {/* Top bar. `app-titlebar` makes the empty header area a drag region so the
           window can be moved (its interactive children are auto-marked no-drag in
           index.css). On macOS the traffic lights sit at the very top-left. */}
@@ -866,6 +907,8 @@ export function App() {
             <StudyHome
               onNavigate={setView}
               onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+              demoBusy={demoBusy}
+              onLoadDemo={loadStudyDemo}
             />
           )}
           {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && (

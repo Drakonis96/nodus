@@ -20,7 +20,19 @@ import type { AppSettings } from '@shared/types';
 // Everything else in AppSettings stays per-vault (monitored collections, embeddings,
 // onboarding flags, sync/backup, …).
 
-export const GLOBAL_PREF_KEYS = ['theme', 'uiLanguage', 'promptLanguage', 'mascotEnabled', 'mascotAlwaysOnTop', 'mascotVaultCostumes'] as const;
+export const GLOBAL_PREF_KEYS = [
+  'theme',
+  'uiLanguage',
+  'promptLanguage',
+  'interfaceScale',
+  'accessibleFont',
+  'highContrast',
+  'reduceMotion',
+  'readingFocusMode',
+  'mascotEnabled',
+  'mascotAlwaysOnTop',
+  'mascotVaultCostumes',
+] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 
 export const SHARED_MODEL_KEYS = [

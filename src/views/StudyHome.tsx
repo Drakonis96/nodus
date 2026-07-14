@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { View } from '../navigation';
 import type { StudyWorkspace } from '@shared/studyOrg';
 import { t } from '../i18n';
 import { Icon } from '../components/ui';
+import { useDataRefresh } from '../hooks';
 
 const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; description: string }> = [
   { view: 'studyCourses', icon: 'graduation', title: 'Cursos y asignaturas', description: 'Organiza cursos, asignaturas, temas y apuntes.' },
@@ -15,17 +16,24 @@ const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; descr
   { view: 'studyProgress', icon: 'chartBar', title: 'Progreso', description: 'Sigue tu dominio, fortalezas y temas débiles.' },
 ];
 
-export function StudyHome({ onNavigate, onOpenDocument }: { onNavigate: (view: View) => void; onOpenDocument?: (id: string) => void }) {
+export function StudyHome({ onNavigate, onOpenDocument, demoBusy = false, onLoadDemo }: { onNavigate: (view: View) => void; onOpenDocument?: (id: string) => void; demoBusy?: boolean; onLoadDemo?: () => void }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [materialCount, setMaterialCount] = useState(0);
+  const reload = useCallback(async () => {
+    const [next, materials] = await Promise.all([window.nodus.getStudyWorkspace(), window.nodus.listStudyMaterials()]);
+    setWorkspace(next);
+    setMaterialCount(materials.length);
+  }, []);
   useEffect(() => {
     let active = true;
     void Promise.all([window.nodus.getStudyWorkspace(), window.nodus.listStudyMaterials()]).then(([next, materials]) => { if (active) { setWorkspace(next); setMaterialCount(materials.length); } });
     return () => { active = false; };
   }, []);
+  useDataRefresh(reload);
   const recent = [...(workspace?.documents ?? [])]
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 5);
+  const empty = Boolean(workspace && workspace.courses.length === 0 && workspace.subjects.length === 0 && workspace.documents.length === 0 && materialCount === 0);
   return (
     <div className="h-full overflow-y-auto p-6">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -39,6 +47,21 @@ export function StudyHome({ onNavigate, onOpenDocument }: { onNavigate: (view: V
             {t('Organiza materiales y apuntes, practica lo aprendido y planifica el siguiente paso desde un espacio local y privado.')}
           </p>
         </header>
+
+        {empty && onLoadDemo && (
+          <section className="rounded-xl border border-teal-800/60 bg-teal-950/20 p-5" data-testid="study-demo-offer">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-semibold text-teal-200">{t('Explora un espacio de estudio de ejemplo')}</h2>
+                <p className="mt-1 text-xs leading-5 text-neutral-400">{t('Carga un curso local con asignaturas, apuntes, una pregunta, una tarjeta y un plan. Puedes eliminarlo por completo cuando termines.')}</p>
+              </div>
+              <button className="btn btn-primary shrink-0" disabled={demoBusy} onClick={onLoadDemo}>
+                <Icon name={demoBusy ? 'sync' : 'graduation'} className={demoBusy ? 'animate-spin' : ''} />
+                {demoBusy ? t('Cargando…') : t('Cargar datos de ejemplo')}
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="grid gap-3 sm:grid-cols-3">
           {[

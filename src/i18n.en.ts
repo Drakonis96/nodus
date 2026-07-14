@@ -23,6 +23,9 @@ export const EN: Record<string, string> = {
   Biblioteca: 'Library',
   'Vault de estudio': 'Study vault',
   'Tu espacio de aprendizaje': 'Your learning workspace',
+  'Explora un espacio de estudio de ejemplo': 'Explore a sample study workspace',
+  'Carga un curso local con asignaturas, apuntes, una pregunta, una tarjeta y un plan. Puedes eliminarlo por completo cuando termines.':
+    'Load a local course with subjects, notes, a question, a flashcard and a plan. You can remove it completely when you finish.',
   'Organiza materiales y apuntes, practica lo aprendido y planifica el siguiente paso desde un espacio local y privado.':
     'Organise materials and notes, practise what you learn and plan the next step from a private local workspace.',
   'Cursos y asignaturas': 'Courses and subjects',
@@ -42,6 +45,23 @@ export const EN: Record<string, string> = {
   'Guía de estudio del corpus': 'Corpus study guide',
   'Crea una ruta guiada a partir de las obras e ideas que ya tienes en Nodus.':
     'Create a guided path from the works and ideas you already have in Nodus.',
+  'Accesibilidad y lectura': 'Accessibility and reading',
+  'Tamaño de la interfaz': 'Interface size',
+  'Ajusta menús, botones y texto sin cambiar el contenido de los documentos.': 'Adjust menus, buttons and text without changing document content.',
+  'Fuente de alta legibilidad': 'High-legibility font',
+  'Usa una fuente de sistema más ancha y clara, también sin conexión.': 'Use a wider, clearer system font that also works offline.',
+  'Contraste reforzado': 'Enhanced contrast',
+  'Refuerza bordes, foco de teclado y separación entre fondo y texto.': 'Strengthen borders, keyboard focus and foreground/background separation.',
+  'Reducir animaciones': 'Reduce motion',
+  'Elimina movimiento no esencial; la preferencia del sistema siempre se respeta.': 'Remove non-essential motion; the system preference is always respected.',
+  'Modo de lectura': 'Reading mode',
+  'Da al editor una medida más cómoda y reduce el ruido visual del área de lectura.': 'Give the editor a more comfortable measure and reduce visual noise in the reading area.',
+  'Puedes recorrer los controles con Tab, activar botones con Intro o Espacio y abrir la paleta global con Ctrl/⌘ K.': 'Use Tab to move through controls, Enter or Space to activate buttons, and Ctrl/⌘ K to open the global palette.',
+  'Usar tema claro': 'Use light theme',
+  'Usar tema oscuro': 'Use dark theme',
+  'Activar animaciones': 'Enable motion',
+  'Entrar en modo lectura': 'Enter reading mode',
+  'Salir del modo lectura': 'Exit reading mode',
   'Aquí organizarás cursos, asignaturas, temas, carpetas y apuntes.':
     'This is where you will organise courses, subjects, topics, folders and notes.',
   'Aquí reunirás y consultarás todos tus materiales y fuentes.':

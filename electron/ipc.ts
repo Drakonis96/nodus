@@ -221,6 +221,7 @@ import { parsePageNumber, zoteroOpenPdfUrl, zoteroSelectUrl } from '@shared/page
 import { hasAnyData, seedDemoData, clearDemoData } from './db/demoData';
 import { seedGenealogyDemoData } from './db/genealogyDemoData';
 import { seedDatabasesDemoData } from './db/databasesDemoData';
+import { seedStudyDemoData } from './db/studyDemoData';
 import { generateDemoPortraits, hasDemoPortraitKey } from './ai/genealogyDemoPortraits';
 import { exportNotes } from './export/notesExport';
 import { reorderNotesByAI } from './ai/notesOrder';
@@ -2472,6 +2473,8 @@ export function registerIpc(
   // Databases demo: seeds three sample databases covering every column type and flips
   // the vault to the databases type.
   h('data:seedDatabasesDemo', async () => seedDatabasesDemoData());
+  // Study demo stays entirely local and is only accepted by an empty study vault.
+  h('data:seedStudyDemo', async () => seedStudyDemoData());
 
   h('updates:check', async () => checkForUpdates());
   h('updates:install', async () => installUpdate());

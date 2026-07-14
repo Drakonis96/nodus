@@ -78,6 +78,7 @@ try {
     hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
     hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
+    hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -92,6 +93,7 @@ try {
   assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
   assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
+  assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -823,6 +825,58 @@ try {
   assert.deepEqual(dataFixture.foreignKeyErrors, [], 'study data panel detects no orphaned references');
   assert.ok(dataFixture.studyRows > 0, 'study data panel counts the E2E rows');
   console.log('[e2e] study privacy controls and real data administration checks ok');
+
+  // Accessibility preferences are changed through the rendered controls and
+  // applied at the document root, including the study-only reading mode.
+  await page.getByRole('button', { name: 'Interfaz', exact: true }).click();
+  const accessibility = page.getByTestId('accessibility-settings');
+  await accessibility.waitFor({ timeout: 30_000 });
+  await page.getByLabel('Tamaño de la interfaz', { exact: true }).fill('1.15');
+  const checkAccessibility = async (label) => accessibility.locator('label').filter({ hasText: label }).locator('input[type="checkbox"]').check();
+  await checkAccessibility('Fuente de alta legibilidad');
+  await checkAccessibility('Contraste reforzado');
+  await checkAccessibility('Reducir animaciones');
+  await checkAccessibility('Modo de lectura');
+  await page.waitForFunction(() => document.documentElement.classList.contains('accessible-font')
+    && document.documentElement.classList.contains('high-contrast')
+    && document.documentElement.classList.contains('reduce-motion')
+    && document.documentElement.classList.contains('reading-focus'));
+  assert.equal(await page.getByTestId('app-shell').getAttribute('data-interface-scale'), '1.15');
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K');
+  await page.getByText('Salir del modo lectura', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.keyboard.press('Escape');
+  console.log('[e2e] accessibility controls + keyboard command palette apply globally');
+
+  // A second, empty study vault exercises the real sample-data offer and the
+  // reversible cleanup path without touching the study records created above.
+  await page.evaluate(async () => {
+    const created = await window.nodus.createVault({ name: 'Study demo smoke', type: 'estudio' });
+    const switched = await window.nodus.switchVault(created.vault.id);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true });
+  });
+  await page.reload();
+  await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Cargar datos de ejemplo', exact: true }).click();
+  await page.waitForFunction(async () => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    return workspace.courses.length === 1 && workspace.subjects.length === 2 && workspace.documents.length === 2;
+  }, { timeout: 30_000 });
+  await page.getByText('Membrana plasmática · resumen', { exact: true }).waitFor({ timeout: 30_000 });
+  const demoFixture = await page.evaluate(async () => ({
+    settings: await window.nodus.getSettings(),
+    questions: await window.nodus.listStudyQuestions(),
+    cards: await window.nodus.listStudyFlashcards(),
+    planner: await window.nodus.getStudyPlanner(),
+  }));
+  assert.equal(demoFixture.settings.demoMode, true);
+  assert.equal(demoFixture.questions.length, 1);
+  assert.equal(demoFixture.cards.length, 1);
+  assert.equal(demoFixture.planner.plans.length, 1);
+  await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
+  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0, { timeout: 30_000 });
+  await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
+  console.log('[e2e] reversible study sample workspace works through the real UI and IPC bridge');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

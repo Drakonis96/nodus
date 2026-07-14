@@ -87,6 +87,11 @@ try {
     'nodus_get_database_schema',
     'nodus_query_database',
     'nodus_get_database_row',
+    'nodus_study_get_workspace',
+    'nodus_study_get_document',
+    'nodus_study_search',
+    'nodus_study_list_questions',
+    'nodus_study_get_progress',
   ];
   assert.deepEqual([...server.tools.keys()], expectedTools);
 
@@ -138,6 +143,45 @@ try {
   assert.equal(qFiltered.total, 0, 'query filters by text');
   const gotRow = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
   assert.equal(gotRow.fields.Nombre, 'Gato', 'nodus_get_database_row decodes the row');
+
+  // Read-only study-vault tools expose organisation, grounded search, questions
+  // and progress without allowing an MCP client to mutate learning state.
+  const studyOrg = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
+  const studyQuestions = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts'));
+  const studyCourse = studyOrg.createStudyCourse({ name: 'Biología MCP' });
+  const studySubject = studyOrg.createStudySubject({ courseId: studyCourse.id, name: 'Biología celular' });
+  const studyTopic = studyOrg.createStudyTopic({ subjectId: studySubject.id, name: 'Membrana' });
+  const studyDoc = studyOrg.createStudyDocument({
+    title: 'Membrana plasmática',
+    contentMarkdown: '# Membrana\n\nEl transporte activo mueve solutos contra gradiente.',
+    placement: { courseId: studyCourse.id, subjectId: studySubject.id, topicId: studyTopic.id },
+  });
+  const studyQuestion = studyQuestions.createStudyQuestion({
+    prompt: '¿Qué mueve solutos contra gradiente?',
+    type: 'short',
+    answer: { text: 'El transporte activo.' },
+    explanation: 'El transporte activo requiere energía.',
+    courseId: studyCourse.id,
+    subjectId: studySubject.id,
+    topicId: studyTopic.id,
+    documentId: studyDoc.id,
+    source: { title: studyDoc.title, excerpt: 'El transporte activo mueve solutos contra gradiente.' },
+  });
+  const studyWorkspace = await callTool(server, 'nodus_study_get_workspace', { includeArchived: false });
+  assert.ok(studyWorkspace.courses.some((course) => course.id === studyCourse.id));
+  assert.equal('contentMarkdown' in studyWorkspace.documents.find((document) => document.id === studyDoc.id), false, 'workspace keeps document bodies compact');
+  const compactStudyDoc = await callTool(server, 'nodus_study_get_document', { documentId: studyDoc.shortId, includeContent: false });
+  assert.equal(compactStudyDoc.contentOmitted, true);
+  assert.equal('contentMarkdown' in compactStudyDoc.document, false);
+  const fullStudyDoc = await callTool(server, 'nodus_study_get_document', { documentId: studyDoc.id, includeContent: true });
+  assert.match(fullStudyDoc.document.contentMarkdown, /transporte activo/);
+  const studySearch = await callTool(server, 'nodus_study_search', { query: 'transporte activo', kinds: ['document'], limit: 10 });
+  assert.ok(studySearch.results.some((result) => result.sourceId === studyDoc.id), 'study search returns grounded document snippets');
+  const questionList = await callTool(server, 'nodus_study_list_questions', { query: 'solutos', favorite: false, limit: 10, offset: 0 });
+  assert.ok(questionList.questions.some((question) => question.id === studyQuestion.id));
+  const studyProgress = await callTool(server, 'nodus_study_get_progress');
+  assert.equal(typeof studyProgress.progress.dueCards, 'number');
+  assert.ok(Array.isArray(studyProgress.planner.events));
 
   const ideas = await callTool(server, 'nodus_list_ideas', { limit: 1, offset: 0, query: 'turismo' });
   assert.equal(ideas.total, 1);

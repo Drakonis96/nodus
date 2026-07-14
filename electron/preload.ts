@@ -845,6 +845,7 @@ const api: NodusApi = {
   clearDemoData: () => ipcRenderer.invoke('data:clearDemo').then(() => undefined),
   seedGenealogyDemoData: () => ipcRenderer.invoke('data:seedGenealogyDemo'),
   seedDatabasesDemoData: () => ipcRenderer.invoke('data:seedDatabasesDemo'),
+  seedStudyDemoData: () => ipcRenderer.invoke('data:seedStudyDemo'),
   generateDemoPortraits: () => ipcRenderer.invoke('data:generateDemoPortraits'),
   onDemoPortraitsProgress: (cb) => {
     const listener = (_e: unknown, p: { done: number; total: number }) => cb(p);

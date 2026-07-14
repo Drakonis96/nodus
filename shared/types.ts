@@ -1047,6 +1047,16 @@ export interface AppSettings {
   // Language injected into AI prompts → language of generated ideas/themes/answers.
   promptLanguage: PromptLanguage;
   animationSpeed: number; // 0..1
+  /** Global UI zoom. Kept independent from document/editor typography. */
+  interfaceScale: number; // 0.85..1.3
+  /** Uses a wider, highly legible system font stack without downloading fonts. */
+  accessibleFont: boolean;
+  /** Strengthens borders, focus rings and foreground/background separation. */
+  highContrast: boolean;
+  /** Disables non-essential motion, in addition to the OS preference. */
+  reduceMotion: boolean;
+  /** Reduces visual noise and gives study reading surfaces a calmer measure. */
+  readingFocusMode: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -1079,6 +1089,8 @@ export interface AppSettings {
   genealogyTourComplete: boolean;
   // Completion flag for the databases-mode guided tour (shown once per databases vault).
   databasesTourComplete: boolean;
+  // Completion flag for the optional study-vault orientation tour.
+  studyTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -5189,6 +5201,8 @@ export interface NodusApi {
    *  kicks off background portrait generation when a Gemini key is present. */
   seedGenealogyDemoData(): Promise<{ seeded: boolean; willGeneratePortraits: boolean }>;
   seedDatabasesDemoData(): Promise<boolean>;
+  /** Seed an empty study vault with a small, fully local learning workspace. */
+  seedStudyDemoData(): Promise<boolean>;
   /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
   generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
   /** Progress of demo portrait generation. Returns an unsubscribe function. */

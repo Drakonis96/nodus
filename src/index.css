@@ -22,6 +22,8 @@
 
 :root {
   color-scheme: dark;
+  --interface-scale: 1;
+  --animation-speed: 1;
 }
 
 .light {
@@ -35,8 +37,67 @@ body,
   margin: 0;
 }
 
+html {
+  font-size: calc(16px * var(--interface-scale));
+}
+
 body {
   @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+}
+
+/* Accessibility controls are offline-safe and affect renderer-owned surfaces,
+   including portals. The OS reduced-motion preference is always respected. */
+.accessible-font body {
+  font-family: Verdana, Tahoma, Arial, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+:where(button, a, input, select, textarea, [role='button'], [tabindex]):focus-visible {
+  outline: 3px solid #2dd4bf;
+  outline-offset: 2px;
+}
+
+.high-contrast body {
+  background: #000;
+  color: #fff;
+}
+
+.high-contrast :where(.card, .input, button, select, textarea) {
+  border-color: #a3a3a3 !important;
+}
+
+.high-contrast.light body {
+  background: #fff;
+  color: #000;
+}
+
+.reading-focus .study-editor-shell .milkdown .ProseMirror {
+  --study-editor-width: 48rem;
+  --study-editor-line: 1.8;
+}
+
+.reading-focus .study-editor-shell {
+  background-image: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }
 
 @keyframes study-plan-progress {

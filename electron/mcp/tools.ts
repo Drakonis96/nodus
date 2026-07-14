@@ -40,6 +40,10 @@ import type { DatabaseColumn, DatabaseRow } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
 import * as writingDrafts from '../db/writingDraftsRepo';
+import * as studyOrg from '../db/studyOrgRepo';
+import * as studyQuestions from '../db/studyQuestionsRepo';
+import * as studyLearning from '../db/studyLearningRepo';
+import { searchStudyCorpus } from '../ai/studySearch';
 import { buildAuthorGraph, getDebate, getDebates } from '../graph/graphService';
 import { embed, AiError } from '../ai/aiClient';
 import { decomposeQuestion, mapCoverage } from '../ai/researchMap';
@@ -496,6 +500,9 @@ export function registerTools(server: McpServer): void {
         passages: count('passages'),
         notes: count('notes'),
         databases: dbMode.listDatabases().length,
+        studyCourses: studyOrg.getStudyWorkspace().courses.length,
+        studyDocuments: studyOrg.getStudyWorkspace().documents.length,
+        studyQuestions: studyQuestions.listStudyQuestions().length,
       },
       enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS },
     }))
@@ -1716,5 +1723,135 @@ export function registerTools(server: McpServer): void {
         const detail = dbMode.getDatabaseDetail(row.databaseId);
         return dbRowRecord(detail?.columns ?? [], row);
       })()
+  );
+
+  // ── Study vault (read-only) ────────────────────────────────────────────────
+  // Learning data can be inspected and searched by an explicitly enabled local
+  // MCP client, but creation, grading and review decisions remain in the app.
+  server.registerTool(
+    'nodus_study_get_workspace',
+    {
+      title: 'Get study workspace',
+      description:
+        'Returns the active vault\'s study organisation: courses, subjects, topics and compact document metadata. Read-only. Empty arrays mean that the active vault has no study layer.',
+      inputSchema: { includeArchived: z.boolean().default(false) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ includeArchived }) =>
+      tool(() => {
+        const workspace = studyOrg.getStudyWorkspace({ includeArchived });
+        return {
+          courses: workspace.courses,
+          subjects: workspace.subjects,
+          topics: workspace.topics,
+          documents: workspace.documents.map(({ contentMarkdown: _content, ...document }) => document),
+          placements: workspace.placements,
+          tags: workspace.tags,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_study_get_document',
+    {
+      title: 'Get study document',
+      description:
+        'Gets one study document and its placements. Content is omitted by default; pass includeContent=true when the complete Markdown is needed. Read-only.',
+      inputSchema: {
+        documentId: z.string().trim().min(1),
+        includeContent: z.boolean().default(false),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ documentId, includeContent }) =>
+      tool(() => {
+        const workspace = studyOrg.getStudyWorkspace({ includeArchived: true, includeDeleted: false });
+        const document = workspace.documents.find((item) => item.id === documentId || item.shortId === documentId);
+        if (!document) throw notFound('study document', documentId);
+        const { contentMarkdown: _contentMarkdown, ...metadata } = document;
+        return {
+          document: includeContent ? document : metadata,
+          placements: workspace.placements.filter((placement) => placement.documentId === document.id),
+          tags: workspace.documentTags
+            .filter((link) => link.documentId === document.id)
+            .map((link) => workspace.tags.find((tag) => tag.id === link.tagId))
+            .filter(Boolean),
+          contentOmitted: !includeContent,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_study_search',
+    {
+      title: 'Search the study corpus',
+      description:
+        'Searches study documents, imported materials, transcripts, questions and exams in the active vault. Returns grounded snippets and precise locations where available. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(2).max(2_000),
+        kinds: z.array(z.enum(['document', 'material', 'transcript', 'question', 'exam'])).max(5).optional(),
+        courseId: z.string().trim().min(1).optional(),
+        subjectId: z.string().trim().min(1).optional(),
+        topicId: z.string().trim().min(1).optional(),
+        limit: z.number().int().min(1).max(100).default(20),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, kinds, courseId, subjectId, topicId, limit }) =>
+      tool(async () => searchStudyCorpus(query, { kinds, courseId, subjectId, topicId, limit }))()
+  );
+
+  server.registerTool(
+    'nodus_study_list_questions',
+    {
+      title: 'List study questions',
+      description:
+        'Lists compact, source-grounded questions from the active study vault. Read-only; lifecycle and grading actions remain inside Nodus.',
+      inputSchema: {
+        query: querySchema,
+        subjectId: z.string().trim().min(1).optional(),
+        topicId: z.string().trim().min(1).optional(),
+        favorite: z.boolean().default(false),
+        limit: z.number().int().min(1).max(200).default(50),
+        offset: z.number().int().min(0).default(0),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, subjectId, topicId, favorite, limit, offset }) =>
+      tool(() => {
+        const questions = studyQuestions.listStudyQuestions({ search: query, subjectId, topicId, favorite });
+        const compact = questions.map((question) => ({
+          id: question.id,
+          shortId: question.shortId,
+          prompt: question.prompt,
+          type: question.type,
+          difficulty: question.difficulty,
+          cognitiveLevel: question.cognitiveLevel,
+          status: question.status,
+          explanation: question.explanation,
+          tags: question.tags,
+          courseId: question.courseId,
+          subjectId: question.subjectId,
+          topicId: question.topicId,
+          source: question.source,
+          favorite: question.favorite,
+        }));
+        return page('questions', compact, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_study_get_progress',
+    {
+      title: 'Get study progress',
+      description:
+        'Returns the local evidence-based study progress dashboard and planner snapshot. Read-only; no review, session or goal is changed.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    tool(() => ({
+      progress: studyLearning.getStudyProgressDashboard(),
+      planner: studyLearning.getStudyPlanner(),
+    }))
   );
 }

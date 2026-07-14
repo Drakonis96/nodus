@@ -31,7 +31,7 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'models', label: 'Modelos IA', icon: 'wand', keywords: 'model model id embedding embeddings extraccion sintesis tutor resumen fusion razonamiento openrouter unpaywall contexto concurrencia' },
   { id: 'library', label: 'Biblioteca', icon: 'book', keywords: 'zotero sincronizacion tag lectura automatizacion cola analisis resumen relaciones' },
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
-  { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion' },
+  { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
   { id: 'system', label: 'Sistema', icon: 'settings', keywords: 'ayuda tutorial actualizaciones update version' },
   { id: 'data', label: 'Datos', icon: 'download', keywords: 'backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
@@ -282,6 +282,7 @@ export function Settings({
     visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar'),
     visibleSettingsSection('interface', 'Idioma', 'interfaz prompts idioma español english citas'),
     visibleSettingsSection('interface', 'Apariencia', 'tema claro oscuro animaciones velocidad'),
+    visibleSettingsSection('interface', 'Accesibilidad y lectura', 'escala zoom fuente legible contraste movimiento animaciones enfoque lectura teclado lector pantalla'),
     visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante'),
     visibleSettingsSection('interface', 'Barra lateral', 'menu lateral ordenar ocultar mostrar navegacion'),
     visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar'),
@@ -454,6 +455,47 @@ export function Settings({
                 onChange={(e) => patch({ animationSpeed: parseFloat(e.target.value) })}
               />
             </Row>
+          </Section>
+      )}
+
+      {visibleSettingsSection('interface', 'Accesibilidad y lectura', 'escala zoom fuente legible contraste movimiento animaciones enfoque lectura teclado lector pantalla') && (
+          <Section title={t('Accesibilidad y lectura')}>
+            <div data-testid="accessibility-settings" className="space-y-3">
+              <Row label={t('Tamaño de la interfaz')} hint={t('Ajusta menús, botones y texto sin cambiar el contenido de los documentos.') }>
+                <div className="flex w-full max-w-md items-center gap-3">
+                  <input
+                    className="min-w-0 flex-1"
+                    type="range"
+                    min={0.85}
+                    max={1.3}
+                    step={0.05}
+                    value={settings.interfaceScale}
+                    aria-label={t('Tamaño de la interfaz')}
+                    onChange={(e) => void patch({ interfaceScale: Math.max(0.85, Math.min(1.3, Number(e.target.value))) })}
+                  />
+                  <output className="w-12 text-right text-xs text-neutral-400">{Math.round(settings.interfaceScale * 100)}%</output>
+                </div>
+              </Row>
+              <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
+                <span><span className="block text-sm text-neutral-300">{t('Fuente de alta legibilidad')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Usa una fuente de sistema más ancha y clara, también sin conexión.')}</span></span>
+                <input type="checkbox" checked={settings.accessibleFont} onChange={(e) => void patch({ accessibleFont: e.target.checked })} />
+              </label>
+              <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
+                <span><span className="block text-sm text-neutral-300">{t('Contraste reforzado')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Refuerza bordes, foco de teclado y separación entre fondo y texto.')}</span></span>
+                <input type="checkbox" checked={settings.highContrast} onChange={(e) => void patch({ highContrast: e.target.checked })} />
+              </label>
+              <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
+                <span><span className="block text-sm text-neutral-300">{t('Reducir animaciones')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Elimina movimiento no esencial; la preferencia del sistema siempre se respeta.')}</span></span>
+                <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => void patch({ reduceMotion: e.target.checked })} />
+              </label>
+              {activeVault?.type === 'estudio' && (
+                <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
+                  <span><span className="block text-sm text-neutral-300">{t('Modo de lectura')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Da al editor una medida más cómoda y reduce el ruido visual del área de lectura.')}</span></span>
+                  <input type="checkbox" checked={settings.readingFocusMode} onChange={(e) => void patch({ readingFocusMode: e.target.checked })} />
+                </label>
+              )}
+              <p className="text-xs text-neutral-500">{t('Puedes recorrer los controles con Tab, activar botones con Intro o Espacio y abrir la paleta global con Ctrl/⌘ K.')}</p>
+            </div>
           </Section>
       )}
 
