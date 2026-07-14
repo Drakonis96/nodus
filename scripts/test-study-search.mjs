@@ -28,6 +28,7 @@ try {
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const materials = require(path.join(repoRoot, 'electron/db/studyMaterialsRepo.ts'));
   const recordings = require(path.join(repoRoot, 'electron/db/studyRecordingsRepo.ts'));
+  const questions = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts'));
   const search = require(path.join(repoRoot, 'electron/ai/studySearch.ts'));
   const { closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
 
@@ -59,10 +60,17 @@ try {
     kind: 'literal', contentMarkdown: 'El ejecutivo central coordina recursos.', status: 'ready',
     segments: [{ tStart: 7, tEnd: 12, text: 'El ejecutivo central coordina recursos.', speaker: 'Docente' }],
   });
+  const question = questions.createStudyQuestion({
+    prompt: '¿Qué subsistema mantiene imágenes temporalmente?', type: 'short', status: 'approved',
+    answer: { text: 'La agenda visoespacial.' }, explanation: 'Procede del apunte de memoria.',
+    courseId: course.id, subjectId: subject.id, topicId: topic.id, documentId: document.id,
+    source: { title: document.title, excerpt: 'La agenda visoespacial mantiene imágenes temporalmente.' },
+  });
 
   const collected = search.collectStudySearchEntries();
   assert.ok(collected.some((entry) => entry.sourceId === document.id && entry.kind === 'document'));
   assert.ok(collected.some((entry) => entry.sourceId === material.material.id && entry.kind === 'material'));
+  assert.ok(collected.some((entry) => entry.sourceId === question.id && entry.kind === 'question'), 'the central bank participates in the hybrid index');
   const transcriptEntry = collected.find((entry) => entry.kind === 'transcript');
   assert.equal(transcriptEntry.location.timestampSeconds, 7, 'transcript index preserves audio seek target');
   const rebuilt = await search.rebuildStudySearchIndex();
@@ -77,6 +85,8 @@ try {
   assert.equal(materialSearch.results[0].sourceId, material.material.id);
   const transcriptSearch = await search.searchStudyCorpus('ejecutivo central');
   assert.equal(transcriptSearch.results[0].location.recordingId, recording.recording.id);
+  const questionSearch = await search.searchStudyCorpus('qué subsistema mantiene imágenes', { kinds: ['question'] });
+  assert.equal(questionSearch.results[0].sourceId, question.id);
 
   const saved = search.saveStudySearch('Memoria clave', 'memoria', { subjectId: subject.id });
   assert.equal(search.listStudySavedSearches()[0].id, saved.id);

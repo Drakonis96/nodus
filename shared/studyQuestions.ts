@@ -119,7 +119,15 @@ export interface StudyQuestionGenerationResult {
 export interface StudyQuestionCollection {
   id: string; shortId: string; name: string; description: string; color: string;
   favorite: boolean; position: number; archivedAt: string | null; questionCount: number;
-  createdAt: string; updatedAt: string;
+  questionIds: string[]; createdAt: string; updatedAt: string;
+}
+
+export interface StudyQuestionSimilar { question: StudyQuestion; similarity: number }
+export interface StudyQuestionAnalytics {
+  averageResponseMs: number;
+  successRate: number | null;
+  observedDifficulty: 'unrated' | 'too_easy' | 'balanced' | 'too_hard';
+  optionSelections: Array<{ optionId: string; text: string; selectedCount: number; correct: boolean }>;
 }
 
 export interface StudyQuestionVersion {

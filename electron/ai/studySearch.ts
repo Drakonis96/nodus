@@ -216,9 +216,35 @@ function addTranscriptEntries(entries: StudySearchIndexEntry[], maps: ReturnType
   }
 }
 
+function addQuestionEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeof nameMaps>): void {
+  const rows = getDb().prepare(`SELECT * FROM study_questions WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY updated_at DESC`).all() as Row[];
+  for (const row of rows) {
+    const sourceId = String(row.id); const title = String(row.prompt); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const answer = parseJson<{ text?: string; value?: unknown }>(row.answer_json, {}); const options = parseJson<Array<{ text?: string }>>(row.options_json, []);
+    const text = [title, answer.text ?? String(answer.value ?? ''), String(row.explanation ?? ''), String(row.source_excerpt ?? ''), ...options.map((option) => option.text ?? '')].filter(Boolean).join('\n');
+    entries.push({
+      indexId: `question:${sourceId}`, kind: 'question', sourceId, title, text,
+      subtitle: [scopeSubtitle(scope, maps), String(row.question_type), String(row.difficulty)].filter(Boolean).join(' · '),
+      tags: parseJson(row.tags_json, []), scope, location: {}, createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+      contentHash: hash(`${title}\0${text}`), embedding: null, excluded: false,
+    });
+  }
+}
+
+function addExamEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeof nameMaps>): void {
+  const rows = getDb().prepare(`SELECT a.*, GROUP_CONCAT(q.prompt, '\n') AS prompts FROM study_assessments a
+    LEFT JOIN study_assessment_items i ON i.assessment_id=a.id LEFT JOIN study_questions q ON q.id=i.question_id
+    WHERE a.kind='exam' AND a.archived_at IS NULL AND a.deleted_at IS NULL GROUP BY a.id ORDER BY a.updated_at DESC`).all() as Row[];
+  for (const row of rows) {
+    const sourceId = String(row.id); const title = String(row.title); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const text = [title, String(row.description ?? ''), String(row.prompts ?? '')].filter(Boolean).join('\n');
+    entries.push({ indexId: `exam:${sourceId}`, kind: 'exam', sourceId, title, text, subtitle: scopeSubtitle(scope, maps), tags: [], scope, location: {}, createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`${title}\0${text}`), embedding: null, excluded: false });
+  }
+}
+
 export function collectStudySearchEntries(): StudySearchIndexEntry[] {
   const entries: StudySearchIndexEntry[] = []; const maps = nameMaps();
-  addDocumentEntries(entries, maps); addMaterialEntries(entries, maps); addTranscriptEntries(entries, maps);
+  addDocumentEntries(entries, maps); addMaterialEntries(entries, maps); addTranscriptEntries(entries, maps); addQuestionEntries(entries, maps); addExamEntries(entries, maps);
   return entries;
 }
 

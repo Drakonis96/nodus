@@ -6,8 +6,10 @@ import type {
   StudyQuestionFilters,
   StudyQuestionInput,
   StudyQuestionVersion,
+  StudyQuestionAnalytics,
+  StudyQuestionSimilar,
 } from '@shared/studyQuestions';
-import { findSimilarStudyQuestion, validateStudyQuestionInput } from '@shared/studyQuestions';
+import { findSimilarStudyQuestion, studyQuestionSimilarity, validateStudyQuestionInput } from '@shared/studyQuestions';
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import { getDb } from './database';
 
@@ -186,7 +188,7 @@ export function listStudyQuestionCollections(): StudyQuestionCollection[] {
     LEFT JOIN study_question_collection_items i ON i.collection_id=c.id GROUP BY c.id ORDER BY c.favorite DESC, c.position, c.name`).all() as Row[]).map((row) => ({
     id: String(row.id), shortId: String(row.short_id), name: String(row.name), description: String(row.description ?? ''), color: String(row.color ?? '#0f766e'),
     favorite: bool(row.favorite), position: Number(row.position), archivedAt: row.archived_at ? String(row.archived_at) : null,
-    questionCount: Number(row.question_count), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    questionCount: Number(row.question_count), questionIds: (getDb().prepare('SELECT question_id FROM study_question_collection_items WHERE collection_id=? ORDER BY position').all(String(row.id)) as Row[]).map((item) => String(item.question_id)), createdAt: String(row.created_at), updatedAt: String(row.updated_at),
   }));
 }
 
@@ -209,3 +211,26 @@ export function setStudyQuestionCollectionItems(collectionId: string, questionId
 }
 
 export function deleteStudyQuestionCollection(id: string): void { getDb().prepare('DELETE FROM study_question_collections WHERE id=?').run(id); }
+
+export function findSimilarStudyQuestions(id: string, threshold = 0.45): StudyQuestionSimilar[] {
+  const current = getStudyQuestion(id); if (!current) return [];
+  return listStudyQuestions({ archived: true }).filter((question) => question.id !== id)
+    .map((question) => ({ question, similarity: studyQuestionSimilarity(current.prompt, question.prompt) }))
+    .filter((entry) => entry.similarity >= threshold).sort((left, right) => right.similarity - left.similarity).slice(0, 12);
+}
+
+export function getStudyQuestionAnalytics(id: string): StudyQuestionAnalytics {
+  const question = getStudyQuestion(id); if (!question) throw new Error('Pregunta no encontrada.');
+  const rows = getDb().prepare('SELECT response_json FROM study_attempt_answers WHERE question_id=?').all(id) as Row[];
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const response = json<{ value?: string | string[] }>(row.response_json, {}); const values = Array.isArray(response.value) ? response.value : response.value == null ? [] : [response.value];
+    for (const value of values) counts.set(String(value), (counts.get(String(value)) ?? 0) + 1);
+  }
+  const successRate = question.usageCount ? question.correctCount / question.usageCount : null;
+  const observedDifficulty = successRate == null ? 'unrated' : successRate >= 0.88 ? 'too_easy' : successRate <= 0.35 ? 'too_hard' : 'balanced';
+  return {
+    averageResponseMs: question.usageCount ? Math.round(question.totalResponseMs / question.usageCount) : 0, successRate, observedDifficulty,
+    optionSelections: question.options.map((option) => ({ optionId: option.id, text: option.text, selectedCount: counts.get(option.id) ?? 0, correct: option.correct })),
+  };
+}

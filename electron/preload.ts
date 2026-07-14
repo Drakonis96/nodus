@@ -541,6 +541,8 @@ const api: NodusApi = {
   createStudyQuestionCollection: (name, description) => ipcRenderer.invoke('study:questions:collections:create', name, description),
   setStudyQuestionCollectionItems: (collectionId, questionIds) => ipcRenderer.invoke('study:questions:collections:setItems', collectionId, questionIds).then(() => undefined),
   deleteStudyQuestionCollection: (id) => ipcRenderer.invoke('study:questions:collections:delete', id).then(() => undefined),
+  getStudyQuestionAnalytics: (id) => ipcRenderer.invoke('study:questions:analytics', id),
+  findSimilarStudyQuestions: (id, threshold) => ipcRenderer.invoke('study:questions:similar', id, threshold),
   listStudyAssessments: (kind, includeArchived) => ipcRenderer.invoke('study:assessments:list', kind, includeArchived),
   getStudyAssessment: (id) => ipcRenderer.invoke('study:assessments:get', id),
   createStudyAssessment: (input) => ipcRenderer.invoke('study:assessments:create', input),

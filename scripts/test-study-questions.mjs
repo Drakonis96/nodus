@@ -63,7 +63,13 @@ try {
 
   const collection = bank.createStudyQuestionCollection('Parcial 1', 'Selección revisada');
   bank.setStudyQuestionCollectionItems(collection.id, [manual.id]);
-  assert.equal(bank.listStudyQuestionCollections().find((item) => item.id === collection.id).questionCount, 1);
+  const variant = bank.duplicateStudyQuestion(manual.id);
+  bank.setStudyQuestionCollectionItems(collection.id, [manual.id, variant.id]);
+  const populatedCollection = bank.listStudyQuestionCollections().find((item) => item.id === collection.id);
+  assert.equal(populatedCollection.questionCount, 2);
+  assert.deepEqual(populatedCollection.questionIds, [manual.id, variant.id], 'collection membership is durable and additive');
+  assert.ok(bank.findSimilarStudyQuestions(manual.id, 0.35).some((entry) => entry.question.id === variant.id));
+  assert.equal(bank.getStudyQuestionAnalytics(manual.id).observedDifficulty, 'unrated');
   const exported = bank.exportStudyQuestions([manual.id]);
   assert.equal(exported.questions.length, 1);
   assert.equal(bank.importStudyQuestions(exported).length, 1);
@@ -95,7 +101,8 @@ try {
   legacy.close();
 
   const view = await readFile(path.join(repoRoot, 'src/views/StudyBankView.tsx'), 'utf8');
-  assert.match(view, /study-question-bank/); assert.match(view, /study-question-save/); assert.match(view, /Abrir fuente/);
+  for (const marker of ['study-question-bank', 'study-question-save', 'study-question-search-mode', 'study-question-edit', 'study-question-versions', 'study-question-similar']) assert.match(view, new RegExp(marker));
+  assert.match(view, /Abrir fuente/);
   closeDb();
   console.log('Study questions phase 10a tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }

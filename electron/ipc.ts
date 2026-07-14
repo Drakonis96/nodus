@@ -1881,6 +1881,8 @@ export function registerIpc(
   h('study:questions:collections:create', async (_e, name: string, description?: string) => studyQuestions.createStudyQuestionCollection(name, description));
   h('study:questions:collections:setItems', async (_e, collectionId: string, questionIds: string[]) => studyQuestions.setStudyQuestionCollectionItems(collectionId, questionIds));
   h('study:questions:collections:delete', async (_e, id: string) => studyQuestions.deleteStudyQuestionCollection(id));
+  h('study:questions:analytics', async (_e, id: string) => studyQuestions.getStudyQuestionAnalytics(id));
+  h('study:questions:similar', async (_e, id: string, threshold?: number) => studyQuestions.findSimilarStudyQuestions(id, threshold));
   h('study:assessments:list', async (_e, kind?: 'test' | 'exam', includeArchived?: boolean) => studyAssessments.listStudyAssessments(kind, includeArchived));
   h('study:assessments:get', async (_e, id: string) => studyAssessments.getStudyAssessment(id));
   h('study:assessments:create', async (_e, input: StudyAssessmentInput) => studyAssessments.createStudyAssessment(input));

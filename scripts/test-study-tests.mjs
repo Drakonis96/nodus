@@ -66,6 +66,10 @@ try {
   assert.equal(submitted.status, 'submitted'); assert.equal(submitted.correctCount, 1); assert.equal(submitted.incorrectCount, 1); assert.equal(submitted.omittedCount, 1);
   assert.equal(submitted.score, 0.75); assert.equal(submitted.maxScore, 3);
   assert.equal(bank.getStudyQuestion(single.id).usageCount, 11, 'submission records exactly one use');
+  const analytics = bank.getStudyQuestionAnalytics(single.id);
+  assert.equal(analytics.observedDifficulty, 'too_easy');
+  assert.equal(analytics.optionSelections.find((option) => option.optionId === 'A').selectedCount, 1, 'distractor analysis reads durable answers');
+  assert.ok(analytics.averageResponseMs > 0, 'response time is aggregated');
   tests.submitStudyAttempt(attempt.id);
   assert.equal(bank.getStudyQuestion(single.id).usageCount, 11, 'resubmission is idempotent');
   const retryErrors = tests.startStudyAttempt({ assessmentId: assessment.id, mode: 'practice', retryKind: 'errors', sourceAttemptId: submitted.id });

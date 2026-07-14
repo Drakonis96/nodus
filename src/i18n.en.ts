@@ -4121,5 +4121,14 @@ export const EN: Record<string, string> = {
   'Crear rúbrica': 'Create rubric',
   Integrada: 'Built-in',
 
+  // ── Study vault · central question bank ──────────────────────────────────
+  'Usar en test': 'Use in test',
+  'Usar en examen': 'Use in exam',
+  'Opciones (una por línea; anteponer * a las correctas)': 'Options (one per line; prefix correct answers with *)',
+  selecciones: 'selections',
+  'Tiempo medio': 'Average time',
+  'Reabre la pregunta antes de editarla': 'Reopen the question before editing it',
+  'Preguntas similares': 'Similar questions',
+
   // <<END_EN>>
 };

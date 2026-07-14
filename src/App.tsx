@@ -945,6 +945,8 @@ export function App() {
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
+            onOpenTests={() => setView('studyTests')}
+            onOpenExams={() => setView('studyExams')}
           />}
           {view === 'studyTests' && <StudyTestView onOpenQuestionBank={() => setView('studyQuestions')} />}
           {view === 'studyExams' && <StudyExamView onOpenQuestionBank={() => setView('studyQuestions')} />}

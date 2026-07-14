@@ -74,6 +74,8 @@ import type {
   StudyQuestionGenerationResult,
   StudyQuestionInput,
   StudyQuestionVersion,
+  StudyQuestionAnalytics,
+  StudyQuestionSimilar,
 } from './studyQuestions';
 import type {
   StudyAssessment,
@@ -180,6 +182,8 @@ export type {
   StudyQuestionStatus,
   StudyQuestionType,
   StudyQuestionVersion,
+  StudyQuestionAnalytics,
+  StudyQuestionSimilar,
 } from './studyQuestions';
 export type {
   StudyAnswerEvaluation,
@@ -4834,6 +4838,8 @@ export interface NodusApi {
   createStudyQuestionCollection(name: string, description?: string): Promise<StudyQuestionCollection>;
   setStudyQuestionCollectionItems(collectionId: string, questionIds: string[]): Promise<void>;
   deleteStudyQuestionCollection(id: string): Promise<void>;
+  getStudyQuestionAnalytics(id: string): Promise<StudyQuestionAnalytics>;
+  findSimilarStudyQuestions(id: string, threshold?: number): Promise<StudyQuestionSimilar[]>;
   listStudyAssessments(kind?: StudyAssessment['kind'], includeArchived?: boolean): Promise<StudyAssessment[]>;
   getStudyAssessment(id: string): Promise<StudyAssessment | null>;
   createStudyAssessment(input: StudyAssessmentInput): Promise<StudyAssessment>;
