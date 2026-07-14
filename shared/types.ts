@@ -21,6 +21,38 @@ import type {
   StudyStyleInput,
   StudyStyleVersion,
 } from './studyImprove';
+import type {
+  StudyMaterialAnnotation,
+  StudyMaterialAnnotationInput,
+  StudyMaterialContent,
+  StudyMaterialDetail,
+  StudyMaterialImportInput,
+  StudyMaterialImportResult,
+  StudyMaterialListOptions,
+  StudyMaterialPlacement,
+  StudyMaterialSummary,
+  StudyMaterialUpdateInput,
+} from './studyMaterials';
+export type {
+  StudyMaterialAnnotation,
+  StudyMaterialAnnotationInput,
+  StudyMaterialBibliography,
+  StudyMaterialContent,
+  StudyMaterialDetail,
+  StudyMaterialFragmentLink,
+  StudyMaterialImportInput,
+  StudyMaterialImportResult,
+  StudyMaterialListOptions,
+  StudyMaterialMetadata,
+  StudyMaterialPlacement,
+  StudyMaterialPreviewKind,
+  StudyMaterialReadState,
+  StudyMaterialRect,
+  StudyMaterialSourceRef,
+  StudyMaterialSummary,
+  StudyMaterialUpdateInput,
+  StudyMaterialVersion,
+} from './studyMaterials';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4535,6 +4567,19 @@ export interface NodusApi {
   cancelStudyImprove(): Promise<void>;
   listStudyImprovementLog(documentId: string): Promise<StudyImprovementLog[]>;
   updateStudyImprovementAction(id: string, action: StudyImprovementLog['action']): Promise<void>;
+  listStudyMaterials(options?: StudyMaterialListOptions): Promise<StudyMaterialSummary[]>;
+  getStudyMaterial(id: string): Promise<StudyMaterialDetail>;
+  getStudyMaterialContent(id: string): Promise<StudyMaterialContent>;
+  importStudyMaterials(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
+  replaceStudyMaterialFile(id: string, ocr?: boolean): Promise<StudyMaterialSummary | null>;
+  updateStudyMaterial(id: string, patch: StudyMaterialUpdateInput): Promise<StudyMaterialSummary>;
+  restoreStudyMaterialVersion(id: string, versionId: string): Promise<StudyMaterialSummary>;
+  addStudyMaterialPlacement(id: string, input: StudyMaterialImportInput): Promise<StudyMaterialPlacement | null>;
+  createStudyMaterialAnnotation(materialId: string, input: StudyMaterialAnnotationInput): Promise<StudyMaterialAnnotation>;
+  updateStudyMaterialAnnotation(id: string, patch: Partial<StudyMaterialAnnotationInput>): Promise<StudyMaterialAnnotation>;
+  deleteStudyMaterialAnnotation(id: string): Promise<void>;
+  createStudyNoteFromMaterial(materialId: string, annotationId?: string | null, title?: string): Promise<{ documentId: string }>;
+  setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

@@ -111,6 +111,10 @@ import type {
   StudyStyleAssociationKind,
   StudyStyleExport,
   StudyStyleInput,
+  StudyMaterialAnnotationInput,
+  StudyMaterialImportInput,
+  StudyMaterialListOptions,
+  StudyMaterialUpdateInput,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -217,6 +221,7 @@ import * as studyProgress from './db/studyProgressRepo';
 import * as studyOrg from './db/studyOrgRepo';
 import * as studyEditor from './db/studyEditorRepo';
 import * as studyStyles from './db/studyStylesRepo';
+import * as studyMaterials from './db/studyMaterialsRepo';
 import { transcribeStudyAudio } from './ai/studyTranscription';
 import { improveStudyText } from './ai/studyImprove';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
@@ -1703,6 +1708,35 @@ export function registerIpc(
   h('study:improve:cancel', async (_e, requestId: string) => studyImproveAborters.get(requestId)?.abort());
   h('study:improve:log', async (_e, documentId: string) => studyStyles.listStudyImprovementLog(documentId));
   h('study:improve:action', async (_e, id: string, action: StudyImprovementLog['action']) => studyStyles.updateStudyImprovementAction(id, action));
+  h('study:materials:list', async (_e, options?: StudyMaterialListOptions) => studyMaterials.listStudyMaterials(options));
+  h('study:materials:get', async (_e, id: string) => studyMaterials.getStudyMaterial(id));
+  h('study:materials:content', async (_e, id: string) => studyMaterials.getStudyMaterialContent(id));
+  h('study:materials:import', async (_e, input?: StudyMaterialImportInput) => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Añadir materiales de estudio', properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'] }],
+    });
+    if (picked.canceled) return [];
+    const results = [];
+    for (const filePath of picked.filePaths) results.push(await studyMaterials.importStudyMaterialFile(filePath, input));
+    return results;
+  });
+  h('study:materials:replace', async (_e, id: string, ocr?: boolean) => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Sustituir fichero del material', properties: ['openFile'],
+      filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    return studyMaterials.replaceStudyMaterialFile(id, picked.filePaths[0], Boolean(ocr));
+  });
+  h('study:materials:update', async (_e, id: string, patch: StudyMaterialUpdateInput) => studyMaterials.updateStudyMaterial(id, patch));
+  h('study:materials:version:restore', async (_e, id: string, versionId: string) => studyMaterials.restoreStudyMaterialVersion(id, versionId));
+  h('study:materials:placement:add', async (_e, id: string, input: StudyMaterialImportInput) => studyMaterials.addStudyMaterialPlacement(id, input));
+  h('study:materials:annotation:create', async (_e, materialId: string, input: StudyMaterialAnnotationInput) => studyMaterials.createStudyMaterialAnnotation(materialId, input));
+  h('study:materials:annotation:update', async (_e, id: string, patch: Partial<StudyMaterialAnnotationInput>) => studyMaterials.updateStudyMaterialAnnotation(id, patch));
+  h('study:materials:annotation:delete', async (_e, id: string) => studyMaterials.deleteStudyMaterialAnnotation(id));
+  h('study:materials:note:create', async (_e, materialId: string, annotationId?: string | null, title?: string) => studyMaterials.createStudyNoteFromMaterial(materialId, annotationId, title));
+  h('study:materials:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => studyMaterials.setStudyMaterialLifecycle(id, action));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

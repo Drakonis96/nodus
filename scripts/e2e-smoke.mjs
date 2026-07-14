@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -489,6 +489,52 @@ try {
   await page.locator('.study-editor-shell .md .katex').waitFor({ timeout: 30_000 });
   assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
   console.log('[e2e] study Milkdown editor + metadata + raw Markdown + versioning ok');
+
+  // ── Study materials: native import dialog + embedded PDF + source note ─────
+  const pdfPath = path.join(userData, 'fuente-smoke.pdf');
+  const pdfBytes = await app.evaluate(async ({ BrowserWindow }) => {
+    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent('<!doctype html><style>body{font:22px sans-serif;padding:60px}</style><h1>Fuente smoke</h1><p>Fragmento verificable para anotación 2026.</p>')}`);
+    const data = await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
+    win.destroy();
+    return [...data];
+  });
+  await writeFile(pdfPath, Buffer.from(pdfBytes));
+  await app.evaluate(({ dialog }, filePath) => {
+    dialog.showOpenDialog = async (_window, options) => {
+      const actual = options ?? _window;
+      if (actual?.title === 'Añadir materiales de estudio') return { canceled: false, filePaths: [filePath] };
+      return { canceled: true, filePaths: [] };
+    };
+  }, pdfPath);
+  await page.getByRole('button', { name: 'Materiales', exact: true }).click();
+  await page.getByTestId('study-materials-view').waitFor({ timeout: 30_000 });
+  const materialSearchPadding = await page.getByTestId('study-material-search').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
+  assert.ok(materialSearchPadding >= 30, 'material search keeps its icon and text separated');
+  await page.getByTestId('study-material-import').click();
+  await page.getByText('fuente-smoke', { exact: true }).waitFor({ timeout: 30_000 });
+  const importedMaterial = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'fuente-smoke'));
+  assert.equal(importedMaterial?.previewKind, 'pdf', 'PDF import stores an embedded material');
+  assert.ok((importedMaterial?.extractedChars ?? 0) > 20, 'PDF text is extracted for search and citations');
+  await page.getByText('fuente-smoke', { exact: true }).click();
+  await page.getByTestId('study-pdf-viewer').waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="study-pdf-text-layer"] span')?.textContent?.length, { timeout: 30_000 });
+  assert.ok(await page.locator('[data-testid="study-pdf-viewer"] canvas').evaluate((canvas) => canvas.width > 0 && canvas.height > 0), 'embedded PDF page rendered to canvas');
+  await page.getByTestId('study-pdf-text-layer').evaluate((layer) => {
+    const span = [...layer.querySelectorAll('span')].find((item) => item.textContent?.includes('Fragmento')) ?? layer.querySelector('span');
+    if (!span) throw new Error('PDF text layer has no selectable text');
+    const range = document.createRange(); range.selectNodeContents(span);
+    const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+    layer.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  await page.getByTestId('study-pdf-annotation-dialog').waitFor();
+  await page.getByTestId('study-pdf-annotation-dialog').locator('textarea').fill('Evidencia importante');
+  await page.getByRole('button', { name: 'Guardar subrayado', exact: true }).click();
+  await page.getByText('Evidencia importante', { exact: true }).waitFor();
+  await page.getByText('Crear apunte', { exact: true }).last().click();
+  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke')), { timeout: 30_000 });
+  assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');
+  console.log('[e2e] study material import + embedded PDF + highlight-to-note provenance ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

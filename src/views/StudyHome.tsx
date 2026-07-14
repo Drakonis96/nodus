@@ -15,9 +15,10 @@ const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; descr
 
 export function StudyHome({ onNavigate, onOpenDocument }: { onNavigate: (view: View) => void; onOpenDocument?: (id: string) => void }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
+  const [materialCount, setMaterialCount] = useState(0);
   useEffect(() => {
     let active = true;
-    void window.nodus.getStudyWorkspace().then((next) => { if (active) setWorkspace(next); });
+    void Promise.all([window.nodus.getStudyWorkspace(), window.nodus.listStudyMaterials()]).then(([next, materials]) => { if (active) { setWorkspace(next); setMaterialCount(materials.length); } });
     return () => { active = false; };
   }, []);
   const recent = [...(workspace?.documents ?? [])]
@@ -41,7 +42,7 @@ export function StudyHome({ onNavigate, onOpenDocument }: { onNavigate: (view: V
           {[
             { label: 'Cursos activos', value: workspace?.courses.length ?? 0, icon: 'graduation' },
             { label: 'Asignaturas', value: workspace?.subjects.length ?? 0, icon: 'book' },
-            { label: 'Materiales', value: workspace?.documents.length ?? 0, icon: 'notebook' },
+            { label: 'Materiales', value: materialCount, icon: 'notebook' },
           ].map((metric) => (
             <button key={metric.label} onClick={() => onNavigate(metric.label === 'Materiales' ? 'studyLibrary' : 'studyCourses')}
               className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-900/35 p-4 text-left hover:border-indigo-700/60">

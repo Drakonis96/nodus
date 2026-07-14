@@ -8,6 +8,7 @@ import { DatabasesChatView } from './views/DatabasesChatView';
 import { DatabasesSearchView } from './views/DatabasesSearchView';
 import { StudyHome, StudyScaffoldView } from './views/StudyHome';
 import { StudyOrganizationView } from './views/StudyOrganizationView';
+import { StudyMaterialsView } from './views/StudyMaterialsView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -808,8 +809,8 @@ export function App() {
                     <StudySidebar
                       activeTarget={studyTarget}
                       activeView={view}
-                      onOpen={(target) => { setStudyTarget(target); setView(target.kind === 'document' ? 'studyLibrary' : 'studyCourses'); }}
-                      onNavigate={(targetView) => setView(targetView)}
+                      onOpen={(target) => { setStudyTarget(target); setView('studyCourses'); }}
+                      onNavigate={(targetView) => { if (targetView === 'studyLibrary') setStudyTarget(null); setView(targetView); }}
                     />
                     {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
@@ -863,7 +864,7 @@ export function App() {
           {view === 'home' && isEstudio && (
             <StudyHome
               onNavigate={setView}
-              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyLibrary'); }}
+              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             />
           )}
           {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && (
@@ -923,7 +924,7 @@ export function App() {
           {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
           {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} />}
-          {view === 'studyLibrary' && <StudyOrganizationView target={studyTarget} mode="library" onTargetChange={setStudyTarget} />}
+          {view === 'studyLibrary' && <StudyMaterialsView onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView
