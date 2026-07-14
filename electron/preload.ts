@@ -17,6 +17,7 @@ let activeChatRequestId: string | null = null;
 let activeDbChatRequestId: string | null = null;
 let activeNodiChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
+let activeStudyAssistantRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -495,6 +496,28 @@ const api: NodusApi = {
     ipcRenderer.on('study:search:progress', listener);
     return () => ipcRenderer.removeListener('study:search:progress', listener);
   },
+  listStudyAssistantSources: () => ipcRenderer.invoke('study:assistant:sources'),
+  listStudyAssistantConversations: (includeArchived) => ipcRenderer.invoke('study:assistant:list', includeArchived),
+  getStudyAssistantConversation: (id) => ipcRenderer.invoke('study:assistant:get', id),
+  createStudyAssistantConversation: (input) => ipcRenderer.invoke('study:assistant:create', input),
+  updateStudyAssistantConversation: (id, patch) => ipcRenderer.invoke('study:assistant:update', id, patch),
+  deleteStudyAssistantConversation: (id) => ipcRenderer.invoke('study:assistant:delete', id).then(() => undefined),
+  streamStudyAssistant: async (request, handlers) => {
+    const requestId = `study-assistant-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => { if (id === requestId) handlers.onDelta(delta); };
+    const onReasoning = (_e: unknown, id: string, delta: string) => { if (id === requestId) handlers.onReasoning?.(delta); };
+    ipcRenderer.on('study:assistant:delta', onDelta); ipcRenderer.on('study:assistant:reasoning', onReasoning);
+    activeStudyAssistantRequestId = requestId;
+    try { return await ipcRenderer.invoke('study:assistant:stream', requestId, request); }
+    finally {
+      if (activeStudyAssistantRequestId === requestId) activeStudyAssistantRequestId = null;
+      ipcRenderer.removeListener('study:assistant:delta', onDelta); ipcRenderer.removeListener('study:assistant:reasoning', onReasoning);
+    }
+  },
+  cancelStudyAssistant: async () => {
+    if (activeStudyAssistantRequestId) await ipcRenderer.invoke('study:assistant:cancel', activeStudyAssistantRequestId);
+  },
+  exportStudyAssistantConversation: (id) => ipcRenderer.invoke('study:assistant:export', id),
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

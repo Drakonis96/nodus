@@ -122,6 +122,9 @@ import type {
   StudyTranscriptInput,
   StudyTranscriptSegmentInput,
   StudySearchOptions,
+  StudyAssistantConversationInput,
+  StudyAssistantConversationPatch,
+  StudyAssistantRequest,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -233,6 +236,7 @@ import * as studyRecordings from './db/studyRecordingsRepo';
 import { transcribeStudyAudio } from './ai/studyTranscription';
 import { improveStudyText } from './ai/studyImprove';
 import * as studySearch from './ai/studySearch';
+import * as studyAssistant from './ai/studyAssistant';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -473,6 +477,7 @@ export function registerIpc(
   const chatAborters = new Map<string, AbortController>();
   const nodiChatAborters = new Map<string, AbortController>();
   const studyImproveAborters = new Map<string, AbortController>();
+  const studyAssistantAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
     const payload = withVaultKeyProviders(getActiveVault());
@@ -1785,6 +1790,31 @@ export function registerIpc(
   h('study:search:saved:delete', async (_e, id: string) => studySearch.deleteStudySavedSearch(id));
   h('study:search:history:list', async () => studySearch.listStudySearchHistory());
   h('study:search:history:clear', async () => studySearch.clearStudySearchHistory());
+  h('study:assistant:sources', async () => studyAssistant.getStudyAssistantSources());
+  h('study:assistant:list', async (_e, includeArchived?: boolean) => studyAssistant.listStudyAssistantConversations(Boolean(includeArchived)));
+  h('study:assistant:get', async (_e, id: string) => studyAssistant.getStudyAssistantConversation(id));
+  h('study:assistant:create', async (_e, input?: StudyAssistantConversationInput) => studyAssistant.createStudyAssistantConversation(input));
+  h('study:assistant:update', async (_e, id: string, patch: StudyAssistantConversationPatch) => studyAssistant.updateStudyAssistantConversation(id, patch));
+  h('study:assistant:delete', async (_e, id: string) => studyAssistant.deleteStudyAssistantConversation(id));
+  h('study:assistant:stream', async (e, requestId: string, request: StudyAssistantRequest) => {
+    const controller = new AbortController(); studyAssistantAborters.set(requestId, controller);
+    try {
+      return await studyAssistant.streamStudyAssistant(request, (delta, kind) => {
+        if (!e.sender.isDestroyed()) e.sender.send(kind === 'reasoning' ? 'study:assistant:reasoning' : 'study:assistant:delta', requestId, delta);
+      }, controller.signal);
+    } finally { studyAssistantAborters.delete(requestId); }
+  });
+  h('study:assistant:cancel', async (_e, requestId: string) => studyAssistantAborters.get(requestId)?.abort());
+  h('study:assistant:export', async (_e, id: string) => {
+    const conversation = studyAssistant.getStudyAssistantConversation(id); if (!conversation) return null;
+    const safeTitle = conversation.title.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'chat-estudio';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar conversación de estudio', defaultPath: `${safeTitle}.md`, filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, studyAssistant.renderStudyAssistantConversation(conversation), 'utf8');
+    return { path: picked.filePath };
+  });
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

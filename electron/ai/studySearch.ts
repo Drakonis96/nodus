@@ -11,6 +11,8 @@ import type {
   StudySearchResponse,
 } from '@shared/studySearch';
 import { rankStudySearchEntries, suggestStudySearchCorrections } from '@shared/studySearch';
+import type { StudyAssistantSourceOption } from '@shared/studyAssistant';
+import { studyAssistantSourceKey } from '@shared/studyAssistant';
 import { parseStudyMaterialMarkers } from '@shared/studyMaterials';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
@@ -218,6 +220,52 @@ export function collectStudySearchEntries(): StudySearchIndexEntry[] {
   const entries: StudySearchIndexEntry[] = []; const maps = nameMaps();
   addDocumentEntries(entries, maps); addMaterialEntries(entries, maps); addTranscriptEntries(entries, maps);
   return entries;
+}
+
+/** Lightweight source catalogue for the assistant's manual context picker. */
+export function listStudyAssistantSourceOptions(): StudyAssistantSourceOption[] {
+  const entries = ensureLexicalIndex().entries.filter((entry) => !entry.excluded);
+  const grouped = new Map<string, StudyAssistantSourceOption>();
+  for (const entry of entries) {
+    const sourceKey = studyAssistantSourceKey(entry.kind, entry.sourceId);
+    const current = grouped.get(sourceKey);
+    if (current) {
+      current.chunks += 1;
+      if (entry.updatedAt > current.updatedAt) current.updatedAt = entry.updatedAt;
+      continue;
+    }
+    grouped.set(sourceKey, {
+      sourceKey, kind: entry.kind, sourceId: entry.sourceId, title: entry.title, subtitle: entry.subtitle,
+      scope: entry.scope, chunks: 1, updatedAt: entry.updatedAt,
+    });
+  }
+  return [...grouped.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.title.localeCompare(b.title));
+}
+
+/** Hybrid retrieval without polluting the user's search history. Manual source
+ * selection is strict: only selected source keys can enter the returned context. */
+export async function retrieveStudyAssistantEntries(
+  query: string,
+  options: StudySearchOptions,
+  sourceKeys: string[] = [],
+  limit = 18,
+): Promise<StudySearchIndexEntry[]> {
+  const store = ensureLexicalIndex();
+  const selected = new Set(sourceKeys);
+  const candidates = store.entries.filter((entry) => !entry.excluded && (!selected.size || selected.has(studyAssistantSourceKey(entry.kind, entry.sourceId))));
+  const hasVectors = candidates.some((entry) => entry.embedding?.length);
+  const queryVector = hasVectors ? await embed(query).catch(() => null) : null;
+  const ranked = rankStudySearchEntries(query, candidates, { ...options, limit: Math.max(limit * 3, 60) }, queryVector);
+  const byId = new Map(candidates.map((entry) => [entry.indexId, entry]));
+  const ordered = ranked.map((result) => byId.get(result.indexId)).filter((entry): entry is StudySearchIndexEntry => Boolean(entry));
+  if (selected.size && ordered.length < limit) {
+    const rankedIds = new Set(ordered.map((entry) => entry.indexId));
+    const fallback = candidates
+      .filter((entry) => !rankedIds.has(entry.indexId))
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    ordered.push(...fallback);
+  }
+  return ordered.slice(0, limit);
 }
 
 export async function rebuildStudySearchIndex(): Promise<StudySearchProgress> {

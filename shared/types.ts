@@ -56,6 +56,16 @@ import type {
   StudySearchProgress,
   StudySearchResponse,
 } from './studySearch';
+import type {
+  StudyAssistantConversation,
+  StudyAssistantConversationInput,
+  StudyAssistantConversationPatch,
+  StudyAssistantConversationSummary,
+  StudyAssistantRequest,
+  StudyAssistantResponse,
+  StudyAssistantSourceOption,
+  StudyAssistantStreamHandlers,
+} from './studyAssistant';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -110,6 +120,25 @@ export type {
   StudySearchScope,
   StudySearchSort,
 } from './studySearch';
+export type {
+  StudyAssistantCitation,
+  StudyAssistantContextStats,
+  StudyAssistantConversation,
+  StudyAssistantConversationInput,
+  StudyAssistantConversationPatch,
+  StudyAssistantConversationSummary,
+  StudyAssistantLanguage,
+  StudyAssistantLevel,
+  StudyAssistantMessage,
+  StudyAssistantRequest,
+  StudyAssistantResponse,
+  StudyAssistantScopeKind,
+  StudyAssistantSelection,
+  StudyAssistantSourceOption,
+  StudyAssistantStreamHandlers,
+  StudyAssistantTask,
+  StudyAssistantTone,
+} from './studyAssistant';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4667,6 +4696,15 @@ export interface NodusApi {
   listStudySearchHistory(): Promise<StudySearchHistoryEntry[]>;
   clearStudySearchHistory(): Promise<void>;
   onStudySearchProgress(cb: (progress: StudySearchProgress) => void): () => void;
+  listStudyAssistantSources(): Promise<StudyAssistantSourceOption[]>;
+  listStudyAssistantConversations(includeArchived?: boolean): Promise<StudyAssistantConversationSummary[]>;
+  getStudyAssistantConversation(id: string): Promise<StudyAssistantConversation | null>;
+  createStudyAssistantConversation(input?: StudyAssistantConversationInput): Promise<StudyAssistantConversation>;
+  updateStudyAssistantConversation(id: string, patch: StudyAssistantConversationPatch): Promise<StudyAssistantConversation | null>;
+  deleteStudyAssistantConversation(id: string): Promise<void>;
+  streamStudyAssistant(request: StudyAssistantRequest, handlers: StudyAssistantStreamHandlers): Promise<StudyAssistantResponse>;
+  cancelStudyAssistant(): Promise<void>;
+  exportStudyAssistantConversation(id: string): Promise<{ path: string } | null>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

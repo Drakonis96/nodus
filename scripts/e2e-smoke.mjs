@@ -550,21 +550,21 @@ try {
   await classRecorder.waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1_300);
   await classRecorder.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.waitForFunction(async () => (await window.nodus.listStudyRecordings()).length === 1, { timeout: 30_000 });
-  const recordingFixture = await page.evaluate(async () => {
-    const recording = (await window.nodus.listStudyRecordings())[0];
-    const literal = await window.nodus.saveStudyTranscript(recording.id, {
+  const recordingIdHandle = await page.waitForFunction(async () => (await window.nodus.listStudyRecordings())[0]?.id || false, { timeout: 30_000 });
+  const capturedRecordingId = await recordingIdHandle.jsonValue();
+  const recordingFixture = await page.evaluate(async (recordingId) => {
+    const literal = await window.nodus.saveStudyTranscript(recordingId, {
       kind: 'literal', contentMarkdown: 'Definición literal de memoria de trabajo.', status: 'ready', progress: 1,
       modelProvider: 'local', modelName: 'Whisper smoke',
       segments: [{ tStart: 0.2, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
     });
-    await window.nodus.saveStudyTranscript(recording.id, {
+    await window.nodus.saveStudyTranscript(recordingId, {
       kind: 'corrected', contentMarkdown: 'Definición literal de memoria de trabajo.', sourceTranscriptId: literal.id,
       segments: [{ tStart: 0.2, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
     });
-    await window.nodus.createStudyAudioMarker(recording.id, { tSeconds: 0, label: 'Concepto clave' });
-    return { id: recording.id, literalId: literal.id };
-  });
+    await window.nodus.createStudyAudioMarker(recordingId, { tSeconds: 0, label: 'Concepto clave' });
+    return { id: recordingId, literalId: literal.id };
+  }, capturedRecordingId);
   await page.locator(`[data-testid="study-recording-${recordingFixture.id}"]`).click();
   await page.getByTestId('study-recording-player').waitFor({ timeout: 30_000 });
   await page.getByText('Concepto clave', { exact: false }).waitFor();
@@ -594,6 +594,45 @@ try {
   await page.getByTestId('study-recording-player').locator('audio').waitFor();
   await page.waitForFunction(() => (document.querySelector('[data-testid="study-recording-player"] audio')?.currentTime ?? 0) >= 0.19, { timeout: 30_000 });
   console.log('[e2e] hybrid study search + saved query + timestamp navigation ok');
+
+  // ── Study assistant: strict manual scope, durable history and evidence links ─
+  await page.getByRole('button', { name: 'Chat de estudio', exact: true }).click();
+  await page.getByTestId('study-chat-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-chat-new').click();
+  await page.getByTestId('study-chat-scope').selectOption('manual');
+  const sourceSearch = page.getByTestId('study-chat-source-search');
+  assert.ok(await sourceSearch.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'assistant source search keeps icon and text separated');
+  await page.getByTestId('study-chat-input').fill('¿Qué dicen mis fuentes sobre la memoria?');
+  await page.getByTestId('study-chat-send').click();
+  await page.getByText('No hay información suficiente en las fuentes seleccionadas para responder con seguridad.', { exact: false }).waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('study-chat-message-user').count(), 1, 'an insufficient-context response preserves the user question');
+  const seededStudyChat = await page.evaluate(async () => {
+    const source = (await window.nodus.listStudyAssistantSources()).find((item) => item.kind === 'document' && item.title === 'Apunte smoke');
+    const conversation = (await window.nodus.listStudyAssistantConversations())[0];
+    if (!source || !conversation) throw new Error('Study assistant fixture source/conversation unavailable');
+    const citation = {
+      id: 'S1', sourceKey: source.sourceKey, indexId: `${source.sourceKey}:0`, kind: source.kind, sourceId: source.sourceId,
+      title: source.title, subtitle: source.subtitle, quote: 'Texto importante con una fórmula y una tabla.',
+      location: { documentId: source.sourceId, from: 0, to: 48 }, scope: source.scope,
+    };
+    await window.nodus.updateStudyAssistantConversation(conversation.id, {
+      title: 'Cita smoke', selection: { scope: 'manual', sourceKeys: [source.sourceKey] },
+      messages: [
+        { id: crypto.randomUUID(), role: 'user', content: 'Abre la evidencia.', createdAt: new Date().toISOString() },
+        { id: crypto.randomUUID(), role: 'assistant', content: 'La evidencia está en el apunte [S1](nodus://study/evidence/S1).', citations: [citation], createdAt: new Date().toISOString() },
+      ],
+    });
+    return conversation.id;
+  });
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.getByRole('button', { name: 'Chat de estudio', exact: true }).click();
+  await page.getByText('Cita smoke', { exact: true }).click();
+  await page.getByTestId('study-chat-message-assistant').waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('study-chat-message-assistant').innerText(), /S1/, 'persisted assistant response keeps a verified evidence citation');
+  await page.getByRole('button', { name: /S1 · Apunte smoke/ }).click();
+  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  assert.ok(seededStudyChat, 'study conversation persists in the local vault history');
+  console.log('[e2e] grounded study chat + insufficient-context guard + direct evidence navigation ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

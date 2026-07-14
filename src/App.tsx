@@ -11,6 +11,7 @@ import { StudyOrganizationView } from './views/StudyOrganizationView';
 import { StudyMaterialsView } from './views/StudyMaterialsView';
 import { StudyRecordingsView } from './views/StudyRecordingsView';
 import { StudySearchView } from './views/StudySearchView';
+import { StudyChatView } from './views/StudyChatView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -77,7 +78,6 @@ const STUDY_SCAFFOLD_VIEWS = new Set<View>([
   'studyPlanner',
   'studyReview',
   'studyProgress',
-  'studyChat',
 ]);
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
@@ -935,6 +935,12 @@ export function App() {
           />}
           {view === 'studyLibrary' && <StudyMaterialsView initialMaterialId={studyMaterialTarget} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {view === 'studyRecordings' && <StudyRecordingsView initialRecordingId={studyRecordingTarget?.id} initialTimestamp={studyRecordingTarget?.timestamp} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
+          {view === 'studyChat' && <StudyChatView
+            settings={settings}
+            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+          />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView
