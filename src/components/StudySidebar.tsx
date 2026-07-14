@@ -62,7 +62,7 @@ export function StudySidebar({
   activeTarget: StudyNavigationTarget | null;
   activeView: string;
   onOpen: (target: StudyNavigationTarget) => void;
-  onNavigate: (view: 'studyCourses' | 'studyLibrary' | 'studyRecordings') => void;
+  onNavigate: (view: 'studyCourses' | 'studySearch' | 'studyLibrary' | 'studyRecordings') => void;
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -164,6 +164,10 @@ export function StudySidebar({
       <button onClick={() => onNavigate('studyCourses')}
         className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studyCourses' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
         <Icon name="graduation" /><span>{t('Cursos y asignaturas')}</span>
+      </button>
+      <button onClick={() => onNavigate('studySearch')}
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studySearch' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
+        <Icon name="search" /><span>{t('Buscar')}</span>
       </button>
       <button onClick={() => onNavigate('studyLibrary')}
         className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studyLibrary' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>

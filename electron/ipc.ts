@@ -121,6 +121,7 @@ import type {
   StudyRecordingUpdateInput,
   StudyTranscriptInput,
   StudyTranscriptSegmentInput,
+  StudySearchOptions,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -231,6 +232,7 @@ import * as studyMaterials from './db/studyMaterialsRepo';
 import * as studyRecordings from './db/studyRecordingsRepo';
 import { transcribeStudyAudio } from './ai/studyTranscription';
 import { improveStudyText } from './ai/studyImprove';
+import * as studySearch from './ai/studySearch';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1767,6 +1769,22 @@ export function registerIpc(
   h('study:recordings:note:create', async (_e, recordingId: string, transcriptId: string) => studyRecordings.createStudyNoteFromTranscript(recordingId, transcriptId));
   h('study:recordings:audio:delete', async (_e, id: string) => studyRecordings.deleteStudyRecordingAudio(id));
   h('study:recordings:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => studyRecordings.setStudyRecordingLifecycle(id, action));
+  h('study:search:query', async (_e, query: string, options?: StudySearchOptions) => studySearch.searchStudyCorpus(query, options));
+  h('study:search:status', async () => studySearch.getStudySearchIndexStatus());
+  h('study:search:rebuild', async (e) => {
+    const off = studySearch.onStudySearchProgress((next) => { if (!e.sender.isDestroyed()) e.sender.send('study:search:progress', next); });
+    try { return await studySearch.rebuildStudySearchIndex(); } finally { off(); }
+  });
+  h('study:search:pause', async () => studySearch.pauseStudySearchIndex());
+  h('study:search:resume', async () => studySearch.resumeStudySearchIndex());
+  h('study:search:stop', async () => studySearch.stopStudySearchIndex());
+  h('study:search:deleteIndex', async () => studySearch.deleteStudySearchIndex());
+  h('study:search:exclude', async (_e, sourceId: string, excluded: boolean) => studySearch.setStudySearchSourceExcluded(sourceId, excluded));
+  h('study:search:saved:list', async () => studySearch.listStudySavedSearches());
+  h('study:search:saved:create', async (_e, name: string, query: string, options: StudySearchOptions) => studySearch.saveStudySearch(name, query, options));
+  h('study:search:saved:delete', async (_e, id: string) => studySearch.deleteStudySavedSearch(id));
+  h('study:search:history:list', async () => studySearch.listStudySearchHistory());
+  h('study:search:history:clear', async () => studySearch.clearStudySearchHistory());
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

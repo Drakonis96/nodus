@@ -477,6 +477,24 @@ const api: NodusApi = {
   createStudyNoteFromTranscript: (recordingId, transcriptId) => ipcRenderer.invoke('study:recordings:note:create', recordingId, transcriptId),
   deleteStudyRecordingAudio: (id) => ipcRenderer.invoke('study:recordings:audio:delete', id),
   setStudyRecordingLifecycle: (id, action) => ipcRenderer.invoke('study:recordings:lifecycle', id, action).then(() => undefined),
+  searchStudyCorpus: (query, options) => ipcRenderer.invoke('study:search:query', query, options),
+  getStudySearchIndexStatus: () => ipcRenderer.invoke('study:search:status'),
+  rebuildStudySearchIndex: () => ipcRenderer.invoke('study:search:rebuild'),
+  pauseStudySearchIndex: () => ipcRenderer.invoke('study:search:pause').then(() => undefined),
+  resumeStudySearchIndex: () => ipcRenderer.invoke('study:search:resume').then(() => undefined),
+  stopStudySearchIndex: () => ipcRenderer.invoke('study:search:stop').then(() => undefined),
+  deleteStudySearchIndex: () => ipcRenderer.invoke('study:search:deleteIndex').then(() => undefined),
+  setStudySearchSourceExcluded: (sourceId, excluded) => ipcRenderer.invoke('study:search:exclude', sourceId, excluded),
+  listStudySavedSearches: () => ipcRenderer.invoke('study:search:saved:list'),
+  saveStudySearch: (name, query, options) => ipcRenderer.invoke('study:search:saved:create', name, query, options),
+  deleteStudySavedSearch: (id) => ipcRenderer.invoke('study:search:saved:delete', id).then(() => undefined),
+  listStudySearchHistory: () => ipcRenderer.invoke('study:search:history:list'),
+  clearStudySearchHistory: () => ipcRenderer.invoke('study:search:history:clear').then(() => undefined),
+  onStudySearchProgress: (cb) => {
+    const listener = (_e: unknown, next: Parameters<typeof cb>[0]) => cb(next);
+    ipcRenderer.on('study:search:progress', listener);
+    return () => ipcRenderer.removeListener('study:search:progress', listener);
+  },
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

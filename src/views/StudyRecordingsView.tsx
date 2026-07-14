@@ -93,7 +93,7 @@ function RecordingPlayer({ detail, onTime }: { detail: StudyRecordingDetail; onT
   );
 }
 
-export function StudyRecordingsView({ onOpenDocument }: { onOpenDocument: (id: string) => void }) {
+export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initialTimestamp }: { onOpenDocument: (id: string) => void; initialRecordingId?: string | null; initialTimestamp?: number | null }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [recordings, setRecordings] = useState<StudyRecordingSummary[]>([]);
   const [selected, setSelected] = useState<StudyRecordingDetail | null>(null);
@@ -123,6 +123,7 @@ export function StudyRecordingsView({ onOpenDocument }: { onOpenDocument: (id: s
   const autoPausedRef = useRef(false);
   const manuallyPausedRef = useRef(false);
   const cancelledRef = useRef(false);
+  const initialSeekConsumedRef = useRef(false);
 
   const reload = useCallback(async () => {
     const [nextWorkspace, nextRecordings] = await Promise.all([
@@ -140,6 +141,7 @@ export function StudyRecordingsView({ onOpenDocument }: { onOpenDocument: (id: s
   }, [activeTranscriptKind]);
 
   useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { if (initialRecordingId) { initialSeekConsumedRef.current = false; void open(initialRecordingId); } }, [initialRecordingId, open]);
   useEffect(() => {
     if (!selected) return;
     const transcript = selected.transcripts.find((entry) => entry.kind === activeTranscriptKind);
@@ -376,7 +378,7 @@ export function StudyRecordingsView({ onOpenDocument }: { onOpenDocument: (id: s
                 <button className="btn btn-ghost text-red-400" title={t('Mover a la papelera')} onClick={() => void window.nodus.setStudyRecordingLifecycle(selected.id, 'trash').then(() => { setSelected(null); return reload(); })}><Icon name="trash" /></button>
               </div>
 
-              <RecordingPlayer detail={selected} onTime={(audio) => { audioRef.current = audio; }} />
+              <RecordingPlayer detail={selected} onTime={(audio) => { audioRef.current = audio; if (audio && initialTimestamp != null && !initialSeekConsumedRef.current) { audio.currentTime = initialTimestamp; initialSeekConsumedRef.current = true; } }} />
               <div className="flex flex-wrap items-center gap-2">
                 <button className="btn btn-secondary" onClick={() => void addMarker()}><Icon name="plus" />{t('Añadir marcador')}</button>
                 {!busy && <button className="btn btn-primary" onClick={() => void transcribe()}><Icon name="microphone" />{selected.processingStatus === 'cancelled' ? t('Reanudar transcripción') : selected.transcripts.length ? t('Reprocesar con Whisper') : t('Transcribir con Whisper')}</button>}

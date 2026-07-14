@@ -33,7 +33,7 @@ function materialIcon(kind: StudyMaterialPreviewKind): string {
   return kind === 'image' ? 'image' : kind === 'audio' ? 'play' : kind === 'presentation' ? 'columns' : kind === 'pdf' ? 'book' : 'notebook';
 }
 
-export function StudyMaterialsView({ onOpenDocument }: { onOpenDocument: (id: string) => void }) {
+export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOpenDocument: (id: string) => void; initialMaterialId?: string | null }) {
   const [materials, setMaterials] = useState<StudyMaterialSummary[]>([]);
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [query, setQuery] = useState('');
@@ -47,6 +47,7 @@ export function StudyMaterialsView({ onOpenDocument }: { onOpenDocument: (id: st
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  useEffect(() => { if (initialMaterialId) setSelected(initialMaterialId); }, [initialMaterialId]);
 
   const load = async () => {
     const [nextMaterials, nextWorkspace] = await Promise.all([

@@ -48,6 +48,14 @@ import type {
   StudyTranscriptSegment,
   StudyTranscriptSegmentInput,
 } from './studyRecordings';
+import type {
+  StudySavedSearch,
+  StudySearchHistoryEntry,
+  StudySearchIndexStatus,
+  StudySearchOptions,
+  StudySearchProgress,
+  StudySearchResponse,
+} from './studySearch';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -87,6 +95,21 @@ export type {
   StudyTranscriptSegmentInput,
   StudyWhisperChunk,
 } from './studyRecordings';
+export type {
+  StudySavedSearch,
+  StudySearchHistoryEntry,
+  StudySearchIndexEntry,
+  StudySearchIndexStatus,
+  StudySearchKind,
+  StudySearchLocation,
+  StudySearchOptions,
+  StudySearchProgress,
+  StudySearchResponse,
+  StudySearchResult,
+  StudySearchScore,
+  StudySearchScope,
+  StudySearchSort,
+} from './studySearch';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4630,6 +4653,20 @@ export interface NodusApi {
   createStudyNoteFromTranscript(recordingId: string, transcriptId: string): Promise<{ documentId: string }>;
   deleteStudyRecordingAudio(id: string): Promise<StudyRecordingSummary>;
   setStudyRecordingLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  searchStudyCorpus(query: string, options?: StudySearchOptions): Promise<StudySearchResponse>;
+  getStudySearchIndexStatus(): Promise<StudySearchProgress>;
+  rebuildStudySearchIndex(): Promise<StudySearchProgress>;
+  pauseStudySearchIndex(): Promise<void>;
+  resumeStudySearchIndex(): Promise<void>;
+  stopStudySearchIndex(): Promise<void>;
+  deleteStudySearchIndex(): Promise<void>;
+  setStudySearchSourceExcluded(sourceId: string, excluded: boolean): Promise<StudySearchIndexStatus>;
+  listStudySavedSearches(): Promise<StudySavedSearch[]>;
+  saveStudySearch(name: string, query: string, options: StudySearchOptions): Promise<StudySavedSearch>;
+  deleteStudySavedSearch(id: string): Promise<void>;
+  listStudySearchHistory(): Promise<StudySearchHistoryEntry[]>;
+  clearStudySearchHistory(): Promise<void>;
+  onStudySearchProgress(cb: (progress: StudySearchProgress) => void): () => void;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

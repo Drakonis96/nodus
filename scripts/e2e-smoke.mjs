@@ -74,6 +74,7 @@ try {
     hasStudyStt: typeof window.nodus?.transcribeStudyAudio === 'function',
     hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
+    hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -84,6 +85,7 @@ try {
   assert.equal(bridge.hasStudyStt, true, 'study speech-to-text bridge available');
   assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
+  assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -554,11 +556,11 @@ try {
     const literal = await window.nodus.saveStudyTranscript(recording.id, {
       kind: 'literal', contentMarkdown: 'Definición literal de memoria de trabajo.', status: 'ready', progress: 1,
       modelProvider: 'local', modelName: 'Whisper smoke',
-      segments: [{ tStart: 0, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
+      segments: [{ tStart: 0.2, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
     });
     await window.nodus.saveStudyTranscript(recording.id, {
       kind: 'corrected', contentMarkdown: 'Definición literal de memoria de trabajo.', sourceTranscriptId: literal.id,
-      segments: [{ tStart: 0, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
+      segments: [{ tStart: 0.2, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
     });
     await window.nodus.createStudyAudioMarker(recording.id, { tSeconds: 0, label: 'Concepto clave' });
     return { id: recording.id, literalId: literal.id };
@@ -572,6 +574,26 @@ try {
   await page.getByRole('button', { name: 'Crear apunte', exact: true }).click();
   await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/recording/')), { timeout: 30_000 });
   console.log('[e2e] direct class capture + recording player + timestamped transcript provenance ok');
+
+  // ── Study hybrid search: local index, saved search and direct seek ─────────
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await page.getByTestId('study-search-view').waitFor({ timeout: 30_000 });
+  const hybridInput = page.getByTestId('study-search-input');
+  assert.ok(await hybridInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'hybrid search keeps its icon and text separated');
+  await page.getByTestId('study-search-view').locator('select').first().selectOption('transcript');
+  await hybridInput.fill('memoria de trabajo');
+  await page.getByTestId('study-search-result').first().waitFor({ timeout: 30_000 });
+  assert.match(await page.getByTestId('study-search-result').first().innerText(), /Definición literal de memoria de trabajo/, 'literal transcript is found through the unified local index');
+  await page.getByRole('button', { name: 'Guardar búsqueda', exact: true }).click();
+  const savedSearchDialog = page.getByRole('dialog', { name: 'Guardar búsqueda' });
+  await savedSearchDialog.locator('input').fill('Memoria smoke');
+  await savedSearchDialog.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.waitForFunction(async () => (await window.nodus.listStudySavedSearches()).some((item) => item.name === 'Memoria smoke'), { timeout: 30_000 });
+  await page.getByTestId('study-search-result').first().locator('button').first().click();
+  await page.getByTestId('study-recording-detail').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-recording-player').locator('audio').waitFor();
+  await page.waitForFunction(() => (document.querySelector('[data-testid="study-recording-player"] audio')?.currentTime ?? 0) >= 0.19, { timeout: 30_000 });
+  console.log('[e2e] hybrid study search + saved query + timestamp navigation ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

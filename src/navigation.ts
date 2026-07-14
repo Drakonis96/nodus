@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studyLibrary' | 'studyRecordings' | 'studyQuestions' | 'studyTests' | 'studyExams' | 'studyPlanner' | 'studyReview' | 'studyProgress' | 'studyChat' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyQuestions' | 'studyTests' | 'studyExams' | 'studyPlanner' | 'studyReview' | 'studyProgress' | 'studyChat' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -59,6 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Study mode — scoped to the 'estudio' vault type. The existing `study` route
   // remains the corpus-guided study tool and complements this local workspace.
   { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
+  { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
   { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
   { id: 'studyRecordings', label: 'Grabaciones', icon: 'microphone', group: 'explore' },
   { id: 'studyQuestions', label: 'Banco de preguntas', icon: 'help', group: 'analyze' },

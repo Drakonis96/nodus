@@ -6,7 +6,9 @@ import { Icon } from '../components/ui';
 
 const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; description: string }> = [
   { view: 'studyCourses', icon: 'graduation', title: 'Cursos y asignaturas', description: 'Organiza cursos, asignaturas, temas y apuntes.' },
+  { view: 'studySearch', icon: 'search', title: 'Buscar en el estudio', description: 'Encuentra fragmentos, páginas y momentos de audio.' },
   { view: 'studyLibrary', icon: 'book', title: 'Materiales de estudio', description: 'Reúne documentos, grabaciones y fuentes.' },
+  { view: 'studyRecordings', icon: 'microphone', title: 'Grabaciones', description: 'Graba clases, transcribe y crea apuntes enlazados.' },
   { view: 'studyQuestions', icon: 'help', title: 'Banco de preguntas', description: 'Prepara preguntas, tests y exámenes.' },
   { view: 'studyReview', icon: 'refresh', title: 'Repaso', description: 'Practica con tarjetas y repetición espaciada.' },
   { view: 'studyPlanner', icon: 'calendar', title: 'Planificador', description: 'Distribuye objetivos, sesiones y fechas clave.' },

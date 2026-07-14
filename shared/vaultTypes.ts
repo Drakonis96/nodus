@@ -185,6 +185,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // Study mode owns its academic organisation, materials, assessment and
   // planning surfaces. They must never leak into research/records/database vaults.
   studyCourses: ['estudio'],
+  studySearch: ['estudio'],
   studyLibrary: ['estudio'],
   studyRecordings: ['estudio'],
   studyQuestions: ['estudio'],
