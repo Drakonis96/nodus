@@ -13,6 +13,7 @@
     "test": "node --test scripts/test-*.mjs",
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
+    "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",

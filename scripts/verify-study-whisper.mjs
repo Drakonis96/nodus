@@ -4,7 +4,7 @@
 // it downloads sizeable model files and can take several minutes.
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -87,7 +87,11 @@ try {
     }
   }
   assert.deepEqual(errors, [], `renderer errors: ${errors.join(' | ')}`);
-  console.log(JSON.stringify({ backend: 'renderer-wasm', report }, null, 2));
+  const payload = { backend: 'renderer-wasm', generatedAt: new Date().toISOString(), report };
+  if (process.env.NODUS_WHISPER_REPORT) {
+    await writeFile(path.resolve(process.env.NODUS_WHISPER_REPORT), JSON.stringify(payload, null, 2), 'utf8');
+  }
+  console.log(JSON.stringify(payload, null, 2));
   console.log('Real Study Whisper verification passed.');
 } finally {
   await app?.close().catch(() => undefined);
