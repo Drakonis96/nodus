@@ -20,6 +20,7 @@ import { Markdown } from '../components/Markdown';
 import { ModelPicker } from '../components/ModelPicker';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { t } from '../i18n';
+import { AudioPanel } from '../components/AudioPanel';
 
 const TASKS: Array<{ id: StudyAssistantTask; label: string }> = [
   { id: 'answer', label: 'Responder' }, { id: 'summary', label: 'Resumir' }, { id: 'explain', label: 'Explicar' },
@@ -78,6 +79,7 @@ export function StudyChatView({
   const [error, setError] = useState('');
   const [activeCitation, setActiveCitation] = useState<StudyAssistantCitation | null>(null);
   const [noteTarget, setNoteTarget] = useState('');
+  const [audioMessageId, setAudioMessageId] = useState<string | null>(null);
   const [model, setModel] = useFeatureModel(settings, 'studyModel');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -218,7 +220,8 @@ export function StudyChatView({
                   {item.citationWarning && <p className="mt-3 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-[10px] text-amber-300">{t('La respuesta no incluyó citas verificables. Revísala o vuelve a generarla con otro ámbito.')}</p>}
                   {item.citations?.length ? <div className="mt-3 flex flex-wrap gap-1.5 border-t border-neutral-800 pt-3">{item.citations.map((citation) => <button key={`${item.id}-${citation.id}`} className="rounded-full border border-teal-900 px-2 py-1 text-[10px] text-teal-400 hover:border-teal-600" onClick={() => openEvidence(citation)}>{citation.id} · {citation.title}{evidenceLocation(citation) ? ` · ${evidenceLocation(citation)}` : ''}</button>)}</div> : null}
                   {item.stats && <p className="mt-2 text-[9px] text-neutral-700">{item.stats.sourceCount} {t('fuentes')} · ≈{item.stats.estimatedInputTokens.toLocaleString()} tokens · {[item.stats.provider, item.stats.model].filter(Boolean).join(' / ')}{item.stats.truncated ? ` · ${t('contexto comprimido')}` : ''}</p>}
-                  {!item.error && item.content && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-2"><button className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void navigator.clipboard.writeText(item.content)}><Icon name="copy" size={11} />{t('Copiar')}</button><button className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void saveAnswerToNote(item, false)}><Icon name="notebook" size={11} />{t('Crear apunte nuevo')}</button><select className="input ml-auto h-7 max-w-44 text-[10px]" value={noteTarget} onChange={(event) => setNoteTarget(event.target.value)}><option value="">{t('Elegir apunte…')}</option>{workspace?.documents.map((document) => <option key={document.id} value={document.id}>{document.title}</option>)}</select><button disabled={!noteTarget} className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void saveAnswerToNote(item, true)}>{t('Añadir al apunte')}</button></div>}
+                  {!item.error && item.content && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-2"><button className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void navigator.clipboard.writeText(item.content)}><Icon name="copy" size={11} />{t('Copiar')}</button><button className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => setAudioMessageId((current) => current === item.id ? null : item.id)}><Icon name="play" size={11} />{t('Escuchar')}</button><button className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void saveAnswerToNote(item, false)}><Icon name="notebook" size={11} />{t('Crear apunte nuevo')}</button><select className="input ml-auto h-7 max-w-44 text-[10px]" value={noteTarget} onChange={(event) => setNoteTarget(event.target.value)}><option value="">{t('Elegir apunte…')}</option>{workspace?.documents.map((document) => <option key={document.id} value={document.id}>{document.title}</option>)}</select><button disabled={!noteTarget} className="btn btn-ghost h-7 px-2 text-[10px]" onClick={() => void saveAnswerToNote(item, true)}>{t('Añadir al apunte')}</button></div>}
+                  {audioMessageId === item.id && <div className="mt-2" data-testid="study-assistant-audio"><AudioPanel entityKind="study_assistant" entityId={item.id} sourceMarkdown={item.content} title={t('Respuesta del asistente')} subjectId={selection.subjectId} localOnly compact /></div>}
                 </div>}
             </article>)}
             {reasoning && <details className="rounded-lg border border-neutral-800 p-3 text-[10px] text-neutral-600"><summary>{t('Razonamiento del modelo')}</summary><pre className="mt-2 whitespace-pre-wrap">{reasoning}</pre></details>}

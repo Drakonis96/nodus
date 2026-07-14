@@ -67,6 +67,12 @@ function stripWrappingFence(value: string): string {
   return match ? match[1] : trimmed;
 }
 
+function completeProtectedStreamPrefix(value: string): string {
+  const lastOpen = value.lastIndexOf('⟦');
+  const lastClose = value.lastIndexOf('⟧');
+  return lastOpen > lastClose ? value.slice(0, lastOpen) : value;
+}
+
 function hash(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -92,6 +98,7 @@ export async function improveStudyText(
   const prompt = buildStudyImprovePrompt(request, style, protectedValue.text);
   const model = modelFor(request, style);
   let streamed = '';
+  let visibleStreamed = '';
   const raw = await completeTextStream({
     system: prompt.system,
     user: prompt.user,
@@ -101,7 +108,15 @@ export async function improveStudyText(
   }, (delta, kind) => {
     if (kind !== 'content') return;
     streamed += delta;
-    onDelta(delta);
+    // Provider chunks can split a protected marker. Hold an unfinished marker
+    // and expose only restored, user-facing text to the preview.
+    const safePrefix = completeProtectedStreamPrefix(streamed);
+    const visiblePrefix = restoreProtectedSpans(safePrefix, protectedValue.spans);
+    if (visiblePrefix.startsWith(visibleStreamed)) {
+      const visibleDelta = visiblePrefix.slice(visibleStreamed.length);
+      visibleStreamed = visiblePrefix;
+      if (visibleDelta) onDelta(visibleDelta);
+    }
   }, model, signal);
   const protectedResult = stripWrappingFence(raw || streamed);
   const missing = missingProtectedSpans(protectedResult, protectedValue.spans);
@@ -109,6 +124,11 @@ export async function improveStudyText(
     throw new Error(`La mejora alteró ${missing.length} fragmento(s) protegido(s). El original no se ha modificado.`);
   }
   const text = restoreProtectedSpans(protectedResult, protectedValue.spans);
+  if (text.startsWith(visibleStreamed)) {
+    const trailingDelta = text.slice(visibleStreamed.length);
+    visibleStreamed = text;
+    if (trailingDelta) onDelta(trailingDelta);
+  }
   const warnings = studyImprovementWarnings(original, text, protectedValue.spans, request.mode);
   if (request.mode === 'free') warnings.unshift('Transformación libre: revisa los cambios de significado antes de aceptar.');
   const originalHash = hash(original);

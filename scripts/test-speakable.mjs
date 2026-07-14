@@ -23,7 +23,7 @@ try {
     external: ['@shared/*'],
     logLevel: 'silent',
   });
-  const { markdownToSpeech, splitForNarration, splitMarkdownSections, deepResearchSegments, immersionSegments } =
+  const { markdownToSpeech, splitForNarration, splitMarkdownSections, deepResearchSegments, immersionSegments, formulasToSpeech, studyNarrationSegments } =
     await import(pathToFileURL(outfile).href);
 
   // ── Citation buttons are removed entirely (label + link) ────────────────────
@@ -114,6 +114,22 @@ try {
   {
     assert.deepEqual(deepResearchSegments({ title: '', abstract: '', draftMarkdown: '' }), []);
     assert.deepEqual(immersionSegments({ overview: '', stations: [] }), []);
+  }
+
+  // ── Study narration understands formulas, modes and pronunciation ──────────
+  {
+    assert.match(formulasToSpeech('La fórmula $x^2 + \\frac{a}{b}$.'), /x al cuadrado.*a dividido por b/);
+    const markdown = '# Memoria\n\nLa sigla TCC explica $x^2$.\n\n## Referencias\n\nNo narrar esta referencia.';
+    const full = studyNarrationSegments(markdown, { title: 'Apunte', pronunciations: [{ written: 'TCC', spoken: 'te ce ce' }] });
+    assert.ok(full.some((segment) => segment.text.includes('te ce ce')));
+    assert.ok(full.some((segment) => segment.text.includes('al cuadrado')));
+    assert.ok(!full.some((segment) => segment.text.includes('No narrar')), 'reference sections stay silent');
+    const selection = studyNarrationSegments(markdown, { mode: 'selection', selection: 'Sólo esta frase.', title: 'Selección' });
+    assert.equal(selection.length, 1);
+    assert.match(selection[0].text, /Sólo esta frase/);
+    const cursor = studyNarrationSegments('Antes. Después del cursor.', { mode: 'cursor', cursorOffset: 7, title: 'Cursor' });
+    assert.ok(!cursor[0].text.includes('Antes'));
+    assert.match(cursor[0].text, /Después del cursor/);
   }
 
   console.log('test-speakable: all assertions passed');

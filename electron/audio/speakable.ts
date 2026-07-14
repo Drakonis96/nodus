@@ -1,4 +1,4 @@
-import type { AudioSegment } from '@shared/types';
+import type { AudioSegment, AudioSegmentRequest } from '@shared/types';
 
 // Pure text helpers that turn rendered report / immersion content into clean
 // prose for narration. Kept free of any Electron/DB imports so the citation- and
@@ -17,7 +17,7 @@ import type { AudioSegment } from '@shared/types';
  */
 export function markdownToSpeech(md: string): string {
   if (!md) return '';
-  let text = md.replace(/\r\n/g, '\n');
+  let text = formulasToSpeech(md.replace(/\r\n/g, '\n'));
 
   // 1) Remove fenced code blocks wholesale — never narratable.
   text = text.replace(/```[\s\S]*?```/g, '');
@@ -71,6 +71,37 @@ export function markdownToSpeech(md: string): string {
     .replace(/ +([.,;:!?])/g, '$1')
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
+/** Turn common inline LaTeX constructs into understandable spoken prose. This
+ * intentionally covers the high-frequency forms used in notes; unknown commands
+ * lose their slash instead of being read as punctuation. */
+export function formulasToSpeech(value: string): string {
+  return value
+    .replace(/\$\$([\s\S]*?)\$\$/g, (_match, formula: string) => ` ${speakFormula(formula)} `)
+    .replace(/\$([^$\n]+)\$/g, (_match, formula: string) => ` ${speakFormula(formula)} `);
+}
+
+function speakFormula(formula: string): string {
+  return formula
+    .replace(/\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/g, '$1 dividido por $2')
+    .replace(/\\sqrt\s*\{([^{}]+)\}/g, 'raíz cuadrada de $1')
+    .replace(/\^\{([^{}]+)\}/g, ' elevado a $1')
+    .replace(/\^2\b/g, ' al cuadrado')
+    .replace(/\^3\b/g, ' al cubo')
+    .replace(/\^([\p{L}\p{N}]+)/gu, ' elevado a $1')
+    .replace(/_\{([^{}]+)\}/g, ' subíndice $1')
+    .replace(/_([\p{L}\p{N}]+)/gu, ' subíndice $1')
+    .replace(/\\(?:times|cdot)\b/g, ' por ')
+    .replace(/\\(?:leq|le)\b/g, ' menor o igual que ')
+    .replace(/\\(?:geq|ge)\b/g, ' mayor o igual que ')
+    .replace(/\\neq\b/g, ' distinto de ')
+    .replace(/\\infty\b/g, ' infinito ')
+    .replace(/\\alpha\b/g, ' alfa ').replace(/\\beta\b/g, ' beta ').replace(/\\gamma\b/g, ' gamma ')
+    .replace(/\\[a-zA-Z]+/g, ' ')
+    .replace(/[{}]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -192,6 +223,45 @@ export function splitMarkdownSections(md: string): MarkdownSection[] {
   const tail = text.slice(lastIndex).trim();
   if (tail || lastHeading) sections.push({ heading: lastHeading, body: tail });
   return sections.filter((s) => s.body || s.heading);
+}
+
+/** Study-specific segmentation: complete document, selected text, or content
+ * starting at the cursor. References/footnote definitions and code stay silent;
+ * each short clip is a visual follow-along unit in the global player. */
+export function studyNarrationSegments(markdown: string, request: AudioSegmentRequest = {}): AudioSegment[] {
+  let selected = request.mode === 'selection' ? (request.selection ?? '')
+    : request.mode === 'cursor' ? markdown.slice(Math.max(0, request.cursorOffset ?? 0)) : markdown;
+  selected = removeReferenceSections(selected);
+  const entries = request.pronunciations ?? [];
+  const segments: AudioSegment[] = [];
+  const sections = splitMarkdownSections(selected);
+  for (const section of sections) {
+    let prose = markdownToSpeech(section.body);
+    for (const entry of entries) {
+      if (!entry.written.trim() || !entry.spoken.trim()) continue;
+      const escaped = entry.written.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      prose = prose.replace(new RegExp(`\\b${escaped}\\b`, 'giu'), entry.spoken.trim());
+    }
+    const prefix = section.heading ? `${section.heading}. ` : '';
+    splitForNarration(`${prefix}${prose}`.trim(), 620).forEach((part, index, all) => segments.push({
+      index: segments.length,
+      label: section.heading ? (all.length > 1 ? `${section.heading} · ${index + 1}/${all.length}` : section.heading)
+        : `${request.title || 'Lectura'} · ${segments.length + 1}`,
+      text: part,
+    }));
+  }
+  if (!segments.length) {
+    const prose = markdownToSpeech(selected);
+    splitForNarration(prose, 620).forEach((part, index) => segments.push({ index, label: `${request.title || 'Lectura'} · ${index + 1}`, text: part }));
+  }
+  return segments.map((segment, index) => ({ ...segment, index }));
+}
+
+function removeReferenceSections(markdown: string): string {
+  const withoutDefinitions = markdown.replace(/^\[\^[^\]]+\]:.*$/gm, '');
+  const lines = withoutDefinitions.split('\n');
+  const cutoff = lines.findIndex((line) => /^#{1,6}\s+(?:referencias|bibliograf[ií]a|notas)\s*$/i.test(line.trim()));
+  return (cutoff >= 0 ? lines.slice(0, cutoff) : lines).join('\n');
 }
 
 // ── Immersion ────────────────────────────────────────────────────────────────

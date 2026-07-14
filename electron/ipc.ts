@@ -7,6 +7,7 @@ import type {
   AppSettings,
   AudioEntityKind,
   AudioProvider,
+  AudioSegmentRequest,
   AddProjectLinkInput,
   ApplyManuscriptCitationRequest,
   ApplyProjectSuggestionsRequest,
@@ -125,6 +126,7 @@ import type {
   StudyAssistantConversationInput,
   StudyAssistantConversationPatch,
   StudyAssistantRequest,
+  StudyPronunciationEntry,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -166,9 +168,16 @@ import {
   deleteClip as deleteAudioClip,
   deleteEntityClips,
   getEntitySegments,
+  audioClipPath,
+  createStudyAudioBookmark,
+  deleteStudyAudioBookmark,
+  getStudyPronunciations,
+  listStudyAudioBookmarks,
+  listStudyAudioPlaylist,
   listEntityClips,
   readClipBytes,
   saveClip,
+  setStudyPronunciations,
 } from './audio/audioService';
 import {
   clearHumeKey,
@@ -1301,8 +1310,8 @@ export function registerIpc(
 
   // audio / text-to-speech. Synthesis runs in the renderer (Piper via WebAssembly);
   // the main process supplies the speakable segments and persists the resulting WAVs.
-  h('audio:segments', async (_e, entityKind: AudioEntityKind, entityId: string) =>
-    getEntitySegments(entityKind, entityId)
+  h('audio:segments', async (_e, entityKind: AudioEntityKind, entityId: string, request?: AudioSegmentRequest) =>
+    getEntitySegments(entityKind, entityId, request)
   );
   h('audio:listClips', async (_e, entityKind: AudioEntityKind, entityId: string) =>
     listEntityClips(entityKind, entityId)
@@ -1326,6 +1335,17 @@ export function registerIpc(
   h('audio:deleteEntityClips', async (_e, entityKind: AudioEntityKind, entityId: string) => {
     deleteEntityClips(entityKind, entityId);
   });
+  h('audio:exportClip', async (_e, clipId: string) => {
+    const source = audioClipPath(clipId); if (!source) return null;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: 'Guardar audio', defaultPath: path.basename(source), filters: [{ name: 'Audio WAV', extensions: ['wav'] }] });
+    if (picked.canceled || !picked.filePath) return null; fs.copyFileSync(source, picked.filePath); return { path: picked.filePath };
+  });
+  h('audio:study:bookmarks', async (_e, kind: AudioEntityKind, id: string) => listStudyAudioBookmarks(kind, id));
+  h('audio:study:bookmark:create', async (_e, kind: AudioEntityKind, id: string, segmentIndex: number, label: string) => createStudyAudioBookmark(kind, id, segmentIndex, label));
+  h('audio:study:bookmark:delete', async (_e, id: string) => deleteStudyAudioBookmark(id));
+  h('audio:study:pronunciations', async (_e, subjectId: string) => getStudyPronunciations(subjectId));
+  h('audio:study:pronunciations:set', async (_e, subjectId: string, entries: StudyPronunciationEntry[]) => setStudyPronunciations(subjectId, entries));
+  h('audio:study:playlist', async (_e, subjectId: string) => listStudyAudioPlaylist(subjectId));
 
   // Hume (cloud TTS): key stays in the main process; the renderer only sees
   // whether a key exists, the voice list, and the resulting audio bytes.

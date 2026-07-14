@@ -22,6 +22,7 @@ import {
 import { announceStudyWorkspaceChanged } from '../components/StudySidebar';
 import { Icon, Spinner } from '../components/ui';
 import { t } from '../i18n';
+import { AudioPanel } from '../components/AudioPanel';
 
 type CaptureState = 'idle' | 'recording' | 'paused' | 'saving';
 
@@ -397,6 +398,15 @@ export function StudyRecordingsView({ onOpenDocument, initialRecordingId, initia
                     <button className="btn btn-ghost h-7 px-2 text-xs text-red-400" disabled={!latestTranscript(activeTranscriptKind)} onClick={() => { const transcript = latestTranscript(activeTranscriptKind); if (transcript) void window.nodus.deleteStudyTranscript(transcript.id).then(() => open(selected.id)); }}><Icon name="trash" size={12} /></button>
                   </div>
                   <textarea className="min-h-48 w-full resize-y bg-transparent p-3 text-sm leading-relaxed outline-none" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t('La transcripción aparecerá aquí…')} />
+                  {latestTranscript(activeTranscriptKind) && <div className="border-t border-neutral-800 p-2" data-testid="study-transcript-audio"><AudioPanel
+                    entityKind="study_transcript"
+                    entityId={latestTranscript(activeTranscriptKind)!.id}
+                    sourceMarkdown={draft}
+                    title={`${selected.title} · ${t(TRANSCRIPT_LABELS[activeTranscriptKind])}`}
+                    subjectId={selected.subjectId}
+                    localOnly
+                    compact
+                  /></div>}
                   {latestTranscript(activeTranscriptKind)?.segments.length ? <div className="max-h-72 space-y-1 overflow-y-auto border-t border-neutral-800 p-2" data-testid="study-transcript-segments">{latestTranscript(activeTranscriptKind)!.segments.map((segment) => (
                     <div key={segment.id} className="grid gap-2 rounded-lg border border-neutral-800/80 p-2 md:grid-cols-[64px_100px_1fr]">
                       <button className="text-left text-xs font-medium text-teal-400" onClick={() => jumpTo(segment.tStart)}>{formatStudyTimestamp(segment.tStart)}</button>

@@ -26,6 +26,7 @@ installRuntimeHooks(root);
 try {
   const Database = require('better-sqlite3');
   const shared = require(path.join(repoRoot, 'shared/studyImprove.ts'));
+  const improve = require(path.join(repoRoot, 'electron/ai/studyImprove.ts'));
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const styles = require(path.join(repoRoot, 'electron/db/studyStylesRepo.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
@@ -83,7 +84,35 @@ try {
     originalChars: 12, resultChars: 13, warnings: ['Revisar'], action: 'generated',
   });
   styles.updateStudyImprovementAction(log.id, 'replace');
-  assert.equal(styles.listStudyImprovementLog(document.id)[0].action, 'replace', 'provenance action follows user decision');
+  assert.equal(styles.listStudyImprovementLog(document.id).find((entry) => entry.id === log.id)?.action, 'replace', 'provenance action follows user decision');
+
+  // Exercise the complete improvement pipeline with a realistic academic
+  // fragment. The controlled provider streams an actual rewrite while the
+  // production prompt, protected-span restoration, warnings and provenance
+  // code all run unchanged.
+  const academicSample = '# Práctica de recuperación\n\nsegun “la recuperación fortalece la memoria”, el grupo recordó 50% más en 2024 (Roediger & Karpicke, 2006, p. 251). La magnitud fue $d = 1.50$.\n\n- este resultado demuestra una mejora.\n- `score = 50` permanece sin cambios.';
+  let streamed = '';
+  const improved = await improve.improveStudyText({
+    documentId: document.id,
+    text: academicSample,
+    styleId: 'builtin:academic',
+    scope: 'selection',
+    level: 'moderate',
+    length: 'similar',
+    mode: 'preserve',
+    protectedTerms: ['Roediger', 'Karpicke'],
+    variables: { subject: 'Psicología cognitiva', language: 'es', documentType: 'apunte' },
+    model: { provider: 'ollama', model: 'controlled-local-verifier' },
+  }, (delta) => { streamed += delta; });
+  assert.equal(streamed, improved.text, 'the streamed text and final result agree');
+  assert.match(improved.text, /Según/u, 'the provider rewrite is applied');
+  for (const protectedFragment of ['“la recuperación fortalece la memoria”', '50%', '2024', '(Roediger & Karpicke, 2006, p. 251)', '$d = 1.50$', '`score = 50`']) {
+    assert.ok(improved.text.includes(protectedFragment), `protected fragment survives: ${protectedFragment}`);
+  }
+  assert.equal(improved.modelProvider, 'ollama');
+  assert.equal(improved.modelName, 'controlled-local-verifier');
+  assert.ok(improved.protectedSpanCount >= 6);
+  assert.equal(styles.listStudyImprovementLog(document.id).some((entry) => entry.id === improved.logId), true, 'full rewrite records provenance');
 
   const exported = styles.exportStudyStyles([custom.id]);
   assert.equal(exported.format, 'nodus-study-styles');
@@ -126,6 +155,21 @@ function installRuntimeHooks(userDataPath) {
   };
   Module._load = function load(request, parent, isMain) {
     if (request === 'electron') return electronStub;
+    if (request === './aiClient' && parent?.filename?.endsWith('/electron/ai/studyImprove.ts')) {
+      return {
+        resolveModelRef: () => ({ provider: 'ollama', model: 'controlled-local-verifier' }),
+        completeTextStream: async (options, onDelta) => {
+          const selection = options.user.match(/<<<NODUS_SELECTION\n([\s\S]*?)\nNODUS_SELECTION>>>/)?.[1] ?? '';
+          const result = selection
+            .replace(/^segun\b/imu, 'Según')
+            .replace(/\beste resultado demuestra\b/iu, 'Este resultado muestra');
+          const midpoint = Math.ceil(result.length / 2);
+          onDelta(result.slice(0, midpoint), 'content');
+          onDelta(result.slice(midpoint), 'content');
+          return result;
+        },
+      };
+    }
     return originalLoad.call(this, request, parent, isMain);
   };
   require.extensions['.ts'] = function loadTs(module, filename) {

@@ -718,8 +718,9 @@ export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
  *  settings + generation surface without changing callers. */
 export type AudioProvider = 'piper' | 'kokoro' | 'hume';
 
-/** The two content kinds that can be narrated. Values match DecorativeImageEntityKind. */
-export type AudioEntityKind = 'deep_research' | 'immersion';
+/** Content kinds that can be narrated. Study kinds are stored in the vault's
+ * regenerable local audio catalogue rather than in sync/backups. */
+export type AudioEntityKind = 'deep_research' | 'immersion' | 'study_document' | 'study_transcript' | 'study_assistant' | 'study_subject' | 'study_question';
 
 /** One Hume voice as returned by the voice-list endpoint. `humeProvider` says which
  *  Hume library it belongs to (needed to synthesize with it). */
@@ -759,6 +760,35 @@ export interface AudioSegment {
   index: number;
   label: string;
   text: string;
+}
+
+export interface AudioSegmentRequest {
+  mode?: 'full' | 'selection' | 'cursor';
+  markdown?: string;
+  selection?: string;
+  cursorOffset?: number;
+  title?: string;
+  pronunciations?: Array<{ written: string; spoken: string }>;
+}
+
+export interface StudyAudioBookmark {
+  id: string;
+  entityKind: AudioEntityKind;
+  entityId: string;
+  segmentIndex: number;
+  label: string;
+  createdAt: string;
+}
+
+export interface StudyPronunciationEntry { written: string; spoken: string }
+
+export interface StudyAudioPlaylistItem {
+  entityId: string;
+  title: string;
+  subjectId: string;
+  clipCount: number;
+  durationSec: number;
+  updatedAt: string;
 }
 
 // ── AI translations ─────────────────────────────────────────────────────────
@@ -4476,7 +4506,7 @@ export interface NodusApi {
   onDecorativeImageChanged(cb: (image: DecorativeImage) => void): () => void;
 
   // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
-  getAudioSegments(entityKind: AudioEntityKind, entityId: string): Promise<AudioSegment[]>;
+  getAudioSegments(entityKind: AudioEntityKind, entityId: string, request?: AudioSegmentRequest): Promise<AudioSegment[]>;
   listAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<AudioClip[]>;
   clearAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
   saveAudioClip(
@@ -4487,6 +4517,13 @@ export interface NodusApi {
   getAudioClipDataUrl(clipId: string): Promise<string | null>;
   deleteAudioClip(clipId: string): Promise<void>;
   deleteEntityAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
+  exportAudioClip(clipId: string): Promise<{ path: string } | null>;
+  listStudyAudioBookmarks(entityKind: AudioEntityKind, entityId: string): Promise<StudyAudioBookmark[]>;
+  createStudyAudioBookmark(entityKind: AudioEntityKind, entityId: string, segmentIndex: number, label: string): Promise<StudyAudioBookmark>;
+  deleteStudyAudioBookmark(id: string): Promise<void>;
+  getStudyPronunciations(subjectId: string): Promise<StudyPronunciationEntry[]>;
+  setStudyPronunciations(subjectId: string, entries: StudyPronunciationEntry[]): Promise<StudyPronunciationEntry[]>;
+  listStudyAudioPlaylist(subjectId: string): Promise<StudyAudioPlaylistItem[]>;
   // AI translations of a report/immersion (source Markdown supplied by the renderer).
   listContentTranslations(
     entityKind: TranslationEntityKind,

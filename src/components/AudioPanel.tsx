@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AudioClip, AudioEntityKind, AudioProvider } from '@shared/types';
+import type {
+  AudioClip,
+  AudioEntityKind,
+  AudioProvider,
+  AudioSegment,
+  AudioSegmentRequest,
+  StudyAudioBookmark,
+  StudyAudioPlaylistItem,
+  StudyPronunciationEntry,
+} from '@shared/types';
 import { findVoice, getEngine } from '../lib/audio';
 import { synthesizeSegment } from '../lib/audio/synth';
 import { useAudioPlayer, type PlayerTrack } from './AudioPlayer';
@@ -22,30 +31,73 @@ export function AudioPanel({
   entityKind,
   entityId,
   compact,
+  sourceMarkdown,
+  selectionText,
+  cursorOffset,
+  title,
+  subjectId,
+  localOnly = false,
 }: {
   entityKind: AudioEntityKind;
   entityId: string;
   compact?: boolean;
+  sourceMarkdown?: string;
+  selectionText?: string;
+  cursorOffset?: number;
+  title?: string;
+  subjectId?: string | null;
+  localOnly?: boolean;
 }) {
   const player = useAudioPlayer();
   const [clips, setClips] = useState<AudioClip[]>([]);
   const [run, setRun] = useState<RunProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voiceReady, setVoiceReady] = useState<boolean | null>(null);
+  const [segments, setSegments] = useState<AudioSegment[]>([]);
+  const [mode, setMode] = useState<NonNullable<AudioSegmentRequest['mode']>>('full');
+  const [bookmarks, setBookmarks] = useState<StudyAudioBookmark[]>([]);
+  const [pronunciations, setPronunciations] = useState<StudyPronunciationEntry[]>([]);
+  const [playlist, setPlaylist] = useState<StudyAudioPlaylistItem[]>([]);
+  const [dictionaryDraft, setDictionaryDraft] = useState({ written: '', spoken: '' });
+  const [showStudyTools, setShowStudyTools] = useState(false);
   const cancelRef = useRef(false);
   const clipsDoneRef = useRef(0);
   const mounted = useRef(true);
 
   const generating = run != null;
+  const study = entityKind.startsWith('study_');
+
+  const segmentRequest = useMemo<AudioSegmentRequest>(() => ({
+    mode,
+    markdown: sourceMarkdown,
+    selection: selectionText,
+    cursorOffset,
+    title,
+    pronunciations,
+  }), [mode, sourceMarkdown, selectionText, cursorOffset, title, pronunciations]);
 
   const refreshClips = async () => {
     const list = await window.nodus.listAudioClips(entityKind, entityId);
     if (mounted.current) setClips(list);
   };
 
+  const refreshStudyMeta = async () => {
+    if (!study) return;
+    const [nextBookmarks, nextPronunciations, nextPlaylist] = await Promise.all([
+      window.nodus.listStudyAudioBookmarks(entityKind, entityId),
+      subjectId ? window.nodus.getStudyPronunciations(subjectId) : Promise.resolve([]),
+      subjectId ? window.nodus.listStudyAudioPlaylist(subjectId) : Promise.resolve([]),
+    ]);
+    if (mounted.current) { setBookmarks(nextBookmarks); setPronunciations(nextPronunciations); setPlaylist(nextPlaylist); }
+  };
+
   const checkVoice = async (): Promise<{ provider: AudioProvider; voiceId: string } | null> => {
     const settings = await window.nodus.getSettings();
     const provider = settings.audioProvider ?? 'piper';
+    if (localOnly && provider === 'hume') {
+      if (mounted.current) setVoiceReady(false);
+      return null;
+    }
     const chosen = settings.audioVoice;
     if (!chosen) {
       if (mounted.current) setVoiceReady(false);
@@ -59,6 +111,7 @@ export function AudioPanel({
   useEffect(() => {
     mounted.current = true;
     void refreshClips();
+    void refreshStudyMeta();
     void checkVoice();
     return () => {
       mounted.current = false;
@@ -66,6 +119,12 @@ export function AudioPanel({
     };
     // eslint-disable-next-line
   }, [entityKind, entityId]);
+
+  useEffect(() => {
+    let active = true;
+    void window.nodus.getAudioSegments(entityKind, entityId, segmentRequest).then((next) => { if (active) setSegments(next); }).catch(() => { if (active) setSegments([]); });
+    return () => { active = false; };
+  }, [entityKind, entityId, segmentRequest]);
 
   const totalDuration = useMemo(() => clips.reduce((acc, c) => acc + c.durationSec, 0), [clips]);
   const playable = useMemo<PlayerTrack[]>(
@@ -77,7 +136,7 @@ export function AudioPanel({
     setError(null);
     const chosen = await checkVoice();
     if (!chosen) {
-      setError(t('Elige y prepara una voz en Ajustes → IA → Audio y voz.'));
+      setError(localOnly ? t('La lectura de estudio requiere una voz local de Piper o Kokoro.') : t('Elige y prepara una voz en Ajustes → IA → Audio y voz.'));
       return;
     }
     // Local voices carry static metadata; cloud (Hume) voices are dynamic, so the
@@ -85,7 +144,7 @@ export function AudioPanel({
     const language = findVoice(chosen.provider, chosen.voiceId)?.language ?? '';
     let segments;
     try {
-      segments = await window.nodus.getAudioSegments(entityKind, entityId);
+      segments = await window.nodus.getAudioSegments(entityKind, entityId, segmentRequest);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       return;
@@ -124,6 +183,7 @@ export function AudioPanel({
       clipsDoneRef.current = 0;
       if (mounted.current) setRun(null);
       await refreshClips();
+      await refreshStudyMeta();
     }
   };
 
@@ -151,6 +211,7 @@ export function AudioPanel({
   const hasClips = clips.length > 0;
   const anyMissing = clips.some((c) => c.missing);
   const pct = run && run.total > 0 ? Math.round((run.done / run.total) * 100) : 0;
+  const segmentText = new Map(segments.map((segment) => [segment.index, segment.text]));
 
   return (
     <div className={`rounded-lg border border-neutral-800 bg-neutral-900/40 ${compact ? 'p-3' : 'p-4'}`}>
@@ -165,6 +226,12 @@ export function AudioPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {study && <select data-testid="study-audio-mode" className="input h-8 py-0 text-xs" value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}>
+            <option value="full">{t('Documento completo')}</option>
+            <option value="selection" disabled={!selectionText?.trim()}>{t('Selección actual')}</option>
+            <option value="cursor">{t('Desde el cursor')}</option>
+          </select>}
+          {study && <button data-testid="study-audio-tools" className={`btn btn-ghost h-8 px-2 text-xs ${showStudyTools ? 'bg-teal-950 text-teal-300' : ''}`} onClick={() => setShowStudyTools((value) => !value)}>{t('Pronunciación y lista')}</button>}
           {hasClips && !generating && (
             <>
               <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => player.play(playable, 0)} disabled={playable.length === 0}>
@@ -189,9 +256,19 @@ export function AudioPanel({
 
       {voiceReady === false && !generating && (
         <div className="mt-2 text-xs text-amber-400/90">
-          {t('Elige y prepara una voz en Ajustes → IA → Audio y voz para poder narrar.')}
+          {localOnly ? t('Elige una voz local de Piper o Kokoro en Ajustes → IA → Audio y voz.') : t('Elige y prepara una voz en Ajustes → IA → Audio y voz para poder narrar.')}
         </div>
       )}
+
+      {showStudyTools && study && <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/50 p-3" data-testid="study-audio-study-tools">
+        <div className="flex items-center justify-between"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Diccionario de pronunciación')}</h4>{subjectId && <span className="text-[9px] text-neutral-700">{t('Guardado por asignatura')}</span>}</div>
+        {subjectId ? <><div className="mt-2 flex gap-1"><input className="input h-8 min-w-0 flex-1 text-xs" value={dictionaryDraft.written} onChange={(event) => setDictionaryDraft((current) => ({ ...current, written: event.target.value }))} placeholder={t('Texto escrito')} /><input className="input h-8 min-w-0 flex-1 text-xs" value={dictionaryDraft.spoken} onChange={(event) => setDictionaryDraft((current) => ({ ...current, spoken: event.target.value }))} placeholder={t('Cómo debe sonar')} /><button className="btn btn-ghost h-8 px-2" onClick={() => {
+          if (!dictionaryDraft.written.trim() || !dictionaryDraft.spoken.trim()) return;
+          void window.nodus.setStudyPronunciations(subjectId, [...pronunciations, dictionaryDraft]).then((next) => { setPronunciations(next); setDictionaryDraft({ written: '', spoken: '' }); });
+        }}>+</button></div><div className="mt-2 flex flex-wrap gap-1">{pronunciations.map((entry) => <button key={`${entry.written}:${entry.spoken}`} className="rounded-full border border-neutral-800 px-2 py-1 text-[9px] text-neutral-500 hover:border-red-900 hover:text-red-300" title={t('Eliminar')} onClick={() => void window.nodus.setStudyPronunciations(subjectId, pronunciations.filter((candidate) => candidate !== entry)).then(setPronunciations)}>{entry.written} → {entry.spoken} ×</button>)}</div></> : <p className="mt-2 text-[10px] text-neutral-600">{t('Asocia el contenido a una asignatura para guardar pronunciaciones propias.')}</p>}
+        {playlist.length > 0 && <div className="mt-3 border-t border-neutral-800 pt-2"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Lista de reproducción de la asignatura')}</h4><div className="mt-1 space-y-1">{playlist.map((item) => <div key={item.entityId} className="flex items-center text-[10px] text-neutral-500"><span className="min-w-0 flex-1 truncate">{item.title}</span><span>{item.clipCount} {t('pistas')} · {formatDuration(item.durationSec)}</span></div>)}</div></div>}
+        {bookmarks.length > 0 && <div className="mt-3 border-t border-neutral-800 pt-2"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Marcadores')}</h4><div className="mt-1 flex flex-wrap gap-1">{bookmarks.map((bookmark) => <button key={bookmark.id} className="rounded-full border border-teal-900 px-2 py-1 text-[9px] text-teal-400" onClick={() => { const clip = clips.find((candidate) => candidate.segmentIndex === bookmark.segmentIndex); if (clip) playFrom(clip); }} onContextMenu={(event) => { event.preventDefault(); void window.nodus.deleteStudyAudioBookmark(bookmark.id).then(refreshStudyMeta); }}>{bookmark.label}</button>)}</div></div>}
+      </div>}
 
       {generating && run && (
         <div className="mt-3">
@@ -231,14 +308,29 @@ export function AudioPanel({
                 >
                   {clip.missing ? '⚠' : isPlaying ? '⏸' : '▶'}
                 </button>
-                <span className="min-w-0 flex-1 truncate text-neutral-300" title={clip.segmentLabel}>
-                  {clip.segmentLabel}
+                <span className="min-w-0 flex-1 text-neutral-300" title={clip.segmentLabel}>
+                  <span className="block truncate">{clip.segmentLabel}</span>
+                  {isCurrent && segmentText.get(clip.segmentIndex) && <mark className="mt-0.5 block line-clamp-2 bg-teal-950/70 text-[10px] leading-4 text-teal-200" data-testid="study-audio-active-phrase">{segmentText.get(clip.segmentIndex)}</mark>}
                 </span>
                 {clip.missing ? (
                   <span className="shrink-0 text-[10px] text-amber-500/80">{t('sin archivo')}</span>
                 ) : (
                   <span className="shrink-0 font-mono text-[10px] text-neutral-500">{formatDuration(clip.durationSec)}</span>
                 )}
+                <button
+                  className="shrink-0 text-neutral-600 hover:text-amber-300"
+                  title={t('Añadir marcador')}
+                  onClick={() => void window.nodus.createStudyAudioBookmark(entityKind, entityId, clip.segmentIndex, clip.segmentLabel).then(refreshStudyMeta)}
+                >
+                  ☆
+                </button>
+                <button
+                  className="shrink-0 text-neutral-600 hover:text-teal-300"
+                  title={t('Descargar audio')}
+                  onClick={() => void window.nodus.exportAudioClip(clip.id)}
+                >
+                  ↓
+                </button>
                 <button
                   className="shrink-0 text-neutral-600 hover:text-red-400"
                   title={t('Eliminar pista')}

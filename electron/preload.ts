@@ -295,7 +295,7 @@ const api: NodusApi = {
   },
 
   // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
-  getAudioSegments: (entityKind, entityId) => ipcRenderer.invoke('audio:segments', entityKind, entityId),
+  getAudioSegments: (entityKind, entityId, request) => ipcRenderer.invoke('audio:segments', entityKind, entityId, request),
   listAudioClips: (entityKind, entityId) => ipcRenderer.invoke('audio:listClips', entityKind, entityId),
   clearAudioClips: (entityKind, entityId) =>
     ipcRenderer.invoke('audio:clearClips', entityKind, entityId).then(() => undefined),
@@ -304,6 +304,13 @@ const api: NodusApi = {
   deleteAudioClip: (clipId) => ipcRenderer.invoke('audio:deleteClip', clipId).then(() => undefined),
   deleteEntityAudioClips: (entityKind, entityId) =>
     ipcRenderer.invoke('audio:deleteEntityClips', entityKind, entityId).then(() => undefined),
+  exportAudioClip: (clipId) => ipcRenderer.invoke('audio:exportClip', clipId),
+  listStudyAudioBookmarks: (entityKind, entityId) => ipcRenderer.invoke('audio:study:bookmarks', entityKind, entityId),
+  createStudyAudioBookmark: (entityKind, entityId, segmentIndex, label) => ipcRenderer.invoke('audio:study:bookmark:create', entityKind, entityId, segmentIndex, label),
+  deleteStudyAudioBookmark: (id) => ipcRenderer.invoke('audio:study:bookmark:delete', id).then(() => undefined),
+  getStudyPronunciations: (subjectId) => ipcRenderer.invoke('audio:study:pronunciations', subjectId),
+  setStudyPronunciations: (subjectId, entries) => ipcRenderer.invoke('audio:study:pronunciations:set', subjectId, entries),
+  listStudyAudioPlaylist: (subjectId) => ipcRenderer.invoke('audio:study:playlist', subjectId),
   humeStatus: () => ipcRenderer.invoke('audio:humeStatus'),
   humeSetKey: (key) => ipcRenderer.invoke('audio:humeSetKey', key),
   humeClearKey: () => ipcRenderer.invoke('audio:humeClearKey'),

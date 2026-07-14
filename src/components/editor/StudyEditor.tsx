@@ -25,6 +25,7 @@ import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
 import { StudyDictation } from './StudyDictation';
 import { StudyImproveDialog } from './StudyImproveDialog';
+import { AudioPanel } from '../AudioPanel';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -155,6 +156,9 @@ export function StudyEditor({
   const [showSearch, setShowSearch] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
   const [showDictation, setShowDictation] = useState(false);
+  const [showAudio, setShowAudio] = useState(false);
+  const [audioSelection, setAudioSelection] = useState('');
+  const [audioCursor, setAudioCursor] = useState(0);
   const [search, setSearch] = useState('');
   const [replacement, setReplacement] = useState('');
   const [dictionaryWord, setDictionaryWord] = useState('');
@@ -353,6 +357,12 @@ export function StudyEditor({
         <button className="btn btn-ghost h-8 px-2" onClick={() => setShowSearch(!showSearch)}><Icon name="search" size={13} /></button>
         <button className="btn btn-ghost h-8 px-2" onClick={openCommentDialog} title={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
         <button data-testid="study-dictation-toggle" className={`btn btn-ghost h-8 px-2 ${showDictation ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setShowDictation(!showDictation)} title={t('Dictado por voz')}><Icon name="microphone" size={13} /></button>
+        <button data-testid="study-audio-toggle" className={`btn btn-ghost h-8 px-2 ${showAudio ? 'bg-teal-950 text-teal-300' : ''}`} onClick={() => {
+          const target = resolveImproveSelection(false);
+          setAudioSelection(target?.text ?? '');
+          setAudioCursor(rawTextareaRef.current?.selectionStart ?? target?.from ?? 0);
+          setShowAudio((value) => !value);
+        }} title={t('Lectura por voz')}><Icon name="play" size={13} /></button>
         <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 px-2 ${improveTarget ? 'bg-teal-950 text-teal-300' : ''}`} onClick={() => openImprovement()} title={`${t('Mejorar texto')} (⌘⇧I)`}><Icon name="wand" size={13} /> {t('Mejorar')}</button>
         {improveUndo != null && <button data-testid="study-improve-undo" className="btn btn-ghost h-8 px-2 text-amber-300" onClick={() => { const current = draft; setDraft(improveUndo); setImproveUndo(current); setRaw(true); setSaveState('dirty'); }} title={t('Deshacer la última mejora')}><Icon name="undo" size={13} /> {t('Deshacer mejora')}</button>}
         <button data-testid="study-doc-style" className={`btn btn-ghost h-8 px-2 ${showStyle ? 'bg-indigo-900/50' : ''}`} title={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={13} /></button>
@@ -423,6 +433,17 @@ export function StudyEditor({
           if (action === 'finish') setShowDictation(false);
         }}
       />}
+      {showAudio && <div className="border-b border-neutral-800 bg-neutral-900/30 p-3" data-testid="study-audio-panel"><AudioPanel
+        entityKind="study_document"
+        entityId={active.id}
+        sourceMarkdown={draft}
+        selectionText={audioSelection}
+        cursorOffset={audioCursor}
+        title={title}
+        subjectId={subjectId}
+        localOnly
+        compact
+      /></div>}
       {showStyle && (
         <div className="grid grid-cols-2 gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
           <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>

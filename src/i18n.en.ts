@@ -3980,5 +3980,22 @@ export const EN: Record<string, string> = {
   fuentes: 'sources',
   'contexto comprimido': 'compressed context',
 
+  // ── Study vault · local narration ─────────────────────────────────────────
+  'La lectura de estudio requiere una voz local de Piper o Kokoro.': 'Study narration requires a local Piper or Kokoro voice.',
+  'Desde el cursor': 'From cursor',
+  'Pronunciación y lista': 'Pronunciation and playlist',
+  'Elige una voz local de Piper o Kokoro en Ajustes → IA → Audio y voz.': 'Choose a local Piper or Kokoro voice in Settings → AI → Audio and voice.',
+  'Diccionario de pronunciación': 'Pronunciation dictionary',
+  'Guardado por asignatura': 'Saved per subject',
+  'Texto escrito': 'Written text',
+  'Cómo debe sonar': 'How it should sound',
+  'Asocia el contenido a una asignatura para guardar pronunciaciones propias.': 'Link the content to a subject to save custom pronunciations.',
+  'Lista de reproducción de la asignatura': 'Subject playlist',
+  pistas: 'tracks',
+  Marcadores: 'Bookmarks',
+  'Descargar audio': 'Download audio',
+  'Lectura por voz': 'Read aloud',
+  Escuchar: 'Listen',
+
   // <<END_EN>>
 };

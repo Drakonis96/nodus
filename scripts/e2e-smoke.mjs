@@ -550,8 +550,16 @@ try {
   await classRecorder.waitFor({ timeout: 30_000 });
   await page.waitForTimeout(1_300);
   await classRecorder.getByRole('button', { name: 'Guardar', exact: true }).click();
-  const recordingIdHandle = await page.waitForFunction(async () => (await window.nodus.listStudyRecordings())[0]?.id || false, { timeout: 30_000 });
-  const capturedRecordingId = await recordingIdHandle.jsonValue();
+  const capturedRecordingId = await page.evaluate(async () => {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const recordingId = (await window.nodus.listStudyRecordings())[0]?.id;
+      if (typeof recordingId === 'string' && recordingId.length > 0) return recordingId;
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    throw new Error('Timed out waiting for the captured study recording');
+  });
+  assert.equal(typeof capturedRecordingId, 'string');
   const recordingFixture = await page.evaluate(async (recordingId) => {
     const literal = await window.nodus.saveStudyTranscript(recordingId, {
       kind: 'literal', contentMarkdown: 'Definición literal de memoria de trabajo.', status: 'ready', progress: 1,
@@ -633,6 +641,39 @@ try {
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   assert.ok(seededStudyChat, 'study conversation persists in the local vault history');
   console.log('[e2e] grounded study chat + insufficient-context guard + direct evidence navigation ok');
+
+  // ── Study narration: selection/cursor modes, formula speech and dictionary ─
+  await page.getByRole('button', { name: /Markdown crudo/ }).click();
+  const narrationTextarea = page.locator('.study-editor-shell textarea').first();
+  await narrationTextarea.evaluate((element) => {
+    const text = element.value;
+    const from = Math.max(0, text.indexOf('Texto'));
+    element.focus(); element.setSelectionRange(from, Math.min(text.length, from + 18));
+    element.dispatchEvent(new Event('select', { bubbles: true }));
+  });
+  await page.getByTestId('study-audio-toggle').click();
+  await page.getByTestId('study-audio-panel').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-audio-mode').selectOption('selection');
+  const narrationSegments = await page.evaluate(async () => window.nodus.getAudioSegments('study_document', (await window.nodus.getStudyWorkspace()).documents.find((document) => document.title === 'Apunte smoke').id, {
+    markdown: '# Fórmula\n\nEl valor $x^2$ se conserva.\n\n```js\nconst noLeer = true\n```\n\n## Referencias\n\nNo narrar.',
+    title: 'Fórmula',
+  }));
+  assert.ok(narrationSegments.some((segment) => segment.text.includes('al cuadrado')), 'study narration verbalizes common formulas');
+  assert.ok(!narrationSegments.some((segment) => segment.text.includes('noLeer') || segment.text.includes('No narrar')), 'study narration excludes code and references');
+  await page.getByTestId('study-audio-tools').click();
+  const audioTools = page.getByTestId('study-audio-study-tools');
+  await audioTools.getByPlaceholder('Texto escrito').fill('TCC');
+  await audioTools.getByPlaceholder('Cómo debe sonar').fill('te ce ce');
+  await audioTools.getByRole('button', { name: '+' }).click();
+  await page.waitForFunction(async () => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
+    const subjectId = workspace.placements.find((placement) => placement.documentId === document?.id)?.subjectId;
+    return subjectId ? (await window.nodus.getStudyPronunciations(subjectId)).some((entry) => entry.written === 'TCC' && entry.spoken === 'te ce ce') : false;
+  }, { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Generar audio', exact: true }).click();
+  await page.getByText('La lectura de estudio requiere una voz local de Piper o Kokoro.', { exact: true }).waitFor({ timeout: 30_000 });
+  console.log('[e2e] local study narration modes + formula speech + pronunciation dictionary ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
