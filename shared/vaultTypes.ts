@@ -186,6 +186,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // planning surfaces. They must never leak into research/records/database vaults.
   studyCourses: ['estudio'],
   studyLibrary: ['estudio'],
+  studyRecordings: ['estudio'],
   studyQuestions: ['estudio'],
   studyTests: ['estudio'],
   studyExams: ['estudio'],

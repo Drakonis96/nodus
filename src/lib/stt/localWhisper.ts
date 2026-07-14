@@ -4,6 +4,11 @@ type Pending = {
   onProgress?: (fraction: number) => void;
 };
 
+export interface LocalWhisperResult {
+  text: string;
+  chunks: Array<{ text: string; timestamp: [number | null, number | null] | null }>;
+}
+
 let worker: Worker | null = null;
 const pending = new Map<string, Pending>();
 
@@ -56,8 +61,21 @@ async function decodeMono(blob: Blob): Promise<Float32Array> {
 }
 
 export async function transcribeLocalWhisper(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void): Promise<string> {
+  return (await transcribeLocalWhisperDetailed(blob, model, language, onProgress)).text;
+}
+
+export async function transcribeLocalWhisperDetailed(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void): Promise<LocalWhisperResult> {
   const samples = await decodeMono(blob);
-  return request<string>({ type: 'transcribe', model, samples, language }, [samples.buffer], onProgress);
+  const result = await request<LocalWhisperResult | string>({ type: 'transcribe', model, samples, language }, [samples.buffer], onProgress);
+  return typeof result === 'string' ? { text: result, chunks: [] } : result;
+}
+
+export function cancelLocalWhisper(): void {
+  const error = new Error('Transcripción cancelada.');
+  pending.forEach((current) => current.reject(error));
+  pending.clear();
+  worker?.terminate();
+  worker = null;
 }
 
 export function isLocalWhisperModelReady(model: string): boolean {

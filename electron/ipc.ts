@@ -115,6 +115,12 @@ import type {
   StudyMaterialImportInput,
   StudyMaterialListOptions,
   StudyMaterialUpdateInput,
+  StudyAudioMarkerInput,
+  StudyRecordingCreateInput,
+  StudyRecordingListOptions,
+  StudyRecordingUpdateInput,
+  StudyTranscriptInput,
+  StudyTranscriptSegmentInput,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -222,6 +228,7 @@ import * as studyOrg from './db/studyOrgRepo';
 import * as studyEditor from './db/studyEditorRepo';
 import * as studyStyles from './db/studyStylesRepo';
 import * as studyMaterials from './db/studyMaterialsRepo';
+import * as studyRecordings from './db/studyRecordingsRepo';
 import { transcribeStudyAudio } from './ai/studyTranscription';
 import { improveStudyText } from './ai/studyImprove';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
@@ -1737,6 +1744,29 @@ export function registerIpc(
   h('study:materials:annotation:delete', async (_e, id: string) => studyMaterials.deleteStudyMaterialAnnotation(id));
   h('study:materials:note:create', async (_e, materialId: string, annotationId?: string | null, title?: string) => studyMaterials.createStudyNoteFromMaterial(materialId, annotationId, title));
   h('study:materials:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => studyMaterials.setStudyMaterialLifecycle(id, action));
+  h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
+  h('study:recordings:get', async (_e, id: string) => studyRecordings.getStudyRecording(id));
+  h('study:recordings:content', async (_e, id: string) => studyRecordings.getStudyRecordingContent(id));
+  h('study:recordings:create', async (_e, input: StudyRecordingCreateInput) => studyRecordings.createStudyRecording(input));
+  h('study:recordings:import', async (_e, scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>) => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Añadir grabaciones de clase', properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Grabaciones de audio', extensions: ['mp3', 'wav', 'm4a', 'ogg', 'webm'] }],
+    });
+    if (picked.canceled) return [];
+    return picked.filePaths.map((filePath) => studyRecordings.importStudyRecordingFile(filePath, scope));
+  });
+  h('study:recordings:update', async (_e, id: string, patch: StudyRecordingUpdateInput) => studyRecordings.updateStudyRecording(id, patch));
+  h('study:recordings:marker:create', async (_e, recordingId: string, input: StudyAudioMarkerInput) => studyRecordings.createStudyAudioMarker(recordingId, input));
+  h('study:recordings:marker:update', async (_e, id: string, patch: Partial<StudyAudioMarkerInput>) => studyRecordings.updateStudyAudioMarker(id, patch));
+  h('study:recordings:marker:delete', async (_e, id: string) => studyRecordings.deleteStudyAudioMarker(id));
+  h('study:recordings:transcript:save', async (_e, recordingId: string, input: StudyTranscriptInput) => studyRecordings.saveStudyTranscript(recordingId, input));
+  h('study:recordings:transcript:update', async (_e, id: string, contentMarkdown: string, segments?: StudyTranscriptSegmentInput[]) => studyRecordings.updateStudyTranscript(id, contentMarkdown, segments));
+  h('study:recordings:segment:update', async (_e, id: string, patch: Partial<StudyTranscriptSegmentInput>) => studyRecordings.updateStudyTranscriptSegment(id, patch));
+  h('study:recordings:transcript:delete', async (_e, id: string) => studyRecordings.deleteStudyTranscript(id));
+  h('study:recordings:note:create', async (_e, recordingId: string, transcriptId: string) => studyRecordings.createStudyNoteFromTranscript(recordingId, transcriptId));
+  h('study:recordings:audio:delete', async (_e, id: string) => studyRecordings.deleteStudyRecordingAudio(id));
+  h('study:recordings:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => studyRecordings.setStudyRecordingLifecycle(id, action));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

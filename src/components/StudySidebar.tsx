@@ -62,7 +62,7 @@ export function StudySidebar({
   activeTarget: StudyNavigationTarget | null;
   activeView: string;
   onOpen: (target: StudyNavigationTarget) => void;
-  onNavigate: (view: 'studyCourses' | 'studyLibrary') => void;
+  onNavigate: (view: 'studyCourses' | 'studyLibrary' | 'studyRecordings') => void;
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -168,6 +168,10 @@ export function StudySidebar({
       <button onClick={() => onNavigate('studyLibrary')}
         className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studyLibrary' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
         <Icon name="book" /><span>{t('Materiales')}</span>
+      </button>
+      <button onClick={() => onNavigate('studyRecordings')}
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studyRecordings' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
+        <Icon name="microphone" /><span>{t('Grabaciones')}</span>
       </button>
 
       <div className="mt-1 max-h-[48vh] overflow-y-auto pr-0.5">

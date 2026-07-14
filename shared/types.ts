@@ -33,6 +33,21 @@ import type {
   StudyMaterialSummary,
   StudyMaterialUpdateInput,
 } from './studyMaterials';
+import type {
+  StudyAudioMarker,
+  StudyAudioMarkerInput,
+  StudyRecordingContent,
+  StudyRecordingCreateInput,
+  StudyRecordingDetail,
+  StudyRecordingImportResult,
+  StudyRecordingListOptions,
+  StudyRecordingSummary,
+  StudyRecordingUpdateInput,
+  StudyTranscript,
+  StudyTranscriptInput,
+  StudyTranscriptSegment,
+  StudyTranscriptSegmentInput,
+} from './studyRecordings';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -53,6 +68,25 @@ export type {
   StudyMaterialUpdateInput,
   StudyMaterialVersion,
 } from './studyMaterials';
+export type {
+  StudyAudioMarker,
+  StudyAudioMarkerInput,
+  StudyRecordingContent,
+  StudyRecordingCreateInput,
+  StudyRecordingDetail,
+  StudyRecordingImportResult,
+  StudyRecordingListOptions,
+  StudyRecordingScope,
+  StudyRecordingStatus,
+  StudyRecordingSummary,
+  StudyRecordingUpdateInput,
+  StudyTranscript,
+  StudyTranscriptInput,
+  StudyTranscriptKind,
+  StudyTranscriptSegment,
+  StudyTranscriptSegmentInput,
+  StudyWhisperChunk,
+} from './studyRecordings';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4580,6 +4614,22 @@ export interface NodusApi {
   deleteStudyMaterialAnnotation(id: string): Promise<void>;
   createStudyNoteFromMaterial(materialId: string, annotationId?: string | null, title?: string): Promise<{ documentId: string }>;
   setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
+  getStudyRecording(id: string): Promise<StudyRecordingDetail>;
+  getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  createStudyRecording(input: StudyRecordingCreateInput): Promise<StudyRecordingImportResult>;
+  importStudyRecordings(scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>): Promise<StudyRecordingImportResult[]>;
+  updateStudyRecording(id: string, patch: StudyRecordingUpdateInput): Promise<StudyRecordingSummary>;
+  createStudyAudioMarker(recordingId: string, input: StudyAudioMarkerInput): Promise<StudyAudioMarker>;
+  updateStudyAudioMarker(id: string, patch: Partial<StudyAudioMarkerInput>): Promise<StudyAudioMarker>;
+  deleteStudyAudioMarker(id: string): Promise<void>;
+  saveStudyTranscript(recordingId: string, input: StudyTranscriptInput): Promise<StudyTranscript>;
+  updateStudyTranscript(id: string, contentMarkdown: string, segments?: StudyTranscriptSegmentInput[]): Promise<StudyTranscript>;
+  updateStudyTranscriptSegment(id: string, patch: Partial<StudyTranscriptSegmentInput>): Promise<StudyTranscriptSegment>;
+  deleteStudyTranscript(id: string): Promise<void>;
+  createStudyNoteFromTranscript(recordingId: string, transcriptId: string): Promise<{ documentId: string }>;
+  deleteStudyRecordingAudio(id: string): Promise<StudyRecordingSummary>;
+  setStudyRecordingLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

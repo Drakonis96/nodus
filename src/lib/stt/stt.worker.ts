@@ -9,7 +9,10 @@ type WorkerRequest =
   | { id: string; type: 'ensure'; model: string }
   | { id: string; type: 'transcribe'; model: string; samples: Float32Array; language?: string | null };
 
-type AsrPipeline = (samples: Float32Array, options: Record<string, unknown>) => Promise<{ text?: string }>;
+type AsrPipeline = (samples: Float32Array, options: Record<string, unknown>) => Promise<{
+  text?: string;
+  chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }>;
+}>;
 const pipelines = new Map<string, AsrPipeline>();
 
 async function getPipeline(id: string, model: string) {
@@ -44,8 +47,18 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       chunk_length_s: 25,
       stride_length_s: 4,
       return_timestamps: true,
-    }) as { text?: string };
-    self.postMessage({ id: request.id, type: 'result', result: output.text?.trim() ?? '' });
+    });
+    self.postMessage({
+      id: request.id,
+      type: 'result',
+      result: {
+        text: output.text?.trim() ?? '',
+        chunks: (output.chunks ?? []).map((chunk) => ({
+          text: chunk.text?.trim() ?? '',
+          timestamp: chunk.timestamp ?? null,
+        })),
+      },
+    });
   } catch (error) {
     self.postMessage({ id: request.id, type: 'error', error: error instanceof Error ? error.message : String(error) });
   }

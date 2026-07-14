@@ -73,6 +73,7 @@ try {
     hasSearchDetail: typeof window.nodus?.getSearchResultDetail === 'function',
     hasStudyStt: typeof window.nodus?.transcribeStudyAudio === 'function',
     hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
+    hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -82,6 +83,7 @@ try {
   assert.equal(bridge.hasSearchDetail, true, 'search detail modal bridge available');
   assert.equal(bridge.hasStudyStt, true, 'study speech-to-text bridge available');
   assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
+  assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -535,6 +537,41 @@ try {
   await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke')), { timeout: 30_000 });
   assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');
   console.log('[e2e] study material import + embedded PDF + highlight-to-note provenance ok');
+
+  // ── Study recordings: direct microphone capture + timed transcript UI ─────
+  await page.getByRole('button', { name: 'Grabaciones', exact: true }).click();
+  await page.getByTestId('study-recordings-view').waitFor({ timeout: 30_000 });
+  const recordingSearchPadding = await page.getByPlaceholder('Buscar grabaciones o transcripciones…').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
+  assert.ok(recordingSearchPadding >= 30, 'recording search keeps its icon and text separated');
+  await page.getByRole('button', { name: 'Grabar clase', exact: true }).click();
+  const classRecorder = page.getByTestId('study-class-recorder');
+  await classRecorder.waitFor({ timeout: 30_000 });
+  await page.waitForTimeout(1_300);
+  await classRecorder.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.waitForFunction(async () => (await window.nodus.listStudyRecordings()).length === 1, { timeout: 30_000 });
+  const recordingFixture = await page.evaluate(async () => {
+    const recording = (await window.nodus.listStudyRecordings())[0];
+    const literal = await window.nodus.saveStudyTranscript(recording.id, {
+      kind: 'literal', contentMarkdown: 'Definición literal de memoria de trabajo.', status: 'ready', progress: 1,
+      modelProvider: 'local', modelName: 'Whisper smoke',
+      segments: [{ tStart: 0, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
+    });
+    await window.nodus.saveStudyTranscript(recording.id, {
+      kind: 'corrected', contentMarkdown: 'Definición literal de memoria de trabajo.', sourceTranscriptId: literal.id,
+      segments: [{ tStart: 0, tEnd: 1, text: 'Definición literal de memoria de trabajo.', speaker: 'Docente' }],
+    });
+    await window.nodus.createStudyAudioMarker(recording.id, { tSeconds: 0, label: 'Concepto clave' });
+    return { id: recording.id, literalId: literal.id };
+  });
+  await page.locator(`[data-testid="study-recording-${recordingFixture.id}"]`).click();
+  await page.getByTestId('study-recording-player').waitFor({ timeout: 30_000 });
+  await page.getByText('Concepto clave', { exact: false }).waitFor();
+  await page.getByTestId('study-transcript-segments').waitFor();
+  assert.equal(await page.getByTestId('study-transcript-segments').locator('input').first().inputValue(), 'Docente', 'speaker label persists');
+  assert.match(await page.getByTestId('study-transcript-segments').locator('textarea').first().inputValue(), /Definición literal/, 'timestamped transcript block renders and remains linked to audio');
+  await page.getByRole('button', { name: 'Crear apunte', exact: true }).click();
+  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/recording/')), { timeout: 30_000 });
+  console.log('[e2e] direct class capture + recording player + timestamped transcript provenance ok');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(

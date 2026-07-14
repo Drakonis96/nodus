@@ -9,6 +9,7 @@ import { DatabasesSearchView } from './views/DatabasesSearchView';
 import { StudyHome, StudyScaffoldView } from './views/StudyHome';
 import { StudyOrganizationView } from './views/StudyOrganizationView';
 import { StudyMaterialsView } from './views/StudyMaterialsView';
+import { StudyRecordingsView } from './views/StudyRecordingsView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -810,7 +811,7 @@ export function App() {
                       activeTarget={studyTarget}
                       activeView={view}
                       onOpen={(target) => { setStudyTarget(target); setView('studyCourses'); }}
-                      onNavigate={(targetView) => { if (targetView === 'studyLibrary') setStudyTarget(null); setView(targetView); }}
+                      onNavigate={(targetView) => { if (targetView === 'studyLibrary' || targetView === 'studyRecordings') setStudyTarget(null); setView(targetView); }}
                     />
                     {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
@@ -925,6 +926,7 @@ export function App() {
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
           {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} />}
           {view === 'studyLibrary' && <StudyMaterialsView onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
+          {view === 'studyRecordings' && <StudyRecordingsView onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView
