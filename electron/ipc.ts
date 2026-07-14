@@ -130,6 +130,10 @@ import type {
   StudyQuestionFilters,
   StudyQuestionGenerationRequest,
   StudyQuestionInput,
+  StudyAssessmentInput,
+  StudyAttemptAnswerInput,
+  StudyAttemptStartInput,
+  StudyTestBuildRequest,
   StudyPronunciationEntry,
 } from '@shared/types';
 
@@ -252,6 +256,8 @@ import * as studySearch from './ai/studySearch';
 import * as studyAssistant from './ai/studyAssistant';
 import * as studyQuestions from './db/studyQuestionsRepo';
 import { generateStudyQuestions } from './ai/studyQuestions';
+import * as studyAssessments from './db/studyAssessmentsRepo';
+import { buildStudyTest } from './ai/studyTests';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1870,6 +1876,28 @@ export function registerIpc(
   h('study:questions:collections:create', async (_e, name: string, description?: string) => studyQuestions.createStudyQuestionCollection(name, description));
   h('study:questions:collections:setItems', async (_e, collectionId: string, questionIds: string[]) => studyQuestions.setStudyQuestionCollectionItems(collectionId, questionIds));
   h('study:questions:collections:delete', async (_e, id: string) => studyQuestions.deleteStudyQuestionCollection(id));
+  h('study:assessments:list', async (_e, kind?: 'test' | 'exam', includeArchived?: boolean) => studyAssessments.listStudyAssessments(kind, includeArchived));
+  h('study:assessments:get', async (_e, id: string) => studyAssessments.getStudyAssessment(id));
+  h('study:assessments:create', async (_e, input: StudyAssessmentInput) => studyAssessments.createStudyAssessment(input));
+  h('study:assessments:buildTest', async (_e, input: StudyTestBuildRequest) => buildStudyTest(input));
+  h('study:assessments:update', async (_e, id: string, patch: Partial<Omit<StudyAssessmentInput, 'questionIds'>> & { archived?: boolean }) => studyAssessments.updateStudyAssessment(id, patch));
+  h('study:assessments:delete', async (_e, id: string) => studyAssessments.deleteStudyAssessment(id));
+  h('study:attempts:list', async (_e, assessmentId?: string) => studyAssessments.listStudyAttempts(assessmentId));
+  h('study:attempts:get', async (_e, id: string) => studyAssessments.getStudyAttempt(id));
+  h('study:attempts:start', async (_e, input: StudyAttemptStartInput) => studyAssessments.startStudyAttempt(input));
+  h('study:attempts:answer', async (_e, id: string, input: StudyAttemptAnswerInput) => studyAssessments.saveStudyAttemptAnswer(id, input));
+  h('study:attempts:submit', async (_e, id: string, expired?: boolean) => studyAssessments.submitStudyAttempt(id, expired));
+  h('study:attempts:abandon', async (_e, id: string) => studyAssessments.abandonStudyAttempt(id));
+  h('study:assessments:export', async (_e, id: string, includeAnswers?: boolean) => {
+    const assessment = studyAssessments.getStudyAssessment(id); if (!assessment) return null;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar test de estudio', defaultPath: `${assessment.title.replace(/[\\/:*?"<>|]+/g, '-').slice(0, 80) || 'test'}.md`,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, studyAssessments.renderStudyAssessmentMarkdown(assessment, Boolean(includeAnswers)), 'utf8');
+    return { path: picked.filePath };
+  });
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

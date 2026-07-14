@@ -13,6 +13,7 @@ import { StudyRecordingsView } from './views/StudyRecordingsView';
 import { StudySearchView } from './views/StudySearchView';
 import { StudyChatView } from './views/StudyChatView';
 import { StudyBankView } from './views/StudyBankView';
+import { StudyTestView } from './views/StudyTestView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -73,7 +74,6 @@ import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const STUDY_SCAFFOLD_VIEWS = new Set<View>([
-  'studyTests',
   'studyExams',
   'studyPlanner',
   'studyReview',
@@ -946,6 +946,7 @@ export function App() {
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
+          {view === 'studyTests' && <StudyTestView onOpenQuestionBank={() => setView('studyQuestions')} />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (
             <StudyGuideView

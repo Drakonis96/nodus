@@ -75,6 +75,15 @@ import type {
   StudyQuestionInput,
   StudyQuestionVersion,
 } from './studyQuestions';
+import type {
+  StudyAssessment,
+  StudyAssessmentInput,
+  StudyAttempt,
+  StudyAttemptAnswer,
+  StudyAttemptAnswerInput,
+  StudyAttemptStartInput,
+  StudyTestBuildRequest,
+} from './studyAssessments';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -165,6 +174,25 @@ export type {
   StudyQuestionType,
   StudyQuestionVersion,
 } from './studyQuestions';
+export type {
+  StudyAnswerEvaluation,
+  StudyAssessment,
+  StudyAssessmentConfig,
+  StudyAssessmentInput,
+  StudyAssessmentItem,
+  StudyAssessmentKind,
+  StudyAssessmentMode,
+  StudyAssessmentSelection,
+  StudyAttempt,
+  StudyAttemptAnswer,
+  StudyAttemptAnswerInput,
+  StudyAttemptConfig,
+  StudyAttemptStartInput,
+  StudyAttemptStatus,
+  StudyCorrectionMode,
+  StudyQuestionResponse,
+  StudyTestBuildRequest,
+} from './studyAssessments';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4783,6 +4811,19 @@ export interface NodusApi {
   createStudyQuestionCollection(name: string, description?: string): Promise<StudyQuestionCollection>;
   setStudyQuestionCollectionItems(collectionId: string, questionIds: string[]): Promise<void>;
   deleteStudyQuestionCollection(id: string): Promise<void>;
+  listStudyAssessments(kind?: StudyAssessment['kind'], includeArchived?: boolean): Promise<StudyAssessment[]>;
+  getStudyAssessment(id: string): Promise<StudyAssessment | null>;
+  createStudyAssessment(input: StudyAssessmentInput): Promise<StudyAssessment>;
+  buildStudyTest(request: StudyTestBuildRequest): Promise<StudyAssessment>;
+  updateStudyAssessment(id: string, patch: Partial<Omit<StudyAssessmentInput, 'questionIds'>> & { archived?: boolean }): Promise<StudyAssessment>;
+  deleteStudyAssessment(id: string): Promise<void>;
+  listStudyAttempts(assessmentId?: string): Promise<StudyAttempt[]>;
+  getStudyAttempt(id: string): Promise<StudyAttempt | null>;
+  startStudyAttempt(input: StudyAttemptStartInput): Promise<StudyAttempt>;
+  saveStudyAttemptAnswer(attemptId: string, input: StudyAttemptAnswerInput): Promise<StudyAttemptAnswer>;
+  submitStudyAttempt(id: string, expired?: boolean): Promise<StudyAttempt>;
+  abandonStudyAttempt(id: string): Promise<StudyAttempt>;
+  exportStudyAssessment(id: string, includeAnswers?: boolean): Promise<{ path: string } | null>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

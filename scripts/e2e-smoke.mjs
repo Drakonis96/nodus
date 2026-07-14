@@ -697,6 +697,29 @@ try {
   assert.match(bankFixture.source.excerpt, /respuesta procede del fragmento verificable/i);
   console.log('[e2e] study question bank manual authoring + approval provenance ok');
 
+  // ── Study tests: approved-bank build, durable answer and correction ───────
+  await page.getByRole('button', { name: 'Tests', exact: true }).click();
+  await page.getByTestId('study-tests-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-test-new').click();
+  await page.getByTestId('study-test-title').fill('Test smoke verificable');
+  await page.getByTestId('study-test-create').click();
+  await page.getByText('Test smoke verificable', { exact: true }).last().waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-test-start').click();
+  await page.getByTestId('study-test-runner').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-test-response').fill('Demuestra que el fragmento está conectado con su evidencia local.');
+  await page.getByTestId('study-test-submit').click();
+  await page.getByTestId('study-test-results').waitFor({ timeout: 30_000 });
+  const testFixture = await page.evaluate(async () => {
+    const assessment = (await window.nodus.listStudyAssessments('test')).find((item) => item.title === 'Test smoke verificable');
+    if (!assessment) throw new Error('Study test fixture was not persisted');
+    const attempt = (await window.nodus.listStudyAttempts(assessment.id))[0];
+    return { assessment, attempt };
+  });
+  assert.equal(testFixture.assessment.items.length, 1, 'adaptive test uses the approved bank question');
+  assert.equal(testFixture.attempt.status, 'submitted', 'test attempt is durably submitted');
+  assert.equal(testFixture.attempt.correctCount, 1, 'objective short answer is corrected deterministically');
+  console.log('[e2e] study test construction + durable attempt + objective correction ok');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),
