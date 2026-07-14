@@ -374,37 +374,52 @@ try {
   assert.equal(dbmode.profileNumberMean, 5.75, 'analysis profile computes numeric mean over IPC');
   console.log('[e2e] databases mode (CSV import + relations + views + analysis) ok over IPC');
 
-  // ── Study vault phase 1: real vault switch + IPC + renderer hierarchy ──────
-  const study = await page.evaluate(async () => {
+  // ── Study vault: real UI creation flow + visual/structural regressions ─────
+  await page.evaluate(async () => {
     const created = await window.nodus.createVault({ name: 'Study smoke', type: 'estudio' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
     await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true });
-    const course = await window.nodus.createStudyCourse({ name: 'Curso smoke' });
-    const subject = await window.nodus.createStudySubject({ courseId: course.id, name: 'Asignatura smoke' });
-    const topic = await window.nodus.createStudyTopic({ subjectId: subject.id, name: 'Tema smoke' });
-    const document = await window.nodus.createStudyDocument({
-      title: 'Apunte smoke',
-      contentMarkdown: '# Contenido',
-      placement: { topicId: topic.id },
-    });
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).first().click();
+  await page.getByTestId('study-create-course').waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByText('Crea tu primer curso para empezar.', { exact: true }).count(), 0, 'empty-state guidance stays out of the sidebar');
+  assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'estudio', 'study vault uses the teal Nodus logo');
+
+  const searchPadding = await page.getByPlaceholder('Buscar materiales…').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
+  assert.ok(searchPadding >= 30, `study search reserves space for its leading icon (${searchPadding}px)`);
+  const organizationBox = await page.getByTestId('study-sidebar-organization').boundingBox();
+  const analyzeBox = await page.getByRole('button', { name: 'Analizar', exact: true }).boundingBox();
+  assert.ok(organizationBox && analyzeBox && analyzeBox.y - (organizationBox.y + organizationBox.height) < 40, 'Analyze follows Organization without a flex spacer');
+
+  const createStudyItem = async (buttonTestId, name) => {
+    await page.getByTestId(buttonTestId).click();
+    await page.getByTestId('study-create-dialog').waitFor();
+    await page.getByTestId('study-create-name').fill(name);
+    await page.getByTestId('study-create-submit').click();
+    await page.getByTestId('study-create-dialog').waitFor({ state: 'detached' });
+  };
+  await createStudyItem('study-create-course', 'Curso smoke');
+  await createStudyItem('study-create-subject', 'Asignatura smoke');
+  await createStudyItem('study-create-folder', 'Carpeta smoke');
+  await page.getByText('Asignatura smoke', { exact: true }).first().click();
+  await createStudyItem('study-create-topic', 'Tema smoke');
+  await createStudyItem('study-create-document', 'Apunte smoke');
+
+  const study = await page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
+    const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
     return {
-      courseId: course.id,
-      counts: [workspace.courses.length, workspace.subjects.length, workspace.topics.length, workspace.documents.length],
-      placement: workspace.placements.find((item) => item.documentId === document.id),
+      counts: [workspace.courses.length, workspace.subjects.length, workspace.topics.length, workspace.folders.length, workspace.documents.length],
+      placement: workspace.placements.find((item) => item.documentId === document?.id),
     };
   });
-  assert.deepEqual(study.counts, [1, 1, 1, 1], 'study organization CRUD crosses the real IPC bridge');
-  assert.ok(study.placement?.courseId && study.placement?.subjectId && study.placement?.topicId, 'topic placement indexes every hierarchy level');
-  await page.reload();
-  await page.waitForFunction(() => document.body.textContent?.includes('Curso smoke'), { timeout: 30_000 });
-  await page.getByText('Curso smoke', { exact: true }).first().click();
-  await page.waitForFunction(() => document.body.textContent?.includes('Apunte smoke'), { timeout: 30_000 });
+  assert.deepEqual(study.counts, [1, 1, 1, 1, 1], 'all organization buttons create through the real renderer and IPC bridge');
+  assert.ok(study.placement?.courseId && study.placement?.subjectId && study.placement?.topicId, 'UI-created material keeps the selected hierarchy placement');
   assert.match(await page.locator('body').innerText(), /Cursos y asignaturas/, 'study-specific sidebar is rendered');
-  console.log('[e2e] study vault hierarchy + material view ok over IPC and renderer');
+  console.log('[e2e] study logo, search padding, sidebar flow and creation dialogs ok');
 
-  await page.getByText('Apunte smoke', { exact: true }).last().click();
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-toggle').click();
   await page.getByTestId('study-dictation').waitFor({ timeout: 30_000 });

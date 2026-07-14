@@ -64,6 +64,7 @@ import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
+import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const STUDY_SCAFFOLD_VIEWS = new Set<View>([
@@ -599,7 +600,13 @@ export function App() {
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
-          <img src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : nodusLogo} alt="" className="h-7 w-7" />
+          <img
+            data-testid="nodus-logo"
+            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : 'academic'}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : nodusLogo}
+            alt=""
+            className="h-7 w-7"
+          />
           <span>Nodus</span>
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>

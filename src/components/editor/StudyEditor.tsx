@@ -19,6 +19,7 @@ import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOr
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Markdown } from '../Markdown';
 import { Icon, Spinner } from '../ui';
+import { TextInputModal } from '../TextInputModal';
 import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
 import { StudyDictation } from './StudyDictation';
@@ -145,6 +146,7 @@ export function StudyEditor({
   const [search, setSearch] = useState('');
   const [replacement, setReplacement] = useState('');
   const [dictionaryWord, setDictionaryWord] = useState('');
+  const [textDialog, setTextDialog] = useState<{ kind: 'comment' | 'tag'; selectedText?: string } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   const baselineRef = useRef('');
@@ -234,13 +236,21 @@ export function StudyEditor({
     const heading = document.querySelectorAll('.study-milkdown .ProseMirror h1, .study-milkdown .ProseMirror h2, .study-milkdown .ProseMirror h3, .study-milkdown .ProseMirror h4, .study-milkdown .ProseMirror h5, .study-milkdown .ProseMirror h6')[index];
     heading?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
-  const addComment = async () => {
+  const openCommentDialog = () => {
     const selectedText = window.getSelection()?.toString().trim() ?? '';
-    const comment = window.prompt(selectedText ? t('Comentario sobre la selección') : t('Comentario del documento'));
-    if (!comment) return;
+    setTextDialog({ kind: 'comment', selectedText });
+  };
+  const submitTextDialog = async (value: string) => {
+    if (textDialog?.kind === 'tag') {
+      await onCreateTag(value);
+      setTextDialog(null);
+      return;
+    }
+    const selectedText = textDialog?.selectedText ?? '';
     const from = selectedText ? Math.max(0, draft.indexOf(selectedText)) : 0;
-    await window.nodus.createStudyAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment });
+    await window.nodus.createStudyAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment: value });
     await loadData(active.id);
+    setTextDialog(null);
   };
   const restoreVersion = async (version: StudyDocVersion) => {
     if (!window.confirm(t('¿Restaurar esta versión? El estado actual seguirá disponible en el historial.'))) return;
@@ -298,7 +308,7 @@ export function StudyEditor({
         }}><Icon name="code" size={13} /> {t('Markdown crudo')}</button>
         <button className={`btn btn-ghost h-8 px-2 ${split ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setSplit(!split)}><Icon name="columns" size={13} /> {t('Dividir')}</button>
         <button className="btn btn-ghost h-8 px-2" onClick={() => setShowSearch(!showSearch)}><Icon name="search" size={13} /></button>
-        <button className="btn btn-ghost h-8 px-2" onClick={() => void addComment()} title={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
+        <button className="btn btn-ghost h-8 px-2" onClick={openCommentDialog} title={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
         <button data-testid="study-dictation-toggle" className={`btn btn-ghost h-8 px-2 ${showDictation ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setShowDictation(!showDictation)} title={t('Dictado por voz')}><Icon name="microphone" size={13} /></button>
         <button data-testid="study-doc-style" className={`btn btn-ghost h-8 px-2 ${showStyle ? 'bg-indigo-900/50' : ''}`} title={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={13} /></button>
         <button className={`btn btn-ghost h-8 px-2 ${showHistory ? 'bg-indigo-900/50' : ''}`} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
@@ -394,10 +404,7 @@ export function StudyEditor({
                 return <button key={tag.id} type="button" className={`rounded-full border px-2 py-1 text-[10px] ${selected ? 'border-indigo-700 bg-indigo-900/40 text-indigo-300' : 'border-neutral-800 text-neutral-600 hover:text-neutral-300'}`}
                   onClick={() => void onSetTags(selected ? activeTagIds.filter((id) => id !== tag.id) : [...activeTagIds, tag.id])}>{tag.name}</button>;
               })}
-              <button type="button" className="rounded-full border border-dashed border-neutral-700 px-2 py-1 text-[10px] text-neutral-500 hover:border-indigo-700 hover:text-indigo-300" onClick={() => {
-                const name = window.prompt(t('Nueva etiqueta'));
-                if (name?.trim()) void onCreateTag(name.trim());
-              }}>+ {t('Etiqueta')}</button>
+              <button type="button" className="rounded-full border border-dashed border-neutral-700 px-2 py-1 text-[10px] text-neutral-500 hover:border-indigo-700 hover:text-indigo-300" onClick={() => setTextDialog({ kind: 'tag' })}>+ {t('Etiqueta')}</button>
             </div>
           </div>
         </div>
@@ -472,6 +479,18 @@ export function StudyEditor({
           </aside>
         )}
       </div>
+      {textDialog && (
+        <TextInputModal
+          testId={`study-${textDialog.kind}-dialog`}
+          title={textDialog.kind === 'tag'
+            ? t('Nueva etiqueta')
+            : textDialog.selectedText ? t('Comentario sobre la selección') : t('Comentario del documento')}
+          label={textDialog.kind === 'tag' ? t('Nombre de la etiqueta') : t('Comentario')}
+          multiline={textDialog.kind === 'comment'}
+          onSubmit={submitTextDialog}
+          onCancel={() => setTextDialog(null)}
+        />
+      )}
     </div>
   );
 }

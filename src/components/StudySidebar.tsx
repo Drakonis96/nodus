@@ -159,7 +159,7 @@ export function StudySidebar({
   };
 
   return (
-    <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1">
+    <div data-testid="study-sidebar-organization" className="mt-2 flex flex-col gap-1">
       <p className="px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Organización')}</p>
       <button onClick={() => onNavigate('studyCourses')}
         className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${activeView === 'studyCourses' ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'}`}>
@@ -171,7 +171,6 @@ export function StudySidebar({
       </button>
 
       <div className="mt-1 max-h-[48vh] overflow-y-auto pr-0.5">
-        {tree.length === 0 && <p className="px-3 py-2 text-xs leading-5 text-neutral-600">{t('Crea tu primer curso para empezar.')}</p>}
         {tree.map((course) => (
           <div key={course.id}>
             <div className="flex items-center">
