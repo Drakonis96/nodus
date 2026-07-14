@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { StudyDocument, StudyDocumentKind, StudyWorkspace } from '@shared/studyOrg';
+import type { StudyExportFormat, StudyExportScope } from '@shared/types';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
@@ -200,6 +201,7 @@ export function StudyOrganizationView({
   const [editing, setEditing] = useState<StudyDocument | null>(null);
   const [openDocumentIds, setOpenDocumentIds] = useState<string[]>([]);
   const [createDraft, setCreateDraft] = useState<StudyCreateDraft | null>(null);
+  const [exportFormat, setExportFormat] = useState<StudyExportFormat>('markdown');
 
   const reload = useCallback(async () => {
     const next = await window.nodus.getStudyWorkspace();
@@ -307,6 +309,7 @@ export function StudyOrganizationView({
 
   if (!workspace) return <div className="flex h-full items-center justify-center"><Spinner label={t('Cargando vault de estudio…')} /></div>;
   const selectedTitle = targetTitle(workspace, target);
+  const exportScope: StudyExportScope = target ? { kind: target.kind, id: target.id } : { kind: 'workspace' };
   const openDocuments = openDocumentIds.map((id) => workspace.documents.find((document) => document.id === id)).filter((document): document is StudyDocument => Boolean(document));
 
   if (editing) {
@@ -394,6 +397,10 @@ export function StudyOrganizationView({
             <button data-testid="study-create-folder" className="btn btn-ghost" onClick={() => openCreateDialog('folder')}><Icon name="folderPlus" /> {t('Carpeta')}</button>
           </>
         )}
+        <select aria-label={t('Formato de exportación')} className="input h-8 w-28 text-xs" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as StudyExportFormat)}>
+          <option value="markdown">Markdown</option><option value="txt">TXT</option><option value="html">HTML</option><option value="docx">Word</option><option value="pdf">PDF</option><option value="bundle">{t('Paquete')}</option>
+        </select>
+        <button data-testid="study-export-scope" className="btn btn-ghost" onClick={() => void window.nodus.exportStudyScope(exportScope, exportFormat)}><Icon name="download" /> {t('Exportar')}</button>
         <button data-testid="study-create-document" className="btn btn-primary" onClick={() => openCreateDialog('document')}><Icon name="plus" /> {t('Material')}</button>
       </header>
 

@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import AdmZip from 'adm-zip';
 import { ipcMain, shell, BrowserWindow, dialog, app, nativeImage } from 'electron';
 import type {
   AppSettings,
@@ -259,6 +260,8 @@ import * as studyAssistant from './ai/studyAssistant';
 import * as studyQuestions from './db/studyQuestionsRepo';
 import * as studyLearning from './db/studyLearningRepo';
 import * as studyAiUsage from './db/studyAiUsageRepo';
+import * as studyDataAdmin from './db/studyDataAdmin';
+import { exportStudyScope } from './export/studyExport';
 import { generateStudyQuestions } from './ai/studyQuestions';
 import * as studyAssessments from './db/studyAssessmentsRepo';
 import { buildStudyTest } from './ai/studyTests';
@@ -489,6 +492,38 @@ function dbGuessMime(ext: string): string | null {
     '.json': 'application/json',
   };
   return map[ext.toLowerCase()] ?? null;
+}
+
+async function importStudyMaterialPaths(paths: string[], input: StudyMaterialImportInput = {}) {
+  const results: Awaited<ReturnType<typeof studyMaterials.importStudyMaterialFile>>[] = [];
+  const visit = async (filePath: string): Promise<void> => {
+    const stat = fs.statSync(filePath);
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(filePath, { withFileTypes: true })) {
+        if (entry.name.startsWith('.')) continue;
+        await visit(path.join(filePath, entry.name));
+      }
+      return;
+    }
+    if (path.extname(filePath).toLowerCase() === '.zip') {
+      const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-study-import-'));
+      try {
+        const entries = new AdmZip(filePath).getEntries().filter((entry) => !entry.isDirectory);
+        let index = 0;
+        for (const entry of entries) {
+          const name = path.basename(entry.entryName);
+          if (!name || !studyMaterials.supportsStudyMaterial(name)) continue;
+          const extracted = path.join(temp, `${String(index++).padStart(4, '0')}-${name}`);
+          fs.writeFileSync(extracted, entry.getData());
+          results.push(await studyMaterials.importStudyMaterialFile(extracted, input));
+        }
+      } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+      return;
+    }
+    if (studyMaterials.supportsStudyMaterial(filePath)) results.push(await studyMaterials.importStudyMaterialFile(filePath, input));
+  };
+  for (const selected of paths) await visit(selected);
+  return results;
 }
 
 /** Register every IPC channel backing the window.nodus API. */
@@ -1767,12 +1802,15 @@ export function registerIpc(
   h('study:materials:import', async (_e, input?: StudyMaterialImportInput) => {
     const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
       title: 'Añadir materiales de estudio', properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'] }],
+      filters: [{ name: 'Materiales de estudio', extensions: ['pdf', 'docx', 'md', 'markdown', 'pptx', 'txt', 'html', 'htm', 'epub', 'png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff', 'mp3', 'wav', 'm4a', 'ogg', 'zip'] }],
     });
     if (picked.canceled) return [];
-    const results = [];
-    for (const filePath of picked.filePaths) results.push(await studyMaterials.importStudyMaterialFile(filePath, input));
-    return results;
+    return importStudyMaterialPaths(picked.filePaths, input);
+  });
+  h('study:materials:importFolder', async (_e, input?: StudyMaterialImportInput) => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, { title: 'Añadir carpeta de materiales', properties: ['openDirectory'] });
+    if (picked.canceled) return [];
+    return importStudyMaterialPaths(picked.filePaths, input);
   });
   h('study:materials:replace', async (_e, id: string, ocr?: boolean) => {
     const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
@@ -2308,6 +2346,7 @@ export function registerIpc(
   // export / import
   h('data:export', async () => exportData());
   h('data:exportSync', async () => {
+    if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Exportar paquete de sincronización',
       defaultPath: path.join(app.getPath('documents'), `nodus-sync-${new Date().toISOString().slice(0, 10)}.nodussync`),
@@ -2362,6 +2401,7 @@ export function registerIpc(
   });
 
   h('data:importSync', async () => {
+    if (getActiveVault().type === 'estudio' && !getSettings().studySyncEnabled) throw new Error('La sincronización del vault de estudio está desactivada en Ajustes.');
     const { canceled, filePaths } = await dialog.showOpenDialog({
       title: 'Importar paquete de sincronización',
       properties: ['openFile'],
@@ -2369,6 +2409,27 @@ export function registerIpc(
     });
     if (canceled || filePaths.length === 0) return null;
     return mergeSyncPackage(fs.readFileSync(filePaths[0]));
+  });
+  h('study:data:overview', async () => studyDataAdmin.getStudyDataOverview());
+  h('study:data:exportScope', async (_e, scope, format) => {
+    if (!getSettings().studySharingEnabled) throw new Error('La exportación para compartir está desactivada en Ajustes.');
+    return exportStudyScope(scope, format);
+  });
+  h('study:data:maintain', async (_e, action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair') => {
+    if (action === 'rebuild-indexes') return studyDataAdmin.rebuildStudyIndexes();
+    if (action === 'clear-embeddings') return studyDataAdmin.clearStudyEmbeddingCache();
+    if (action === 'empty-trash') return studyDataAdmin.emptyStudyTrash();
+    if (action === 'repair') return studyDataAdmin.repairStudyData();
+    throw new Error('Acción de mantenimiento no válida.');
+  });
+  h('study:data:diagnostic', async () => {
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar diagnóstico del vault de estudio', defaultPath: 'nodus-estudio-diagnostico.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, JSON.stringify(studyDataAdmin.buildStudyDiagnostic(), null, 2), 'utf8');
+    return { path: picked.filePath };
   });
   h('data:import', async (_e, password: string) => {
     const result = await importData(password);

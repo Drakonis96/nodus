@@ -95,6 +95,32 @@ try {
       name TEXT NOT NULL, layout TEXT NOT NULL DEFAULT 'table', filter_json TEXT, sort_json TEXT,
       position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
     );
+    CREATE TABLE study_courses (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE study_docs (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
+      content_markdown TEXT NOT NULL DEFAULT '', embedding BLOB,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE study_placements (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE,
+      document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+      course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE study_materials (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
+      content_blob BLOB, content_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE study_material_placements (
+      id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE,
+      material_id TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
+      document_id TEXT REFERENCES study_docs(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
   `;
   const dbA = new Database(path.join(root, 'machine-a.sqlite'));
   const dbB = new Database(path.join(root, 'machine-b.sqlite'));
@@ -122,6 +148,16 @@ try {
   dbA.prepare("INSERT INTO saved_searches VALUES ('s1', 'Memoria', 'memoria', 'semantic', '[]', ?)").run(T0);
   dbA.prepare("INSERT INTO edge_feedback VALUES ('iA', 'iB', 'contradicts', 'rejected', '', ?)").run(T2);
 
+  // Study data includes a dependency tree and binary payloads. It is merged
+  // row-by-row (newest wins) while each blob-bearing row stays atomic.
+  dbA.prepare("INSERT INTO study_courses VALUES ('courseA', 'CUR-A', 'Historia', ?, ?)").run(T0, T1);
+  dbA.prepare("INSERT INTO study_docs VALUES ('docShared', 'DOC-A', 'Tema 1', '# versión A', ?, ?, ?)")
+    .run(Buffer.from('EMBED-A'), T0, T1);
+  dbA.prepare("INSERT INTO study_placements VALUES ('placementA', 'PLC-A', 'docShared', 'courseA', ?, ?)").run(T0, T1);
+  dbA.prepare("INSERT INTO study_materials VALUES ('materialA', 'MAT-A', 'Diapositivas', ?, 'hash-a', ?, ?)")
+    .run(Buffer.from('MATERIAL-A'), T0, T1);
+  dbA.prepare("INSERT INTO study_material_placements VALUES ('materialPlacementA', 'MPL-A', 'materialA', 'docShared', ?, ?)").run(T0, T1);
+
   // ── Machine A: a whole Databases-vault database (columns, options, cell,
   //    attachment blob, relation, saved view) — an atomic sync unit at T1 ──────
   dbA.prepare('INSERT INTO db_databases VALUES (?, ?, ?, NULL, 0, ?, ?)').run('dbShared', 'DB-A001', 'Muestras', T0, T1);
@@ -141,6 +177,8 @@ try {
   dbB.prepare('INSERT INTO notes VALUES (?, NULL, ?, ?, ?, NULL, 0, ?, ?)').run('n2', 'Compartida', 'markdown', 'versión nueva de B', T0, T1);
   dbB.prepare('INSERT INTO notes VALUES (?, NULL, ?, ?, ?, NULL, 0, ?, ?)').run('n3', 'Solo B', 'markdown', 'local de B', T0, T0);
   dbB.prepare("INSERT INTO edge_feedback VALUES ('iB', 'iA', 'contradicts', 'confirmed', '', ?)").run(T0);
+  dbB.prepare("INSERT INTO study_docs VALUES ('docShared', 'DOC-A', 'Tema local más nuevo', '# versión B', ?, ?, ?)")
+    .run(Buffer.from('EMBED-B'), T0, T2);
 
   // ── Machine B: an OLDER copy of the same database (must be replaced whole),
   //    plus a B-only database (must never be touched by A's package) ──────────
@@ -159,6 +197,8 @@ try {
   assert.equal(pkg.counts.notes, 2, 'A exports its two notes');
   assert.equal(pkg.counts.note_folders, 2);
   assert.equal(pkg.counts.databases, 1, 'A exports its one database as a unit');
+  assert.equal(pkg.counts.study_courses, 1, 'study tables are included in the portable package');
+  assert.equal(pkg.counts.study_materials, 1, 'study material blobs are included');
 
   useDb(dbB);
   const summary = sync.mergeSyncPackage(pkg.buffer);
@@ -168,6 +208,7 @@ try {
   assert.deepEqual(summary.savedSearches, { inserted: 1, updated: 0, skipped: 0 });
   assert.deepEqual(summary.edgeFeedback, { inserted: 0, updated: 1, skipped: 0 }, 'newer rejection overrides older confirm (direction-agnostic)');
   assert.deepEqual(summary.databases, { inserted: 0, updated: 1, skipped: 0 }, 'newer database replaces the whole older local tree');
+  assert.deepEqual(summary.study, { inserted: 4, updated: 0, skipped: 1 }, 'study dependencies insert; newer local document wins');
 
   // The shared database is now A's newer copy, whole (columns, options, cell, blob, relation, view).
   assert.equal(dbB.prepare("SELECT name FROM db_databases WHERE id = 'dbShared'").get().name, 'Muestras', 'database name adopted from A');
@@ -181,6 +222,10 @@ try {
   assert.equal(dbB.prepare("SELECT COUNT(*) AS n FROM db_rows WHERE id = 'rowBold'").get().n, 0, 'stale B row replaced away');
   // B's own database is untouched — nothing local deleted.
   assert.equal(dbB.prepare("SELECT name FROM db_databases WHERE id = 'dbLocalB'").get().name, 'Solo B', 'B-only database left intact');
+  assert.equal(dbB.prepare("SELECT title FROM study_docs WHERE id = 'docShared'").get().title, 'Tema local más nuevo', 'newer local study row is preserved');
+  assert.equal(dbB.prepare("SELECT embedding FROM study_docs WHERE id = 'docShared'").get().embedding.toString(), 'EMBED-B', 'newer local embedding stays byte-exact');
+  assert.equal(dbB.prepare("SELECT content_blob FROM study_materials WHERE id = 'materialA'").get().content_blob.toString(), 'MATERIAL-A', 'study material blob restores byte-for-byte');
+  assert.equal(dbB.prepare("SELECT course_id FROM study_placements WHERE id = 'placementA'").get().course_id, 'courseA', 'study foreign-key tree survives out-of-order table merge');
 
   assert.equal(dbB.prepare("SELECT content FROM notes WHERE id = 'n2'").get().content, 'versión nueva de B', 'local newer content preserved');
   assert.equal(dbB.prepare("SELECT folder_id FROM notes WHERE id = 'n1'").get().folder_id, 'f2', 'note keeps its folder');
@@ -193,6 +238,7 @@ try {
   assert.equal(again.notes.inserted + again.notes.updated, 0, 'second merge is a no-op for notes');
   assert.equal(again.edgeFeedback.updated, 0, 'second merge is a no-op for feedback');
   assert.deepEqual(again.databases, { inserted: 0, updated: 0, skipped: 1 }, 'equal-timestamp database skipped on re-merge');
+  assert.equal(again.study.inserted + again.study.updated, 0, 'second study merge is idempotent');
   assert.equal(dbB.prepare('SELECT COUNT(*) AS n FROM notes').get().n, 3, 'row counts stable');
   assert.equal(dbB.prepare('SELECT COUNT(*) AS n FROM db_databases').get().n, 2, 'database count stable (shared + B-only)');
 

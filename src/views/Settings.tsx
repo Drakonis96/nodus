@@ -8,6 +8,7 @@ import type {
   ModelRef,
   StudyAiTask,
   StudyAiUsageSummary,
+  StudyDataOverview,
   StudySubject,
   UpdateProgressEvent,
   VaultSummary,
@@ -813,7 +814,8 @@ export function Settings({
                         total(summary.writingDrafts) +
                         total(summary.savedSearches) +
                         total(summary.edgeFeedback) +
-                        total(summary.databases);
+                        total(summary.databases) +
+                        total(summary.study);
                       flash(`${t('Sincronización fusionada')}: ${applied} ${t('cambios aplicados (nada local se ha borrado).')}`);
                     } catch (e) {
                       flash(e instanceof Error ? e.message : String(e));
@@ -824,7 +826,7 @@ export function Settings({
                 </button>
               </div>
               <p className="mt-1 text-xs text-neutral-500">
-                {t('Lleva tus notas, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
+                {t('Lleva tus notas, datos de estudio, materiales y grabaciones, borradores, búsquedas guardadas, auditorías de relaciones y bases de datos a otro equipo. Al importar se fusiona: gana la versión más reciente y nunca se borra nada local.')}
               </p>
             </div>
             <div className="mt-2 border-t border-neutral-800 pt-3">
@@ -988,6 +990,7 @@ export function Settings({
                 </div>
               )}
             </div>
+            {activeVault?.type === 'estudio' && <StudyDataAdministration />}
           </Section>
       )}
 
@@ -1506,6 +1509,39 @@ const STUDY_TASK_MODELS: Array<{ task: StudyAiTask; label: string; key: 'chatMod
   { task: 'flashcards', label: 'Generación de flashcards', key: 'flashcardModel' },
 ];
 
+function formatDataBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / 1024 ** 2).toFixed(1)} MiB`;
+}
+
+function StudyDataAdministration() {
+  const [overview, setOverview] = useState<StudyDataOverview | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const refresh = async () => setOverview(await window.nodus.getStudyDataOverview());
+  useEffect(() => { void refresh(); }, []);
+  const run = async (action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair', destructive = false) => {
+    if (destructive && !window.confirm(t('Esta acción elimina datos de forma permanente. ¿Quieres continuar?'))) return;
+    setBusy(true); setMessage('');
+    try { const result = await window.nodus.maintainStudyData(action); setMessage(result.message); await refresh(); }
+    catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setBusy(false); }
+  };
+  return <div className="mt-3 border-t border-neutral-800 pt-4" data-testid="study-data-admin">
+    <div className="flex flex-wrap items-start gap-3"><div className="mr-auto"><label className="text-sm">{t('Administración del vault de estudio')}</label><p className="mt-0.5 text-xs text-neutral-500">{t('Comprobaciones locales de SQLite, almacenamiento, índices, huérfanos y papelera.')}</p></div><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void refresh()}><Icon name="refresh" />{t('Comprobar')}</button></div>
+    {overview && <><div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{[
+      [t('Base del vault'), formatDataBytes(overview.databaseBytes)], [t('Materiales'), formatDataBytes(overview.materialBytes)],
+      [t('Grabaciones'), formatDataBytes(overview.recordingBytes)], [t('Índices vectoriales'), formatDataBytes(overview.embeddingBytes)],
+    ].map(([label, value]) => <div key={label} className="rounded-lg bg-neutral-900 p-3"><span className="block text-[10px] uppercase tracking-wider text-neutral-600">{label}</span><b className="mt-1 block text-sm text-neutral-300">{value}</b></div>)}</div>
+      <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${overview.integrityOk && overview.foreignKeyErrors.length === 0 ? 'border-emerald-900/60 bg-emerald-950/20 text-emerald-300' : 'border-red-900/60 bg-red-950/20 text-red-300'}`}>
+        {overview.integrityOk && overview.foreignKeyErrors.length === 0 ? t('Integridad correcta: sin referencias huérfanas.') : `${overview.integrityMessages.join('; ')} · ${overview.foreignKeyErrors.length} ${t('referencias huérfanas')}`} · schema v{overview.schemaVersion}/{overview.expectedSchemaVersion} · {overview.studyRows} {t('filas de estudio')} · {overview.trashRows} {t('en papelera')}
+      </div></>}
+    <div className="mt-3 flex flex-wrap gap-2"><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('repair')}><Icon name="settings" />{t('Verificar y optimizar')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('rebuild-indexes')}><Icon name="refresh" />{t('Reconstruir índices')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('clear-embeddings', true)}>{t('Limpiar índices vectoriales')}</button><button className="btn btn-ghost border border-red-900 text-red-400" disabled={busy || !overview?.trashRows} onClick={() => void run('empty-trash', true)}><Icon name="trash" />{t('Vaciar papelera')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={async () => { const result = await window.nodus.exportStudyDiagnostic(); if (result) setMessage(result.path); }}><Icon name="download" />{t('Exportar diagnóstico')}</button></div>
+    {message && <p className="mt-2 text-xs text-amber-300">{message}</p>}
+  </div>;
+}
+
 function StudyAiModelSettings({ settings, patch }: { settings: AppSettings; patch: (value: Partial<AppSettings>) => Promise<void> }) {
   const [summary, setSummary] = useState<StudyAiUsageSummary | null>(null); const [subjects, setSubjects] = useState<StudySubject[]>([]); const [subjectId, setSubjectId] = useState('');
   const refreshUsage = () => window.nodus.getStudyAiUsageSummary().then(setSummary);
@@ -1515,9 +1551,9 @@ function StudyAiModelSettings({ settings, patch }: { settings: AppSettings; patc
   const setSubjectModel = (task: StudyAiTask, model: ModelRef | null) => { if (!subjectId) return; void patch({ studyAiSubjectModels: { ...settings.studyAiSubjectModels, [subjectId]: { ...settings.studyAiSubjectModels[subjectId], [task]: model } } }); };
   return <div className="my-5 rounded-xl border border-teal-900/50 bg-teal-950/10 p-4" data-testid="study-ai-settings"><div className="flex flex-wrap items-start gap-2"><div className="mr-auto"><h3 className="text-sm font-semibold text-teal-200">{t('Modelos del vault de estudio')}</h3><p className="mt-1 text-xs text-neutral-500">{t('Cada tarea conserva un modelo principal y un alternativo independiente. Los estilos personalizados pueden seguir fijando su propio modelo.')}</p></div><span className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500">{summary?.calls ?? 0} {t('llamadas este mes')}</span></div>
     <div className="mt-4 grid grid-cols-[minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(11rem,1fr)] gap-2 text-xs"><b className="text-neutral-600">{t('Tarea')}</b><b className="text-neutral-600">{t('Principal')}</b><b className="text-neutral-600">{t('Alternativo ante error')}</b>{STUDY_TASK_MODELS.map((item) => <div key={item.task} className="contents"><span className="self-center text-neutral-300">{t(item.label)}</span><ModelPicker compact settings={settings} value={settings[item.key]} onChange={(model) => void setPrimary(item.key, model)} emptyLabel="Usar modelo de estudio/síntesis" /><ModelPicker compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void setFallback(item.task, model)} emptyLabel="Sin modelo alternativo" /></div>)}</div>
-    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Transcripción externa')}<div className="mt-1 flex gap-2"><select className="input" value={settings.sttProvider} onChange={(event) => void patch({ sttProvider: event.target.value as AppSettings['sttProvider'] })}><option value="local">{t('Whisper local (offline)')}</option><option value="openai">OpenAI</option></select><ModelPicker compact settings={settings} value={settings.transcriptionModel} onChange={(model) => void patch({ transcriptionModel: model })} emptyLabel="Modelo del proveedor" /></div></label><label className="text-xs text-neutral-500">{t('Modelo por asignatura')}<select className="input mt-1 w-full" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">{t('Selecciona una asignatura')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>{subjectId && STUDY_TASK_MODELS.map((item) => <label key={item.task} className="text-xs text-neutral-500">{t(item.label)}<ModelPicker compact settings={settings} value={settings.studyAiSubjectModels[subjectId]?.[item.task] ?? null} onChange={(model) => setSubjectModel(item.task, model)} emptyLabel="Heredar modelo principal" /></label>)}</div>
+    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Transcripción externa')}<div className="mt-1 flex gap-2"><select className="input" value={settings.sttProvider} onChange={(event) => void patch({ sttProvider: event.target.value as AppSettings['sttProvider'] })}><option value="local">{t('Whisper local (offline)')}</option><option value="openai">OpenAI</option></select><ModelPicker compact settings={settings} value={settings.transcriptionModel} onChange={(model) => void patch({ transcriptionModel: model })} emptyLabel="Modelo del proveedor" /></div></label><label className="text-xs text-neutral-500">{t('Modelo por asignatura')}<select className="input mt-1 w-full" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">{t('Selecciona una asignatura')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>{subjectId && STUDY_TASK_MODELS.map((item) => <label key={item.task} className="text-xs text-neutral-500">{t(item.label)}<ModelPicker compact settings={settings} value={settings.studyAiSubjectModels[subjectId]?.[item.task] ?? null} onChange={(model) => setSubjectModel(item.task, model)} emptyLabel="Heredar modelo principal" /></label>)}{subjectId && <label className="flex items-center gap-2 rounded-lg border border-neutral-800 p-3 text-xs text-neutral-400"><input type="checkbox" checked={settings.studyAiExcludedSubjectIds.includes(subjectId)} onChange={(event) => void patch({ studyAiExcludedSubjectIds: event.target.checked ? [...new Set([...settings.studyAiExcludedSubjectIds, subjectId])] : settings.studyAiExcludedSubjectIds.filter((id) => id !== subjectId) })} />{t('Excluir esta asignatura de todo procesamiento externo')}</label>}</div>
     <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-3"><label className="text-xs text-neutral-500">{t('Presupuesto mensual (USD)')}<input data-testid="study-ai-budget" className="input mt-1 w-full" type="number" min="0" step="1" value={settings.studyAiMonthlyBudgetUsd} onChange={(event) => void patch({ studyAiMonthlyBudgetUsd: Math.max(0, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Avisar al porcentaje')}<input className="input mt-1 w-full" type="number" min="1" max="100" value={settings.studyAiBudgetWarningPercent} onChange={(event) => void patch({ studyAiBudgetWarningPercent: Math.max(1, Math.min(100, Number(event.target.value))) })} /></label><div className="rounded-lg bg-neutral-900 p-3 text-xs"><span className="text-neutral-500">{t('Coste conocido del mes')}</span><b className="mt-1 block text-lg">${(summary?.knownCostUsd ?? 0).toFixed(4)}</b><span className="text-[10px] text-neutral-600">{summary?.unknownCostCalls ?? 0} {t('llamadas sin precio publicado; no se estiman')}</span></div><label className="text-xs text-neutral-500">{t('Máx. caracteres de entrada')}<input className="input mt-1 w-full" type="number" min="1000" value={settings.studyAiMaxInputChars} onChange={(event) => void patch({ studyAiMaxInputChars: Math.max(1000, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Máx. tokens de salida')}<input className="input mt-1 w-full" type="number" min="128" value={settings.studyAiMaxOutputTokens} onChange={(event) => void patch({ studyAiMaxOutputTokens: Math.max(128, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Reintentos antes del alternativo')}<input className="input mt-1 w-full" type="number" min="0" max="2" value={settings.studyAiRetryCount} onChange={(event) => void patch({ studyAiRetryCount: Math.max(0, Math.min(2, Number(event.target.value))) })} /></label></div>
-    <div className="mt-3 flex flex-wrap gap-4 text-xs"><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiLocalOnly} onChange={(event) => void patch({ studyAiLocalOnly: event.target.checked })} />{t('Usar solo modelos locales')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiConfirmExternal} onChange={(event) => void patch({ studyAiConfirmExternal: event.target.checked })} />{t('Confirmar antes de enviar datos fuera del dispositivo')}</label><button className="ml-auto text-red-400 hover:text-red-300" onClick={() => void window.nodus.clearStudyAiUsage().then(refreshUsage)}>{t('Borrar historial de consumo')}</button></div>
+    <div className="mt-3 rounded-lg border border-neutral-800 p-3 text-xs" data-testid="study-privacy-settings"><div className="flex flex-wrap items-center gap-4"><label className="text-neutral-500">{t('Procesamiento')}<select className="input ml-2 h-8 w-32" value={settings.studyAiPrivacyMode} onChange={(event) => { const mode = event.target.value as AppSettings['studyAiPrivacyMode']; void patch({ studyAiPrivacyMode: mode, studyAiLocalOnly: mode === 'local' }); }}><option value="local">{t('Solo local')}</option><option value="hybrid">{t('Híbrido')}</option><option value="external">{t('Externo')}</option></select></label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiEnabled} onChange={(event) => void patch({ studyAiEnabled: event.target.checked })} />{t('Funciones IA')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAnalyticsEnabled} onChange={(event) => void patch({ studyAnalyticsEnabled: event.target.checked })} />{t('Analíticas locales')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studySyncEnabled} onChange={(event) => void patch({ studySyncEnabled: event.target.checked })} />{t('Sync de estudio')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studySharingEnabled} onChange={(event) => void patch({ studySharingEnabled: event.target.checked })} />{t('Exportar para compartir')}</label></div><div className="mt-3 flex flex-wrap gap-4"><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiConfirmExternal} disabled={settings.studyAiPrivacyMode === 'local'} onChange={(event) => void patch({ studyAiConfirmExternal: event.target.checked })} />{t('Confirmar antes de enviar datos fuera del dispositivo')}</label><button className="ml-auto text-red-400 hover:text-red-300" onClick={() => void window.nodus.clearStudyAiUsage().then(refreshUsage)}>{t('Borrar historial de consumo')}</button></div></div>
   </div>;
 }
 

@@ -45,6 +45,12 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   studyAiSubjectModels: {},
   studyAiMonthlyBudgetUsd: 0,
   studyAiBudgetWarningPercent: 80,
+  studyAiEnabled: true,
+  studyAnalyticsEnabled: true,
+  studySyncEnabled: true,
+  studySharingEnabled: true,
+  studyAiPrivacyMode: 'hybrid',
+  studyAiExcludedSubjectIds: [],
   studyAiLocalOnly: false,
   studyAiConfirmExternal: true,
   studyAiMaxInputChars: 120000,
@@ -146,6 +152,8 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  if (parsed.studyAiPrivacyMode === undefined && parsed.studyAiLocalOnly) merged.studyAiPrivacyMode = 'local';
+  merged.studyAiLocalOnly = merged.studyAiPrivacyMode === 'local';
   // Deep-merge local-provider config so a stored partial (or a newly added
   // provider absent from an older settings blob) keeps its default base URL.
   merged.localProviders = {
@@ -193,6 +201,9 @@ export function getSettings(): AppSettings {
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.studyAiLocalOnly !== undefined && patch.studyAiPrivacyMode === undefined) {
+    patch = { ...patch, studyAiPrivacyMode: patch.studyAiLocalOnly ? 'local' : 'hybrid' };
+  }
   const current = getSettings();
   // Shared keys (theme/language + the AI model configuration) go to the global store;
   // everything else stays per-vault. Model keys are also kept in the per-vault blob as a

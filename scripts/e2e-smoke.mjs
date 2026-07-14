@@ -813,6 +813,17 @@ try {
   assert.equal(aiPolicyFixture.usage.knownCostUsd, 0, 'unknown provider price is never guessed');
   console.log('[e2e] independent study AI policy, budget and truthful usage accounting ok');
 
+  await page.getByTestId('study-privacy-settings').waitFor({ timeout: 30_000 });
+  assert.equal(aiPolicyFixture.settings.studyAiPrivacyMode, 'hybrid');
+  assert.equal(aiPolicyFixture.settings.studyAiConfirmExternal, true);
+  await page.getByRole('button', { name: 'Datos', exact: true }).click();
+  await page.getByTestId('study-data-admin').waitFor({ timeout: 30_000 });
+  const dataFixture = await page.evaluate(async () => await window.nodus.getStudyDataOverview());
+  assert.equal(dataFixture.integrityOk, true, 'study data panel runs SQLite integrity checks');
+  assert.deepEqual(dataFixture.foreignKeyErrors, [], 'study data panel detects no orphaned references');
+  assert.ok(dataFixture.studyRows > 0, 'study data panel counts the E2E rows');
+  console.log('[e2e] study privacy controls and real data administration checks ok');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

@@ -61,10 +61,11 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
 
   const subjects = workspace?.subjects.filter((subject) => !courseId || subject.courseId === courseId) ?? [];
   const topics = workspace?.topics.filter((topic) => !subjectId || topic.subjectId === subjectId) ?? [];
-  const importMaterials = async () => {
+  const importMaterials = async (folder = false) => {
     setBusy(true); setMessage('');
     try {
-      const results = await window.nodus.importStudyMaterials({ courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null, ocr });
+      const input = { courseId: courseId || null, subjectId: subjectId || null, topicId: topicId || null, ocr };
+      const results = folder ? await window.nodus.importStudyMaterialFolder(input) : await window.nodus.importStudyMaterials(input);
       if (results.length) {
         const duplicates = results.filter((result) => result.duplicate).length;
         setMessage(`${results.length} ${t('materiales añadidos')}${duplicates ? ` · ${duplicates} ${t('duplicados enlazados sin copiar')}` : ''}`);
@@ -76,7 +77,7 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
 
   return <div className="flex h-full min-h-0 flex-col bg-neutral-950" data-testid="study-materials-view">
     <header className="border-b border-neutral-800 px-5 py-4">
-      <div className="flex flex-wrap items-center gap-3"><div><h1 className="text-lg font-semibold text-neutral-100">{t('Materiales de estudio')}</h1><p className="text-xs text-neutral-500">{t('Fuentes locales, anotables y enlazadas con tus apuntes.')}</p></div><span className="rounded-full bg-teal-950 px-2.5 py-1 text-[10px] text-teal-300">{materials.length} {t('materiales')}</span><div className="ml-auto flex items-center gap-2"><label className="flex items-center gap-2 text-[10px] text-neutral-500"><input type="checkbox" checked={ocr} onChange={(event) => setOcr(event.target.checked)} />{t('OCR para escaneos')}</label><button data-testid="study-material-import" className="btn btn-primary" disabled={busy} onClick={() => void importMaterials()}>{busy ? <Spinner label={t('Importando…')} /> : <><Icon name="upload" size={13} /> {t('Añadir archivos')}</>}</button></div></div>
+      <div className="flex flex-wrap items-center gap-3"><div><h1 className="text-lg font-semibold text-neutral-100">{t('Materiales de estudio')}</h1><p className="text-xs text-neutral-500">{t('Fuentes locales, anotables y enlazadas con tus apuntes.')}</p></div><span className="rounded-full bg-teal-950 px-2.5 py-1 text-[10px] text-teal-300">{materials.length} {t('materiales')}</span><div className="ml-auto flex items-center gap-2"><label className="flex items-center gap-2 text-[10px] text-neutral-500"><input type="checkbox" checked={ocr} onChange={(event) => setOcr(event.target.checked)} />{t('OCR para escaneos')}</label><button className="btn btn-ghost" disabled={busy} onClick={() => void importMaterials(true)}><Icon name="folderPlus" size={13} /> {t('Añadir carpeta')}</button><button data-testid="study-material-import" className="btn btn-primary" disabled={busy} onClick={() => void importMaterials()}>{busy ? <Spinner label={t('Importando…')} /> : <><Icon name="upload" size={13} /> {t('Añadir archivos o ZIP')}</>}</button></div></div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(240px,1fr)_150px_150px_180px_180px_180px_auto]">
         <div className="relative"><Icon name="search" size={13} className="pointer-events-none absolute left-3 top-2.5 text-neutral-600" /><input data-testid="study-material-search" className="input input-with-leading-icon h-8 w-full" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar materiales…')} /></div>
         <select className="input h-8 text-xs" value={readState} onChange={(event) => setReadState(event.target.value as StudyMaterialReadState | 'all')}><option value="all">{t('Todos los estados')}</option>{Object.entries(READ_LABEL).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select>

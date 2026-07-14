@@ -1003,6 +1003,13 @@ export interface AppSettings {
   studyAiSubjectModels: Record<string, Partial<Record<StudyAiTask, ModelRef | null>>>;
   studyAiMonthlyBudgetUsd: number;
   studyAiBudgetWarningPercent: number;
+  studyAiEnabled: boolean;
+  studyAnalyticsEnabled: boolean;
+  studySyncEnabled: boolean;
+  studySharingEnabled: boolean;
+  studyAiPrivacyMode: 'local' | 'hybrid' | 'external';
+  studyAiExcludedSubjectIds: string[];
+  /** Legacy mirror kept for older settings payloads; privacyMode is authoritative. */
   studyAiLocalOnly: boolean;
   studyAiConfirmExternal: boolean;
   studyAiMaxInputChars: number;
@@ -1979,6 +1986,36 @@ export interface SyncMergeSummary {
   savedSearches: SyncTableCounts;
   edgeFeedback: SyncTableCounts;
   databases: SyncTableCounts;
+  /** Aggregate changes across every study_* table. */
+  study: SyncTableCounts;
+}
+
+export interface StudyDataOverview {
+  schemaVersion: number;
+  expectedSchemaVersion: number;
+  databaseBytes: number;
+  materialBytes: number;
+  recordingBytes: number;
+  embeddingBytes: number;
+  studyRows: number;
+  trashRows: number;
+  integrityOk: boolean;
+  integrityMessages: string[];
+  foreignKeyErrors: string[];
+  journalMode: string;
+  lastCheckedAt: string;
+}
+
+export interface StudyDataMaintenanceResult {
+  ok: boolean;
+  changedRows: number;
+  message: string;
+}
+
+export type StudyExportFormat = 'markdown' | 'txt' | 'html' | 'docx' | 'pdf' | 'bundle';
+export interface StudyExportScope {
+  kind: 'workspace' | 'course' | 'subject' | 'topic' | 'folder' | 'document';
+  id?: string;
 }
 
 export interface GraphData {
@@ -4796,6 +4833,7 @@ export interface NodusApi {
   getStudyMaterial(id: string): Promise<StudyMaterialDetail>;
   getStudyMaterialContent(id: string): Promise<StudyMaterialContent>;
   importStudyMaterials(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
+  importStudyMaterialFolder(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   replaceStudyMaterialFile(id: string, ocr?: boolean): Promise<StudyMaterialSummary | null>;
   updateStudyMaterial(id: string, patch: StudyMaterialUpdateInput): Promise<StudyMaterialSummary>;
   restoreStudyMaterialVersion(id: string, versionId: string): Promise<StudyMaterialSummary>;
@@ -5122,6 +5160,10 @@ export interface NodusApi {
   exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
   /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
   importSyncPackage(): Promise<SyncMergeSummary | null>;
+  getStudyDataOverview(): Promise<StudyDataOverview>;
+  maintainStudyData(action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair'): Promise<StudyDataMaintenanceResult>;
+  exportStudyDiagnostic(): Promise<{ path: string } | null>;
+  exportStudyScope(scope: StudyExportScope, format: StudyExportFormat): Promise<{ path: string } | null>;
   /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
   setBackupPassword(password: string): Promise<void>;
   clearBackupPassword(): Promise<void>;

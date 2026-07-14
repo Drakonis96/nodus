@@ -131,7 +131,7 @@ function renderSuggestions(suggestions: ProjectInsertionSuggestion[]): string {
   return ['**Sugerencias de insercion:**', ...rows].join('\n');
 }
 
-function markdownToPlainText(markdown: string): string {
+export function markdownToPlainText(markdown: string): string {
   return markdown
     .replace(/\[([^\]]+)\]\((nodus:\/\/[^)]+)\)/g, '$1')
     .replace(/^\s{0,3}#{1,6}\s+/gm, '')
@@ -140,7 +140,7 @@ function markdownToPlainText(markdown: string): string {
     .trim() + '\n';
 }
 
-async function markdownToDocx(markdown: string): Promise<Buffer> {
+export async function markdownToDocx(markdown: string): Promise<Buffer> {
   const children = markdownToDocxParagraphs(markdown);
   const refs = collectCitations(markdown);
   if (refs.length) {
