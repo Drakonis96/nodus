@@ -32,8 +32,8 @@ try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.equal(SCHEMA_VERSION, 57, 'phase 4 reaches the planned style schema v57');
-  assert.equal(getDb().pragma('user_version', { simple: true }), 57);
+  assert.ok(SCHEMA_VERSION >= 57, 'phase 4 style schema remains present');
+  assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION);
   for (const table of ['study_materials', 'study_recordings', 'study_styles', 'study_style_versions', 'study_style_associations', 'study_improvement_log']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
   }
@@ -129,7 +129,7 @@ try {
     (id, short_id, title, kind, content_markdown, position, created_at, updated_at) VALUES (?, ?, ?, 'apunte', ?, 0, ?, ?)`)
     .run('legacy-style-doc', 'DOC-STYLE-LEGACY', 'Legado v54', '# No perder', timestamp, timestamp);
   runMigrations(legacy);
-  assert.equal(legacy.pragma('user_version', { simple: true }), 57);
+  assert.equal(legacy.pragma('user_version', { simple: true }), SCHEMA_VERSION);
   assert.deepEqual(legacy.prepare('SELECT title, content_markdown FROM study_docs WHERE id = ?').get('legacy-style-doc'), { title: 'Legado v54', content_markdown: '# No perder' });
   legacy.close();
 

@@ -126,6 +126,10 @@ import type {
   StudyAssistantConversationInput,
   StudyAssistantConversationPatch,
   StudyAssistantRequest,
+  StudyQuestionExport,
+  StudyQuestionFilters,
+  StudyQuestionGenerationRequest,
+  StudyQuestionInput,
   StudyPronunciationEntry,
 } from '@shared/types';
 
@@ -246,6 +250,8 @@ import { transcribeStudyAudio } from './ai/studyTranscription';
 import { improveStudyText } from './ai/studyImprove';
 import * as studySearch from './ai/studySearch';
 import * as studyAssistant from './ai/studyAssistant';
+import * as studyQuestions from './db/studyQuestionsRepo';
+import { generateStudyQuestions } from './ai/studyQuestions';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -1835,6 +1841,35 @@ export function registerIpc(
     fs.writeFileSync(picked.filePath, studyAssistant.renderStudyAssistantConversation(conversation), 'utf8');
     return { path: picked.filePath };
   });
+  h('study:questions:list', async (_e, filters?: StudyQuestionFilters) => studyQuestions.listStudyQuestions(filters));
+  h('study:questions:get', async (_e, id: string) => studyQuestions.getStudyQuestion(id));
+  h('study:questions:create', async (_e, input: StudyQuestionInput) => studyQuestions.createStudyQuestion(input));
+  h('study:questions:update', async (_e, id: string, patch: Partial<StudyQuestionInput>) => studyQuestions.updateStudyQuestion(id, patch));
+  h('study:questions:duplicate', async (_e, id: string) => studyQuestions.duplicateStudyQuestion(id));
+  h('study:questions:versions', async (_e, id: string) => studyQuestions.listStudyQuestionVersions(id));
+  h('study:questions:restore', async (_e, id: string, versionId: string) => studyQuestions.restoreStudyQuestionVersion(id, versionId));
+  h('study:questions:lifecycle', async (_e, id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete') => studyQuestions.setStudyQuestionLifecycle(id, action));
+  h('study:questions:generate', async (_e, request: StudyQuestionGenerationRequest) => generateStudyQuestions(request));
+  h('study:questions:export', async (_e, ids?: string[]) => {
+    const payload = studyQuestions.exportStudyQuestions(ids);
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar banco de preguntas', defaultPath: 'nodus-preguntas.json', filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return { path: picked.filePath };
+  });
+  h('study:questions:import', async () => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Importar banco de preguntas', properties: ['openFile'], filters: [{ name: 'Nodus Study Questions', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return [];
+    return studyQuestions.importStudyQuestions(JSON.parse(fs.readFileSync(picked.filePaths[0], 'utf8')) as StudyQuestionExport);
+  });
+  h('study:questions:collections:list', async () => studyQuestions.listStudyQuestionCollections());
+  h('study:questions:collections:create', async (_e, name: string, description?: string) => studyQuestions.createStudyQuestionCollection(name, description));
+  h('study:questions:collections:setItems', async (_e, collectionId: string, questionIds: string[]) => studyQuestions.setStudyQuestionCollectionItems(collectionId, questionIds));
+  h('study:questions:collections:delete', async (_e, id: string) => studyQuestions.deleteStudyQuestionCollection(id));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

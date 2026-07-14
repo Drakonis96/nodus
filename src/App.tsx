@@ -12,6 +12,7 @@ import { StudyMaterialsView } from './views/StudyMaterialsView';
 import { StudyRecordingsView } from './views/StudyRecordingsView';
 import { StudySearchView } from './views/StudySearchView';
 import { StudyChatView } from './views/StudyChatView';
+import { StudyBankView } from './views/StudyBankView';
 import { Library } from './views/Library';
 import { GraphView } from './views/GraphView';
 import { GapsView } from './views/GapsView';
@@ -72,7 +73,6 @@ import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const STUDY_SCAFFOLD_VIEWS = new Set<View>([
-  'studyQuestions',
   'studyTests',
   'studyExams',
   'studyPlanner',
@@ -940,6 +940,11 @@ export function App() {
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+          />}
+          {view === 'studyQuestions' && <StudyBankView
+            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
           {STUDY_SCAFFOLD_VIEWS.has(view) && <StudyScaffoldView view={view} />}
           {view === 'study' && (

@@ -675,6 +675,28 @@ try {
   await page.getByText('La lectura de estudio requiere una voz local de Piper o Kokoro.', { exact: true }).waitFor({ timeout: 30_000 });
   console.log('[e2e] local study narration modes + formula speech + pronunciation dictionary ok');
 
+  // ── Study question bank: manual authoring, validation and source metadata ─
+  await page.getByRole('button', { name: 'Banco de preguntas', exact: true }).click();
+  await page.getByTestId('study-question-bank').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-question-new').click();
+  const questionEditor = page.getByTestId('study-question-editor');
+  const questionTextareas = questionEditor.locator('textarea');
+  await questionTextareas.nth(0).fill('¿Qué demuestra el fragmento verificable de la fuente smoke?');
+  await questionTextareas.nth(1).fill('Demuestra que el fragmento está conectado con su evidencia local.');
+  await questionTextareas.nth(2).fill('La respuesta procede del fragmento verificable guardado en el vault.');
+  await page.getByTestId('study-question-save').click();
+  await page.getByRole('heading', { name: '¿Qué demuestra el fragmento verificable de la fuente smoke?', exact: true }).waitFor({ timeout: 30_000 });
+  const bankFixture = await page.evaluate(async () => {
+    const question = (await window.nodus.listStudyQuestions({ search: 'fragmento verificable' }))[0];
+    if (!question) throw new Error('Question bank fixture was not persisted');
+    await window.nodus.updateStudyQuestion(question.id, { status: 'approved', locked: true });
+    return (await window.nodus.getStudyQuestion(question.id));
+  });
+  assert.equal(bankFixture.status, 'approved');
+  assert.equal(bankFixture.locked, true);
+  assert.match(bankFixture.source.excerpt, /respuesta procede del fragmento verificable/i);
+  console.log('[e2e] study question bank manual authoring + approval provenance ok');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

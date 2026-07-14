@@ -66,6 +66,15 @@ import type {
   StudyAssistantSourceOption,
   StudyAssistantStreamHandlers,
 } from './studyAssistant';
+import type {
+  StudyQuestion,
+  StudyQuestionCollection,
+  StudyQuestionFilters,
+  StudyQuestionGenerationRequest,
+  StudyQuestionGenerationResult,
+  StudyQuestionInput,
+  StudyQuestionVersion,
+} from './studyQuestions';
 export type {
   StudyMaterialAnnotation,
   StudyMaterialAnnotationInput,
@@ -139,6 +148,23 @@ export type {
   StudyAssistantTask,
   StudyAssistantTone,
 } from './studyAssistant';
+export type {
+  StudyCognitiveLevel,
+  StudyQuestion,
+  StudyQuestionAnswer,
+  StudyQuestionCollection,
+  StudyQuestionDifficulty,
+  StudyQuestionExport,
+  StudyQuestionFilters,
+  StudyQuestionGenerationRequest,
+  StudyQuestionGenerationResult,
+  StudyQuestionInput,
+  StudyQuestionOption,
+  StudyQuestionSource,
+  StudyQuestionStatus,
+  StudyQuestionType,
+  StudyQuestionVersion,
+} from './studyQuestions';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -4742,6 +4768,21 @@ export interface NodusApi {
   streamStudyAssistant(request: StudyAssistantRequest, handlers: StudyAssistantStreamHandlers): Promise<StudyAssistantResponse>;
   cancelStudyAssistant(): Promise<void>;
   exportStudyAssistantConversation(id: string): Promise<{ path: string } | null>;
+  listStudyQuestions(filters?: StudyQuestionFilters): Promise<StudyQuestion[]>;
+  getStudyQuestion(id: string): Promise<StudyQuestion | null>;
+  createStudyQuestion(input: StudyQuestionInput): Promise<StudyQuestion>;
+  updateStudyQuestion(id: string, patch: Partial<StudyQuestionInput>): Promise<StudyQuestion>;
+  duplicateStudyQuestion(id: string): Promise<StudyQuestion>;
+  listStudyQuestionVersions(id: string): Promise<StudyQuestionVersion[]>;
+  restoreStudyQuestionVersion(id: string, versionId: string): Promise<StudyQuestion>;
+  setStudyQuestionLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  generateStudyQuestions(request: StudyQuestionGenerationRequest): Promise<StudyQuestionGenerationResult>;
+  exportStudyQuestions(ids?: string[]): Promise<{ path: string } | null>;
+  importStudyQuestions(): Promise<StudyQuestion[]>;
+  listStudyQuestionCollections(): Promise<StudyQuestionCollection[]>;
+  createStudyQuestionCollection(name: string, description?: string): Promise<StudyQuestionCollection>;
+  setStudyQuestionCollectionItems(collectionId: string, questionIds: string[]): Promise<void>;
+  deleteStudyQuestionCollection(id: string): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;
