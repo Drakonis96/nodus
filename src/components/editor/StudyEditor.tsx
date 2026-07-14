@@ -17,14 +17,24 @@ import { DEFAULT_STUDY_DOC_STYLE, studyCommandMarkdown, studyDocumentStats } fro
 import { deleteLastStudySentence } from '@shared/sttModels';
 import type { StudyDocument, StudyDocumentKind, StudyTag } from '@shared/studyOrg';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
+import type { StudyImproveScope } from '@shared/studyImprove';
 import { Markdown } from '../Markdown';
 import { Icon, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
 import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
 import { StudyDictation } from './StudyDictation';
+import { StudyImproveDialog } from './StudyImproveDialog';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
+
+interface ImproveTarget {
+  from: number;
+  to: number;
+  text: string;
+  scope: StudyImproveScope;
+  initialStyleId?: string;
+}
 
 const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
   apunte: 'Apunte', manual: 'Manual', libro: 'Libro', articulo: 'Artículo', presentacion: 'Presentación',
@@ -104,6 +114,7 @@ export function StudyEditor({
   documents,
   tags,
   activeTagIds,
+  subjectId,
   activeId,
   onActivate,
   onClose,
@@ -118,6 +129,7 @@ export function StudyEditor({
   documents: StudyDocument[];
   tags: StudyTag[];
   activeTagIds: string[];
+  subjectId?: string | null;
   activeId: string;
   onActivate: (id: string) => void;
   onClose: (id: string) => void;
@@ -147,6 +159,9 @@ export function StudyEditor({
   const [replacement, setReplacement] = useState('');
   const [dictionaryWord, setDictionaryWord] = useState('');
   const [textDialog, setTextDialog] = useState<{ kind: 'comment' | 'tag'; selectedText?: string } | null>(null);
+  const [improveTarget, setImproveTarget] = useState<ImproveTarget | null>(null);
+  const [improveUndo, setImproveUndo] = useState<string | null>(null);
+  const [improveContextMenu, setImproveContextMenu] = useState<{ x: number; y: number; target: ImproveTarget } | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   const baselineRef = useRef('');
@@ -173,6 +188,33 @@ export function StudyEditor({
       baselineRef.current = JSON.stringify({ title: active.title, content: active.contentMarkdown, style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
     });
   }, [active?.id, loadData]);
+
+  const resolveImproveSelection = (allowFallback: boolean): ImproveTarget | null => {
+    const textarea = rawTextareaRef.current;
+    if (raw && textarea) {
+      let from = textarea.selectionStart;
+      let to = textarea.selectionEnd;
+      if (from !== to) return { from, to, text: draft.slice(from, to), scope: 'selection' };
+      if (!allowFallback) return null;
+      from = draft.lastIndexOf('\n', Math.max(0, from - 1)) + 1;
+      const nextLine = draft.indexOf('\n', to);
+      to = nextLine === -1 ? draft.length : nextLine;
+      if (draft.slice(from, to).trim()) return { from, to, text: draft.slice(from, to), scope: 'paragraph' };
+    }
+    const selection = window.getSelection()?.toString() ?? '';
+    if (selection.trim()) {
+      const from = draft.indexOf(selection);
+      if (from >= 0) return { from, to: from + selection.length, text: selection, scope: 'selection' };
+    }
+    if (!allowFallback) return null;
+    if (!window.confirm(t('No hay texto seleccionado. ¿Quieres mejorar el documento completo?'))) return null;
+    return { from: 0, to: draft.length, text: draft, scope: 'document' };
+  };
+
+  const openImprovement = (initialStyleId?: string) => {
+    const target = resolveImproveSelection(true);
+    if (target) setImproveTarget({ ...target, initialStyleId });
+  };
 
   const currentSignature = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
   useEffect(() => {
@@ -207,6 +249,7 @@ export function StudyEditor({
     const keydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save('manual'); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); setShowSearch(true); }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); openImprovement(); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
@@ -310,6 +353,8 @@ export function StudyEditor({
         <button className="btn btn-ghost h-8 px-2" onClick={() => setShowSearch(!showSearch)}><Icon name="search" size={13} /></button>
         <button className="btn btn-ghost h-8 px-2" onClick={openCommentDialog} title={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
         <button data-testid="study-dictation-toggle" className={`btn btn-ghost h-8 px-2 ${showDictation ? 'bg-indigo-900/50 text-indigo-300' : ''}`} onClick={() => setShowDictation(!showDictation)} title={t('Dictado por voz')}><Icon name="microphone" size={13} /></button>
+        <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 px-2 ${improveTarget ? 'bg-teal-950 text-teal-300' : ''}`} onClick={() => openImprovement()} title={`${t('Mejorar texto')} (⌘⇧I)`}><Icon name="wand" size={13} /> {t('Mejorar')}</button>
+        {improveUndo != null && <button data-testid="study-improve-undo" className="btn btn-ghost h-8 px-2 text-amber-300" onClick={() => { const current = draft; setDraft(improveUndo); setImproveUndo(current); setRaw(true); setSaveState('dirty'); }} title={t('Deshacer la última mejora')}><Icon name="undo" size={13} /> {t('Deshacer mejora')}</button>}
         <button data-testid="study-doc-style" className={`btn btn-ghost h-8 px-2 ${showStyle ? 'bg-indigo-900/50' : ''}`} title={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={13} /></button>
         <button className={`btn btn-ghost h-8 px-2 ${showHistory ? 'bg-indigo-900/50' : ''}`} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
         <button className={`btn btn-ghost h-8 px-2 ${focusMode ? 'bg-indigo-900/50' : ''}`} onClick={() => setFocusMode(!focusMode)} title={t('Modo concentración')}><Icon name="eye" size={13} /></button>
@@ -324,6 +369,9 @@ export function StudyEditor({
       <div className="flex flex-wrap gap-1 border-b border-neutral-800 px-3 py-1.5">
         {(['titulo', 'subtitulo', 'tabla', 'cita', 'imagen', 'audio', 'test', 'academico'] as StudyEditorCommand[]).map((command) => (
           <button key={command} className="rounded px-2 py-1 text-[10px] text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200" onClick={() => insertCommand(command)}>/{command}</button>
+        ))}
+        {[['formal', 'builtin:formal'], ['académico', 'builtin:academic'], ['claro', 'builtin:clear'], ['conciso', 'builtin:concise']].map(([label, styleId]) => (
+          <button key={styleId} className="rounded px-2 py-1 text-[10px] text-teal-700 hover:bg-teal-950 hover:text-teal-300" onClick={() => openImprovement(styleId)}>/{label}</button>
         ))}
         <span className="ml-auto py-1 text-[10px] text-neutral-600">{stats.words} {t('palabras')} · {stats.characters} {t('caracteres')} · {stats.paragraphs} {t('párrafos')} · {stats.readingMinutes} min</span>
       </div>
@@ -410,7 +458,12 @@ export function StudyEditor({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1" onDragOver={(event) => {
+      <div className="flex min-h-0 flex-1" onContextMenu={(event) => {
+        const target = resolveImproveSelection(false);
+        if (!target) return;
+        event.preventDefault();
+        setImproveContextMenu({ x: event.clientX, y: event.clientY, target });
+      }} onClick={() => setImproveContextMenu(null)} onDragOver={(event) => {
         if (event.dataTransfer.types.includes('application/x-nodus-study-doc') || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
       }} onDrop={(event) => void handleEditorDrop(event)}>
         {!focusMode && <DocOutline markdown={draft} onJump={jumpToHeading} />}
@@ -491,6 +544,29 @@ export function StudyEditor({
           onCancel={() => setTextDialog(null)}
         />
       )}
+      {improveContextMenu && <div className="fixed z-[130] min-w-48 rounded-lg border border-neutral-700 bg-neutral-900 p-1 shadow-2xl" style={{ left: improveContextMenu.x, top: improveContextMenu.y }} onClick={(event) => event.stopPropagation()}>
+        <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-neutral-200 hover:bg-teal-950 hover:text-teal-300" onClick={() => { setImproveTarget(improveContextMenu.target); setImproveContextMenu(null); }}><Icon name="wand" size={13} /> {t('Mejorar selección con IA')}</button>
+      </div>}
+      {improveTarget && <StudyImproveDialog
+        documentId={active.id}
+        documentKind={active.kind}
+        subjectId={subjectId}
+        original={improveTarget.text}
+        scope={improveTarget.scope}
+        initialStyleId={improveTarget.initialStyleId}
+        protectedTerms={[active.title, ...data.customDictionary]}
+        onClose={() => setImproveTarget(null)}
+        onApply={(text, action) => {
+          setImproveUndo(draft);
+          const separator = action === 'insert_below' ? `\n\n${text}` : text;
+          const next = `${draft.slice(0, improveTarget.from)}${action === 'insert_below' ? improveTarget.text : ''}${separator}${draft.slice(improveTarget.to)}`;
+          setDraft(next);
+          setRaw(true);
+          setEditorRevision((value) => value + 1);
+          setSaveState('dirty');
+          setImproveTarget(null);
+        }}
+      />}
     </div>
   );
 }

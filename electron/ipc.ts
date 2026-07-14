@@ -106,6 +106,11 @@ import type {
   StudyAnnotationInput,
   StudyDocUpdateInput,
   StudySttRequest,
+  StudyImproveRequest,
+  StudyImprovementLog,
+  StudyStyleAssociationKind,
+  StudyStyleExport,
+  StudyStyleInput,
 } from '@shared/types';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
@@ -211,7 +216,9 @@ import { generateHypothesisLab } from './ai/hypothesisLab';
 import * as studyProgress from './db/studyProgressRepo';
 import * as studyOrg from './db/studyOrgRepo';
 import * as studyEditor from './db/studyEditorRepo';
+import * as studyStyles from './db/studyStylesRepo';
 import { transcribeStudyAudio } from './ai/studyTranscription';
+import { improveStudyText } from './ai/studyImprove';
 import { buildWritingWorkshopSnapshot, generateWritingWorkshopDraft } from './ai/writingWorkshop';
 import { generateDeepResearchReport } from './ai/deepResearch';
 import { reprocessConnections } from './ai/reprocessConnections';
@@ -451,6 +458,7 @@ export function registerIpc(
   // button (`research:chatStream:cancel`) can abort the provider mid-answer.
   const chatAborters = new Map<string, AbortController>();
   const nodiChatAborters = new Map<string, AbortController>();
+  const studyImproveAborters = new Map<string, AbortController>();
 
   const emitVaultChanged = () => {
     const payload = withVaultKeyProviders(getActiveVault());
@@ -1651,6 +1659,50 @@ export function registerIpc(
     studyEditor.updateStudyAnnotation(id, patch));
   h('study:annotation:delete', async (_e, id: string) => studyEditor.deleteStudyAnnotation(id));
   h('study:stt:transcribe', async (_e, request: StudySttRequest) => transcribeStudyAudio(request));
+  h('study:styles:list', async (_e, options?: { includeArchived?: boolean; search?: string }) => studyStyles.listStudyStyles(options));
+  h('study:styles:create', async (_e, input: StudyStyleInput) => studyStyles.createStudyStyle(input));
+  h('study:styles:update', async (_e, id: string, patch: Partial<StudyStyleInput>) => studyStyles.updateStudyStyle(id, patch));
+  h('study:styles:duplicate', async (_e, id: string) => studyStyles.duplicateStudyStyle(id));
+  h('study:styles:archive', async (_e, id: string, archived: boolean) => studyStyles.archiveStudyStyle(id, archived));
+  h('study:styles:delete', async (_e, id: string) => studyStyles.deleteStudyStyle(id));
+  h('study:styles:versions', async (_e, styleId: string) => studyStyles.listStudyStyleVersions(styleId));
+  h('study:styles:restore', async (_e, styleId: string, versionId: string) => studyStyles.restoreStudyStyleVersion(styleId, versionId));
+  h('study:styles:associations', async () => studyStyles.listStudyStyleAssociations());
+  h('study:styles:associate', async (_e, styleId: string, kind: StudyStyleAssociationKind, targetId?: string, isDefault?: boolean) =>
+    studyStyles.setStudyStyleAssociation(styleId, kind, targetId, isDefault));
+  h('study:styles:default', async (_e, subjectId?: string | null, documentKind?: string | null) =>
+    studyStyles.resolveStudyStyleDefault(subjectId, documentKind));
+  h('study:styles:export', async (_e, styleIds?: string[]) => {
+    const payload = studyStyles.exportStudyStyles(styleIds);
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Exportar estilos de estudio', defaultPath: 'nodus-study-styles.json', filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return { path: picked.filePath };
+  });
+  h('study:styles:import', async () => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Importar estilos de estudio', properties: ['openFile'], filters: [{ name: 'Nodus Study Styles', extensions: ['json'] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return [];
+    const payload = JSON.parse(fs.readFileSync(picked.filePaths[0], 'utf8')) as StudyStyleExport;
+    return studyStyles.importStudyStyles(payload);
+  });
+  h('study:improve', async (e, requestId: string, request: StudyImproveRequest) => {
+    const controller = new AbortController();
+    studyImproveAborters.set(requestId, controller);
+    try {
+      return await improveStudyText(request, (delta) => {
+        if (!e.sender.isDestroyed()) e.sender.send('study:improve:delta', requestId, delta);
+      }, controller.signal);
+    } finally {
+      studyImproveAborters.delete(requestId);
+    }
+  });
+  h('study:improve:cancel', async (_e, requestId: string) => studyImproveAborters.get(requestId)?.abort());
+  h('study:improve:log', async (_e, documentId: string) => studyStyles.listStudyImprovementLog(documentId));
+  h('study:improve:action', async (_e, id: string, action: StudyImprovementLog['action']) => studyStyles.updateStudyImprovementAction(id, action));
 
   h('study:plan', async (_e, request?: StudyPlanRequest) => buildStudyPlan(request ?? {}));
   h('study:progress:set', async (_e, record: {

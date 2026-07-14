@@ -10,6 +10,39 @@ import type {
   StudyDocUpdateInput,
 } from './studyEditor';
 import type { StudySttRequest, StudySttResult } from './sttModels';
+import type {
+  StudyImproveRequest,
+  StudyImproveResult,
+  StudyImproveStreamHandlers,
+  StudyImprovementLog,
+  StudyStyle,
+  StudyStyleAssociation,
+  StudyStyleAssociationKind,
+  StudyStyleInput,
+  StudyStyleVersion,
+} from './studyImprove';
+export type {
+  StudyImproveLength,
+  StudyImproveLevel,
+  StudyImproveMode,
+  StudyImprovePresetId,
+  StudyImproveRequest,
+  StudyImproveResult,
+  StudyImproveScope,
+  StudyImproveStreamHandlers,
+  StudyImprovementLog,
+  StudyImproveVariables,
+  StudyProtectedSpan,
+  StudyProtectedSpanKind,
+  StudyStyle,
+  StudyStyleAssociation,
+  StudyStyleAssociationKind,
+  StudyStyleCategory,
+  StudyStyleConfig,
+  StudyStyleExport,
+  StudyStyleInput,
+  StudyStyleVersion,
+} from './studyImprove';
 export type {
   StudyDictationAction,
   StudyDictationTransform,
@@ -4485,6 +4518,23 @@ export interface NodusApi {
   updateStudyAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
   deleteStudyAnnotation(id: string): Promise<void>;
   transcribeStudyAudio(request: StudySttRequest): Promise<StudySttResult>;
+  listStudyStyles(options?: { includeArchived?: boolean; search?: string }): Promise<StudyStyle[]>;
+  createStudyStyle(input: StudyStyleInput): Promise<StudyStyle>;
+  updateStudyStyle(id: string, patch: Partial<StudyStyleInput>): Promise<StudyStyle>;
+  duplicateStudyStyle(id: string): Promise<StudyStyle>;
+  archiveStudyStyle(id: string, archived: boolean): Promise<StudyStyle>;
+  deleteStudyStyle(id: string): Promise<void>;
+  listStudyStyleVersions(styleId: string): Promise<StudyStyleVersion[]>;
+  restoreStudyStyleVersion(styleId: string, versionId: string): Promise<StudyStyle>;
+  listStudyStyleAssociations(): Promise<StudyStyleAssociation[]>;
+  setStudyStyleAssociation(styleId: string, kind: StudyStyleAssociationKind, targetId?: string, isDefault?: boolean): Promise<StudyStyleAssociation>;
+  resolveStudyStyleDefault(subjectId?: string | null, documentKind?: string | null): Promise<string>;
+  exportStudyStyles(styleIds?: string[]): Promise<{ path: string } | null>;
+  importStudyStyles(): Promise<StudyStyle[]>;
+  improveStudyText(request: StudyImproveRequest, handlers: StudyImproveStreamHandlers): Promise<StudyImproveResult>;
+  cancelStudyImprove(): Promise<void>;
+  listStudyImprovementLog(documentId: string): Promise<StudyImprovementLog[]>;
+  updateStudyImprovementAction(id: string, action: StudyImprovementLog['action']): Promise<void>;
 
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;

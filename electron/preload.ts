@@ -16,6 +16,7 @@ import type {
 let activeChatRequestId: string | null = null;
 let activeDbChatRequestId: string | null = null;
 let activeNodiChatRequestId: string | null = null;
+let activeStudyImproveRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -415,6 +416,38 @@ const api: NodusApi = {
   updateStudyAnnotation: (id, patch) => ipcRenderer.invoke('study:annotation:update', id, patch),
   deleteStudyAnnotation: (id) => ipcRenderer.invoke('study:annotation:delete', id).then(() => undefined),
   transcribeStudyAudio: (request) => ipcRenderer.invoke('study:stt:transcribe', request),
+  listStudyStyles: (options) => ipcRenderer.invoke('study:styles:list', options),
+  createStudyStyle: (input) => ipcRenderer.invoke('study:styles:create', input),
+  updateStudyStyle: (id, patch) => ipcRenderer.invoke('study:styles:update', id, patch),
+  duplicateStudyStyle: (id) => ipcRenderer.invoke('study:styles:duplicate', id),
+  archiveStudyStyle: (id, archived) => ipcRenderer.invoke('study:styles:archive', id, archived),
+  deleteStudyStyle: (id) => ipcRenderer.invoke('study:styles:delete', id).then(() => undefined),
+  listStudyStyleVersions: (styleId) => ipcRenderer.invoke('study:styles:versions', styleId),
+  restoreStudyStyleVersion: (styleId, versionId) => ipcRenderer.invoke('study:styles:restore', styleId, versionId),
+  listStudyStyleAssociations: () => ipcRenderer.invoke('study:styles:associations'),
+  setStudyStyleAssociation: (styleId, kind, targetId, isDefault) => ipcRenderer.invoke('study:styles:associate', styleId, kind, targetId, isDefault),
+  resolveStudyStyleDefault: (subjectId, documentKind) => ipcRenderer.invoke('study:styles:default', subjectId, documentKind),
+  exportStudyStyles: (styleIds) => ipcRenderer.invoke('study:styles:export', styleIds),
+  importStudyStyles: () => ipcRenderer.invoke('study:styles:import'),
+  improveStudyText: async (request, handlers) => {
+    const requestId = `study-improve-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onDelta = (_e: unknown, id: string, delta: string) => {
+      if (id === requestId) handlers.onDelta(delta);
+    };
+    ipcRenderer.on('study:improve:delta', onDelta);
+    activeStudyImproveRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('study:improve', requestId, request);
+    } finally {
+      if (activeStudyImproveRequestId === requestId) activeStudyImproveRequestId = null;
+      ipcRenderer.removeListener('study:improve:delta', onDelta);
+    }
+  },
+  cancelStudyImprove: async () => {
+    if (activeStudyImproveRequestId) await ipcRenderer.invoke('study:improve:cancel', activeStudyImproveRequestId);
+  },
+  listStudyImprovementLog: (documentId) => ipcRenderer.invoke('study:improve:log', documentId),
+  updateStudyImprovementAction: (id, action) => ipcRenderer.invoke('study:improve:action', id, action).then(() => undefined),
 
   getStudyPlan: (request) => ipcRenderer.invoke('study:plan', request),
   setStudyProgress: (record) => ipcRenderer.invoke('study:progress:set', record),

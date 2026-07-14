@@ -316,6 +316,7 @@ export function StudyOrganizationView({
         documents={openDocuments.length ? openDocuments : [editing]}
         tags={workspace.tags}
         activeTagIds={workspace.documentTags.filter((link) => link.documentId === editing.id).map((link) => link.tagId)}
+        subjectId={workspace.placements.find((placement) => placement.documentId === editing.id && placement.subjectId)?.subjectId}
         activeId={editing.id}
         onActivate={(id) => {
           const document = workspace.documents.find((candidate) => candidate.id === id);

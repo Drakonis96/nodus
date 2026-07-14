@@ -31,8 +31,8 @@ try {
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.equal(SCHEMA_VERSION, 54, 'phase 2 owns schema v54');
-  assert.equal(getDb().pragma('user_version', { simple: true }), 54);
+  assert.ok(SCHEMA_VERSION >= 54, 'phase 2 requires schema v54 or later');
+  assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION);
   for (const table of ['study_doc_versions', 'study_annotations', 'study_doc_links']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
   }
@@ -99,7 +99,7 @@ try {
     (id, short_id, title, kind, content_markdown, position, created_at, updated_at) VALUES (?, ?, ?, 'apunte', ?, 0, ?, ?)`)
     .run('legacy-doc', 'DOC-LEGACY', 'Legado', '# Conservado', timestamp, timestamp);
   runMigrations(legacy);
-  assert.equal(legacy.pragma('user_version', { simple: true }), 54);
+  assert.equal(legacy.pragma('user_version', { simple: true }), SCHEMA_VERSION);
   const legacyDoc = legacy.prepare('SELECT title, content_markdown, style_json FROM study_docs WHERE id = ?').get('legacy-doc');
   assert.deepEqual(legacyDoc, { title: 'Legado', content_markdown: '# Conservado', style_json: '{}' }, 'v53 document preserved');
   legacy.close();

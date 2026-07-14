@@ -72,6 +72,7 @@ try {
     hasImageQueue: typeof window.nodus?.queueDecorativeImage === 'function',
     hasSearchDetail: typeof window.nodus?.getSearchResultDetail === 'function',
     hasStudyStt: typeof window.nodus?.transcribeStudyAudio === 'function',
+    hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -80,6 +81,7 @@ try {
   assert.equal(bridge.hasImageQueue, true, 'decorative image queue available');
   assert.equal(bridge.hasSearchDetail, true, 'search detail modal bridge available');
   assert.equal(bridge.hasStudyStt, true, 'study speech-to-text bridge available');
+  assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
   console.log('[e2e] preload bridge ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
@@ -453,6 +455,32 @@ try {
   });
   assert.equal(editorRoundTrip?.content, editorMarkdown, 'raw Markdown round-trips exactly through the editor');
   assert.ok((editorRoundTrip?.versions ?? 0) >= 1, 'editor save creates a recoverable version');
+
+  // Selection-only improvement UI, style CRUD and failure preservation. The smoke
+  // profile intentionally has no API key, so generation must fail without touching
+  // the original — provider success is covered by the shared AI client tests.
+  await page.locator('.study-editor-shell textarea').evaluate((element) => {
+    element.focus();
+    element.setSelectionRange(15, 32);
+    element.dispatchEvent(new Event('select', { bubbles: true }));
+  });
+  await page.getByTestId('study-improve-toggle').click();
+  await page.getByTestId('study-improve-dialog').waitFor();
+  assert.equal(await page.locator('[data-testid^="study-style-builtin-"]').count(), 13, 'all predefined improvement styles are visible');
+  await page.getByRole('button', { name: 'Estilos', exact: true }).click();
+  await page.getByTestId('study-style-new').click();
+  await page.getByTestId('study-style-name').fill('Estilo smoke');
+  await page.getByTestId('study-style-prompt').fill('Aclara el texto seleccionado sin añadir ninguna información nueva.');
+  await page.getByTestId('study-style-save').click();
+  await page.waitForFunction(async () => (await window.nodus.listStudyStyles()).some((style) => style.name === 'Estilo smoke'), { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Mejora', exact: true }).click();
+  await page.getByText('Estilo smoke', { exact: true }).click();
+  await page.getByTestId('study-improve-run').click();
+  await page.getByText('El original permanece intacto.', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-improve-dialog').locator('header button').last().click();
+  assert.equal(await page.locator('.study-editor-shell textarea').inputValue(), editorMarkdown, 'failed improvement leaves original Markdown untouched');
+  console.log('[e2e] study improvement dialog + custom styles + failure preservation ok');
+
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown .katex').waitFor({ timeout: 30_000 });
