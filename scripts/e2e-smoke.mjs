@@ -720,6 +720,41 @@ try {
   assert.equal(testFixture.attempt.correctCount, 1, 'objective short answer is corrected deterministically');
   console.log('[e2e] study test construction + durable attempt + objective correction ok');
 
+  // ── Study exams: long-form autosave, delivery and pending grading ─────────
+  await page.evaluate(async () => {
+    await window.nodus.createStudyQuestion({
+      prompt: 'Explica con argumentos cómo se conserva la procedencia en el vault de estudio.', type: 'essay', difficulty: 'medium', cognitiveLevel: 'analyze',
+      status: 'approved', answer: { text: 'Debe explicar enlaces, fragmentos exactos y evidencia local.' }, explanation: 'Criterios smoke de respuesta desarrollada.',
+      source: { title: 'Fuente smoke', excerpt: 'Los fragmentos exactos mantienen enlaces locales verificables.' }, locked: true,
+    });
+  });
+  await page.getByRole('button', { name: 'Exámenes', exact: true }).click();
+  await page.getByTestId('study-exams-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-exam-new').click();
+  await page.getByTestId('study-exam-title').fill('Simulacro smoke');
+  const examQuestion = page.getByTestId('study-exam-builder').locator('label').filter({ hasText: 'Explica con argumentos cómo se conserva la procedencia' });
+  await examQuestion.locator('input[type="checkbox"]').check();
+  await page.getByTestId('study-exam-create').click();
+  await page.getByText('Simulacro smoke', { exact: true }).last().waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-exam-start').click();
+  await page.getByTestId('study-exam-runner').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-exam-response').fill('La procedencia se conserva mediante fragmentos exactos, enlaces locales y evidencia verificable.');
+  await page.waitForFunction(async () => {
+    const exam = (await window.nodus.listStudyAssessments('exam')).find((item) => item.title === 'Simulacro smoke');
+    return exam ? (await window.nodus.listStudyAttempts(exam.id))[0]?.answers.some((answer) => String(answer.response.text ?? '').includes('fragmentos exactos')) : false;
+  }, { timeout: 30_000 });
+  await page.getByRole('button', { name: 'Entregar examen', exact: true }).click();
+  await page.getByTestId('study-exam-results').waitFor({ timeout: 30_000 });
+  const examFixture = await page.evaluate(async () => {
+    const exam = (await window.nodus.listStudyAssessments('exam')).find((item) => item.title === 'Simulacro smoke');
+    if (!exam) throw new Error('Study exam fixture was not persisted');
+    return { exam, attempt: (await window.nodus.listStudyAttempts(exam.id))[0] };
+  });
+  assert.equal(examFixture.attempt.status, 'submitted');
+  assert.equal(examFixture.attempt.answers[0].isCorrect, null, 'long-form answer remains pending auditable grading');
+  assert.match(examFixture.attempt.answers[0].response.text, /evidencia verificable/);
+  console.log('[e2e] written exam + autosave + pending-grading delivery ok');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),
