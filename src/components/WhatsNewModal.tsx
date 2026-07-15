@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { releaseNotesSince, type ReleaseNoteScope } from '@shared/releaseNotes';
+import { releaseNotesForMajor, type ReleaseNoteScope } from '@shared/releaseNotes';
 import { Icon } from './ui';
 import { t } from '../i18n';
 import { Nodi } from './nodi/Nodi';
 
-// Shown once after the app updates: the release notes for every version newer than
-// the one last seen on this machine. "Last seen" lives in localStorage (a pure
-// renderer concern — no DB migration), and is advanced to the current version when
-// the user dismisses the modal, so it never reappears for the same version.
+// Shown once after the app updates, with the complete release history for the
+// current major version. "Last seen" lives in localStorage (a pure renderer
+// concern — no DB migration), and is advanced to the current version when the
+// user dismisses the modal, so it never reappears for the same version.
 
 const LAST_SEEN_KEY = 'nodus.lastSeenVersion';
 
@@ -43,16 +43,16 @@ function writeLastSeen(version: string): void {
 export function hasPendingWhatsNew(): boolean {
   const current = __APP_VERSION__;
   const lastSeen = readLastSeen();
-  return lastSeen !== current && releaseNotesSince(lastSeen, current).length > 0;
+  return lastSeen !== current && releaseNotesForMajor(current).length > 0;
 }
 
 export function WhatsNewModal({ uiLanguage, onSettled }: { uiLanguage: 'es' | 'en'; onSettled?: () => void }) {
   const current = __APP_VERSION__;
-  // Compute once on mount: the notes to show, based on what this machine last saw.
+  // Compute once on mount: each update shows the complete current-major history.
   const [notes] = useState(() => {
     const lastSeen = readLastSeen();
     if (lastSeen === current) return [];
-    return releaseNotesSince(lastSeen, current);
+    return releaseNotesForMajor(current);
   });
   const [open, setOpen] = useState(notes.length > 0);
 
@@ -113,7 +113,7 @@ export function WhatsNewModal({ uiLanguage, onSettled }: { uiLanguage: 'es' | 'e
               <div className="whats-new-release-version">v{note.version}</div>
               <ul>
                 {note.highlights.map((h, i) => {
-                  const scope = h.scope ?? 'general';
+                  const scope = h.scope;
                   const scopeMeta = RELEASE_SCOPE_META[scope];
                   return (
                     <li key={i}>

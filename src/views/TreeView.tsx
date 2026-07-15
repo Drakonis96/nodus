@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { buildTreeFamilies, treeFamilyLaneY } from '@shared/treeFamilies';
-import { branchColorForTheme, deriveTreeKinship, TREE_KINSHIP_ROLE_LABEL_ES } from '@shared/treeKinship';
+import { branchColorForTheme, deriveTreeKinship, treeKinshipLabel } from '@shared/treeKinship';
 import { matchesTreeSearch } from '@shared/treeSearch';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { parentAgeWarning } from '@shared/kinshipRelations';
@@ -14,7 +14,7 @@ import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
 import { PersonDossier } from '../components/PersonDossier';
 import { KinshipEditor } from '../components/KinshipEditor';
 import { useIsLightTheme } from '../hooks';
-import { t } from '../i18n';
+import { getActiveLang, t } from '../i18n';
 
 const NODE_W = 128;
 const NODE_H = 176;
@@ -118,7 +118,7 @@ export function TreeView({
   const searchMatches = useMemo(() => new Set(layout.nodes.flatMap((node) => {
     const person = personById.get(node.personId);
     const relation = kinship.get(node.personId);
-    const relationLabel = relation ? t(TREE_KINSHIP_ROLE_LABEL_ES[relation.role]) : t('Pariente');
+    const relationLabel = relation ? treeKinshipLabel(relation, getActiveLang()) : t('Sin parentesco registrado');
     return person && matchesTreeSearch(searchQuery, [person.displayName, dates(person), relationLabel]) ? [node.personId] : [];
   })), [kinship, layout.nodes, personById, searchQuery]);
   const familyPairSet = useMemo(() => {
@@ -351,9 +351,10 @@ export function TreeView({
             const frameX = x + (NODE_W - FRAME_W) / 2;
             const max = 16;
             const relation = kinship.get(n.personId);
-            const relationLabel = relation ? t(TREE_KINSHIP_ROLE_LABEL_ES[relation.role]) : t('Pariente');
+            const relationLabel = relation ? treeKinshipLabel(relation, getActiveLang()) : t('Sin parentesco registrado');
+            const relationDisplayLabel = relationLabel.length > 21 ? `${relationLabel.slice(0, 20)}…` : relationLabel;
             const relationColor = relation && relation.branch !== 'neutral' ? branchColorFor(n.personId) : dateFill;
-            const relationTagWidth = Math.min(NODE_W - 8, Math.max(44, relationLabel.length * 5.8 + 14));
+            const relationTagWidth = Math.min(NODE_W - 8, Math.max(44, relationDisplayLabel.length * 5.8 + 14));
             const isSearchMatch = searchActive && searchMatches.has(n.personId);
             return (
               <g
@@ -435,7 +436,7 @@ export function TreeView({
                     strokeOpacity={0.38}
                   />
                   <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={relationColor} fontSize={10} fontWeight={700}>
-                    {relationLabel}
+                    {relationDisplayLabel}
                   </text>
                 </g>
                 <text

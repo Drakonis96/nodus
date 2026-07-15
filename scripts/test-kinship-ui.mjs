@@ -44,7 +44,9 @@ test('paternal and maternal colours are the only user-selectable tree branch col
 
 test('each person displays an explicit relationship label relative to the focus', () => {
   assert.match(tree, /deriveTreeKinship/);
-  assert.match(tree, /TREE_KINSHIP_ROLE_LABEL_ES/);
+  assert.match(tree, /treeKinshipLabel/);
+  assert.match(tree, /getActiveLang/);
+  assert.match(tree, /relationDisplayLabel/);
   assert.match(tree, /relationLabel/);
   assert.match(kinshipModel, /Abuelo paterno/);
   assert.match(kinshipModel, /Tía materna/);

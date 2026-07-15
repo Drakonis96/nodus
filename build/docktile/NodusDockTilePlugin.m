@@ -10,7 +10,11 @@
 @implementation NodusDockTilePlugin
 
 - (NSString *)persistedIconPath {
-  return [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/Nodus/last-dock-icon.png"];
+  // Electron derives app.getPath("userData") from package.json's lowercase
+  // package name ("nodus"), even though CFBundleDisplayName is "Nodus".
+  // Keep this native pre-launch reader on that exact path: otherwise the Dock
+  // cannot find the icon that Electron persisted after the app has quit.
+  return [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/nodus/last-dock-icon.png"];
 }
 
 - (void)refreshIcon {

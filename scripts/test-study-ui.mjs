@@ -34,7 +34,8 @@ test('macOS keeps the last vault and theme dock icon after Nodus exits', async (
   assert.match(persistentIcon, /last-dock-icon\.png/);
   assert.match(persistentIcon, /app\.dock\.setIcon\(image\)/);
   assert.match(dockPlugin, /NSDockTilePlugIn/);
-  assert.match(dockPlugin, /last-dock-icon\.png/);
+  assert.match(dockPlugin, /Library\/Application Support\/nodus\/last-dock-icon\.png/);
+  assert.doesNotMatch(dockPlugin, /Library\/Application Support\/Nodus\/last-dock-icon\.png/);
   assert.match(dockPlugin, /dockTile\.contentView = self\.imageView/);
   assert.match(packageJson, /"NSDockTilePlugIn": "NodusDockTile\.docktileplugin"/);
   assert.match(generator, /Static fallback matches the current dynamic icon system/);

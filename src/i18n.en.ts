@@ -5202,6 +5202,7 @@ export const EN: Record<string, string> = {
   Descendiente: 'Descendant',
   'Pariente por afinidad': 'Relative by marriage',
   Pariente: 'Relative',
+  'Sin parentesco registrado': 'No recorded kinship',
   'Color de la rama paterna': 'Paternal branch colour',
   'Color de la rama materna': 'Maternal branch colour',
   Paterna: 'Paternal',

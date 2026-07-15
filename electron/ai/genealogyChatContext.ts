@@ -14,7 +14,7 @@ import { allSocialRelations } from '../db/socialRepo';
 import { getSettings } from '../db/settingsRepo';
 import { embed } from './aiClient';
 import { nameTokens } from '@shared/archiveDiscovery';
-import { deriveTreeKinship, TREE_KINSHIP_ROLE_LABEL_ES, type TreeKinshipContext } from '@shared/treeKinship';
+import { deriveTreeKinship, treeKinshipLabel, type TreeKinshipContext } from '@shared/treeKinship';
 
 const MAX_PERSONS = 250;
 const MAX_EVENTS = 220;
@@ -95,7 +95,7 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
       conyuges: spouses.get(p.personId) ?? [],
       hijos: children.get(p.personId) ?? [],
       parentesco_tag: relative?.role,
-      parentesco_con_persona_central: relative ? TREE_KINSHIP_ROLE_LABEL_ES[relative.role] : undefined,
+      parentesco_con_persona_central: relative ? treeKinshipLabel(relative, 'es') : undefined,
       rama_de_la_persona_central: relative?.branch,
       relevante_para_la_consulta: relevantIds.has(p.personId) || undefined,
     };
