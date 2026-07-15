@@ -1115,7 +1115,12 @@ try {
     const created = await window.nodus.createVault({ name: 'Study demo smoke', type: 'estudio' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true });
+    await window.nodus.updateSettings({
+      onboardingComplete: true,
+      tourComplete: true,
+      advancedTourComplete: true,
+      studyTourComplete: true,
+    });
   });
   await page.reload();
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
@@ -1141,6 +1146,10 @@ try {
   assert.equal(demoFixture.cellIdeas.length, 4);
   assert.equal(demoFixture.cellGraph.edges.length, 3);
   assert.equal(demoFixture.ecologyIdeas.length, 3);
+  const studyTourLabel = page.getByText(/^Tutorial de estudio/);
+  await studyTourLabel.waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: /^Saltar/ }).click();
+  await studyTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
   await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0, { timeout: 30_000 });
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
