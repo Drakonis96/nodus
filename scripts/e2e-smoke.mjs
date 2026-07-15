@@ -51,6 +51,19 @@ setTimeout(() => {
   await mkdir(modelDir, { recursive: true });
   await writeFile(path.join(modelDir, 'ggml-base.bin'), 'e2e-placeholder');
 }
+async function closeElectronApp(instance) {
+  if (!instance) return;
+  const child = instance.process();
+  let timeout;
+  const closed = instance.close().then(() => true, () => false);
+  const closedCleanly = await Promise.race([
+    closed,
+    new Promise((resolve) => { timeout = setTimeout(() => resolve(false), 5_000); }),
+  ]);
+  clearTimeout(timeout);
+  if (!closedCleanly && child.exitCode === null && !child.killed) child.kill('SIGKILL');
+}
+
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
@@ -223,7 +236,7 @@ try {
   console.log('[e2e] STT engine/model management rendered in Settings');
   if (process.env.NODUS_E2E_STT_ONLY === '1') {
     assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
-    await app.close(); app = null;
+    await closeElectronApp(app); app = null;
     await rm(userData, { recursive: true, force: true });
     console.log('[e2e] focused STT Settings + whisper.cpp streaming smoke passed');
     process.exit(0);
@@ -581,7 +594,7 @@ try {
     assert.equal(await recordingLanguage.inputValue(), 'auto', 'recordings preserve per-audio automatic detection');
     assert.ok(await recordingLanguage.locator('option').count() >= 100, 'recordings expose every language supported by multilingual Whisper');
     assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
-    await app.close(); app = null;
+    await closeElectronApp(app); app = null;
     await rm(userData, { recursive: true, force: true });
     console.log('[e2e] focused dictation + recording language UI smoke passed');
     process.exit(0);
@@ -801,7 +814,7 @@ try {
     });
     await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight'), importedEpub.id, { timeout: 30_000 });
     assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
-    await app.close(); app = null;
+    await closeElectronApp(app); app = null;
     await rm(userData, { recursive: true, force: true });
     console.log('[e2e] focused PDF + EPUB annotation toolbar smoke passed');
     process.exit(0);
@@ -1163,7 +1176,7 @@ try {
   );
   console.log('[e2e] no renderer page errors');
 
-  await app.close();
+  await closeElectronApp(app);
   app = null;
 
   // ── DB migrated to the current schema ───────────────────────────────────────
@@ -1182,7 +1195,7 @@ try {
 
   console.log('e2e smoke test passed');
 } finally {
-  if (app) await app.close().catch(() => {});
+  if (app) await closeElectronApp(app);
   await rm(userData, { recursive: true, force: true });
 }
 
