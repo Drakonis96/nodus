@@ -100,25 +100,28 @@ export async function improveStudyText(
   const aiSettings = getSettings();
   let streamed = '';
   let visibleStreamed = '';
-  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => completeTextStream({
-    system: prompt.system,
-    user: prompt.user,
-    temperature: request.mode === 'free' ? Math.max(style.temperature, style.creativity) : Math.min(style.temperature, 0.45),
-    maxTokens: Math.min(style.maxOutputTokens, aiSettings.studyAiMaxOutputTokens),
-    plainContext: true,
-  }, (delta, kind) => {
-    if (kind !== 'content') return;
-    streamed += delta;
-    // Provider chunks can split a protected marker. Hold an unfinished marker
-    // and expose only restored, user-facing text to the preview.
-    const safePrefix = completeProtectedStreamPrefix(streamed);
-    const visiblePrefix = restoreProtectedSpans(safePrefix, protectedValue.spans);
-    if (visiblePrefix.startsWith(visibleStreamed)) {
-      const visibleDelta = visiblePrefix.slice(visibleStreamed.length);
-      visibleStreamed = visiblePrefix;
-      if (visibleDelta) onDelta(visibleDelta);
-    }
-  }, model, signal));
+  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => {
+    if (process.env.NODUS_E2E_FORCE_STUDY_AI_FAILURE === '1') return Promise.reject(new Error('E2E: proveedor de IA no disponible.'));
+    return completeTextStream({
+      system: prompt.system,
+      user: prompt.user,
+      temperature: request.mode === 'free' ? Math.max(style.temperature, style.creativity) : Math.min(style.temperature, 0.45),
+      maxTokens: Math.min(style.maxOutputTokens, aiSettings.studyAiMaxOutputTokens),
+      plainContext: true,
+    }, (delta, kind) => {
+      if (kind !== 'content') return;
+      streamed += delta;
+      // Provider chunks can split a protected marker. Hold an unfinished marker
+      // and expose only restored, user-facing text to the preview.
+      const safePrefix = completeProtectedStreamPrefix(streamed);
+      const visiblePrefix = restoreProtectedSpans(safePrefix, protectedValue.spans);
+      if (visiblePrefix.startsWith(visibleStreamed)) {
+        const visibleDelta = visiblePrefix.slice(visibleStreamed.length);
+        visibleStreamed = visiblePrefix;
+        if (visibleDelta) onDelta(visibleDelta);
+      }
+    }, model, signal);
+  });
   const raw = completed.value; const model = completed.model;
   const protectedResult = stripWrappingFence(raw || streamed);
   // Some small local models helpfully expand a placeholder back to the exact

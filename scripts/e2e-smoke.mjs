@@ -72,6 +72,7 @@ try {
     NODUS_USERDATA: userData,
     NODUS_DISABLE_AUTO_UPDATE: '1',
     NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
+    NODUS_E2E_FORCE_STUDY_AI_FAILURE: '1',
   };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({
