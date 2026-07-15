@@ -127,6 +127,8 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarCustomized: false,
   treeFrame: 'oak',
   treeOrientation: 'ancestors_top',
+  treePaternalColor: '#2563eb',
+  treeMaternalColor: '#dc2626',
   recoverySetupVersion: 0,
   backupVaultIds: [],
   backupIncludePreferences: true,

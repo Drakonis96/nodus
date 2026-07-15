@@ -1226,6 +1226,9 @@ export interface AppSettings {
   treeFrame: string;
   /** Family-tree vertical direction. Legacy vaults default to ancestors on top. */
   treeOrientation: 'ancestors_top' | 'ancestors_bottom';
+  /** User-selected colours for the two primary ancestor branches. */
+  treePaternalColor: string;
+  treeMaternalColor: string;
   // ── Recovery and automatic encrypted backups ──────────────────────────────
   /** Version of the global recovery-folder onboarding contract completed here. */
   recoverySetupVersion: number;

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
+import { buildTreeFamilies } from '@shared/treeFamilies';
+import { branchColorForTheme, deriveTreeKinship, type TreeKinshipRole } from '@shared/treeKinship';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { parentAgeWarning } from '@shared/kinshipRelations';
 import { mirrorDefaultPortrait } from '@shared/treePortraits';
@@ -14,10 +16,25 @@ import { useIsLightTheme } from '../hooks';
 import { t } from '../i18n';
 
 const NODE_W = 128;
-const NODE_H = 158;
+const NODE_H = 176;
 const FRAME_W = 100;
 const FRAME_H = 116;
 const PAD = 40;
+
+const KINSHIP_ROLE_LABEL: Record<TreeKinshipRole, string> = {
+  focus: 'Persona principal', father: 'Padre', mother: 'Madre', parent: 'Progenitor/a',
+  paternal_grandfather: 'Abuelo paterno', paternal_grandmother: 'Abuela paterna', paternal_grandparent: 'Abuelo/a paterno/a',
+  maternal_grandfather: 'Abuelo materno', maternal_grandmother: 'Abuela materna', maternal_grandparent: 'Abuelo/a materno/a',
+  paternal_ancestor: 'Antepasado/a paterno/a', maternal_ancestor: 'Antepasado/a materno/a', ancestor: 'Antepasado/a',
+  brother: 'Hermano', sister: 'Hermana', sibling: 'Hermano/a', spouse: 'Cónyuge/pareja',
+  son: 'Hijo', daughter: 'Hija', child: 'Hijo/a', grandson: 'Nieto', granddaughter: 'Nieta', grandchild: 'Nieto/a',
+  paternal_uncle: 'Tío paterno', paternal_aunt: 'Tía paterna', maternal_uncle: 'Tío materno', maternal_aunt: 'Tía materna', uncle_aunt: 'Tío/a',
+  nephew: 'Sobrino', niece: 'Sobrina', nibling: 'Sobrino/a', cousin: 'Primo/a', descendant: 'Descendiente',
+};
+
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
 
 function dates(p: Person): string {
   const b = p.birthDate?.trim();
@@ -48,6 +65,8 @@ export function TreeView({
   const dateFill = light ? '#52525b' : '#a1a1aa';
   const vaultFrame = settings?.treeFrame ?? 'oak';
   const orientation = settings?.treeOrientation ?? 'ancestors_top';
+  const paternalColor = settings?.treePaternalColor ?? '#2563eb';
+  const maternalColor = settings?.treeMaternalColor ?? '#dc2626';
 
   const reload = useCallback(async () => {
     const [ps, rs] = await Promise.all([window.nodus.listPersons(), window.nodus.allRelationships()]);
@@ -72,23 +91,43 @@ export function TreeView({
     ) != null).map((relationship) => `${relationship.fromPerson}->${relationship.toPerson}`)
   ), [personById, rels]);
 
+  const parentEdges = useMemo(() => rels.filter((r) => r.type === 'parent').map((r) => ({ parent: r.fromPerson, child: r.toPerson })), [rels]);
+  const spouseEdges = useMemo(() => rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })), [rels]);
+  const siblingEdges = useMemo(() => rels.filter((r) => r.type === 'sibling').map((r) => ({ a: r.fromPerson, b: r.toPerson })), [rels]);
+  const treePersons = useMemo(() => persons.map((p) => ({ id: p.personId, sex: p.sex, birthYear: parseHistoricalDate(p.birthDate).year })), [persons]);
+
   const layout: TreeLayoutResult = useMemo(
     () =>
       computeTreeLayout({
         focusId,
-        persons: persons.map((p) => ({ id: p.personId, sex: p.sex, birthYear: parseHistoricalDate(p.birthDate).year })),
-        parentEdges: rels.filter((r) => r.type === 'parent').map((r) => ({ parent: r.fromPerson, child: r.toPerson })),
-        spouseEdges: rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
-        siblingEdges: rels.filter((r) => r.type === 'sibling').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
+        persons: treePersons,
+        parentEdges,
+        spouseEdges,
+        siblingEdges,
         nodeWidth: NODE_W,
         nodeHeight: NODE_H,
         vGap: 52,
         orientation,
       }),
-    [focusId, orientation, rels, persons]
+    [focusId, orientation, parentEdges, siblingEdges, spouseEdges, treePersons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
+  const families = useMemo(() => buildTreeFamilies(parentEdges, layout.nodes), [layout.nodes, parentEdges]);
+  const kinship = useMemo(() => deriveTreeKinship({ focusId, parentEdges, spouseEdges, siblingEdges, persons: treePersons }), [focusId, parentEdges, siblingEdges, spouseEdges, treePersons]);
+  const familyPairSet = useMemo(() => {
+    const pairs = new Set<string>();
+    for (const family of families) for (let i = 0; i < family.parentIds.length; i++) {
+      for (let j = i + 1; j < family.parentIds.length; j++) pairs.add(pairKey(family.parentIds[i], family.parentIds[j]));
+    }
+    return pairs;
+  }, [families]);
+  const spousePairSet = useMemo(() => new Set(spouseEdges.map((edge) => pairKey(edge.a, edge.b))), [spouseEdges]);
+  const branchColorFor = (personId: string): string => {
+    const context = kinship.get(personId);
+    if (!context || context.branch === 'neutral') return light ? '#64748b' : '#94a3b8';
+    return branchColorForTheme(context.branch === 'paternal' ? paternalColor : maternalColor, context.tone, light);
+  };
   const frameTop = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD });
   const frameBottom = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H });
   const frameSide = (id: string, side: 'left' | 'right') => ({
@@ -112,7 +151,7 @@ export function TreeView({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-neutral-800 p-4">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 p-4">
         <Icon name="tree" size={20} className="text-indigo-300" />
         <h1 className="text-lg font-semibold">{t('Árbol genealógico')}</h1>
         <select
@@ -135,6 +174,28 @@ export function TreeView({
           <Icon name={orientation === 'ancestors_top' ? 'arrowUp' : 'arrowDown'} size={13} />
           {orientation === 'ancestors_top' ? t('Ascendientes arriba') : t('Ascendientes abajo')}
         </button>
+        <div className="tree-branch-colors flex items-center gap-2" data-testid="tree-branch-color-controls">
+          <label className="tree-branch-color-control" title={t('Color de la rama paterna')}>
+            <input
+              type="color"
+              value={paternalColor}
+              aria-label={t('Color de la rama paterna')}
+              data-testid="tree-paternal-color"
+              onChange={(event) => void window.nodus.updateSettings({ treePaternalColor: event.target.value }).then(() => onSettingsChange?.())}
+            />
+            <span>{t('Paterna')}</span>
+          </label>
+          <label className="tree-branch-color-control" title={t('Color de la rama materna')}>
+            <input
+              type="color"
+              value={maternalColor}
+              aria-label={t('Color de la rama materna')}
+              data-testid="tree-maternal-color"
+              onChange={(event) => void window.nodus.updateSettings({ treeMaternalColor: event.target.value }).then(() => onSettingsChange?.())}
+            />
+            <span>{t('Materna')}</span>
+          </label>
+        </div>
         <div className="ml-auto flex items-center gap-1">
           <button className="btn btn-ghost px-2 py-1" onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}>
             <Icon name="minus" />
@@ -143,6 +204,11 @@ export function TreeView({
           <button className="btn btn-ghost px-2 py-1" onClick={() => setZoom((z) => Math.min(2, z + 0.15))}>
             <Icon name="plus" />
           </button>
+        </div>
+        <div className="tree-line-legend basis-full" data-testid="tree-line-legend">
+          <span><i className="tree-line-sample tree-line-sample-parent" />{t('Progenitores e hijos')}</span>
+          <span><i className="tree-line-sample tree-line-sample-spouse" />{t('Cónyuges/pareja')}</span>
+          <span><i className="tree-line-sample tree-line-sample-sibling" />{t('Hermanos sin progenitores conocidos')}</span>
         </div>
       </div>
 
@@ -155,28 +221,82 @@ export function TreeView({
           style={{ minWidth: '100%' }}
         >
           <TreeFrameDefs />
-          {layout.edges.map((e, i) => {
-            if (e.kind === 'spouse' || e.kind === 'sibling') {
-              const fromLeft = (pos.get(e.from)?.x ?? 0) < (pos.get(e.to)?.x ?? 0);
-              const a = frameSide(e.from, fromLeft ? 'right' : 'left');
-              const b = frameSide(e.to, fromLeft ? 'left' : 'right');
-              return <line key={`${e.kind}${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.kind === 'spouse' ? '#8a5a2b' : '#64748b'} strokeWidth={e.kind === 'spouse' ? 2.5 : 1.5} strokeDasharray={e.kind === 'spouse' ? '2 4' : '7 4'} strokeLinecap="round" />;
-            }
-            // Parent → child always exits toward the next generation, in either view.
-            const a = orientation === 'ancestors_top' ? frameBottom(e.from) : frameTop(e.from);
-            const b = orientation === 'ancestors_top' ? frameTop(e.to) : frameBottom(e.to);
-            const adoptive = adoptiveSet.has(`${e.from}->${e.to}`);
-            const inconsistent = inconsistentParentSet.has(`${e.from}->${e.to}`);
-            const midY = (a.y + b.y) / 2;
+          {families.map((family, familyIndex) => {
+            const orderedParents = family.parentIds.slice().sort((a, b) => (pos.get(a)?.x ?? 0) - (pos.get(b)?.x ?? 0));
+            const parentCenters = orderedParents.map((id) => ({ id, ...(orientation === 'ancestors_top' ? frameBottom(id) : frameTop(id)) }));
+            const childPoints = family.childIds.map((id) => ({ id, ...(orientation === 'ancestors_top' ? frameTop(id) : frameBottom(id)) }));
+            if (parentCenters.length === 0 || childPoints.length === 0) return null;
+            const parentMidY = orderedParents.length > 1 ? frameSide(orderedParents[0], 'right').y : parentCenters[0].y;
+            const anchorX = orderedParents.length > 1
+              ? (frameSide(orderedParents[0], 'right').x + frameSide(orderedParents[orderedParents.length - 1], 'left').x) / 2
+              : parentCenters[0].x;
+            const childY = childPoints[0].y;
+            // Every family crossing the same generation pair gets a distinct lane.
+            const laneFraction = 0.3 + 0.4 * ((family.laneIndex + 1) / (family.laneCount + 1));
+            const laneY = parentMidY + (childY - parentMidY) * laneFraction;
+            const childXs = childPoints.map((point) => point.x);
+            const minChildX = Math.min(...childXs);
+            const maxChildX = Math.max(...childXs);
+            const connectorPath = [
+              `M ${anchorX} ${parentMidY} V ${laneY}`,
+              `M ${Math.min(anchorX, minChildX)} ${laneY} H ${Math.max(anchorX, maxChildX)}`,
+              ...childPoints.map((point) => `M ${point.x} ${laneY} V ${point.y}`),
+            ].join(' ');
+            const gradientId = `tree-family-${familyIndex}`;
+            const parentColors = orderedParents.map(branchColorFor);
+            const fallbackColor = branchColorFor(family.childIds[0]);
+            const hasAdoptive = family.parentIds.some((parentId) => family.childIds.some((childId) => adoptiveSet.has(`${parentId}->${childId}`)));
+            const hasInconsistent = family.parentIds.some((parentId) => family.childIds.some((childId) => inconsistentParentSet.has(`${parentId}->${childId}`)));
+            const unionIsSpouse = orderedParents.length > 1 && orderedParents.some((parentId, index) => orderedParents.slice(index + 1).some((otherId) => spousePairSet.has(pairKey(parentId, otherId))));
+            const parentNames = orderedParents.map((id) => personById.get(id)?.displayName ?? id).join(' + ');
+            const childNames = family.childIds.map((id) => personById.get(id)?.displayName ?? id).join(', ');
             return (
-              <path
-                key={`p${i}`}
-                d={`M ${a.x} ${a.y} V ${midY} H ${b.x} V ${b.y}`}
-                fill="none"
-                stroke={inconsistent ? '#d97706' : adoptive ? '#6b7280' : '#4b5563'}
-                strokeWidth={inconsistent ? 2 : 1.5}
-                strokeDasharray={inconsistent ? '3 3' : adoptive ? '5 4' : undefined}
-              />
+              <g key={family.id} data-tree-family={family.id}>
+                <title>{t('Familia: {parents} → {children}').replace('{parents}', parentNames).replace('{children}', childNames)}</title>
+                <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={Math.min(...parentCenters.map((point) => point.x), minChildX)} x2={Math.max(...parentCenters.map((point) => point.x), maxChildX)}>
+                  {(parentColors.length > 0 ? parentColors : [fallbackColor]).map((color, index, colors) => (
+                    <stop key={`${color}-${index}`} offset={`${colors.length === 1 ? 50 : (index / (colors.length - 1)) * 100}%`} stopColor={color} />
+                  ))}
+                </linearGradient>
+                {orderedParents.length > 1 && orderedParents.map((parentId) => {
+                  const centerX = (pos.get(parentId)?.x ?? 0) + PAD + NODE_W / 2;
+                  const side = centerX < anchorX ? 'right' : 'left';
+                  const point = frameSide(parentId, side);
+                  const d = `M ${point.x} ${point.y} H ${anchorX}`;
+                  return (
+                    <g key={parentId}>
+                      <path d={d} fill="none" stroke={light ? '#ffffffcc' : '#09090bdd'} strokeWidth={5} strokeLinecap="round" />
+                      <path d={d} fill="none" stroke={branchColorFor(parentId)} strokeWidth={2.2} strokeDasharray={unionIsSpouse ? '3 4' : undefined} strokeLinecap="round" />
+                    </g>
+                  );
+                })}
+                <path d={connectorPath} fill="none" stroke={light ? '#ffffffcc' : '#09090bdd'} strokeWidth={5} strokeLinejoin="round" />
+                <path
+                  d={connectorPath}
+                  fill="none"
+                  stroke={parentColors.length > 1 ? `url(#${gradientId})` : parentColors[0] ?? fallbackColor}
+                  strokeWidth={2.2}
+                  strokeDasharray={hasInconsistent ? '3 3' : hasAdoptive ? '6 4' : undefined}
+                  strokeLinejoin="round"
+                />
+                <circle cx={anchorX} cy={parentMidY} r={hasInconsistent ? 4 : 3} fill={hasInconsistent ? '#f59e0b' : parentColors[0] ?? fallbackColor} stroke={light ? '#fff' : '#09090b'} strokeWidth={1.5} />
+              </g>
+            );
+          })}
+
+          {layout.edges.filter((edge) => edge.kind !== 'parent').map((edge, index) => {
+            if (edge.kind === 'spouse' && familyPairSet.has(pairKey(edge.from, edge.to))) return null;
+            const fromLeft = (pos.get(edge.from)?.x ?? 0) < (pos.get(edge.to)?.x ?? 0);
+            const a = frameSide(edge.from, fromLeft ? 'right' : 'left');
+            const b = frameSide(edge.to, fromLeft ? 'left' : 'right');
+            const color = edge.kind === 'spouse' ? '#8a5a2b' : light ? '#64748b' : '#94a3b8';
+            const label = edge.kind === 'spouse' ? t('Cónyuges/pareja') : t('Hermanos sin progenitores conocidos');
+            return (
+              <g key={`${edge.kind}${index}`}>
+                <title>{label}: {personById.get(edge.from)?.displayName} — {personById.get(edge.to)?.displayName}</title>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={light ? '#ffffffcc' : '#09090bdd'} strokeWidth={5} strokeLinecap="round" />
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={2} strokeDasharray={edge.kind === 'spouse' ? '3 4' : '7 4'} strokeLinecap="round" />
+              </g>
             );
           })}
 
@@ -191,6 +311,9 @@ export function TreeView({
             const mirror = mirrorDefaultPortrait(p.sex, n.coupleSide);
             const frameX = x + (NODE_W - FRAME_W) / 2;
             const max = 16;
+            const relation = kinship.get(n.personId);
+            const relationLabel = relation ? t(KINSHIP_ROLE_LABEL[relation.role]) : t('Pariente');
+            const relationColor = relation && relation.branch !== 'neutral' ? branchColorFor(n.personId) : dateFill;
             return (
               <g
                 key={n.personId}
@@ -198,6 +321,7 @@ export function TreeView({
                 onClick={() => setSelected(n.personId)}
                 onDoubleClick={() => setFocusId(n.personId)}
               >
+                <title>{p.displayName} · {relationLabel}</title>
                 {(isFocus || isSel) && (
                   <rect
                     x={frameX - 4}
@@ -222,7 +346,10 @@ export function TreeView({
                 <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill={nameFill} fontSize={13} fontWeight={600}>
                   {p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName}
                 </text>
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={dateFill} fontSize={11}>
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={relationColor} fontSize={10} fontWeight={700}>
+                  {relationLabel}
+                </text>
+                <text x={x + NODE_W / 2} y={y + FRAME_H + 50} textAnchor="middle" fill={dateFill} fontSize={11}>
                   {dates(p)}
                 </text>
               </g>
