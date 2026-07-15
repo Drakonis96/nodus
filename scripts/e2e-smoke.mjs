@@ -196,6 +196,7 @@ try {
       recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
+      modelSettingsMode: 'advanced',
       favorites: [model, chat],
       extractionModel: model,
       synthesisModel: model,
@@ -219,7 +220,14 @@ try {
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
+  const advancedPickerHeights = await page.locator('[data-testid="common-model-overrides"] select').evaluateAll((selects) => selects.map((select) => select.getBoundingClientRect().height));
+  assert.ok(advancedPickerHeights.length >= 5, 'advanced model settings render a common selector for every task, including Nodi');
+  assert.ok(Math.max(...advancedPickerHeights) - Math.min(...advancedPickerHeights) <= 1, 'the Nodi model selector has the same height as adjacent advanced selectors');
   console.log('[e2e] image provider settings rendered');
+  await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
+  await page.getByTestId('about-updates').waitFor();
+  assert.equal(await page.getByText('Guía esencial de Nodus e IA', { exact: true }).count(), 0, 'Updates is rendered under About Nodus, not Tutorials');
+  await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByTestId('nodus-local-ai-models').waitFor({ timeout: 30_000 });
   const localAiStatus = await page.evaluate(() => window.nodus.getNodusLocalAiStatus());
   assert.equal(localAiStatus.models.length, 6, 'integrated local AI catalog is available over the real preload bridge');
@@ -1157,6 +1165,19 @@ try {
   assert.equal(aiPolicyFixture.settings.studyAiPrivacyMode, 'hybrid');
   assert.equal(aiPolicyFixture.settings.studyAiConfirmExternal, true);
   await page.getByRole('button', { name: 'Backup / copia de seguridad', exact: true }).click();
+  const autoBackupToggle = page.getByText('Copias de seguridad automáticas', { exact: true }).locator('xpath=../..').locator('input[type="checkbox"]');
+  if (!(await autoBackupToggle.isChecked())) await autoBackupToggle.click();
+  const backupScopeNotice = page.getByTestId('automatic-backup-scope');
+  await backupScopeNotice.waitFor();
+  const backupScopeColors = await backupScopeNotice.evaluate(async (element) => {
+    const light = getComputedStyle(element).backgroundColor;
+    document.documentElement.classList.add('dark');
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const dark = getComputedStyle(element).backgroundColor;
+    document.documentElement.classList.remove('dark');
+    return { light, dark };
+  });
+  assert.notEqual(backupScopeColors.light, backupScopeColors.dark, 'automatic-backup notice exposes distinct light and dark surfaces');
   await page.getByTestId('study-data-admin').waitFor({ timeout: 30_000 });
   const dataFixture = await page.evaluate(async () => await window.nodus.getStudyDataOverview());
   assert.equal(dataFixture.integrityOk, true, 'study data panel runs SQLite integrity checks');

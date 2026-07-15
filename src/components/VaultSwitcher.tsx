@@ -603,7 +603,9 @@ function IconBtn({ icon, title, onClick, disabled, danger }: { icon: string; tit
   return (
     <button
       className={`rounded p-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
-        danger ? 'text-neutral-400 hover:bg-red-950/40 hover:text-red-400' : 'text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+        danger
+          ? 'text-neutral-500 hover:bg-red-100 hover:text-red-600 dark:text-neutral-400 dark:hover:bg-red-950/40 dark:hover:text-red-400'
+          : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200'
       }`}
       title={title}
       onClick={onClick}

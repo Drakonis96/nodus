@@ -32,9 +32,9 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
-  { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial actualizaciones update version' },
+  { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia actualizaciones update version' },
 ];
 
 function normalizeSettingsText(value: string): string {
@@ -304,7 +304,7 @@ export function Settings({
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
-    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version'),
   ].filter(Boolean).length;
 
   return (
@@ -571,7 +571,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar') && (
+      {visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado') && (
           <Section title={t('Ayuda')}>
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -653,42 +653,10 @@ export function Settings({
                 </button>
               </div>
             )}
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>
-                {updateMessage && <p className="text-xs text-neutral-500 mt-0.5">{updateMessage}</p>}
-                {(updatePct != null || updateBusy) && (
-                  <div className="mt-2 w-72 max-w-full">
-                    <div className="h-2 rounded-full bg-neutral-800 overflow-hidden">
-                      <div
-                        className="h-full bg-indigo-500 transition-all duration-300"
-                        style={{ width: `${updatePct ?? 100}%` }}
-                      />
-                    </div>
-                    {updateProgress?.bytesPerSecond != null && updateProgress.status === 'downloading' && (
-                      <p className="mt-1 text-[11px] text-neutral-500">
-                        {Math.round(updateProgress.bytesPerSecond / 1024)} KiB/s
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2">
-                {updateDownloaded && (
-                  <button className="btn btn-primary" onClick={installUpdate}>
-                    <Icon name="refresh" /> {t('Reiniciar')}
-                  </button>
-                )}
-                <button className="btn btn-ghost border border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
-                  <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
-                  {checkingUpdate ? t('Buscando…') : updateBusy ? t('Actualizando…') : t('Buscar actualización')}
-                </button>
-              </div>
-            </div>
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador') && (
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version') && (
         <Section title={t('Acerca de Nodus')}>
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
             <div className="flex items-start gap-3">
@@ -721,6 +689,38 @@ export function Settings({
             <p className="mt-2 text-xs text-neutral-500">
               {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
             </p>
+          </div>
+          <div data-testid="about-updates" className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+            <div>
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Actualizaciones')}</label>
+              {updateMessage && <p className="mt-0.5 text-xs text-neutral-500">{updateMessage}</p>}
+              {(updatePct != null || updateBusy) && (
+                <div className="mt-2 w-72 max-w-full">
+                  <div className="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+                    <div
+                      className="h-full bg-indigo-500 transition-all duration-300"
+                      style={{ width: `${updatePct ?? 100}%` }}
+                    />
+                  </div>
+                  {updateProgress?.bytesPerSecond != null && updateProgress.status === 'downloading' && (
+                    <p className="mt-1 text-[11px] text-neutral-500">
+                      {Math.round(updateProgress.bytesPerSecond / 1024)} KiB/s
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {updateDownloaded && (
+                <button className="btn btn-primary" onClick={installUpdate}>
+                  <Icon name="refresh" /> {t('Reiniciar')}
+                </button>
+              )}
+              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
+                <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
+                {checkingUpdate ? t('Buscando…') : updateBusy ? t('Actualizando…') : t('Buscar actualización')}
+              </button>
+            </div>
           </div>
         </Section>
       )}
@@ -982,9 +982,9 @@ export function Settings({
                     </span>
                   </div>
 
-                  <div className="flex items-start gap-2 rounded-md border border-emerald-900/60 bg-emerald-950/15 p-3 text-xs text-emerald-200">
+                  <div data-testid="automatic-backup-scope" className="flex items-start gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/15 dark:text-emerald-200">
                     <Icon name="lock" className="mt-0.5 shrink-0" />
-                    <div><span className="font-medium">{t('Cada copia protege todo Nodus automáticamente.')}</span><p className="mt-1 text-[11px] text-neutral-400">{t('Incluye todas las bóvedas, documentos, preferencias, historiales, archivos generados y claves API. No existen exclusiones configurables.')}</p></div>
+                    <div><span className="font-medium">{t('Cada copia protege todo Nodus automáticamente.')}</span><p className="mt-1 text-[11px] text-neutral-600 dark:text-neutral-400">{t('Incluye todas las bóvedas, documentos, preferencias, historiales, archivos generados y claves API. No existen exclusiones configurables.')}</p></div>
                   </div>
 
                   {/* Schedule: which day(s) of the week + at what time. If the machine
@@ -1165,7 +1165,7 @@ export function Settings({
                 <Row label={t('Visión y OCR de imágenes')}><ModelPicker allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <Row label={t('Resúmenes de obras')}><ModelPicker allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
                 <Row label={t('Fusión y deduplicación')}><ModelPicker allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" /></Row>
-                <Row label={t('Asistente Nodi')}><ModelPicker allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} menu emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')}><ModelPicker allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} emptyLabel="Seleccionar modelo" /></Row>
               </div>
               <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
             </>}
