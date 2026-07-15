@@ -1,6 +1,6 @@
 name: CI
 
-# Runs the full quality gate on every branch push and PR: typecheck + renderer
+# Runs the full quality gate on pull requests and pushes to main: typecheck + renderer
 # and main builds, the unit/integration suite (node --test discovers
 # scripts/test-*.mjs and runs them in parallel; scripts that need better-sqlite3
 # re-exec themselves under Electron-as-Node to match the app ABI), and the e2e
@@ -9,13 +9,13 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 concurrency:
-  # A branch push with an open PR emits both push and pull_request events. Use
-  # the source branch for both so only one canonical run survives per commit.
+  # Keep only the newest run for a PR branch (or main) without creating a
+  # second, cancelled check for every commit pushed to an open PR.
   group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
