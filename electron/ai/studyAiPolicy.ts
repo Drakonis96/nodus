@@ -22,7 +22,13 @@ export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef |
 export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
   const settings = getSettings(); if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${settings.studyAiMaxInputChars.toLocaleString('es-ES')} caracteres.`);
   const summary = getStudyAiUsageSummary(); if (summary.budgetUsd > 0 && summary.knownCostUsd >= summary.budgetUsd) throw new Error('Se ha alcanzado el presupuesto mensual de IA para estudio.');
-  const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId); const fallback = settings.studyAiFallbackModels[input.task];
+  const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId);
+  if (process.env.NODUS_E2E_FORCE_STUDY_AI_FAILURE === '1') {
+    const error = new Error('E2E: proveedor de IA no disponible.');
+    recordStudyAiUsage({ task: input.task, model: primary, inputChars: input.inputChars, outputChars: 0, status: 'error', fallbackUsed: false, error: error.message, startedAt: new Date().toISOString() });
+    throw error;
+  }
+  const fallback = settings.studyAiFallbackModels[input.task];
   const candidates: Array<{ model: ModelRef; fallback: boolean }> = [{ model: primary, fallback: false }];
   if (fallback?.provider && fallback.model && (fallback.provider !== primary.provider || fallback.model !== primary.model)) candidates.push({ model: fallback, fallback: true });
   let lastError: unknown;

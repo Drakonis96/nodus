@@ -101,7 +101,6 @@ export async function improveStudyText(
   let streamed = '';
   let visibleStreamed = '';
   const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => {
-    if (process.env.NODUS_E2E_FORCE_STUDY_AI_FAILURE === '1') return Promise.reject(new Error('E2E: proveedor de IA no disponible.'));
     return completeTextStream({
       system: prompt.system,
       user: prompt.user,
