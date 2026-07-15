@@ -490,20 +490,20 @@ export function Settings({
               </Row>
               <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
                 <span><span className="block text-sm text-neutral-300">{t('Fuente de alta legibilidad')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Usa una fuente de sistema más ancha y clara, también sin conexión.')}</span></span>
-                <input type="checkbox" checked={settings.accessibleFont} onChange={(e) => void patch({ accessibleFont: e.target.checked })} />
+                <input data-testid="accessibility-font" type="checkbox" checked={settings.accessibleFont} onChange={(e) => void patch({ accessibleFont: e.target.checked })} />
               </label>
               <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
                 <span><span className="block text-sm text-neutral-300">{t('Contraste reforzado')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Refuerza bordes, foco de teclado y separación entre fondo y texto.')}</span></span>
-                <input type="checkbox" checked={settings.highContrast} onChange={(e) => void patch({ highContrast: e.target.checked })} />
+                <input data-testid="accessibility-contrast" type="checkbox" checked={settings.highContrast} onChange={(e) => void patch({ highContrast: e.target.checked })} />
               </label>
               <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
                 <span><span className="block text-sm text-neutral-300">{t('Reducir animaciones')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Elimina movimiento no esencial; la preferencia del sistema siempre se respeta.')}</span></span>
-                <input type="checkbox" checked={settings.reduceMotion} onChange={(e) => void patch({ reduceMotion: e.target.checked })} />
+                <input data-testid="accessibility-motion" type="checkbox" checked={settings.reduceMotion} onChange={(e) => void patch({ reduceMotion: e.target.checked })} />
               </label>
               {activeVault?.type === 'estudio' && (
                 <label className="flex items-start justify-between gap-4 rounded-lg border border-neutral-800 p-3">
                   <span><span className="block text-sm text-neutral-300">{t('Modo de lectura')}</span><span className="mt-0.5 block text-xs text-neutral-500">{t('Da al editor una medida más cómoda y reduce el ruido visual del área de lectura.')}</span></span>
-                  <input type="checkbox" checked={settings.readingFocusMode} onChange={(e) => void patch({ readingFocusMode: e.target.checked })} />
+                  <input data-testid="accessibility-reading" type="checkbox" checked={settings.readingFocusMode} onChange={(e) => void patch({ readingFocusMode: e.target.checked })} />
                 </label>
               )}
               <p className="text-xs text-neutral-500">{t('Puedes recorrer los controles con Tab, activar botones con Intro o Espacio y abrir la paleta global con Ctrl/⌘ K.')}</p>

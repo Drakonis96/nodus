@@ -14,7 +14,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # A branch push with an open PR emits both push and pull_request events. Use
+  # the source branch for both so only one canonical run survives per commit.
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -49,4 +51,5 @@ jobs:
         run: npm test
 
       - name: E2E smoke (real app boot)
+        timeout-minutes: 10
         run: npm run test:e2e

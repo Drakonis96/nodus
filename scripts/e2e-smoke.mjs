@@ -64,6 +64,22 @@ async function closeElectronApp(instance) {
   if (!closedCleanly && child.exitCode === null && !child.killed) child.kill('SIGKILL');
 }
 
+async function waitForCondition(label, probe, { timeout = 30_000, interval = 100 } = {}) {
+  const deadline = Date.now() + timeout;
+  let lastError = null;
+  while (Date.now() < deadline) {
+    try {
+      if (await probe()) return;
+      lastError = null;
+    } catch (cause) {
+      lastError = cause;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
+  const detail = lastError instanceof Error ? ` Último error: ${lastError.message}` : '';
+  throw new Error(`Tiempo agotado esperando: ${label}.${detail}`);
+}
+
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
@@ -142,10 +158,10 @@ try {
   assert.equal(new Set(languageButtonSizes).size, 1, `every cinematic tutorial language button has the same dimensions: ${languageButtonSizes.join(', ')}`);
   await page.getByTestId('tutorial-language-fr').click();
   await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
-  await page.waitForFunction(async () => {
+  await waitForCondition('preferencias de idioma del tutorial', () => page.evaluate(async () => {
     const settings = await window.nodus.getSettings();
     return settings.uiLanguage === 'en' && settings.promptLanguage === 'fr';
-  });
+  }));
   assert.equal(await page.locator('.tutorial-progress button').count(), 13, 'essential guide exposes thirteen novice-friendly chapters');
   await page.locator('.tutorial-topbar button').click();
   await page.getByText('Skip the essential guide?', { exact: true }).waitFor();
@@ -609,11 +625,11 @@ try {
   await page.getByTestId('study-doc-style').click();
   await page.getByTestId('study-doc-kind').selectOption('manual');
   await page.getByTestId('study-doc-color').fill('#22c55e');
-  await page.waitForFunction(async () => {
+  await waitForCondition('metadatos del editor de estudio', () => page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
     const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
     return document?.favorite === true && document.kind === 'manual' && document.color === '#22c55e';
-  }, { timeout: 30_000 });
+  }));
   console.log('[e2e] study editor metadata controls ok');
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
@@ -809,7 +825,7 @@ try {
     const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
     layer.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight' && annotation.selectedText.length > 0), importedMaterial.id, { timeout: 30_000 });
+  await waitForCondition('anotación PDF resaltada', () => page.evaluate(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight' && annotation.selectedText.length > 0), importedMaterial.id));
   await page.getByTestId('study-material-annotations-sidebar').waitFor();
   for (const tool of ['highlight', 'underline', 'brush', 'sticky', 'comment']) await page.getByTestId(`study-pdf-tool-${tool}`).waitFor();
   await page.getByTestId('study-pdf-tool-brush').click();
@@ -819,7 +835,7 @@ try {
   assert.ok(annotationCanvasBox);
   await page.mouse.move(annotationCanvasBox.x + 80, annotationCanvasBox.y + 100);
   await page.mouse.down(); await page.mouse.move(annotationCanvasBox.x + 150, annotationCanvasBox.y + 130, { steps: 4 }); await page.mouse.up();
-  await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'brush' && annotation.thickness === 7), importedMaterial.id, { timeout: 30_000 });
+  await waitForCondition('trazo PDF persistido', () => page.evaluate(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'brush' && annotation.thickness === 7), importedMaterial.id));
   await page.getByTestId('study-pdf-tool-sticky').click();
   await annotationCanvas.click({ position: { x: 180, y: 160 } });
   await page.getByTestId('study-pdf-sticky-dialog').locator('textarea').fill('Sticker smoke');
@@ -831,7 +847,7 @@ try {
   await page.getByTestId('study-pdf-inline-comment').getByRole('button', { name: 'Guardar', exact: true }).click();
   await page.getByText('Comentario smoke', { exact: true }).waitFor();
   await page.getByText('Crear apunte', { exact: true }).last().click();
-  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke')), { timeout: 30_000 });
+  await waitForCondition('apunte creado desde material', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke'))));
   assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');
   console.log('[e2e] study material import + embedded PDF + highlight-to-note provenance ok');
   if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY === '1') {
@@ -859,7 +875,7 @@ try {
       if (!node) throw new Error('EPUB text fixture not found');
       const range = document.createRange(); range.selectNodeContents(node); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
-    await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight'), importedEpub.id, { timeout: 30_000 });
+    await waitForCondition('anotación EPUB resaltada', () => page.evaluate(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight'), importedEpub.id));
     assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
     await closeElectronApp(app); app = null;
     await rm(userData, { recursive: true, force: true });
@@ -924,7 +940,7 @@ try {
   const savedSearchDialog = page.getByRole('dialog', { name: 'Guardar búsqueda' });
   await savedSearchDialog.locator('input').fill('Memoria smoke');
   await savedSearchDialog.getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.waitForFunction(async () => (await window.nodus.listStudySavedSearches()).some((item) => item.name === 'Memoria smoke'), { timeout: 30_000 });
+  await waitForCondition('búsqueda de estudio guardada', () => page.evaluate(async () => (await window.nodus.listStudySavedSearches()).some((item) => item.name === 'Memoria smoke')));
   await page.getByTestId('study-search-result').first().locator('button').first().click();
   await page.getByTestId('study-recording-detail').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-recording-player').locator('audio').waitFor();
@@ -977,12 +993,12 @@ try {
   await audioTools.getByPlaceholder('Texto escrito').fill('TCC');
   await audioTools.getByPlaceholder('Cómo debe sonar').fill('te ce ce');
   await audioTools.getByRole('button', { name: '+' }).click();
-  await page.waitForFunction(async () => {
+  await waitForCondition('pronunciación de estudio guardada', () => page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
     const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
     const subjectId = workspace.placements.find((placement) => placement.documentId === document?.id)?.subjectId;
     return subjectId ? (await window.nodus.getStudyPronunciations(subjectId)).some((entry) => entry.written === 'TCC' && entry.spoken === 'te ce ce') : false;
-  }, { timeout: 30_000 });
+  }));
   await page.getByRole('button', { name: 'Generar audio', exact: true }).click();
   await page.getByText('La lectura de estudio requiere una voz local de Piper o Kokoro.', { exact: true }).waitFor({ timeout: 30_000 });
   console.log('[e2e] local study narration modes + formula speech + pronunciation dictionary ok');
@@ -1055,10 +1071,10 @@ try {
   await page.getByTestId('study-exam-start').click();
   await page.getByTestId('study-exam-runner').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-exam-response').fill('La procedencia se conserva mediante fragmentos exactos, enlaces locales y evidencia verificable.');
-  await page.waitForFunction(async () => {
+  await waitForCondition('respuesta larga de examen guardada', () => page.evaluate(async () => {
     const exam = (await window.nodus.listStudyAssessments('exam')).find((item) => item.title === 'Simulacro smoke');
     return exam ? (await window.nodus.listStudyAttempts(exam.id))[0]?.answers.some((answer) => String(answer.response.text ?? '').includes('fragmentos exactos')) : false;
-  }, { timeout: 30_000 });
+  }));
   await page.getByRole('button', { name: 'Entregar examen', exact: true }).click();
   await page.getByTestId('study-exam-results').waitFor({ timeout: 30_000 });
   const examFixture = await page.evaluate(async () => {
@@ -1093,7 +1109,7 @@ try {
   await page.getByTestId('study-review-session').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-review-session').locator('button').first().click();
   await page.getByTestId('study-review-rate-4').click();
-  await page.waitForFunction(async () => (await window.nodus.listStudyFlashcards()).some((card) => card.front.includes('procedencia local') && card.srs.repetitions === 1), { timeout: 30_000 });
+  await waitForCondition('repaso SM-2 persistido', () => page.evaluate(async () => (await window.nodus.listStudyFlashcards()).some((card) => card.front.includes('procedencia local') && card.srs.repetitions === 1)));
   console.log('[e2e] flashcard authoring + real SM-2 review persistence ok');
 
   await page.getByRole('button', { name: 'Planificador', exact: true }).click();
@@ -1104,7 +1120,7 @@ try {
   await page.getByRole('button', { name: 'Iniciar', exact: true }).click();
   await page.getByTestId('study-pomodoro-active').waitFor({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Finalizar y registrar', exact: true }).click();
-  await page.waitForFunction(async () => (await window.nodus.getStudyPlanner()).sessions.some((session) => session.endedAt), { timeout: 30_000 });
+  await waitForCondition('sesión Pomodoro finalizada', () => page.evaluate(async () => (await window.nodus.getStudyPlanner()).sessions.some((session) => session.endedAt)));
   await page.getByRole('button', { name: 'Progreso', exact: true }).click();
   await page.getByTestId('study-progress-view').waitFor({ timeout: 30_000 });
   const learningFixture = await page.evaluate(async () => ({ planner: await window.nodus.getStudyPlanner(), progress: await window.nodus.getStudyProgressDashboard() }));
@@ -1154,11 +1170,18 @@ try {
   const accessibility = page.getByTestId('accessibility-settings');
   await accessibility.waitFor({ timeout: 30_000 });
   await page.getByLabel('Tamaño de la interfaz', { exact: true }).fill('1.15');
-  const checkAccessibility = async (label) => accessibility.locator('label').filter({ hasText: label }).locator('input[type="checkbox"]').check();
-  await checkAccessibility('Fuente de alta legibilidad');
-  await checkAccessibility('Contraste reforzado');
-  await checkAccessibility('Reducir animaciones');
-  await checkAccessibility('Modo de lectura');
+  await waitForCondition('escala de interfaz persistida', () => page.evaluate(async () => (await window.nodus.getSettings()).interfaceScale === 1.15));
+  const accessibilityPreferences = [
+    ['accessibility-font', 'accessibleFont'],
+    ['accessibility-contrast', 'highContrast'],
+    ['accessibility-motion', 'reduceMotion'],
+    ['accessibility-reading', 'readingFocusMode'],
+  ];
+  for (const [testId, key] of accessibilityPreferences) {
+    const enabled = await page.evaluate(async (settingKey) => Boolean((await window.nodus.getSettings())[settingKey]), key);
+    if (!enabled) await page.getByTestId(testId).click();
+    await waitForCondition(`preferencia de accesibilidad ${key}`, () => page.evaluate(async (settingKey) => Boolean((await window.nodus.getSettings())[settingKey]), key));
+  }
   await page.waitForFunction(() => document.documentElement.classList.contains('accessible-font')
     && document.documentElement.classList.contains('high-contrast')
     && document.documentElement.classList.contains('reduce-motion')
@@ -1185,10 +1208,10 @@ try {
   await page.reload();
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
   await page.getByRole('button', { name: 'Cargar datos de ejemplo', exact: true }).click();
-  await page.waitForFunction(async () => {
+  await waitForCondition('datos de ejemplo de estudio cargados', () => page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
     return workspace.courses.length === 1 && workspace.subjects.length === 2 && workspace.documents.length === 2;
-  }, { timeout: 30_000 });
+  }));
   await page.getByText('Membrana plasmática · resumen', { exact: true }).waitFor({ timeout: 30_000 });
   const demoFixture = await page.evaluate(async () => ({
     settings: await window.nodus.getSettings(),
@@ -1211,7 +1234,7 @@ try {
   await page.getByRole('button', { name: /^Saltar/ }).click();
   await studyTourLabel.waitFor({ state: 'detached', timeout: 30_000 });
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
-  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0, { timeout: 30_000 });
+  await waitForCondition('datos de ejemplo de estudio eliminados', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0));
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
   console.log('[e2e] reversible study sample workspace works through the real UI and IPC bridge');
 
