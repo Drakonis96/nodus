@@ -51,6 +51,23 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(app, /slice\(0, 12_000\)/);
 });
 
+test('Nodi and the genealogy assistant receive tags relative to the persisted tree focus', async () => {
+  const [nodi, assistant, genealogy] = await Promise.all([
+    read('electron/ai/nodiChat.ts'),
+    read('electron/ai/researchAssistant.ts'),
+    read('electron/ai/genealogyChatContext.ts'),
+  ]);
+  assert.match(genealogy, /getSettings\(\)\.treeFocusPersonId/);
+  assert.match(genealogy, /deriveTreeKinship/);
+  assert.match(genealogy, /persona_central/);
+  assert.match(genealogy, /parentesco_tag/);
+  assert.match(genealogy, /parentesco_con_persona_central/);
+  assert.match(nodi, /parentesco_con_persona_central/);
+  assert.match(nodi, /buildGenealogyContext/);
+  assert.match(assistant, /parentesco_con_persona_central/);
+  assert.match(assistant, /buildGenealogyContext/);
+});
+
 test('Nodi chat keeps model selection inside settings and exposes deletable history and dedicated scrollbars', async () => {
   const [component, css, settings, picker, globalCss] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),

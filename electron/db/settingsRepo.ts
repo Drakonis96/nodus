@@ -126,6 +126,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarHidden: [],
   sidebarCustomized: false,
   treeFrame: 'oak',
+  treeFocusPersonId: null,
   treeOrientation: 'ancestors_top',
   treePaternalColor: '#2563eb',
   treeMaternalColor: '#dc2626',

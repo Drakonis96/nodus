@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { buildTreeFamilies } from '@shared/treeFamilies';
-import { branchColorForTheme, deriveTreeKinship, type TreeKinshipRole } from '@shared/treeKinship';
+import { branchColorForTheme, deriveTreeKinship, TREE_KINSHIP_ROLE_LABEL_ES } from '@shared/treeKinship';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { parentAgeWarning } from '@shared/kinshipRelations';
 import { mirrorDefaultPortrait } from '@shared/treePortraits';
@@ -20,17 +20,6 @@ const NODE_H = 176;
 const FRAME_W = 100;
 const FRAME_H = 116;
 const PAD = 40;
-
-const KINSHIP_ROLE_LABEL: Record<TreeKinshipRole, string> = {
-  focus: 'Persona principal', father: 'Padre', mother: 'Madre', parent: 'Progenitor/a',
-  paternal_grandfather: 'Abuelo paterno', paternal_grandmother: 'Abuela paterna', paternal_grandparent: 'Abuelo/a paterno/a',
-  maternal_grandfather: 'Abuelo materno', maternal_grandmother: 'Abuela materna', maternal_grandparent: 'Abuelo/a materno/a',
-  paternal_ancestor: 'Antepasado/a paterno/a', maternal_ancestor: 'Antepasado/a materno/a', ancestor: 'Antepasado/a',
-  brother: 'Hermano', sister: 'Hermana', sibling: 'Hermano/a', spouse: 'Cónyuge/pareja',
-  son: 'Hijo', daughter: 'Hija', child: 'Hijo/a', grandson: 'Nieto', granddaughter: 'Nieta', grandchild: 'Nieto/a',
-  paternal_uncle: 'Tío paterno', paternal_aunt: 'Tía paterna', maternal_uncle: 'Tío materno', maternal_aunt: 'Tía materna', uncle_aunt: 'Tío/a',
-  nephew: 'Sobrino', niece: 'Sobrina', nibling: 'Sobrino/a', cousin: 'Primo/a', descendant: 'Descendiente',
-};
 
 function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -72,8 +61,12 @@ export function TreeView({
     const [ps, rs] = await Promise.all([window.nodus.listPersons(), window.nodus.allRelationships()]);
     setPersons(ps);
     setRels(rs);
-    setFocusId((cur) => (cur && ps.some((p) => p.personId === cur) ? cur : ps[0]?.personId ?? ''));
-  }, []);
+    setFocusId((cur) => {
+      if (cur && ps.some((p) => p.personId === cur)) return cur;
+      const saved = settings?.treeFocusPersonId;
+      return saved && ps.some((p) => p.personId === saved) ? saved : ps[0]?.personId ?? '';
+    });
+  }, [settings?.treeFocusPersonId]);
 
   useEffect(() => {
     void reload();
@@ -134,6 +127,11 @@ export function TreeView({
     x: (pos.get(id)?.x ?? 0) + PAD + (NODE_W - FRAME_W) / 2 + (side === 'right' ? FRAME_W : 0),
     y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H / 2,
   });
+  const changeFocus = (nextFocusId: string) => {
+    setFocusId(nextFocusId);
+    setSelected(null);
+    void window.nodus.updateSettings({ treeFocusPersonId: nextFocusId }).then(() => onSettingsChange?.());
+  };
 
   if (persons.length === 0) {
     return (
@@ -155,9 +153,10 @@ export function TreeView({
         <Icon name="tree" size={20} className="text-indigo-300" />
         <h1 className="text-lg font-semibold">{t('Árbol genealógico')}</h1>
         <select
+          data-testid="tree-focus-person"
           className="input h-9 max-w-[16rem] text-sm"
           value={focusId}
-          onChange={(e) => setFocusId(e.target.value)}
+          onChange={(e) => changeFocus(e.target.value)}
           title={t('Centrar el árbol en…')}
         >
           {persons.map((p) => (
@@ -312,14 +311,15 @@ export function TreeView({
             const frameX = x + (NODE_W - FRAME_W) / 2;
             const max = 16;
             const relation = kinship.get(n.personId);
-            const relationLabel = relation ? t(KINSHIP_ROLE_LABEL[relation.role]) : t('Pariente');
+            const relationLabel = relation ? t(TREE_KINSHIP_ROLE_LABEL_ES[relation.role]) : t('Pariente');
             const relationColor = relation && relation.branch !== 'neutral' ? branchColorFor(n.personId) : dateFill;
+            const relationTagWidth = Math.min(NODE_W - 8, Math.max(44, relationLabel.length * 5.8 + 14));
             return (
               <g
                 key={n.personId}
                 style={{ cursor: 'pointer', transition: 'transform 300ms ease' }}
                 onClick={() => setSelected(n.personId)}
-                onDoubleClick={() => setFocusId(n.personId)}
+                onDoubleClick={() => changeFocus(n.personId)}
               >
                 <title>{p.displayName} · {relationLabel}</title>
                 {(isFocus || isSel) && (
@@ -346,9 +346,22 @@ export function TreeView({
                 <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill={nameFill} fontSize={13} fontWeight={600}>
                   {p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName}
                 </text>
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={relationColor} fontSize={10} fontWeight={700}>
-                  {relationLabel}
-                </text>
+                <g data-testid={`tree-kinship-tag-${n.personId}`}>
+                  <rect
+                    x={x + (NODE_W - relationTagWidth) / 2}
+                    y={y + FRAME_H + 22}
+                    width={relationTagWidth}
+                    height={16}
+                    rx={8}
+                    fill={relationColor}
+                    fillOpacity={light ? 0.12 : 0.18}
+                    stroke={relationColor}
+                    strokeOpacity={0.38}
+                  />
+                  <text x={x + NODE_W / 2} y={y + FRAME_H + 34} textAnchor="middle" fill={relationColor} fontSize={10} fontWeight={700}>
+                    {relationLabel}
+                  </text>
+                </g>
                 <text x={x + NODE_W / 2} y={y + FRAME_H + 50} textAnchor="middle" fill={dateFill} fontSize={11}>
                   {dates(p)}
                 </text>
@@ -471,7 +484,6 @@ function NodePanel({
         </button>
       </div>
 
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Añadir parentesco')}</h3>
       <KinshipEditor person={person} persons={persons} onChanged={onChanged} compact />
     </div>
   );

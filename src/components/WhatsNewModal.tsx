@@ -146,14 +146,6 @@ export function WhatsNewModal({ uiLanguage, onSettled }: { uiLanguage: 'es' | 'e
                 {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
               </p>
             </div>
-            <button
-              className="whats-new-paypal-button"
-              data-testid="whats-new-support-paypal"
-              onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
-            >
-              <Icon name="paypal" size={16} /> {t('Apoyar')}
-              <Icon name="external" size={12} className="opacity-75" />
-            </button>
           </aside>
         </div>
 

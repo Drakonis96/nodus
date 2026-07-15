@@ -2093,7 +2093,7 @@ select.input optgroup {
 .whats-new-footer > button:last-child { justify-self: end; }
 .whats-new-footer .whats-new-footer-support { justify-self: center; margin-left: 0; color: white; background: #0070ba; box-shadow: 0 9px 22px rgb(0 112 186 / .2); }
 .whats-new-footer .whats-new-footer-support:hover { background: #005ea6; }
-@media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } .whats-new-paypal-button { margin-left: 58px; } }
+@media (max-width: 680px) { .whats-new-backdrop { padding: 12px; } .whats-new-cinema { max-height: 92vh; border-radius: 20px; } .whats-new-hero { min-height: 205px; grid-template-columns: 1fr 145px; padding: 25px 20px; } .whats-new-hero h2 { font-size: 31px; } .whats-new-hero-copy > p { font-size: 11px; } .whats-new-nodi svg { height: 150px !important; } .whats-new-scroll { padding: 18px; } .whats-new-support { align-items: flex-start; flex-wrap: wrap; } }
 @media (prefers-reduced-motion: reduce) { .whats-new-aurora, .whats-new-confetti { animation: none; } }
 
 /* Cinematic, app-wide essentials tutorial. It deliberately owns the full viewport so

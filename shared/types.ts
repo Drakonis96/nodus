@@ -1224,6 +1224,8 @@ export interface AppSettings {
   sidebarCustomized: boolean;
   /** Default wooden frame design for the genealogy tree (per-person overrides win). */
   treeFrame: string;
+  /** Person used as the relative centre for every displayed and AI-visible kinship tag. */
+  treeFocusPersonId: string | null;
   /** Family-tree vertical direction. Legacy vaults default to ancestors on top. */
   treeOrientation: 'ancestors_top' | 'ancestors_bottom';
   /** User-selected colours for the two primary ancestor branches. */

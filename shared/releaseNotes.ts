@@ -23,6 +23,32 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.4',
+    date: '2026-07-16',
+    highlights: [
+      {
+        scope: 'genealogy',
+        es: 'El árbol separa correctamente las unidades familiares para que las líneas de los abuelos paternos y maternos no vuelvan a unirse por error. Las ramas paterna y materna usan azul y rojo por defecto, permiten elegir sus dos colores principales y distinguen las subramas mediante variaciones de intensidad.',
+        en: 'The tree now keeps family units separate, preventing paternal and maternal grandparent lines from being joined incorrectly. Paternal and maternal branches use blue and red by default, let you choose their two main colours, and distinguish sub-branches through tonal variations.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'Cada persona muestra ahora una etiqueta de parentesco relativa a la persona protagonista del árbol: padres, hermanos, tíos, primos, sobrinos, abuelos, bisabuelos, tatarabuelos y sus equivalentes descendentes, entre otros. Las etiquetas se recalculan al cambiar el centro y también forman parte del contexto de Nodi y del asistente.',
+        en: 'Every person now shows a kinship label relative to the tree’s focus person, including parents, siblings, uncles and aunts, cousins, nephews and nieces, grandparents, great-grandparents, great-great-grandparents and their descendant equivalents. Labels are recalculated when the focus changes and are also included in Nodi and assistant context.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'Las relaciones familiares y sociales comparten una interfaz más limpia: cada bloque conserva su listado y ofrece un único botón para abrir un modal de alta o edición. Los selectores tienen buscador, admiten varias personas y las relaciones sociales permiten elegir uno o varios tipos preconfigurados en una sola operación.',
+        en: 'Family and social relations now share a cleaner interface: each section keeps its persistent list and provides one button that opens an add or edit modal. Selectors include search, support multiple people, and social relations let you choose one or more predefined types in a single operation.',
+      },
+      {
+        scope: 'general',
+        es: 'Se han pulido varios detalles de interfaz: la marca de Nodus conserva su margen al ocultar el sidebar, la primera persona del listado ya no queda tapada, los desplegables se muestran por encima de los modales sin solapar la lupa con el texto y el banner de apoyo evita duplicar el botón de PayPal.',
+        en: 'Several interface details have been polished: the Nodus brand keeps its margin when the sidebar is hidden, the first person in the list is no longer clipped, dropdowns appear above modals without overlapping the search icon and text, and the support banner no longer duplicates the PayPal button.',
+      },
+    ],
+  },
+  {
     version: '2.3.3',
     date: '2026-07-15',
     highlights: [

@@ -38,7 +38,7 @@ try {
   const social = require(path.join(repoRoot, 'electron/db/socialRepo.ts'));
   const personPlaces = require(path.join(repoRoot, 'electron/db/personPlacesRepo.ts'));
   const orch = require(path.join(repoRoot, 'electron/archive/archiveDiscovery.ts'));
-  const { getSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
+  const { getSettings, updateSettings } = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { getActiveVault } = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
   const { clearDemoData } = require(path.join(repoRoot, 'electron/db/demoData.ts'));
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
@@ -145,10 +145,16 @@ try {
 
   // ── Genealogy chat context: family-history material assembled from a question ──
   const { buildGenealogyContext } = require(path.join(repoRoot, 'electron/ai/genealogyChatContext.ts'));
+  const tomasPerson = entities.listPersons({ search: 'Tomás Serrano Campos' })[0];
+  updateSettings({ treeFocusPersonId: tomasPerson.personId });
   const ctx = await buildGenealogyContext('¿Quiénes eran los padres de Tomás Serrano y qué dice su partida de bautismo?');
   assert.equal(ctx.resumen.personas, 14, 'the whole family is in the context');
   const tomas = ctx.personas.find((p) => p.nombre === 'Tomás Serrano Campos');
   assert.ok(tomas, 'the mentioned person is present');
+  assert.equal(ctx.persona_central.nombre, 'Tomás Serrano Campos', 'the persisted tree focus reaches the AI context');
+  assert.equal(tomas.parentesco_tag, 'focus', 'the protagonist is tagged as the focus person');
+  assert.equal(tomas.parentesco_con_persona_central, 'Persona principal', 'the visible Spanish kinship tag reaches both assistants');
+  assert.ok(ctx.personas.some((person) => person.parentesco_tag === 'father' || person.parentesco_tag === 'mother'), 'parents receive focus-relative tags');
   assert.ok(tomas.padres.length >= 2, 'kinship resolved (parents present)');
   assert.ok(tomas.relevante_para_la_consulta, 'a person named in the question is flagged relevant');
   assert.ok(ctx.eventos.length > 0, 'life events assembled');

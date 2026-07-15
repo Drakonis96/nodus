@@ -4,22 +4,30 @@ import type { Person } from '@shared/types';
 import { Icon } from './ui';
 import { t } from '../i18n';
 
+export interface SearchableMultiSelectOption {
+  id: string;
+  label: string;
+  description?: string | null;
+}
+
 function normalizeSearch(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
 }
 
-export function PersonMultiSelect({
-  persons,
+export function SearchableMultiSelect({
+  options,
   selectedIds,
   onChange,
   placeholder,
+  searchPlaceholder = t('Buscar familiar…'),
   maxSelected,
   testId,
 }: {
-  persons: Person[];
+  options: SearchableMultiSelectOption[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   placeholder: string;
+  searchPlaceholder?: string;
   maxSelected?: number;
   testId?: string;
 }) {
@@ -28,12 +36,12 @@ export function PersonMultiSelect({
   const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
   const rootRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const personById = useMemo(() => new Map(persons.map((person) => [person.personId, person])), [persons]);
-  const selected = selectedIds.map((id) => personById.get(id)).filter((person): person is Person => Boolean(person));
+  const optionById = useMemo(() => new Map(options.map((option) => [option.id, option])), [options]);
+  const selected = selectedIds.map((id) => optionById.get(id)).filter((option): option is SearchableMultiSelectOption => Boolean(option));
   const filtered = useMemo(() => {
     const normalized = normalizeSearch(query.trim());
-    return persons.filter((person) => !normalized || normalizeSearch(person.displayName).includes(normalized));
-  }, [persons, query]);
+    return options.filter((option) => !normalized || normalizeSearch(`${option.label} ${option.description ?? ''}`).includes(normalized));
+  }, [options, query]);
   const atLimit = maxSelected != null && selectedIds.length >= maxSelected;
 
   const updatePopoverPosition = useCallback(() => {
@@ -88,19 +96,19 @@ export function PersonMultiSelect({
         onClick={() => setOpen((current) => !current)}
       >
         <span className={`min-w-0 flex-1 truncate ${selected.length === 0 ? 'text-neutral-500' : 'text-neutral-200'}`}>
-          {selected.length === 0 ? placeholder : selected.map((person) => person.displayName).join(', ')}
+          {selected.length === 0 ? placeholder : selected.map((option) => option.label).join(', ')}
         </span>
         {selected.length > 1 && <span className="shrink-0 rounded-full bg-indigo-600/20 px-1.5 text-[10px] text-indigo-300">{selected.length}</span>}
         <Icon name="chevronDown" size={13} className="shrink-0 text-neutral-500" />
       </button>
       {open && createPortal(
-        <div ref={popoverRef} style={popoverStyle} className="person-multi-select-popover z-[80] flex flex-col rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
+        <div ref={popoverRef} style={popoverStyle} className="person-multi-select-popover z-[120] flex flex-col rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
           <div className="relative mb-1.5">
             <Icon name="search" size={13} className="pointer-events-none absolute left-2 top-2 text-neutral-500" />
             <input
               className="input h-8 w-full text-xs"
               style={{ paddingLeft: '1.9rem' }}
-              placeholder={t('Buscar familiar…')}
+              placeholder={searchPlaceholder}
               value={query}
               autoFocus
               data-testid={testId ? `${testId}-search` : undefined}
@@ -110,19 +118,19 @@ export function PersonMultiSelect({
           <div className="min-h-0 max-h-56 flex-1 space-y-0.5 overflow-y-auto" role="listbox" aria-multiselectable="true">
             {filtered.length === 0 ? (
               <p className="px-2 py-3 text-center text-xs text-neutral-600">{t('Sin coincidencias')}</p>
-            ) : filtered.map((person) => {
-              const checked = selectedIds.includes(person.personId);
+            ) : filtered.map((option) => {
+              const checked = selectedIds.includes(option.id);
               const disabled = atLimit && !checked;
               return (
                 <label
-                  key={person.personId}
+                  key={option.id}
                   role="option"
                   aria-selected={checked}
                   className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer hover:bg-neutral-900'}`}
                 >
-                  <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(person.personId)} />
-                  <span className="min-w-0 flex-1 truncate text-neutral-200">{person.displayName}</span>
-                  {person.birthDate && <span className="shrink-0 text-[10px] text-neutral-600">{person.birthDate}</span>}
+                  <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(option.id)} />
+                  <span className="min-w-0 flex-1 truncate text-neutral-200">{option.label}</span>
+                  {option.description && <span className="shrink-0 text-[10px] text-neutral-600">{option.description}</span>}
                 </label>
               );
             })}
@@ -138,4 +146,20 @@ export function PersonMultiSelect({
       )}
     </div>
   );
+}
+
+export function PersonMultiSelect(props: {
+  persons: Person[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  placeholder: string;
+  maxSelected?: number;
+  testId?: string;
+}) {
+  const options = useMemo<SearchableMultiSelectOption[]>(() => props.persons.map((person) => ({
+    id: person.personId,
+    label: person.displayName,
+    description: person.birthDate,
+  })), [props.persons]);
+  return <SearchableMultiSelect {...props} options={options} />;
 }

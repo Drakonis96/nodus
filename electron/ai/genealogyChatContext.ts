@@ -11,8 +11,10 @@ import { allRelationships } from '../db/relationshipsRepo';
 import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
 import { listOpenSuggestions } from '../db/kinshipSuggestionsRepo';
 import { allSocialRelations } from '../db/socialRepo';
+import { getSettings } from '../db/settingsRepo';
 import { embed } from './aiClient';
 import { nameTokens } from '@shared/archiveDiscovery';
+import { deriveTreeKinship, TREE_KINSHIP_ROLE_LABEL_ES, type TreeKinshipContext } from '@shared/treeKinship';
 
 const MAX_PERSONS = 250;
 const MAX_EVENTS = 220;
@@ -30,6 +32,7 @@ function snippet(text: string | null | undefined, max = DOC_SNIPPET): string | n
 
 export interface GenealogyChatContext {
   resumen: { personas: number; eventos: number; documentos: number; relaciones_sociales: number; parentescos_sugeridos: number };
+  persona_central: { id: string; nombre: string } | null;
   personas: unknown[];
   eventos: unknown[];
   relaciones_sociales: unknown[];
@@ -42,6 +45,16 @@ export interface GenealogyChatContext {
 export async function buildGenealogyContext(question: string): Promise<GenealogyChatContext> {
   const persons = listPersons();
   const nameById = new Map(persons.map((p) => [p.personId, p.displayName]));
+  const relationships = allRelationships();
+  const savedFocusId = getSettings().treeFocusPersonId;
+  const focusPerson = persons.find((person) => person.personId === savedFocusId) ?? persons[0] ?? null;
+  const kinship: Map<string, TreeKinshipContext> = focusPerson ? deriveTreeKinship({
+    focusId: focusPerson.personId,
+    persons: persons.map((person) => ({ id: person.personId, sex: person.sex })),
+    parentEdges: relationships.filter((relationship) => relationship.type === 'parent').map((relationship) => ({ parent: relationship.fromPerson, child: relationship.toPerson })),
+    spouseEdges: relationships.filter((relationship) => relationship.type === 'spouse').map((relationship) => ({ a: relationship.fromPerson, b: relationship.toPerson })),
+    siblingEdges: relationships.filter((relationship) => relationship.type === 'sibling').map((relationship) => ({ a: relationship.fromPerson, b: relationship.toPerson })),
+  }) : new Map<string, TreeKinshipContext>();
 
   // Kin maps from a single relationships pass (avoids a kinOf query per person).
   const parents = new Map<string, string[]>();
@@ -51,7 +64,7 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
     if (!v) return;
     (m.get(k) ?? m.set(k, []).get(k)!).push(v);
   };
-  for (const r of allRelationships()) {
+  for (const r of relationships) {
     if (r.type === 'parent') {
       push(children, r.fromPerson, nameById.get(r.toPerson));
       push(parents, r.toPerson, nameById.get(r.fromPerson));
@@ -69,18 +82,24 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
   });
   const relevantIds = new Set(relevant.map((p) => p.personId));
 
-  const personas = persons.slice(0, MAX_PERSONS).map((p) => ({
-    id: p.personId,
-    nombre: p.displayName,
-    sexo: p.sex,
-    nacimiento: p.birthDate,
-    defuncion: p.deathDate,
-    variantes: p.names.map((n) => n.name).filter((n) => n !== p.displayName),
-    padres: parents.get(p.personId) ?? [],
-    conyuges: spouses.get(p.personId) ?? [],
-    hijos: children.get(p.personId) ?? [],
-    relevante_para_la_consulta: relevantIds.has(p.personId) || undefined,
-  }));
+  const personas = persons.slice(0, MAX_PERSONS).map((p) => {
+    const relative = kinship.get(p.personId);
+    return {
+      id: p.personId,
+      nombre: p.displayName,
+      sexo: p.sex,
+      nacimiento: p.birthDate,
+      defuncion: p.deathDate,
+      variantes: p.names.map((n) => n.name).filter((n) => n !== p.displayName),
+      padres: parents.get(p.personId) ?? [],
+      conyuges: spouses.get(p.personId) ?? [],
+      hijos: children.get(p.personId) ?? [],
+      parentesco_tag: relative?.role,
+      parentesco_con_persona_central: relative ? TREE_KINSHIP_ROLE_LABEL_ES[relative.role] : undefined,
+      rama_de_la_persona_central: relative?.branch,
+      relevante_para_la_consulta: relevantIds.has(p.personId) || undefined,
+    };
+  });
 
   const eventos = listEvents()
     .slice(0, MAX_EVENTS)
@@ -148,6 +167,7 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
       relaciones_sociales: relaciones_sociales.length,
       parentescos_sugeridos: parentescos_sugeridos.length,
     },
+    persona_central: focusPerson ? { id: focusPerson.personId, nombre: focusPerson.displayName } : null,
     personas,
     eventos,
     relaciones_sociales,
