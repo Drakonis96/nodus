@@ -6,6 +6,7 @@ import { Icon } from './ui';
 import { PersonMultiSelect } from './PersonMultiSelect';
 import { confirm } from './feedback';
 import { t } from '../i18n';
+import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 
 export function KinshipEditor({ person, persons, onChanged, compact = false }: {
   person: Person;
@@ -139,7 +140,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
   ) != null;
 
   return (
-    <div className={`rounded-md border border-neutral-800 bg-neutral-900/40 ${compact ? 'p-2.5' : 'p-3'}`}>
+    <div className={`${PERSON_DOSSIER_SECTION_CLASS} ${compact ? '!p-2.5' : ''}`} data-testid="person-dossier-family-relations">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
@@ -149,7 +150,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
             {t('Padres, hijos, hermanos y parejas vinculados a esta persona.')}
           </p>
         </div>
-        <button className="btn btn-ghost h-7 shrink-0 gap-1 border border-neutral-700 px-2 text-[11px]" onClick={openNew}>
+        <button className={PERSON_DOSSIER_ADD_BUTTON_CLASS} onClick={openNew}>
           <Icon name="plus" size={11} /> {t('Añadir relación')}
         </button>
       </div>

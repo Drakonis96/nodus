@@ -3348,7 +3348,10 @@ export const EN: Record<string, string> = {
   'Editar datos': 'Edit details',
   'Añadir evento': 'Add event',
   'Añadir variante': 'Add variant',
+  'Nueva variante del nombre': 'New name variant',
   'Nueva variante del nombre…': 'New name variant…',
+  'Añade otra grafía o forma documentada del nombre.': 'Add another spelling or documented form of the name.',
+  'Sin variantes del nombre registradas.': 'No name variants recorded.',
   'Tipo de evento': 'Event type',
   'Fecha (puede ser incierta: «c. 1850»)': 'Date (may be uncertain: “c. 1850”)',
   'Lugar': 'Place',
@@ -3907,6 +3910,8 @@ export const EN: Record<string, string> = {
   // ── Map · places · gazetteer ───────────────────────────────────────────────
   'Lugares': 'Places',
   'Añadir lugar': 'Add place',
+  'Nuevo lugar': 'New place',
+  'Busca un lugar y registra su relación con esta persona.': 'Search for a place and record its connection to this person.',
   'Registra los lugares de esta persona (municipio, estado, país). Construyen su mapa individual y alimentan el mapa general.':
     'Log this person’s places (municipality, state, country). They build their individual map and feed the general map.',
   'Sin lugares registrados.': 'No places recorded.',
@@ -4893,6 +4898,7 @@ export const EN: Record<string, string> = {
   'Planifica eventos y deja que Nodi te avise incluso después de haber estado desconectado.': 'Plan events and let Nodi remind you even after you have been offline.',
   'Nuevo evento': 'New event',
   'Editar evento': 'Edit event',
+  'Registra el tipo, la fecha, el lugar y las notas del evento.': 'Record the event type, date, place and notes.',
   Semana: 'Week',
   Lun: 'Mon',
   Mar: 'Tue',

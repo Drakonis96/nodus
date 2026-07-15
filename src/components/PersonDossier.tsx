@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   ArchiveItem,
   DocumentLinkSuggestion,
@@ -21,6 +22,7 @@ import { MarkdownNotesEditor } from './MarkdownNotesEditor';
 import { RelationsSection } from './RelationsSection';
 import { PersonPlacesSection } from './PersonPlacesSection';
 import { KinshipEditor } from './KinshipEditor';
+import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 import { confirm } from './feedback';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
@@ -183,11 +185,11 @@ export function PersonDossier({
       )}
 
       {/* Biography — generated only on demand. */}
-      <section className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3">
+      <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-biography">
         <div className="mb-2 flex items-center gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Biografía')}</h3>
           <button
-            className="btn btn-ghost ml-auto h-7 gap-1.5 border border-neutral-700 px-2 text-xs"
+            className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`}
             disabled={bioBusy}
             onClick={() => void generateBio()}
           >
@@ -335,17 +337,19 @@ export function PersonDossier({
         </section>
       )}
 
-      {kin && (kin.parents.length || kin.spouses.length || kin.children.length || kin.siblings.length) > 0 && (
-        <section>
+      <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-kinship">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Parentesco')}</h3>
-          <div className="space-y-1.5 text-sm">
-            <KinRow label={t('Padres')} people={kin.parents} onNavigate={onNavigate} />
-            <KinRow label={t('Cónyuges')} people={kin.spouses} onNavigate={onNavigate} />
-            <KinRow label={t('Hijos')} people={kin.children} onNavigate={onNavigate} />
-            <KinRow label={t('Hermanos')} people={kin.siblings} onNavigate={onNavigate} />
-          </div>
-        </section>
-      )}
+          {kin && (kin.parents.length || kin.spouses.length || kin.children.length || kin.siblings.length) > 0 ? (
+            <div className="space-y-1.5 text-sm">
+              <KinRow label={t('Padres')} people={kin.parents} onNavigate={onNavigate} />
+              <KinRow label={t('Cónyuges')} people={kin.spouses} onNavigate={onNavigate} />
+              <KinRow label={t('Hijos')} people={kin.children} onNavigate={onNavigate} />
+              <KinRow label={t('Hermanos')} people={kin.siblings} onNavigate={onNavigate} />
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-500">{t('Sin parentesco por ahora')}</p>
+          )}
+      </section>
 
       <KinshipEditor
         person={person}
@@ -364,7 +368,7 @@ export function PersonDossier({
 
       <PersonPlacesSection personId={person.personId} />
 
-      <section>
+      <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-documents">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('Documentos')} <span className="text-neutral-600">({documents.length})</span>
         </h3>
@@ -418,7 +422,7 @@ export function PersonDossier({
         )}
       </section>
 
-      <section>
+      <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-evidence">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('Evidencia')} <span className="text-neutral-600">({evidence.length})</span>
         </h3>
@@ -439,7 +443,7 @@ export function PersonDossier({
         )}
       </section>
 
-      <section>
+      <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-notes">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Notas')}</h3>
         <MarkdownNotesEditor
           value={person.notes}
@@ -528,28 +532,34 @@ function PersonBasicsEditor({
 
 /** Add or remove name variants/spellings for a person. */
 function NameVariantsEditor({ person, onChanged }: { person: Person; onChanged: () => Promise<void> }) {
-  const [adding, setAdding] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const add = async () => {
     const name = value.trim();
     if (!name) return;
-    await window.nodus.addPersonName(person.personId, name, 'variante');
-    setValue('');
-    setAdding(false);
-    await onChanged();
+    setSaving(true);
+    try {
+      await window.nodus.addPersonName(person.personId, name, 'variante');
+      setValue('');
+      setModalOpen(false);
+      await onChanged();
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <section>
+    <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-name-variants">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Variantes del nombre')}</h3>
-        <button className="btn btn-ghost ml-auto h-6 gap-1 border border-neutral-700 px-2 text-[11px]" onClick={() => setAdding((v) => !v)}>
+        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} onClick={() => { setValue(''); setModalOpen(true); }}>
           <Icon name="plus" size={11} /> {t('Añadir variante')}
         </button>
       </div>
-      {person.names.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+      {person.names.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
           {person.names.map((n) => (
             <span key={n.name} className="rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300">
               {n.name}
@@ -557,21 +567,34 @@ function NameVariantsEditor({ person, onChanged }: { person: Person; onChanged: 
             </span>
           ))}
         </div>
+      ) : (
+        <p className="text-sm text-neutral-500">{t('Sin variantes del nombre registradas.')}</p>
       )}
-      {adding && (
-        <div className="flex gap-2">
-          <input
-            className="input h-8 flex-1 text-sm"
-            value={value}
-            autoFocus
-            placeholder={t('Nueva variante del nombre…')}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void add()}
-          />
-          <button className="btn btn-primary h-8 px-3 text-xs" disabled={!value.trim()} onClick={() => void add()}>
-            {t('Guardar')}
-          </button>
-        </div>
+      {modalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setModalOpen(false); }}>
+          <section className="card-modal w-full max-w-lg p-5" role="dialog" aria-modal="true" aria-labelledby="name-variant-modal-title">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <h3 id="name-variant-modal-title" className="text-base font-semibold text-neutral-100">{t('Nueva variante del nombre')}</h3>
+                <p className="mt-1 text-xs text-neutral-500">{t('Añade otra grafía o forma documentada del nombre.')}</p>
+              </div>
+              <button className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-400" aria-label={t('Cerrar')} disabled={saving} onClick={() => setModalOpen(false)}><Icon name="x" size={15} /></button>
+            </div>
+            <input
+              className="input h-9 w-full text-sm"
+              value={value}
+              autoFocus
+              placeholder={t('Nueva variante del nombre…')}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={(event) => event.key === 'Enter' && void add()}
+            />
+            <div className="mt-4 flex justify-end gap-2 border-t border-neutral-800 pt-3">
+              <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" disabled={saving} onClick={() => setModalOpen(false)}>{t('Cancelar')}</button>
+              <button className="btn btn-primary min-w-32" disabled={saving || !value.trim()} onClick={() => void add()}>{saving ? t('Guardando…') : t('Guardar')}</button>
+            </div>
+          </section>
+        </div>,
+        document.body
       )}
     </section>
   );
@@ -599,47 +622,32 @@ function EventsEditor({
   };
 
   return (
-    <section>
+    <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-life-events">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('Eventos de su vida')} <span className="text-neutral-600">({events.length})</span>
         </h3>
-        <button className="btn btn-ghost ml-auto h-6 gap-1 border border-neutral-700 px-2 text-[11px]" onClick={() => setAdding((v) => !v)}>
+        <button className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`} onClick={() => setAdding(true)}>
           <Icon name="plus" size={11} /> {t('Añadir evento')}
         </button>
       </div>
 
       {adding && (
-        <div className="mb-2">
-          <EventForm
-            personId={personId}
-            onSaved={async () => {
-              setAdding(false);
-              await onChanged();
-            }}
-            onCancel={() => setAdding(false)}
-          />
-        </div>
+        <EventForm
+          personId={personId}
+          onSaved={async () => {
+            setAdding(false);
+            await onChanged();
+          }}
+          onCancel={() => setAdding(false)}
+        />
       )}
 
-      {events.length === 0 && !adding ? (
+      {events.length === 0 ? (
         <p className="text-sm text-neutral-500">{t('Sin eventos registrados.')}</p>
       ) : (
         <ul className="space-y-1.5">
-          {events.map((e) =>
-            editingId === e.eventId ? (
-              <li key={e.eventId}>
-                <EventForm
-                  personId={personId}
-                  event={e}
-                  onSaved={async () => {
-                    setEditingId(null);
-                    await onChanged();
-                  }}
-                  onCancel={() => setEditingId(null)}
-                />
-              </li>
-            ) : (
+          {events.map((e) => (
               <li key={e.eventId} className="flex items-center gap-2 rounded-md border border-neutral-800 px-3 py-2 text-sm">
                 <span className="font-medium text-neutral-200">{t(EVENT_TYPE_LABEL[e.type] ?? e.type)}</span>
                 {e.date ? <span className="text-neutral-400">· {e.date}</span> : null}
@@ -653,10 +661,23 @@ function EventsEditor({
                   </button>
                 </div>
               </li>
-            )
-          )}
+          ))}
         </ul>
       )}
+      {editingId && (() => {
+        const event = events.find((candidate) => candidate.eventId === editingId);
+        return event ? (
+          <EventForm
+            personId={personId}
+            event={event}
+            onSaved={async () => {
+              setEditingId(null);
+              await onChanged();
+            }}
+            onCancel={() => setEditingId(null)}
+          />
+        ) : null;
+      })()}
     </section>
   );
 }
@@ -707,29 +728,37 @@ function EventForm({
     }
   };
 
-  return (
-    <div className="space-y-2 rounded-md border border-neutral-800 bg-neutral-950 p-2.5">
-      <div className="grid grid-cols-2 gap-2">
-        <select className="input h-8 text-sm" value={type} onChange={(e) => setType(e.target.value as HistoricalEventType)}>
-          {EVENT_TYPE_OPTIONS.map((tp) => (
-            <option key={tp} value={tp}>
-              {t(EVENT_TYPE_LABEL[tp] ?? tp)}
-            </option>
-          ))}
-        </select>
-        <input className="input h-8 text-sm" value={date} onChange={(e) => setDate(e.target.value)} placeholder={t('Fecha (puede ser incierta: «c. 1850»)')} />
-      </div>
-      <input className="input h-8 w-full text-sm" value={place} onChange={(e) => setPlace(e.target.value)} placeholder={t('Lugar')} />
-      <textarea className="input min-h-14 w-full resize-y text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Notas')} />
-      <div className="flex gap-2">
-        <button className="btn btn-primary h-8 flex-1 text-xs" disabled={saving} onClick={() => void save()}>
-          {saving ? t('Guardando…') : t('Guardar evento')}
-        </button>
-        <button className="btn btn-ghost h-8 border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>
-          {t('Cancelar')}
-        </button>
-      </div>
-    </div>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4" onMouseDown={(mouseEvent) => { if (mouseEvent.target === mouseEvent.currentTarget && !saving) onCancel(); }}>
+      <section className="card-modal max-h-[90vh] w-full max-w-lg overflow-y-auto p-5" role="dialog" aria-modal="true" aria-labelledby="person-event-modal-title">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 id="person-event-modal-title" className="text-base font-semibold text-neutral-100">{event ? t('Editar evento') : t('Nuevo evento')}</h3>
+            <p className="mt-1 text-xs text-neutral-500">{t('Registra el tipo, la fecha, el lugar y las notas del evento.')}</p>
+          </div>
+          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-400" aria-label={t('Cerrar')} disabled={saving} onClick={onCancel}><Icon name="x" size={15} /></button>
+        </div>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <select className="input h-9 text-sm" value={type} onChange={(changeEvent) => setType(changeEvent.target.value as HistoricalEventType)}>
+              {EVENT_TYPE_OPTIONS.map((eventType) => (
+                <option key={eventType} value={eventType}>
+                  {t(EVENT_TYPE_LABEL[eventType] ?? eventType)}
+                </option>
+              ))}
+            </select>
+            <input className="input h-9 text-sm" value={date} onChange={(changeEvent) => setDate(changeEvent.target.value)} placeholder={t('Fecha (puede ser incierta: «c. 1850»)')} />
+          </div>
+          <input className="input h-9 w-full text-sm" value={place} onChange={(changeEvent) => setPlace(changeEvent.target.value)} placeholder={t('Lugar')} />
+          <textarea className="input min-h-20 w-full resize-y text-sm" value={notes} onChange={(changeEvent) => setNotes(changeEvent.target.value)} placeholder={t('Notas')} />
+          <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
+            <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>{t('Cancelar')}</button>
+            <button className="btn btn-primary min-w-32" disabled={saving} onClick={() => void save()}>{saving ? t('Guardando…') : event ? t('Guardar cambios') : t('Guardar evento')}</button>
+          </div>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }
 

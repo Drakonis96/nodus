@@ -78,8 +78,8 @@ test('family and social relation additions use symmetric clean modal flows', () 
   assert.match(social, /role="dialog" aria-modal="true"/);
   assert.match(social, /function EditRelationModal/);
   assert.doesNotMatch(social, /function EditRelationForm/);
-  assert.match(editor, /rounded-md border border-neutral-800 bg-neutral-900\/40/);
-  assert.match(social, /rounded-md border border-neutral-800 bg-neutral-900\/40/);
+  assert.match(editor, /PERSON_DOSSIER_SECTION_CLASS/);
+  assert.match(social, /PERSON_DOSSIER_SECTION_CLASS/);
   assert.doesNotMatch(tree, /t\('Añadir parentesco'\)/);
 });
 

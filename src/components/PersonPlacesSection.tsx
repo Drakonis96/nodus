@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { GazetteerPlace, MapPlacePoint, PersonPlace } from '@shared/types';
 import { Icon } from './ui';
 import { PlacePicker } from './PlacePicker';
 import { PlacesMap } from './PlacesMap';
 import { confirm } from './feedback';
 import { t, tx } from '../i18n';
+import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 
 // A person's PLACE RECORD: the list of places associated with them (birth, residence,
 // death…) with a date, plus their individual map built from those places. Resolving a
@@ -53,14 +55,14 @@ export function PersonPlacesSection({ personId }: { personId: string }) {
   };
 
   return (
-    <section>
+    <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-places">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('Lugares')} <span className="text-neutral-600">({places.length})</span>
         </h3>
         <button
-          className="btn btn-ghost ml-auto h-6 gap-1 border border-neutral-700 px-2 text-[11px]"
-          onClick={() => setAdding((v) => !v)}
+          className={`${PERSON_DOSSIER_ADD_BUTTON_CLASS} ml-auto`}
+          onClick={() => setAdding(true)}
         >
           <Icon name="plus" size={11} /> {t('Añadir lugar')}
         </button>
@@ -71,19 +73,17 @@ export function PersonPlacesSection({ personId }: { personId: string }) {
       </p>
 
       {adding && (
-        <div className="mb-3">
-          <AddPersonPlace
-            personId={personId}
-            onSaved={async () => {
-              setAdding(false);
-              await load();
-            }}
-            onCancel={() => setAdding(false)}
-          />
-        </div>
+        <AddPersonPlace
+          personId={personId}
+          onSaved={async () => {
+            setAdding(false);
+            await load();
+          }}
+          onCancel={() => setAdding(false)}
+        />
       )}
 
-      {places.length === 0 && !adding ? (
+      {places.length === 0 ? (
         <p className="text-sm text-neutral-500">{t('Sin lugares registrados.')}</p>
       ) : (
         <ul className="mb-3 space-y-1.5">
@@ -149,56 +149,55 @@ function AddPersonPlace({
     }
   };
 
-  return (
-    <div className="space-y-2 rounded-md border border-neutral-800 bg-neutral-950 p-2.5">
-      {!picked ? (
-        <PlacePicker autoFocus onPick={setPicked} />
-      ) : (
-        <div className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1.5 text-sm">
-          <Icon name="map" size={14} className="shrink-0 text-amber-400" />
-          <span className="min-w-0 flex-1">
-            <span className="truncate text-neutral-100">{picked.name}</span>
-            <span className="text-neutral-500"> · {[picked.admin1, picked.country].filter(Boolean).join(', ')}</span>
-          </span>
-          <button className="btn btn-ghost h-6 px-2 text-[11px]" onClick={() => setPicked(null)}>
-            {t('Cambiar')}
-          </button>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel(); }}>
+      <section className="card-modal w-full max-w-lg p-5" role="dialog" aria-modal="true" aria-labelledby="person-place-modal-title">
+        <div className="mb-4 flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 id="person-place-modal-title" className="text-base font-semibold text-neutral-100">{t('Nuevo lugar')}</h3>
+            <p className="mt-1 text-xs text-neutral-500">{t('Busca un lugar y registra su relación con esta persona.')}</p>
+          </div>
+          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0 text-neutral-400" aria-label={t('Cerrar')} disabled={saving} onClick={onCancel}><Icon name="x" size={15} /></button>
         </div>
-      )}
+        <div className="space-y-3">
+          {!picked ? (
+            <PlacePicker autoFocus onPick={setPicked} />
+          ) : (
+            <div className="flex items-center gap-2 rounded-md border border-neutral-800 bg-neutral-900/50 px-2 py-1.5 text-sm">
+              <Icon name="map" size={14} className="shrink-0 text-amber-400" />
+              <span className="min-w-0 flex-1">
+                <span className="truncate text-neutral-100">{picked.name}</span>
+                <span className="text-neutral-500"> · {[picked.admin1, picked.country].filter(Boolean).join(', ')}</span>
+              </span>
+              <button className="btn btn-ghost h-7 px-2 text-[11px]" onClick={() => setPicked(null)}>{t('Cambiar')}</button>
+            </div>
+          )}
 
-      {picked && (
-        <>
-          <div className="grid grid-cols-2 gap-2">
-            <select className="input h-8 text-sm" value={label} onChange={(e) => setLabel(e.target.value)}>
-              {PLACE_LABELS.map((l) => (
-                <option key={l} value={l}>
-                  {t(PLACE_LABEL_ES[l])}
-                </option>
-              ))}
-            </select>
-            <input
-              className="input h-8 text-sm"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              placeholder={t('Fecha (puede ser incierta: «c. 1850»)')}
-            />
+          {picked && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <select className="input h-9 text-sm" value={label} onChange={(event) => setLabel(event.target.value)}>
+                  {PLACE_LABELS.map((placeLabel) => (
+                    <option key={placeLabel} value={placeLabel}>{t(PLACE_LABEL_ES[placeLabel])}</option>
+                  ))}
+                </select>
+                <input
+                  className="input h-9 text-sm"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  placeholder={t('Fecha (puede ser incierta: «c. 1850»)')}
+                />
+              </div>
+              <input className="input h-9 w-full text-sm" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder={t('Notas')} />
+            </>
+          )}
+          <div className="flex justify-end gap-2 border-t border-neutral-800 pt-3">
+            <button className="btn btn-ghost border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>{t('Cancelar')}</button>
+            <button className="btn btn-primary min-w-32" disabled={saving || !picked} onClick={() => void save()}>{saving ? t('Guardando…') : t('Guardar lugar')}</button>
           </div>
-          <input className="input h-8 w-full text-sm" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t('Notas')} />
-          <div className="flex gap-2">
-            <button className="btn btn-primary h-8 flex-1 text-xs" disabled={saving} onClick={() => void save()}>
-              {saving ? t('Guardando…') : t('Guardar lugar')}
-            </button>
-            <button className="btn btn-ghost h-8 border border-neutral-700 px-3 text-xs" onClick={onCancel} disabled={saving}>
-              {t('Cancelar')}
-            </button>
-          </div>
-        </>
-      )}
-      {!picked && (
-        <button className="btn btn-ghost h-7 w-full border border-neutral-700 text-xs" onClick={onCancel}>
-          {t('Cancelar')}
-        </button>
-      )}
-    </div>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }

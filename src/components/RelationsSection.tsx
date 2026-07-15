@@ -7,6 +7,7 @@ import { ContactDossier } from './ContactDossier';
 import { SearchableMultiSelect, type SearchableMultiSelectOption } from './PersonMultiSelect';
 import { confirm } from './feedback';
 import { t, tx } from '../i18n';
+import { PERSON_DOSSIER_ADD_BUTTON_CLASS, PERSON_DOSSIER_SECTION_CLASS } from './personDossierLayout';
 
 /**
  * The social-relations network, from a single person's ficha: connections beyond
@@ -60,7 +61,7 @@ export function RelationsSection({
   };
 
   return (
-    <section className="rounded-md border border-neutral-800 bg-neutral-900/40 p-3">
+    <section className={PERSON_DOSSIER_SECTION_CLASS} data-testid="person-dossier-social-relations">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
@@ -71,7 +72,7 @@ export function RelationsSection({
           </p>
         </div>
         <button
-          className="btn btn-ghost h-7 shrink-0 gap-1 border border-neutral-700 px-2 text-[11px]"
+          className={PERSON_DOSSIER_ADD_BUTTON_CLASS}
           onClick={() => setAdding(true)}
         >
           <Icon name="plus" size={11} /> {t('Añadir relación')}
