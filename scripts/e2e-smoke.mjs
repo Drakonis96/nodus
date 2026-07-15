@@ -612,7 +612,10 @@ try {
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
   await page.locator('.study-editor-shell textarea').fill(editorMarkdown);
-  await page.getByRole('button', { name: /^Guardar$/ }).click({ force: true, noWaitAfter: true });
+  // Dispatch from the renderer instead of Playwright's pointer action. On the
+  // headless macOS runner the save handler completes, but the pointer action
+  // can remain pending until Playwright's 30 s action timeout.
+  await page.getByRole('button', { name: /^Guardar$/ }).evaluate((button) => button.click());
   await page.waitForFunction(() => document.body.textContent?.includes('Guardado'), { timeout: 30_000 });
   const editorRoundTrip = await page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
