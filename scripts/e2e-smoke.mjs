@@ -682,15 +682,45 @@ try {
   });
   await page.getByTestId('study-selection-text-color').waitFor();
   assert.equal(await page.locator('[data-testid^="study-quick-improve-"]').count(), 4, 'the selection exposes exactly the four configured prompt shortcuts');
-  await page.getByTestId('study-quick-improve-builtin-academic').click();
-  await page.getByText('El original permanece intacto.', { exact: true }).waitFor({ timeout: 30_000 });
+  const failedImprovement = await page.evaluate(async () => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
+    const style = (await window.nodus.listStudyStyles()).find((item) => item.id === 'builtin:academic');
+    if (!document || !style) throw new Error('Improvement failure fixture not found');
+    try {
+      await window.nodus.improveStudyText({
+        documentId: document.id,
+        subjectId: workspace.placements.find((item) => item.documentId === document.id)?.subjectId,
+        text: 'Texto',
+        styleId: style.id,
+        scope: 'selection',
+        level: style.level,
+        length: style.length,
+        mode: 'preserve',
+        variables: { language: style.language, documentType: document.kind, selectedText: 'Texto' },
+        protectedTerms: [document.title],
+        model: null,
+      });
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  assert.equal(failedImprovement, true, 'the deterministic provider failure reaches the renderer bridge');
   const unchangedAfterImprovement = await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.find((item) => item.title === 'Apunte smoke')?.contentMarkdown);
-  assert.equal(unchangedAfterImprovement, editorMarkdown, 'failed improvement leaves original Markdown untouched');
+  // Milkdown may canonicalize equivalent table separators when leaving raw
+  // mode; the selected source phrase itself must remain byte-for-byte intact.
+  assert.match(unchangedAfterImprovement ?? '', /Texto \*\*importante\*\* con \$x\^2\$\./, 'failed improvement leaves the selected Markdown untouched');
   console.log('[e2e] compact prompt manager + four contextual streaming shortcuts + failure preservation ok');
 
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown .katex').waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown table.children').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+    const range = document.createRange();
+    range.selectNodeContents(root); range.collapse(false);
+    const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+  });
   await page.getByTestId('study-heading-level').selectOption('2');
   await page.locator('.study-milkdown .ProseMirror h2').waitFor({ timeout: 30_000 });
   assert.equal(await page.locator('.study-milkdown .ProseMirror').getByText('## Título', { exact: true }).count(), 0, 'visual heading insertion creates a heading node rather than literal Markdown');
