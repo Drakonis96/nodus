@@ -8,7 +8,7 @@ import {
 } from '@shared/localAiModels';
 import { t } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
-import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from './SettingsModelList';
+import { SettingsModelList, settingsModelRowClass } from './SettingsModelList';
 import { Icon } from './ui';
 
 function formatBytes(bytes: number): string {
@@ -19,11 +19,9 @@ function formatBytes(bytes: number): string {
 export function LocalAiModelsSettings({
   settings,
   patch,
-  onSelectEmbedding,
 }: {
   settings: AppSettings;
   patch: (value: Partial<AppSettings>) => Promise<void>;
-  onSelectEmbedding: (model: string) => void;
 }) {
   const [status, setStatus] = useState<NodusLocalAiStatus | null>(null);
   const [busy, setBusy] = useState('');
@@ -31,7 +29,23 @@ export function LocalAiModelsSettings({
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<NodusLocalModelDefinition | null>(null);
 
-  const refresh = async () => setStatus(await window.nodus.getNodusLocalAiStatus());
+  const exposeDownloadedChatModels = async (nextStatus: NodusLocalAiStatus) => {
+    const downloaded = new Set(nextStatus.models.filter((model) => model.downloaded).map((model) => model.id));
+    const additions: ModelRef[] = NODUS_LOCAL_MODELS
+      .filter((model) => model.kind === 'chat' && downloaded.has(model.id))
+      .map((model) => ({ provider: 'nodus', model: model.id }));
+    const favorites = [...settings.favorites];
+    for (const addition of additions) {
+      if (!favorites.some((favorite) => favorite.provider === addition.provider && favorite.model === addition.model)) favorites.push(addition);
+    }
+    if (favorites.length !== settings.favorites.length) await patch({ favorites });
+  };
+
+  const refresh = async () => {
+    const nextStatus = await window.nodus.getNodusLocalAiStatus();
+    setStatus(nextStatus);
+    await exposeDownloadedChatModels(nextStatus);
+  };
   useEffect(() => { void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, []);
 
   const installed = useMemo(() => new Map(status?.models.map((model) => [model.id, model]) ?? []), [status]);
@@ -52,18 +66,12 @@ export function LocalAiModelsSettings({
         setStatus(prepared);
         setBusy(model.id);
       }
-      setStatus(await window.nodus.downloadNodusLocalModel(model.id, (fraction) => setProgress(needsRuntime ? 0.2 + fraction * 0.8 : fraction)));
+      const nextStatus = await window.nodus.downloadNodusLocalModel(model.id, (fraction) => setProgress(needsRuntime ? 0.2 + fraction * 0.8 : fraction));
+      setStatus(nextStatus);
+      await exposeDownloadedChatModels(nextStatus);
     }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(''); }
-  };
-
-  const selectChat = async (model: NodusLocalModelDefinition, target: 'general' | 'vision') => {
-    const ref: ModelRef = { provider: 'nodus', model: model.id };
-    const favorites = settings.favorites.some((favorite) => favorite.provider === ref.provider && favorite.model === ref.model)
-      ? settings.favorites
-      : [...settings.favorites, ref];
-    await patch(target === 'general' ? { favorites, synthesisModel: ref } : { favorites, visionModel: ref });
   };
 
   const remove = async () => {
@@ -87,22 +95,15 @@ export function LocalAiModelsSettings({
       {NODUS_LOCAL_MODELS.filter((model) => model.kind === kind).map((model) => {
         const local = installed.get(model.id);
         const downloaded = Boolean(local?.downloaded);
-        const selectedEmbedding = kind === 'embedding' && settings.embeddingProvider === 'nodus' && settings.embeddingModel === model.id;
-        const selectedGeneral = kind === 'chat' && settings.synthesisModel?.provider === 'nodus' && settings.synthesisModel.model === model.id;
-        const selectedVision = kind === 'chat' && settings.visionModel?.provider === 'nodus' && settings.visionModel.model === model.id;
-        const selected = selectedEmbedding || selectedGeneral || selectedVision;
         const runtimeReady = model.runtime === 'transformers' || Boolean(status?.runtime.ready);
-        return <article key={model.id} className={settingsModelRowClass(selected, false, 'sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4')}>
-          <div className="flex min-w-0 items-start gap-3">
-            <SettingsModelDot selected={selected} />
-            <div className="min-w-0">
+        return <article key={model.id} className={settingsModelRowClass(false, false, 'sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-4')}>
+          <div className="min-w-0">
               <div className="flex items-start gap-2">
                 <h5 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{model.label}</h5>
                 <button className="mt-0.5 text-neutral-400 hover:text-indigo-600 dark:text-neutral-600 dark:hover:text-indigo-300" title={t('Abrir fuente del modelo')} onClick={() => void window.nodus.openExternal(model.sourceUrl)}><Icon name="external" size={12} /></button>
               </div>
               <p className="mt-0.5 text-[10px] text-neutral-500 dark:text-neutral-600">{model.quantization} · {formatBytes(nodusLocalModelBytes(model))}{model.dimensions ? ` · ${model.dimensions}d` : ''}{model.vision ? ` · ${t('entrada de imagen')}` : ''}</p>
               <p className="mt-1.5 max-w-3xl text-xs leading-5 text-neutral-600 dark:text-neutral-500">{t(model.description)}</p>
-            </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:max-w-[25rem] sm:justify-end">
             <span className={`mr-auto rounded-full px-2 py-1 text-[10px] font-medium sm:mr-0 ${downloaded ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-500'}`}>
@@ -111,12 +112,6 @@ export function LocalAiModelsSettings({
             {downloaded
               ? <button className="btn btn-ghost h-7 px-2 text-[10px] text-red-400" disabled={Boolean(busy)} onClick={() => setDeleting(model)}><Icon name="trash" size={10} />{t('Eliminar')}</button>
               : <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={Boolean(busy)} onClick={() => void download(model)}><Icon name="download" size={10} />{busy === `runtime:${model.id}` ? t('Preparando motor…') : busy === model.id ? t('Descargando…') : t('Descargar')}</button>}
-            {downloaded && (kind === 'embedding'
-              ? <button className={`btn h-7 px-2 text-[10px] ${selectedEmbedding ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`} disabled={!runtimeReady || selectedEmbedding} onClick={() => onSelectEmbedding(model.id)}>{selectedEmbedding ? t('Seleccionado') : t('Usar para embeddings')}</button>
-              : <>
-                <button className={`btn h-7 px-2 text-[10px] ${selectedGeneral ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`} disabled={!runtimeReady || selectedGeneral} onClick={() => void selectChat(model, 'general')}>{selectedGeneral ? t('Modelo general') : t('Usar como general')}</button>
-                <button className={`btn h-7 px-2 text-[10px] ${selectedVision ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`} disabled={!runtimeReady || selectedVision} onClick={() => void selectChat(model, 'vision')}>{selectedVision ? t('Modelo de visión') : t('Usar para visión')}</button>
-              </>)}
             {downloaded && !runtimeReady && <span className="w-full text-right text-[10px] text-amber-600 dark:text-amber-400">{t('Instala el motor local para poder usar este modelo.')}</span>}
           </div>
         </article>;

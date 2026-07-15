@@ -233,6 +233,9 @@ try {
   assert.equal(localAiStatus.models.length, 6, 'integrated local AI catalog is available over the real preload bridge');
   assert.equal(await page.getByText('BGE-M3 Q8_0', { exact: true }).count(), 1, 'local embedding catalog renders');
   assert.equal(await page.getByText('Qwen3.5-0.8B Q4', { exact: true }).count(), 1, 'local multimodal chat catalog renders');
+  for (const assignmentAction of ['Seleccionado', 'Usar para embeddings', 'Modelo general', 'Usar como general', 'Modelo de visión', 'Usar para visión']) {
+    assert.equal(await page.getByRole('button', { name: assignmentAction, exact: true }).count(), 0, `${assignmentAction} is not offered from the download catalog`);
+  }
   assert.equal(await page.getByText('Importante sobre los embeddings:', { exact: false }).count(), 1, 'embedding compatibility warning remains visible');
   if (process.env.NODUS_E2E_LOCAL_RUNTIME === '1') {
     const installedRuntime = await page.evaluate(async () => {

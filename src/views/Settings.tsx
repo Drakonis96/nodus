@@ -1155,7 +1155,6 @@ export function Settings({
             <LocalAiModelsSettings
               settings={settings}
               patch={patch}
-              onSelectEmbedding={(model) => setPendingEmbeddingChange({ provider: 'nodus', model })}
             />
             <SttSettings settings={settings} patch={patch} />
             {settings.modelSettingsMode === 'advanced' && <>

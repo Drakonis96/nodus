@@ -58,6 +58,9 @@ try {
   assert.match(ui, /nodus-local-embedding-list/, 'embedding models use the shared settings list pattern');
   assert.match(ui, /nodus-local-chat-list/, 'chat models use the shared settings list pattern');
   assert.match(ui, /Preparando motor…/, 'the UI explains the automatic dependency stage');
+  assert.match(ui, /exposeDownloadedChatModels/, 'downloaded local chat models are exposed to the shared dropdowns');
+  assert.doesNotMatch(ui, /SettingsModelDot|selectedEmbedding|selectedGeneral|selectedVision/, 'the download catalog must not present models as active selections');
+  assert.doesNotMatch(ui, /onSelectEmbedding|selectChat|Usar para embeddings|Usar como general|Usar para visión|Modelo general|Modelo de visión/, 'model assignment belongs exclusively to the shared dropdowns');
   assert.doesNotMatch(ui, /lg:grid-cols-3/, 'local model catalogs do not regress to card grids');
   assert.match(providers, /nodus: 'Nodus local'/, 'the integrated provider has a user-facing label');
   assert.match(studyPolicy, /model\.provider === 'nodus'/, 'local-only study policy accepts managed Nodus models');
