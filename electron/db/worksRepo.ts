@@ -1,7 +1,7 @@
 import { getDb } from './database';
 import { expandCollectionKeys } from './collectionsRepo';
 import { currentEmbeddingConfig } from './ideasRepo';
-import type { Work, WorkView, WorkFilter, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
+import type { Work, WorkView, WorkFilter, WorkPage, WorkPageRequest, DeepTrigger, ZoteroTag, SummaryStatus, WorkCreator } from '@shared/types';
 import { HEALTH_BUCKET_WHERE } from './corpusHealthBuckets';
 
 function normalizeZoteroTag(tag: string): string {
@@ -166,6 +166,14 @@ export function listZoteroTags(): ZoteroTag[] {
 }
 
 export function listWorks(filter: WorkFilter = {}): WorkView[] {
+  return queryWorks(filter).items;
+}
+
+export function listWorksPage(filter: WorkFilter = {}, request: WorkPageRequest): WorkPage {
+  return queryWorks(filter, request);
+}
+
+function queryWorks(filter: WorkFilter, request?: WorkPageRequest): WorkPage {
   const db = getDb();
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -323,8 +331,16 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
   }
 
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  const rows = db.prepare(`SELECT * FROM works w ${where} ORDER BY year DESC, title ASC`).all(params) as Work[];
-  if (rows.length === 0) return [];
+  const total = Number((db.prepare(`SELECT COUNT(*) AS n FROM works w ${where}`).get(params) as { n: number }).n);
+  const limit = request ? Math.min(250, Math.max(1, Math.trunc(request.limit))) : Math.max(1, total);
+  const offset = request ? Math.min(total, Math.max(0, Math.trunc(request.offset))) : 0;
+  const order = workOrderBy(request?.sort ?? null, params);
+  params.pageLimit = limit;
+  params.pageOffset = offset;
+  const rows = db
+    .prepare(`SELECT * FROM works w ${where} ORDER BY ${order} LIMIT @pageLimit OFFSET @pageOffset`)
+    .all(params) as Work[];
+  if (rows.length === 0) return { items: [], total, offset, limit };
 
   // Batch-load themes for all works in one query instead of N+1.
   const ids = rows.map((r) => r.nodus_id);
@@ -341,7 +357,7 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
   const zoteroTagsByWork = zoteroTagsForWorks(ids);
   const ideaCountsByWork = ideaCountsForWorks(ids);
 
-  return rows.map((r) =>
+  const items = rows.map((r) =>
     toView(
       r,
       themesByWork.get(r.nodus_id) ?? [],
@@ -349,6 +365,56 @@ export function listWorks(filter: WorkFilter = {}): WorkView[] {
       ideaCountsByWork.get(r.nodus_id) ?? 0
     )
   );
+  return { items, total, offset, limit };
+}
+
+function workOrderBy(
+  sort: WorkPageRequest['sort'],
+  params: Record<string, unknown>
+): string {
+  if (!sort) return 'w.year DESC, w.title COLLATE NOCASE ASC';
+  const dir = sort.dir === 'desc' ? 'DESC' : 'ASC';
+  let expression: string;
+  switch (sort.key) {
+    case 'title':
+      expression = 'w.title COLLATE NOCASE';
+      break;
+    case 'authors':
+      expression = 'w.authors_json COLLATE NOCASE';
+      break;
+    case 'year':
+      return `w.year IS NULL ASC, w.year ${dir}, w.title COLLATE NOCASE ASC`;
+    case 'themes':
+      expression = `(SELECT MIN(t.label) FROM work_themes wt JOIN themes t ON t.theme_id = wt.theme_id WHERE wt.nodus_id = w.nodus_id) COLLATE NOCASE`;
+      break;
+    case 'ideas':
+      expression = '(SELECT COUNT(*) FROM idea_occurrences io WHERE io.nodus_id = w.nodus_id)';
+      break;
+    case 'light':
+      expression = `CASE w.light_status WHEN 'done' THEN 3 WHEN 'pending' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END`;
+      break;
+    case 'deep':
+      expression = `CASE w.deep_status WHEN 'done' THEN 4 WHEN 'pending' THEN 3 WHEN 'skipped_no_text' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END`;
+      break;
+    case 'summary':
+      expression = `CASE w.summary_status WHEN 'done' THEN 4 WHEN 'pending' THEN 3 WHEN 'skipped_no_text' THEN 2 WHEN 'failed' THEN 1 ELSE 0 END`;
+      break;
+    case 'embeddings': {
+      const config = currentEmbeddingConfig();
+      params.sortEmbeddingProvider = config.provider;
+      params.sortEmbeddingModel = config.model;
+      expression = `(SELECT COUNT(*) FROM idea_occurrences io JOIN ideas i ON i.global_id = io.global_id WHERE io.nodus_id = w.nodus_id AND i.embedding IS NOT NULL AND i.embedding_provider = @sortEmbeddingProvider AND i.embedding_model = @sortEmbeddingModel)`;
+      break;
+    }
+    case 'passages': {
+      const config = currentEmbeddingConfig();
+      params.sortPassageProvider = config.provider;
+      params.sortPassageModel = config.model;
+      expression = `(SELECT COUNT(*) FROM passages p WHERE p.nodus_id = w.nodus_id AND p.embedding IS NOT NULL AND p.embedding_provider = @sortPassageProvider AND p.embedding_model = @sortPassageModel)`;
+      break;
+    }
+  }
+  return `${expression} ${dir}, w.title COLLATE NOCASE ASC`;
 }
 
 export interface UpsertWorkInput {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { invalidateVaultQueryCache } from './vaultQueryCache';
 
 /** Track whether the light theme is active (App stamps `.light` on <html>). */
 export function useIsLightTheme(): boolean {
@@ -30,6 +31,7 @@ interface DismissableLayerOptions {
 
 /** Notify the mounted data views after a cross-cutting operation such as a Zotero sync. */
 export function notifyDataChanged(): void {
+  invalidateVaultQueryCache();
   window.dispatchEvent(new Event(DATA_CHANGED_EVENT));
 }
 
@@ -57,7 +59,10 @@ export function useScanComplete(onComplete: () => void): void {
     let prevActive = false;
     return window.nodus.onQueueProgress((p) => {
       const active = p.total > 0 && p.done + p.failed < p.total;
-      if (prevActive && !active) cb.current();
+      if (prevActive && !active) {
+        invalidateVaultQueryCache();
+        cb.current();
+      }
       prevActive = active;
     });
   }, []);

@@ -22,10 +22,16 @@ import type {
   WritingWorkshopMatrixRow,
   WritingWorkshopSection,
 } from '@shared/types';
-import { WORDS_PER_PAGE, countWords } from './deepResearchCore';
+import {
+  DEEP_RESEARCH_NARRATIVE_RULES,
+  WORDS_PER_PAGE,
+  countWords,
+  normalizeNarrativeSection,
+} from './deepResearchCore';
 import { getSettings } from '../db/settingsRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
 import { allRelationships } from '../db/relationshipsRepo';
+import { allSocialRelations } from '../db/socialRepo';
 import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
 import { findSimilarWorks } from '../db/workSummariesRepo';
 import { getWork } from '../db/worksRepo';
@@ -45,7 +51,7 @@ const MAX_PERSONS_CONTEXT = 200;
 const MAX_EVENTS_CONTEXT = 200;
 const MIN_SECTIONS = 3;
 const MAX_SECTIONS = 12;
-const SECTION_WORDS = { min: 500, max: 1400 } as const;
+const SECTION_WORDS = { min: 700, max: 1800 } as const;
 
 // ── Source pool ─────────────────────────────────────────────────────────────
 
@@ -65,6 +71,7 @@ export interface GenSource {
 export interface FamilyFacts {
   personas: { id: string; nombre: string; nacimiento: string | null; defuncion: string | null; padres: string[]; conyuges: string[]; hijos: string[] }[];
   eventos: { tipo: string; fecha: string | null; lugar: string | null; participantes: string[] }[];
+  relaciones_sociales: { persona: string; contacto: string; tipo_contacto: string; relacion: string; notas: string | null }[];
 }
 
 /** The person a report is being centred on, with their kin and biography. */
@@ -116,6 +123,13 @@ export function buildFamilyFacts(): FamilyFacts {
         lugar: e.placeName,
         participantes: e.participants.map((pt) => pt.displayName ?? nameById.get(pt.personId) ?? ''),
       })),
+    relaciones_sociales: allSocialRelations().slice(0, 200).map((relation) => ({
+      persona: relation.personName,
+      contacto: relation.targetName,
+      tipo_contacto: relation.targetKind,
+      relacion: relation.role,
+      notas: relation.notes,
+    })),
   };
 }
 
@@ -281,7 +295,7 @@ export async function orchestrateGenealogyDeepResearch(
         focusPerson,
       }),
       sourceById,
-      sectionHardCap
+      sectionTarget
     );
   } catch {
     plan = fallbackPlan(request.objective, sources, focusPerson);
@@ -334,7 +348,7 @@ export async function orchestrateGenealogyDeepResearch(
       if (!stoppedReason) stoppedReason = 'Una o más secciones se resolvieron de forma degradada por un fallo del modelo.';
     }
 
-    const { markdown, cited } = applyGenealogyCitations(ensureHeading(raw, section.title), sourceById);
+    const { markdown, cited } = applyGenealogyCitations(normalizeNarrativeSection(raw, section.title), sourceById);
     for (const id of cited) citedSourceIds.add(id);
     for (const id of section.sourceIds) if (sourceById.has(id)) citedSourceIds.add(id);
     written.push({ section, markdown });
@@ -453,7 +467,8 @@ async function aiPlan(input: GenPlanInput, model: ModelRef | null): Promise<GenP
     'Eres el planificador de un INFORME DE HISTORIA FAMILIAR (Deep Research en modo genealogía de Nodus).',
     'Diseñas el esqueleto de un informe riguroso y bien documentado a partir de las FUENTES (documentos de archivo y bibliografía) y de los HECHOS de la familia (personas, parentescos, eventos) que se te dan.',
     'PRINCIPIO: pocas secciones LARGAS y de fondo, no muchas cortas. Organiza el relato de forma útil (p. ej. por generaciones, por figuras clave, por lugares o migraciones, y una sección de fuentes y método).',
-    `Planifica en torno a ${input.sectionTarget} secciones; nunca más de ${input.sectionHardCap}. El cuerpo debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas.`,
+    `Planifica en torno a ${input.sectionTarget} secciones amplias y nunca más de esa cifra en el plan inicial. Usa menos si el relato queda más unido. El cuerpo debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas.`,
+    'Cada título debe abarcar una etapa o línea narrativa sustantiva. Evita títulos partidos por dos puntos, punto y coma o guion largo.',
     'Sigue el estándar de prueba genealógico: identidad y parentesco son HIPÓTESIS probadas con evidencia; no des por ciertos vínculos sin apoyo documental.',
     'Asigna a cada sección los `sourceIds` que la sostienen (copia los ids EXACTOS de la lista de fuentes). No inventes fuentes ni ids.',
     input.focusPerson
@@ -497,6 +512,7 @@ async function aiWriteSection(input: GenSectionInput, model: ModelRef | null): P
     'Sigue el estándar de prueba genealógico: distingue lo que la fuente AFIRMA de lo que se infiere; nunca afirmes una identidad o un parentesco sin apoyo documental; señala los datos inciertos o contradictorios.',
     'CITAS: cuando sostengas un hecho con una fuente, cítala inmediatamente como enlace Markdown. Documentos: `[Título](nodus://archive/<itemId>)`. Obras: `[Autor, Año](nodus://work/<nodusId>)`. Copia el `id` EXACTO del campo `id` de la fuente (quita el prefijo `doc:`/`work:`). Nunca inventes ids.',
     'Respeta los nombres y las fechas de época tal como constan; no los modernices. Nombra a las personas por su nombre completo.',
+    ...DEEP_RESEARCH_NARRATIVE_RULES,
     'No repitas lo ya dicho (se te da un resumen de las secciones previas). Empieza con un encabezado Markdown "## " y el título dado. Devuelve solo el Markdown de la sección.',
     input.focusPerson
       ? `Hay una PERSONA EN FOCO: ${input.focusPerson.nombre}. Mantén el relato centrado en ella: el resto de personas aparece solo en la medida en que se relaciona con su vida.`
@@ -530,6 +546,7 @@ async function aiFinalize(input: GenFinalizeInput, model: ModelRef | null): Prom
     'Devuelve SOLO JSON: {"title":"título breve del informe","abstract":"resumen de 6-10 líneas","limitations":["..."],"nextSteps":["..."]}',
     'Las limitaciones deben ser honestas y genealógicas: vínculos aún no probados, fuentes no consultadas, fechas inciertas o contradictorias, homónimos por resolver.',
     'Los próximos pasos deben sugerir qué registros o fuentes buscar para probar lo que queda como hipótesis.',
+    'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
   ].join('\n');
   const user = JSON.stringify(
     { objetivo: input.objective, idioma: input.language, titulo_provisional: input.planTitle, secciones: input.sectionTitles, fuentes_citadas: input.sourcesCited, fuentes_consideradas: input.sourcesConsidered },
@@ -667,7 +684,7 @@ function resolveTargetPages(target: DeepResearchRequest['targetLength'], sourceC
 }
 
 function resolveSections(targetPages: { min: number; max: number }, sectionLimit: 'auto' | number): { target: number; hardCap: number } {
-  const natural = clamp(Math.round(((targetPages.min + targetPages.max) / 2) / 2), MIN_SECTIONS, 9);
+  const natural = clamp(Math.round(((targetPages.min + targetPages.max) / 2) / 3.5), MIN_SECTIONS, 7);
   if (typeof sectionLimit === 'number' && Number.isFinite(sectionLimit) && sectionLimit > 0) {
     const target = clamp(Math.round(sectionLimit), MIN_SECTIONS, MAX_SECTIONS);
     return { target, hardCap: Math.min(MAX_SECTIONS, target + 1) };
@@ -677,10 +694,6 @@ function resolveSections(targetPages: { min: number; max: number }, sectionLimit
 
 function summarizePrior(written: { section: GenPlanSection; markdown: string }[]): string {
   return written.map((w, i) => `${i + 1}. ${w.section.title}`).join('\n');
-}
-function ensureHeading(markdown: string, title: string): string {
-  const trimmed = (markdown ?? '').trim();
-  return /^#{1,3}\s/.test(trimmed) ? trimmed : `## ${title}\n\n${trimmed}`;
 }
 function pages(words: number): number {
   return Math.max(1, Math.round(words / WORDS_PER_PAGE));

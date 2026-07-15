@@ -178,7 +178,7 @@ export async function runDeepScan(
     }
 
     const settings = getSettings();
-    const extractionModel = model ?? settings.extractionModel ?? null;
+    const extractionModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
     // Fusion runs many small dedup/relate calls; let it use a dedicated (often faster)
     // model, falling back to the synthesis model to preserve prior behavior.
     const fusionModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -47,16 +47,66 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
-test('academic + genealogy + databases are selectable; estudio/primary_sources are declared but gated', () => {
+test('shipped and preview vaults are selectable; announced future vaults remain gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
-  assert.deepEqual(ids, ['academic', 'genealogy', 'databases']);
+  assert.deepEqual(ids, ['academic', 'genealogy', 'estudio', 'databases', 'worldbuilding', 'docencia']);
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
+  assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
-  for (const gated of ['estudio', 'primary_sources']) {
+  for (const preview of ['worldbuilding', 'docencia']) {
+    assert.equal(vt.getVaultTypeDef(preview).available, true, `${preview} preview is selectable`);
+    assert.equal(vt.isPreviewVaultType(preview), true);
+    assert.equal(vt.isViewAllowedForVaultType('home', preview), true);
+    assert.equal(vt.isViewAllowedForVaultType('settings', preview), false);
+  }
+  for (const gated of ['primary_sources', 'testimonios']) {
     assert.equal(vt.getVaultTypeDef(gated).available, false, `${gated} not selectable this release`);
   }
   // Order shown in the picker: shipped types first, then the coming-soon ones.
-  assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases']);
+  assert.deepEqual(vt.VAULT_TYPES.map((d) => d.id), ['academic', 'genealogy', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);
+});
+
+test('the vault picker derives selectable modes from the canonical registry', async () => {
+  const picker = await readFile(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
+  assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
+  assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'worldbuilding',\s*\]/s);
+  assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
+  assert.match(picker, /type === 'estudio'\) return 'pre-alpha'/);
+  assert.match(picker, /type === 'genealogy'\) return 'alpha'/);
+  assert.match(picker, /type === 'databases'\) return 'beta'/);
+  assert.match(picker, /data-testid="vault-phase-notice"/);
+  assert.match(picker, /data-testid="vault-preview-notice"/);
+  assert.match(picker, />PREVIEW<\/span>/);
+  assert.match(picker, /Icon name="bug"/);
+  assert.match(picker, /data-testid="vault-phase-tooltip"/);
+  assert.match(picker, /tooltipOpen && createPortal/);
+  assert.match(picker, /className="pointer-events-none fixed z-\[90\]/);
+  assert.match(picker, /window\.innerWidth - width - 8/);
+  assert.match(picker, /window\.innerHeight - 8/);
+  assert.match(picker, /className=\{`card-modal max-h-\[90vh\]/, 'vault creation and management dialogs use an opaque surface');
+  assert.doesNotMatch(picker, /className=\{`card max-h-\[90vh\]/, 'translucent cards must not be used as modal panels');
+});
+
+test('teaching and worldbuilding previews expose their complete inert bilingual sidebars', async () => {
+  const [sidebar, app, english] = await Promise.all([
+    readFile(path.join(repoRoot, 'src/components/PreviewVaultSidebar.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
+  ]);
+  for (const label of ['Cursos y asignaturas', 'Grupos', 'Horarios', 'Calendario', 'Materiales', 'Grabaciones', 'Banco de preguntas', 'Rúbricas', 'Exámenes', 'Calificaciones', 'Guía docente / Programación', 'Unidades didácticas', 'Situaciones de aprendizaje', 'Adaptaciones', 'Proyectos de innovación', 'Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Escenas', 'Tramas', 'Manuscritos']) {
+    assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in preview sidebar`);
+  }
+  assert.match(sidebar, /disabled aria-disabled="true"/);
+  assert.match(app, /<PreviewVaultSidebar type=\{activeVault\.type\}/);
+  assert.match(app, /preview-vault-home-/);
+  assert.match(english, /'World chat'/);
+  assert.match(english, /'Teaching guide \/ Course planning'/);
+});
+
+test('the header vault action uses a stable localized label', async () => {
+  const app = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  assert.match(app, /icon="archive"\s+label=\{t\('Bóvedas'\)\}/s);
+  assert.doesNotMatch(app, /label=\{activeVault\?\.name \?\? t\('Bóveda'\)\}/);
 });
 
 test('databases mode: table/analysis/chat views scoped to it + data-analyst prompt pack', () => {
@@ -90,7 +140,7 @@ test('genealogy hides argumentative + idea-graph authoring views, keeps records 
   const hidden = vt.defaultHiddenViewsForType('genealogy');
   // Argumentative/idea-graph surfaces AND the idea-graph authoring tools (Writing,
   // Projects) are hidden; they'd run empty in genealogy.
-  for (const h of ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading', 'research', 'gaps', 'ideas', 'authors', 'graph', 'writing', 'projects']) {
+  for (const h of ['argument', 'debate', 'immersion', 'hypothesis', 'reading', 'research', 'gaps', 'ideas', 'authors', 'graph', 'writing', 'projects']) {
     assert.ok(hidden.includes(h), `${h} hidden in genealogy`);
   }
   // Deep Research STAYS (it has a genealogy pipeline over the archive/library), and so
@@ -108,23 +158,42 @@ test('vaultTypeImagePrompt steers image aesthetics by type', () => {
   assert.equal(vt.vaultTypeImagePrompt('estudio'), '');
 });
 
-test('primary_sources hides argument/study surfaces but keeps ideas/authors', () => {
+test('primary_sources hides argument surfaces but keeps ideas/authors', () => {
   const hidden = vt.defaultHiddenViewsForType('primary_sources');
-  assert.ok(hidden.includes('argument') && hidden.includes('debate') && hidden.includes('study'));
+  assert.ok(hidden.includes('argument') && hidden.includes('debate'));
   for (const kept of ['ideas', 'authors', 'library', 'graph', 'notes']) {
     assert.ok(!hidden.includes(kept), `${kept} stays visible in primary_sources`);
   }
   assert.match(vt.vaultTypePromptPack('primary_sources'), /FUENTES PRIMARIAS/);
 });
 
-test('academic shows the full sidebar; estudio hides research/authoring views', () => {
+test('academic shows the full sidebar; estudio uses its dedicated learning workspace', () => {
   assert.deepEqual(vt.defaultHiddenViewsForType('academic'), []);
   const estudioHidden = vt.defaultHiddenViewsForType('estudio');
-  assert.ok(estudioHidden.includes('debate'));
-  assert.ok(estudioHidden.includes('deepResearch'));
-  // Core learning surfaces must stay visible.
-  for (const kept of ['search', 'library', 'ideas', 'study', 'reading', 'notes']) {
+  for (const hidden of ['search', 'library', 'graph', 'debate', 'deepResearch', 'writing', 'notes']) {
+    assert.ok(estudioHidden.includes(hidden), `${hidden} replaced by a study-specific surface`);
+  }
+  for (const kept of ['studyCourses', 'studySchedule', 'studySearch', 'studyLibrary', 'studyRecordings', 'studyChat', 'studyQuestions']) {
     assert.ok(!estudioHidden.includes(kept), `${kept} stays visible in estudio`);
+  }
+});
+
+test('all dedicated study views are scoped to estudio', () => {
+  const studyViews = [
+    'studyCourses',
+    'studySchedule',
+    'studySearch',
+    'studyLibrary',
+    'studyRecordings',
+    'studyChat',
+    'studyQuestions',
+    'studyReview',
+  ];
+  for (const view of studyViews) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
+    for (const other of ['academic', 'genealogy', 'primary_sources', 'databases']) {
+      assert.equal(vt.isViewAllowedForVaultType(view, other), false, `${view} hidden in ${other}`);
+    }
   }
 });
 

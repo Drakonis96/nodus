@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { NodiChatMessage, NodiNotification, VaultType } from '@shared/types';
+import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNotification, VaultType } from '@shared/types';
 import { Nodi, type NodiRole, type NodiState } from './Nodi';
+import { Markdown } from '../Markdown';
+import { ModelPicker } from '../ModelPicker';
+import { Icon } from '../ui';
+import { setActiveLang, t } from '../../i18n';
 import './companion.css';
 
 /** Nodi wears a subtle accessory that reflects the active vault's mode. */
@@ -89,8 +93,15 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [messages, setMessages] = useState<NodiChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
-  const [allVaults, setAllVaults] = useState(false);
+  const [contexts, setContexts] = useState<NodiContextKind[]>(['documentation', 'current_view']);
+  const [conversations, setConversations] = useState<NodiConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [chatTool, setChatTool] = useState<'none' | 'history' | 'contexts' | 'settings'>('none');
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [nodiModel, setNodiModel] = useState<ModelRef | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{ kind: 'conversation'; conversation: NodiConversation } | { kind: 'all' } | null>(null);
   const msgsRef = useRef<HTMLDivElement | null>(null);
+  const hasOpenSurface = menuOpen || helpOpen || panel !== 'none';
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -106,21 +117,45 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   const [vaultType, setVaultType] = useState<VaultType | null>(null);
   const [celebrate, setCelebrate] = useState(false);
+  const latestNotificationId = useRef<string | null>(null);
+  const notificationsReady = useRef(false);
   // Costumes come from the parent (app) when provided, otherwise fetched (overlay).
   const [fetchedCostumes, setFetchedCostumes] = useState(true);
   const costumesEnabled = costumes ?? fetchedCostumes;
   const role = costumesEnabled ? roleForVault(vaultType) : 'none';
 
   useEffect(() => {
-    if (costumes !== undefined) return;
-    window.nodus.getSettings().then((s) => setFetchedCostumes(s.mascotVaultCostumes)).catch(() => {});
-    return window.nodus.onSettingsChanged((s) => setFetchedCostumes(s.mascotVaultCostumes));
+    const apply = (next: AppSettings) => {
+      setSettings(next);
+      setNodiModel(next.nodiModel ?? next.synthesisModel ?? null);
+      setActiveLang(next.uiLanguage);
+      if (costumes === undefined) setFetchedCostumes(next.mascotVaultCostumes);
+    };
+    window.nodus.getSettings().then(apply).catch(() => {});
+    return window.nodus.onSettingsChanged(apply);
   }, [costumes]);
+
+  const refreshConversations = useCallback(() => {
+    void window.nodus.listNodiConversations().then(setConversations).catch(() => {});
+  }, []);
+  useEffect(() => { refreshConversations(); }, [refreshConversations]);
 
   // ── Notifications: load + live updates ────────────────────────────────────
   useEffect(() => {
-    window.nodus.listNotifications().then(setNtfs).catch(() => {});
-    return window.nodus.onNotificationsChanged(setNtfs);
+    window.nodus.listNotifications().then((next) => {
+      latestNotificationId.current = next[0]?.id ?? null;
+      notificationsReady.current = true;
+      setNtfs(next);
+    }).catch(() => {});
+    return window.nodus.onNotificationsChanged((next) => {
+      const latest = next[0];
+      if (latest && !latest.read && notificationsReady.current && latest.id !== latestNotificationId.current) {
+        setCelebrate(true);
+        window.setTimeout(() => setCelebrate(false), 1500);
+      }
+      latestNotificationId.current = latest?.id ?? null;
+      setNtfs(next);
+    });
   }, []);
 
   // ── Active vault: drives Nodi's per-vault accessory + a little "poof" when it
@@ -175,27 +210,38 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   }, []);
   useEffect(() => {
     if (!isOverlay) return;
-    window.nodus.nodiSetMouseIgnore(true);
-    lastInteractive.current = false;
+    if (hasOpenSurface) {
+      lastInteractive.current = true;
+      void window.nodus.nodiSetExpanded(true);
+    } else {
+      lastInteractive.current = false;
+      void window.nodus.nodiSetExpanded(false);
+    }
     const onMove = (e: MouseEvent) => {
       if (draggingRef.current) return;
+      if (hasOpenSurface) { setInteractive(true); return; }
       const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
       setInteractive(!!el?.closest('[data-nodi-interactive]'));
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
-  }, [isOverlay, setInteractive]);
+  }, [hasOpenSurface, isOverlay, setInteractive]);
 
   // ── Auto-scroll chat ──────────────────────────────────────────────────────
   useEffect(() => {
     if (panel === 'chat' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
   }, [messages, panel]);
 
-  const closeAll = () => {
+  const closeAll = useCallback(() => {
     setMenuOpen(false);
     setPanel('none');
     setHelpOpen(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isOverlay) return;
+    return window.nodus.onNodiDismiss(closeAll);
+  }, [closeAll, isOverlay]);
 
   // Click anywhere outside Nodi or its controls closes the menu/panels/bubble.
   useEffect(() => {
@@ -258,17 +304,58 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   };
 
   const nodiState: NodiState = streaming ? 'loading' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
+  const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
 
   type Item = { id: string; label: string; icon: React.ReactNode; onClick: () => void; badge?: number };
   const items: Item[] = useMemo(() => {
     const base: Item[] = [
-      { id: 'help', label: '¿Quién soy?', icon: <IconHelp />, onClick: () => { setHelpOpen((v) => !v); setPanel('none'); } },
-      { id: 'ntf', label: 'Notificaciones', icon: <IconBell />, onClick: openNotifications, badge: unread },
-      { id: 'chat', label: 'Chat', icon: <IconChat />, onClick: () => { setPanel((p) => (p === 'chat' ? 'none' : 'chat')); setHelpOpen(false); } },
+      { id: 'help', label: t('¿Quién soy?'), icon: <IconHelp />, onClick: () => { setHelpOpen((v) => !v); setPanel('none'); } },
+      { id: 'ntf', label: t('Notificaciones'), icon: <IconBell />, onClick: openNotifications, badge: unread },
+      { id: 'chat', label: t('Chat'), icon: <IconChat />, onClick: () => { setPanel((p) => (p === 'chat' ? 'none' : 'chat')); setHelpOpen(false); } },
     ];
-    if (isOverlay) base.push({ id: 'open', label: 'Abrir Nodus', icon: <IconOpen />, onClick: () => window.nodus.nodiOpenMainWindow() });
+    if (isOverlay) base.push({ id: 'open', label: t('Abrir Nodus'), icon: <IconOpen />, onClick: () => window.nodus.nodiOpenMainWindow() });
     return base;
-  }, [isOverlay, unread, panel]);
+  }, [isOverlay, unread, panel, settings?.uiLanguage]);
+
+  const newChat = () => {
+    if (streaming) return;
+    setActiveConversationId(null);
+    setMessages([]);
+    setInput('');
+    setChatTool('none');
+  };
+
+  const openConversation = (conversation: NodiConversation) => {
+    if (streaming) return;
+    setActiveConversationId(conversation.id);
+    setMessages(conversation.messages);
+    setContexts(conversation.contexts);
+    setNodiModel(conversation.model ?? settings?.nodiModel ?? settings?.synthesisModel ?? null);
+    setChatTool('none');
+  };
+
+  const confirmDeleteConversations = async () => {
+    if (!deleteConfirmation || streaming) return;
+    if (deleteConfirmation.kind === 'all') {
+      await window.nodus.clearNodiConversations();
+      setConversations([]); setActiveConversationId(null); setMessages([]); setInput('');
+    } else {
+      const id = deleteConfirmation.conversation.id;
+      await window.nodus.deleteNodiConversation(id);
+      setConversations((current) => current.filter((conversation) => conversation.id !== id));
+      if (activeConversationId === id) { setActiveConversationId(null); setMessages([]); setInput(''); }
+    }
+    setDeleteConfirmation(null);
+  };
+
+  const toggleContext = (kind: NodiContextKind) => {
+    setContexts((current) => current.includes(kind) ? current.filter((item) => item !== kind) : [...current, kind]);
+  };
+
+  const changeNodiModel = (model: ModelRef | null) => {
+    setNodiModel(model);
+    void window.nodus.updateSettings({ nodiModel: model });
+  };
 
   const send = async () => {
     const text = input.trim();
@@ -277,28 +364,38 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setMessages([...next, { role: 'assistant', content: '' }]);
     setInput('');
     setStreaming(true);
+    let conversationId = activeConversationId;
+    let assistantText = '';
     try {
-      await window.nodus.nodiChatStream(
-        { messages: next, allVaults },
+      const saved = await window.nodus.saveNodiConversation({
+        id: conversationId,
+        title: next.find((message) => message.role === 'user')?.content.slice(0, 72),
+        messages: next,
+        contexts,
+        model: nodiModel,
+      });
+      conversationId = saved.id;
+      setActiveConversationId(saved.id);
+      const currentView = contexts.includes('current_view') ? await window.nodus.getNodiViewContext() : null;
+      const answer = await window.nodus.nodiChatStream(
+        { messages: next, contexts, model: nodiModel, currentView },
         {
-          onDelta: (d) =>
-            setMessages((cur) => {
-              const copy = cur.slice();
-              const last = copy[copy.length - 1];
-              if (last?.role === 'assistant') copy[copy.length - 1] = { ...last, content: last.content + d };
-              return copy;
-            }),
+          onDelta: (delta) => {
+            assistantText += delta;
+            setMessages([...next, { role: 'assistant', content: assistantText }]);
+          },
         }
       );
+      assistantText = answer || assistantText;
     } catch (err) {
-      setMessages((cur) => {
-        const copy = cur.slice();
-        const last = copy[copy.length - 1];
-        const msg = err instanceof Error ? err.message : 'No se pudo responder.';
-        if (last?.role === 'assistant') copy[copy.length - 1] = { ...last, content: last.content || `⚠️ ${msg}` };
-        return copy;
-      });
+      assistantText ||= `⚠️ ${err instanceof Error ? err.message : t('No se pudo responder.')}`;
     } finally {
+      const finalMessages: NodiChatMessage[] = [...next, { role: 'assistant', content: assistantText }];
+      setMessages(finalMessages);
+      if (conversationId) {
+        await window.nodus.saveNodiConversation({ id: conversationId, messages: finalMessages, contexts, model: nodiModel }).catch(() => undefined);
+      }
+      refreshConversations();
       setStreaming(false);
     }
   };
@@ -326,13 +423,13 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       <div className="nodi-anchor" style={anchorStyle}>
         {helpOpen && (
           <div className="nodi-bubble" data-nodi-interactive>
-            <button className="nodi-bubble-x" onClick={() => setHelpOpen(false)} aria-label="Cerrar">✕</button>
-            <h4>¡Hola! Soy Nodi</h4>
-            Soy el nodo que acompaña Nodus. Puedo ayudarte a orientarte por la app.
+            <button className="nodi-bubble-x" onClick={() => setHelpOpen(false)} aria-label={t('Cerrar')}>✕</button>
+            <h4>{t('¡Hola! Soy Nodi')}</h4>
+            {t('Soy el asistente integrado de Nodus. Puedo orientarte por la app y trabajar con los contextos que selecciones.')}
             <ul>
-              <li><b>Chat</b>: pregúntame sobre Nodus y su configuración.</li>
-              <li><b>Notificaciones</b>: te aviso de novedades.</li>
-              <li>Y más funciones en camino…</li>
+              <li><b>{t('Chat')}</b>: {t('respuestas fundamentadas en las fuentes activas.')}</li>
+              <li><b>{t('Contextos')}</b>: {t('documentación, vista actual y recuperación acotada del vault.')}</li>
+              <li><b>{t('Notificaciones')}</b>: {t('avisos locales de la aplicación.')}</li>
             </ul>
           </div>
         )}
@@ -340,14 +437,14 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         {panel === 'notifications' && (
           <div className="nodi-panel" data-nodi-interactive style={{ height: 320 }}>
             <div className="nodi-panel-head">
-              <span>Notificaciones</span>
+              <span>{t('Notificaciones')}</span>
               <span className="grow" />
-              <button onClick={() => window.nodus.clearNotifications().then(setNtfs)}>Limpiar</button>
-              <button onClick={() => setPanel('none')} aria-label="Cerrar">✕</button>
+              <button onClick={() => window.nodus.clearNotifications().then(setNtfs)}>{t('Limpiar')}</button>
+              <button onClick={() => setPanel('none')} aria-label={t('Cerrar')}>✕</button>
             </div>
             <div className="nodi-panel-body">
               {ntfs.length === 0 ? (
-                <div className="nodi-empty">No hay notificaciones.</div>
+                <div className="nodi-empty">{t('No hay notificaciones.')}</div>
               ) : (
                 ntfs.map((n) => (
                   <div key={n.id} className={`nodi-ntf${n.read ? '' : ' unread'}`}>
@@ -365,18 +462,60 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         )}
 
         {panel === 'chat' && (
-          <div className="nodi-panel" data-nodi-interactive style={{ height: 380 }}>
+          <div className="nodi-panel nodi-chat-panel" data-nodi-interactive style={{ height: 460 }}>
             <div className="nodi-panel-head">
-              <span>Chat con Nodi</span>
+              <span className="nodi-chat-title" title={activeConversation?.title ?? t('Chat con Nodi')}>{activeConversation?.title ?? t('Chat con Nodi')}</span>
               <span className="grow" />
-              {messages.length > 0 && <button onClick={() => setMessages([])}>Limpiar</button>}
-              <button onClick={() => setPanel('none')} aria-label="Cerrar">✕</button>
+              <button className="nodi-head-icon" disabled={streaming} onClick={newChat} title={t('Nuevo chat')} aria-label={t('Nuevo chat')}><Icon name="plus" size={15} /></button>
+              <button className={`nodi-head-icon${chatTool === 'history' ? ' active' : ''}`} disabled={streaming} onClick={() => setChatTool((tool) => tool === 'history' ? 'none' : 'history')} title={t('Historial de chats')} aria-label={t('Historial de chats')}><Icon name="clock" size={15} /></button>
+              <button className={`nodi-head-icon nodi-context-button${chatTool === 'contexts' ? ' active' : ''}`} onClick={() => setChatTool((tool) => tool === 'contexts' ? 'none' : 'contexts')} title={t('Contextos')} aria-label={t('Contextos')}><Icon name="layers" size={15} /><span>{contexts.length}</span></button>
+              <button className={`nodi-head-icon${chatTool === 'settings' ? ' active' : ''}`} onClick={() => setChatTool((tool) => tool === 'settings' ? 'none' : 'settings')} title={t('Ajustes de Nodi')} aria-label={t('Ajustes de Nodi')}><Icon name="settings" size={15} /></button>
+              <button className="nodi-head-icon" onClick={() => setPanel('none')} title={t('Cerrar')} aria-label={t('Cerrar')}><Icon name="x" size={15} /></button>
             </div>
+            {chatTool === 'history' && (
+              <div className="nodi-chat-tool nodi-history">
+                <div className="nodi-history-head"><div className="nodi-tool-title">{t('Historial de chats')}</div>{conversations.length > 0 && <button className="nodi-clear-history" onClick={() => setDeleteConfirmation({ kind: 'all' })}><Icon name="trash" size={11} />{t('Borrar todo')}</button>}</div>
+                {conversations.length === 0 ? <div className="nodi-tool-empty">{t('Todavía no hay conversaciones guardadas.')}</div> : conversations.map((conversation) => (
+                  <div key={conversation.id} className={`nodi-history-row${conversation.id === activeConversationId ? ' active' : ''}`}>
+                    <button className="nodi-history-open" onClick={() => openConversation(conversation)}><span className="nodi-history-copy"><b>{conversation.title}</b><small>{conversation.vaultName ?? t('Sin bóveda')} · {new Date(conversation.updatedAt).toLocaleDateString()}</small></span><span>{conversation.messages.length}</span></button>
+                    <button className="nodi-history-delete" title={t('Borrar conversación')} aria-label={`${t('Borrar conversación')}: ${conversation.title}`} onClick={() => setDeleteConfirmation({ kind: 'conversation', conversation })}><Icon name="trash" size={12} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {chatTool === 'contexts' && (
+              <div className="nodi-chat-tool">
+                <div className="nodi-tool-title">{t('Contextos para la próxima respuesta')}</div>
+                <div className="nodi-context-grid">
+                  {([
+                    ['documentation', t('Documentación de Nodus'), t('Funciones y rutas verificadas de la aplicación.')],
+                    ['current_view', t('Vista actual'), t('Texto visible de la sección abierta, acotado.')],
+                    ['vault', t('Bóveda actual'), t('Recuperación semántica relevante, no el vault completo.')],
+                    ['all_vaults', t('Todos los vaults'), t('Inventario transversal con conteos y elementos relevantes de cada vault.')],
+                  ] as Array<[NodiContextKind, string, string]>).map(([kind, label, description]) => (
+                    <label key={kind}>
+                      <input type="checkbox" checked={contexts.includes(kind)} onChange={() => toggleContext(kind)} />
+                      <span><b>{label}</b><small>{description}</small></span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {chatTool === 'settings' && settings && (
+              <div className="nodi-chat-tool nodi-settings-tool">
+                <div className="nodi-tool-title">{t('Ajustes de Nodi')}</div>
+                <label><span>{t('Modelo')}</span><ModelPicker settings={settings} value={nodiModel} onChange={changeNodiModel} compact menu emptyLabel="Usar modelo de síntesis" /></label>
+                <div className="nodi-visibility-row"><span>{t('Visible en la interfaz')}</span><b>{settings.mascotEnabled ? t('Sí') : t('No')}</b></div>
+                <button className="nodi-open-settings" onClick={() => void window.nodus.nodiOpenSettings()}><Icon name="external" size={13} /> {t('Abrir ajustes de visibilidad')}</button>
+              </div>
+            )}
             <div className="nodi-chat-msgs" ref={msgsRef} style={{ flex: 1 }}>
-              {messages.length === 0 && <div className="nodi-empty">Pregúntame lo que quieras sobre Nodus.</div>}
+              {messages.length === 0 && <div className="nodi-empty">{t('Pregúntame sobre Nodus o sobre los contextos que selecciones.')}</div>}
               {messages.map((m, i) => (
                 <div key={i} className={`nodi-msg ${m.role}`}>
-                  {m.content || (streaming && i === messages.length - 1 ? <span className="nodi-typing">escribiendo…</span> : '')}
+                  {m.content
+                    ? m.role === 'assistant' ? <Markdown content={m.content} verify={false} /> : m.content
+                    : streaming && i === messages.length - 1 ? <span className="nodi-typing">{t('escribiendo…')}</span> : ''}
                 </div>
               ))}
             </div>
@@ -385,7 +524,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                 <textarea
                   className="nodi-chat-input"
                   value={input}
-                  placeholder="Escribe a Nodi…"
+                  placeholder={t('Escribe a Nodi…')}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -395,20 +534,19 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                   }}
                 />
                 {streaming ? (
-                  <button className="nodi-chat-send" onClick={() => window.nodus.cancelNodiChat()} title="Detener">■</button>
+                  <button className="nodi-chat-send" onClick={() => window.nodus.cancelNodiChat()} title={t('Detener')}>■</button>
                 ) : (
-                  <button className="nodi-chat-send" onClick={() => void send()} disabled={!input.trim()} title="Enviar">
+                  <button className="nodi-chat-send" onClick={() => void send()} disabled={!input.trim()} title={t('Enviar')}>
                     <IconSend />
                   </button>
                 )}
               </div>
-              <div className="nodi-chat-opts">
-                <label>
-                  <input type="checkbox" checked={allVaults} onChange={(e) => setAllVaults(e.target.checked)} />
-                  Todas las bóvedas
-                </label>
-              </div>
+              <div className="nodi-chat-status"><Icon name="layers" size={11} /> {t('{count} contextos activos').replace('{count}', String(contexts.length))}</div>
             </div>
+            {deleteConfirmation && <div className="nodi-confirm-overlay"><div className="nodi-confirm-dialog" role="dialog" aria-modal="true" aria-label={t(deleteConfirmation.kind === 'all' ? 'Borrar todo el historial' : 'Borrar conversación')}>
+              <Icon name="trash" size={18} /><h3>{t(deleteConfirmation.kind === 'all' ? 'Borrar todo el historial' : 'Borrar conversación')}</h3><p>{deleteConfirmation.kind === 'all' ? t('Se eliminarán todas las conversaciones de Nodi. Esta acción no se puede deshacer.') : t('Se eliminará «{title}». Esta acción no se puede deshacer.').replace('{title}', deleteConfirmation.conversation.title)}</p>
+              <div><button onClick={() => setDeleteConfirmation(null)}>{t('Cancelar')}</button><button className="danger" onClick={() => void confirmDeleteConversations()}>{t('Borrar')}</button></div>
+            </div></div>}
           </div>
         )}
 

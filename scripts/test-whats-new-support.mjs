@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const modal = await readFile(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
+const translations = await readFile(path.join(root, 'src/i18n.en.ts'), 'utf8');
+const icons = await readFile(path.join(root, 'src/components/ui.tsx'), 'utf8');
+
+assert.match(modal, /data-testid="whats-new-paypal-support"/);
+assert.match(modal, /data-testid="whats-new-cinematic-modal"/);
+assert.match(modal, /Nodi state="celebrating"/);
+assert.match(modal, /whats-new-confetti/);
+assert.match(modal, /initial=\{\{ opacity: 0, y: 28, scale: \.96 \}\}/);
+assert.match(modal, /data-testid="whats-new-support-paypal"/);
+assert.match(modal, /data-testid="whats-new-footer-support-paypal"/);
+assert.equal((modal.match(/https:\/\/paypal\.me\/Jorgepb96/g) ?? []).length, 2);
+assert.match(modal, /<footer className="whats-new-footer">[\s\S]*whats-new-footer-support[\s\S]*Explorar las novedades[\s\S]*<\/footer>/);
+assert.match(modal, /<div className="whats-new-release-version">v\{note\.version\}<\/div>/);
+assert.match(modal, /note\.highlights\.map[\s\S]*<li key=\{i\}>/);
+assert.doesNotMatch(modal, /<motion\.li/);
+assert.match(modal, /Icon name="paypal"/);
+assert.match(modal, /https:\/\/paypal\.me\/Jorgepb96/);
+assert.match(modal, /La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación/);
+assert.match(translations, /'Apoya el proyecto': 'Support the project'/);
+assert.match(translations, /Donations are entirely optional: they do not unlock features or change access to the application/);
+assert.match(icons, /paypal:/);
+
+console.log('What\'s new PayPal support tests passed!');

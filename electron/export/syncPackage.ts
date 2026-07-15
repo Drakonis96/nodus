@@ -43,7 +43,13 @@ interface SyncPayload {
   saved_searches: SearchRow[];
   edge_feedback: FeedbackRow[];
   databases: DbSyncUnit[];
+  /** Every study_* table is carried independently. Older v1 packages simply
+   * omit these keys, so the extension remains backwards compatible. */
+  [table: `study_${string}`]: PortableRow[];
 }
+
+type PortableScalar = string | number | null | { __nodusBuffer: string };
+type PortableRow = Record<string, PortableScalar>;
 
 interface FolderRow {
   id: string;
@@ -94,7 +100,7 @@ interface FeedbackRow {
 /** Snapshot the user layer into a zip buffer with a validating manifest. */
 export function buildSyncPackage(appVersion: string): { buffer: Buffer; counts: Record<string, number> } {
   const db = getDb();
-  const payload: SyncPayload = {
+  const payload = {
     note_folders: db.prepare('SELECT id, parent_id, name, order_idx, created_at, updated_at FROM note_folders').all() as FolderRow[],
     notes: db
       .prepare('SELECT id, folder_id, title, kind, content, source_json, order_idx, created_at, updated_at FROM notes')
@@ -105,7 +111,11 @@ export function buildSyncPackage(appVersion: string): { buffer: Buffer; counts: 
     saved_searches: db.prepare('SELECT id, name, query, mode, kinds_json, created_at FROM saved_searches').all() as SearchRow[],
     edge_feedback: db.prepare('SELECT from_id, to_id, type, verdict, note, created_at FROM edge_feedback').all() as FeedbackRow[],
     databases: serializeDatabasesForSync(),
-  };
+  } as SyncPayload;
+  for (const table of listStudyTables()) {
+    payload[table as `study_${string}`] = (db.prepare(`SELECT * FROM ${quoteIdentifier(table)}`).all() as Record<string, unknown>[])
+      .map(encodePortableRow);
+  }
   const counts = Object.fromEntries(Object.entries(payload).map(([table, rows]) => [table, rows.length]));
   const manifest: SyncManifest = {
     format: SYNC_FORMAT,
@@ -159,6 +169,7 @@ export function mergeSyncPackage(buffer: Buffer): SyncMergeSummary {
     savedSearches: zeroCounts(),
     edgeFeedback: zeroCounts(),
     databases: zeroCounts(),
+    study: zeroCounts(),
   };
 
   const tx = db.transaction(() => {
@@ -168,9 +179,96 @@ export function mergeSyncPackage(buffer: Buffer): SyncMergeSummary {
     mergeSearches(payload.saved_searches ?? [], summary.savedSearches);
     mergeFeedback(payload.edge_feedback ?? [], summary.edgeFeedback);
     mergeDatabases(payload.databases ?? [], summary.databases);
+    mergeStudyTables(payload, summary.study);
   });
   tx();
   return summary;
+}
+
+function quoteIdentifier(value: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) throw new Error('Identificador de tabla no válido.');
+  return `"${value}"`;
+}
+
+function listStudyTables(): string[] {
+  return (getDb().prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'study\\_%' ESCAPE '\\' ORDER BY name").all() as { name: string }[])
+    .map((row) => row.name)
+    .filter((name) => /^study_[A-Za-z0-9_]+$/.test(name));
+}
+
+function encodePortableRow(row: Record<string, unknown>): PortableRow {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => {
+    if (Buffer.isBuffer(value)) return [key, { __nodusBuffer: value.toString('base64') }];
+    if (value === null || typeof value === 'string' || typeof value === 'number') return [key, value];
+    throw new Error(`El campo ${key} contiene un valor no portable.`);
+  })) as PortableRow;
+}
+
+function decodePortableValue(value: PortableScalar): string | number | Buffer | null {
+  if (value && typeof value === 'object') {
+    if (typeof value.__nodusBuffer !== 'string') throw new Error('Valor binario no válido en el paquete de sincronización.');
+    return Buffer.from(value.__nodusBuffer, 'base64');
+  }
+  return value;
+}
+
+interface TableColumn { name: string; pk: number }
+
+/**
+ * Merge every study row as an atomic record. Primary keys identify conflicts;
+ * updated_at (or created_at) decides which side wins. The complete row is
+ * written in one statement, including binary material/audio/embedding fields.
+ * Foreign keys are deferred until the transaction ends so an arbitrary table
+ * name order cannot split a course/document/material tree mid-import.
+ */
+function mergeStudyTables(payload: SyncPayload, counts: SyncTableCounts): void {
+  const db = getDb();
+  const localTables = new Set(listStudyTables());
+  const incomingTables = Object.keys(payload).filter((name) => /^study_[A-Za-z0-9_]+$/.test(name)).sort();
+  if (incomingTables.length === 0) return;
+  db.pragma('defer_foreign_keys = ON');
+  for (const table of incomingTables) {
+    const rows = payload[table as `study_${string}`];
+    if (!Array.isArray(rows)) continue;
+    if (!localTables.has(table)) {
+      counts.skipped += rows.length;
+      continue;
+    }
+    const columns = db.pragma(`table_info(${quoteIdentifier(table)})`) as TableColumn[];
+    const allowed = new Set(columns.map((column) => column.name));
+    const primaryKeys = columns.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) => column.name);
+    if (primaryKeys.length === 0) {
+      counts.skipped += rows.length;
+      continue;
+    }
+    for (const portable of rows) {
+      const row = Object.fromEntries(Object.entries(portable).filter(([key]) => allowed.has(key)).map(([key, value]) => [key, decodePortableValue(value)]));
+      if (primaryKeys.some((key) => row[key] === undefined)) throw new Error(`Paquete inválido: falta la clave primaria de ${table}.`);
+      const where = primaryKeys.map((key) => `${quoteIdentifier(key)} = ?`).join(' AND ');
+      const keyValues = primaryKeys.map((key) => row[key]);
+      const local = db.prepare(`SELECT * FROM ${quoteIdentifier(table)} WHERE ${where}`).get(...keyValues) as Record<string, unknown> | undefined;
+      const names = Object.keys(row);
+      if (!local) {
+        const placeholders = names.map(() => '?').join(', ');
+        db.prepare(`INSERT INTO ${quoteIdentifier(table)} (${names.map(quoteIdentifier).join(', ')}) VALUES (${placeholders})`).run(...names.map((name) => row[name]));
+        counts.inserted += 1;
+        continue;
+      }
+      const timestampKey = row.updated_at !== undefined ? 'updated_at' : row.created_at !== undefined ? 'created_at' : null;
+      if (!timestampKey || String(row[timestampKey] ?? '') <= String(local[timestampKey] ?? '')) {
+        counts.skipped += 1;
+        continue;
+      }
+      const mutable = names.filter((name) => !primaryKeys.includes(name));
+      if (mutable.length === 0) {
+        counts.skipped += 1;
+        continue;
+      }
+      db.prepare(`UPDATE ${quoteIdentifier(table)} SET ${mutable.map((name) => `${quoteIdentifier(name)} = ?`).join(', ')} WHERE ${where}`)
+        .run(...mutable.map((name) => row[name]), ...keyValues);
+      counts.updated += 1;
+    }
+  }
 }
 
 function zeroCounts(): SyncTableCounts {

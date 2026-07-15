@@ -15,6 +15,12 @@ export interface CentroidMatch {
   similarity: number;
 }
 
+export interface NeighborMatch {
+  queryId: string;
+  candidateId: string;
+  similarity: number;
+}
+
 export function cosineF32(a: Float32Array, b: Float32Array): number {
   let dot = 0;
   let na = 0;
@@ -94,6 +100,88 @@ export async function topMatchesPerCentroidChunked(
     }
     scored.sort((a, b) => b.similarity - a.similarity);
     out.push(...scored.slice(0, maxPerCentroid));
+  }
+  return out;
+}
+
+function coarseCosine(a: Float32Array, b: Float32Array, maxDimensions: number): number {
+  const n = Math.min(a.length, b.length);
+  const stride = Math.max(1, Math.floor(n / Math.max(1, maxDimensions)));
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < n; i += stride) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
+  }
+  return na === 0 || nb === 0 ? 0 : dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
+/**
+ * Two-stage nearest-neighbour search: a cheap 64-dimension projection selects a
+ * bounded shortlist, then exact cosine ranks that shortlist. This avoids the
+ * previous full-dimensional O(N²) scans while preserving exact scores for every
+ * returned pair.
+ */
+export function topApproximateNeighbors(
+  queries: LabeledVector[],
+  candidates: LabeledVector[],
+  threshold: number,
+  maxPerQuery: number,
+  shortlistSize = 64,
+  coarseDimensions = 64
+): NeighborMatch[] {
+  const out: NeighborMatch[] = [];
+  const shortlistLimit = Math.max(maxPerQuery, shortlistSize);
+  for (const query of queries) {
+    const shortlist = candidates
+      .filter((candidate) => candidate.id !== query.id)
+      .map((candidate) => ({ candidate, coarse: coarseCosine(query.vector, candidate.vector, coarseDimensions) }))
+      .sort((a, b) => b.coarse - a.coarse)
+      .slice(0, shortlistLimit);
+    const exact = shortlist
+      .map(({ candidate }) => ({ queryId: query.id, candidateId: candidate.id, similarity: cosineF32(query.vector, candidate.vector) }))
+      .filter((match) => match.similarity >= threshold)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, maxPerQuery);
+    out.push(...exact);
+  }
+  return out;
+}
+
+export async function topApproximateNeighborsChunked(
+  queries: LabeledVector[],
+  candidates: LabeledVector[],
+  threshold: number,
+  maxPerQuery: number,
+  yieldFn: () => Promise<void>,
+  shortlistSize = 64,
+  coarseDimensions = 64,
+  chunkSize = 256
+): Promise<NeighborMatch[]> {
+  const out: NeighborMatch[] = [];
+  const shortlistLimit = Math.max(maxPerQuery, shortlistSize);
+  let sinceYield = 0;
+  for (const query of queries) {
+    const coarse: Array<{ candidate: LabeledVector; coarse: number }> = [];
+    for (const candidate of candidates) {
+      if (candidate.id !== query.id) {
+        coarse.push({ candidate, coarse: coarseCosine(query.vector, candidate.vector, coarseDimensions) });
+      }
+      if (++sinceYield >= chunkSize) {
+        sinceYield = 0;
+        await yieldFn();
+      }
+    }
+    const exact = coarse
+      .sort((a, b) => b.coarse - a.coarse)
+      .slice(0, shortlistLimit)
+      .map(({ candidate }) => ({ queryId: query.id, candidateId: candidate.id, similarity: cosineF32(query.vector, candidate.vector) }))
+      .filter((match) => match.similarity >= threshold)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, maxPerQuery);
+    out.push(...exact);
   }
   return out;
 }

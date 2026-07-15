@@ -34,6 +34,8 @@ try {
     'connectors are ignored and all-but-one token is enough on long names'
   );
   assert.match(disc.personProfileText({ name: 'Ana', events: [{ type: 'baptism', date: '1875', place: 'Sevilla' }] }), /Sevilla/);
+  assert.ok(disc.documentHasGenealogyAnchor({ name: 'Ana', birthDate: '1875', places: ['Sevilla'] }, 'Registro parroquial de Sevilla de 1875'));
+  assert.equal(disc.documentHasGenealogyAnchor({ name: 'Ana', birthDate: '1875', places: ['Sevilla'] }, 'Informe minero de Asturias de 1936'), false);
   assert.match(disc.archiveEmbeddingText({ title: 'Padrón', extractedText: 'vecinos de la villa' }), /vecinos/);
 
   // ── Repo + orchestrator ───────────────────────────────────────────────────

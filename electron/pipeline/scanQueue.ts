@@ -17,6 +17,7 @@ import { discoverSemanticBridges } from '../ai/semanticBridges';
 import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
+import { addNotification } from '../notifications';
 
 type ProgressListener = (p: QueueProgress) => void;
 
@@ -47,6 +48,8 @@ class ScanQueue {
   private degradedRetryScheduled = new Set<string>();
   /** True when a completed deep scan requested semantic bridge discovery on drain. */
   private bridgeAfterDrain = false;
+  /** Terminal jobs already represented in a drain notification. */
+  private notifiedTerminalIds = new Set<string>();
 
   onProgress(cb: ProgressListener): () => void {
     this.listeners.add(cb);
@@ -125,8 +128,11 @@ class ScanQueue {
     void this.run();
   }
 
-  enqueueBridge(model?: ModelRef | null): void {
-    if (this.items.some((i) => i.kind === 'bridge' && (i.state === 'queued' || i.state === 'running'))) {
+  enqueueBridge(model?: ModelRef | null, scopeNodusIds?: string[]): void {
+    const existing = this.items.find((i) => i.kind === 'bridge' && (i.state === 'queued' || i.state === 'running'));
+    if (existing) {
+      if (!scopeNodusIds) existing.scopeNodusIds = undefined;
+      else if (existing.scopeNodusIds) existing.scopeNodusIds = [...new Set([...existing.scopeNodusIds, ...scopeNodusIds])];
       return;
     }
     this.insertPending({
@@ -138,6 +144,7 @@ class ScanQueue {
       error: null,
       enqueued_at: new Date().toISOString(),
       model: model ?? null,
+      scopeNodusIds,
     });
     this.emit();
     void this.run();
@@ -217,6 +224,7 @@ class ScanQueue {
     this.degradedRetryScheduled.clear();
     this.bridgeAfterDrain = false;
     this.deepSinceReprocess = false;
+    this.notifiedTerminalIds.clear();
     this.paused = false;
     this.pausedReason = null;
     this.emit();
@@ -269,7 +277,26 @@ class ScanQueue {
       // Queue drained after deep scans → re-trace relations, (re-)index and
       // discover semantic bridges so the global graph stays connected.
       void this.runPostBatch();
+    } else if (!this.paused) {
+      this.notifyDrain();
     }
+  }
+
+  private notifyDrain(): void {
+    const terminal = this.items.filter((item) =>
+      (item.state === 'done' || item.state === 'failed') && !this.notifiedTerminalIds.has(item.id)
+    );
+    if (!terminal.length) return;
+    for (const item of terminal) this.notifiedTerminalIds.add(item.id);
+    const done = terminal.filter((item) => item.state === 'done').length;
+    const failed = terminal.length - done;
+    const english = getSettings().uiLanguage === 'en';
+    addNotification({
+      title: failed ? (english ? 'The analysis queue finished with issues' : 'La cola de análisis ha terminado con incidencias') : (english ? 'Analysis queue completed' : 'Cola de análisis completada'),
+      body: failed ? (english ? `${done} tasks completed and ${failed} failed.` : `${done} tareas completadas y ${failed} con errores.`) : (english ? `${done} tasks completed. The vault knowledge is up to date.` : `${done} tareas completadas. El conocimiento de la bóveda está actualizado.`),
+      kind: failed ? 'warning' : 'success',
+      dedupeKey: `scan-queue:${failed ? 'warning' : 'success'}`,
+    });
   }
 
   /**
@@ -279,13 +306,16 @@ class ScanQueue {
    * step is best-effort; failures are logged and never block the queue.
    */
   private async runPostBatch(): Promise<void> {
-    await this.autoReprocessConnections();
     const ids = Array.from(this.pendingIndexWorks);
     this.pendingIndexWorks.clear();
     await this.autoIndex(ids);
+    if (ids.length > 0) await this.autoReprocessConnections(ids);
     if (this.bridgeAfterDrain) {
       this.bridgeAfterDrain = false;
-      this.maybeEnqueueBridge();
+      if (ids.length > 0) this.maybeEnqueueBridge(ids);
+      else this.notifyDrain();
+    } else {
+      this.notifyDrain();
     }
   }
 
@@ -314,11 +344,20 @@ class ScanQueue {
    * relations) after a batch of deep scans completes. Runs once per drain cycle;
    * failures are logged but never block the queue.
    */
-  private async autoReprocessConnections(): Promise<void> {
+  private async autoReprocessConnections(nodusIds: string[]): Promise<void> {
     if (this.reprocessing) return;
     this.reprocessing = true;
     try {
-      await reprocessConnections({ relations: true });
+      const result = await reprocessConnections({ relations: true, nodusIds });
+      if (result.relationsAdded > 0 || result.newThemes > 0) {
+        const english = getSettings().uiLanguage === 'en';
+        addNotification({
+          title: english ? 'New connections in your vault' : 'Nuevas conexiones en tu bóveda',
+          body: english ? `${result.relationsAdded} relations and ${result.newThemes} new themes detected.` : `${result.relationsAdded} relaciones y ${result.newThemes} temas nuevos detectados.`,
+          kind: 'info',
+          dedupeKey: 'knowledge-connections',
+        });
+      }
     } catch (e) {
       console.error('[scanQueue] reprocess automático falló:', e instanceof Error ? e.message : String(e));
     } finally {
@@ -354,10 +393,10 @@ class ScanQueue {
   }
 
   /** Enqueue semantic bridge discovery once indexing is done, if configured. */
-  private maybeEnqueueBridge(): void {
+  private maybeEnqueueBridge(nodusIds: string[]): void {
     if (!this.embeddingConfigured()) return;
     const settings = getSettings();
-    this.enqueueBridge(settings.synthesisModel ?? null);
+    this.enqueueBridge(settings.synthesisModel ?? null, nodusIds);
   }
 
   private async process(item: QueueItem): Promise<void> {
@@ -548,10 +587,19 @@ class ScanQueue {
         item.subPct = 1;
       }
       this.emit();
-    });
+    }, item.scopeNodusIds);
     item.detail = `${result.added} nuevas · ${result.validated} validados · ${result.candidatesScanned} escaneados`;
     item.subPct = 1;
     this.emit();
+    if (result.added > 0) {
+      const english = getSettings().uiLanguage === 'en';
+      addNotification({
+        title: english ? 'Nodi found semantic relations' : 'Nodi ha encontrado relaciones semánticas',
+        body: english ? `${result.added} new connections after reviewing ${result.candidatesScanned} candidates.` : `${result.added} conexiones nuevas tras revisar ${result.candidatesScanned} candidatos.`,
+        kind: 'info',
+        dedupeKey: 'semantic-bridges',
+      });
+    }
   }
 
   /**

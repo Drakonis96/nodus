@@ -3,13 +3,13 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dialog, app } from 'electron';
-import type { AiProvider, AppSettings } from '@shared/types';
+import type { AiProvider, AppSettings, BackupSelection } from '@shared/types';
 import { AI_PROVIDERS } from '@shared/providers';
 import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import type { VaultType } from '@shared/types';
-import { clearApiKey, getApiKey, setApiKey } from '../secrets/secretStore';
+import { clearApiKey, getApiKey, getBackupPassword, setApiKey } from '../secrets/secretStore';
 import {
   decryptBackupPayload,
   encryptBackupPayload,
@@ -40,9 +40,11 @@ interface BackupVaultEntry {
 interface BackupManifest {
   format: 'nodus.encrypted-backup';
   // v3 = secret-free single-vault backup. v4 = multi-vault (every vault of every
-  // type). `includesSecrets` distinguishes a manual export (keys inside) from an
-  // automatic one. Older app versions reject newer formats cleanly.
-  formatVersion: 1 | 2 | 3 | 4;
+  // type). v5 adds granular auxiliary state. v6 encrypts the payload with an
+  // independent recovery key and wraps that key with the master password.
+  // `includesSecrets` distinguishes a manual export (keys inside) from an automatic
+  // one. Older app versions reject newer formats cleanly.
+  formatVersion: 1 | 2 | 3 | 4 | 5 | 6;
   schemaVersion: number;
   appVersion: string;
   date: string;
@@ -51,6 +53,8 @@ interface BackupManifest {
   includesSecrets?: boolean;
   /** v4 only: number of vaults in the archive (for a quick UI summary). */
   vaultCount?: number;
+  /** v6: the stable recovery key is wrapped by the user's password. */
+  recovery?: { wrappedKeyCipher: BackupCipherMetadata };
 }
 
 interface PayloadManifest {
@@ -62,6 +66,8 @@ interface PayloadManifest {
   /** v4 only: the vaults included and which one was active. */
   activeVaultId?: string;
   vaults?: BackupVaultEntry[];
+  /** v5 only: user-selected scope. Omitted means the historical all-data scope. */
+  selection?: BackupSelection;
 }
 
 interface EmbeddingInventory {
@@ -79,17 +85,105 @@ interface BackupInventory {
   };
   modelSettings: Pick<
     AppSettings,
-    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
-    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
-    | 'imageProvider' | 'imageModel' | 'imageStyle'
+    | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
+    | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
+    | 'imageProvider' | 'imageModel' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
   >;
   apiKeyProviders: AiProvider[];
 }
 
+const GLOBAL_AUXILIARY_FILES = ['app-prefs.json', 'nodi-chat-history.json', 'nodi-notifications.json', 'nodi-welcome.seed'] as const;
+const VAULT_HISTORY_FILES = ['study-chat-history.json', 'study-search-index.json'] as const;
+const VAULT_MEDIA_FILES = ['study-audio-meta.json'] as const;
+const RECOVERY_PREF_KEYS = [
+  'recoverySetupVersion',
+  'backupVaultIds',
+  'backupIncludePreferences',
+  'backupIncludeHistories',
+  'backupIncludeGeneratedMedia',
+  'backupIncludeApiKeys',
+  'autoBackupEnabled',
+  'autoBackupFolder',
+  'autoBackupIntervalHours',
+  'autoBackupDays',
+  'autoBackupHour',
+  'autoBackupMinute',
+  'lastAutoBackupAt',
+  'lastAutoBackupStatus',
+] as const;
+
 /** Local MCP access credentials must never leave the machine in a backup. */
 type BackupSettings = Omit<AppSettings, 'providerKeys' | 'mcpToken'>;
+
+function fullBackupSelection(): BackupSelection {
+  return {
+    vaultIds: [],
+    includePreferences: true,
+    includeHistories: true,
+    includeGeneratedMedia: true,
+    includeApiKeys: true,
+  };
+}
+
+function normalizeBackupSelection(input: Partial<BackupSelection> | undefined, includeSecrets: boolean): BackupSelection {
+  return {
+    vaultIds: Array.isArray(input?.vaultIds) ? [...new Set(input.vaultIds.filter((id): id is string => typeof id === 'string' && id.length > 0))] : [],
+    includePreferences: input?.includePreferences !== false,
+    includeHistories: input?.includeHistories !== false,
+    includeGeneratedMedia: input?.includeGeneratedMedia !== false,
+    includeApiKeys: includeSecrets && input?.includeApiKeys !== false,
+  };
+}
+
+function addFileIfPresent(files: Record<string, Buffer>, archiveName: string, sourcePath: string): void {
+  try {
+    if (fs.statSync(sourcePath).isFile()) files[archiveName] = fs.readFileSync(sourcePath);
+  } catch {
+    /* Optional auxiliary state may not have been created yet. */
+  }
+}
+
+function addDirectoryIfPresent(files: Record<string, Buffer>, archivePrefix: string, sourceDir: string): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(sourceDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) continue;
+    const source = path.join(sourceDir, entry.name);
+    const target = `${archivePrefix}/${entry.name}`;
+    if (entry.isDirectory()) addDirectoryIfPresent(files, target, source);
+    else if (entry.isFile()) addFileIfPresent(files, target, source);
+  }
+}
+
+function addAuxiliaryFiles(
+  files: Record<string, Buffer>,
+  vaults: ReturnType<typeof listVaults>,
+  selection: BackupSelection
+): void {
+  if (selection.includePreferences) {
+    for (const name of GLOBAL_AUXILIARY_FILES) {
+      addFileIfPresent(files, `aux/global/${name}`, path.join(app.getPath('userData'), name));
+    }
+  }
+  for (const vault of vaults) {
+    const dir = path.dirname(vault.path);
+    if (selection.includeHistories) {
+      for (const name of VAULT_HISTORY_FILES) addFileIfPresent(files, `aux/vaults/${vault.id}/${name}`, path.join(dir, name));
+    }
+    if (selection.includeGeneratedMedia) {
+      for (const name of VAULT_MEDIA_FILES) addFileIfPresent(files, `aux/vaults/${vault.id}/${name}`, path.join(dir, name));
+      addDirectoryIfPresent(files, `aux/vaults/${vault.id}/audio`, path.join(dir, 'audio'));
+    }
+  }
+}
 
 /**
  * Export a self-contained encrypted `*.nodus` archive. The SQLite snapshot is
@@ -99,27 +193,33 @@ type BackupSettings = Omit<AppSettings, 'providerKeys' | 'mcpToken'>;
 /**
  * Build the complete encrypted `.nodus` archive in memory. Shared by the manual
  * export (dialog + generated password + secrets) and the automatic scheduled
- * backup (master password, secrets EXCLUDED). Dialog-free so it can run
+ * backup (master password, all data included). Dialog-free so it can run
  * headless and be exercised by tests.
  */
 export async function createBackupArchive(options: {
   password: string;
-  includeSecrets: boolean;
   appVersion: string;
+  /** Independent credential used by automatic recovery snapshots (v6). */
+  recoveryKey?: string;
 }): Promise<Buffer> {
   const settings = getSettings();
+  // Full-state backup is a safety invariant, not a renderer preference. Legacy
+  // granular settings and unexpected extra options can never reduce this scope.
+  const selection = fullBackupSelection();
   const manifest: ExportManifestBase = {
     schemaVersion: SCHEMA_VERSION,
     appVersion: options.appVersion,
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
-  const apiKeys = options.includeSecrets ? readApiKeys() : {};
+  const includesSecrets = true;
+  const apiKeys = readApiKeys();
 
   // Snapshot EVERY vault (all types), not just the active one, so the archive is an
   // integral copy of the whole app. Each vault's DB carries its own settings row,
   // which is scrubbed of the MCP token/listener in the snapshot.
   const vaults = listVaults();
+  if (vaults.length === 0) throw new Error('Nodus no contiene ninguna bóveda válida para proteger.');
   const activeVaultId = getActiveVault().id;
   const files: Record<string, Buffer> = {};
   const vaultEntries: BackupVaultEntry[] = [];
@@ -132,7 +232,8 @@ export async function createBackupArchive(options: {
     vaultEntries.push({ id: vault.id, name: vault.name, type: vault.type, legacy: vault.legacy, dbFile, inventoryFile });
   }
   files['registry.json'] = Buffer.from(JSON.stringify({ activeVaultId, vaults: vaultEntries }, null, 2));
-  if (options.includeSecrets) {
+  addAuxiliaryFiles(files, vaults, selection);
+  if (includesSecrets) {
     files['api-keys.json'] = Buffer.from(JSON.stringify(apiKeys, null, 2));
   }
 
@@ -140,6 +241,7 @@ export async function createBackupArchive(options: {
     ...manifest,
     activeVaultId,
     vaults: vaultEntries,
+    selection,
     files: Object.fromEntries(
       Object.entries(files).map(([name, data]) => [name, { sha256: sha256Hex(data), bytes: data.byteLength }])
     ),
@@ -149,23 +251,30 @@ export async function createBackupArchive(options: {
   const payloadZip = new AdmZip();
   for (const [name, data] of Object.entries(files)) payloadZip.addFile(name, data);
 
-  const { ciphertext, metadata } = encryptBackupPayload(payloadZip.toBuffer(), options.password);
+  const recoveryKey = options.recoveryKey?.trim() || '';
+  const payloadCredential = recoveryKey || options.password;
+  const { ciphertext, metadata } = encryptBackupPayload(payloadZip.toBuffer(), payloadCredential);
+  const wrappedRecovery = recoveryKey
+    ? encryptBackupPayload(Buffer.from(recoveryKey, 'utf8'), options.password)
+    : null;
   const outerManifest: BackupManifest = {
     format: 'nodus.encrypted-backup',
-    formatVersion: 4,
+    formatVersion: recoveryKey ? 6 : 5,
     ...manifest,
     cipher: metadata,
-    includesSecrets: options.includeSecrets,
+    includesSecrets,
     vaultCount: vaultEntries.length,
+    recovery: wrappedRecovery ? { wrappedKeyCipher: wrappedRecovery.metadata } : undefined,
   };
 
   const zip = new AdmZip();
   zip.addFile('manifest.json', Buffer.from(JSON.stringify(outerManifest, null, 2)));
   zip.addFile('backup.bin', ciphertext);
+  if (wrappedRecovery) zip.addFile('recovery-key.bin', wrappedRecovery.ciphertext);
   return zip.toBuffer();
 }
 
-export async function exportData(): Promise<{ path: string; password: string } | null> {
+export async function exportData(): Promise<{ path: string; password: string; recoveryKey: string } | null> {
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Exportar biblioteca Nodus',
     defaultPath: path.join(app.getPath('documents'), `nodus-export-${Date.now()}.nodus`),
@@ -174,9 +283,14 @@ export async function exportData(): Promise<{ path: string; password: string } |
   if (canceled || !filePath) return null;
 
   const password = generateBackupPassword();
-  const archive = await createBackupArchive({ password, includeSecrets: true, appVersion: app.getVersion() });
+  const recoveryKey = generateBackupPassword();
+  const archive = await createBackupArchive({
+    password,
+    appVersion: app.getVersion(),
+    recoveryKey,
+  });
   fs.writeFileSync(filePath, archive);
-  return { path: filePath, password };
+  return { path: filePath, password, recoveryKey };
 }
 
 /** Import a password-protected `*.nodus` archive, validating schema compatibility and hashes. */
@@ -188,11 +302,77 @@ export async function importData(password: string): Promise<{ ok: boolean; messa
     filters: [{ name: 'Nodus', extensions: ['nodus'] }],
   });
   if (canceled || filePaths.length === 0) return { ok: false, message: 'Cancelado' };
-  return restoreBackupArchive(fs.readFileSync(filePaths[0]), password);
+  return restoreBackupArchiveSafely(fs.readFileSync(filePaths[0]), password, app.getVersion());
+}
+
+/**
+ * Restore with a complete local safety snapshot taken first. If an I/O failure
+ * happens after validation but during the multi-file swap, Nodus immediately
+ * rolls the original state back. The safety archive is deliberately retained
+ * after success as an additional escape hatch and is encrypted with the existing
+ * backup master password (or the import password on a fresh device).
+ */
+export async function restoreBackupArchiveSafely(
+  archive: Buffer,
+  password: string,
+  appVersion: string
+): Promise<BackupRestoreResult> {
+  if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
+  const safetyPassword = getBackupPassword() || password;
+  let safetyPath = '';
+  try {
+    const safetyArchive = await createBackupArchive({
+      password: safetyPassword,
+      appVersion,
+    });
+    const safetyDir = path.join(app.getPath('userData'), 'restore-safety');
+    safetyPath = path.join(safetyDir, `pre-restore-${Date.now()}.nodus`);
+    writeAtomicFile(safetyPath, safetyArchive);
+
+    const result = restoreBackupArchive(archive, password);
+    if (!result.ok) {
+      fs.rmSync(safetyPath, { force: true });
+      return result;
+    }
+    return {
+      ...result,
+      message: `${result.message} Se ha conservado una copia de seguridad previa en ${safetyPath}.`,
+      safetyBackupPath: safetyPath,
+    };
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    if (!safetyPath || !fs.existsSync(safetyPath)) {
+      return { ok: false, message: `La restauración se canceló antes de modificar los datos: ${failure}` };
+    }
+    try {
+      const rollback = restoreBackupArchive(fs.readFileSync(safetyPath), safetyPassword);
+      if (!rollback.ok) throw new Error(rollback.message);
+      return {
+        ok: false,
+        message: `La restauración falló (${failure}), pero Nodus recuperó automáticamente el estado anterior. Copia de seguridad: ${safetyPath}`,
+        safetyBackupPath: safetyPath,
+      };
+    } catch (rollbackError) {
+      return {
+        ok: false,
+        message: `La restauración falló (${failure}) y no se pudo completar la reversión automática (${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}). No borres la copia de emergencia: ${safetyPath}`,
+        safetyBackupPath: safetyPath,
+      };
+    }
+  }
 }
 
 /** Restore a `.nodus` archive buffer (dialog-free, so it is unit-testable). */
-export function restoreBackupArchive(archive: Buffer, password: string): { ok: boolean; message: string } {
+export interface BackupRestoreResult {
+  ok: boolean;
+  message: string;
+  safetyBackupPath?: string;
+  /** Internal hand-off used to persist the independent key on a restored device. */
+  recoveryKey?: string;
+  usedRecoveryKey?: boolean;
+}
+
+export function restoreBackupArchive(archive: Buffer, password: string): BackupRestoreResult {
   if (!password.trim()) return { ok: false, message: 'Importación cancelada: falta la contraseña de la copia.' };
   const zip = new AdmZip(archive);
   const manifestEntry = zip.getEntry('manifest.json');
@@ -202,7 +382,7 @@ export function restoreBackupArchive(archive: Buffer, password: string): { ok: b
   }
 
   const manifest = JSON.parse(zip.readAsText(manifestEntry)) as BackupManifest;
-  const supportedVersions = [1, 2, 3, 4];
+  const supportedVersions = [1, 2, 3, 4, 5, 6];
   if (manifest.format !== 'nodus.encrypted-backup' || !supportedVersions.includes(manifest.formatVersion)) {
     return { ok: false, message: 'Formato de copia de seguridad no soportado.' };
   }
@@ -216,8 +396,26 @@ export function restoreBackupArchive(archive: Buffer, password: string): { ok: b
   }
 
   let payload: AdmZip;
+  let recoveredKey: string | undefined;
+  let usedRecoveryKey = false;
   try {
-    payload = new AdmZip(decryptBackupPayload(encryptedEntry.getData(), password, manifest.cipher));
+    let payloadCredential = password;
+    if (manifest.formatVersion >= 6) {
+      const wrappedEntry = zip.getEntry('recovery-key.bin');
+      if (!manifest.recovery?.wrappedKeyCipher || !wrappedEntry) {
+        return { ok: false, message: 'Copia inválida: falta la clave de recuperación cifrada.' };
+      }
+      try {
+        payloadCredential = decryptBackupPayload(wrappedEntry.getData(), password, manifest.recovery.wrappedKeyCipher).toString('utf8');
+      } catch {
+        // If password unwrapping fails, the supplied credential may itself be the
+        // independent recovery key. Payload authentication decides definitively.
+        payloadCredential = password;
+        usedRecoveryKey = true;
+      }
+      recoveredKey = payloadCredential;
+    }
+    payload = new AdmZip(decryptBackupPayload(encryptedEntry.getData(), payloadCredential, manifest.cipher));
   } catch {
     return { ok: false, message: 'No se pudo descifrar la copia. Revisa la contraseña o el archivo.' };
   }
@@ -242,12 +440,15 @@ export function restoreBackupArchive(archive: Buffer, password: string): { ok: b
   if (manifest.formatVersion >= 4) {
     const result = restoreAllVaults(payload, payloadManifest);
     if (!result.ok) return result;
+    if (manifest.formatVersion >= 5) restoreAuxiliaryFiles(payload, payloadManifest);
     if (includesSecrets) restoreApiKeys(importedKeys);
     return {
       ok: true,
       message: includesSecrets
         ? `Importación completa: ${result.restored} bóveda(s) con su biblioteca, embeddings, grafo y claves API restauradas.`
         : `Importación completa: ${result.restored} bóveda(s) restauradas (biblioteca, embeddings y grafo). Las claves API locales se han conservado (la copia automática no las incluye).`,
+      recoveryKey: recoveredKey,
+      usedRecoveryKey,
     };
   }
 
@@ -347,6 +548,80 @@ function restoreAllVaults(
     return { ok: true, restored: staged.length };
   } finally {
     cleanup();
+  }
+}
+
+function writeAtomicFile(target: string, data: Buffer): void {
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temporary = `${target}.restore-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(temporary, data);
+  fs.renameSync(temporary, target);
+}
+
+function restoreGlobalPreferences(data: Buffer): void {
+  const target = path.join(app.getPath('userData'), 'app-prefs.json');
+  let incoming: Record<string, unknown>;
+  try {
+    incoming = JSON.parse(data.toString('utf8')) as Record<string, unknown>;
+  } catch {
+    throw new Error('La copia contiene preferencias globales ilegibles.');
+  }
+  let current: Record<string, unknown> = {};
+  try {
+    current = JSON.parse(fs.readFileSync(target, 'utf8')) as Record<string, unknown>;
+  } catch {
+    /* A new device has no current preference file yet. */
+  }
+  // Absolute folder paths and recovery scheduling belong to this machine. Importing
+  // another computer's values could silently redirect snapshots to a missing path.
+  const merged = { ...incoming };
+  for (const key of RECOVERY_PREF_KEYS) {
+    if (current[key] !== undefined) merged[key] = current[key];
+    else delete merged[key];
+  }
+  writeAtomicFile(target, Buffer.from(JSON.stringify(merged, null, 2)));
+}
+
+function safeArchiveRelative(value: string): string | null {
+  const normalized = path.posix.normalize(value);
+  if (!normalized || normalized === '.' || normalized.startsWith('../') || path.posix.isAbsolute(normalized)) return null;
+  return normalized;
+}
+
+function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest): void {
+  const selection = normalizeBackupSelection(payloadManifest.selection, false);
+  if (selection.includePreferences) {
+    for (const name of GLOBAL_AUXILIARY_FILES) {
+      const entry = payload.getEntry(`aux/global/${name}`);
+      if (!entry) continue;
+      if (name === 'app-prefs.json') restoreGlobalPreferences(entry.getData());
+      else writeAtomicFile(path.join(app.getPath('userData'), name), entry.getData());
+    }
+  }
+
+  const restoredVaults = new Map(listVaults().map((vault) => [vault.id, vault]));
+  for (const vaultEntry of payloadManifest.vaults ?? []) {
+    const vault = restoredVaults.get(vaultEntry.id);
+    if (!vault) continue;
+    const targetDir = path.dirname(vault.path);
+    if (selection.includeHistories) {
+      for (const name of VAULT_HISTORY_FILES) {
+        const entry = payload.getEntry(`aux/vaults/${vault.id}/${name}`);
+        if (entry) writeAtomicFile(path.join(targetDir, name), entry.getData());
+      }
+    }
+    if (selection.includeGeneratedMedia) {
+      for (const name of VAULT_MEDIA_FILES) {
+        const entry = payload.getEntry(`aux/vaults/${vault.id}/${name}`);
+        if (entry) writeAtomicFile(path.join(targetDir, name), entry.getData());
+      }
+      const prefix = `aux/vaults/${vault.id}/audio/`;
+      for (const entry of payload.getEntries()) {
+        if (entry.isDirectory || !entry.entryName.startsWith(prefix)) continue;
+        const relative = safeArchiveRelative(entry.entryName.slice(prefix.length));
+        if (relative) writeAtomicFile(path.join(targetDir, 'audio', ...relative.split('/')), entry.getData());
+      }
+    }
   }
 }
 
@@ -451,6 +726,13 @@ function embeddingInventory(db: Database.Database, table: string): EmbeddingInve
 }
 
 function databaseMatchesInventory(databasePath: string, expected: BackupInventory): boolean {
+  const checkDb = new Database(databasePath, { readonly: true, fileMustExist: true });
+  try {
+    const result = checkDb.pragma('quick_check', { simple: true });
+    if (result !== 'ok') return false;
+  } finally {
+    checkDb.close();
+  }
   const actual = databaseInventory(databasePath, expected.modelSettings as Omit<AppSettings, 'providerKeys'>, {});
   for (const [table, expectedRows] of Object.entries(expected.tableRows)) {
     if (actual.tableRows[table] !== expectedRows) return false;
@@ -480,11 +762,13 @@ function settingsMatchInventory(
 function modelSettings(
   settings: Pick<
     AppSettings,
-    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel'
+    | 'embeddingProvider' | 'embeddingModel' | 'favorites' | 'defaultModel' | 'modelSettingsMode' | 'modelSettingsVersion'
     | 'extractionModel' | 'synthesisModel' | 'summaryModel' | 'fusionModel'
-    | 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
+    | 'chatModel' | 'nodiModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel'
     | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel'
-    | 'imageProvider' | 'imageModel' | 'imageStyle'
+    | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' | 'transcriptionModel' | 'sttProvider'
+    | 'sttTransformersModel' | 'sttWhisperCppModel' | 'sttWhisperCppExecutable'
+    | 'imageProvider' | 'imageModel' | 'imageStyle' | 'audioProvider' | 'audioVoice' | 'audioSpeed'
   >
 ): BackupInventory['modelSettings'] {
   return {
@@ -492,11 +776,14 @@ function modelSettings(
     embeddingModel: settings.embeddingModel,
     favorites: settings.favorites,
     defaultModel: settings.defaultModel,
+    modelSettingsMode: settings.modelSettingsMode,
+    modelSettingsVersion: settings.modelSettingsVersion,
     extractionModel: settings.extractionModel,
     synthesisModel: settings.synthesisModel,
     summaryModel: settings.summaryModel,
     fusionModel: settings.fusionModel,
     chatModel: settings.chatModel,
+    nodiModel: settings.nodiModel,
     deepResearchModel: settings.deepResearchModel,
     immersionModel: settings.immersionModel,
     writingModel: settings.writingModel,
@@ -505,9 +792,21 @@ function modelSettings(
     studyModel: settings.studyModel,
     tutorModel: settings.tutorModel,
     hypothesisModel: settings.hypothesisModel,
+    improveModel: settings.improveModel,
+    questionGenModel: settings.questionGenModel,
+    gradingModel: settings.gradingModel,
+    flashcardModel: settings.flashcardModel,
+    transcriptionModel: settings.transcriptionModel,
+    sttProvider: settings.sttProvider,
+    sttTransformersModel: settings.sttTransformersModel,
+    sttWhisperCppModel: settings.sttWhisperCppModel,
+    sttWhisperCppExecutable: settings.sttWhisperCppExecutable,
     imageProvider: settings.imageProvider,
     imageModel: settings.imageModel,
     imageStyle: settings.imageStyle,
+    audioProvider: settings.audioProvider,
+    audioVoice: settings.audioVoice,
+    audioSpeed: settings.audioSpeed,
   };
 }
 

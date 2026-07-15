@@ -7,8 +7,8 @@ import type { AppSettings } from '@shared/types';
 // families live here, both persisted in a single JSON in userData so that creating
 // or switching vaults never resets them:
 //
-//  • GLOBAL_PREF_KEYS   — theme and interface / prompt language. Always present, so
-//                         the first vault read seeds them unconditionally.
+//  • GLOBAL_PREF_KEYS   — theme/interface preferences and the recovery policy. Always
+//                         present, so the first vault read seeds them unconditionally.
 //  • SHARED_MODEL_KEYS  — the AI model configuration (favorites, every workload
 //                         selector, local-provider base URLs and the image model).
 //                         API keys are already shared across vaults, so the models
@@ -17,32 +17,63 @@ import type { AppSettings } from '@shared/types';
 //                         settingsRepo), so an unconfigured vault opened first can
 //                         never lock in empty defaults for a configured one.
 //
-// Everything else in AppSettings stays per-vault (monitored collections, embeddings,
-// onboarding flags, sync/backup, …).
+// Everything else in AppSettings stays per-vault (including granular feature/task
+// overrides, monitored collections and vault onboarding flags).
 
-export const GLOBAL_PREF_KEYS = ['theme', 'uiLanguage', 'promptLanguage', 'mascotEnabled', 'mascotAlwaysOnTop', 'mascotVaultCostumes'] as const;
+export const GLOBAL_PREF_KEYS = [
+  'theme',
+  'uiLanguage',
+  'promptLanguage',
+  'interfaceScale',
+  'accessibleFont',
+  'highContrast',
+  'reduceMotion',
+  'readingFocusMode',
+  'mascotEnabled',
+  'mascotAlwaysOnTop',
+  'mascotVaultCostumes',
+  'basicsTutorialVersion',
+  'recoverySetupVersion',
+  'backupVaultIds',
+  'backupIncludePreferences',
+  'backupIncludeHistories',
+  'backupIncludeGeneratedMedia',
+  'backupIncludeApiKeys',
+  'autoBackupEnabled',
+  'autoBackupFolder',
+  'autoBackupIntervalHours',
+  'autoBackupDays',
+  'autoBackupHour',
+  'autoBackupMinute',
+  'lastAutoBackupAt',
+  'lastAutoBackupStatus',
+] as const;
 export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 
 export const SHARED_MODEL_KEYS = [
   'favorites',
   'localProviders',
+  'modelSettingsMode',
+  'modelSettingsVersion',
+  'embeddingProvider',
+  'embeddingModel',
   'extractionModel',
   'visionModel',
   'synthesisModel',
   'summaryModel',
   'fusionModel',
-  'chatModel',
-  'deepResearchModel',
-  'immersionModel',
-  'writingModel',
-  'argumentMapModel',
-  'authorModel',
-  'studyModel',
-  'tutorModel',
-  'hypothesisModel',
+  'nodiModel',
+  'transcriptionModel',
+  'sttProvider',
+  'sttTransformersModel',
+  'sttWhisperCppModel',
+  'sttWhisperCppExecutable',
   'imageProvider',
   'imageModel',
   'imageStyle',
+  'audioProvider',
+  'audioVoice',
+  'audioSpeed',
 ] as const;
 export type SharedModelKey = (typeof SHARED_MODEL_KEYS)[number];
 
@@ -63,8 +94,11 @@ export function readGlobalPrefs(): Partial<Pick<AppSettings, SharedPrefKey>> {
 
 export function writeGlobalPrefs(patch: Partial<Pick<AppSettings, SharedPrefKey>>): void {
   const next = { ...readGlobalPrefs(), ...patch };
-  fs.mkdirSync(path.dirname(prefsFile()), { recursive: true });
-  fs.writeFileSync(prefsFile(), JSON.stringify(next, null, 2));
+  const target = prefsFile();
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(temporary, JSON.stringify(next, null, 2));
+  fs.renameSync(temporary, target);
 }
 
 /** Split a settings patch into its global (shared) and per-vault parts. Language/theme

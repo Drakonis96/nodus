@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
+import { isPreviewVaultType, VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
@@ -26,18 +27,28 @@ interface PendingDestructiveAction {
 }
 
 /** Vault types offered when creating a vault, each with its accent colour. */
-const NEW_VAULT_TYPES: VaultType[] = ['academic', 'genealogy', 'databases'];
+const NEW_VAULT_TYPES: VaultType[] = VAULT_TYPES.filter((type) => type.available).map((type) => type.id);
 /** Shown in the create grid but not yet selectable — flagged "Próximamente". */
-const COMING_SOON_VAULT_TYPES: VaultType[] = ['primary_sources', 'estudio'];
-const CREATE_VAULT_TYPES: VaultType[] = [...NEW_VAULT_TYPES, ...COMING_SOON_VAULT_TYPES];
+const COMING_SOON_VAULT_TYPES: VaultType[] = VAULT_TYPES.filter((type) => !type.available).map((type) => type.id);
+/** Product order in the three-column creation grid, read row by row. */
+const CREATE_VAULT_TYPES: VaultType[] = [
+  'academic', 'primary_sources', 'testimonios',
+  'databases', 'docencia', 'estudio',
+  'genealogy', 'worldbuilding',
+];
 const isComingSoonVaultType = (type: VaultType) => COMING_SOON_VAULT_TYPES.includes(type);
 const VAULT_TYPE_COLOR: Record<string, string> = {
   academic: '#6366f1',
-  estudio: '#6366f1',
+  estudio: '#0f766e',
   primary_sources: '#6366f1',
   genealogy: '#ca8a04',
   databases: '#b30333',
+  testimonios: '#0891b2',
+  worldbuilding: '#7c3aed',
+  docencia: '#ea580c',
 };
+
+type VaultPhase = 'pre-alpha' | 'alpha' | 'beta';
 
 function generateFourDigitCode(): string {
   return Array.from({ length: 4 }, () => Math.floor(Math.random() * 10)).join('');
@@ -54,15 +65,51 @@ export function vaultTypeLabel(type: VaultType): string {
       return t('Genealogía');
     case 'databases':
       return t('Bases de datos');
+    case 'testimonios':
+      return t('Testimonios');
+    case 'worldbuilding':
+      return t('Worldbuilding');
+    case 'docencia':
+      return t('Docencia');
     case 'academic':
     default:
       return t('Académico');
   }
 }
 
-/** Genealogy and databases are newer modes → they wear a "Beta" badge. */
-function isBetaVaultType(type: VaultType): boolean {
-  return type === 'genealogy' || type === 'databases';
+/** A stable, recognisable glyph for each workspace mode. */
+export function vaultTypeIcon(type: VaultType): string {
+  switch (type) {
+    case 'estudio': return 'graduation';
+    case 'primary_sources': return 'archive';
+    case 'genealogy': return 'tree';
+    case 'databases': return 'table';
+    case 'testimonios': return 'microphone';
+    case 'worldbuilding': return 'globe';
+    case 'docencia': return 'presentation';
+    case 'academic':
+    default: return 'network';
+  }
+}
+
+function vaultTypePhase(type: VaultType): VaultPhase | null {
+  if (type === 'estudio') return 'pre-alpha';
+  if (type === 'genealogy') return 'alpha';
+  if (type === 'databases') return 'beta';
+  return null;
+}
+
+function vaultTypeDescription(type: VaultType): string {
+  switch (type) {
+    case 'academic': return t('Investigación y escritura académica.');
+    case 'genealogy': return t('Historia familiar y archivo.');
+    case 'estudio': return t('Aprendizaje y materiales de estudio.');
+    case 'databases': return t('Tablas y datos estructurados.');
+    case 'primary_sources': return t('Archivo y fuentes históricas.');
+    case 'testimonios': return t('Historia oral y periodismo.');
+    case 'worldbuilding': return t('Preview de un espacio para construir mundos, personajes, lugares, reglas y narrativas. Las secciones todavía no están disponibles.');
+    case 'docencia': return t('Preview de un espacio para organizar la docencia, evaluar y crear materiales. Las secciones todavía no están disponibles.');
+  }
 }
 
 export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onActiveVaultChanged }: VaultSwitcherProps) {
@@ -82,6 +129,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   // Add-vault modal.
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState('');
+  const [addNameError, setAddNameError] = useState<string | null>(null);
   const [addType, setAddType] = useState<VaultType>('academic');
 
   // Rename / duplicate modals.
@@ -183,9 +231,10 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
     run(async () => {
       const name = addName.trim();
       if (!name) {
-        setMessage(t('Escribe un nombre para la bóveda.'));
+        setAddNameError(t('Escribe un nombre para la bóveda.'));
         return;
       }
+      setAddNameError(null);
       const created = await window.nodus.createVault({ name, type: addType });
       const result = await window.nodus.switchVault(created.vault.id);
       setAddOpen(false);
@@ -302,7 +351,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
           <div className="flex items-center justify-between gap-2 border-b border-neutral-800 px-3 py-2">
             <div className="text-sm font-semibold text-neutral-200">{tx('Bóvedas ({n})', { n: vaults.length })}</div>
             <div className="flex items-center gap-1">
-              <button className="btn btn-primary gap-1.5 px-2 py-1 text-xs" onClick={() => setAddOpen(true)} title={t('Añadir bóveda')}>
+              <button className="btn btn-primary gap-1.5 px-2 py-1 text-xs" onClick={() => { setAddNameError(null); setAddOpen(true); }} title={t('Añadir bóveda')}>
                 <Icon name="plus" size={14} /> {t('Añadir')}
               </button>
               <button className="btn btn-ghost px-2 py-1" onClick={() => onClose()} title={t('Cerrar')}>
@@ -353,7 +402,9 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
               const delReason = deleteDisabledReason(vault);
               return (
                 <div key={vault.id} className="flex min-w-0 items-center gap-2 rounded-md border border-neutral-800 px-2 py-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: VAULT_TYPE_COLOR[vault.type] ?? '#6366f1' }} />
+                  <span data-testid={`vault-type-icon-${vault.type}`} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-white" style={{ backgroundColor: VAULT_TYPE_COLOR[vault.type] ?? '#6366f1' }}>
+                    <Icon name={vaultTypeIcon(vault.type)} size={15} />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate text-sm text-neutral-200">{vault.name}</span>
@@ -361,9 +412,8 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-neutral-500">
                       <span className="truncate">{vaultTypeLabel(vault.type)}</span>
-                      {isBetaVaultType(vault.type) && (
-                        <span className="shrink-0 rounded border border-amber-600/50 bg-amber-500/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-amber-400">Beta</span>
-                      )}
+                      {vaultTypePhase(vault.type) && <VaultPhaseBadge phase={vaultTypePhase(vault.type)!} compact />}
+                      {isPreviewVaultType(vault.type) && <PreviewBadge compact />}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
@@ -414,14 +464,23 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       {/* Add-vault modal */}
       {addOpen &&
         createPortal(
-          <ModalShell title={t('Añadir bóveda')} onCancel={() => setAddOpen(false)}>
+          <ModalShell title={t('Añadir bóveda')} onCancel={() => setAddOpen(false)} wide>
             <label className="block text-sm">
               {t('Nombre de la bóveda')}
-              <input className="input mt-1 w-full" autoFocus value={addName} onChange={(e) => setAddName(e.target.value)} placeholder={t('Nombre de la bóveda')} />
+              <input
+                className="input mt-1 w-full"
+                autoFocus
+                aria-invalid={Boolean(addNameError)}
+                aria-describedby={addNameError ? 'vault-name-error' : undefined}
+                value={addName}
+                onChange={(e) => { setAddName(e.target.value); if (addNameError) setAddNameError(null); }}
+                placeholder={t('Nombre de la bóveda')}
+              />
+              {addNameError && <span id="vault-name-error" data-testid="vault-name-error" role="alert" className="mt-1 block text-xs text-red-400">{addNameError}</span>}
             </label>
             <div className="mt-3">
               <div className="mb-1.5 text-xs text-neutral-500">{t('Tipo de bóveda')}</div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {CREATE_VAULT_TYPES.map((tp) => {
                   const soon = isComingSoonVaultType(tp);
                   return (
@@ -429,8 +488,8 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                       key={tp}
                       type="button"
                       disabled={soon}
-                      title={soon ? t('Próximamente') : undefined}
-                      className={`relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center transition-colors ${
+                      title={soon ? `${t('Próximamente')}: ${vaultTypeDescription(tp)}` : undefined}
+                      className={`relative min-h-28 flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-center transition-colors ${
                         soon
                           ? 'cursor-not-allowed border-neutral-800/70 opacity-50'
                           : addType === tp
@@ -444,18 +503,23 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                         <span className="absolute right-1 top-1 rounded border border-neutral-600/60 bg-neutral-500/10 px-1 text-[9px] font-semibold uppercase text-neutral-400">
                           {t('Pronto')}
                         </span>
+                      ) : isPreviewVaultType(tp) ? (
+                        <PreviewBadge />
                       ) : (
-                        isBetaVaultType(tp) && (
-                          <span className="absolute right-1 top-1 rounded border border-amber-600/50 bg-amber-500/10 px-1 text-[9px] font-semibold uppercase text-amber-400">Beta</span>
-                        )
+                        vaultTypePhase(tp) && <VaultPhaseBadge phase={vaultTypePhase(tp)!} />
                       )}
-                      <span className="h-6 w-6 rounded-full" style={{ backgroundColor: VAULT_TYPE_COLOR[tp] }} />
+                      <span data-testid={`new-vault-type-icon-${tp}`} className="grid h-8 w-8 place-items-center rounded-lg text-white" style={{ backgroundColor: VAULT_TYPE_COLOR[tp] }}>
+                        <Icon name={vaultTypeIcon(tp)} size={18} />
+                      </span>
                       <span className="text-xs font-medium text-neutral-200">{vaultTypeLabel(tp)}</span>
+                      <span className="max-w-40 text-[10px] leading-tight text-neutral-500">{vaultTypeDescription(tp)}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
+            {vaultTypePhase(addType) && <VaultPhaseNotice phase={vaultTypePhase(addType)!} />}
+            {isPreviewVaultType(addType) && <PreviewNotice />}
             <p className="mt-3 text-xs text-neutral-500">{t('Las claves de IA se comparten entre todas las bóvedas: no hace falta reconfigurarlas.')}</p>
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setAddOpen(false)}>
@@ -550,11 +614,103 @@ function IconBtn({ icon, title, onClick, disabled, danger }: { icon: string; tit
   );
 }
 
+function PreviewBadge({ compact = false }: { compact?: boolean }) {
+  const description = t('Vista previa navegable. Puedes crear el vault y consultar sus secciones, pero todavía no contienen funciones.');
+  return <span className={`${compact ? '' : 'absolute right-1 top-1'} shrink-0 rounded border border-violet-500/50 bg-violet-500/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-violet-300`} title={description} aria-label={`PREVIEW. ${description}`}>PREVIEW</span>;
+}
+
+function PreviewNotice() {
+  return <div className="mt-3 flex items-start gap-2 rounded-lg border border-violet-700/50 bg-violet-500/10 px-3 py-2 text-xs text-violet-200" data-testid="vault-preview-notice"><Icon name="info" size={14} className="mt-0.5 shrink-0" /><span>{t('Este vault es una preview navegable: se creará normalmente, pero por ahora sus secciones son solo una muestra y no permiten realizar acciones.')}</span></div>;
+}
+
 /** A small centered modal shell used by the add / rename / duplicate dialogs. */
-function ModalShell({ title, children, onCancel }: { title: string; children: React.ReactNode; onCancel: () => void }) {
+function VaultPhaseBadge({ phase, compact = false }: { phase: VaultPhase; compact?: boolean }) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<{ left: number; top: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const label = phase === 'pre-alpha' ? 'PRE-ALPHA' : phase === 'alpha' ? 'ALPHA' : 'BETA';
+  const summary = phase === 'pre-alpha'
+    ? t('Desarrollo muy temprano; solo recomendable para testers.')
+    : phase === 'alpha'
+      ? t('Funciones principales aún en prueba; solo recomendable para testers.')
+      : t('Funcional, pero aún necesita feedback y corrección de errores.');
+
+  useLayoutEffect(() => {
+    if (!tooltipOpen) {
+      setTooltipPos(null);
+      return;
+    }
+    const update = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.min(272, window.innerWidth - 16);
+      const height = tooltipRef.current?.offsetHeight ?? 124;
+      const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+      const below = rect.bottom + 6;
+      const top = below + height <= window.innerHeight - 8
+        ? below
+        : Math.max(8, rect.top - height - 6);
+      setTooltipPos({ left, top, width });
+    };
+    update();
+    const frame = window.requestAnimationFrame(update);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [tooltipOpen]);
+
+  return (
+    <span
+      ref={triggerRef}
+      className={`${compact ? 'relative' : 'absolute right-1 top-1'} z-10 shrink-0`}
+      tabIndex={compact ? 0 : undefined}
+      aria-label={`${label}. ${summary}`}
+      onMouseEnter={() => setTooltipOpen(true)}
+      onMouseLeave={() => setTooltipOpen(false)}
+      onFocus={() => setTooltipOpen(true)}
+      onBlur={() => setTooltipOpen(false)}
+    >
+      <span className="block rounded border border-amber-600/50 bg-amber-500/10 px-1 text-[9px] font-semibold uppercase tracking-wide text-amber-400">{label}</span>
+      {tooltipOpen && createPortal(
+        <div
+          ref={tooltipRef}
+          role="tooltip"
+          data-testid="vault-phase-tooltip"
+          className="pointer-events-none fixed z-[90] rounded-lg border border-neutral-700 bg-neutral-950 p-2 text-left text-[10px] font-normal normal-case leading-snug tracking-normal text-neutral-300 opacity-100 shadow-xl"
+          style={tooltipPos ? { left: tooltipPos.left, top: tooltipPos.top, width: tooltipPos.width } : { left: -9999, top: -9999, width: 272 }}
+        >
+          <strong className="text-neutral-100">{label}</strong> · {summary}<br />
+          {t('La fase avanzará cuando haya suficiente feedback y pulido.')}<br />
+          <span className="mt-1 flex items-center gap-1 text-amber-300"><Icon name="bug" size={11} />{t('Reporta los errores desde el botón superior.')}</span>
+        </div>,
+        document.body
+      )}
+    </span>
+  );
+}
+
+function VaultPhaseNotice({ phase }: { phase: VaultPhase }) {
+  const early = phase === 'pre-alpha' || phase === 'alpha';
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-700/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-300" data-testid="vault-phase-notice">
+      <Icon name={early ? 'alert' : 'bug'} size={14} className="mt-0.5 shrink-0" />
+      <span>{early
+        ? t('Versión experimental recomendada solo para testers. Guarda copias de seguridad y reporta cualquier error desde el botón superior.')
+        : t('Versión beta: ayúdanos con sugerencias y reportando errores desde el botón superior.')}</span>
+    </div>
+  );
+}
+
+function ModalShell({ title, children, onCancel, wide = false }: { title: string; children: React.ReactNode; onCancel: () => void; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-6" onClick={onCancel}>
-      <div className="card w-full max-w-md p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+      <div className={`card-modal max-h-[90vh] w-full overflow-y-auto p-5 ${wide ? 'max-w-2xl' : 'max-w-md'}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         <h2 className="mb-3 text-base font-semibold">{title}</h2>
         {children}
       </div>

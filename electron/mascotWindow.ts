@@ -12,11 +12,12 @@ const RENDERER_DIST = path.join(__dirname, '../dist');
 // Roomy enough for Nodi plus its radial menu and a compact panel. The window is
 // transparent and click-through by default (the renderer re-enables the mouse only
 // over Nodi and open panels), so the extra size is not a dead zone over other apps.
-const WIDTH = 540;
+const WIDTH = 600;
 const HEIGHT = 520;
 const MARGIN = 16;
 
 let mascotWindow: BrowserWindow | null = null;
+let tutorialVisible = false;
 
 function positionBottomRight(win: BrowserWindow): void {
   const { workArea } = screen.getPrimaryDisplay();
@@ -68,9 +69,12 @@ function createMascotWindow(): BrowserWindow {
   positionBottomRight(win);
 
   win.on('show', applyLevels);
+  win.on('blur', () => {
+    if (!win.isDestroyed()) win.webContents.send('nodi:dismiss');
+  });
   win.once('ready-to-show', () => {
     applyLevels();
-    win.showInactive();
+    if (!tutorialVisible) win.showInactive();
   });
 
   if (VITE_DEV_SERVER_URL) {
@@ -94,16 +98,24 @@ export function applyMascotWindow(): void {
   } catch {
     want = false;
   }
-  if (want) {
+  if (want && !tutorialVisible) {
     if (!mascotWindow || mascotWindow.isDestroyed()) {
       mascotWindow = createMascotWindow();
     } else {
       mascotWindow.showInactive();
     }
+  } else if (tutorialVisible && mascotWindow && !mascotWindow.isDestroyed()) {
+    mascotWindow.hide();
   } else if (mascotWindow && !mascotWindow.isDestroyed()) {
     mascotWindow.close();
     mascotWindow = null;
   }
+}
+
+/** Temporarily hide the real companion while the cinematic tutorial stages its own Nodi. */
+export function setMascotTutorialVisible(visible: boolean): void {
+  tutorialVisible = visible;
+  applyMascotWindow();
 }
 
 /** Close the mascot window (e.g. when the main window closes or the app quits). */

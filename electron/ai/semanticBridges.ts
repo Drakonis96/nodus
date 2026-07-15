@@ -5,19 +5,19 @@ import {
   addEdge,
   canonicalEdgeKey,
   currentEmbeddingConfig,
-  findSimilarIdeas,
-  ideasWithEmbeddings,
+  ideaVectorsForCompute,
   normalizeEdgeType,
 } from '../db/ideasRepo';
 import { completeJson } from './aiClient';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
-import { yieldToEventLoop, YIELD_EVERY } from '../util/async';
+import { computeNearestNeighbors } from '../graph/computeHost';
 
 const SIM_THRESHOLD = 0.70;
 const TOP_K_PER_IDEA = 12;
 const MAX_CANDIDATES = 1200;
 const VALIDATION_BATCH = 15;
 const CHECKPOINT_KIND = 'semantic_bridge_batch';
+const MAX_MANUAL_QUERY_IDEAS = 400;
 
 const VALID_EDGE_TYPES: EdgeType[] = [
   'extends', 'contradicts', 'applies_to', 'shares_method', 'precondition_of',
@@ -135,8 +135,32 @@ function loadExistingEdgePairs(): Set<string> {
   return set;
 }
 
-async function findCandidates(): Promise<Candidate[]> {
-  const ideas = ideasWithEmbeddings();
+function bridgeQueryIds(nodusIds?: string[]): Set<string> {
+  const db = getDb();
+  if (nodusIds && nodusIds.length > 0) {
+    const placeholders = nodusIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(`SELECT DISTINCT global_id FROM idea_occurrences WHERE nodus_id IN (${placeholders})`)
+      .all(...nodusIds) as Array<{ global_id: string }>;
+    return new Set(rows.map((row) => row.global_id));
+  }
+  // A manual full-vault pass advances through the least-connected ideas first.
+  // Keeping each run bounded prevents an accidental 10k×10k scan.
+  const rows = db
+    .prepare(
+      `SELECT i.global_id
+         FROM ideas i
+        WHERE i.embedding IS NOT NULL AND i.orphaned_at IS NULL
+        ORDER BY (SELECT COUNT(*) FROM visible_edges e WHERE e.from_id = i.global_id OR e.to_id = i.global_id) ASC,
+                 i.created_at DESC
+        LIMIT ?`
+    )
+    .all(MAX_MANUAL_QUERY_IDEAS) as Array<{ global_id: string }>;
+  return new Set(rows.map((row) => row.global_id));
+}
+
+async function findCandidates(nodusIds?: string[]): Promise<Candidate[]> {
+  const ideas = ideaVectorsForCompute();
   if (ideas.length < 2) return [];
 
   const themeMap = loadThemeMap();
@@ -144,17 +168,21 @@ async function findCandidates(): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
 
   const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
+  const queryIds = bridgeQueryIds(nodusIds);
+  const queries = ideas.filter((idea) => queryIds.has(idea.global_id));
+  if (queries.length === 0) return [];
   const seenPairs = new Set<string>();
 
-  // Each findSimilarIdeas() is a synchronous full-table vec_cosine scan, so this
-  // loop is O(N²) on the single main-thread event loop. Yield periodically so the
-  // UI and IPC stay responsive while bridge discovery runs in the background.
-  let scanned = 0;
-  for (const a of ideas) {
-    if (++scanned % YIELD_EVERY === 0) await yieldToEventLoop();
-    const similar = findSimilarIdeas(a.embedding, SIM_THRESHOLD, TOP_K_PER_IDEA, { excludeIds: [a.global_id] });
-    for (const hit of similar) {
-      const b = ideaById.get(hit.global_id);
+  const matches = await computeNearestNeighbors(
+    queries.map((idea) => ({ id: idea.global_id, vector: idea.vector })),
+    ideas.map((idea) => ({ id: idea.global_id, vector: idea.vector })),
+    SIM_THRESHOLD,
+    TOP_K_PER_IDEA
+  );
+  for (const match of matches) {
+      const a = ideaById.get(match.queryId);
+      const b = ideaById.get(match.candidateId);
+      if (!a) continue;
       if (!b) continue;
 
       const pairKey = [a.global_id, b.global_id].sort().join('|');
@@ -179,10 +207,9 @@ async function findCandidates(): Promise<Candidate[]> {
         toStatement: b.statement,
         fromType: a.type,
         toType: b.type,
-        similarity: hit.similarity,
+        similarity: match.similarity,
         crossTheme,
       });
-    }
   }
 
   candidates.sort((a, b) => b.similarity - a.similarity);
@@ -305,7 +332,8 @@ function persistBridges(
 
 export async function discoverSemanticBridges(
   model?: ModelRef | null,
-  onProgress?: ProgressListener
+  onProgress?: ProgressListener,
+  nodusIds?: string[]
 ): Promise<SemanticBridgeResult> {
   if (running) {
     return { candidatesScanned: 0, crossThemeCandidates: 0, validated: 0, added: 0 };
@@ -318,7 +346,7 @@ export async function discoverSemanticBridges(
   try {
     emit({ phase: 'scan', label: 'Escaneando pares semánticos', current: 0, total: 0, candidatesFound: 0, bridgesAdded: 0 });
 
-    const candidates = await findCandidates();
+    const candidates = await findCandidates(nodusIds);
     const crossTheme = candidates.filter((c) => c.crossTheme).length;
 
     emit({ phase: 'scan', label: `${candidates.length} candidatos encontrados (${crossTheme} cross-tema)`, current: 1, total: 1, candidatesFound: candidates.length, bridgesAdded: 0 });

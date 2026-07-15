@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -121,4 +121,20 @@ test('extractItemYear reads the type-specific date/year fields', () => {
   assert.equal(dt.extractItemYear('birth_record', { padre: 'Pedro' }), null, 'non-date fields ignored');
   assert.equal(dt.extractItemYear(null, { anio: '1875' }), null);
   assert.equal(dt.extractItemYear('census', null), null);
+});
+
+test('genealogy archive compacts filters and exposes icon-first actions', async () => {
+  const view = await readFile(path.join(repoRoot, 'src/views/ArchiveView.tsx'), 'utf8');
+  const filters = await readFile(path.join(repoRoot, 'src/components/ArchiveFilterBar.tsx'), 'utf8');
+  assert.match(view, /compact=\{isGenealogy\}/);
+  assert.match(view, /docTypes: fDocTypes\.length \? fDocTypes : undefined/);
+  assert.match(view, /fDocTypes\.length === 1 \? fDocTypes\[0\] : null/);
+  assert.match(view, /function ArchiveActionButton/);
+  assert.match(view, /group-hover\/archive-action:max-w-40/);
+  assert.doesNotMatch(view, /emptyLabel="Tipo de documento"/);
+  assert.match(filters, /data-testid="archive-filter-menu-button"/);
+  assert.match(filters, /data-testid="archive-filter-menu"/);
+  assert.match(filters, /ARCHIVE_DOC_TYPES/);
+  assert.match(filters, /enabled\.has\('docType'\)/);
+  assert.match(filters, /enabled\.has\('folder'\)/);
 });

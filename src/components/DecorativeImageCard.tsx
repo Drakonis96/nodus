@@ -190,8 +190,8 @@ export function DecorativeImageCard({
   if (thumbnail) {
     if (current?.status !== 'ready' || !dataUrl) return null;
     return (
-      <div className={`relative ${className}`}>
-        <img src={dataUrl} alt="" loading="lazy" decoding="async" className="h-24 w-full rounded-lg object-cover" />
+      <div className={`relative h-24 overflow-hidden rounded-lg ${className}`}>
+        <img src={dataUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
         {current.source === 'ai' && <AiBadge size="sm" />}
       </div>
     );

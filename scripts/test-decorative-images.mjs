@@ -49,7 +49,7 @@ try {
     assert.ok(!/\s{2,}/.test(prompt), 'visual context whitespace is compacted');
   }
 
-  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, app] = await Promise.all([
+  const [service, ipc, jobs, migration, imageModels, card, imageModal, searchView, app, providersUi, modelListUi, audioSettingsUi] = await Promise.all([
     readFile(path.join(root, 'electron/ai/decorativeImages.ts'), 'utf8'),
     readFile(path.join(root, 'electron/ipc.ts'), 'utf8'),
     readFile(path.join(root, 'src/backgroundJobs.ts'), 'utf8'),
@@ -59,6 +59,9 @@ try {
     readFile(path.join(root, 'src/components/DecorativeImageModal.tsx'), 'utf8'),
     readFile(path.join(root, 'src/views/SearchView.tsx'), 'utf8'),
     readFile(path.join(root, 'src/App.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/views/ProvidersSettings.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/components/SettingsModelList.tsx'), 'utf8'),
+    readFile(path.join(root, 'src/views/AudioGenerationSettings.tsx'), 'utf8'),
   ]);
 
   // Disabled means a DB-only not-requested state: no text/image provider path.
@@ -89,6 +92,10 @@ try {
   assert.ok(imageModels.includes("gemini-3.1-flash-lite-image"), 'verified Google image model is present');
   assert.ok(imageModels.includes("architecture?.output_modalities?.includes('image')"), 'OpenRouter results require image output');
   assert.ok(imageModels.includes('imagePriceUsd: cheapest?.value ?? null'), 'unpublished image prices remain unavailable');
+  assert.ok(providersUi.includes('image-generation-model-list'), 'image models use the shared settings list pattern');
+  assert.ok(providersUi.includes('provider-model-list-'), 'provider model catalogs use the shared settings list pattern');
+  assert.ok(audioSettingsUi.includes('audio-engine-model-list') && audioSettingsUi.includes('audio-voice-list-'), 'audio models and voices use the shared settings list pattern');
+  assert.ok(modelListUi.includes('dark:bg-neutral-950/20') && modelListUi.includes('bg-indigo-50'), 'the shared list defines explicit light and dark surfaces');
 
   // Persistence includes every requested audit field plus optimized thumbnail.
   for (const column of ['requested', 'status', 'provider', 'model', 'style', 'prompt', 'asset_ref', 'error', 'thumbnail_blob']) {
@@ -96,6 +103,8 @@ try {
   }
   assert.ok(card.includes("if (thumbnail)"));
   assert.ok(card.includes("current?.status !== 'ready' || !dataUrl) return null"), 'missing thumbnails render no broken space');
+  assert.ok(card.includes('relative h-24 overflow-hidden rounded-lg'), 'thumbnail owns a default height that callers can override');
+  assert.ok(card.includes('absolute inset-0 h-full w-full object-cover'), 'thumbnail image fills the complete caller-provided frame');
   // The main views stay uncluttered: a single "Design" pill opens the modal,
   // where style/scene editing and regeneration live. Cost is disclosed there.
   assert.ok(card.includes('DesignPill') && card.includes('DecorativeImageModal'), 'the card exposes only a design entry point and hosts the modal');

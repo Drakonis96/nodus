@@ -386,6 +386,7 @@ function normalizeThemeKey(label: string): string {
  */
 export function buildThemeConstellation(data: GraphData): GraphModel {
   const themeNodes = data.nodes.filter((n) => n.type === 'theme');
+  const themeIds = new Set(themeNodes.map((node) => node.id));
   const labelToId = new Map<string, string>(); // normalized theme label → theme node id
   for (const theme of themeNodes) labelToId.set(normalizeThemeKey(theme.label), theme.id);
 
@@ -435,6 +436,19 @@ export function buildThemeConstellation(data: GraphData): GraphModel {
       color: THEME_CONSTELLATION_PALETTE[index % THEME_CONSTELLATION_PALETTE.length],
     };
   });
+
+  // The progressive overview endpoint already returns aggregated theme↔theme
+  // edges. Preserve them directly instead of trying to reconstruct them from
+  // idea nodes that were intentionally omitted from the compact payload.
+  const directThemeEdges = data.edges.filter(
+    (edge) => themeIds.has(edge.source) && themeIds.has(edge.target)
+  );
+  if (directThemeEdges.length) {
+    return {
+      nodes,
+      edges: directThemeEdges.map((edge) => ({ ...edge, layoutEdge: true })),
+    };
+  }
 
   const edges: EdgeModel[] = [];
   for (const [key, weight] of pairWeight) {

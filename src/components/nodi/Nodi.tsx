@@ -7,6 +7,7 @@ export type NodiState =
   | 'connecting'
   | 'discovering'
   | 'waving'
+  | 'celebrating'
   | 'loading'
   | 'sleeping';
 export type NodiRole = 'none' | 'academic' | 'genealogy' | 'study';

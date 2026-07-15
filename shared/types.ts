@@ -3,6 +3,372 @@
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type {
+  StudyAnnotation,
+  StudyAnnotationInput,
+  StudyDocEditorData,
+  StudyDocUpdateInput,
+} from './studyEditor';
+import type {
+  StudySttProvider,
+  StudySttRequest,
+  StudySttResult,
+  StudySttStreamHandlers,
+  WhisperCppStatus,
+} from './sttModels';
+import type { NodusLocalAiStatus } from './localAiModels';
+import type {
+  StudyImproveRequest,
+  StudyImproveResult,
+  StudyImproveStreamHandlers,
+  StudyImprovementLog,
+  StudyStyle,
+  StudyStyleAssociation,
+  StudyStyleAssociationKind,
+  StudyStyleInput,
+  StudyStyleVersion,
+} from './studyImprove';
+import type {
+  StudyMaterialAnnotation,
+  StudyMaterialAnnotationInput,
+  StudyMaterialContent,
+  StudyMaterialDetail,
+  StudyMaterialImportInput,
+  StudyMaterialImportResult,
+  StudyMaterialIndexResult,
+  StudyMaterialListOptions,
+  StudyMaterialPlacement,
+  StudyMaterialSummary,
+  StudyMaterialUpdateInput,
+  ZoteroStudyMaterialImportInput,
+} from './studyMaterials';
+import type {
+  StudyAudioMarker,
+  StudyAudioMarkerInput,
+  StudyRecordingContent,
+  StudyRecordingCreateInput,
+  StudyRecordingDetail,
+  StudyRecordingImportResult,
+  StudyRecordingListOptions,
+  StudyRecordingSummary,
+  StudyRecordingUpdateInput,
+  StudyTranscript,
+  StudyTranscriptInput,
+  StudyTranscriptSegment,
+  StudyTranscriptSegmentInput,
+} from './studyRecordings';
+import type {
+  StudySavedSearch,
+  StudySearchHistoryEntry,
+  StudySearchIndexStatus,
+  StudySearchOptions,
+  StudySearchProgress,
+  StudySearchResponse,
+} from './studySearch';
+import type {
+  StudyAssistantConversation,
+  StudyAssistantConversationInput,
+  StudyAssistantConversationPatch,
+  StudyAssistantConversationSummary,
+  StudyAssistantRequest,
+  StudyAssistantResponse,
+  StudyAssistantSourceOption,
+  StudyAssistantStreamHandlers,
+} from './studyAssistant';
+import type {
+  StudyQuestion,
+  StudyQuestionCollection,
+  StudyQuestionFilters,
+  StudyQuestionGenerationRequest,
+  StudyQuestionGenerationResult,
+  StudyQuestionInput,
+  StudyQuestionVersion,
+  StudyQuestionAnalytics,
+  StudyQuestionSimilar,
+} from './studyQuestions';
+import type {
+  StudyAssessment,
+  StudyAssessmentInput,
+  StudyAttempt,
+  StudyAttemptAnswer,
+  StudyAttemptAnswerInput,
+  StudyAttemptStartInput,
+  StudyTestBuildRequest,
+} from './studyAssessments';
+import type {
+  StudyGradingRequest,
+  StudyGradingRun,
+  StudyGradingStreamHandlers,
+  StudyRubric,
+  StudyRubricInput,
+} from './studyGrading';
+import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+import type { StudyProgressDashboard } from './studyStats';
+import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
+import type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
+import type { StudySchedule } from './studySchedule';
+import type {
+  StudyIdeaDetail,
+  StudyIdeaSummary,
+  StudyKnowledgeGraph,
+  StudyKnowledgeJob,
+  StudyKnowledgeProgress,
+} from './studyKnowledge';
+export type { StudySchedule, StudyScheduleCell, StudyScheduleDay, StudySchedulePeriod, StudyScheduleSection } from './studySchedule';
+export type {
+  ExtractedStudyIdea,
+  ExtractedStudyRelation,
+  StudyAssessmentKnowledgeContext,
+  StudyIdeaConnection,
+  StudyIdeaDetail,
+  StudyIdeaEvidence,
+  StudyIdeaRelationType,
+  StudyIdeaSummary,
+  StudyIdeaType,
+  StudyKnowledgeExtraction,
+  StudyKnowledgeGraph,
+  StudyKnowledgeGraphEdge,
+  StudyKnowledgeGraphNode,
+  StudyKnowledgeJob,
+  StudyKnowledgeJobStatus,
+  StudyKnowledgeProgress,
+  StudyKnowledgeSourceKind,
+} from './studyKnowledge';
+export type {
+  StudyMaterialAnnotation,
+  StudyMaterialAnnotationInput,
+  StudyMaterialBibliography,
+  StudyMaterialContent,
+  StudyMaterialDetail,
+  StudyMaterialFragmentLink,
+  StudyMaterialImportInput,
+  StudyMaterialImportResult,
+  StudyMaterialIndexResult,
+  StudyMaterialIndexStatus,
+  StudyMaterialListOptions,
+  StudyMaterialMetadata,
+  StudyMaterialPlacement,
+  StudyMaterialPreviewKind,
+  StudyMaterialAnnotationKind,
+  StudyMaterialPoint,
+  StudyMaterialReadState,
+  StudyMaterialRect,
+  StudyMaterialSourceRef,
+  StudyMaterialSummary,
+  StudyMaterialVisualAnalysisStatus,
+  StudyMaterialUpdateInput,
+  StudyMaterialVersion,
+  ZoteroStudyMaterialImportInput,
+} from './studyMaterials';
+export type {
+  StudyAudioMarker,
+  StudyAudioMarkerInput,
+  StudyRecordingContent,
+  StudyRecordingCreateInput,
+  StudyRecordingDetail,
+  StudyRecordingImportResult,
+  StudyRecordingListOptions,
+  StudyRecordingScope,
+  StudyRecordingStatus,
+  StudyRecordingSummary,
+  StudyRecordingUpdateInput,
+  StudyTranscript,
+  StudyTranscriptInput,
+  StudyTranscriptKind,
+  StudyTranscriptSegment,
+  StudyTranscriptSegmentInput,
+  StudyWhisperChunk,
+} from './studyRecordings';
+export type {
+  StudySavedSearch,
+  StudySearchHistoryEntry,
+  StudySearchIndexEntry,
+  StudySearchIndexStatus,
+  StudySearchKind,
+  StudySearchLocation,
+  StudySearchOptions,
+  StudySearchProgress,
+  StudySearchResponse,
+  StudySearchResult,
+  StudySearchScore,
+  StudySearchScope,
+  StudySearchSort,
+} from './studySearch';
+export type {
+  StudyAssistantCitation,
+  StudyAssistantContextStats,
+  StudyAssistantConversation,
+  StudyAssistantConversationInput,
+  StudyAssistantConversationPatch,
+  StudyAssistantConversationSummary,
+  StudyAssistantLanguage,
+  StudyAssistantLevel,
+  StudyAssistantMessage,
+  StudyAssistantRequest,
+  StudyAssistantResponse,
+  StudyAssistantScopeKind,
+  StudyAssistantSelection,
+  StudyAssistantSourceOption,
+  StudyAssistantStreamHandlers,
+  StudyAssistantTask,
+  StudyAssistantTone,
+} from './studyAssistant';
+export type {
+  StudyCognitiveLevel,
+  StudyQuestion,
+  StudyQuestionAnswer,
+  StudyQuestionCollection,
+  StudyQuestionDifficulty,
+  StudyQuestionExport,
+  StudyQuestionFilters,
+  StudyQuestionGenerationRequest,
+  StudyQuestionGenerationResult,
+  StudyQuestionInput,
+  StudyQuestionOption,
+  StudyQuestionSource,
+  StudyQuestionStatus,
+  StudyQuestionType,
+  StudyQuestionVersion,
+  StudyQuestionAnalytics,
+  StudyQuestionSimilar,
+} from './studyQuestions';
+export type {
+  StudyAnswerEvaluation,
+  StudyAssessment,
+  StudyAssessmentConfig,
+  StudyAssessmentInput,
+  StudyAssessmentItem,
+  StudyAssessmentKind,
+  StudyAssessmentMode,
+  StudyAssessmentSelection,
+  StudyAttempt,
+  StudyAttemptAnswer,
+  StudyAttemptAnswerInput,
+  StudyAttemptConfig,
+  StudyAttemptStartInput,
+  StudyAttemptStatus,
+  StudyCorrectionMode,
+  StudyQuestionResponse,
+  StudyTestBuildRequest,
+} from './studyAssessments';
+export type {
+  StudyCriterionGrade,
+  StudyGradingAnnotation,
+  StudyGradingAnnotationInput,
+  StudyGradingAnnotationKind,
+  StudyGradingAnnotationSeverity,
+  StudyGradingRequest,
+  StudyGradingResult,
+  StudyGradingRun,
+  StudyGradingSeverity,
+  StudyGradingSource,
+  StudyGradingStreamHandlers,
+  StudyRubric,
+  StudyRubricCriterion,
+  StudyRubricInput,
+} from './studyGrading';
+export type { StudyFlashcard, StudyFlashcardInput, StudyFlashcardType, StudyReviewInput, StudyReviewRecord } from './studyFlashcards';
+export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './studySrs';
+export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
+export type { StudyCalendarEvent, StudyCalendarEventInput, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
+export type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
+export type {
+  StudyImproveLength,
+  StudyImproveLevel,
+  StudyImproveMode,
+  StudyImprovePresetId,
+  StudyImproveRequest,
+  StudyImproveResult,
+  StudyImproveScope,
+  StudyImproveStreamHandlers,
+  StudyImprovementLog,
+  StudyImproveVariables,
+  StudyProtectedSpan,
+  StudyProtectedSpanKind,
+  StudyStyle,
+  StudyStyleAssociation,
+  StudyStyleAssociationKind,
+  StudyStyleCategory,
+  StudyStyleConfig,
+  StudyStyleExport,
+  StudyStyleInput,
+  StudyStyleVersion,
+} from './studyImprove';
+export type {
+  StudyDictationAction,
+  StudyDictationTransform,
+  StudyDictationTransformOptions,
+  StudySttDeviceProfile,
+  StudySttModel,
+  StudySttProvider,
+  StudySttRequest,
+  StudySttResult,
+  StudySttStreamHandlers,
+  WhisperCppStatus,
+} from './sttModels';
+export type {
+  ParsedStudyDocLink,
+  StudyAnnotation,
+  StudyAnnotationInput,
+  StudyDocEditorData,
+  StudyDocLink,
+  StudyDocStyle,
+  StudyDocUpdateInput,
+  StudyDocVersion,
+  StudyDocumentStats,
+  StudyEditorAlignment,
+  StudyEditorCommand,
+  StudyEditorSaveReason,
+  StudyEditorTheme,
+  StudyOutlineItem,
+} from './studyEditor';
+import type {
+  CreateStudyCourseInput,
+  CreateStudyDocumentInput,
+  CreateStudyFolderInput,
+  CreateStudySubjectInput,
+  CreateStudyTagInput,
+  CreateStudyTemplateInput,
+  CreateStudyTopicInput,
+  StudyCourse,
+  StudyDocument,
+  StudyEntityMoveInput,
+  StudyEntityKind,
+  StudyFolder,
+  StudyLifecycleAction,
+  StudyPlacement,
+  StudyPlacementInput,
+  StudySubject,
+  StudyTag,
+  StudyTemplate,
+  StudyTopic,
+  StudyWorkspace,
+  StudyWorkspaceOptions,
+} from './studyOrg';
+export type {
+  CreateStudyCourseInput,
+  CreateStudyDocumentInput,
+  CreateStudyFolderInput,
+  CreateStudySubjectInput,
+  CreateStudyTagInput,
+  CreateStudyTemplateInput,
+  CreateStudyTopicInput,
+  StudyCourse,
+  StudyDocument,
+  StudyDocumentKind,
+  StudyEntityMoveInput,
+  StudyEntityKind,
+  StudyFolder,
+  StudyLifecycleAction,
+  StudyPlacement,
+  StudyPlacementInput,
+  StudySubject,
+  StudyTag,
+  StudyTemplate,
+  StudyTopic,
+  StudyWorkspace,
+  StudyWorkspaceOptions,
+} from './studyOrg';
 import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { VaultType };
@@ -81,6 +447,19 @@ export interface DatabaseChatRequest {
   question: string;
   databaseIds: string[];
   history?: DbChatTurn[];
+}
+
+export interface DatabaseChatConversationSummary {
+  id: string;
+  title: string;
+  databaseIds: string[];
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DatabaseChatConversation extends DatabaseChatConversationSummary {
+  messages: DbChatTurn[];
 }
 
 export type IdeaType = 'claim' | 'finding' | 'construct' | 'method' | 'framework';
@@ -235,6 +614,8 @@ export interface ManagedTheme {
 export interface ReprocessConnectionsOptions {
   /** Also re-trace idea↔idea relations (stored as inferred edges) in addition to idea↔theme. */
   relations: boolean;
+  /** Limit automatic maintenance to ideas occurring in these newly changed works. */
+  nodusIds?: string[];
 }
 
 /** Progress event emitted during reprocessConnections. */
@@ -338,15 +719,18 @@ export type AiProvider =
   | 'anthropic'
   | 'openai'
   | 'openrouter'
+  | 'groq'
+  | 'cerebras'
   | 'deepseek'
   | 'gemini'
   | 'xiaomi'
   | 'ollama'
-  | 'lmstudio';
+  | 'lmstudio'
+  | 'nodus';
 /** Providers that run on the user's machine (or LAN) via a configurable base URL.
  *  They need no API key (an optional token is supported for secured instances). */
 export type LocalProvider = Extract<AiProvider, 'ollama' | 'lmstudio'>;
-export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini' | 'ollama' | 'lmstudio'>;
+export type EmbeddingProvider = Extract<AiProvider, 'openai' | 'openrouter' | 'gemini' | 'ollama' | 'lmstudio' | 'nodus'>;
 export type ImageProvider = 'google' | 'openai' | 'openrouter';
 
 /** User-editable connection settings for a local provider. The base URL includes
@@ -489,8 +873,9 @@ export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';
  *  settings + generation surface without changing callers. */
 export type AudioProvider = 'piper' | 'kokoro' | 'hume';
 
-/** The two content kinds that can be narrated. Values match DecorativeImageEntityKind. */
-export type AudioEntityKind = 'deep_research' | 'immersion';
+/** Content kinds that can be narrated. Study kinds are stored in the vault's
+ * regenerable local audio catalogue rather than in sync/backups. */
+export type AudioEntityKind = 'deep_research' | 'immersion' | 'study_document' | 'study_transcript' | 'study_assistant' | 'study_subject' | 'study_question';
 
 /** One Hume voice as returned by the voice-list endpoint. `humeProvider` says which
  *  Hume library it belongs to (needed to synthesize with it). */
@@ -530,6 +915,35 @@ export interface AudioSegment {
   index: number;
   label: string;
   text: string;
+}
+
+export interface AudioSegmentRequest {
+  mode?: 'full' | 'selection' | 'cursor';
+  markdown?: string;
+  selection?: string;
+  cursorOffset?: number;
+  title?: string;
+  pronunciations?: Array<{ written: string; spoken: string }>;
+}
+
+export interface StudyAudioBookmark {
+  id: string;
+  entityKind: AudioEntityKind;
+  entityId: string;
+  segmentIndex: number;
+  label: string;
+  createdAt: string;
+}
+
+export interface StudyPronunciationEntry { written: string; spoken: string }
+
+export interface StudyAudioPlaylistItem {
+  entityId: string;
+  title: string;
+  subjectId: string;
+  clipCount: number;
+  durationSec: number;
+  updatedAt: string;
 }
 
 // ── AI translations ─────────────────────────────────────────────────────────
@@ -587,6 +1001,8 @@ export interface ContentTranslation {
   /** Full translated document as Markdown. */
   markdown: string;
   model: ModelRef | null;
+  status: 'generating' | 'ready' | 'error';
+  error: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -618,6 +1034,10 @@ export interface AppSettings {
   favorites: ModelRef[];
   /** @deprecated Legacy global selector, retained only for one-time migration. */
   defaultModel: ModelRef | null;
+  /** Simplified selectors or per-task overrides. Stored per vault. */
+  modelSettingsMode: 'basic' | 'advanced';
+  /** One-time migration marker for the simplified model settings. */
+  modelSettingsVersion: number;
   extractionModel: ModelRef | null;
   // Vision model for analysing archive images (visual description + OCR). Falls back
   // to extractionModel when null. Should be an image-capable model.
@@ -633,6 +1053,8 @@ export interface AppSettings {
   // Per-feature choices. Null means "seed from synthesisModel until the user
   // chooses inside that feature"; once chosen, each value persists separately.
   chatModel: ModelRef | null;
+  /** Model used only by the Nodi companion chat. */
+  nodiModel: ModelRef | null;
   deepResearchModel: ModelRef | null;
   immersionModel: ModelRef | null;
   writingModel: ModelRef | null;
@@ -641,6 +1063,42 @@ export interface AppSettings {
   studyModel: ModelRef | null;
   tutorModel: ModelRef | null;
   hypothesisModel: ModelRef | null;
+  // Study-vault task routing. Each workflow persists independently so choosing a
+  // fast model for questions never retargets grading or text improvement.
+  improveModel: ModelRef | null;
+  /** Up to four study-writing prompts exposed as contextual editor shortcuts. */
+  studyImproveToolbarStyleIds: string[];
+  questionGenModel: ModelRef | null;
+  gradingModel: ModelRef | null;
+  flashcardModel: ModelRef | null;
+  transcriptionModel: ModelRef | null;
+  /** Optional second choice, used only when the primary task model fails before producing output. */
+  studyAiFallbackModels: Partial<Record<StudyAiTask, ModelRef | null>>;
+  /** Per-subject overrides; styles keep their own existing model override. */
+  studyAiSubjectModels: Record<string, Partial<Record<StudyAiTask, ModelRef | null>>>;
+  studyAiMonthlyBudgetUsd: number;
+  studyAiBudgetWarningPercent: number;
+  studyAiEnabled: boolean;
+  studyAnalyticsEnabled: boolean;
+  studySyncEnabled: boolean;
+  studySharingEnabled: boolean;
+  studyAiPrivacyMode: 'local' | 'hybrid' | 'external';
+  studyAiExcludedSubjectIds: string[];
+  /** Legacy mirror kept for older settings payloads; privacyMode is authoritative. */
+  studyAiLocalOnly: boolean;
+  studyAiConfirmExternal: boolean;
+  studyAiMaxInputChars: number;
+  studyAiMaxOutputTokens: number;
+  studyAiTemperature: number;
+  studyAiRetryCount: number;
+  /** Speech-to-text backend. Transformers.js/ONNX is the local factory default. */
+  sttProvider: StudySttProvider;
+  /** Hugging Face model id used by the Transformers.js ONNX worker. */
+  sttTransformersModel: string;
+  /** GGML model id used by the optional whisper.cpp executable. */
+  sttWhisperCppModel: string;
+  /** User-selected whisper-cli executable; empty means auto-detect on PATH. */
+  sttWhisperCppExecutable: string;
   /** Provider/model used only for optional decorative image generation. */
   imageProvider: ImageProvider;
   imageModel: string;
@@ -670,6 +1128,16 @@ export interface AppSettings {
   // Language injected into AI prompts → language of generated ideas/themes/answers.
   promptLanguage: PromptLanguage;
   animationSpeed: number; // 0..1
+  /** Global UI zoom. Kept independent from document/editor typography. */
+  interfaceScale: number; // 0.85..1.3
+  /** Uses a wider, highly legible system font stack without downloading fonts. */
+  accessibleFont: boolean;
+  /** Strengthens borders, focus rings and foreground/background separation. */
+  highContrast: boolean;
+  /** Disables non-essential motion, in addition to the OS preference. */
+  reduceMotion: boolean;
+  /** Reduces visual noise and gives study reading surfaces a calmer measure. */
+  readingFocusMode: boolean;
   // Nodi mascot: show the floating companion (visual/animation only for now — no wired
   // behaviour yet). App-wide preference, on by default.
   mascotEnabled: boolean;
@@ -687,6 +1155,8 @@ export interface AppSettings {
   openRouterThroughput: boolean;
   unpaywallEmail: string;
   onboardingComplete: boolean;
+  /** App-wide version of the introductory AI/vault tutorial already completed. */
+  basicsTutorialVersion: number;
   // First-run usage tour (distinct from the setup onboarding above).
   tourComplete: boolean;
   // Advanced research-workflow walkthrough. Opt-in (never auto-shown): defaults
@@ -702,6 +1172,8 @@ export interface AppSettings {
   genealogyTourComplete: boolean;
   // Completion flag for the databases-mode guided tour (shown once per databases vault).
   databasesTourComplete: boolean;
+  // Completion flag for the optional study-vault orientation tour.
+  studyTourComplete: boolean;
   // Large-PDF / extraction strategy
   preferZoteroFulltext: boolean;
   ocrEnabled: boolean;
@@ -749,11 +1221,23 @@ export interface AppSettings {
   sidebarCustomized: boolean;
   /** Default wooden frame design for the genealogy tree (per-person overrides win). */
   treeFrame: string;
-  // ── Automatic encrypted backups ────────────────────────────────────────────
+  // ── Recovery and automatic encrypted backups ──────────────────────────────
+  /** Version of the global recovery-folder onboarding contract completed here. */
+  recoverySetupVersion: number;
+  /** Empty means every registered vault. Otherwise only these vault ids are copied. */
+  backupVaultIds: string[];
+  /** Include app-wide preferences plus Nodi notifications/conversations. */
+  backupIncludePreferences: boolean;
+  /** Include per-vault assistant/search histories stored outside SQLite. */
+  backupIncludeHistories: boolean;
+  /** Include regenerable narration WAVs and their per-vault metadata. */
+  backupIncludeGeneratedMedia: boolean;
+  /** Legacy compatibility field. New backups always include API keys in their encrypted payload. */
+  backupIncludeApiKeys: boolean;
   // Scheduled backups to a user-chosen folder (point it at iCloud Drive /
   // Google Drive to get off-machine copies for free). Encrypted with the
   // master backup password stored in the OS keychain; unlike the manual
-  // export, automatic backups NEVER include API keys or tokens.
+  // export. MCP tokens are never included; API keys are protected inside backups.
   autoBackupEnabled: boolean;
   autoBackupFolder: string;
   autoBackupIntervalHours: number;
@@ -772,6 +1256,53 @@ export interface AutoBackupResult {
   message: string;
   path?: string;
   prunedCount?: number;
+}
+
+/** User-facing scope for a complete encrypted backup. Database-backed content is
+ * always copied as a whole per selected vault so foreign-key relationships cannot
+ * be broken by a partial restore. */
+export interface BackupSelection {
+  vaultIds: string[];
+  includePreferences: boolean;
+  includeHistories: boolean;
+  includeGeneratedMedia: boolean;
+  includeApiKeys: boolean;
+}
+
+export interface RecoverySnapshotSummary {
+  fileName: string;
+  path: string;
+  date: string;
+  appVersion: string;
+  schemaVersion: number;
+  vaultCount: number;
+  bytes: number;
+  includesSecrets: boolean;
+}
+
+export interface RecoveryFolderInspection {
+  path: string;
+  kind: 'empty' | 'recovery' | 'invalid' | 'missing';
+  message: string;
+  snapshots: RecoverySnapshotSummary[];
+}
+
+export interface RecoveryStatus {
+  setupVersion: number;
+  needsSetup: boolean;
+  previousInstallation: boolean;
+  configuredRoot: string;
+  folder: RecoveryFolderInspection | null;
+  hasPassword: boolean;
+  hasRecoveryKey: boolean;
+}
+
+export interface RecoverySetupResult {
+  ok: boolean;
+  message: string;
+  snapshot?: RecoverySnapshotSummary;
+  /** Shown once after setup so the user can store an independent credential. */
+  recoveryKey?: string;
 }
 
 export interface VaultSummary {
@@ -1440,10 +1971,30 @@ export interface PdfAnalysis {
 
 export interface ZoteroCollection {
   key: string;
+  /** Raw Zotero key inside its library. `key` stays globally unique in Nodus. */
+  itemKey: string;
+  library: ZoteroLibrary;
   name: string;
   parentCollection: string | false;
   itemCount: number; // direct items only (Zotero meta.numItems)
   subCount: number; // number of subcollections (Zotero meta.numCollections)
+}
+
+export interface ZoteroLibrary {
+  type: 'user' | 'group';
+  id: string;
+  name: string;
+}
+
+export interface ZoteroAttachmentInfo {
+  key: string;
+  itemKey: string;
+  library: ZoteroLibrary;
+  title: string;
+  contentType: string | null;
+  linkMode: string | null;
+  filename: string | null;
+  available: boolean;
 }
 
 /** Rich bibliographic metadata for one work, read live from Zotero for the detail panel. */
@@ -1466,6 +2017,9 @@ export interface WorkMeta {
 
 export interface ZoteroItem {
   key: string;
+  /** Raw Zotero item key inside `library`; `key` is the Nodus-safe identity. */
+  itemKey: string;
+  library: ZoteroLibrary;
   version: number;
   title: string;
   creators: ZoteroCreator[];
@@ -1475,6 +2029,10 @@ export interface ZoteroItem {
   abstract: string | null;
   tags: string[];
   collections: string[];
+  publisher: string | null;
+  publicationTitle: string | null;
+  isbn: string | null;
+  url: string | null;
 }
 
 /** A raw Zotero creator. `creatorType` distinguishes author/editor/translator/… */
@@ -1521,6 +2079,8 @@ export interface QueueItem {
    * to run on completion regardless of the auto-* settings. Used by "Procesar todo".
    */
   chain?: boolean;
+  /** Changed works that bound an automatic semantic-maintenance job. Omitted for a manual full pass. */
+  scopeNodusIds?: string[];
 }
 
 export interface QueueProgress {
@@ -1609,6 +2169,36 @@ export interface SyncMergeSummary {
   savedSearches: SyncTableCounts;
   edgeFeedback: SyncTableCounts;
   databases: SyncTableCounts;
+  /** Aggregate changes across every study_* table. */
+  study: SyncTableCounts;
+}
+
+export interface StudyDataOverview {
+  schemaVersion: number;
+  expectedSchemaVersion: number;
+  databaseBytes: number;
+  materialBytes: number;
+  recordingBytes: number;
+  embeddingBytes: number;
+  studyRows: number;
+  trashRows: number;
+  integrityOk: boolean;
+  integrityMessages: string[];
+  foreignKeyErrors: string[];
+  journalMode: string;
+  lastCheckedAt: string;
+}
+
+export interface StudyDataMaintenanceResult {
+  ok: boolean;
+  changedRows: number;
+  message: string;
+}
+
+export type StudyExportFormat = 'markdown' | 'txt' | 'html' | 'docx' | 'pdf' | 'bundle';
+export interface StudyExportScope {
+  kind: 'workspace' | 'course' | 'subject' | 'topic' | 'folder' | 'document';
+  id?: string;
 }
 
 export interface GraphData {
@@ -1620,6 +2210,38 @@ export interface IdeaDetail {
   idea: Idea;
   occurrences: (IdeaOccurrence & { work: WorkView })[];
   evidence: Evidence[];
+}
+
+/** Compact row used by the paginated Ideas list; it deliberately omits graph-wide payloads. */
+export interface IdeaListItem {
+  id: string;
+  label: string;
+  type: IdeaType;
+  statement: string;
+  workCount: number;
+  themes: string[];
+  maxConfidence: number;
+  connectionCount: number;
+}
+
+export interface IdeaPageRequest {
+  offset: number;
+  limit: number;
+  search?: string;
+  type?: IdeaType | '';
+  sort: 'label' | 'type' | 'works' | 'connections' | 'confidence';
+}
+
+export interface IdeaPage {
+  items: IdeaListItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface IdeaConnection {
+  edge: GraphEdge;
+  node: IdeaListItem;
 }
 
 /** One idea anchored to a work, with that idea↔work occurrence's fields. */
@@ -1915,6 +2537,13 @@ export interface GapAggregate {
   works: { nodus_id: string; title: string; zotero_key: string }[];
   /** Individual records behind this normalized aggregate; use one with `nodus_get_gap`. */
   gapIds: string[];
+}
+
+export interface GapPage {
+  items: GapAggregate[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 export interface GapDetail {
@@ -2589,6 +3218,39 @@ export interface CorpusHealth {
     /** Works with text whose full-text passage index is missing or outdated. */
     passagesPendingWorks: number;
   };
+}
+
+/** Compact, aggregate-only payload for the academic Home dashboard. */
+export interface AcademicHomeStats {
+  totalWorks: number;
+  readTaggedWorks: number;
+  manualDeepWorks: number;
+  unreadWorks: number;
+  deepTarget: number;
+  lightDone: number;
+  lightPending: number;
+  lightMissing: number;
+  deepDone: number;
+  deepPending: number;
+  deepMissing: number;
+  skippedNoText: number;
+  failedWorks: number;
+  ideaNodes: number;
+  themeNodes: number;
+  semanticEdges: number;
+  totalEmbeddableIdeas: number;
+  embeddedIdeas: number;
+  embeddingIncompleteWorks: number;
+  gaps: number;
+  contradictions: number;
+}
+
+/** Home uses one small IPC response instead of cloning the complete corpus. */
+export interface AcademicHomeSnapshot {
+  stats: AcademicHomeStats;
+  health: CorpusHealth;
+  queue: QueueProgress;
+  latestSync: SyncLogEntry | null;
 }
 
 /** AI-suggested ways to find literature that would fill a research gap. */
@@ -3310,6 +3972,21 @@ export interface AuthorSummary {
   hasSynthesis: boolean;
 }
 
+export interface AuthorPageRequest {
+  offset: number;
+  limit: number;
+  query?: string;
+  sort: 'name' | 'surname' | 'works' | 'ideas' | 'connections';
+  synthesis: 'all' | 'with' | 'without';
+}
+
+export interface AuthorPage {
+  items: AuthorSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
 export interface AuthorDossierWork {
   nodus_id: string;
   title: string;
@@ -3945,11 +4622,42 @@ export interface NodiChatMessage {
   content: string;
 }
 
+export type NodiContextKind = 'documentation' | 'current_view' | 'vault' | 'all_vaults';
+
+export interface NodiViewContext {
+  viewId: string;
+  title: string;
+  text: string;
+  capturedAt: number;
+}
+
 export interface NodiChatRequest {
   messages: NodiChatMessage[];
-  /** When true, the assistant is told about every vault (cross-vault awareness),
-   *  not only the active one. */
-  allVaults: boolean;
+  contexts: NodiContextKind[];
+  model?: ModelRef | null;
+  /** The in-window companion can attach the latest visible view directly. The
+   * overlay falls back to the bounded snapshot published by the main renderer. */
+  currentView?: NodiViewContext | null;
+}
+
+export interface NodiConversation {
+  id: string;
+  title: string;
+  messages: NodiChatMessage[];
+  contexts: NodiContextKind[];
+  model: ModelRef | null;
+  vaultId: string | null;
+  vaultName: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NodiConversationInput {
+  id?: string | null;
+  title?: string;
+  messages: NodiChatMessage[];
+  contexts: NodiContextKind[];
+  model?: ModelRef | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3966,9 +4674,21 @@ export interface NodusApi {
   markNotificationsRead(): Promise<NodiNotification[]>;
   clearNotifications(): Promise<NodiNotification[]>;
   onNotificationsChanged(cb: (list: NodiNotification[]) => void): () => void;
+  listNodiConversations(): Promise<NodiConversation[]>;
+  getNodiConversation(id: string): Promise<NodiConversation | null>;
+  saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;
+  deleteNodiConversation(id: string): Promise<void>;
+  clearNodiConversations(): Promise<void>;
   nodiChatStream(request: NodiChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<string>;
   cancelNodiChat(): Promise<void>;
+  setNodiViewContext(context: NodiViewContext): Promise<void>;
+  getNodiViewContext(): Promise<NodiViewContext | null>;
+  setNodiTutorialVisible(visible: boolean): Promise<void>;
+  nodiOpenSettings(): Promise<void>;
+  onNodiNavigate(cb: (view: 'settings') => void): () => void;
   nodiSetMouseIgnore(ignore: boolean): Promise<void>;
+  nodiSetExpanded(expanded: boolean): Promise<void>;
+  onNodiDismiss(cb: () => void): () => void;
   nodiOpenMainWindow(): Promise<void>;
   nodiMoveWindow(dx: number, dy: number): Promise<void>;
   onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
@@ -4185,6 +4905,11 @@ export interface NodusApi {
   narrateDatabaseAnalysis(result: AnalysisResult): Promise<string>;
   dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string }>;
   cancelDbChat(): Promise<void>;
+  listDatabaseChatConversations(): Promise<DatabaseChatConversationSummary[]>;
+  getDatabaseChatConversation(id: string): Promise<DatabaseChatConversation | null>;
+  createDatabaseChatConversation(input: { title: string; databaseIds: string[] }): Promise<DatabaseChatConversation>;
+  saveDatabaseChatConversation(id: string, messages: DbChatTurn[], databaseIds: string[]): Promise<DatabaseChatConversation | null>;
+  deleteDatabaseChatConversation(id: string): Promise<void>;
   listDatabaseViews(databaseId: string): Promise<DatabaseSavedView[]>;
   createDatabaseView(databaseId: string, input: SavedViewInput): Promise<DatabaseSavedView>;
   updateDatabaseView(id: string, patch: Partial<SavedViewInput>): Promise<DatabaseSavedView | null>;
@@ -4220,6 +4945,10 @@ export interface NodusApi {
   listModels(provider: AiProvider): Promise<ModelInfo[]>;
   listEmbeddingModels(provider: EmbeddingProvider): Promise<ModelInfo[]>;
   listImageModels(): Promise<ImageModelInfo[]>;
+  getNodusLocalAiStatus(): Promise<NodusLocalAiStatus>;
+  installNodusLocalRuntime(onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
+  downloadNodusLocalModel(model: string, onProgress?: (fraction: number) => void): Promise<NodusLocalAiStatus>;
+  deleteNodusLocalModel(model: string): Promise<NodusLocalAiStatus>;
   /** Ping a local provider (Ollama / LM Studio) to verify its base URL is reachable. */
   testLocalProvider(provider: LocalProvider): Promise<LocalProviderTestResult>;
   getDecorativeImage(entityKind: DecorativeImageEntityKind, entityId: string): Promise<DecorativeImage | null>;
@@ -4238,7 +4967,7 @@ export interface NodusApi {
   onDecorativeImageChanged(cb: (image: DecorativeImage) => void): () => void;
 
   // audio / text-to-speech (synthesis runs in the renderer; main persists WAVs)
-  getAudioSegments(entityKind: AudioEntityKind, entityId: string): Promise<AudioSegment[]>;
+  getAudioSegments(entityKind: AudioEntityKind, entityId: string, request?: AudioSegmentRequest): Promise<AudioSegment[]>;
   listAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<AudioClip[]>;
   clearAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
   saveAudioClip(
@@ -4249,6 +4978,13 @@ export interface NodusApi {
   getAudioClipDataUrl(clipId: string): Promise<string | null>;
   deleteAudioClip(clipId: string): Promise<void>;
   deleteEntityAudioClips(entityKind: AudioEntityKind, entityId: string): Promise<void>;
+  exportAudioClip(clipId: string): Promise<{ path: string } | null>;
+  listStudyAudioBookmarks(entityKind: AudioEntityKind, entityId: string): Promise<StudyAudioBookmark[]>;
+  createStudyAudioBookmark(entityKind: AudioEntityKind, entityId: string, segmentIndex: number, label: string): Promise<StudyAudioBookmark>;
+  deleteStudyAudioBookmark(id: string): Promise<void>;
+  getStudyPronunciations(subjectId: string): Promise<StudyPronunciationEntry[]>;
+  setStudyPronunciations(subjectId: string, entries: StudyPronunciationEntry[]): Promise<StudyPronunciationEntry[]>;
+  listStudyAudioPlaylist(subjectId: string): Promise<StudyAudioPlaylistItem[]>;
   // AI translations of a report/immersion (source Markdown supplied by the renderer).
   listContentTranslations(
     entityKind: TranslationEntityKind,
@@ -4267,15 +5003,20 @@ export interface NodusApi {
 
   // zotero
   zoteroPing(): Promise<{ ok: boolean; userId?: string; message?: string }>;
-  zoteroCollections(): Promise<ZoteroCollection[]>;
-  zoteroChildCollections(parentKey: string): Promise<ZoteroCollection[]>;
+  zoteroLibraries(): Promise<ZoteroLibrary[]>;
+  zoteroCollections(library?: ZoteroLibrary): Promise<ZoteroCollection[]>;
+  zoteroChildCollections(parentKey: string, library?: ZoteroLibrary): Promise<ZoteroCollection[]>;
   zoteroCollectionItems(
     collectionKey: string,
-    opts?: { query?: string; recursive?: boolean }
+    opts?: { query?: string; recursive?: boolean; library?: ZoteroLibrary }
   ): Promise<ZoteroItem[]>;
+  zoteroSearchItems(library: ZoteroLibrary, query: string): Promise<ZoteroItem[]>;
+  zoteroItemAttachments(itemKey: string, library?: ZoteroLibrary): Promise<ZoteroAttachmentInfo[]>;
 
   // works / library
+  getAcademicHomeSnapshot(): Promise<AcademicHomeSnapshot>;
   listWorks(filter?: WorkFilter): Promise<WorkView[]>;
+  listWorksPage(filter: WorkFilter | undefined, request: WorkPageRequest): Promise<WorkPage>;
   listZoteroTags(): Promise<ZoteroTag[]>;
   getWork(nodusId: string): Promise<WorkView | null>;
   ingestZoteroItems(items: ZoteroItem[]): Promise<WorkView[]>;
@@ -4339,6 +5080,12 @@ export interface NodusApi {
 
   // graph
   getGraph(lens: 'ideas' | 'authors'): Promise<GraphData>;
+  /** Compact initial theme constellation; never includes the full idea corpus. */
+  getGraphOverview(): Promise<GraphData>;
+  /** Bounded theme backbone plus cross-theme bridges. */
+  getGraphTheme(theme: string, cap?: number): Promise<GraphData>;
+  listIdeasPage(request: IdeaPageRequest): Promise<IdeaPage>;
+  listIdeaConnections(globalId: string): Promise<IdeaConnection[]>;
   getIdeaDetail(globalId: string): Promise<IdeaDetail | null>;
   getEdgeDetail(edgeId: string): Promise<EdgeDetail | null>;
   /** Every direct idea↔idea edge touching an idea (its connections). */
@@ -4358,6 +5105,7 @@ export interface NodusApi {
   // authors (dossier + synthesis matrix)
   /** Lightweight list of every author with their corpus footprint. */
   listAuthors(): Promise<AuthorSummary[]>;
+  listAuthorsPage(request: AuthorPageRequest): Promise<AuthorPage>;
   /** Full study card for one author (ideas, relations, themes, cached synthesis). */
   getAuthorDossier(authorId: string): Promise<AuthorDossier | null>;
   /** Generate (and cache) the AI thesis/remember/positioning for one author. */
@@ -4370,6 +5118,193 @@ export interface NodusApi {
   exportAuthorSyntheses(request: AuthorSynthesisExportRequest): Promise<{ path: string } | null>;
 
   // study guide
+  /** Complete local organization snapshot for the active study vault. */
+  getStudyWorkspace(options?: StudyWorkspaceOptions): Promise<StudyWorkspace>;
+  getStudySchedule(): Promise<StudySchedule>;
+  saveStudySchedule(schedule: StudySchedule): Promise<StudySchedule>;
+  createStudyCourse(input: CreateStudyCourseInput): Promise<StudyCourse>;
+  createStudySubject(input: CreateStudySubjectInput): Promise<StudySubject>;
+  createStudyTopic(input: CreateStudyTopicInput): Promise<StudyTopic>;
+  createStudyFolder(input: CreateStudyFolderInput): Promise<StudyFolder>;
+  createStudyDocument(input: CreateStudyDocumentInput): Promise<StudyDocument>;
+  updateStudyEntity(kind: StudyEntityKind, id: string, patch: Record<string, unknown>): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument | null>;
+  moveStudyEntity(kind: Exclude<StudyEntityKind, 'course' | 'document'>, id: string, input: StudyEntityMoveInput): Promise<StudySubject | StudyTopic | StudyFolder>;
+  addStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
+  setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
+  removeStudyPlacement(id: string): Promise<void>;
+  setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction): Promise<void>;
+  duplicateStudyTree(kind: StudyEntityKind, id: string): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument>;
+  createStudyTag(input: CreateStudyTagInput): Promise<StudyTag>;
+  updateStudyTag(id: string, patch: Partial<CreateStudyTagInput> & { favorite?: boolean; position?: number }): Promise<StudyTag | null>;
+  deleteStudyTag(id: string): Promise<void>;
+  setStudyDocumentTags(documentId: string, tagIds: string[]): Promise<void>;
+  createStudyTemplate(input: CreateStudyTemplateInput): Promise<StudyTemplate>;
+  updateStudyTemplate(id: string, patch: Partial<CreateStudyTemplateInput> & { favorite?: boolean; position?: number }): Promise<StudyTemplate | null>;
+  deleteStudyTemplate(id: string): Promise<void>;
+  applyStudyTemplate(id: string, name?: string): Promise<StudyCourse | StudySubject | StudyDocument>;
+  getStudyDocEditorData(documentId: string): Promise<StudyDocEditorData>;
+  updateStudyDoc(documentId: string, input: StudyDocUpdateInput): Promise<StudyDocument>;
+  restoreStudyDocVersion(documentId: string, versionId: string): Promise<StudyDocument>;
+  createStudyAnnotation(documentId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
+  updateStudyAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
+  deleteStudyAnnotation(id: string): Promise<void>;
+  transcribeStudyAudio(request: StudySttRequest, handlers?: StudySttStreamHandlers): Promise<StudySttResult>;
+  cancelStudyTranscription(): Promise<void>;
+  getWhisperCppStatus(): Promise<WhisperCppStatus>;
+  installWhisperCpp(): Promise<WhisperCppStatus>;
+  uninstallWhisperCpp(): Promise<WhisperCppStatus>;
+  chooseWhisperCppExecutable(): Promise<string | null>;
+  downloadWhisperCppModel(model: string, onProgress?: (fraction: number) => void): Promise<WhisperCppStatus>;
+  deleteWhisperCppModel(model: string): Promise<WhisperCppStatus>;
+  listStudyStyles(options?: { includeArchived?: boolean; search?: string }): Promise<StudyStyle[]>;
+  createStudyStyle(input: StudyStyleInput): Promise<StudyStyle>;
+  updateStudyStyle(id: string, patch: Partial<StudyStyleInput>): Promise<StudyStyle>;
+  duplicateStudyStyle(id: string): Promise<StudyStyle>;
+  archiveStudyStyle(id: string, archived: boolean): Promise<StudyStyle>;
+  deleteStudyStyle(id: string): Promise<void>;
+  listStudyStyleVersions(styleId: string): Promise<StudyStyleVersion[]>;
+  restoreStudyStyleVersion(styleId: string, versionId: string): Promise<StudyStyle>;
+  listStudyStyleAssociations(): Promise<StudyStyleAssociation[]>;
+  setStudyStyleAssociation(styleId: string, kind: StudyStyleAssociationKind, targetId?: string, isDefault?: boolean): Promise<StudyStyleAssociation>;
+  resolveStudyStyleDefault(subjectId?: string | null, documentKind?: string | null): Promise<string>;
+  exportStudyStyles(styleIds?: string[]): Promise<{ path: string } | null>;
+  importStudyStyles(): Promise<StudyStyle[]>;
+  improveStudyText(request: StudyImproveRequest, handlers: StudyImproveStreamHandlers): Promise<StudyImproveResult>;
+  cancelStudyImprove(): Promise<void>;
+  listStudyImprovementLog(documentId: string): Promise<StudyImprovementLog[]>;
+  updateStudyImprovementAction(id: string, action: StudyImprovementLog['action']): Promise<void>;
+  listStudyMaterials(options?: StudyMaterialListOptions): Promise<StudyMaterialSummary[]>;
+  getStudyMaterial(id: string): Promise<StudyMaterialDetail>;
+  getStudyMaterialContent(id: string): Promise<StudyMaterialContent>;
+  importStudyMaterials(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
+  importStudyMaterialFolder(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
+  chooseStudyMaterialPaths(folder?: boolean): Promise<string[]>;
+  getPathForDroppedFile(file: unknown): string;
+  importStudyMaterialPaths(paths: string[], input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
+  importZoteroStudyMaterial(input: ZoteroStudyMaterialImportInput): Promise<StudyMaterialImportResult>;
+  openStudyMaterialInZotero(id: string): Promise<void>;
+  reindexStudyMaterial(id: string): Promise<StudyMaterialIndexResult>;
+  onStudyMaterialIndexChanged(cb: (id: string) => void): () => void;
+  replaceStudyMaterialFile(id: string, ocr?: boolean): Promise<StudyMaterialSummary | null>;
+  updateStudyMaterial(id: string, patch: StudyMaterialUpdateInput): Promise<StudyMaterialSummary>;
+  restoreStudyMaterialVersion(id: string, versionId: string): Promise<StudyMaterialSummary>;
+  addStudyMaterialPlacement(id: string, input: StudyMaterialImportInput): Promise<StudyMaterialPlacement | null>;
+  setPrimaryStudyMaterialPlacement(id: string, input: StudyMaterialImportInput): Promise<StudyMaterialPlacement | null>;
+  removeStudyMaterialPlacement(id: string, placementId: string): Promise<void>;
+  createStudyMaterialAnnotation(materialId: string, input: StudyMaterialAnnotationInput): Promise<StudyMaterialAnnotation>;
+  updateStudyMaterialAnnotation(id: string, patch: Partial<StudyMaterialAnnotationInput>): Promise<StudyMaterialAnnotation>;
+  deleteStudyMaterialAnnotation(id: string): Promise<void>;
+  exportAnnotatedStudyMaterial(id: string): Promise<{ path: string } | null>;
+  createStudyNoteFromMaterial(materialId: string, annotationId?: string | null, title?: string): Promise<{ documentId: string }>;
+  setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
+  getStudyRecording(id: string): Promise<StudyRecordingDetail>;
+  getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  createStudyRecording(input: StudyRecordingCreateInput): Promise<StudyRecordingImportResult>;
+  importStudyRecordings(scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>): Promise<StudyRecordingImportResult[]>;
+  updateStudyRecording(id: string, patch: StudyRecordingUpdateInput): Promise<StudyRecordingSummary>;
+  createStudyAudioMarker(recordingId: string, input: StudyAudioMarkerInput): Promise<StudyAudioMarker>;
+  updateStudyAudioMarker(id: string, patch: Partial<StudyAudioMarkerInput>): Promise<StudyAudioMarker>;
+  deleteStudyAudioMarker(id: string): Promise<void>;
+  saveStudyTranscript(recordingId: string, input: StudyTranscriptInput): Promise<StudyTranscript>;
+  updateStudyTranscript(id: string, contentMarkdown: string, segments?: StudyTranscriptSegmentInput[]): Promise<StudyTranscript>;
+  updateStudyTranscriptSegment(id: string, patch: Partial<StudyTranscriptSegmentInput>): Promise<StudyTranscriptSegment>;
+  deleteStudyTranscript(id: string): Promise<void>;
+  createStudyNoteFromTranscript(recordingId: string, transcriptId: string, placements?: StudyPlacementInput[]): Promise<{ documentId: string }>;
+  deleteStudyRecordingAudio(id: string): Promise<StudyRecordingSummary>;
+  setStudyRecordingLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  searchStudyCorpus(query: string, options?: StudySearchOptions): Promise<StudySearchResponse>;
+  getStudySearchIndexStatus(): Promise<StudySearchProgress>;
+  rebuildStudySearchIndex(): Promise<StudySearchProgress>;
+  pauseStudySearchIndex(): Promise<void>;
+  resumeStudySearchIndex(): Promise<void>;
+  stopStudySearchIndex(): Promise<void>;
+  deleteStudySearchIndex(): Promise<void>;
+  setStudySearchSourceExcluded(sourceId: string, excluded: boolean): Promise<StudySearchIndexStatus>;
+  listStudySavedSearches(): Promise<StudySavedSearch[]>;
+  saveStudySearch(name: string, query: string, options: StudySearchOptions): Promise<StudySavedSearch>;
+  deleteStudySavedSearch(id: string): Promise<void>;
+  listStudySearchHistory(): Promise<StudySearchHistoryEntry[]>;
+  clearStudySearchHistory(): Promise<void>;
+  onStudySearchProgress(cb: (progress: StudySearchProgress) => void): () => void;
+  listStudyIdeas(subjectId: string, query?: string): Promise<StudyIdeaSummary[]>;
+  getStudyIdeaDetail(id: string): Promise<StudyIdeaDetail | null>;
+  getStudyKnowledgeGraph(subjectId: string): Promise<StudyKnowledgeGraph>;
+  listStudyKnowledgeJobs(subjectId?: string): Promise<StudyKnowledgeJob[]>;
+  getStudyKnowledgeProgress(): Promise<StudyKnowledgeProgress>;
+  reanalyzeStudyKnowledgeSource(sourceKind: 'material' | 'document', sourceId: string): Promise<void>;
+  onStudyKnowledgeChanged(cb: (progress: StudyKnowledgeProgress) => void): () => void;
+  listStudyAssistantSources(): Promise<StudyAssistantSourceOption[]>;
+  listStudyAssistantConversations(includeArchived?: boolean): Promise<StudyAssistantConversationSummary[]>;
+  getStudyAssistantConversation(id: string): Promise<StudyAssistantConversation | null>;
+  createStudyAssistantConversation(input?: StudyAssistantConversationInput): Promise<StudyAssistantConversation>;
+  updateStudyAssistantConversation(id: string, patch: StudyAssistantConversationPatch): Promise<StudyAssistantConversation | null>;
+  deleteStudyAssistantConversation(id: string): Promise<void>;
+  streamStudyAssistant(request: StudyAssistantRequest, handlers: StudyAssistantStreamHandlers): Promise<StudyAssistantResponse>;
+  cancelStudyAssistant(): Promise<void>;
+  exportStudyAssistantConversation(id: string): Promise<{ path: string } | null>;
+  listStudyQuestions(filters?: StudyQuestionFilters): Promise<StudyQuestion[]>;
+  getStudyQuestion(id: string): Promise<StudyQuestion | null>;
+  createStudyQuestion(input: StudyQuestionInput): Promise<StudyQuestion>;
+  updateStudyQuestion(id: string, patch: Partial<StudyQuestionInput>): Promise<StudyQuestion>;
+  duplicateStudyQuestion(id: string): Promise<StudyQuestion>;
+  listStudyQuestionVersions(id: string): Promise<StudyQuestionVersion[]>;
+  restoreStudyQuestionVersion(id: string, versionId: string): Promise<StudyQuestion>;
+  setStudyQuestionLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): Promise<void>;
+  generateStudyQuestions(request: StudyQuestionGenerationRequest): Promise<StudyQuestionGenerationResult>;
+  exportStudyQuestions(ids?: string[]): Promise<{ path: string } | null>;
+  importStudyQuestions(): Promise<StudyQuestion[]>;
+  listStudyQuestionCollections(): Promise<StudyQuestionCollection[]>;
+  createStudyQuestionCollection(name: string, description?: string): Promise<StudyQuestionCollection>;
+  setStudyQuestionCollectionItems(collectionId: string, questionIds: string[]): Promise<void>;
+  deleteStudyQuestionCollection(id: string): Promise<void>;
+  getStudyQuestionAnalytics(id: string): Promise<StudyQuestionAnalytics>;
+  findSimilarStudyQuestions(id: string, threshold?: number): Promise<StudyQuestionSimilar[]>;
+  listStudyAssessments(kind?: StudyAssessment['kind'], includeArchived?: boolean): Promise<StudyAssessment[]>;
+  getStudyAssessment(id: string): Promise<StudyAssessment | null>;
+  createStudyAssessment(input: StudyAssessmentInput): Promise<StudyAssessment>;
+  buildStudyTest(request: StudyTestBuildRequest): Promise<StudyAssessment>;
+  updateStudyAssessment(id: string, patch: Partial<Omit<StudyAssessmentInput, 'questionIds'>> & { archived?: boolean }): Promise<StudyAssessment>;
+  deleteStudyAssessment(id: string): Promise<void>;
+  listStudyAttempts(assessmentId?: string): Promise<StudyAttempt[]>;
+  getStudyAttempt(id: string): Promise<StudyAttempt | null>;
+  startStudyAttempt(input: StudyAttemptStartInput): Promise<StudyAttempt>;
+  saveStudyAttemptAnswer(attemptId: string, input: StudyAttemptAnswerInput): Promise<StudyAttemptAnswer>;
+  submitStudyAttempt(id: string, expired?: boolean): Promise<StudyAttempt>;
+  abandonStudyAttempt(id: string): Promise<StudyAttempt>;
+  exportStudyAssessment(id: string, includeAnswers?: boolean): Promise<{ path: string } | null>;
+  listStudyRubrics(includeArchived?: boolean): Promise<StudyRubric[]>;
+  createStudyRubric(input: StudyRubricInput): Promise<StudyRubric>;
+  updateStudyRubric(id: string, patch: Partial<StudyRubricInput> & { archived?: boolean }): Promise<StudyRubric>;
+  duplicateStudyRubric(id: string): Promise<StudyRubric>;
+  deleteStudyRubric(id: string): Promise<void>;
+  listStudyGradingRuns(attemptAnswerId?: string): Promise<StudyGradingRun[]>;
+  gradeStudyAnswer(request: StudyGradingRequest, handlers: StudyGradingStreamHandlers): Promise<StudyGradingRun>;
+  cancelStudyGrading(): Promise<void>;
+  setStudyGradingManualScore(id: string, score: number, comment?: string): Promise<StudyGradingRun>;
+  listStudyFlashcards(options?: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string }): Promise<StudyFlashcard[]>;
+  createStudyFlashcard(input: StudyFlashcardInput): Promise<StudyFlashcard>;
+  updateStudyFlashcard(id: string, patch: Partial<StudyFlashcardInput>): Promise<StudyFlashcard>;
+  createStudyFlashcardsFromQuestions(questionIds: string[]): Promise<StudyFlashcard[]>;
+  reviewStudyFlashcard(input: StudyReviewInput): Promise<{ card: StudyFlashcard; review: StudyReviewRecord }>;
+  setStudyFlashcardState(id: string, action: 'master' | 'reset' | 'exclude' | 'include' | 'archive' | 'delete'): Promise<void>;
+  getStudyProgressDashboard(): Promise<StudyProgressDashboard>;
+  getStudyPlanner(): Promise<StudyPlannerSnapshot>;
+  createStudyPlan(input: { title: string; description?: string; courseId?: string | null; subjectId?: string | null; examAt?: string | null; availableMinutes?: number; config?: Record<string, unknown> }): Promise<StudyPlan>;
+  createStudyPlanBlock(input: { planId?: string | null; title: string; type?: string; courseId?: string | null; subjectId?: string | null; topicId?: string | null; startsAt: string; durationMinutes?: number; priority?: number; notes?: string }): Promise<StudyPlanBlock>;
+  createStudyCalendarEvent(input: StudyCalendarEventInput): Promise<StudyCalendarEvent>;
+  updateStudyCalendarEvent(id: string, input: StudyCalendarEventInput): Promise<StudyCalendarEvent>;
+  deleteStudyCalendarEvent(id: string): Promise<void>;
+  addStudyCalendarEventToExternal(id: string, target: 'google' | 'icloud'): Promise<void>;
+  createStudyGoal(input: { title: string; period?: StudyGoal['period']; targetValue?: number; unit?: string; startsAt?: string; endsAt?: string | null; subjectId?: string | null }): Promise<StudyGoal>;
+  updateStudyPlannerItem(kind: 'block' | 'event' | 'goal', id: string, patch: Record<string, unknown>): Promise<void>;
+  startStudySession(input: { planBlockId?: string | null; subjectId?: string | null; topicId?: string | null; mode?: string; plannedMinutes?: number }): Promise<StudyStudySession>;
+  finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): Promise<StudyStudySession>;
+  exportStudyPlannerIcs(): Promise<{ path: string } | null>;
+  listStudyAiUsage(limit?: number): Promise<StudyAiUsage[]>;
+  getStudyAiUsageSummary(): Promise<StudyAiUsageSummary>;
+  clearStudyAiUsage(): Promise<void>;
+
   /** Guided corpus mastery plan over authors, ideas and Zotero-linked works. */
   getStudyPlan(request?: StudyPlanRequest): Promise<StudyGuidePlan>;
   /** Persist study progress for an author/work/idea/theme. */
@@ -4387,6 +5322,7 @@ export interface NodusApi {
   generateImmersionSession(request: ImmersionRequest, handlers?: ImmersionStreamHandlers): Promise<ImmersionSession>;
   listImmersionSessions(): Promise<ImmersionSessionSummary[]>;
   getImmersionSession(id: string): Promise<ImmersionSession | null>;
+  restartImmersionSession(id: string): Promise<ImmersionSession | null>;
   setImmersionProgress(id: string, progress: ImmersionProgress): Promise<void>;
   answerImmersionQuestion(request: ImmersionAnswerRequest): Promise<ImmersionAnswerResult>;
   deleteImmersionSession(id: string): Promise<void>;
@@ -4411,6 +5347,8 @@ export interface NodusApi {
 
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
+  getGapsPage(offset: number, limit: number): Promise<GapPage>;
+  getContradictionCount(): Promise<number>;
   getGapDetail(gapId: string): Promise<GapDetail | null>;
   getContradictions(): Promise<EdgeDetail[]>;
   getReadingPath(request?: ReadingPathRequest): Promise<ReadingPathPlan>;
@@ -4583,12 +5521,16 @@ export interface NodusApi {
   exportProjectChapter(request: ExportProjectChapterRequest): Promise<{ path: string } | null>;
 
   // export / import
-  exportData(): Promise<{ path: string; password: string } | null>;
+  exportData(): Promise<{ path: string; password: string; recoveryKey: string } | null>;
   importData(password: string): Promise<{ ok: boolean; message: string }>;
   /** Export the user layer (notes, drafts, saved searches, edge verdicts) as a portable sync package. */
   exportSyncPackage(): Promise<{ path: string; counts: Record<string, number> } | null>;
   /** Merge a sync package from another machine. Additive; newest row wins; never deletes local data. */
   importSyncPackage(): Promise<SyncMergeSummary | null>;
+  getStudyDataOverview(): Promise<StudyDataOverview>;
+  maintainStudyData(action: 'rebuild-indexes' | 'clear-embeddings' | 'empty-trash' | 'repair'): Promise<StudyDataMaintenanceResult>;
+  exportStudyDiagnostic(): Promise<{ path: string } | null>;
+  exportStudyScope(scope: StudyExportScope, format: StudyExportFormat): Promise<{ path: string } | null>;
   /** Set (≥8 chars) the master password that encrypts every automatic backup. Stored in the OS keychain. */
   setBackupPassword(password: string): Promise<void>;
   clearBackupPassword(): Promise<void>;
@@ -4597,8 +5539,16 @@ export interface NodusApi {
   chooseBackupFolder(): Promise<string | null>;
   /** Run one automatic-style backup immediately (no secrets, master password, prune). */
   runBackupNow(): Promise<AutoBackupResult>;
-  /** Write a plaintext recovery kit (master password) to a user-chosen file. */
+  /** Write a plaintext recovery kit (master password + independent recovery key) to a user-chosen file. */
   saveBackupRecoveryKit(): Promise<{ ok: boolean; message: string }>;
+  /** Inspect whether recovery onboarding is required for this installation. */
+  getRecoveryStatus(): Promise<RecoveryStatus>;
+  /** Pick and inspect an empty folder or an existing Nodus recovery root. */
+  chooseRecoveryFolder(mode: 'create' | 'restore', language?: AppLanguage): Promise<RecoveryFolderInspection | null>;
+  /** Create a recovery root and commit its first verified full-state snapshot. */
+  initializeRecoveryFolder(path: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
+  /** Restore a selected snapshot from an existing recovery root. */
+  restoreRecoverySnapshot(root: string, fileName: string, password: string, language?: AppLanguage): Promise<RecoverySetupResult>;
   /** Wipe all derived graph data (ideas, themes, edges, authors, gaps) and reset scan
    *  status on every work. The library and settings are kept. */
   resetGraph(): Promise<void>;
@@ -4614,6 +5564,8 @@ export interface NodusApi {
    *  kicks off background portrait generation when a Gemini key is present. */
   seedGenealogyDemoData(): Promise<{ seeded: boolean; willGeneratePortraits: boolean }>;
   seedDatabasesDemoData(): Promise<boolean>;
+  /** Seed an empty study vault with a small, fully local learning workspace. */
+  seedStudyDemoData(): Promise<boolean>;
   /** Generate daguerreotype portraits for the demo people (cheap Gemini model). */
   generateDemoPortraits(): Promise<{ generated: number; skipped: number }>;
   /** Progress of demo portrait generation. Returns an unsubscribe function. */
@@ -4679,6 +5631,31 @@ export interface WorkFilter {
   yearMin?: number;
   yearMax?: number;
   includeArchived?: boolean;
+}
+
+export type WorkSortKey =
+  | 'title'
+  | 'authors'
+  | 'year'
+  | 'themes'
+  | 'ideas'
+  | 'light'
+  | 'deep'
+  | 'summary'
+  | 'embeddings'
+  | 'passages';
+
+export interface WorkPageRequest {
+  offset: number;
+  limit: number;
+  sort?: { key: WorkSortKey; dir: 'asc' | 'desc' } | null;
+}
+
+export interface WorkPage {
+  items: WorkView[];
+  total: number;
+  offset: number;
+  limit: number;
 }
 
 /** A Zotero collection available as a Library filter, flattened with its depth. */

@@ -1,9 +1,10 @@
 // Inmersión — the fully guided topic-mastery experience.
 //
 // Flow: home (topic + budget) → scope (the territory map, pure embeddings+graph,
-// no AI) → one-time generation (every AI answer is persisted) → player (panorama
+// no AI) → one-time generation (every generated section is persisted) → player (panorama
 // · stations with literal quotes and an embedded graph excerpt · contrast matrix
-// · frontiers · final exam). Sessions resume forever from the saved plan; no step
+// · frontiers · final exam). Sessions resume from the saved plan; restarting a
+// finished route clears learner answers without regenerating its content. No step
 // ever re-calls the AI except open-answer assessment.
 //
 // Styling note: every color utility here either has an explicit `.light` override
@@ -25,6 +26,7 @@ import type {
   ImmersionSessionSummary,
   ImmersionStation,
   DecorativeImageStyle,
+  ContentTranslation,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
@@ -33,7 +35,7 @@ import { ModelPicker } from '../components/ModelPicker';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { TranslationModal } from '../components/TranslationModal';
+import { TranslationPanel } from '../components/TranslationModal';
 import { confirm } from '../components/feedback';
 import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
@@ -284,11 +286,13 @@ export function ImmersionView({
     });
   };
 
-  const openSession = async (id: string) => {
+  const openSession = async (id: string, restart = false) => {
     setError(null);
     setOpeningId(id);
     try {
-      const loaded = await window.nodus.getImmersionSession(id);
+      const loaded = restart
+        ? await window.nodus.restartImmersionSession(id)
+        : await window.nodus.getImmersionSession(id);
       if (loaded) {
         setSession(loaded);
         setMode('player');
@@ -357,7 +361,7 @@ export function ImmersionView({
               setError(null);
               setComposerOpen(true);
             }}
-            onOpenSession={(id) => void openSession(id)}
+            onOpenSession={(id, restart) => void openSession(id, restart)}
             onDeleteSession={(s) => void deleteSession(s)}
             onDeleteSessions={deleteSessions}
           />
@@ -474,7 +478,7 @@ function ImmersionHome({
   openingId: string | null;
   error: string | null;
   onNew: () => void;
-  onOpenSession: (id: string) => void;
+  onOpenSession: (id: string, restart: boolean) => void;
   onDeleteSession: (s: ImmersionSessionSummary) => void;
   onDeleteSessions: (ids: string[]) => Promise<boolean>;
 }) {
@@ -524,7 +528,7 @@ function ImmersionHome({
             <Icon name="target" className="text-indigo-300" /> {t('Inmersión')}
           </h1>
           <p className="mt-0.5 text-xs text-neutral-500">
-            {t('Domina un tema de tu corpus: panorama, estaciones con citas literales, contrastes, fronteras y examen final. Todo queda grabado para retomarlo.')}
+            {t('Domina un tema de tu corpus: el contenido y el progreso se guardan para retomarlos; tus respuestas se borran al reiniciar.')}
           </p>
         </div>
         <div className="flex-1" />
@@ -602,7 +606,7 @@ function ImmersionHome({
                 ? t('Cargando inmersiones…')
                 : search.trim()
                   ? t('Ninguna inmersión coincide con tu búsqueda.')
-                  : t('Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso y tus respuestas, lista para retomarla.')}
+                  : t('Aún no hay inmersiones. Crea la primera y quedará aquí, con su progreso, lista para retomarla.')}
             </div>
             {!search.trim() && !loadingSessions && (
               <button className="btn btn-primary gap-1.5" onClick={onNew}>
@@ -621,7 +625,7 @@ function ImmersionHome({
                 selected={selected.has(s.id)}
                 opening={openingId === s.id}
                 onToggle={() => toggle(s.id)}
-                onOpen={() => onOpenSession(s.id)}
+                onOpen={() => onOpenSession(s.id, s.finished)}
                 onDelete={() => onDeleteSession(s)}
               />
             ))}
@@ -637,7 +641,7 @@ function ImmersionHome({
                 selected={selected.has(s.id)}
                 opening={openingId === s.id}
                 onToggle={() => toggle(s.id)}
-                onOpen={() => onOpenSession(s.id)}
+                onOpen={() => onOpenSession(s.id, s.finished)}
                 onDelete={() => onDeleteSession(s)}
               />
             ))}
@@ -710,9 +714,9 @@ function SessionGridCard({
         </button>
         {!selecting && (
           <div className="flex flex-col gap-1.5">
-            <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+            <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening} title={s.finished ? t('Reiniciar borra las respuestas anteriores y comienza el recorrido desde el principio.') : undefined}>
               <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
-              {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+              {s.finished ? t('Reiniciar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
             </button>
             <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
               <Icon name="trash" size={12} />
@@ -781,9 +785,9 @@ function SessionListRow({
       </button>
       {!selecting && (
         <>
-          <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening}>
+          <button className="btn btn-primary !py-1 text-xs gap-1" onClick={onOpen} disabled={opening} title={s.finished ? t('Reiniciar borra las respuestas anteriores y comienza el recorrido desde el principio.') : undefined}>
             <Icon name={opening ? 'sync' : 'play'} size={12} className={opening ? 'animate-spin' : ''} />
-            {s.finished ? t('Repasar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
+            {s.finished ? t('Reiniciar') : s.progressPct > 0 ? t('Continuar') : t('Empezar')}
           </button>
           <button className="btn btn-ghost !py-1 text-xs text-neutral-500 hover:text-red-400" onClick={onDelete}>
             <Icon name="trash" size={12} />
@@ -1154,7 +1158,7 @@ function ImmersionScopeScreen({
                   <Icon name="sync" className="animate-spin text-indigo-300" /> {t('Generando tu inmersión…')}
                 </h3>
                 <p className="mt-1 text-xs text-neutral-500">
-                  {t('Cada respuesta de la IA se guarda: este recorrido será tuyo para siempre y podrás retomarlo sin regenerar nada.')}
+                  {t('Cada parte generada por la IA se guarda: podrás retomar el recorrido sin regenerarlo. Las respuestas de test y texto se limpian al reiniciar.')}
                 </p>
                 <p className="mt-2 text-xs text-indigo-300">
                   {t('Puedes cambiar de sección: la generación seguirá en segundo plano y este progreso reaparecerá cuando vuelvas.')}
@@ -1217,7 +1221,8 @@ function ImmersionPlayer({
   onSaveToNotes: () => void;
 }) {
   const steps = useMemo(() => playerSteps(session), [session]);
-  const [translating, setTranslating] = useState(false);
+  const [showTranslations, setShowTranslations] = useState(true);
+  const [appliedTranslation, setAppliedTranslation] = useState<ContentTranslation | null>(null);
   // Honest total study time from the actual route, not the requested budget:
   // a deep route can hold far more stations than a single afternoon.
   const totalMinutes = useMemo(() => steps.reduce((acc, s) => acc + stepMeta(s, session).minutes, 0), [steps, session]);
@@ -1372,7 +1377,7 @@ function ImmersionPlayer({
         </button>
         <ProgressRing pct={overallPct} finished={progress.finishedAt != null} size={38} />
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-neutral-100">{session.plan.title}</div>
+          <div className="truncate text-sm font-semibold text-neutral-100">{appliedTranslation?.title ?? session.plan.title}</div>
           <div className="text-[11px] text-neutral-500">
             {tx('Paso {a} de {b}', { a: current + 1, b: steps.length })}
             {!progress.finishedAt && <> · {tx('~{n} min restantes', { n: remainingMinutes })}</>}
@@ -1385,7 +1390,7 @@ function ImmersionPlayer({
           </div>
         </div>
         <div className="flex-1" />
-        <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={() => setTranslating(true)}>
+        <button className={`btn btn-ghost gap-1.5 text-xs border ${showTranslations ? 'border-indigo-600 text-indigo-300' : 'border-neutral-700'}`} onClick={() => setShowTranslations((value) => !value)}>
           <Icon name="languages" size={13} /> {t('Traducir')}
         </button>
         <button className="btn btn-ghost gap-1.5 text-xs border border-neutral-700" onClick={onSaveToNotes}>
@@ -1460,7 +1465,7 @@ function ImmersionPlayer({
               className="flex justify-center gap-6 px-8 py-6 max-md:px-4"
             >
               <div className="min-w-0 max-w-[56rem] flex-1">
-                {step.kind === 'panorama' && (
+                {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={onCitation} /> : <>{step.kind === 'panorama' && (
                   <PanoramaStep session={session} onCitation={onCitation} onJump={(i) => goTo(i)} onSession={onSession} />
                 )}
                 {step.kind === 'station' && (
@@ -1476,7 +1481,8 @@ function ImmersionPlayer({
                 {step.kind === 'frontiers' && <FrontiersStep session={session} />}
                 {step.kind === 'exam' && (
                   <ExamStep session={session} onAnswered={onAnswered} onFinish={finish} onSaveToNotes={onSaveToNotes} onExit={onExit} />
-                )}
+                )}</>}
+                {showTranslations && <TranslationPanel entityKind="immersion" entityId={session.id} sourceTitle={session.plan.title} sourceMarkdown={sessionMarkdown(session)} model={session.model} activeTranslationId={appliedTranslation?.id ?? null} onApply={setAppliedTranslation} />}
               </div>
               <ContextRail step={step} session={session} onCitation={onCitation} />
             </motion.div>
@@ -1503,17 +1509,6 @@ function ImmersionPlayer({
         )}
       </footer>
       <FindInPage targetRef={mainRef} />
-      {translating && (
-        <TranslationModal
-          entityKind="immersion"
-          entityId={session.id}
-          sourceTitle={session.plan.title}
-          sourceMarkdown={sessionMarkdown(session)}
-          model={session.model}
-          onCitation={onCitation}
-          onClose={() => setTranslating(false)}
-        />
-      )}
     </div>
   );
 }

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://huggingface.co https://*.huggingface.co https://*.hf.co https://*.xethub.hf.co">
+    <title>Nodus local Whisper verification</title>
+  </head>
+  <body>
+    <p id="status">Preparing the local Whisper verifier…</p>
+    <script type="module" src="/scripts/fixtures/study-whisper-verify.ts"></script>
+  </body>
+</html>

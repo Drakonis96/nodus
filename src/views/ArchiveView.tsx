@@ -63,11 +63,11 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
   const [selected, setSelected] = useState<ArchiveItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [addDocType, setAddDocType] = useState<string | null>(null);
   const [textEntry, setTextEntry] = useState(false);
 
   // ── Filters (Notion-style) + sorting ────────────────────────────────────────
   const [availableTags, setAvailableTags] = useState<ArchiveTagCount[]>([]);
+  const [fDocTypes, setFDocTypes] = useState<string[]>([]);
   const [fKinds, setFKinds] = useState<ArchiveItemKind[]>([]);
   const [fTags, setFTags] = useState<string[]>([]);
   const [fTagsMode, setFTagsMode] = useState<ArchiveMatchMode>('all');
@@ -86,10 +86,11 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
   const [sort, setSort] = useState<ArchiveSortKey>('updatedDesc');
 
   const activeFilterCount =
-    fKinds.length + fTags.length + fPersonIds.length + fFolderIds.length + countActiveFacets(fFacets) +
+    fDocTypes.length + fKinds.length + fTags.length + fPersonIds.length + fFolderIds.length + countActiveFacets(fFacets) +
     (fYearFrom.trim() || fYearTo.trim() ? 1 : 0);
 
   const clearFilters = () => {
+    setFDocTypes([]);
     setFKinds([]);
     setFTags([]);
     setFPersonIds([]);
@@ -111,6 +112,7 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
       await window.nodus.listArchiveItems({
         folderIds: fFolderIds.length ? fFolderIds : undefined,
         search: search.trim() || undefined,
+        docTypes: fDocTypes.length ? fDocTypes : undefined,
         kinds: fKinds.length ? fKinds : undefined,
         tags: fTags.length ? fTags : undefined,
         tagsMode: fTagsMode,
@@ -122,7 +124,7 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
         sort,
       })
     );
-  }, [search, fKinds, fTags, fTagsMode, fPersonIds, fPersonsMode, fFolderIds, fFacets, fYearFrom, fYearTo, sort]);
+  }, [search, fDocTypes, fKinds, fTags, fTagsMode, fPersonIds, fPersonsMode, fFolderIds, fFacets, fYearFrom, fYearTo, sort]);
 
   useEffect(() => {
     void reload();
@@ -135,7 +137,7 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
       // A single active folder facet is used as the ingest target so new files land
       // where the user is looking; otherwise they are unfiled.
       const target = fFolderIds.length === 1 ? fFolderIds[0] : null;
-      const result = await window.nodus.pickAndIngestArchive(target, addDocType);
+      const result = await window.nodus.pickAndIngestArchive(target, fDocTypes.length === 1 ? fDocTypes[0] : null);
       if (result.added || result.duplicates) {
         setMessage(
           t('Añadidos: {a} · duplicados omitidos: {d}')
@@ -184,25 +186,16 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <DocTypeSelect
-            value={addDocType}
-            onChange={setAddDocType}
-            emptyLabel="Tipo de documento"
-            className="input h-9 w-48 text-sm"
-            genealogyFilter={isGenealogy}
-          />
-          <button className="btn btn-primary h-9 gap-1.5" disabled={busy} onClick={() => void addFiles()}>
-            <Icon name="upload" /> {t('Añadir archivos')}
-          </button>
-          <button
-            className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+          <ArchiveActionButton label={t('Añadir archivos')} icon="upload" primary disabled={busy} onClick={() => void addFiles()} />
+          <ArchiveActionButton
+            label={t('Nueva entrada')}
+            icon="edit"
             onClick={() => setTextEntry(true)}
             title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
-          >
-            <Icon name="edit" /> {t('Nueva entrada')}
-          </button>
-          <button
-            className="btn btn-ghost h-9 gap-1.5 border border-neutral-700"
+          />
+          <ArchiveActionButton
+            label={t('Indexar')}
+            icon="wand"
             disabled={busy}
             title={t('Indexar el texto de los documentos para descubrir relaciones semánticas con las personas')}
             onClick={async () => {
@@ -221,9 +214,7 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
                 setBusy(false);
               }
             }}
-          >
-            <Icon name="wand" size={15} /> {t('Indexar')}
-          </button>
+          />
         </div>
         <p className="text-xs text-neutral-500">
           {t('El Archivo guarda fuentes primarias (documentos, registros, fotografías). La bibliografía académica (libros, artículos, tesis) se gestiona en la Biblioteca importándola desde Zotero.')}
@@ -237,6 +228,10 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
 
         <div className="flex flex-wrap items-center gap-2">
           <ArchiveFilterBar
+            compact={isGenealogy}
+            genealogyOnly={isGenealogy}
+            docTypes={fDocTypes}
+            onDocTypesChange={setFDocTypes}
             facets={fFacets}
             onFacetsChange={setFFacets}
             kinds={fKinds}
@@ -259,8 +254,11 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
             onSortChange={setSort}
             activeCount={activeFilterCount}
             onClear={clearFilters}
+            folderIds={fFolderIds}
+            onFolderIdsChange={setFFolderIds}
+            folders={folderOptions.map((folder) => ({ value: folder.id, label: folder.label }))}
           />
-          {folderOptions.length > 0 && (
+          {!isGenealogy && folderOptions.length > 0 && (
             <div className="flex h-8 items-center overflow-hidden rounded-md border border-neutral-700 bg-neutral-900" style={{ width: 200 }}>
               <ChipSelectCell
                 values={fFolderIds}
@@ -342,6 +340,38 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
         />
       )}
     </div>
+  );
+}
+
+function ArchiveActionButton({
+  label,
+  icon,
+  primary = false,
+  disabled,
+  title,
+  onClick,
+}: {
+  label: string;
+  icon: string;
+  primary?: boolean;
+  disabled?: boolean;
+  title?: string;
+  onClick: () => void | Promise<void>;
+}) {
+  return (
+    <span className="group/archive-action inline-flex" title={title ?? label}>
+      <button
+        className={`btn h-9 min-h-9 justify-center gap-0 px-2.5 py-0 ${primary ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => void onClick()}
+      >
+        <Icon name={icon} size={15} />
+        <span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover/archive-action:ml-1.5 group-hover/archive-action:max-w-40 group-hover/archive-action:opacity-100 group-focus-within/archive-action:ml-1.5 group-focus-within/archive-action:max-w-40 group-focus-within/archive-action:opacity-100">
+          {label}
+        </span>
+      </button>
+    </span>
   );
 }
 

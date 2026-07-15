@@ -58,6 +58,8 @@ interface SigmaGraphProps {
   onOpenNode: (id: string, label: string, type: string) => void;
   onOpenEdge: (id: string, type: string) => void;
   onClearFocus: () => void;
+  /** Fires after the active scene has been installed and painted by Sigma. */
+  onReady?: () => void;
   onApiReady?: (api: SigmaGraphApi | null) => void;
   /** Hide the minimap overlay — for small embedded excerpts where it would cover the graph. */
   showMinimap?: boolean;
@@ -72,6 +74,22 @@ const CAMERA_SELECTION_GUARD_MS = 260;
 // without spending an unbounded amount of CPU on large research libraries.
 function obsidianSettleMs(nodeCount: number): number {
   return Math.min(24_000, Math.max(7_500, 4_500 + nodeCount * 4));
+}
+
+// The final collision pass runs on the renderer thread. Keep its work proportional
+// to the scene size so a large corpus cannot introduce a second pause after the
+// worker layout has already finished.
+function overlapIterations(nodeCount: number): number {
+  if (nodeCount > 5_000) return 8;
+  if (nodeCount > 1_500) return 16;
+  if (nodeCount > 500) return 28;
+  return 60;
+}
+
+function compactSettleIterations(nodeCount: number): number {
+  if (nodeCount > 120) return 160;
+  if (nodeCount > 40) return 240;
+  return 360;
 }
 
 function nodeColor(type: string): string {
@@ -282,6 +300,7 @@ export function SigmaGraph({
   onOpenNode,
   onOpenEdge,
   onClearFocus,
+  onReady,
   onApiReady,
   showMinimap = true,
 }: SigmaGraphProps) {
@@ -315,16 +334,23 @@ export function SigmaGraph({
   // event handlers, so a level change never re-installs listeners.
   const viewLevelRef = useRef(viewLevel);
   const onDrillDownRef = useRef(onDrillDown);
+  const onReadyRef = useRef(onReady);
   const overrideActiveRef = useRef(!!overrideModel);
 
-  const derivedModel = useMemo(() => buildGraphModel(data, filters, lens, preset, revealedNodeIds), [data, filters, lens, preset, revealedNodeIds]);
-  const model = overrideModel ?? derivedModel;
+  // Overview/backbone callers already provide the exact bounded scene. Do not
+  // derive the full graph behind it: that eager fallback used to traverse and
+  // sort every node/edge before rendering a handful of themes.
+  const model = useMemo(
+    () => overrideModel ?? buildGraphModel(data, filters, lens, preset, revealedNodeIds),
+    [data, filters, lens, overrideModel, preset, revealedNodeIds]
+  );
 
   useEffect(() => {
     viewLevelRef.current = viewLevel;
     onDrillDownRef.current = onDrillDown;
     overrideActiveRef.current = !!overrideModel;
-  }, [viewLevel, onDrillDown, overrideModel]);
+    onReadyRef.current = onReady;
+  }, [viewLevel, onDrillDown, onReady, overrideModel]);
 
   const fadeNode = lightTheme ? '#d8d8d8' : '#2b2b2b';
 
@@ -1195,14 +1221,14 @@ export function SigmaGraph({
         // synchronously in one shot, guarantee circle spacing, and frame it once.
         // No worker "breathe" — that kept the camera drifting and made the zoom
         // controls feel unresponsive on these small scenes.
-        // Fewer iterations for a large "show all" scene so the synchronous settle
-        // never blocks the main thread for long.
-        settleSync(graph, graph.order > 600 ? 180 : 500);
-        resolveOverlaps(graph, { padding: graph.order > 600 ? 8 : 16 });
+        settleSync(graph, compactSettleIterations(graph.order));
+        resolveOverlaps(graph, {
+          padding: graph.order > 120 ? 10 : 16,
+          iterations: overlapIterations(graph.order),
+        });
         layoutRef.current = null;
         sigma.refresh();
         void sigma.getCamera().animatedReset({ duration: 320 });
-        ensureClusters();
       } else {
         const layout = new WorkerLayout(graph);
         layoutRef.current = layout;
@@ -1210,21 +1236,23 @@ export function SigmaGraph({
         // but cap the worker budget so very large libraries remain economical.
         const settleMs = obsidianSettleMs(graph.order);
         layout.start({ durationMs: settleMs });
-        // Once the physics have settled, guarantee no two circles are stacked on
-        // top of each other (ForceAtlas2's anti-collision is only approximate) and
-        // precompute LOD clusters so a future zoom-out is instant.
+        // Once the physics have settled, run a bounded final collision pass.
+        // Community detection remains lazy because the current camera policy does
+        // not enter the aggregated LOD automatically.
         clusterTimerRef.current = window.setTimeout(() => {
           clusterTimerRef.current = null;
           if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
-            if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+            if (resolveOverlaps(graph, { iterations: overlapIterations(graph.order) })) {
+              sigmaRef.current?.refresh();
+            }
           }
-          ensureClusters();
         }, settleMs + 300);
       }
     } else {
       layoutRef.current = null;
     }
-  }, [buildDetailGraph, ensureClusters, model]);
+    window.requestAnimationFrame(() => onReadyRef.current?.());
+  }, [buildDetailGraph, model]);
 
   // ── Obsidian-style chronological playback ──────────────────────────────────
   const playHistory = useCallback((): boolean => {
@@ -1303,12 +1331,13 @@ export function SigmaGraph({
     clusterTimerRef.current = window.setTimeout(() => {
       clusterTimerRef.current = null;
       if (!draggingRef.current && detailGraphRef.current === graph && layoutRef.current === layout) {
-        if (resolveOverlaps(graph)) sigmaRef.current?.refresh();
+        if (resolveOverlaps(graph, { iterations: overlapIterations(graph.order) })) {
+          sigmaRef.current?.refresh();
+        }
       }
-      ensureClusters();
     }, settleMs + 300);
     return true;
-  }, [ensureClusters, lens, model, onClearFocus, switchMode]);
+  }, [lens, model, onClearFocus, switchMode]);
 
   // ── Imperative API for the toolbar / navigation ─────────────────────────────
   useEffect(() => {
@@ -1367,7 +1396,9 @@ export function SigmaGraph({
           clusterTimerRef.current = window.setTimeout(() => {
             clusterTimerRef.current = null;
             if (!draggingRef.current && detailGraphRef.current === g && layoutRef.current === layout) {
-              if (resolveOverlaps(g)) sigmaRef.current?.refresh();
+              if (resolveOverlaps(g, { iterations: overlapIterations(g.order) })) {
+                sigmaRef.current?.refresh();
+              }
             }
           }, settleMs + 300);
         }
@@ -1377,7 +1408,7 @@ export function SigmaGraph({
     };
     onApiReady(api);
     return () => onApiReady(null);
-  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, ensureClusters, focusTutor, onClearFocus, playHistory, switchMode]);
+  }, [onApiReady, applyFocusForNode, applyFocusForEdge, clearFocus, focusTutor, onClearFocus, playHistory, switchMode]);
 
   // Final teardown.
   useEffect(() => {

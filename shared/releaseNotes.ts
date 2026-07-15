@@ -12,6 +12,52 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.0',
+    date: '2026-07-15',
+    highlights: [
+      {
+        es: 'El vault de estudio da un gran salto: cursos y asignaturas, carpetas y apuntes, materiales anotables, grabaciones con transcripción, horario, calendario, banco de preguntas, tests, tarjetas, repasos, progreso, grafo de conocimiento y chat fundamentado en tus fuentes.',
+        en: 'Study vault takes a major leap forward: courses and subjects, folders and notes, annotatable materials, recordings with transcripts, timetable, calendar, question bank, tests, flashcards, reviews, progress, a knowledge graph and source-grounded chat.',
+      },
+      {
+        es: 'Zotero se integra más a fondo: las bóvedas pueden usar bibliotecas de grupo y, desde cursos o materiales, buscar un elemento y decidir si importar su adjunto a Nodus o mantener un enlace que lo abra en Zotero.',
+        en: 'Zotero integration goes deeper: vaults can use group libraries and, from courses or materials, search for an item and choose whether to import its attachment into Nodus or keep a link that opens it in Zotero.',
+      },
+      {
+        es: 'Groq y Cerebras se incorporan como proveedores de IA, con carga de modelos cuando el proveedor la permite. La configuración básica y avanzada ahora avisa antes de cambiar de modo para evitar dejar modelos sin configurar por accidente.',
+        en: 'Groq and Cerebras join the AI providers, with model discovery whenever the provider supports it. Basic and advanced setup now asks for confirmation before switching modes, preventing accidental incomplete model configurations.',
+      },
+      {
+        es: 'Los modelos locales son más sencillos de usar: puedes descargar, seleccionar y eliminar modelos integrados para distintas tareas y, si uno necesita un motor previo, Nodus lo instala automáticamente antes de iniciar la descarga.',
+        en: 'Local models are easier to use: download, select and remove integrated models for different tasks, and when a model requires an engine first, Nodus installs it automatically before starting the download.',
+      },
+      {
+        es: 'Nueva guía esencial cinematográfica protagonizada por Nodi para entender bóvedas, proveedores, modelos, embeddings y voz. Nodi se presenta al final, permanece más tranquilo durante el recorrido y no se superpone con su versión real.',
+        en: 'A new cinematic essential guide starring Nodi explains vaults, providers, models, embeddings and speech. Nodi is introduced at the end, stays calmer throughout the tour and no longer overlaps with the live companion.',
+      },
+      {
+        es: 'Nuevo sistema de recuperación total: Nodus protege automáticamente todas tus bóvedas, documentos, ajustes, historiales, archivos y claves en snapshots cifrados dentro de una carpeta segura. Incluye clave de recuperación y un asistente de migración para instalaciones anteriores, compatible con carpetas sincronizadas por Google Drive, Dropbox, iCloud y servicios similares.',
+        en: 'A new complete recovery system automatically protects every vault, document, setting, history, file and key in encrypted snapshots inside a safe folder. It includes a recovery key and a migration assistant for previous installations, compatible with folders synchronized by Google Drive, Dropbox, iCloud and similar services.',
+      },
+      {
+        es: 'Las demos de los modos Académico, Genealogía, Bases de datos y Estudio se han ampliado para que ninguna sección empiece vacía: incluyen carpetas, notas, materiales, conversaciones, informes y ejemplos conectados que puedes explorar y eliminar después.',
+        en: 'The Academic, Genealogy, Databases and Study demos have been expanded so no section starts empty: they include folders, notes, materials, conversations, reports and connected examples that you can explore and remove afterwards.',
+      },
+      {
+        es: 'Nodi cierra correctamente su menú, chat y paneles al hacer clic fuera. También mejoran la experiencia flotante, las animaciones del tutorial y el comportamiento del icono de la app, que conserva el aspecto de la bóveda y el tema activos al cerrar.',
+        en: 'Nodi now closes its menu, chat and panels correctly when you click elsewhere. The floating experience and tutorial animations are improved too, and the app icon now keeps the active vault and theme appearance after quitting.',
+      },
+      {
+        es: 'La navegación lateral se siente más consistente: la marca de Nodus permanece centrada al redimensionar el menú y toda su cabecera permite mostrarlo u ocultarlo.',
+        en: 'Sidebar navigation now feels more consistent: the Nodus brand stays centered as the menu is resized, and its entire header can show or hide it.',
+      },
+      {
+        es: 'El panel de novedades estrena una presentación cinematográfica con Nodi celebrando, versiones y cambios claramente visibles en modo claro y oscuro, además de una sección opcional para apoyar el proyecto open source mediante PayPal.',
+        en: 'The What’s New panel now has a cinematic presentation with Nodi celebrating, versions and changes clearly visible in light and dark mode, plus an optional section to support the open-source project through PayPal.',
+      },
+    ],
+  },
+  {
     version: '2.2.0',
     date: '2026-07-13',
     highlights: [

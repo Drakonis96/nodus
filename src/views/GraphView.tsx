@@ -19,11 +19,19 @@ import { t, tx } from '../i18n';
 //   localStorage.setItem('nodus.graph.engine', 'cytoscape')
 const enginePref = typeof localStorage !== 'undefined' ? localStorage.getItem('nodus.graph.engine') : null;
 const USE_SIGMA = enginePref !== 'cytoscape';
+const EMPTY_GRAPH_DATA: GraphData = { nodes: [], edges: [] };
 
 const IDEA_TYPES: IdeaType[] = ['claim', 'finding', 'construct', 'method', 'framework'];
 const GRAPH_NODE_TYPES: Exclude<GraphNodeType, 'author'>[] = ['theme', ...IDEA_TYPES];
 const EDGE_TYPES = Object.keys(EDGE_LABELS);
 type GraphLens = 'ideas' | 'authors';
+interface GraphSceneRequest {
+  key: string;
+  kind: 'overview' | 'theme' | 'full';
+  lens: GraphLens;
+  theme?: string;
+  cap?: number;
+}
 const DEFAULT_LOCAL_GRAPH_DEPTH = 1;
 const LAYOUT_THEME_LINKS_PER_THEME = 28;
 const LAYOUT_THEME_LINKS_GLOBAL_MAX = 520;
@@ -1425,7 +1433,9 @@ export function GraphView({
   const [auditOpen, setAuditOpen] = useState(false);
   const [ideaDupesOpen, setIdeaDupesOpen] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
-  const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
+  const [data, setData] = useState<GraphData>(EMPTY_GRAPH_DATA);
+  const [overviewData, setOverviewData] = useState<GraphData>(EMPTY_GRAPH_DATA);
+  const [themeScene, setThemeScene] = useState<{ theme: string; data: GraphData } | null>(null);
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [graphLoading, setGraphLoading] = useState(false);
@@ -1459,6 +1469,10 @@ export function GraphView({
   const graphLoadSeqRef = useRef(0);
   const graphRenderSeqRef = useRef(0);
   const graphRequestPendingRef = useRef(false);
+  const graphSceneCacheRef = useRef(new Map<string, GraphData>());
+  const graphSceneRequestRef = useRef<GraphSceneRequest>({ key: 'overview', kind: 'overview', lens: 'ideas' });
+  const graphLoadStateRef = useRef({ running: false, queued: false, force: false });
+  const graphReloadTimerRef = useRef<number | null>(null);
   const pendingGraphTransitionRef = useRef<{ first: number | null; second: number | null }>({ first: null, second: null });
 
   useEffect(() => {
@@ -1518,31 +1532,104 @@ export function GraphView({
     if (lastUserFocusRef.current) focusNodeByIdRef.current(lastUserFocusRef.current);
   }, [highlightDepth]);
 
-  const reload = useCallback(() => {
-    const seq = ++graphLoadSeqRef.current;
-    graphRequestPendingRef.current = true;
-    setGraphLoading(true);
-    void Promise.all([
-      window.nodus.getGraph(lens),
-      window.nodus.getThemes(),
-    ])
-      .then(([nextData, nextThemes]) => {
-        if (seq !== graphLoadSeqRef.current) return;
-        graphRequestPendingRef.current = false;
-        setData(nextData);
-        setThemes(nextThemes.map((x) => x.label));
-        setThemesLoaded(true);
-      }, (error) => {
-        if (seq !== graphLoadSeqRef.current) return;
-        graphRequestPendingRef.current = false;
+  const progressiveOverview =
+    USE_SIGMA && lens === 'ideas' && activePreset === 'overview' && !filters.search.trim() && filters.workIds.length === 0;
+  const requestedTheme = graphLevel.level === 'theme'
+    ? graphLevel.theme
+    : graphLevel.level === 'corpus' && filters.theme
+      ? filters.theme
+      : null;
+  const graphSceneRequest = useMemo<GraphSceneRequest>(() => {
+    if (!progressiveOverview || graphLevel.level === 'full') {
+      return { key: `full:${lens}`, kind: 'full' as const, lens };
+    }
+    if (requestedTheme) {
+      return {
+        key: `theme:${requestedTheme.trim().toLowerCase()}:${Math.min(250, backboneCap)}`,
+        kind: 'theme' as const,
+        lens,
+        theme: requestedTheme,
+        cap: backboneCap,
+      };
+    }
+    return { key: 'overview', kind: 'overview' as const, lens };
+  }, [backboneCap, graphLevel.level, lens, progressiveOverview, requestedTheme]);
+  graphSceneRequestRef.current = graphSceneRequest;
+
+  const applyGraphScene = useCallback((request: GraphSceneRequest, nextData: GraphData) => {
+    if (graphSceneRequestRef.current.key !== request.key) return;
+    setData(nextData);
+    if (request.kind === 'overview') {
+      setOverviewData(nextData);
+      setThemeScene(null);
+      setThemes(nextData.nodes
+        .filter((node) => node.type === 'theme')
+        .map((node) => node.themes[0] ?? node.label));
+    } else if (request.kind === 'theme' && request.theme) {
+      setThemeScene({ theme: request.theme, data: nextData });
+    }
+    setThemesLoaded(true);
+  }, []);
+
+  const loadCurrentGraphScene = useCallback((force = false) => {
+    const state = graphLoadStateRef.current;
+    state.queued = true;
+    state.force ||= force;
+    if (state.running) return;
+    state.running = true;
+    void (async () => {
+      try {
+        while (state.queued) {
+          const runForce = state.force;
+          state.queued = false;
+          state.force = false;
+          const request = graphSceneRequestRef.current;
+          if (runForce) graphSceneCacheRef.current.clear();
+          let nextData = graphSceneCacheRef.current.get(request.key);
+          if (!nextData) {
+            const seq = ++graphLoadSeqRef.current;
+            graphRequestPendingRef.current = true;
+            setGraphLoading(true);
+            nextData = request.kind === 'overview'
+              ? await window.nodus.getGraphOverview()
+              : request.kind === 'theme'
+                ? await window.nodus.getGraphTheme(request.theme ?? '', request.cap)
+                : await window.nodus.getGraph(request.lens);
+            if (seq !== graphLoadSeqRef.current && graphSceneRequestRef.current.key !== request.key) {
+              state.queued = true;
+              continue;
+            }
+            graphSceneCacheRef.current.set(request.key, nextData);
+          }
+          graphRequestPendingRef.current = false;
+          applyGraphScene(request, nextData);
+        }
+      } catch (error) {
         console.error('[graph] load failed', error);
+        graphRequestPendingRef.current = false;
         setGraphLoading(false);
-      });
-  }, [lens]);
+      } finally {
+        state.running = false;
+        if (state.queued) loadCurrentGraphScene(state.force);
+      }
+    })();
+  }, [applyGraphScene]);
+
+  const reload = useCallback(() => {
+    if (graphReloadTimerRef.current != null) window.clearTimeout(graphReloadTimerRef.current);
+    graphReloadTimerRef.current = window.setTimeout(() => {
+      graphReloadTimerRef.current = null;
+      loadCurrentGraphScene(true);
+    }, 80);
+  }, [loadCurrentGraphScene]);
+
+  useEffect(() => () => {
+    if (graphReloadTimerRef.current != null) window.clearTimeout(graphReloadTimerRef.current);
+  }, []);
 
   useEffect(() => {
-    reload();
-  }, [reload]);
+    loadCurrentGraphScene(false);
+  }, [graphSceneRequest.key, loadCurrentGraphScene]);
 
   // Refresh the graph when scans finish so freshly analysed works appear without
   // having to leave and re-open the view.
@@ -1612,6 +1699,10 @@ export function GraphView({
   }, []);
 
   const elements = useMemo<ElementDefinition[]>(() => {
+    // Sigma owns its own renderer-agnostic model. Building the legacy Cytoscape
+    // element list as well made every Sigma render traverse/sort the complete
+    // graph twice, even when the visible scene was only the theme overview.
+    if (USE_SIGMA) return [];
     const f = filters;
     const q = f.search.toLowerCase();
     let visibleNodes = data.nodes.filter((n) => {
@@ -1722,8 +1813,7 @@ export function GraphView({
   // ── Semantic-zoom levels (Sigma engine, overview preset) ────────────────────
   // Levels only apply to the plain idea overview. Search and work-scoped views
   // keep the classic full graph so those flows behave exactly as before.
-  const levelsActive =
-    USE_SIGMA && lens === 'ideas' && activePreset === 'overview' && !filters.search.trim() && filters.workIds.length === 0;
+  const levelsActive = progressiveOverview;
   const activeThemeLabel = !levelsActive
     ? null
     : graphLevel.level === 'theme'
@@ -1731,10 +1821,16 @@ export function GraphView({
       : graphLevel.level === 'corpus' && filters.theme
         ? filters.theme
         : null;
-  const constellationModel = useMemo(() => (levelsActive ? buildThemeConstellation(data) : null), [levelsActive, data]);
+  const constellationModel = useMemo(
+    () => (levelsActive ? buildThemeConstellation(overviewData) : null),
+    [levelsActive, overviewData]
+  );
   const backboneModel = useMemo(
-    () => (levelsActive && activeThemeLabel ? buildThemeBackbone(data, activeThemeLabel, backboneCap) : null),
-    [levelsActive, activeThemeLabel, data, backboneCap]
+    () => (levelsActive && activeThemeLabel && themeScene
+      && themeScene.theme.trim().toLowerCase() === activeThemeLabel.trim().toLowerCase()
+      ? buildThemeBackbone(themeScene.data, activeThemeLabel, backboneCap)
+      : null),
+    [levelsActive, activeThemeLabel, themeScene, backboneCap]
   );
   // Total ideas in the active theme (for the "showing N of M" control at level 2).
   const activeThemeTotal = useMemo(() => {
@@ -1742,11 +1838,15 @@ export function GraphView({
     const key = activeThemeLabel.trim().toLowerCase();
     return constellationModel.nodes.find((n) => n.label.trim().toLowerCase() === key)?.workCount ?? 0;
   }, [activeThemeLabel, constellationModel]);
-  const backboneShown = backboneModel?.nodes.length ?? 0;
-  const graphOverrideModel =
-    !levelsActive || graphLevel.level === 'full' ? null : activeThemeLabel ? backboneModel : constellationModel;
+  const backboneShown = backboneModel?.nodes.filter((node) => !node.bridge).length ?? 0;
+  const maximumThemeIdeas = Math.min(250, activeThemeTotal);
+  const graphOverrideModel = !levelsActive || graphLevel.level === 'full'
+    ? null
+    : activeThemeLabel
+      ? backboneModel ?? constellationModel
+      : constellationModel;
   const graphViewLevel: GraphViewLevel =
-    !levelsActive || graphLevel.level === 'full' ? 'full' : activeThemeLabel ? 'theme' : 'corpus';
+    !levelsActive || graphLevel.level === 'full' ? 'full' : activeThemeLabel && backboneModel ? 'theme' : 'corpus';
 
   const drillIntoTheme = useCallback((_nodeId: string, label: string) => {
     setIdeaDetail(null);
@@ -3320,6 +3420,10 @@ export function GraphView({
                 onOpenNode={onSigmaOpenNode}
                 onOpenEdge={onSigmaOpenEdge}
                 onClearFocus={onSigmaClear}
+                onReady={() => {
+                  graphRequestPendingRef.current = false;
+                  window.requestAnimationFrame(() => setGraphLoading(false));
+                }}
                 onApiReady={(api) => {
                   sigmaApiRef.current = api;
                   clearFocusRef.current = () => api?.clearFocus();
@@ -3334,11 +3438,11 @@ export function GraphView({
             <div ref={containerRef} className="absolute inset-0" />
           )}
 
-          {!USE_SIGMA && graphLoading && (
+          {graphLoading && (
             <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-neutral-950/10">
-              <div className="flex items-center gap-2 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-2 text-sm text-neutral-300 shadow-lg">
-                <span className="inline-block h-4 w-4 rounded-full border-2 border-neutral-600 border-t-indigo-400 animate-spin" />
-                {t('Reorganizando grafo…')}
+              <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white/95 px-3 py-2 text-sm text-neutral-700 shadow-lg dark:border-neutral-800 dark:bg-neutral-900/95 dark:text-neutral-300">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-indigo-500 dark:border-neutral-600 dark:border-t-indigo-400" />
+                {t(USE_SIGMA ? 'Cargando grafo…' : 'Reorganizando grafo…')}
               </div>
             </div>
           )}
@@ -3379,27 +3483,27 @@ export function GraphView({
               {graphViewLevel === 'theme' && activeThemeTotal > 0 && (
                 <div className="card flex items-center gap-2.5 bg-neutral-900/90 px-2.5 py-1.5 text-xs text-neutral-300">
                   <span className="whitespace-nowrap tabular-nums text-neutral-400">
-                    {backboneCap >= activeThemeTotal
+                    {backboneCap >= maximumThemeIdeas && activeThemeTotal <= 250
                       ? tx('Todas · {n} ideas', { n: activeThemeTotal })
                       : tx('{n} de {m} más conectadas', { n: backboneShown, m: activeThemeTotal })}
                   </span>
                   <input
                     type="range"
                     min={20}
-                    max={Math.min(400, Math.max(90, activeThemeTotal))}
+                    max={Math.min(250, Math.max(90, activeThemeTotal))}
                     step={10}
-                    value={Math.min(backboneCap, Math.min(400, Math.max(90, activeThemeTotal)))}
+                    value={Math.min(backboneCap, Math.min(250, Math.max(90, activeThemeTotal)))}
                     onChange={(e) => setBackboneCap(parseInt(e.target.value, 10))}
                     className="h-1 w-28 cursor-pointer accent-indigo-400"
                     title={t('Cuántas ideas mostrar (por conectividad)')}
                     aria-label={t('Número de ideas a mostrar')}
                   />
                   <button
-                    className={`rounded px-1.5 py-0.5 font-medium ${backboneCap >= activeThemeTotal ? 'bg-indigo-500/25 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setBackboneCap((c) => (c >= activeThemeTotal ? 90 : activeThemeTotal))}
-                    title={t('Mostrar todas las ideas del tema (puede ir más lento)')}
+                    className={`rounded px-1.5 py-0.5 font-medium ${backboneCap >= maximumThemeIdeas ? 'bg-indigo-500/25 text-indigo-200' : 'text-neutral-400 hover:bg-neutral-800'}`}
+                    onClick={() => setBackboneCap((c) => (c >= maximumThemeIdeas ? 90 : maximumThemeIdeas))}
+                    title={t(activeThemeTotal > 250 ? 'Mostrar hasta 250 ideas del tema' : 'Mostrar todas las ideas del tema')}
                   >
-                    {t('Todas')}
+                    {activeThemeTotal > 250 ? t('Hasta 250') : t('Todas')}
                   </button>
                 </div>
               )}

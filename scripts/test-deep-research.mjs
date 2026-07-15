@@ -12,7 +12,7 @@
 //   • the model failing on a section degrades gracefully instead of aborting.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -40,6 +40,8 @@ try {
     resolveTargetPages,
     resolveSectionPlan,
     countWords,
+    normalizeNarrativeSection,
+    DEEP_RESEARCH_NARRATIVE_RULES,
     WORDS_PER_PAGE,
     MAX_SECTIONS,
   } = mod;
@@ -265,13 +267,18 @@ try {
     // stay within its section budget and keep full corpus coverage — never balloon.
     const deps = {
       ...baseDeps(snapshot),
-      writeSection: async (input) => `## ${input.section.title}\n\n Breve (${input.citationMenu[0]?.token ?? ''}).`,
+      writeSection: async (input) => {
+        return `## ${input.section.title}\n\nBreve (${input.citationMenu[0]?.token ?? ''}).\n\n### Matiz adicional\n\nContinuación breve.`;
+      },
     };
     const report = await orchestrateDeepResearch({ objective: 'X', targetLength: 'standard' }, deps);
     // Standard auto plan stays small (few, deep sections) and bounded by the +1 grace.
     assert.ok(report.meta.sections >= 4 && report.meta.sections <= 6, `bounded section count (got ${report.meta.sections})`);
     assert.ok(report.meta.ideasCovered >= 40, `keeps full corpus coverage (got ${report.meta.ideasCovered}/50)`);
     assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'thin sections also citation-clean');
+    assert.equal(report.meta.sections, 4, 'standard auto mode stays at four broad epigraphs');
+    assert.ok(!report.draft.draftMarkdown.includes('### '), 'model-added microheadings are flattened');
+    assert.ok(report.draft.draftMarkdown.includes('Matiz adicional. Continuación breve.'), 'microheading content remains as prose');
   }
 
   // ── 6. Resilience: plan + every section failing still yields a report ───────
@@ -302,11 +309,28 @@ try {
   assert.equal(countWords('[Autor (2020)](nodus://idea/g-1) palabra'), 3, 'link label counts, url does not');
   assert.equal(WORDS_PER_PAGE, 450);
 
-  // ── 8. resolveSectionPlan: auto vs. user-capped, with the +1 grace ──────────
+  // ── 8. Narrative normalization: one epigraph, internal cuts become prose ───
+  {
+    const normalized = normalizeNarrativeSection(
+      '## Título improvisado\n\nPrimer párrafo.\n\n### Contexto\n\nSegundo párrafo.\n\n#### Consecuencias\n\nTercer párrafo.',
+      'Línea argumental amplia'
+    );
+    assert.equal((normalized.match(/^#{1,6}\s/gm) ?? []).length, 1, 'one visible epigraph per section');
+    assert.ok(normalized.startsWith('## Línea argumental amplia'), 'the planned title is canonical');
+    assert.ok(normalized.includes('Contexto. Segundo párrafo.'), 'internal heading becomes a prose lead');
+    assert.ok(normalized.includes('Consecuencias. Tercer párrafo.'), 'all artificial subheadings are flattened');
+    assert.ok(
+      DEEP_RESEARCH_NARRATIVE_RULES.some((rule) => rule.includes('dos puntos') && rule.includes('guion largo')),
+      'shared prose contract restricts disruptive punctuation'
+    );
+  }
+
+  // ── 9. resolveSectionPlan: auto vs. user-capped, with the +1 grace ──────────
   {
     const auto = resolveSectionPlan({ min: 15, max: 20 }, 'auto');
     assert.equal(auto.mode, 'auto', 'auto mode reported');
-    assert.ok(auto.target >= 3 && auto.target <= 10, `auto target stays small (got ${auto.target})`);
+    assert.ok(auto.target >= 3 && auto.target <= 7, `auto target stays small (got ${auto.target})`);
+    assert.equal(resolveSectionPlan({ min: 9, max: 14 }, 'auto').target, 4, 'standard report defaults to four deep sections');
     assert.ok(auto.hardCap <= MAX_SECTIONS, 'auto hard cap respects the absolute ceiling');
     assert.ok(auto.hardCap === Math.min(MAX_SECTIONS, auto.target + 1), 'auto hard cap = target + 1 grace');
 
@@ -320,7 +344,7 @@ try {
     assert.ok(huge.target <= MAX_SECTIONS && huge.hardCap <= MAX_SECTIONS, 'huge cap clamped to the ceiling');
   }
 
-  // ── 9. A user section cap is honoured end-to-end (never exceeds cap + 1) ─────
+  // ── 10. A user section cap is honoured end-to-end (never exceeds cap + 1) ────
   {
     const snapshot = makeSnapshot(60);
     const report = await orchestrateDeepResearch(
@@ -334,7 +358,7 @@ try {
     assert.ok(!report.draft.draftMarkdown.includes('HALLUCINATED'), 'capped report stays citation-clean');
   }
 
-  // ── 10. Fewer/deeper by default: auto exhaustive stays well under the old cap ─
+  // ── 11. Fewer/deeper by default: auto exhaustive stays tightly bounded ─────
   {
     const snapshot = makeSnapshot(60);
     const report = await orchestrateDeepResearch(
@@ -342,7 +366,19 @@ try {
       baseDeps(snapshot)
     );
     assert.ok(report.meta.sections <= MAX_SECTIONS, 'never exceeds the absolute section ceiling');
-    assert.ok(report.meta.sections <= 12, `auto mode favours few, deep sections (got ${report.meta.sections})`);
+    assert.ok(report.meta.sections <= 7, `auto mode favours few, deep sections (got ${report.meta.sections})`);
+  }
+
+  // ── 12. All writer routes inherit the same narrative contract ──────────────
+  {
+    const sources = await Promise.all([
+      'electron/ai/deepResearch.ts',
+      'electron/ai/genealogyDeepResearch.ts',
+      'electron/ai/deepResearchClient.ts',
+    ].map((file) => readFile(path.join(repoRoot, file), 'utf8')));
+    assert.ok(sources.every((source) => source.includes('DEEP_RESEARCH_NARRATIVE_RULES')), 'all Deep Research writers share the prose contract');
+    assert.match(sources[0], /nunca superes esa cifra en el plan inicial/, 'general planner cannot spend the grace slot on an extra heading');
+    assert.match(sources[1], /nunca más de esa cifra en el plan inicial/, 'genealogy planner uses the same section discipline');
   }
 
   console.log('deep research orchestration test passed');

@@ -20,6 +20,8 @@ interface TranslationRow {
   title: string;
   markdown: string;
   model_json: string | null;
+  status: 'generating' | 'ready' | 'error';
+  error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,6 +44,8 @@ function toSummary(row: Omit<TranslationRow, 'markdown'>): ContentTranslationSum
     languageLabel: row.language_label,
     title: row.title,
     model: parseModel(row.model_json),
+    status: row.status,
+    error: row.error,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -52,7 +56,7 @@ function toFull(row: TranslationRow): ContentTranslation {
 }
 
 const SUMMARY_COLS =
-  'id, entity_kind, entity_id, language, language_label, title, model_json, created_at, updated_at';
+  'id, entity_kind, entity_id, language, language_label, title, model_json, status, error, created_at, updated_at';
 
 export function listContentTranslations(
   entityKind: TranslationEntityKind,
@@ -98,13 +102,15 @@ export function upsertContentTranslation(input: {
   const createdAt = existing?.created_at ?? now;
   db.prepare(
     `INSERT INTO content_translations (
-       id, entity_kind, entity_id, language, language_label, title, markdown, model_json, created_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       id, entity_kind, entity_id, language, language_label, title, markdown, model_json, status, error, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ready', NULL, ?, ?)
      ON CONFLICT(entity_kind, entity_id, language) DO UPDATE SET
        language_label = excluded.language_label,
        title = excluded.title,
        markdown = excluded.markdown,
        model_json = excluded.model_json,
+       status = 'ready',
+       error = NULL,
        updated_at = excluded.updated_at`
   ).run(
     id,
@@ -122,6 +128,30 @@ export function upsertContentTranslation(input: {
   if (!saved) throw new Error('No se pudo guardar la traducción');
   const { markdown: _markdown, ...summary } = saved;
   return summary;
+}
+
+export function beginContentTranslation(input: {
+  entityKind: TranslationEntityKind;
+  entityId: string;
+  language: string;
+  languageLabel: string;
+  sourceTitle: string;
+  model: ModelRef | null;
+}): ContentTranslationSummary {
+  const db = getDb(); const timestamp = new Date().toISOString();
+  const existing = db.prepare('SELECT id, created_at, markdown, title FROM content_translations WHERE entity_kind=? AND entity_id=? AND language=?')
+    .get(input.entityKind, input.entityId, input.language) as { id: string; created_at: string; markdown: string; title: string } | undefined;
+  const id = existing?.id ?? uuid();
+  db.prepare(`INSERT INTO content_translations (id, entity_kind, entity_id, language, language_label, title, markdown, model_json, status, error, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'generating', NULL, ?, ?)
+    ON CONFLICT(entity_kind, entity_id, language) DO UPDATE SET language_label=excluded.language_label, model_json=excluded.model_json, status='generating', error=NULL, updated_at=excluded.updated_at`)
+    .run(id, input.entityKind, input.entityId, input.language, input.languageLabel, existing?.title || input.sourceTitle, existing?.markdown || '', input.model ? JSON.stringify(input.model) : null, existing?.created_at ?? timestamp, timestamp);
+  return listContentTranslations(input.entityKind, input.entityId).find((item) => item.id === id)!;
+}
+
+export function failContentTranslation(id: string, error: string): void {
+  getDb().prepare("UPDATE content_translations SET status='error', error=?, updated_at=? WHERE id=?")
+    .run(error.slice(0, 2000), new Date().toISOString(), id);
 }
 
 export function deleteContentTranslation(id: string): boolean {

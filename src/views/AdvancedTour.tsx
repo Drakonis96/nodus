@@ -55,12 +55,6 @@ const STEPS: AdvancedTourStep[] = [
   },
   {
     stage: 'Paso 2 · Comprender el corpus',
-    view: 'study',
-    title: 'Modo Estudio: domina autores e ideas',
-    body: 'Cuando el objetivo sea aprender el corpus, entra en Estudio: Nodus prioriza autores, recomienda obras concretas para abrir en Zotero, propone sesiones tutor con pasajes y te permite marcar qué está entendido, qué queda en repaso y qué exige lectura completa.',
-  },
-  {
-    stage: 'Paso 2 · Comprender el corpus',
     view: 'authors',
     title: 'Autores: quién sostiene cada idea',
     body: 'Cambia el foco de las ideas a las voces. En Autores tienes una ficha por autor —su tesis, qué aporta y cómo se posiciona— y una matriz de síntesis que cruza autores con temas para ver de un vistazo quién defiende qué. Es la forma de mapear escuelas, alianzas y disidencias antes de situar tu propia voz.',

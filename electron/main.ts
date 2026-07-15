@@ -19,10 +19,17 @@ import { startMcpServer, stopMcpServer } from './mcp';
 import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from './copilot/server';
 import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
+import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
+import { restorePersistedDockIcon } from './dockIcon';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
+
+// Keep the application identity explicit in development and packaged builds.
+// macOS uses this name when another application (for example Calendar) opens
+// content exported by Nodus.
+app.setName('Nodus');
 
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
@@ -357,6 +364,7 @@ function setupAutoUpdates(): void {
 }
 
 app.whenReady().then(() => {
+  restorePersistedDockIcon();
   getDb(); // open + migrate before anything touches data
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
@@ -389,6 +397,7 @@ app.whenReady().then(() => {
   if (settings.copilotEnabled) void startCopilotServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
   seedWelcomeNotification();
+  startStudyCalendarReminders();
   applyMascotWindow();
   setupAutoUpdates();
 
@@ -415,6 +424,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  stopStudyCalendarReminders();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);
   stopRealtimeSync();

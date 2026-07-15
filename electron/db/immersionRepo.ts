@@ -182,6 +182,13 @@ export function setImmersionProgress(id: string, progress: ImmersionProgress): v
     .run(JSON.stringify(normalizeProgress(progress)), new Date().toISOString(), id);
 }
 
+/** Start a saved route again without regenerating its AI-authored content. */
+export function restartImmersionSession(id: string): ImmersionSession | null {
+  if (!getImmersionSession(id)) return null;
+  setImmersionProgress(id, emptyImmersionProgress());
+  return getImmersionSession(id);
+}
+
 /** Append (or replace) one answer inside the stored progress and persist atomically. */
 export function recordImmersionAnswer(id: string, record: ImmersionAnswerRecord): ImmersionProgress {
   const session = getImmersionSession(id);

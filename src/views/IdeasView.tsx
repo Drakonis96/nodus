@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GraphData, GraphEdge, IdeaDetail, IdeaType, EdgeDetail } from '@shared/types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { GraphEdge, IdeaConnection, IdeaDetail, IdeaListItem, IdeaType, EdgeDetail } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import {
   OccurrenceCard,
@@ -18,25 +18,34 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
+import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 const IDEA_ROW_HEIGHT = 116;
+const IDEAS_PAGE_SIZE = 150;
 const IDEAS_DETAIL_WIDTH_KEY = 'nodus.ideas.detailWidth';
 const IDEAS_DETAIL_DEFAULT_WIDTH = 420;
 
 export function IdeasView({
+  vaultId,
   onOpenGraph,
   onOpenAssistant,
 }: {
+  vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
 }) {
-  const [data, setData] = useState<GraphData>({ nodes: [], edges: [] });
+  const [ideas, setIdeas] = useState<IdeaListItem[]>([]);
+  const [totalIdeas, setTotalIdeas] = useState(0);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<IdeaType | ''>('');
   const [sortKey, setSortKey] = useState<SortKey>('label');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<IdeaDetail | null>(null);
+  const [connections, setConnections] = useState<IdeaConnection[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingIdeaToNotes, setSavingIdeaToNotes] = useState(false);
   const [detailWidth, setDetailWidth] = useState(() =>
@@ -66,83 +75,84 @@ export function IdeasView({
     [detailWidth]
   );
 
-  const reload = useCallback(() => {
-    void window.nodus.getGraph('ideas').then(setData);
-  }, []);
+  const reload = useCallback((force = true) => {
+    const request = {
+      offset: pageOffset,
+      limit: IDEAS_PAGE_SIZE,
+      search: searchQuery || undefined,
+      type: typeFilter,
+      sort: sortKey,
+    } as const;
+    const cacheKey = `ideas:${JSON.stringify(request)}`;
+    if (!force) {
+      const cached = getVaultQueryCache<{ items: IdeaListItem[]; total: number }>(vaultId, cacheKey);
+      if (cached) {
+        setIdeas(cached.items);
+        setTotalIdeas(cached.total);
+        setLoading(false);
+        return;
+      }
+    }
+    setLoading(true);
+    void window.nodus
+      .listIdeasPage(request)
+      .then((page) => {
+        if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
+          setPageOffset(Math.max(0, Math.floor((page.total - 1) / IDEAS_PAGE_SIZE) * IDEAS_PAGE_SIZE));
+          return;
+        }
+        setIdeas(page.items);
+        setTotalIdeas(page.total);
+        setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
+      })
+      .finally(() => setLoading(false));
+  }, [pageOffset, searchQuery, sortKey, typeFilter, vaultId]);
 
   useEffect(() => {
-    reload();
+    const handle = setTimeout(() => setSearchQuery(search.trim()), 250);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [searchQuery, sortKey, typeFilter]);
+
+  useEffect(() => {
+    reload(false);
   }, [reload]);
   useDataRefresh(reload);
   useScanComplete(reload);
 
-  const ideaNodes = useMemo(() => data.nodes.filter((n) => n.type !== 'theme' && n.type !== 'author'), [data.nodes]);
-
-  const edgesByNode = useMemo(() => {
-    const map = new Map<string, GraphEdge[]>();
-    for (const edge of data.edges) {
-      if (edge.type === 'contains') continue;
-      if (!map.has(edge.source)) map.set(edge.source, []);
-      if (!map.has(edge.target)) map.set(edge.target, []);
-      map.get(edge.source)!.push(edge);
-      map.get(edge.target)!.push(edge);
-    }
-    return map;
-  }, [data.edges]);
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    let list = ideaNodes.filter((n) => {
-      if (typeFilter && n.type !== typeFilter) return false;
-      if (q && !n.label.toLowerCase().includes(q) && !(n.statement ?? '').toLowerCase().includes(q)) return false;
-      return true;
-    });
-    list = [...list].sort((a, b) => {
-      switch (sortKey) {
-        case 'label':
-          return a.label.localeCompare(b.label, 'es');
-        case 'type':
-          return a.type.localeCompare(b.type) || a.label.localeCompare(b.label, 'es');
-        case 'works':
-          return b.workCount - a.workCount || a.label.localeCompare(b.label, 'es');
-        case 'connections':
-          return (edgesByNode.get(b.id) ?? []).length - (edgesByNode.get(a.id) ?? []).length || a.label.localeCompare(b.label, 'es');
-        case 'confidence':
-          return b.maxConfidence - a.maxConfidence || a.label.localeCompare(b.label, 'es');
-      }
-    });
-    return list;
-  }, [ideaNodes, search, typeFilter, sortKey, edgesByNode]);
-
-  const connectedIdeas = useMemo(() => {
-    if (!selectedId) return [];
-    const edges = edgesByNode.get(selectedId) ?? [];
-    return edges.map((e) => {
-      const otherId = e.source === selectedId ? e.target : e.source;
-      const otherNode = data.nodes.find((n) => n.id === otherId);
-      return { edge: e, node: otherNode };
-    }).filter((c) => c.node && c.node.type !== 'theme' && c.node.type !== 'author');
-  }, [selectedId, edgesByNode, data.nodes]);
-
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
+      setConnections([]);
       return;
     }
     setDetailLoading(true);
     let on = true;
-    void window.nodus.getIdeaDetail(selectedId).then((d) => {
+    const cacheKey = `idea-detail:${selectedId}`;
+    const cached = getVaultQueryCache<{ detail: IdeaDetail | null; connections: IdeaConnection[] }>(vaultId, cacheKey);
+    if (cached) {
+      setDetail(cached.detail);
+      setConnections(cached.connections);
+      setDetailLoading(false);
+      return;
+    }
+    void Promise.all([window.nodus.getIdeaDetail(selectedId), window.nodus.listIdeaConnections(selectedId)]).then(([d, linked]) => {
       if (on) {
         setDetail(d);
+        setConnections(linked);
+        setVaultQueryCache(vaultId, cacheKey, { detail: d, connections: linked });
         setDetailLoading(false);
       }
     });
     return () => {
       on = false;
     };
-  }, [selectedId]);
+  }, [selectedId, vaultId]);
 
-  const selectedNode = selectedId ? data.nodes.find((n) => n.id === selectedId) : null;
+  const selectedNode = selectedId ? ideas.find((idea) => idea.id === selectedId) : null;
 
   return (
     <div className="h-full flex min-h-0">
@@ -152,7 +162,7 @@ export function IdeasView({
           <div className="flex items-center gap-3 mb-4">
             <Icon name="bulb" size={22} className="text-indigo-300" />
             <h1 className="text-xl font-semibold">{t('Ideas')}</h1>
-            <span className="text-sm text-neutral-500">{tx('{n} ideas extraídas', { n: ideaNodes.length })}</span>
+            <span className="text-sm text-neutral-500">{tx('{n} ideas extraídas', { n: totalIdeas })}</span>
           </div>
 
           {/* Filters */}
@@ -189,19 +199,19 @@ export function IdeasView({
 
         {/* Idea cards */}
         <VirtualList
-          items={filtered}
+          items={ideas}
           itemHeight={IDEA_ROW_HEIGHT}
           getKey={(node) => node.id}
           className="flex-1 min-h-0 px-6 pb-6"
           empty={
             <div className="text-neutral-500 text-sm">
-              {ideaNodes.length === 0
+              {totalIdeas === 0
                 ? t('Aún no hay ideas. Ejecuta escaneos profundos para extraer ideas de tus obras.')
                 : t('Sin resultados para los filtros actuales.')}
             </div>
           }
           renderItem={(node) => {
-            const degree = (edgesByNode.get(node.id) ?? []).length;
+            const degree = node.connectionCount;
             const isSelected = node.id === selectedId;
             return (
               <button
@@ -235,6 +245,19 @@ export function IdeasView({
             );
           }}
         />
+        {!loading && totalIdeas > IDEAS_PAGE_SIZE && (
+          <div className="mx-6 mb-4 flex items-center justify-between text-xs text-neutral-500">
+            <span>{pageOffset + 1}–{Math.min(pageOffset + ideas.length, totalIdeas)} / {totalIdeas}</span>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - IDEAS_PAGE_SIZE))}>
+                <Icon name="arrowLeft" size={13} /> {t('Anterior')}
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset + ideas.length >= totalIdeas} onClick={() => setPageOffset((offset) => offset + IDEAS_PAGE_SIZE)}>
+                {t('Siguiente')} <Icon name="arrowRight" size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Detail panel */}
@@ -332,14 +355,14 @@ export function IdeasView({
               )}
 
               {/* Connected ideas — each expands inline below its row */}
-              {connectedIdeas.length > 0 && (
+              {connections.length > 0 && (
                 <div>
                   <div className="text-xs uppercase text-neutral-500 mb-1">
-                    {tx('Ideas conectadas ({n})', { n: connectedIdeas.length })}
+                    {tx('Ideas conectadas ({n})', { n: connections.length })}
                   </div>
                   <div className="space-y-1.5">
-                    {connectedIdeas.map(({ edge, node }) =>
-                      node ? (
+                    {connections.map(({ edge, node }) =>
+                      (
                         <ConnectedIdeaRow
                           key={edge.id}
                           edge={edge}
@@ -347,7 +370,7 @@ export function IdeasView({
                           onSelectIdea={setSelectedId}
                           onOpenGraph={onOpenGraph}
                         />
-                      ) : null
+                      )
                     )}
                   </div>
                 </div>
@@ -383,7 +406,7 @@ function ConnectedIdeaRow({
   onOpenGraph,
 }: {
   edge: GraphEdge;
-  node: NonNullable<GraphData['nodes'][number]>;
+  node: IdeaListItem;
   onSelectIdea: (id: string) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {

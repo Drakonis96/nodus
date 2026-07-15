@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 52;
+export const SCHEMA_VERSION = 78;
 
 export const migrations: Migration[] = [
   {
@@ -1559,6 +1559,1140 @@ export const migrations: Migration[] = [
         SELECT item_id, folder_id, COALESCE(created_at, datetime('now'))
         FROM archive_items
         WHERE folder_id IS NOT NULL;
+    `,
+  },
+  {
+    version: 53,
+    up: /* sql */ `
+      -- Study vault phase 1: local-first organization. Documents are independent
+      -- entities and placements are many-to-many so one source can appear in
+      -- several courses/topics without duplicating its content.
+      CREATE TABLE study_courses (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE study_subjects (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        course_id   TEXT NOT NULL REFERENCES study_courses(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_subjects_course ON study_subjects(course_id, position);
+
+      CREATE TABLE study_topics (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        subject_id  TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        parent_id   TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_topics_subject ON study_topics(subject_id, parent_id, position);
+
+      CREATE TABLE study_folders (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        parent_id   TEXT REFERENCES study_folders(id) ON DELETE SET NULL,
+        course_id   TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id  TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        name        TEXT NOT NULL,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_folders_parent ON study_folders(parent_id, position);
+      CREATE INDEX idx_study_folders_scope ON study_folders(course_id, subject_id, position);
+
+      CREATE TABLE study_docs (
+        id                  TEXT PRIMARY KEY,
+        short_id            TEXT NOT NULL UNIQUE,
+        title               TEXT NOT NULL,
+        kind                TEXT NOT NULL DEFAULT 'apunte',
+        content_markdown    TEXT NOT NULL DEFAULT '',
+        description         TEXT,
+        color               TEXT,
+        icon                TEXT,
+        favorite            INTEGER NOT NULL DEFAULT 0,
+        pinned              INTEGER NOT NULL DEFAULT 0,
+        locked              INTEGER NOT NULL DEFAULT 0,
+        position            INTEGER NOT NULL DEFAULT 0,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        archived_at         TEXT,
+        deleted_at          TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_docs_kind ON study_docs(kind, position);
+      CREATE INDEX idx_study_docs_recent ON study_docs(updated_at DESC);
+
+      CREATE TABLE study_placements (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        course_id   TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id  TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id    TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        folder_id   TEXT REFERENCES study_folders(id) ON DELETE SET NULL,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        CHECK (course_id IS NOT NULL OR subject_id IS NOT NULL OR topic_id IS NOT NULL OR folder_id IS NOT NULL)
+      );
+      CREATE INDEX idx_study_placements_doc ON study_placements(document_id, position);
+      CREATE INDEX idx_study_placements_course ON study_placements(course_id, position);
+      CREATE INDEX idx_study_placements_subject ON study_placements(subject_id, position);
+      CREATE INDEX idx_study_placements_topic ON study_placements(topic_id, position);
+      CREATE INDEX idx_study_placements_folder ON study_placements(folder_id, position);
+      CREATE UNIQUE INDEX idx_study_placements_unique
+        ON study_placements(document_id, IFNULL(course_id, ''), IFNULL(subject_id, ''), IFNULL(topic_id, ''), IFNULL(folder_id, ''));
+
+      CREATE TABLE study_tags (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        description TEXT,
+        color       TEXT,
+        icon        TEXT,
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE study_doc_tags (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        tag_id      TEXT NOT NULL REFERENCES study_tags(id) ON DELETE CASCADE,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE(document_id, tag_id)
+      );
+      CREATE INDEX idx_study_doc_tags_tag ON study_doc_tags(tag_id, document_id);
+
+      CREATE TABLE study_templates (
+        id           TEXT PRIMARY KEY,
+        short_id     TEXT NOT NULL UNIQUE,
+        kind         TEXT NOT NULL,
+        name         TEXT NOT NULL,
+        description  TEXT,
+        content_json TEXT NOT NULL DEFAULT '{}',
+        color        TEXT,
+        icon         TEXT,
+        favorite     INTEGER NOT NULL DEFAULT 0,
+        position     INTEGER NOT NULL DEFAULT 0,
+        archived_at  TEXT,
+        deleted_at   TEXT,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_templates_kind ON study_templates(kind, position);
+    `,
+  },
+  {
+    version: 54,
+    up: /* sql */ `
+      -- Study vault phase 2: lossless Markdown editing, recoverable versions,
+      -- anchored comments and internal links/backlinks.
+      ALTER TABLE study_docs ADD COLUMN style_json TEXT NOT NULL DEFAULT '{}';
+      ALTER TABLE study_docs ADD COLUMN spellcheck_language TEXT NOT NULL DEFAULT 'es-ES';
+      ALTER TABLE study_docs ADD COLUMN custom_dictionary_json TEXT NOT NULL DEFAULT '[]';
+
+      CREATE TABLE study_doc_versions (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT NOT NULL UNIQUE,
+        document_id      TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        version_no       INTEGER NOT NULL,
+        title            TEXT NOT NULL,
+        content_markdown TEXT NOT NULL,
+        style_json       TEXT NOT NULL DEFAULT '{}',
+        reason           TEXT NOT NULL DEFAULT 'manual',
+        content_hash     TEXT NOT NULL,
+        position         INTEGER NOT NULL DEFAULT 0,
+        archived_at      TEXT,
+        deleted_at       TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL,
+        UNIQUE(document_id, version_no)
+      );
+      CREATE INDEX idx_study_doc_versions_doc ON study_doc_versions(document_id, version_no DESC);
+      CREATE INDEX idx_study_doc_versions_hash ON study_doc_versions(document_id, content_hash);
+
+      CREATE TABLE study_annotations (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        document_id   TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        from_pos      INTEGER NOT NULL DEFAULT 0,
+        to_pos        INTEGER NOT NULL DEFAULT 0,
+        selected_text TEXT NOT NULL DEFAULT '',
+        comment       TEXT NOT NULL DEFAULT '',
+        color         TEXT,
+        resolved_at   TEXT,
+        locked        INTEGER NOT NULL DEFAULT 0,
+        pinned        INTEGER NOT NULL DEFAULT 0,
+        position      INTEGER NOT NULL DEFAULT 0,
+        archived_at   TEXT,
+        deleted_at    TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_annotations_doc ON study_annotations(document_id, resolved_at, position);
+
+      CREATE TABLE study_doc_links (
+        id                 TEXT PRIMARY KEY,
+        short_id           TEXT NOT NULL UNIQUE,
+        source_document_id TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        target_document_id TEXT REFERENCES study_docs(id) ON DELETE CASCADE,
+        target_ref         TEXT NOT NULL,
+        target_title       TEXT,
+        link_text          TEXT,
+        position           INTEGER NOT NULL DEFAULT 0,
+        archived_at        TEXT,
+        deleted_at         TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_doc_links_source ON study_doc_links(source_document_id, position);
+      CREATE INDEX idx_study_doc_links_target ON study_doc_links(target_document_id, position);
+      CREATE UNIQUE INDEX idx_study_doc_links_unique
+        ON study_doc_links(source_document_id, target_ref, IFNULL(link_text, ''));
+    `,
+  },
+  {
+    version: 55,
+    up: /* sql */ `
+      -- Study vault phase 5 schema. The repository and UI are activated in phase 5;
+      -- the table version is installed now so v57 remains append-only and ordered.
+      CREATE TABLE study_materials (
+        id                  TEXT PRIMARY KEY,
+        short_id            TEXT NOT NULL UNIQUE,
+        title               TEXT NOT NULL,
+        description         TEXT,
+        file_name           TEXT,
+        file_path           TEXT,
+        mime_type           TEXT,
+        extension           TEXT,
+        content_blob        BLOB,
+        content_hash        TEXT NOT NULL,
+        extracted_text      TEXT NOT NULL DEFAULT '',
+        extraction_status   TEXT NOT NULL DEFAULT 'pending',
+        metadata_json       TEXT NOT NULL DEFAULT '{}',
+        bibliography_json   TEXT NOT NULL DEFAULT '{}',
+        read_state          TEXT NOT NULL DEFAULT 'pending',
+        page_count          INTEGER,
+        duration_seconds    REAL,
+        size_bytes          INTEGER NOT NULL DEFAULT 0,
+        favorite            INTEGER NOT NULL DEFAULT 0,
+        pinned              INTEGER NOT NULL DEFAULT 0,
+        position            INTEGER NOT NULL DEFAULT 0,
+        archived_at         TEXT,
+        deleted_at          TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_materials_hash ON study_materials(content_hash);
+      CREATE INDEX idx_study_materials_state ON study_materials(read_state, updated_at DESC);
+
+      CREATE TABLE study_material_placements (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        material_id TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
+        course_id   TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id  TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id    TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        folder_id   TEXT REFERENCES study_folders(id) ON DELETE SET NULL,
+        document_id TEXT REFERENCES study_docs(id) ON DELETE SET NULL,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at  TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_material_placements_material ON study_material_placements(material_id, position);
+      CREATE INDEX idx_study_material_placements_scope ON study_material_placements(course_id, subject_id, topic_id, document_id);
+
+      CREATE TABLE study_material_annotations (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        material_id   TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
+        page_number   INTEGER,
+        rect_json     TEXT,
+        from_pos      INTEGER,
+        to_pos        INTEGER,
+        selected_text TEXT NOT NULL DEFAULT '',
+        note          TEXT NOT NULL DEFAULT '',
+        color         TEXT,
+        position      INTEGER NOT NULL DEFAULT 0,
+        archived_at   TEXT,
+        deleted_at    TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_material_annotations_material ON study_material_annotations(material_id, page_number, position);
+
+      CREATE TABLE study_material_fragment_links (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        material_id   TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
+        annotation_id TEXT REFERENCES study_material_annotations(id) ON DELETE SET NULL,
+        document_id   TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        doc_from_pos  INTEGER,
+        doc_to_pos    INTEGER,
+        label         TEXT,
+        source_json   TEXT NOT NULL DEFAULT '{}',
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_material_links_document ON study_material_fragment_links(document_id, position);
+      CREATE INDEX idx_study_material_links_material ON study_material_fragment_links(material_id, position);
+
+      CREATE TABLE study_material_versions (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT NOT NULL UNIQUE,
+        material_id      TEXT NOT NULL REFERENCES study_materials(id) ON DELETE CASCADE,
+        version_no       INTEGER NOT NULL,
+        file_name        TEXT,
+        mime_type        TEXT,
+        content_blob     BLOB,
+        content_hash     TEXT NOT NULL,
+        extracted_text   TEXT NOT NULL DEFAULT '',
+        metadata_json    TEXT NOT NULL DEFAULT '{}',
+        size_bytes       INTEGER NOT NULL DEFAULT 0,
+        created_at       TEXT NOT NULL,
+        UNIQUE(material_id, version_no)
+      );
+      CREATE INDEX idx_study_material_versions_material ON study_material_versions(material_id, version_no DESC);
+    `,
+  },
+  {
+    version: 56,
+    up: /* sql */ `
+      -- Study vault phase 6 schema, activated by its own repository/UI phase.
+      CREATE TABLE study_recordings (
+        id                 TEXT PRIMARY KEY,
+        short_id           TEXT NOT NULL UNIQUE,
+        title              TEXT NOT NULL,
+        file_name          TEXT,
+        file_path          TEXT,
+        mime_type          TEXT,
+        audio_blob         BLOB,
+        content_hash       TEXT NOT NULL,
+        duration_seconds   REAL NOT NULL DEFAULT 0,
+        size_bytes         INTEGER NOT NULL DEFAULT 0,
+        language           TEXT,
+        course_id          TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id         TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id           TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        document_id        TEXT REFERENCES study_docs(id) ON DELETE SET NULL,
+        material_id        TEXT REFERENCES study_materials(id) ON DELETE SET NULL,
+        session_label      TEXT,
+        processing_status  TEXT NOT NULL DEFAULT 'pending',
+        processing_progress REAL NOT NULL DEFAULT 0,
+        favorite           INTEGER NOT NULL DEFAULT 0,
+        position           INTEGER NOT NULL DEFAULT 0,
+        archived_at        TEXT,
+        deleted_at         TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_recordings_scope ON study_recordings(course_id, subject_id, topic_id, updated_at DESC);
+      CREATE INDEX idx_study_recordings_hash ON study_recordings(content_hash);
+
+      CREATE TABLE study_transcripts (
+        id                  TEXT PRIMARY KEY,
+        short_id            TEXT NOT NULL UNIQUE,
+        recording_id        TEXT NOT NULL REFERENCES study_recordings(id) ON DELETE CASCADE,
+        kind                TEXT NOT NULL DEFAULT 'literal',
+        content_markdown    TEXT NOT NULL DEFAULT '',
+        language            TEXT,
+        model_provider      TEXT,
+        model_name          TEXT,
+        status              TEXT NOT NULL DEFAULT 'pending',
+        progress            REAL NOT NULL DEFAULT 0,
+        error_message       TEXT,
+        version_no          INTEGER NOT NULL DEFAULT 1,
+        source_transcript_id TEXT REFERENCES study_transcripts(id) ON DELETE SET NULL,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL,
+        UNIQUE(recording_id, kind, version_no)
+      );
+      CREATE INDEX idx_study_transcripts_recording ON study_transcripts(recording_id, kind, version_no DESC);
+
+      CREATE TABLE study_transcript_segments (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        transcript_id TEXT NOT NULL REFERENCES study_transcripts(id) ON DELETE CASCADE,
+        t_start       REAL NOT NULL,
+        t_end         REAL NOT NULL,
+        text          TEXT NOT NULL,
+        speaker       TEXT,
+        confidence    REAL,
+        chapter       TEXT,
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_transcript_segments_time ON study_transcript_segments(transcript_id, t_start, position);
+
+      CREATE TABLE study_audio_markers (
+        id           TEXT PRIMARY KEY,
+        short_id     TEXT NOT NULL UNIQUE,
+        recording_id TEXT NOT NULL REFERENCES study_recordings(id) ON DELETE CASCADE,
+        t_seconds    REAL NOT NULL,
+        label        TEXT NOT NULL,
+        note         TEXT,
+        color        TEXT,
+        position     INTEGER NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_audio_markers_time ON study_audio_markers(recording_id, t_seconds, position);
+    `,
+  },
+  {
+    version: 57,
+    up: /* sql */ `
+      -- Study vault phase 4: reusable improvement styles, prompt history,
+      -- scoped defaults and a provenance-only AI action log.
+      CREATE TABLE study_styles (
+        id                TEXT PRIMARY KEY,
+        short_id          TEXT NOT NULL UNIQUE,
+        name              TEXT NOT NULL,
+        icon              TEXT NOT NULL DEFAULT '✦',
+        color             TEXT NOT NULL DEFAULT '#0f766e',
+        description       TEXT NOT NULL DEFAULT '',
+        prompt            TEXT NOT NULL,
+        system_prompt     TEXT NOT NULL DEFAULT '',
+        category          TEXT NOT NULL DEFAULT 'custom',
+        language          TEXT NOT NULL DEFAULT 'auto',
+        level             TEXT NOT NULL DEFAULT 'moderate',
+        length_mode       TEXT NOT NULL DEFAULT 'similar',
+        model_provider    TEXT,
+        model_name        TEXT,
+        temperature       REAL NOT NULL DEFAULT 0.2,
+        max_output_tokens INTEGER NOT NULL DEFAULT 2400,
+        creativity        REAL NOT NULL DEFAULT 0.1,
+        locked            INTEGER NOT NULL DEFAULT 0,
+        favorite          INTEGER NOT NULL DEFAULT 0,
+        active            INTEGER NOT NULL DEFAULT 1,
+        position          INTEGER NOT NULL DEFAULT 0,
+        archived_at       TEXT,
+        deleted_at        TEXT,
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_styles_library ON study_styles(archived_at, active DESC, favorite DESC, position, name);
+
+      CREATE TABLE study_style_versions (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        style_id    TEXT NOT NULL REFERENCES study_styles(id) ON DELETE CASCADE,
+        version_no  INTEGER NOT NULL,
+        config_json TEXT NOT NULL,
+        reason      TEXT NOT NULL DEFAULT 'update',
+        created_at  TEXT NOT NULL,
+        UNIQUE(style_id, version_no)
+      );
+      CREATE INDEX idx_study_style_versions_style ON study_style_versions(style_id, version_no DESC);
+
+      CREATE TABLE study_style_associations (
+        id          TEXT PRIMARY KEY,
+        style_id    TEXT NOT NULL,
+        kind        TEXT NOT NULL,
+        target_id   TEXT NOT NULL DEFAULT '',
+        is_default  INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        UNIQUE(style_id, kind, target_id)
+      );
+      CREATE INDEX idx_study_style_associations_target ON study_style_associations(kind, target_id, is_default DESC);
+
+      CREATE TABLE study_improvement_log (
+        id               TEXT PRIMARY KEY,
+        document_id      TEXT NOT NULL REFERENCES study_docs(id) ON DELETE CASCADE,
+        style_id         TEXT NOT NULL,
+        scope            TEXT NOT NULL,
+        mode             TEXT NOT NULL,
+        level            TEXT NOT NULL,
+        length_mode      TEXT NOT NULL,
+        model_provider   TEXT NOT NULL,
+        model_name       TEXT NOT NULL,
+        original_hash    TEXT NOT NULL,
+        result_hash      TEXT NOT NULL,
+        original_chars   INTEGER NOT NULL,
+        result_chars     INTEGER NOT NULL,
+        warnings_json    TEXT NOT NULL DEFAULT '[]',
+        action           TEXT NOT NULL DEFAULT 'generated',
+        created_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_improvement_log_doc ON study_improvement_log(document_id, created_at DESC);
+      CREATE INDEX idx_study_improvement_log_hash ON study_improvement_log(original_hash, result_hash);
+    `,
+  },
+  {
+    version: 58,
+    up: /* sql */ `
+      -- Study vault phase 10a: centralized, source-grounded question bank.
+      CREATE TABLE study_questions (
+        id                 TEXT PRIMARY KEY,
+        short_id           TEXT NOT NULL UNIQUE,
+        prompt             TEXT NOT NULL,
+        question_type      TEXT NOT NULL,
+        difficulty         TEXT NOT NULL DEFAULT 'medium',
+        cognitive_level    TEXT NOT NULL DEFAULT 'understand',
+        status             TEXT NOT NULL DEFAULT 'pending',
+        answer_json        TEXT NOT NULL DEFAULT '{}',
+        options_json       TEXT NOT NULL DEFAULT '[]',
+        explanation        TEXT NOT NULL DEFAULT '',
+        rubric_json        TEXT NOT NULL DEFAULT '{}',
+        competence         TEXT,
+        tags_json          TEXT NOT NULL DEFAULT '[]',
+        course_id          TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id         TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id           TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        document_id        TEXT REFERENCES study_docs(id) ON DELETE SET NULL,
+        material_id        TEXT REFERENCES study_materials(id) ON DELETE SET NULL,
+        recording_id       TEXT REFERENCES study_recordings(id) ON DELETE SET NULL,
+        transcript_id      TEXT REFERENCES study_transcripts(id) ON DELETE SET NULL,
+        source_title       TEXT,
+        source_excerpt     TEXT NOT NULL DEFAULT '',
+        source_location_json TEXT NOT NULL DEFAULT '{}',
+        model_provider     TEXT,
+        model_name         TEXT,
+        generation_prompt  TEXT,
+        favorite           INTEGER NOT NULL DEFAULT 0,
+        locked             INTEGER NOT NULL DEFAULT 0,
+        usage_count        INTEGER NOT NULL DEFAULT 0,
+        correct_count      INTEGER NOT NULL DEFAULT 0,
+        incorrect_count    INTEGER NOT NULL DEFAULT 0,
+        omitted_count      INTEGER NOT NULL DEFAULT 0,
+        total_response_ms  INTEGER NOT NULL DEFAULT 0,
+        position           INTEGER NOT NULL DEFAULT 0,
+        archived_at        TEXT,
+        deleted_at         TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_questions_bank ON study_questions(archived_at, status, favorite DESC, updated_at DESC);
+      CREATE INDEX idx_study_questions_scope ON study_questions(course_id, subject_id, topic_id, question_type, difficulty);
+      CREATE INDEX idx_study_questions_source ON study_questions(document_id, material_id, recording_id, transcript_id);
+
+      CREATE TABLE study_question_versions (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        question_id   TEXT NOT NULL REFERENCES study_questions(id) ON DELETE CASCADE,
+        version_no    INTEGER NOT NULL,
+        snapshot_json TEXT NOT NULL,
+        reason        TEXT NOT NULL DEFAULT 'update',
+        created_at    TEXT NOT NULL,
+        UNIQUE(question_id, version_no)
+      );
+      CREATE INDEX idx_study_question_versions_question ON study_question_versions(question_id, version_no DESC);
+
+      CREATE TABLE study_question_collections (
+        id          TEXT PRIMARY KEY,
+        short_id    TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        color       TEXT NOT NULL DEFAULT '#0f766e',
+        favorite    INTEGER NOT NULL DEFAULT 0,
+        position    INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        created_at  TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      );
+
+      CREATE TABLE study_question_collection_items (
+        collection_id TEXT NOT NULL REFERENCES study_question_collections(id) ON DELETE CASCADE,
+        question_id   TEXT NOT NULL REFERENCES study_questions(id) ON DELETE CASCADE,
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        PRIMARY KEY(collection_id, question_id)
+      );
+      CREATE INDEX idx_study_question_collection_items_question ON study_question_collection_items(question_id);
+    `,
+  },
+  {
+    version: 59,
+    up: /* sql */ `
+      -- Study vault phases 10b/10c: reusable tests/exams and durable attempts.
+      CREATE TABLE study_assessments (
+        id                 TEXT PRIMARY KEY,
+        short_id           TEXT NOT NULL UNIQUE,
+        kind               TEXT NOT NULL,
+        title              TEXT NOT NULL,
+        description        TEXT NOT NULL DEFAULT '',
+        course_id          TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id         TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id           TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        config_json        TEXT NOT NULL DEFAULT '{}',
+        rubric_id          TEXT,
+        available_at       TEXT,
+        duration_minutes   INTEGER,
+        max_attempts       INTEGER,
+        favorite           INTEGER NOT NULL DEFAULT 0,
+        archived_at        TEXT,
+        deleted_at         TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_assessments_kind ON study_assessments(kind, subject_id, updated_at DESC);
+
+      CREATE TABLE study_assessment_items (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        assessment_id TEXT NOT NULL REFERENCES study_assessments(id) ON DELETE CASCADE,
+        question_id   TEXT NOT NULL REFERENCES study_questions(id) ON DELETE RESTRICT,
+        points        REAL NOT NULL DEFAULT 1,
+        required      INTEGER NOT NULL DEFAULT 1,
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL,
+        UNIQUE(assessment_id, question_id)
+      );
+      CREATE INDEX idx_study_assessment_items_order ON study_assessment_items(assessment_id, position);
+
+      CREATE TABLE study_attempts (
+        id                TEXT PRIMARY KEY,
+        short_id          TEXT NOT NULL UNIQUE,
+        assessment_id     TEXT NOT NULL REFERENCES study_assessments(id) ON DELETE CASCADE,
+        mode              TEXT NOT NULL DEFAULT 'practice',
+        status            TEXT NOT NULL DEFAULT 'in_progress',
+        score             REAL,
+        max_score         REAL,
+        correct_count     INTEGER NOT NULL DEFAULT 0,
+        incorrect_count   INTEGER NOT NULL DEFAULT 0,
+        omitted_count     INTEGER NOT NULL DEFAULT 0,
+        duration_seconds  INTEGER NOT NULL DEFAULT 0,
+        started_at        TEXT NOT NULL,
+        submitted_at      TEXT,
+        config_json       TEXT NOT NULL DEFAULT '{}',
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_attempts_assessment ON study_attempts(assessment_id, started_at DESC);
+
+      CREATE TABLE study_attempt_answers (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT NOT NULL UNIQUE,
+        attempt_id       TEXT NOT NULL REFERENCES study_attempts(id) ON DELETE CASCADE,
+        assessment_item_id TEXT NOT NULL REFERENCES study_assessment_items(id) ON DELETE CASCADE,
+        question_id      TEXT NOT NULL REFERENCES study_questions(id) ON DELETE RESTRICT,
+        response_json    TEXT NOT NULL DEFAULT '{}',
+        is_correct       INTEGER,
+        points_awarded   REAL,
+        response_ms      INTEGER NOT NULL DEFAULT 0,
+        flagged          INTEGER NOT NULL DEFAULT 0,
+        confidence       INTEGER,
+        feedback_json    TEXT NOT NULL DEFAULT '{}',
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL,
+        UNIQUE(attempt_id, assessment_item_id)
+      );
+      CREATE INDEX idx_study_attempt_answers_attempt ON study_attempt_answers(attempt_id, created_at);
+    `,
+  },
+  {
+    version: 60,
+    up: /* sql */ `
+      -- Study vault phase 10d: weighted rubrics and auditable AI grading.
+      CREATE TABLE study_rubrics (
+        id            TEXT PRIMARY KEY,
+        short_id      TEXT NOT NULL UNIQUE,
+        name          TEXT NOT NULL,
+        description   TEXT NOT NULL DEFAULT '',
+        criteria_json TEXT NOT NULL,
+        built_in      INTEGER NOT NULL DEFAULT 0,
+        favorite      INTEGER NOT NULL DEFAULT 0,
+        locked        INTEGER NOT NULL DEFAULT 0,
+        archived_at   TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_rubrics_library ON study_rubrics(archived_at, favorite DESC, name);
+
+      CREATE TABLE study_grading_runs (
+        id               TEXT PRIMARY KEY,
+        short_id         TEXT NOT NULL UNIQUE,
+        attempt_answer_id TEXT NOT NULL REFERENCES study_attempt_answers(id) ON DELETE CASCADE,
+        rubric_id        TEXT REFERENCES study_rubrics(id) ON DELETE SET NULL,
+        severity         TEXT NOT NULL DEFAULT 'balanced',
+        model_provider   TEXT NOT NULL,
+        model_name       TEXT NOT NULL,
+        sources_json     TEXT NOT NULL DEFAULT '[]',
+        result_json      TEXT NOT NULL,
+        estimated_score  REAL,
+        manual_score     REAL,
+        manual_comment   TEXT,
+        created_at       TEXT NOT NULL,
+        updated_at       TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_grading_runs_answer ON study_grading_runs(attempt_answer_id, created_at DESC);
+
+      CREATE TABLE study_grading_annotations (
+        id             TEXT PRIMARY KEY,
+        short_id       TEXT NOT NULL UNIQUE,
+        grading_run_id TEXT NOT NULL REFERENCES study_grading_runs(id) ON DELETE CASCADE,
+        from_pos       INTEGER NOT NULL DEFAULT 0,
+        to_pos         INTEGER NOT NULL DEFAULT 0,
+        kind           TEXT NOT NULL,
+        severity       TEXT NOT NULL DEFAULT 'info',
+        message        TEXT NOT NULL,
+        suggestion     TEXT,
+        created_at     TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_grading_annotations_run ON study_grading_annotations(grading_run_id, from_pos);
+    `,
+  },
+  {
+    version: 61,
+    up: /* sql */ `
+      -- Study vault phase 11a-11c: flashcards, spaced repetition and mastery.
+      CREATE TABLE study_flashcards (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, card_type TEXT NOT NULL DEFAULT 'front_back',
+        front TEXT NOT NULL, back TEXT NOT NULL, hint TEXT NOT NULL DEFAULT '', media_json TEXT NOT NULL DEFAULT '{}',
+        tags_json TEXT NOT NULL DEFAULT '[]', course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        document_id TEXT REFERENCES study_docs(id) ON DELETE SET NULL, material_id TEXT REFERENCES study_materials(id) ON DELETE SET NULL,
+        transcript_id TEXT REFERENCES study_transcripts(id) ON DELETE SET NULL, question_id TEXT REFERENCES study_questions(id) ON DELETE SET NULL,
+        source_excerpt TEXT NOT NULL DEFAULT '', difficulty TEXT NOT NULL DEFAULT 'medium', favorite INTEGER NOT NULL DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_flashcards_scope ON study_flashcards(subject_id, topic_id, archived_at, favorite DESC);
+
+      CREATE TABLE study_srs_state (
+        card_id TEXT PRIMARY KEY REFERENCES study_flashcards(id) ON DELETE CASCADE, ease_factor REAL NOT NULL DEFAULT 2.5,
+        interval_days REAL NOT NULL DEFAULT 0, due_at TEXT NOT NULL, repetitions INTEGER NOT NULL DEFAULT 0,
+        lapses INTEGER NOT NULL DEFAULT 0, last_rating INTEGER, last_reviewed_at TEXT, confidence REAL,
+        mastered INTEGER NOT NULL DEFAULT 0, excluded INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_srs_due ON study_srs_state(excluded, mastered, due_at);
+
+      CREATE TABLE study_reviews (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, card_id TEXT NOT NULL REFERENCES study_flashcards(id) ON DELETE CASCADE,
+        rating INTEGER NOT NULL, confidence INTEGER, correct INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL DEFAULT 0,
+        previous_interval_days REAL NOT NULL DEFAULT 0, next_interval_days REAL NOT NULL DEFAULT 0,
+        scheduled_at TEXT, created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_reviews_card ON study_reviews(card_id, created_at DESC);
+
+      CREATE TABLE study_mastery (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, scope_kind TEXT NOT NULL, scope_id TEXT NOT NULL,
+        mastery REAL NOT NULL DEFAULT 0, confidence REAL NOT NULL DEFAULT 0, evidence_count INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'learning', last_activity_at TEXT, updated_at TEXT NOT NULL,
+        UNIQUE(scope_kind, scope_id)
+      );
+      CREATE INDEX idx_study_mastery_level ON study_mastery(scope_kind, mastery, updated_at DESC);
+    `,
+  },
+  {
+    version: 62,
+    up: /* sql */ `
+      -- Study vault phase 11d: local academic planning and actual study time.
+      CREATE TABLE study_plans (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        exam_at TEXT, available_minutes INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1,
+        config_json TEXT NOT NULL DEFAULT '{}', position INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE study_plan_blocks (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, plan_id TEXT REFERENCES study_plans(id) ON DELETE CASCADE,
+        title TEXT NOT NULL, block_type TEXT NOT NULL DEFAULT 'study', course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        starts_at TEXT NOT NULL, duration_minutes INTEGER NOT NULL DEFAULT 25, status TEXT NOT NULL DEFAULT 'planned',
+        priority INTEGER NOT NULL DEFAULT 0, notes TEXT NOT NULL DEFAULT '', position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_plan_blocks_time ON study_plan_blocks(starts_at, status, subject_id);
+      CREATE TABLE study_calendar_events (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, event_type TEXT NOT NULL DEFAULT 'session',
+        starts_at TEXT NOT NULL, ends_at TEXT, all_day INTEGER NOT NULL DEFAULT 0,
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL, notes TEXT NOT NULL DEFAULT '', reminder_minutes INTEGER,
+        completed INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_calendar_events_time ON study_calendar_events(starts_at, event_type);
+      CREATE TABLE study_goals (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, period TEXT NOT NULL DEFAULT 'weekly',
+        target_value REAL NOT NULL DEFAULT 1, current_value REAL NOT NULL DEFAULT 0, unit TEXT NOT NULL DEFAULT 'sesiones',
+        starts_at TEXT NOT NULL, ends_at TEXT, subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        completed INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE TABLE study_study_sessions (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, plan_block_id TEXT REFERENCES study_plan_blocks(id) ON DELETE SET NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL, topic_id TEXT REFERENCES study_topics(id) ON DELETE SET NULL,
+        mode TEXT NOT NULL DEFAULT 'focus', planned_minutes INTEGER NOT NULL DEFAULT 25, actual_seconds INTEGER NOT NULL DEFAULT 0,
+        interruptions INTEGER NOT NULL DEFAULT 0, started_at TEXT NOT NULL, ended_at TEXT, notes TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_sessions_time ON study_study_sessions(started_at, subject_id);
+    `,
+  },
+  {
+    version: 63,
+    up: /* sql */ `
+      -- Study vault phase 12: auditable per-task AI usage without invented pricing.
+      CREATE TABLE study_ai_usage (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, task TEXT NOT NULL,
+        provider TEXT NOT NULL, model TEXT NOT NULL, input_chars INTEGER NOT NULL DEFAULT 0,
+        output_chars INTEGER NOT NULL DEFAULT 0, estimated_cost_usd REAL, status TEXT NOT NULL,
+        fallback_used INTEGER NOT NULL DEFAULT 0, error TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_ai_usage_month ON study_ai_usage(started_at, task, status);
+    `,
+  },
+  {
+    version: 64,
+    up: /* sql */ `
+      -- Study organization browser: topics may live directly in a subject or
+      -- inside one of that subject's folders.
+      ALTER TABLE study_topics ADD COLUMN folder_id TEXT REFERENCES study_folders(id) ON DELETE SET NULL;
+      CREATE INDEX idx_study_topics_folder ON study_topics(folder_id, parent_id, position);
+    `,
+  },
+  {
+    version: 65,
+    up: /* sql */ `
+      -- Rich visual metadata for the study organization browser. Images are
+      -- stored as local data URLs so they remain part of the vault and work
+      -- without an external file path.
+      ALTER TABLE study_courses ADD COLUMN emoji TEXT;
+      ALTER TABLE study_courses ADD COLUMN image_data TEXT;
+      ALTER TABLE study_courses ADD COLUMN year INTEGER;
+      ALTER TABLE study_subjects ADD COLUMN emoji TEXT;
+      ALTER TABLE study_subjects ADD COLUMN image_data TEXT;
+      ALTER TABLE study_subjects ADD COLUMN year INTEGER;
+      ALTER TABLE study_topics ADD COLUMN emoji TEXT;
+      ALTER TABLE study_topics ADD COLUMN image_data TEXT;
+      ALTER TABLE study_topics ADD COLUMN year INTEGER;
+      ALTER TABLE study_folders ADD COLUMN emoji TEXT;
+      ALTER TABLE study_folders ADD COLUMN image_data TEXT;
+      ALTER TABLE study_folders ADD COLUMN year INTEGER;
+      ALTER TABLE study_docs ADD COLUMN emoji TEXT;
+      ALTER TABLE study_docs ADD COLUMN image_data TEXT;
+      ALTER TABLE study_docs ADD COLUMN year INTEGER;
+    `,
+  },
+  {
+    version: 66,
+    up: /* sql */ `
+      -- Semantic material index. The visual description is persisted separately so
+      -- image analysis remains inspectable and can be re-embedded without another
+      -- multimodal request when the embedding model changes.
+      ALTER TABLE study_materials ADD COLUMN visual_description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_status TEXT NOT NULL DEFAULT 'not_applicable';
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_provider TEXT;
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_model TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding BLOB;
+      ALTER TABLE study_materials ADD COLUMN embedding_provider TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding_model TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE study_materials ADD COLUMN embedding_text_hash TEXT;
+      ALTER TABLE study_materials ADD COLUMN index_status TEXT NOT NULL DEFAULT 'pending';
+      ALTER TABLE study_materials ADD COLUMN index_error TEXT;
+      ALTER TABLE study_materials ADD COLUMN indexed_at TEXT;
+      CREATE INDEX idx_study_materials_index_status ON study_materials(index_status, deleted_at, archived_at);
+    `,
+  },
+  {
+    version: 67,
+    up: /* sql */ `
+      -- Keep generated questions attached to the complete study hierarchy.
+      ALTER TABLE study_questions ADD COLUMN folder_id TEXT REFERENCES study_folders(id) ON DELETE SET NULL;
+      CREATE INDEX idx_study_questions_folder ON study_questions(folder_id, created_at DESC);
+    `,
+  },
+  {
+    version: 68,
+    up: /* sql */ `
+      -- Translation jobs become visible and recoverable as soon as they start.
+      ALTER TABLE content_translations ADD COLUMN status TEXT NOT NULL DEFAULT 'ready';
+      ALTER TABLE content_translations ADD COLUMN error TEXT;
+      CREATE INDEX idx_content_translations_status ON content_translations(entity_kind, entity_id, status, updated_at DESC);
+    `,
+  },
+  {
+    version: 69,
+    up: /* sql */ `
+      -- Surface the learner's latest written answer and AI evaluation in the bank.
+      ALTER TABLE study_questions ADD COLUMN last_response TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_questions ADD COLUMN last_score REAL;
+      ALTER TABLE study_questions ADD COLUMN last_max_score REAL;
+      ALTER TABLE study_questions ADD COLUMN last_feedback TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_questions ADD COLUMN last_answered_at TEXT;
+    `,
+  },
+  {
+    version: 70,
+    up: /* sql */ `
+      -- Editable weekly timetable for the study organization workspace.
+      CREATE TABLE study_schedule_periods (
+        id TEXT PRIMARY KEY,
+        section TEXT NOT NULL CHECK(section IN ('morning', 'afternoon')),
+        label TEXT NOT NULL DEFAULT '',
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE study_schedule_cells (
+        day TEXT NOT NULL CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
+        period_id TEXT NOT NULL REFERENCES study_schedule_periods(id) ON DELETE CASCADE,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        PRIMARY KEY(day, period_id)
+      );
+      CREATE TABLE study_schedule_day_styles (
+        day TEXT PRIMARY KEY CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
+        color TEXT
+      );
+      CREATE INDEX idx_study_schedule_cells_subject ON study_schedule_cells(subject_id);
+    `,
+  },
+  {
+    version: 71,
+    up: /* sql */ `
+      -- Remove objective questions left unusable by the former permissive validator.
+      -- They are soft-deleted so a backup can still recover the original row.
+      UPDATE study_questions
+      SET deleted_at = COALESCE(deleted_at, datetime('now')),
+          updated_at = datetime('now')
+      WHERE deleted_at IS NULL
+        AND question_type IN ('single_choice', 'multiple_choice')
+        AND (
+          json_valid(options_json) = 0
+          OR json_array_length(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) < 2
+          OR EXISTS (
+            SELECT 1 FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+            WHERE trim(COALESCE(json_extract(
+              CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+              '$[' || option.key || '].text'
+            ), '')) = ''
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+            WHERE json_extract(
+              CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+              '$[' || option.key || '].correct'
+            ) = 1
+          )
+          OR (
+            question_type = 'single_choice'
+            AND (SELECT COUNT(*)
+              FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+              WHERE json_extract(
+                CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+                '$[' || option.key || '].correct'
+              ) = 1
+            ) <> 1
+          )
+        );
+    `,
+  },
+  {
+    version: 72,
+    up: /* sql */ `
+      -- Subject-scoped knowledge graph for study vaults. Sources remain polymorphic
+      -- so imported materials and editable study notes use the same pipeline.
+      CREATE TABLE study_ideas (
+        id                  TEXT PRIMARY KEY,
+        subject_id          TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        type                TEXT NOT NULL,
+        label               TEXT NOT NULL,
+        normalized_label    TEXT NOT NULL,
+        statement           TEXT NOT NULL,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL,
+        UNIQUE(subject_id, type, normalized_label)
+      );
+      CREATE INDEX idx_study_ideas_subject ON study_ideas(subject_id, updated_at DESC);
+
+      CREATE TABLE study_idea_occurrences (
+        id           TEXT PRIMARY KEY,
+        idea_id      TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        source_kind  TEXT NOT NULL CHECK(source_kind IN ('material', 'document')),
+        source_id    TEXT NOT NULL,
+        source_title TEXT NOT NULL DEFAULT '',
+        source_hash  TEXT NOT NULL DEFAULT '',
+        role         TEXT NOT NULL DEFAULT 'secondary',
+        confidence   REAL NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        UNIQUE(idea_id, source_kind, source_id)
+      );
+      CREATE INDEX idx_study_idea_occ_source ON study_idea_occurrences(source_kind, source_id);
+      CREATE INDEX idx_study_idea_occ_idea ON study_idea_occurrences(idea_id);
+
+      CREATE TABLE study_idea_evidence (
+        id            TEXT PRIMARY KEY,
+        occurrence_id TEXT NOT NULL REFERENCES study_idea_occurrences(id) ON DELETE CASCADE,
+        quote         TEXT NOT NULL,
+        location      TEXT NOT NULL DEFAULT '',
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_idea_evidence_occ ON study_idea_evidence(occurrence_id, position);
+
+      CREATE TABLE study_idea_edges (
+        id                 TEXT PRIMARY KEY,
+        subject_id         TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        from_id            TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        to_id              TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        type               TEXT NOT NULL,
+        basis              TEXT NOT NULL DEFAULT '',
+        confidence         REAL NOT NULL DEFAULT 0,
+        source_kind        TEXT,
+        source_id          TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL,
+        CHECK(from_id <> to_id),
+        UNIQUE(subject_id, from_id, to_id, type)
+      );
+      CREATE INDEX idx_study_idea_edges_subject ON study_idea_edges(subject_id, confidence DESC);
+      CREATE INDEX idx_study_idea_edges_from ON study_idea_edges(from_id);
+      CREATE INDEX idx_study_idea_edges_to ON study_idea_edges(to_id);
+
+      CREATE TABLE study_knowledge_jobs (
+        subject_id    TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        source_kind   TEXT NOT NULL CHECK(source_kind IN ('material', 'document')),
+        source_id     TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'pending',
+        phase         TEXT NOT NULL DEFAULT 'pending',
+        source_hash   TEXT NOT NULL DEFAULT '',
+        model_provider TEXT,
+        model_name    TEXT,
+        error         TEXT,
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY(subject_id, source_kind, source_id)
+      );
+      CREATE INDEX idx_study_knowledge_jobs_status ON study_knowledge_jobs(status, updated_at);
+    `,
+  },
+  {
+    version: 73,
+    up: /* sql */ `
+      ALTER TABLE study_material_annotations ADD COLUMN kind TEXT NOT NULL DEFAULT 'highlight';
+      ALTER TABLE study_material_annotations ADD COLUMN rects_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE study_material_annotations ADD COLUMN path_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE study_material_annotations ADD COLUMN thickness REAL NOT NULL DEFAULT 3;
+    `,
+  },
+  {
+    version: 74,
+    up: /* sql */ `
+      CREATE TABLE database_chat_conversations (
+        id                TEXT PRIMARY KEY,
+        title             TEXT NOT NULL,
+        database_ids_json TEXT NOT NULL DEFAULT '[]',
+        messages_json     TEXT NOT NULL DEFAULT '[]',
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_database_chat_conversations_updated
+        ON database_chat_conversations(updated_at DESC);
+    `,
+  },
+  {
+    version: 75,
+    up: /* sql */ `
+      -- Timetable cells may contain either a subject or an independent activity.
+      ALTER TABLE study_schedule_cells ADD COLUMN activity_title TEXT;
+    `,
+  },
+  {
+    version: 76,
+    up: /* sql */ `
+      -- Full student calendar metadata and durable reminder delivery state.
+      ALTER TABLE study_calendar_events ADD COLUMN icon TEXT NOT NULL DEFAULT 'calendar';
+      ALTER TABLE study_calendar_events ADD COLUMN emoji TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN url TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN reminder_at TEXT;
+      ALTER TABLE study_calendar_events ADD COLUMN notified_at TEXT;
+      CREATE INDEX idx_study_calendar_events_reminder ON study_calendar_events(reminder_at, notified_at, deleted_at);
+    `,
+  },
+  {
+    version: 77,
+    up: /* sql */ `
+      -- Zotero-backed study materials can either copy an attachment into the
+      -- vault or remain a lightweight link opened by the Zotero desktop app.
+      ALTER TABLE study_materials ADD COLUMN origin TEXT NOT NULL DEFAULT 'file';
+      ALTER TABLE study_materials ADD COLUMN zotero_library_type TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_library_id TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_item_key TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_attachment_key TEXT;
+      CREATE INDEX idx_study_materials_zotero_source
+        ON study_materials(zotero_library_type, zotero_library_id, zotero_item_key, zotero_attachment_key);
+    `,
+  },
+  {
+    version: 78,
+    up: /* sql */ `
+      -- Cover the bounded list queries used by the performance-sensitive
+      -- academic views and current-model vector maintenance.
+      CREATE INDEX idx_works_active_year_title
+        ON works(archived, year DESC, title COLLATE NOCASE);
+      CREATE INDEX idx_works_active_analysis_status
+        ON works(archived, light_status, deep_status, summary_status);
+      CREATE INDEX idx_ideas_current_embedding
+        ON ideas(embedding_provider, embedding_model, orphaned_at)
+        WHERE embedding IS NOT NULL;
+      CREATE INDEX idx_idea_theme_links_work
+        ON idea_theme_links(nodus_id, global_id, theme_id);
+      CREATE INDEX idx_edges_type_endpoints
+        ON edges(type, from_id, to_id);
+      CREATE INDEX idx_gaps_kind_statement
+        ON gaps(kind, statement);
     `,
   },
 ];

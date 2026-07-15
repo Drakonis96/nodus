@@ -42,7 +42,8 @@ export async function runLightScan(
   model?: ModelRef | null,
   options: LightScanOptions = {}
 ): Promise<void> {
-  const scanModel = model ?? getSettings().extractionModel ?? null;
+  const settings = getSettings();
+  const scanModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
   const lockedLabels = options.lockedLabels ?? null;
   // Include the lock state in the hash so a previously-scanned work is re-evaluated
   // when the user switches to/from locked main themes.

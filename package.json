@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -12,6 +12,8 @@
     "build": "npm run typecheck && vite build",
     "test": "node --test scripts/test-*.mjs",
     "test:e2e": "node scripts/e2e-smoke.mjs",
+    "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
+    "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -25,11 +27,24 @@
     "@anthropic-ai/sdk": "^0.32.1",
     "@diffusionstudio/vits-web": "^1.0.3",
     "@google/genai": "^2.11.0",
+    "@huggingface/transformers": "^3.8.1",
+    "@milkdown/core": "^7.21.3",
+    "@milkdown/crepe": "^7.21.3",
+    "@milkdown/plugin-history": "^7.21.3",
+    "@milkdown/plugin-listener": "^7.21.3",
+    "@milkdown/plugin-slash": "^7.21.3",
+    "@milkdown/plugin-tooltip": "^7.21.3",
+    "@milkdown/plugin-upload": "^7.21.3",
+    "@milkdown/preset-commonmark": "^7.21.3",
+    "@milkdown/preset-gfm": "^7.21.3",
+    "@milkdown/react": "^7.21.3",
+    "@milkdown/utils": "^7.21.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@napi-rs/canvas": "^0.1.65",
     "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.5.0",
     "cytoscape": "^3.30.2",
+    "diff": "^9.0.0",
     "docx": "^9.7.1",
     "electron-updater": "^6.8.9",
     "framer-motion": "^11.11.17",
@@ -37,18 +52,23 @@
     "graphology-communities-louvain": "^2.0.2",
     "graphology-layout-forceatlas2": "^0.10.1",
     "jsonrepair": "^3.14.0",
+    "katex": "^0.17.0",
     "kokoro-js": "^1.2.1",
     "leaflet": "^1.9.4",
     "mammoth": "^1.8.0",
     "mkcert": "^3.2.0",
     "openai": "^4.73.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.8.69",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
     "sigma": "^3.0.3",
     "tesseract.js": "^5.1.1",
+    "turndown": "^7.2.4",
     "uuid": "^11.0.3",
     "zod": "^3.25.76"
   },
@@ -56,10 +76,12 @@
     "@types/adm-zip": "^0.5.7",
     "@types/better-sqlite3": "^7.6.11",
     "@types/cytoscape": "^3.21.8",
+    "@types/katex": "^0.16.8",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/turndown": "^5.0.6",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.15.0",
     "@typescript-eslint/parser": "^8.15.0",
@@ -98,8 +120,19 @@
         "releaseType": "release"
       }
     ],
+    "beforePack": "build/beforePack.cjs",
     "afterPack": "build/afterPack.cjs",
     "mac": {
+      "extraFiles": [
+        {
+          "from": "build/NodusDockTile.docktileplugin",
+          "to": "PlugIns/NodusDockTile.docktileplugin"
+        }
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio.",
+        "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
+      },
       "target": [
         {
           "target": "dmg",

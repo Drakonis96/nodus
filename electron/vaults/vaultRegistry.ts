@@ -66,7 +66,10 @@ function defaultVaultRecord(): VaultRecord {
 
 function writeRegistry(registry: VaultRegistryFile): VaultRegistryFile {
   fs.mkdirSync(userDataDir(), { recursive: true });
-  fs.writeFileSync(registryPath(), JSON.stringify(registry, null, 2), 'utf8');
+  const target = registryPath();
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
+  fs.writeFileSync(temporary, JSON.stringify(registry, null, 2), 'utf8');
+  fs.renameSync(temporary, target);
   return registry;
 }
 
@@ -130,8 +133,10 @@ function writeVaultManifest(vault: VaultRecord): void {
   if (vault.legacy) return;
   const dir = path.dirname(vault.path);
   fs.mkdirSync(dir, { recursive: true });
+  const target = path.join(dir, 'manifest.json');
+  const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
   fs.writeFileSync(
-    path.join(dir, 'manifest.json'),
+    temporary,
     JSON.stringify(
       {
         id: vault.id,
@@ -146,6 +151,7 @@ function writeVaultManifest(vault: VaultRecord): void {
     ),
     'utf8'
   );
+  fs.renameSync(temporary, target);
 }
 
 function initializeDatabase(file: string): void {

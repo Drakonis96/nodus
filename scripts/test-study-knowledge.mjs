@@ -1,0 +1,104 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+if (!process.argv.includes('--electron-study-knowledge-test')) {
+  execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'), [path.join(repoRoot, 'scripts/test-study-knowledge.mjs'), '--electron-study-knowledge-test'],
+    { cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' });
+  process.exit(0);
+}
+
+const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-study-knowledge-'));
+installRuntimeHooks(root);
+try {
+  const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
+  const materials = require(path.join(repoRoot, 'electron/db/studyMaterialsRepo.ts'));
+  const knowledge = require(path.join(repoRoot, 'electron/db/studyKnowledgeRepo.ts'));
+  const ai = require(path.join(repoRoot, 'electron/ai/studyKnowledge.ts'));
+  const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
+  const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  assert.ok(SCHEMA_VERSION >= 74, 'the knowledge graph schema and any later migrations are installed');
+  for (const table of ['study_ideas', 'study_idea_occurrences', 'study_idea_evidence', 'study_idea_edges', 'study_knowledge_jobs']) {
+    assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
+  }
+
+  const course = org.createStudyCourse({ name: 'Curso' });
+  const subjectA = org.createStudySubject({ courseId: course.id, name: 'Historia' });
+  const subjectB = org.createStudySubject({ courseId: course.id, name: 'Filosofía' });
+  const sourcePath = path.join(root, 'tema.txt');
+  fs.writeFileSync(sourcePath, 'La separación de poderes limita la concentración del poder político. El poder legislativo crea leyes y el ejecutivo las aplica.');
+  const imported = await materials.importStudyMaterialFile(sourcePath, { courseId: course.id, subjectId: subjectA.id });
+  materials.addStudyMaterialPlacement(imported.material.id, { courseId: course.id, subjectId: subjectB.id });
+
+  const extraction = {
+    ideas: [{ key: 'limits', type: 'principle', label: 'Separación de poderes', statement: 'La separación de poderes limita la concentración política.', role: 'principal', confidence: 0.95,
+      evidence: [{ quote: 'La separación de poderes limita la concentración del poder político.', location: 'p. 1' }] }],
+    relations: [],
+  };
+  for (const subject of [subjectA, subjectB]) knowledge.replaceStudySourceKnowledge({ subjectId: subject.id, sourceKind: 'material', sourceId: imported.material.id,
+    sourceTitle: 'Tema', sourceHash: 'hash-1', ideas: extraction.ideas, relations: extraction.relations, embeddings: [[1, 0, 0]], embeddingProvider: 'test', embeddingModel: 'test' });
+  const ideasA = knowledge.listStudyIdeas(subjectA.id); const ideasB = knowledge.listStudyIdeas(subjectB.id);
+  assert.equal(ideasA.length, 1); assert.equal(ideasB.length, 1);
+  assert.notEqual(ideasA[0].id, ideasB[0].id, 'the same concept is independently canonicalised in each subject');
+  assert.equal(knowledge.getStudyIdeaDetail(ideasA[0].id).evidence[0].quote, extraction.ideas[0].evidence[0].quote);
+  knowledge.replaceStudySourceKnowledge({ subjectId: subjectA.id, sourceKind: 'material', sourceId: imported.material.id,
+    sourceTitle: 'Tema', sourceHash: 'hash-1b', ideas: extraction.ideas, relations: extraction.relations, embeddings: [null], embeddingProvider: 'test', embeddingModel: 'test' });
+  assert.ok(knowledge.listStudyIdeaVectors(subjectA.id)[0].embedding, 'reanalyzing an existing idea without a new vector preserves its embedding');
+
+  const sourcePath2 = path.join(root, 'tema-2.txt'); fs.writeFileSync(sourcePath2, 'La limitación del poder protege el equilibrio institucional.');
+  const second = await materials.importStudyMaterialFile(sourcePath2, { courseId: course.id, subjectId: subjectA.id });
+  knowledge.replaceStudySourceKnowledge({ subjectId: subjectA.id, sourceKind: 'material', sourceId: second.material.id, sourceTitle: 'Tema 2', sourceHash: 'hash-2',
+    ideas: [{ key: 'balance', type: 'concept', label: 'Equilibrio institucional', statement: 'El equilibrio institucional limita el poder.', role: 'principal', confidence: 0.9,
+      evidence: [{ quote: 'La limitación del poder protege el equilibrio institucional.', location: '' }] }], relations: [], embeddings: [[0.99, 0.01, 0]], embeddingProvider: 'test', embeddingModel: 'test' });
+  knowledge.connectStudySourceIdeasSemantically(subjectA.id, 'material', second.material.id);
+  assert.ok(knowledge.getStudyKnowledgeGraph(subjectA.id).edges.length >= 1, 'semantic neighbours inside one subject are connected');
+  assert.equal(knowledge.getStudyKnowledgeGraph(subjectB.id).edges.length, 0, 'relations never cross subjects');
+
+  const merged = ai.mergeStudyKnowledgeExtractions([extraction, { ideas: [{ ...extraction.ideas[0], key: 'duplicate', statement: 'Una formulación más extensa sobre la separación de poderes.' }], relations: [] }]);
+  assert.equal(merged.ideas.length, 1, 'duplicate labels from separate chunks are merged');
+  assert.match(ai.buildStudyKnowledgePrompt('Tema', 'Texto').system, /citas textuales exactas/i);
+  assert.deepEqual(ai.chunkStudyKnowledgeText('A'.repeat(120) + '\n\n' + 'B'.repeat(120), 150, 4).map((part) => part.length), [120, 120]);
+
+  const placementB = materials.getStudyMaterial(imported.material.id).placements.find((placement) => placement.subjectId === subjectB.id);
+  materials.removeStudyMaterialPlacement(imported.material.id, placementB.id);
+  knowledge.syncStudyKnowledgeSourceScopes('material', imported.material.id);
+  assert.equal(knowledge.listStudyIdeas(subjectB.id).length, 0, 'removing a placement removes only that subject projection');
+  assert.ok(knowledge.listStudyIdeas(subjectA.id).length >= 1, 'the other subject projection remains intact');
+  const assessmentContext = await ai.retrieveStudyKnowledgeContext(subjectA.id, 'limitación del poder', [`material:${imported.material.id}`]);
+  assert.equal(assessmentContext.ideas.length, 1, 'assessment retrieval respects explicit source selection');
+  assert.match(assessmentContext.outline, /Separación de poderes/);
+
+  const [searchSource, questionSource, ideasView, graphView] = await Promise.all([
+    readFile(path.join(repoRoot, 'electron/ai/studySearch.ts'), 'utf8'), readFile(path.join(repoRoot, 'electron/ai/studyQuestions.ts'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/StudyIdeasView.tsx'), 'utf8'), readFile(path.join(repoRoot, 'src/views/StudyGraphView.tsx'), 'utf8'),
+  ]);
+  assert.match(searchSource, /study-fragment-v2/); assert.match(searchSource, /embedding: null/);
+  assert.match(questionSource, /MAPA CONCEPTUAL DE LA ASIGNATURA/); assert.match(questionSource, /no es evidencia/);
+  for (const view of [ideasView, graphView]) { assert.match(view, /dark:bg-neutral-950/); assert.match(view, /bg-white/); }
+  for (const marker of ['study-ideas-view', 'study-ideas-subject', 'study-idea-card', 'study-idea-detail']) assert.match(ideasView, new RegExp(marker));
+  for (const academicPattern of ['VirtualList', 'DETAIL_MIN_WIDTH', 'DETAIL_MAX_WIDTH', 'Ordenar: nombre', 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasView, new RegExp(academicPattern));
+  for (const marker of ['study-graph-view', 'study-graph-subject', 'study-graph-node']) assert.match(graphView, new RegExp(marker));
+  closeDb(); console.log('Study knowledge graph tests passed!');
+} finally { await rm(root, { recursive: true, force: true }); }
+
+function installRuntimeHooks(userDataPath) {
+  const ts = require('typescript'); const Module = require('node:module');
+  const originalResolveFilename = Module._resolveFilename; const originalLoad = Module._load;
+  const electronStub = { app: { getPath: () => userDataPath, getVersion: () => '0.0.0-test', getAppPath: () => repoRoot, isPackaged: false },
+    safeStorage: { isEncryptionAvailable: () => false, encryptString: (value) => Buffer.from(String(value)), decryptString: (value) => Buffer.from(value).toString() },
+    dialog: { showMessageBoxSync: () => 0 }, shell: {}, BrowserWindow: class {} };
+  Module._resolveFilename = function (request, parent, isMain, options) {
+    if (request.startsWith('@shared/')) return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
+    return originalResolveFilename.call(this, request, parent, isMain, options);
+  };
+  Module._load = function (request, parent, isMain) { if (request === 'electron') return electronStub; return originalLoad.call(this, request, parent, isMain); };
+  require.extensions['.ts'] = function (module, filename) { const source = fs.readFileSync(filename, 'utf8'); module._compile(ts.transpileModule(source, { fileName: filename,
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, moduleResolution: ts.ModuleResolutionKind.NodeJs, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX, resolveJsonModule: true, skipLibCheck: true } }).outputText, filename); };
+}

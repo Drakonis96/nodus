@@ -1,0 +1,139 @@
+import crypto from 'node:crypto';
+import type { StudyFlashcard, StudyFlashcardInput, StudyReviewInput, StudyReviewRecord } from '@shared/studyFlashcards';
+import { validateStudyFlashcard } from '@shared/studyFlashcards';
+import type { StudySrsState } from '@shared/studySrs';
+import { initialStudySrsState, scheduleStudySrsReview, studySrsPriority } from '@shared/studySrs';
+import type { StudyProgressDashboard, StudyProgressScope } from '@shared/studyStats';
+import { recommendStudyFocus, summarizeStudyPerformance } from '@shared/studyStats';
+import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from '@shared/studyPlanner';
+import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
+import { getDb } from './database';
+
+type Row = Record<string, unknown>;
+const now = () => new Date().toISOString();
+const bool = (value: unknown) => Number(value) === 1;
+const json = <T>(value: unknown, fallback: T): T => { try { return JSON.parse(String(value)) as T; } catch { return fallback; } };
+function ids(prefix: string) { const id = crypto.randomUUID(); return { id, shortId: createStudyShortId(prefix, id) }; }
+
+function srsFrom(row?: Row): StudySrsState {
+  if (!row) return initialStudySrsState();
+  return { easeFactor: Number(row.ease_factor), intervalDays: Number(row.interval_days), dueAt: String(row.due_at), repetitions: Number(row.repetitions), lapses: Number(row.lapses), lastRating: row.last_rating == null ? null : Number(row.last_rating) as StudySrsState['lastRating'], lastReviewedAt: row.last_reviewed_at ? String(row.last_reviewed_at) : null, confidence: row.confidence == null ? null : Number(row.confidence), mastered: bool(row.mastered), excluded: bool(row.excluded) };
+}
+
+function toCard(row: Row): StudyFlashcard {
+  const state = getDb().prepare('SELECT * FROM study_srs_state WHERE card_id=?').get(String(row.id)) as Row | undefined;
+  return { id: String(row.id), shortId: String(row.short_id), type: String(row.card_type) as StudyFlashcard['type'], front: String(row.front), back: String(row.back), hint: String(row.hint ?? ''), tags: json(row.tags_json, []), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, documentId: row.document_id ? String(row.document_id) : null, materialId: row.material_id ? String(row.material_id) : null, transcriptId: row.transcript_id ? String(row.transcript_id) : null, questionId: row.question_id ? String(row.question_id) : null, sourceExcerpt: String(row.source_excerpt ?? ''), difficulty: String(row.difficulty) as StudyFlashcard['difficulty'], favorite: bool(row.favorite), position: Number(row.position), archivedAt: row.archived_at ? String(row.archived_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at), srs: srsFrom(state) };
+}
+
+export function listStudyFlashcards(options: { subjectId?: string; topicId?: string; dueOnly?: boolean; includeArchived?: boolean; search?: string } = {}): StudyFlashcard[] {
+  const conditions = ['f.deleted_at IS NULL']; const params: unknown[] = [];
+  if (!options.includeArchived) conditions.push('f.archived_at IS NULL');
+  if (options.subjectId) { conditions.push('f.subject_id=?'); params.push(options.subjectId); }
+  if (options.topicId) { conditions.push('f.topic_id=?'); params.push(options.topicId); }
+  if (options.dueOnly) { conditions.push('s.excluded=0 AND s.mastered=0 AND s.due_at<=?'); params.push(now()); }
+  if (options.search?.trim()) { conditions.push('(f.front LIKE ? OR f.back LIKE ? OR f.tags_json LIKE ?)'); const value = `%${options.search.trim()}%`; params.push(value, value, value); }
+  const rows = getDb().prepare(`SELECT f.* FROM study_flashcards f JOIN study_srs_state s ON s.card_id=f.id WHERE ${conditions.join(' AND ')} ORDER BY f.favorite DESC, s.due_at, f.position`).all(...params) as Row[];
+  return rows.map(toCard).sort((left, right) => studySrsPriority(right.srs) - studySrsPriority(left.srs));
+}
+
+export function createStudyFlashcard(input: StudyFlashcardInput): StudyFlashcard {
+  const errors = validateStudyFlashcard(input); if (errors.length) throw new Error(errors.join(' '));
+  const db = getDb(); const key = ids('FLC'); const timestamp = now();
+  const position = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 value FROM study_flashcards').get() as Row).value);
+  db.transaction(() => {
+    db.prepare(`INSERT INTO study_flashcards (id,short_id,card_type,front,back,hint,tags_json,course_id,subject_id,topic_id,document_id,material_id,transcript_id,question_id,source_excerpt,difficulty,favorite,position,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(key.id, key.shortId, input.type ?? 'front_back', input.front.trim(), input.back.trim(), input.hint?.trim() ?? '', JSON.stringify(input.tags ?? []), input.courseId ?? null, input.subjectId ?? null, input.topicId ?? null, input.documentId ?? null, input.materialId ?? null, input.transcriptId ?? null, input.questionId ?? null, input.sourceExcerpt?.trim() ?? '', input.difficulty ?? 'medium', input.favorite ? 1 : 0, position, timestamp, timestamp);
+    db.prepare('INSERT INTO study_srs_state (card_id,due_at,updated_at) VALUES (?,?,?)').run(key.id, timestamp, timestamp);
+  })();
+  return listStudyFlashcards({ includeArchived: true }).find((card) => card.id === key.id)!;
+}
+
+export function updateStudyFlashcard(id: string, patch: Partial<StudyFlashcardInput>): StudyFlashcard {
+  const current = listStudyFlashcards({ includeArchived: true }).find((card) => card.id === id); if (!current) throw new Error('Tarjeta no encontrada.');
+  const clean: StudyFlashcardInput = { ...current, ...patch }; const errors = validateStudyFlashcard(clean); if (errors.length) throw new Error(errors.join(' '));
+  getDb().prepare(`UPDATE study_flashcards SET card_type=?,front=?,back=?,hint=?,tags_json=?,course_id=?,subject_id=?,topic_id=?,document_id=?,material_id=?,transcript_id=?,question_id=?,source_excerpt=?,difficulty=?,favorite=?,updated_at=? WHERE id=?`).run(clean.type ?? current.type, clean.front.trim(), clean.back.trim(), clean.hint?.trim() ?? '', JSON.stringify(clean.tags ?? []), clean.courseId ?? null, clean.subjectId ?? null, clean.topicId ?? null, clean.documentId ?? null, clean.materialId ?? null, clean.transcriptId ?? null, clean.questionId ?? null, clean.sourceExcerpt?.trim() ?? '', clean.difficulty ?? 'medium', clean.favorite ? 1 : 0, now(), id);
+  return listStudyFlashcards({ includeArchived: true }).find((card) => card.id === id)!;
+}
+
+export function createStudyFlashcardsFromQuestions(questionIds: string[]): StudyFlashcard[] {
+  const rows = getDb().prepare(`SELECT * FROM study_questions WHERE id IN (${questionIds.map(() => '?').join(',') || "''"}) AND deleted_at IS NULL`).all(...questionIds) as Row[];
+  return rows.map((row) => createStudyFlashcard({ type: 'front_back', front: String(row.prompt), back: String(json<{ text?: string; value?: unknown }>(row.answer_json, {}).text ?? json<{ value?: unknown }>(row.answer_json, {}).value ?? ''), tags: json(row.tags_json, []), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, questionId: String(row.id), sourceExcerpt: String(row.source_excerpt ?? ''), difficulty: String(row.difficulty) as StudyFlashcard['difficulty'] }));
+}
+
+export function reviewStudyFlashcard(input: StudyReviewInput): { card: StudyFlashcard; review: StudyReviewRecord } {
+  const card = listStudyFlashcards({ includeArchived: true }).find((item) => item.id === input.cardId); if (!card) throw new Error('Tarjeta no encontrada.');
+  const reviewedAt = new Date(); const next = scheduleStudySrsReview(card.srs, input.rating, reviewedAt, input.confidence); const key = ids('REV');
+  getDb().transaction(() => {
+    getDb().prepare(`UPDATE study_srs_state SET ease_factor=?,interval_days=?,due_at=?,repetitions=?,lapses=?,last_rating=?,last_reviewed_at=?,confidence=?,mastered=?,updated_at=? WHERE card_id=?`).run(next.easeFactor, next.intervalDays, next.dueAt, next.repetitions, next.lapses, next.lastRating, next.lastReviewedAt, next.confidence, next.mastered ? 1 : 0, reviewedAt.toISOString(), card.id);
+    getDb().prepare(`INSERT INTO study_reviews (id,short_id,card_id,rating,confidence,correct,elapsed_ms,previous_interval_days,next_interval_days,scheduled_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(key.id, key.shortId, card.id, input.rating, input.confidence ?? null, next.correct ? 1 : 0, input.elapsedMs ?? 0, next.previousIntervalDays, next.intervalDays, card.srs.dueAt, reviewedAt.toISOString());
+  })();
+  return { card: listStudyFlashcards({ includeArchived: true }).find((item) => item.id === card.id)!, review: { id: key.id, shortId: key.shortId, cardId: card.id, rating: input.rating, confidence: input.confidence ?? null, correct: next.correct, elapsedMs: input.elapsedMs ?? 0, previousIntervalDays: next.previousIntervalDays, nextIntervalDays: next.intervalDays, createdAt: reviewedAt.toISOString() } };
+}
+
+export function setStudyFlashcardState(id: string, action: 'master' | 'reset' | 'exclude' | 'include' | 'archive' | 'delete'): void {
+  const timestamp = now();
+  if (action === 'archive') getDb().prepare('UPDATE study_flashcards SET archived_at=?,updated_at=? WHERE id=?').run(timestamp, timestamp, id);
+  else if (action === 'delete') getDb().prepare('UPDATE study_flashcards SET deleted_at=?,updated_at=? WHERE id=?').run(timestamp, timestamp, id);
+  else if (action === 'reset') getDb().prepare('UPDATE study_srs_state SET ease_factor=2.5,interval_days=0,due_at=?,repetitions=0,lapses=0,last_rating=NULL,last_reviewed_at=NULL,mastered=0,updated_at=? WHERE card_id=?').run(timestamp, timestamp, id);
+  else getDb().prepare(`UPDATE study_srs_state SET ${action === 'master' ? 'mastered=1' : action === 'exclude' ? 'excluded=1' : 'excluded=0'},updated_at=? WHERE card_id=?`).run(timestamp, id);
+}
+
+function performanceFor(condition: string, id?: string): ReturnType<typeof summarizeStudyPerformance> {
+  const params = id ? [id] : [];
+  const objective = getDb().prepare(`SELECT SUM(CASE WHEN a.is_correct=1 THEN 1 ELSE 0 END) correct,SUM(CASE WHEN a.is_correct=0 THEN 1 ELSE 0 END) incorrect,SUM(CASE WHEN a.is_correct IS NULL THEN 1 ELSE 0 END) omitted FROM study_attempt_answers a JOIN study_questions q ON q.id=a.question_id WHERE ${condition}`).get(...params) as Row;
+  const reviews = getDb().prepare(`SELECT COUNT(*) reviews,SUM(CASE WHEN r.correct=0 THEN 1 ELSE 0 END) lapses FROM study_reviews r JOIN study_flashcards f ON f.id=r.card_id WHERE ${condition.replaceAll('q.', 'f.').replace('1=1', '1=1')}`).get(...params) as Row;
+  const sessions = getDb().prepare(`SELECT COALESCE(SUM(actual_seconds),0) seconds FROM study_study_sessions s WHERE ${condition.replaceAll('q.', 's.')}`).get(...params) as Row;
+  return summarizeStudyPerformance({ correct: Number(objective.correct ?? 0), incorrect: Number(objective.incorrect ?? 0), omitted: Number(objective.omitted ?? 0), reviews: Number(reviews.reviews ?? 0), lapses: Number(reviews.lapses ?? 0), studySeconds: Number(sessions.seconds ?? 0) });
+}
+
+export function getStudyProgressDashboard(): StudyProgressDashboard {
+  const db = getDb(); const overall = performanceFor('1=1');
+  const scopes = (table: 'study_subjects' | 'study_topics', foreign: 'subject_id' | 'topic_id'): StudyProgressScope[] => (db.prepare(`SELECT id,name,updated_at FROM ${table} WHERE deleted_at IS NULL`).all() as Row[]).map((row) => ({ id: String(row.id), name: String(row.name), lastActivityAt: String(row.updated_at), ...performanceFor(`q.${foreign}=?`, String(row.id)) }));
+  const bySubject = scopes('study_subjects', 'subject_id'); const byTopic = scopes('study_topics', 'topic_id');
+  const goals = db.prepare('SELECT COUNT(*) total,SUM(completed) completed FROM study_goals WHERE deleted_at IS NULL').get() as Row;
+  const planned = db.prepare("SELECT COALESCE(SUM(duration_minutes),0) value FROM study_plan_blocks WHERE deleted_at IS NULL AND status!='skipped'").get() as Row;
+  const actual = db.prepare('SELECT COALESCE(SUM(actual_seconds),0) value FROM study_study_sessions').get() as Row;
+  const dueCards = Number((db.prepare('SELECT COUNT(*) value FROM study_srs_state WHERE excluded=0 AND mastered=0 AND due_at<=?').get(now()) as Row).value);
+  const weak = recommendStudyFocus([...byTopic]).filter((item) => item.status !== 'unrated').slice(0, 3);
+  return { overall, bySubject, byTopic, dueCards, completedGoals: Number(goals.completed ?? 0), totalGoals: Number(goals.total ?? 0), plannedMinutes: Number(planned.value), actualMinutes: Math.round(Number(actual.value) / 60), recommendations: weak.length ? weak.map((item) => `Prioriza ${item.name}: dominio estimado ${item.mastery}%.`) : ['Completa un test o una sesión de repaso para obtener recomendaciones basadas en evidencia.'] };
+}
+
+function toPlan(row: Row): StudyPlan { return { id: String(row.id), shortId: String(row.short_id), title: String(row.title), description: String(row.description ?? ''), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, examAt: row.exam_at ? String(row.exam_at) : null, availableMinutes: Number(row.available_minutes), enabled: bool(row.enabled), config: json(row.config_json, {}), archivedAt: row.archived_at ? String(row.archived_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function toBlock(row: Row): StudyPlanBlock { return { id: String(row.id), shortId: String(row.short_id), planId: row.plan_id ? String(row.plan_id) : null, title: String(row.title), type: String(row.block_type), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, startsAt: String(row.starts_at), durationMinutes: Number(row.duration_minutes), status: String(row.status) as StudyPlanBlock['status'], priority: Number(row.priority), notes: String(row.notes ?? ''), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function toEvent(row: Row): StudyCalendarEvent { return { id: String(row.id), shortId: String(row.short_id), title: String(row.title), type: String(row.event_type) as StudyCalendarEvent['type'], icon: String(row.icon ?? 'calendar'), emoji: String(row.emoji ?? ''), description: String(row.description ?? ''), url: String(row.url ?? ''), startsAt: String(row.starts_at), endsAt: row.ends_at ? String(row.ends_at) : null, allDay: bool(row.all_day), courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, notes: String(row.notes ?? ''), reminderMinutes: row.reminder_minutes == null ? null : Number(row.reminder_minutes), reminderAt: row.reminder_at ? String(row.reminder_at) : null, notifiedAt: row.notified_at ? String(row.notified_at) : null, completed: bool(row.completed), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function toGoal(row: Row): StudyGoal { return { id: String(row.id), shortId: String(row.short_id), title: String(row.title), period: String(row.period) as StudyGoal['period'], targetValue: Number(row.target_value), currentValue: Number(row.current_value), unit: String(row.unit), startsAt: String(row.starts_at), endsAt: row.ends_at ? String(row.ends_at) : null, subjectId: row.subject_id ? String(row.subject_id) : null, completed: bool(row.completed), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+function toSession(row: Row): StudyStudySession { return { id: String(row.id), shortId: String(row.short_id), planBlockId: row.plan_block_id ? String(row.plan_block_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null, mode: String(row.mode), plannedMinutes: Number(row.planned_minutes), actualSeconds: Number(row.actual_seconds), interruptions: Number(row.interruptions), startedAt: String(row.started_at), endedAt: row.ended_at ? String(row.ended_at) : null, notes: String(row.notes ?? ''), createdAt: String(row.created_at), updatedAt: String(row.updated_at) }; }
+
+export function getStudyPlanner(): StudyPlannerSnapshot { const db = getDb(); return { plans: (db.prepare('SELECT * FROM study_plans WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY position').all() as Row[]).map(toPlan), blocks: (db.prepare('SELECT * FROM study_plan_blocks WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY starts_at').all() as Row[]).map(toBlock), events: (db.prepare('SELECT * FROM study_calendar_events WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY starts_at').all() as Row[]).map(toEvent), goals: (db.prepare('SELECT * FROM study_goals WHERE deleted_at IS NULL AND archived_at IS NULL ORDER BY starts_at').all() as Row[]).map(toGoal), sessions: (db.prepare('SELECT * FROM study_study_sessions ORDER BY started_at DESC LIMIT 100').all() as Row[]).map(toSession) }; }
+
+export function createStudyPlan(input: { title: string; description?: string; courseId?: string | null; subjectId?: string | null; examAt?: string | null; availableMinutes?: number; config?: Record<string, unknown> }): StudyPlan { const key = ids('PLN'); const timestamp = now(); const position = Number((getDb().prepare('SELECT COALESCE(MAX(position),-1)+1 value FROM study_plans').get() as Row).value); getDb().prepare('INSERT INTO study_plans (id,short_id,title,description,course_id,subject_id,exam_at,available_minutes,config_json,position,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)').run(key.id,key.shortId,normalizeStudyName(input.title),input.description?.trim()??'',input.courseId??null,input.subjectId??null,input.examAt??null,input.availableMinutes??0,JSON.stringify(input.config??{}),position,timestamp,timestamp); return getStudyPlanner().plans.find((item)=>item.id===key.id)!; }
+export function createStudyPlanBlock(input: { planId?: string | null; title: string; type?: string; courseId?: string | null; subjectId?: string | null; topicId?: string | null; startsAt: string; durationMinutes?: number; priority?: number; notes?: string }): StudyPlanBlock { const key=ids('BLK');const timestamp=now();getDb().prepare('INSERT INTO study_plan_blocks (id,short_id,plan_id,title,block_type,course_id,subject_id,topic_id,starts_at,duration_minutes,priority,notes,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(key.id,key.shortId,input.planId??null,normalizeStudyName(input.title),input.type??'study',input.courseId??null,input.subjectId??null,input.topicId??null,input.startsAt,Math.max(1,input.durationMinutes??25),input.priority??0,input.notes?.trim()??'',timestamp,timestamp);return getStudyPlanner().blocks.find((item)=>item.id===key.id)!; }
+function validateCalendarEvent(input: StudyCalendarEventInput): void {
+  if (!input.title.trim()) throw new Error('El evento necesita un título.');
+  if (!Number.isFinite(new Date(input.startsAt).getTime())) throw new Error('La fecha del evento no es válida.');
+  if (input.endsAt && new Date(input.endsAt).getTime() < new Date(input.startsAt).getTime()) throw new Error('La hora de fin no puede ser anterior al inicio.');
+  if (input.reminderAt && !Number.isFinite(new Date(input.reminderAt).getTime())) throw new Error('La fecha del aviso no es válida.');
+  if (input.url && !/^https?:\/\//i.test(input.url.trim())) throw new Error('La URL debe comenzar por http:// o https://.');
+}
+export function createStudyCalendarEvent(input: StudyCalendarEventInput): StudyCalendarEvent { validateCalendarEvent(input); const key=ids('EVT');const timestamp=now();getDb().prepare('INSERT INTO study_calendar_events (id,short_id,title,event_type,icon,emoji,description,url,starts_at,ends_at,all_day,course_id,subject_id,topic_id,notes,reminder_minutes,reminder_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(key.id,key.shortId,normalizeStudyName(input.title),input.type??'session',input.icon?.trim()||'calendar',input.emoji?.trim()??'',input.description?.trim()??'',input.url?.trim()??'',input.startsAt,input.endsAt??null,input.allDay?1:0,input.courseId??null,input.subjectId??null,input.topicId??null,input.notes?.trim()??'',input.reminderMinutes??null,input.reminderAt??null,timestamp,timestamp);return getStudyPlanner().events.find((item)=>item.id===key.id)!; }
+export function updateStudyCalendarEvent(id: string, input: StudyCalendarEventInput): StudyCalendarEvent { validateCalendarEvent(input); const timestamp=now(); const result=getDb().prepare('UPDATE study_calendar_events SET title=?,event_type=?,icon=?,emoji=?,description=?,url=?,starts_at=?,ends_at=?,all_day=?,course_id=?,subject_id=?,topic_id=?,notes=?,reminder_minutes=?,reminder_at=?,notified_at=NULL,updated_at=? WHERE id=? AND deleted_at IS NULL').run(normalizeStudyName(input.title),input.type??'session',input.icon?.trim()||'calendar',input.emoji?.trim()??'',input.description?.trim()??'',input.url?.trim()??'',input.startsAt,input.endsAt??null,input.allDay?1:0,input.courseId??null,input.subjectId??null,input.topicId??null,input.notes?.trim()??'',input.reminderMinutes??null,input.reminderAt??null,timestamp,id);if(!result.changes)throw new Error('Evento no encontrado.');return getStudyPlanner().events.find((item)=>item.id===id)!; }
+export function deleteStudyCalendarEvent(id: string): void { const timestamp=now();getDb().prepare('UPDATE study_calendar_events SET deleted_at=?,updated_at=? WHERE id=?').run(timestamp,timestamp,id); }
+export function createStudyGoal(input: { title: string; period?: StudyGoal['period']; targetValue?: number; unit?: string; startsAt?: string; endsAt?: string | null; subjectId?: string | null }): StudyGoal { const key=ids('GOA');const timestamp=now();getDb().prepare('INSERT INTO study_goals (id,short_id,title,period,target_value,unit,starts_at,ends_at,subject_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(key.id,key.shortId,normalizeStudyName(input.title),input.period??'weekly',Math.max(1,input.targetValue??1),input.unit??'sesiones',input.startsAt??timestamp,input.endsAt??null,input.subjectId??null,timestamp,timestamp);return getStudyPlanner().goals.find((item)=>item.id===key.id)!; }
+export function updateStudyPlannerItem(kind: 'block'|'event'|'goal', id: string, patch: Record<string, unknown>): void { const table=kind==='block'?'study_plan_blocks':kind==='event'?'study_calendar_events':'study_goals'; const allowed=kind==='block'?{status:'status',startsAt:'starts_at',durationMinutes:'duration_minutes',notes:'notes'}:kind==='event'?{completed:'completed',startsAt:'starts_at',notes:'notes'}:{currentValue:'current_value',completed:'completed'}; const entries=Object.entries(patch).filter(([key])=>key in allowed); if(!entries.length)return; const values=entries.map(([,value])=>typeof value==='boolean'?(value?1:0):value);getDb().prepare(`UPDATE ${table} SET ${entries.map(([key])=>`${allowed[key as keyof typeof allowed]}=?`).join(',')},updated_at=? WHERE id=?`).run(...values,now(),id); }
+export function startStudySession(input: { planBlockId?: string | null; subjectId?: string | null; topicId?: string | null; mode?: string; plannedMinutes?: number }): StudyStudySession { const key=ids('SES');const timestamp=now();getDb().prepare('INSERT INTO study_study_sessions (id,short_id,plan_block_id,subject_id,topic_id,mode,planned_minutes,started_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(key.id,key.shortId,input.planBlockId??null,input.subjectId??null,input.topicId??null,input.mode??'focus',input.plannedMinutes??25,timestamp,timestamp,timestamp);return getStudyPlanner().sessions.find((item)=>item.id===key.id)!; }
+export function finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): StudyStudySession { const timestamp=now();getDb().prepare('UPDATE study_study_sessions SET actual_seconds=?,interruptions=?,notes=?,ended_at=?,updated_at=? WHERE id=?').run(Math.max(0,input.actualSeconds),input.interruptions??0,input.notes?.trim()??'',timestamp,timestamp,id);return getStudyPlanner().sessions.find((item)=>item.id===id)!; }
+
+export function renderStudyPlannerIcs(snapshot = getStudyPlanner()): string {
+  const stamp=(value:string)=>new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
+  const escape=(value:string)=>value.replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
+  const entries=[...snapshot.events.map((item)=>({id:item.id,title:item.title,start:item.startsAt,end:item.endsAt,description:item.description||item.notes,url:item.url,reminderAt:item.reminderAt})),...snapshot.blocks.map((item)=>({id:item.id,title:item.title,start:item.startsAt,end:new Date(new Date(item.startsAt).getTime()+item.durationMinutes*60000).toISOString(),description:item.notes,url:'',reminderAt:null}))];
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Nodus//Study Calendar//ES','CALSCALE:GREGORIAN','X-WR-CALNAME:Nodus','X-WR-CALDESC:Calendario de Nodus',...entries.flatMap((item)=>{
+    const alarm=item.reminderAt?[`BEGIN:VALARM`,`TRIGGER;VALUE=DATE-TIME:${stamp(item.reminderAt)}`,'ACTION:DISPLAY',`DESCRIPTION:${escape(item.title)}`,'END:VALARM']:[];
+    return ['BEGIN:VEVENT',`UID:${item.id}@nodus`,`DTSTAMP:${stamp(now())}`,`DTSTART:${stamp(item.start)}`,`DTEND:${stamp(item.end??item.start)}`,`SUMMARY:${escape(item.title)}`,`DESCRIPTION:${escape(item.description)}`,...(item.url?[`URL:${escape(item.url)}`]:[]),...alarm,'END:VEVENT'];
+  }),'END:VCALENDAR'].join('\r\n');
+}
+
+export function renderStudyCalendarEventIcs(id: string): string {
+  const event=getStudyPlanner().events.find((item)=>item.id===id);
+  if(!event)throw new Error('Evento no encontrado.');
+  return renderStudyPlannerIcs({ plans:[], blocks:[], events:[event], goals:[], sessions:[] });
+}

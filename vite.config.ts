@@ -24,6 +24,7 @@ const mainExternals = [
   '@napi-rs/canvas',
   '@anthropic-ai/sdk',
   '@google/genai',
+  '@huggingface/transformers',
   // ws (pulled in by the SDKs above) optionally requires these native addons via
   // try/catch; keep them external so that fallback works instead of the bundler
   // hard-failing to resolve an uninstalled optional dependency.

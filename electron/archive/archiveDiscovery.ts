@@ -17,7 +17,7 @@ import {
 import { getPerson, listEvents, listPersons } from '../db/entitiesRepo';
 import { currentEmbeddingConfig, embeddingTextHash } from '../db/ideasRepo';
 import { embed } from '../ai/aiClient';
-import { archiveEmbeddingText, nameAppearsInText, personProfileText } from '@shared/archiveDiscovery';
+import { archiveEmbeddingText, documentHasGenealogyAnchor, nameAppearsInText, personProfileText } from '@shared/archiveDiscovery';
 import type { DocumentLinkSuggestion, PersonLinkSuggestion } from '@shared/types';
 
 /** Embed one archive item's text for semantic discovery. Returns false when there is
@@ -107,6 +107,8 @@ export async function suggestDocumentsForPerson(personId: string): Promise<Docum
       excludeItemIds: [...matched],
     });
     for (const s of similar) {
+      const candidateText = [s.extractedText, s.description].filter(Boolean).join('\n');
+      if (s.similarity < 0.72 && !documentHasGenealogyAnchor({ name: person.displayName, variants, birthDate: person.birthDate, deathDate: person.deathDate, events, places }, candidateText)) continue;
       out.push({ itemId: s.itemId, title: s.title, docType: s.docType, reason: 'semantic', score: Math.round(s.similarity * 100) / 100, snippet: null });
     }
   }

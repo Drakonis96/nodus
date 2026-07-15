@@ -1,9 +1,18 @@
-import type { EmbeddingPipelineProgress } from '@shared/types';
+import type { EmbeddingPipelineProgress, WorkEmbeddingStatus } from '@shared/types';
 import { getDb } from '../db/database';
-import { clearAllEmbeddings, embeddingTextForIdea, ideaNeedsEmbedding, updateIdeaEmbedding } from '../db/ideasRepo';
+import {
+  clearAllEmbeddings,
+  currentEmbeddingConfig,
+  embeddingTextForIdea,
+  embeddingTextHash,
+  ideaNeedsEmbedding,
+  updateIdeaEmbedding,
+} from '../db/ideasRepo';
 import { allWorkSummaryRows, clearAllWorkSummaryEmbeddings, summaryNeedsEmbedding, updateWorkSummaryEmbedding } from '../db/workSummariesRepo';
 import { embed } from './aiClient';
 import { clearAllPassages } from '../db/passagesRepo';
+import { addNotification } from '../notifications';
+import { getSettings } from '../db/settingsRepo';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
 
@@ -260,6 +269,15 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
   } finally {
     state.running = false;
     emit();
+    if (!state.stopRequested && state.totalIdeas > 0) {
+      const english = getSettings().uiLanguage === 'en';
+      addNotification({
+        title: state.error ? (english ? 'Semantic indexing needs attention' : 'La indexación semántica necesita atención') : (english ? 'Idea embeddings completed' : 'Embeddings de ideas completados'),
+        body: state.error ? state.error : (english ? `${state.ideasEmbedded} ideas indexed across ${state.works.length} work(s).` : `${state.ideasEmbedded} ideas indexadas en ${state.works.length} obra(s).`),
+        kind: state.error ? 'warning' : 'success',
+        dedupeKey: `idea-embeddings:${state.error ? 'error' : 'complete'}`,
+      });
+    }
   }
 }
 
@@ -294,8 +312,9 @@ async function reembedAllSummaries(): Promise<void> {
 /** Get per-work embedding status for the library table. */
 export function getWorkEmbeddingStatuses(
   nodusIds?: string[]
-): { nodus_id: string; totalIdeas: number; embeddedIdeas: number; complete: boolean }[] {
+): WorkEmbeddingStatus[] {
   const db = getDb();
+  const config = currentEmbeddingConfig();
 
   let rows: {
     nodus_id: string;
@@ -303,7 +322,7 @@ export function getWorkEmbeddingStatuses(
     type: string;
     label: string;
     statement: string;
-    embedding: Buffer | null;
+    embedding_bytes: number | null;
     embedding_provider: string | null;
     embedding_model: string | null;
     embedding_dim: number | null;
@@ -320,7 +339,7 @@ export function getWorkEmbeddingStatuses(
                 i.type,
                 i.label,
                 i.statement,
-                i.embedding,
+                length(i.embedding) AS embedding_bytes,
                 i.embedding_provider,
                 i.embedding_model,
                 i.embedding_dim,
@@ -345,7 +364,7 @@ export function getWorkEmbeddingStatuses(
                 i.type,
                 i.label,
                 i.statement,
-                i.embedding,
+                length(i.embedding) AS embedding_bytes,
                 i.embedding_provider,
                 i.embedding_model,
                 i.embedding_dim,
@@ -369,7 +388,13 @@ export function getWorkEmbeddingStatuses(
     entry.total.add(row.global_id);
     const themes = row.theme_labels ? row.theme_labels.split(',').filter(Boolean) : [];
     const text = embeddingTextForIdea({ type: row.type, label: row.label, statement: row.statement, themes });
-    if (!ideaNeedsEmbedding(row, text)) entry.embedded.add(row.global_id);
+    const hasCurrentEmbedding =
+      Number(row.embedding_bytes ?? 0) > 0 &&
+      row.embedding_provider === config.provider &&
+      row.embedding_model === config.model &&
+      row.embedding_dim === Number(row.embedding_bytes) / 4 &&
+      row.embedding_text_hash === embeddingTextHash(text);
+    if (hasCurrentEmbedding) entry.embedded.add(row.global_id);
   }
 
   return [...byWork.entries()].map(([nodus_id, value]) => ({

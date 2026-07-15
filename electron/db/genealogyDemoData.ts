@@ -551,6 +551,33 @@ export function seedGenealogyDemoData(): boolean {
       insSocialRel.run(r.id, r.from, targetKind, r.targetId, loc(r.role), loc(r.notes) || null, now, now);
     }
 
+    // Populate the universal Library, Notes, Search and Deep Research surfaces too.
+    db.prepare(`INSERT INTO works
+      (nodus_id,zotero_key,title,authors_json,year,item_type,read_tag,manual_deep,source_type,light_status,light_at,deep_status,deep_at,summary_status,archived)
+      VALUES (?,?,?,?,?,'book',1,1,'abstract_only','done',?,'done',?,'none',0)`)
+      .run('demo-genealogy-work-methods', 'demo-genealogy-methods', loc({ es: 'Guía práctica para investigar archivos familiares', en: 'A practical guide to family archive research' }), JSON.stringify(['Archivo Histórico Provincial']), 2024, now, now);
+    db.prepare('INSERT INTO note_folders (id,parent_id,name,order_idx,created_at,updated_at,summary) VALUES (?,?,?,?,?,?,?)')
+      .run('demo-genealogy-note-folder', null, loc({ es: 'Cuaderno de investigación familiar', en: 'Family research notebook' }), 0, now, now, loc({ es: 'Hipótesis, pendientes y síntesis de la familia Serrano–Vidal.', en: 'Hypotheses, open tasks, and summaries for the Serrano–Vidal family.' }));
+    db.prepare('INSERT INTO notes (id,folder_id,title,kind,content,source_json,order_idx,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('demo-genealogy-note-next-steps', 'demo-genealogy-note-folder', loc({ es: 'Próximos pasos de archivo', en: 'Next archive steps' }), 'markdown', loc({
+        es: '# Próximos pasos\n\n- Confirmar el parentesco propuesto entre Dolores y Lucía.\n- Buscar el expediente militar de Vicente Serrano Vidal.\n- Contrastar el padrón de 1900 con los libros parroquiales.',
+        en: '# Next steps\n\n- Confirm the proposed kinship between Dolores and Lucía.\n- Find Vicente Serrano Vidal’s military record.\n- Compare the 1900 census with parish registers.',
+      }), JSON.stringify({ origin: 'genealogy', ref: 'demo-p5' }), 0, now, now);
+    const deepBrief = { kind: 'deep_research', objective: loc({ es: 'Reconstruir la movilidad de la familia Serrano–Vidal entre Carmona y Sevilla.', en: 'Reconstruct the Serrano–Vidal family’s mobility between Carmona and Seville.' }), tone: 'exploratory', language: getSettings().uiLanguage === 'es' ? 'es' : 'en' };
+    const deepSelection = { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: ['demo-genealogy-work-methods'], passageIds: [], tutorRouteIds: [] };
+    const deepDraft = {
+      generatedAt: now, brief: deepBrief, selection: deepSelection,
+      title: loc({ es: 'De Carmona a Sevilla: itinerario de una familia', en: 'From Carmona to Seville: a family itinerary' }),
+      abstract: loc({ es: 'Informe de ejemplo que combina cronología, lugares y documentos del archivo del vault.', en: 'A sample report combining the vault archive’s timeline, places, and documents.' }),
+      outline: [{ id: 'demo-genealogy-deep-section', title: loc({ es: 'Evidencias disponibles', en: 'Available evidence' }), purpose: loc({ es: 'Ordenar padrones, partidas y movimientos.', en: 'Organize censuses, certificates, and movements.' }), keyClaims: [], sources: ['demo-ait3'] }],
+      draftMarkdown: loc({ es: '## Síntesis\n\nEl padrón de 1900 sitúa a la familia en Carmona. La cronología registra el traslado de Rafael a Sevilla en 1912 y permite formular nuevas búsquedas documentales.\n\n## Qué investigar después\n\nConviene localizar registros de residencia entre 1912 y 1919.', en: '## Synthesis\n\nThe 1900 census places the family in Carmona. The timeline records Rafael’s move to Seville in 1912 and suggests new documentary searches.\n\n## What to investigate next\n\nResidence records between 1912 and 1919 should be located.' }),
+      matrix: [], bibliography: [loc({ es: 'Padrón municipal de Carmona, 1900.', en: 'Carmona municipal census, 1900.' })],
+      nextSteps: [loc({ es: 'Consultar padrones de Sevilla.', en: 'Consult Seville census records.' })], limitations: [loc({ es: 'Demostración basada en un corpus local reducido.', en: 'Demo based on a small local corpus.' })],
+      stats: { selectedIdeas: 0, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: 1, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: 640, truncated: false },
+    };
+    db.prepare('INSERT INTO writing_saved_drafts (id,title,brief_json,selection_json,model_json,draft_json,created_at,updated_at) VALUES (?,?,?,?,NULL,?,?,?)')
+      .run('demo-genealogy-deep-research', deepDraft.title, JSON.stringify(deepBrief), JSON.stringify(deepSelection), JSON.stringify(deepDraft), now, now);
+
     updateSettings({ demoMode: true, genealogyTourComplete: false });
   });
   tx();
@@ -576,6 +603,10 @@ export function clearGenealogyDemoData(): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`
+      DELETE FROM writing_saved_drafts WHERE id LIKE 'demo-genealogy-%';
+      DELETE FROM notes WHERE id LIKE 'demo-genealogy-%';
+      DELETE FROM note_folders WHERE id LIKE 'demo-genealogy-%';
+      DELETE FROM works WHERE nodus_id LIKE 'demo-genealogy-%';
       DELETE FROM social_relations WHERE relation_id LIKE 'demo-%';
       DELETE FROM social_contacts WHERE contact_id LIKE 'demo-%';
       DELETE FROM kinship_suggestion_evidence WHERE suggestion_id LIKE 'demo-%';

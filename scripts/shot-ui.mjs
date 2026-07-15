@@ -55,7 +55,7 @@ try {
   // Backup schedule editor (enable auto-backup so the schedule shows).
   await nav('Ajustes');
   await page.waitForTimeout(400);
-  await page.getByRole('button', { name: 'Datos', exact: true }).first().click({ timeout: 8000 });
+  await page.getByRole('button', { name: 'Backup / copia de seguridad', exact: true }).first().click({ timeout: 8000 });
   await page.waitForTimeout(500);
   // Enable automatic backups in-UI so the schedule editor renders.
   await page.locator('input[type=checkbox]').last().check({ timeout: 8000 }).catch(() => {});

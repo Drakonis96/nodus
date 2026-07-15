@@ -15,6 +15,11 @@ import type {
   EdgeTrace,
   ModelRef,
   EmbeddingProvider,
+  GraphEdge,
+  IdeaConnection,
+  IdeaListItem,
+  IdeaPage,
+  IdeaPageRequest,
 } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, normalizeEmbeddingModel } from '@shared/providers';
 import { getWorksByIds } from './worksRepo';
@@ -264,6 +269,43 @@ export function ideasWithEmbeddings(): { global_id: string; type: IdeaType; labe
     embedding: Buffer;
   }[];
   return rows.map((r) => ({ ...r, embedding: decodeEmbedding(r.embedding) }));
+}
+
+export interface IdeaVectorRecord {
+  global_id: string;
+  type: IdeaType;
+  label: string;
+  statement: string;
+  vector: Float32Array;
+}
+
+/** Current idea vectors as compact Float32Array views for transfer to the compute worker. */
+export function ideaVectorsForCompute(): IdeaVectorRecord[] {
+  const config = currentEmbeddingConfig();
+  const rows = getDb()
+    .prepare(
+      `SELECT global_id, type, label, statement, embedding
+         FROM ideas
+        WHERE embedding IS NOT NULL
+          AND embedding_provider = ?
+          AND embedding_model = ?
+          AND embedding_dim IS NOT NULL
+          AND orphaned_at IS NULL`
+    )
+    .all(config.provider, config.model) as Array<{
+      global_id: string;
+      type: IdeaType;
+      label: string;
+      statement: string;
+      embedding: Buffer;
+    }>;
+  return rows.map((row) => ({
+    global_id: row.global_id,
+    type: row.type,
+    label: row.label,
+    statement: row.statement,
+    vector: new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4),
+  }));
 }
 
 export function allIdeaCandidates(options: { includeDormant?: boolean } = {}): { global_id: string; type: IdeaType; label: string; statement: string }[] {
@@ -663,6 +705,145 @@ export function getIdeaDetail(globalId: string): IdeaDetail | null {
     .filter((x): x is NonNullable<typeof x> => x !== null);
   const evidence = db.prepare('SELECT * FROM evidence WHERE global_id = ?').all(globalId) as Evidence[];
   return { idea, occurrences, evidence };
+}
+
+export function listIdeasPage(request: IdeaPageRequest): IdeaPage {
+  const db = getDb();
+  const limit = Math.min(200, Math.max(1, Math.trunc(request.limit)));
+  const offset = Math.max(0, Math.trunc(request.offset));
+  const clauses = [
+    `EXISTS (
+      SELECT 1 FROM idea_occurrences active_io
+      JOIN works active_w ON active_w.nodus_id = active_io.nodus_id
+      WHERE active_io.global_id = i.global_id
+        AND active_w.archived = 0
+        AND active_w.deep_status = 'done'
+    )`,
+  ];
+  const params: Record<string, unknown> = { limit, offset };
+  if (request.type) {
+    clauses.push('i.type = @type');
+    params.type = request.type;
+  }
+  const search = request.search?.trim().toLowerCase();
+  if (search) {
+    clauses.push('(LOWER(i.label) LIKE @search OR LOWER(i.statement) LIKE @search)');
+    params.search = `%${search}%`;
+  }
+  const where = `WHERE ${clauses.join(' AND ')}`;
+  const total = Number((db.prepare(`SELECT COUNT(*) AS n FROM ideas i ${where}`).get(params) as { n: number }).n);
+  const order = {
+    label: 'i.label COLLATE NOCASE ASC',
+    type: 'i.type ASC, i.label COLLATE NOCASE ASC',
+    works: 'work_count DESC, i.label COLLATE NOCASE ASC',
+    connections: 'connection_count DESC, i.label COLLATE NOCASE ASC',
+    confidence: 'max_confidence DESC, i.label COLLATE NOCASE ASC',
+  }[request.sort];
+  const rows = db
+    .prepare(
+      `SELECT i.global_id AS id, i.label, i.type, i.statement,
+              (SELECT COUNT(DISTINCT io.nodus_id)
+                 FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
+                WHERE io.global_id = i.global_id AND w.archived = 0 AND w.deep_status = 'done') AS work_count,
+              (SELECT MAX(io.confidence) FROM idea_occurrences io WHERE io.global_id = i.global_id) AS max_confidence,
+              (SELECT COUNT(*) FROM visible_edges e
+                WHERE e.type != 'contains' AND (e.from_id = i.global_id OR e.to_id = i.global_id)) AS connection_count
+         FROM ideas i
+         ${where}
+        ORDER BY ${order}
+        LIMIT @limit OFFSET @offset`
+    )
+    .all(params) as Array<{
+      id: string;
+      label: string;
+      type: IdeaType;
+      statement: string;
+      work_count: number;
+      max_confidence: number | null;
+      connection_count: number;
+    }>;
+  const ids = rows.map((row) => row.id);
+  const themes = new Map<string, string[]>();
+  if (ids.length > 0) {
+    const placeholders = ids.map(() => '?').join(',');
+    const themeRows = db
+      .prepare(
+        `SELECT DISTINCT l.global_id, t.label
+           FROM idea_theme_links l JOIN themes t ON t.theme_id = l.theme_id
+          WHERE l.global_id IN (${placeholders})
+          ORDER BY t.label COLLATE NOCASE`
+      )
+      .all(...ids) as Array<{ global_id: string; label: string }>;
+    for (const row of themeRows) {
+      const labels = themes.get(row.global_id) ?? [];
+      labels.push(row.label);
+      themes.set(row.global_id, labels);
+    }
+  }
+  const items: IdeaListItem[] = rows.map((row) => ({
+    id: row.id,
+    label: row.label,
+    type: row.type,
+    statement: row.statement,
+    workCount: Number(row.work_count),
+    themes: themes.get(row.id) ?? [],
+    maxConfidence: Number(row.max_confidence ?? 0),
+    connectionCount: Number(row.connection_count),
+  }));
+  return { items, total, offset, limit };
+}
+
+export function listIdeaConnections(globalId: string): IdeaConnection[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT e.id, e.from_id, e.to_id, e.type AS edge_type, e.basis, e.confidence,
+              other.global_id AS other_id, other.label, other.type AS idea_type, other.statement,
+              (SELECT COUNT(DISTINCT io.nodus_id) FROM idea_occurrences io JOIN works w ON w.nodus_id = io.nodus_id
+                WHERE io.global_id = other.global_id AND w.archived = 0 AND w.deep_status = 'done') AS work_count,
+              (SELECT MAX(io.confidence) FROM idea_occurrences io WHERE io.global_id = other.global_id) AS max_confidence,
+              (SELECT COUNT(*) FROM visible_edges linked
+                WHERE linked.type != 'contains' AND (linked.from_id = other.global_id OR linked.to_id = other.global_id)) AS connection_count
+         FROM visible_edges e
+         JOIN ideas other ON other.global_id = CASE WHEN e.from_id = @id THEN e.to_id ELSE e.from_id END
+        WHERE e.type != 'contains' AND (e.from_id = @id OR e.to_id = @id)
+        ORDER BY e.confidence DESC, other.label COLLATE NOCASE`
+    )
+    .all({ id: globalId }) as Array<{
+      id: string;
+      from_id: string;
+      to_id: string;
+      edge_type: string;
+      basis: EdgeBasis;
+      confidence: number;
+      other_id: string;
+      label: string;
+      idea_type: IdeaType;
+      statement: string;
+      work_count: number;
+      max_confidence: number | null;
+      connection_count: number;
+    }>;
+  return rows.map((row) => ({
+    edge: {
+      id: row.id,
+      source: row.from_id,
+      target: row.to_id,
+      type: row.edge_type,
+      basis: row.basis,
+      confidence: row.confidence,
+    } satisfies GraphEdge,
+    node: {
+      id: row.other_id,
+      label: row.label,
+      type: row.idea_type,
+      statement: row.statement,
+      workCount: Number(row.work_count),
+      themes: [],
+      maxConfidence: Number(row.max_confidence ?? 0),
+      connectionCount: Number(row.connection_count),
+    },
+  }));
 }
 
 /**

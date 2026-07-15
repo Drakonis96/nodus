@@ -11,12 +11,14 @@ import { Worker } from 'node:worker_threads';
 import { yieldToEventLoop } from '../util/async';
 import {
   topMatchesPerCentroidChunked,
+  topApproximateNeighborsChunked,
   type CentroidMatch,
   type LabeledVector,
+  type NeighborMatch,
 } from './similarityCore';
 
 interface Pending {
-  resolve: (matches: CentroidMatch[]) => void;
+  resolve: (matches: Array<CentroidMatch | NeighborMatch>) => void;
   reject: (err: Error) => void;
 }
 
@@ -25,7 +27,7 @@ let workerBroken = false;
 let nextRequestId = 1;
 const pending = new Map<number, Pending>();
 
-const REQUEST_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 120_000;
 
 function workerFile(): string {
   // Bundled next to main.js by the vite worker entry; __dirname comes from the
@@ -53,7 +55,7 @@ function getWorker(): Worker | null {
   try {
     worker = new Worker(file);
     worker.unref(); // never keep the app alive just for the compute thread
-    worker.on('message', (res: { id: number; ok: boolean; matches?: CentroidMatch[]; error?: string }) => {
+    worker.on('message', (res: { id: number; ok: boolean; matches?: Array<CentroidMatch | NeighborMatch>; error?: string }) => {
       const p = pending.get(res.id);
       if (!p) return;
       pending.delete(res.id);
@@ -121,7 +123,7 @@ export async function computeThemeMatches(
       pending.set(id, {
         resolve: (m) => {
           clearTimeout(timer);
-          resolve(m);
+          resolve(m as CentroidMatch[]);
         },
         reject: (e) => {
           clearTimeout(timer);
@@ -136,6 +138,70 @@ export async function computeThemeMatches(
   } catch {
     // Worker failed mid-flight: recompute inline so the caller never sees it.
     return runInline(centroids, candidates, threshold, maxPerCentroid);
+  }
+}
+
+/** Find a bounded approximate top-k off the main thread, with exact cosine scores for returned pairs. */
+export async function computeNearestNeighbors(
+  queries: LabeledVector[],
+  candidates: LabeledVector[],
+  threshold: number,
+  maxPerQuery: number
+): Promise<NeighborMatch[]> {
+  const w = getWorker();
+  if (!w) {
+    return topApproximateNeighborsChunked(
+      queries,
+      candidates,
+      threshold,
+      maxPerQuery,
+      yieldToEventLoop
+    );
+  }
+  const id = nextRequestId++;
+  const wire = (list: LabeledVector[]) =>
+    list.map((value) => {
+      const copy = new Float32Array(value.vector);
+      return { id: value.id, buffer: copy.buffer };
+    });
+  const queryWire = wire(queries);
+  const candidateWire = wire(candidates);
+  try {
+    return await new Promise<NeighborMatch[]>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error('nearest-neighbor worker timed out'));
+      }, REQUEST_TIMEOUT_MS);
+      pending.set(id, {
+        resolve: (matches) => {
+          clearTimeout(timer);
+          resolve(matches as NeighborMatch[]);
+        },
+        reject: (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      });
+      w.postMessage(
+        {
+          id,
+          kind: 'nearestNeighbors',
+          centroids: queryWire,
+          candidates: candidateWire,
+          threshold,
+          maxPerCentroid: maxPerQuery,
+        },
+        [...queryWire, ...candidateWire].map((value) => value.buffer)
+      );
+    });
+  } catch {
+    return topApproximateNeighborsChunked(
+      queries,
+      candidates,
+      threshold,
+      maxPerQuery,
+      yieldToEventLoop
+    );
   }
 }
 

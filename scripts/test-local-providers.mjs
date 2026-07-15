@@ -70,6 +70,11 @@ try {
        } };
      }\n`
   );
+  const nodusLocalAiStubPath = path.join(tmp, 'nodusLocalAi-stub.mjs');
+  await writeFile(
+    nodusLocalAiStubPath,
+    'export async function listNodusLocalChatModels() { return []; }\nexport async function listNodusLocalEmbeddingModels() { return []; }\n'
+  );
 
   const outfile = path.join(tmp, 'providers.mjs');
   await build({
@@ -84,11 +89,12 @@ try {
         name: 'stub-settings',
         setup(b) {
           b.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: stubPath }));
+          b.onResolve({ filter: /nodusLocalAi$/ }, () => ({ path: nodusLocalAiStubPath }));
         },
       },
     ],
   });
-  const { listModels, listEmbeddingModels, testLocalProvider, isLocalProvider, openAiCompatBase } = await import(
+  const { AI_PROVIDERS, listModels, listEmbeddingModels, testLocalProvider, isLocalProvider, openAiCompatBase, supportsJsonMode } = await import(
     pathToFileURL(outfile).href
   );
 
@@ -96,8 +102,49 @@ try {
   assert.equal(isLocalProvider('ollama'), true, 'ollama is local');
   assert.equal(isLocalProvider('lmstudio'), true, 'lmstudio is local');
   assert.equal(isLocalProvider('openai'), false, 'openai is not local');
+  assert.ok(AI_PROVIDERS.includes('groq'), 'Groq is exposed in provider selectors');
+  assert.ok(AI_PROVIDERS.includes('cerebras'), 'Cerebras is exposed in provider selectors');
   assert.equal(openAiCompatBase('ollama'), `${ollamaBase}/v1`, 'ollama inference base is {url}/v1');
   assert.equal(openAiCompatBase('lmstudio'), `${lmstudioBase}/v1`, 'lmstudio inference base is {url}/v1');
+  assert.equal(openAiCompatBase('groq'), 'https://api.groq.com/openai/v1', 'Groq uses its documented OpenAI-compatible base');
+  assert.equal(openAiCompatBase('cerebras'), 'https://api.cerebras.ai/v1', 'Cerebras uses its documented OpenAI-compatible base');
+  assert.equal(supportsJsonMode('groq'), true, 'Groq JSON mode enabled');
+  assert.equal(supportsJsonMode('cerebras'), true, 'Cerebras JSON mode enabled');
+
+  // ── Cloud model discovery: authenticated /v1/models contracts ─────────────
+  const nativeFetch = globalThis.fetch;
+  const cloudCalls = [];
+  try {
+    globalThis.fetch = async (url, options = {}) => {
+      cloudCalls.push({ url: String(url), authorization: options.headers?.Authorization });
+      if (String(url).includes('groq.com')) {
+        return new Response(JSON.stringify({ data: [
+          { id: 'whisper-large-v3', context_window: 448 },
+          { id: 'llama-3.3-70b-versatile', context_window: 131072 },
+          { id: 'playai-tts', context_window: 4000 },
+          { id: 'openai/gpt-oss-120b', context_window: 131072, supported_parameters: ['reasoning'] },
+        ] }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({ data: [
+        { id: 'zai-glm-4.7', owned_by: 'Cerebras' },
+        { id: 'gpt-oss-120b', owned_by: 'Cerebras' },
+      ] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+
+    const groqModels = await listModels('groq', 'gsk-test');
+    assert.deepEqual(groqModels.map((m) => m.id), ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'], 'Groq filters audio-only models');
+    assert.equal(groqModels[0].contextLength, 131072, 'Groq context metadata is retained');
+    assert.equal(groqModels[1].reasoning, true, 'Groq reasoning metadata is retained');
+
+    const cerebrasModels = await listModels('cerebras', 'csk-test');
+    assert.deepEqual(cerebrasModels.map((m) => m.id), ['gpt-oss-120b', 'zai-glm-4.7'], 'Cerebras models are listed alphabetically');
+    assert.deepEqual(cloudCalls, [
+      { url: 'https://api.groq.com/openai/v1/models', authorization: 'Bearer gsk-test' },
+      { url: 'https://api.cerebras.ai/v1/models', authorization: 'Bearer csk-test' },
+    ], 'cloud model endpoints receive the stored bearer key');
+  } finally {
+    globalThis.fetch = nativeFetch;
+  }
 
   // ── Ollama: /api/tags → ModelInfo with metadata, alphabetical ───────────────
   const ollamaModels = await listModels('ollama', null);
@@ -156,14 +203,17 @@ try {
     format: 'esm',
     platform: 'node',
     logLevel: 'silent',
-    plugins: [{ name: 'stub', setup(b) { b.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: deadStub })); } }],
+    plugins: [{ name: 'stub', setup(b) {
+      b.onResolve({ filter: /db\/settingsRepo$/ }, () => ({ path: deadStub }));
+      b.onResolve({ filter: /nodusLocalAi$/ }, () => ({ path: nodusLocalAiStubPath }));
+    } }],
   });
   const dead = await import(pathToFileURL(deadOut).href);
   const deadTest = await dead.testLocalProvider('ollama', null);
   assert.equal(deadTest.ok, false, 'unreachable ollama returns ok:false');
   assert.ok(deadTest.message, 'unreachable ollama returns a message');
 
-  console.log('local providers (ollama + lm studio) contract test passed');
+  console.log('provider contracts (Groq, Cerebras, Ollama + LM Studio) test passed');
 } finally {
   ollama.close();
   lmstudio.close();

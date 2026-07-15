@@ -16,6 +16,8 @@ import { anthropicVisionContent, openAiVisionContent, type VisionImagePart } fro
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { jsonrepair } from 'jsonrepair';
 import { startPerf, type PerfContext } from '../perf';
+import { embedWithNodusLocal, ensureNodusLocalServer } from './nodusLocalAi';
+import { getNodusLocalModel } from '@shared/localAiModels';
 
 export class AiError extends Error {
   /**
@@ -34,7 +36,7 @@ export class AiError extends Error {
 function resolveProviderKey(provider: AiProvider): string | null {
   const stored = getApiKey(provider);
   if (stored) return stored;
-  return isLocalProvider(provider) ? 'local' : null;
+  return isLocalProvider(provider) || provider === 'nodus' ? 'local' : null;
 }
 
 // ── Local model context budgeting ────────────────────────────────────────────
@@ -84,6 +86,17 @@ function genericContextOverflowMessage(): string {
 async function localMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): Promise<number> {
   const ctx = await localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
   if (!ctx) return requestedMax;
+  const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
+  const reserve = Math.max(256, Math.round(ctx * 0.05));
+  const available = ctx - promptTokens - reserve;
+  if (available < MIN_LOCAL_GENERATION_TOKENS) {
+    throw new AiError(contextOverflowMessage(model.provider, model.model, ctx, promptTokens), false, true);
+  }
+  return Math.min(requestedMax, available);
+}
+
+function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: number): number {
+  const ctx = getNodusLocalModel(model.model)?.contextLength ?? 8192;
   const promptTokens = estimateTokens(opts.system) + estimateTokens(opts.user) + 16;
   const reserve = Math.max(256, Math.round(ctx * 0.05));
   const available = ctx - promptTokens - reserve;
@@ -200,6 +213,7 @@ export function resolveModelRef(override?: ModelRef | null): ModelRef {
  * model can actually hold instead of overflowing.
  */
 export async function localModelContextWindow(model: ModelRef): Promise<number | null> {
+  if (model.provider === 'nodus') return getNodusLocalModel(model.model)?.contextLength ?? null;
   if (!isLocalProvider(model.provider)) return null;
   return localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
 }
@@ -219,6 +233,15 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
 
 function openAiClientHeaders(model: ModelRef): Record<string, string> | undefined {
   return model.provider === 'openrouter' ? OPENROUTER_HEADERS : undefined;
+}
+
+/** Cerebras documents the current Chat Completions token cap as
+ * `max_completion_tokens`; the other compatible providers used here accept the
+ * legacy OpenAI `max_tokens` field. Keep the difference at the transport seam. */
+function completionTokensBody(model: ModelRef, maxTokens: number): Record<string, number> {
+  return model.provider === 'cerebras'
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
 }
 
 /** True for a provider 400 (bad request) — used to retry without the optional params. */
@@ -260,11 +283,15 @@ async function rawComplete(
   }
 
   // OpenAI-compatible providers: openai, openrouter, deepseek, gemini, local servers.
-  const baseURL = openAiCompatBase(model.provider);
+  const baseURL = model.provider === 'nodus'
+    ? await ensureNodusLocalServer(model.model, 'chat')
+    : openAiCompatBase(model.provider);
   // Local models load a small, fixed context window; size the request to it (and bail
   // early with an actionable error) instead of overflowing with a cryptic llama.cpp error.
   const requestedMax = opts.maxTokens ?? 8000;
-  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+  const maxTokens = model.provider === 'nodus'
+    ? nodusLocalMaxTokens(model, opts, requestedMax)
+    : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -276,7 +303,7 @@ async function rawComplete(
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: maxTokens,
+    ...completionTokensBody(model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
@@ -535,10 +562,14 @@ async function rawCompleteStream(
     return full;
   }
 
-  const baseURL = openAiCompatBase(model.provider);
+  const baseURL = model.provider === 'nodus'
+    ? await ensureNodusLocalServer(model.model, 'chat')
+    : openAiCompatBase(model.provider);
   // See rawComplete: fit the request to a local model's real context window.
   const requestedMax = opts.maxTokens ?? 8000;
-  const maxTokens = isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
+  const maxTokens = model.provider === 'nodus'
+    ? nodusLocalMaxTokens(model, opts, requestedMax)
+    : isLocalProvider(model.provider) ? await localMaxTokens(model, opts, requestedMax) : requestedMax;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({
     apiKey: key,
@@ -550,11 +581,11 @@ async function rawCompleteStream(
   const baseBody = {
     model: model.model,
     temperature: opts.temperature ?? 0.15,
-    max_tokens: maxTokens,
+    ...completionTokensBody(model, maxTokens),
     stream: true as const,
     messages: [
       { role: 'system' as const, content: opts.system },
-      { role: 'user' as const, content: opts.user },
+      { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
   };
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
@@ -604,6 +635,7 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
 }
 
 async function requestEmbeddings(provider: EmbeddingProvider, key: string, modelId: string, input: string | string[]): Promise<number[][]> {
+  if (provider === 'nodus') return embedWithNodusLocal(modelId, input);
   const baseURL = openAiCompatBase(provider) ?? undefined;
   const OpenAI = (await import('openai')).default;
   const client = new OpenAI({

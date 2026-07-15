@@ -1,6 +1,6 @@
 import { getDb } from './database';
 import { v4 as uuid } from 'uuid';
-import type { EdgeBasis, EdgeType, Evidence, Gap, GapAggregate, GapDetail, GapKind, Idea } from '@shared/types';
+import type { EdgeBasis, EdgeType, Evidence, Gap, GapAggregate, GapDetail, GapKind, GapPage, Idea } from '@shared/types';
 
 export function addGap(
   nodusId: string,
@@ -58,6 +58,25 @@ export function aggregateGaps(): GapAggregate[] {
     }
   }
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
+export function aggregateGapsPage(offset: number, limit: number): GapPage {
+  const all = aggregateGaps();
+  const safeOffset = Math.max(0, Math.trunc(offset));
+  const safeLimit = Math.min(100, Math.max(1, Math.trunc(limit)));
+  return {
+    items: all.slice(safeOffset, safeOffset + safeLimit),
+    total: all.length,
+    offset: safeOffset,
+    limit: safeLimit,
+  };
+}
+
+export function contradictionCount(): number {
+  const row = getDb()
+    .prepare("SELECT COUNT(*) AS n FROM visible_edges WHERE type IN ('contradicts', 'refutes')")
+    .get() as { n: number };
+  return Number(row.n);
 }
 
 export function getGapDetail(gapId: string): GapDetail | null {

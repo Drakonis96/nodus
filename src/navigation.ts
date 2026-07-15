@@ -1,6 +1,6 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'study' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -56,8 +56,19 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'dbSearch', label: 'Buscar', icon: 'search', group: 'explore' },
   { id: 'dbAnalysis', label: 'Análisis', icon: 'chartBar', group: 'analyze' },
   { id: 'dbChat', label: 'Chat de datos', icon: 'chat', group: 'analyze' },
+  // Study mode — scoped to the 'estudio' vault type.
+  { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
+  { id: 'studySchedule', label: 'Horarios', icon: 'clock', group: 'explore' },
+  { id: 'studyCalendar', label: 'Calendario', icon: 'calendar', group: 'explore' },
+  { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
+  { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
+  { id: 'studyRecordings', label: 'Grabaciones', icon: 'microphone', group: 'explore' },
+  { id: 'studyChat', label: 'Chat de estudio', icon: 'chat', group: 'analyze' },
+  { id: 'studyIdeas', label: 'Ideas de estudio', icon: 'bulb', group: 'analyze' },
+  { id: 'studyGraph', label: 'Grafo de estudio', icon: 'layers', group: 'analyze' },
+  { id: 'studyQuestions', label: 'Banco de preguntas', icon: 'help', group: 'analyze' },
+  { id: 'studyReview', label: 'Revisión', icon: 'flashcards', group: 'analyze' },
   // Analizar — superficies derivadas del grafo y síntesis.
-  { id: 'study', label: 'Estudio', icon: 'compass', group: 'analyze' },
   { id: 'immersion', label: 'Inmersión', icon: 'target', group: 'analyze' },
   { id: 'gaps', label: 'Huecos', icon: 'gap', group: 'analyze' },
   { id: 'debate', label: 'Debates', icon: 'scale', group: 'analyze' },

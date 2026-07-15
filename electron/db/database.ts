@@ -31,7 +31,21 @@ function vecCosine(a: Buffer | null, b: Buffer | null): number {
 function openDatabase(file: string): Database.Database {
   const next = new Database(file);
   runMigrations(next);
+  next.pragma('busy_timeout = 5000');
+  next.pragma('synchronous = NORMAL');
+  next.pragma('temp_store = MEMORY');
+  next.pragma('cache_size = -32768');
+  next.pragma('mmap_size = 268435456');
+  next.pragma('wal_autocheckpoint = 1000');
   next.function('vec_cosine', vecCosine);
+  const optimizeTimer = setTimeout(() => {
+    try {
+      if (next.open) next.pragma('optimize');
+    } catch {
+      // The vault may have been switched/closed before the idle maintenance ran.
+    }
+  }, 2_000);
+  optimizeTimer.unref();
   return next;
 }
 

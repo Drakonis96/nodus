@@ -13,6 +13,7 @@ import type {
   VaultType,
   ZoteroTag,
   CollectionFacet,
+  WorkSortKey,
 } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -29,15 +30,17 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
+import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 const LIBRARY_ROW_HEIGHT = 64;
+const LIBRARY_PAGE_SIZE = 200;
 const LIBRARY_GRID_TEMPLATE =
   '2rem minmax(18rem,2fr) minmax(9rem,1fr) 4.5rem minmax(8rem,1fr) 4.5rem 5.25rem 6.25rem 5.75rem 5.75rem 5.75rem 14.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
 
 /** Columns the library table can be ordered by (client-side sort). */
-type SortKey = 'title' | 'authors' | 'year' | 'themes' | 'ideas' | 'light' | 'deep' | 'summary' | 'embeddings' | 'passages';
+type SortKey = WorkSortKey;
 type SortState = { key: SortKey; dir: 'asc' | 'desc' };
 
 // Counts and pipeline-status columns default to descending (most/furthest-along
@@ -335,6 +338,7 @@ function SortHeader({
 }
 
 export function Library({
+  vaultId,
   target,
   vaultType,
   onOpenCollections,
@@ -342,6 +346,7 @@ export function Library({
   onOpenAssistant,
   onOpenArchive,
 }: {
+  vaultId: string | null;
   /** Incoming navigation that pre-applies a filter (e.g. a corpus-health bucket). */
   target?: LibraryNavigationTarget | null;
   vaultType?: VaultType;
@@ -355,6 +360,8 @@ export function Library({
   // for records; primary documents live in the Archive.
   const isRecordsVault = vaultType === 'genealogy' || vaultType === 'primary_sources';
   const [works, setWorks] = useState<WorkView[]>([]);
+  const [totalWorks, setTotalWorks] = useState(0);
+  const [pageOffset, setPageOffset] = useState(0);
   const [filter, setFilter] = useState<WorkFilter>({});
   // Local, instantly-responsive text for the search box. It is debounced into
   // `filter.search` so keystrokes stay smooth even on large libraries.
@@ -379,7 +386,6 @@ export function Library({
   // Client-side ordering over the already-in-memory filtered set. `null` keeps
   // the backend order (year desc, title asc).
   const [sort, setSort] = useState<SortState | null>(null);
-  const initialLoadRef = useRef(true);
   const loadRequestRef = useRef(0);
   const tagFilterRef = useDismissableLayer<HTMLDivElement>({
     open: tagFilterOpen,
@@ -395,44 +401,88 @@ export function Library({
   // Only the works list depends on the active filter, so typing in the search
   // box must reload nothing else. Keeping this isolated is what stops each
   // keystroke from firing five IPC round-trips against SQLite.
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = true) => {
     const requestId = ++loadRequestRef.current;
-    if (initialLoadRef.current) setLoading(true);
+    const cacheKey = `library:${JSON.stringify({ filter, pageOffset, sort })}`;
+    if (!force) {
+      const cached = getVaultQueryCache<{
+        items: WorkView[];
+        total: number;
+        embeddings: WorkEmbeddingStatus[];
+        passages: WorkPassageStatus[];
+      }>(vaultId, cacheKey);
+      if (cached) {
+        setWorks(cached.items);
+        setTotalWorks(cached.total);
+        setEmbeddingStatuses(new Map(cached.embeddings.map((status) => [status.nodus_id, status])));
+        setPassageStatuses(new Map(cached.passages.map((status) => [status.nodus_id, status])));
+        setLoading(false);
+        return;
+      }
+    }
+    setLoading(true);
     try {
-      const w = await window.nodus.listWorks(filter);
+      const page = await window.nodus.listWorksPage(filter, {
+        offset: pageOffset,
+        limit: LIBRARY_PAGE_SIZE,
+        sort,
+      });
       // A newer filter or refresh may have completed while this request was in
       // flight.  Never replace its results with stale rows.
       if (requestId !== loadRequestRef.current) return;
-      setWorks(w);
+      if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
+        setPageOffset(Math.max(0, Math.floor((page.total - 1) / LIBRARY_PAGE_SIZE) * LIBRARY_PAGE_SIZE));
+        return;
+      }
+      setWorks(page.items);
+      setTotalWorks(page.total);
+      const ids = page.items.map((work) => work.nodus_id);
+      const [statuses, passageIndexStatuses] = await Promise.all([
+        window.nodus.getWorkEmbeddingStatuses(ids),
+        window.nodus.getWorkPassageStatuses(ids),
+      ]);
+      if (requestId !== loadRequestRef.current) return;
+      setEmbeddingStatuses(new Map(statuses.map((status) => [status.nodus_id, status])));
+      setPassageStatuses(new Map(passageIndexStatuses.map((status) => [status.nodus_id, status])));
+      setVaultQueryCache(vaultId, cacheKey, {
+        items: page.items,
+        total: page.total,
+        embeddings: statuses,
+        passages: passageIndexStatuses,
+      });
     } finally {
       if (requestId === loadRequestRef.current) {
-        initialLoadRef.current = false;
         setLoading(false);
       }
     }
-  }, [filter]);
+  }, [filter, pageOffset, sort, vaultId]);
 
   // Facets (tags, collections) and per-work index statuses are global — they do
   // not depend on the active filter. Load them once on mount and refresh only
   // when the underlying data actually changes, not on every filter change.
-  const loadFacets = useCallback(async () => {
-    const [tags, statuses, passageIndexStatuses, collections] = await Promise.all([
+  const loadFacets = useCallback(async (force = true) => {
+    if (!force) {
+      const cached = getVaultQueryCache<{ tags: ZoteroTag[]; collections: CollectionFacet[] }>(vaultId, 'library:facets');
+      if (cached) {
+        setAvailableZoteroTags(cached.tags);
+        setAvailableCollections(cached.collections);
+        return;
+      }
+    }
+    const [tags, collections] = await Promise.all([
       window.nodus.listZoteroTags(),
-      window.nodus.getWorkEmbeddingStatuses(),
-      window.nodus.getWorkPassageStatuses(),
       window.nodus.listCollectionFacets(),
     ]);
     setAvailableZoteroTags(tags);
-    setEmbeddingStatuses(new Map(statuses.map((s) => [s.nodus_id, s])));
-    setPassageStatuses(new Map(passageIndexStatuses.map((s) => [s.nodus_id, s])));
     setAvailableCollections(collections);
-  }, []);
+    setVaultQueryCache(vaultId, 'library:facets', { tags, collections });
+  }, [vaultId]);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
   useEffect(() => {
-    void loadFacets();
+    void loadFacets(false);
   }, [loadFacets]);
 
   // Stable reference so the event subscriptions below don't re-register on every
@@ -594,7 +644,11 @@ export function Library({
   };
 
   const processFullLibrary = async () => {
-    const ids = works.map((w) => w.nodus_id);
+    const ids: string[] = [];
+    for (let offset = 0; offset < totalWorks; offset += 250) {
+      const page = await window.nodus.listWorksPage(filter, { offset, limit: 250, sort: null });
+      ids.push(...page.items.map((work) => work.nodus_id));
+    }
     if (ids.length === 0) return;
     const ok = await confirm({
       title: t('Procesar toda la biblioteca'),
@@ -845,6 +899,7 @@ export function Library({
   // click, and clear back to the backend order on the third.
   const cycleSort = (key: SortKey) =>
     setSort((cur) => {
+      setPageOffset(0);
       const first = initialSortDir(key);
       if (!cur || cur.key !== key) return { key, dir: first };
       if (cur.dir === first) return { key, dir: first === 'asc' ? 'desc' : 'asc' };
@@ -896,7 +951,7 @@ export function Library({
       <div className="flex flex-wrap items-start gap-3 mb-4">
         <div>
           <h1 className="text-xl font-semibold">{t('Biblioteca')}</h1>
-          <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: works.length })}</p>
+          <p className="text-sm text-neutral-500 mt-1">{tx('{n} obras visibles', { n: totalWorks })}</p>
         </div>
         <div className="flex-1" />
         <button
@@ -1204,7 +1259,7 @@ export function Library({
 
       {!loading && works.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-          <span>{tx('{n} resultados con los filtros actuales', { n: works.length })}</span>
+          <span>{tx('{n} resultados con los filtros actuales', { n: totalWorks })}</span>
           <button
             className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
             onClick={() => {
@@ -1214,7 +1269,7 @@ export function Library({
             }}
           >
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
-            {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} filtrados', { n: works.length })}
+            {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} de esta página', { n: works.length })}
           </button>
           <button
             className="btn btn-primary px-2 py-1 text-xs"
@@ -1557,6 +1612,29 @@ export function Library({
               </div>
             )}
           />
+        )}
+        {!loading && totalWorks > LIBRARY_PAGE_SIZE && (
+          <div className="flex items-center justify-between border-t border-neutral-800 px-3 py-2 text-xs text-neutral-500">
+            <span>
+              {pageOffset + 1}–{Math.min(pageOffset + works.length, totalWorks)} / {totalWorks}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+                disabled={pageOffset === 0}
+                onClick={() => setPageOffset((offset) => Math.max(0, offset - LIBRARY_PAGE_SIZE))}
+              >
+                <Icon name="arrowLeft" size={13} /> {t('Anterior')}
+              </button>
+              <button
+                className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+                disabled={pageOffset + works.length >= totalWorks}
+                onClick={() => setPageOffset((offset) => offset + LIBRARY_PAGE_SIZE)}
+              >
+                {t('Siguiente')} <Icon name="arrowRight" size={13} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
       {confirmReindex && (
