@@ -794,7 +794,7 @@ export function App() {
         <button
           data-testid="sidebar-header-toggle"
           className="flex h-full shrink-0 items-center justify-center gap-2 px-2 font-semibold text-lg tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
-          style={{ width: navCollapsed ? 112 : sidebarWidth }}
+          style={{ width: sidebarWidth }}
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
           aria-label={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}

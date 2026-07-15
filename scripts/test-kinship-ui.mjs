@@ -5,8 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [editor, tree, dossier, people, settings, styles] = await Promise.all([
+const [editor, picker, tree, dossier, people, settings, styles] = await Promise.all([
   readFile(path.join(root, 'src/components/KinshipEditor.tsx'), 'utf8'),
+  readFile(path.join(root, 'src/components/PersonMultiSelect.tsx'), 'utf8'),
   readFile(path.join(root, 'src/views/TreeView.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PersonDossier.tsx'), 'utf8'),
   readFile(path.join(root, 'src/views/PersonasView.tsx'), 'utf8'),
@@ -47,8 +48,19 @@ test('each person displays an explicit relationship label relative to the focus'
   assert.match(tree, /Tía materna/);
 });
 
-test('relationship editor exposes two known parents, chronology review and repair actions', () => {
-  assert.match(editor, /Progenitor 2 \(si se conoce\)/);
+test('relationship selectors search and allow several relatives without closing', () => {
+  assert.match(editor, /<PersonMultiSelect/);
+  assert.match(people, /<PersonMultiSelect/);
+  assert.match(picker, /Buscar familiar…/);
+  assert.match(picker, /aria-multiselectable="true"/);
+  assert.match(picker, /type="checkbox"/);
+  assert.match(picker, /createPortal/);
+  assert.match(picker, /style=\{\{ paddingLeft: '1\.9rem' \}\}/);
+  assert.match(editor, /maxSelected=\{choice === 'child_of' \? 2 : undefined\}/);
+  assert.match(editor, /kinshipRelationshipSpecsForPeople/);
+});
+
+test('relationship editor keeps chronology review and repair actions', () => {
   assert.match(editor, /parentAgeWarning/);
   assert.match(editor, /Invertir/);
   assert.match(editor, /Editar parentesco/);

@@ -2170,6 +2170,11 @@ select.input optgroup {
 .light .tree-branch-color-control:hover { border-color: #a1a1aa; color: #18181b; }
 .light .tree-line-legend { color: #52525b; }
 
+/* Searchable multi-person picker used by genealogy relationship forms. */
+.person-multi-select-popover { isolation: isolate; }
+.light .person-multi-select-popover { border-color: #d4d4d8; background: #fff; }
+.light .person-multi-select-popover label:hover { background: #f4f4f5; }
+
 @media print {
   body * { visibility: hidden; }
   .study-editor-shell .study-milkdown,

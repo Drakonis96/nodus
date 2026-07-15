@@ -5138,5 +5138,12 @@ export const EN: Record<string, string> = {
   'Cónyuges/pareja': 'Spouses/partners',
   'Hermanos sin progenitores conocidos': 'Siblings without known parents',
   'Familia: {parents} → {children}': 'Family: {parents} → {children}',
+  'Buscar familiar…': 'Search relatives…',
+  'Elegir progenitores…': 'Choose parents…',
+  'Elegir hijos/as…': 'Choose children…',
+  'Elegir hermanos/as…': 'Choose siblings…',
+  'Elegir cónyuges/parejas…': 'Choose spouses/partners…',
+  '{count} de {max} seleccionados': '{count} of {max} selected',
+  '{count} seleccionados': '{count} selected',
   // <<END_EN>>
 };

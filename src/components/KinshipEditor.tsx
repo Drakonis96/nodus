@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Person, Relationship } from '@shared/types';
-import { kinshipRelationshipSpecs, parentAgeWarning, type KinshipChoice } from '@shared/kinshipRelations';
+import { kinshipRelationshipSpecsForPeople, parentAgeWarning, type KinshipChoice } from '@shared/kinshipRelations';
 import { Icon } from './ui';
+import { PersonMultiSelect } from './PersonMultiSelect';
 import { confirm } from './feedback';
 import { t } from '../i18n';
 
@@ -12,8 +13,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
   compact?: boolean;
 }) {
   const [choice, setChoice] = useState<KinshipChoice>('child_of');
-  const [primaryId, setPrimaryId] = useState('');
-  const [secondaryId, setSecondaryId] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [adoptive, setAdoptive] = useState(false);
   const [busy, setBusy] = useState(false);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
@@ -26,7 +26,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
   useEffect(() => { void loadRelationships(); }, [loadRelationships]);
 
   const connect = async () => {
-    const specs = kinshipRelationshipSpecs(person.personId, choice, primaryId, secondaryId, adoptive);
+    const specs = kinshipRelationshipSpecsForPeople(person.personId, choice, selectedIds, adoptive);
     if (specs.length === 0) return;
     const chronologicalIssues = specs.filter((spec) => {
       if (spec.type !== 'parent') return false;
@@ -53,8 +53,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
           await window.nodus.addRelationship(spec.fromPerson, spec.toPerson, spec.type, 'user_asserted', spec.subtype);
         }
       }
-      setPrimaryId('');
-      setSecondaryId('');
+      setSelectedIds([]);
       setAdoptive(false);
       setEditingRelId(null);
       await onChanged();
@@ -64,7 +63,6 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
     }
   };
 
-  const option = (candidate: Person) => <option key={candidate.personId} value={candidate.personId}>{candidate.displayName}</option>;
   const relationshipLabel = (relationship: Relationship) => {
     const otherId = relationship.fromPerson === person.personId ? relationship.toPerson : relationship.fromPerson;
     const otherName = personById.get(otherId)?.displayName ?? t('Persona desconocida');
@@ -97,8 +95,7 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
           ? 'parent_of'
           : 'child_of';
     setChoice(nextChoice);
-    setPrimaryId(otherId);
-    setSecondaryId('');
+    setSelectedIds([otherId]);
     setAdoptive(relationship.subtype === 'adoptive');
     setEditingRelId(relationship.relId);
   };
@@ -146,22 +143,20 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
             ))}
           </div>
         )}
-        <select className="input h-9 w-full text-sm" value={choice} onChange={(event) => { setChoice(event.target.value as KinshipChoice); setPrimaryId(''); setSecondaryId(''); setAdoptive(false); }}>
+        <select className="input h-9 w-full text-sm" value={choice} onChange={(event) => { setChoice(event.target.value as KinshipChoice); setSelectedIds([]); setAdoptive(false); }}>
           <option value="child_of">{t('Esta persona es hijo/a de…')}</option>
           <option value="parent_of">{t('Esta persona es padre/madre de…')}</option>
           <option value="sibling_of">{t('Esta persona es hermano/a de…')}</option>
           <option value="spouse_of">{t('Esta persona es cónyuge/pareja de…')}</option>
         </select>
-        <select className="input h-9 w-full text-sm" value={primaryId} onChange={(event) => setPrimaryId(event.target.value)}>
-          <option value="">{t(choice === 'child_of' ? 'Elegir progenitor 1…' : choice === 'parent_of' ? 'Elegir hijo/a…' : choice === 'sibling_of' ? 'Elegir hermano/a…' : 'Elegir cónyuge/pareja…')}</option>
-          {others.map(option)}
-        </select>
-        {choice === 'child_of' && (
-          <select className="input h-9 w-full text-sm" value={secondaryId} onChange={(event) => setSecondaryId(event.target.value)}>
-            <option value="">{t('Progenitor 2 (si se conoce)…')}</option>
-            {others.filter((candidate) => candidate.personId !== primaryId).map(option)}
-          </select>
-        )}
+        <PersonMultiSelect
+          persons={others}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+          maxSelected={choice === 'child_of' ? 2 : undefined}
+          testId="kinship-person-selector"
+          placeholder={t(choice === 'child_of' ? 'Elegir progenitores…' : choice === 'parent_of' ? 'Elegir hijos/as…' : choice === 'sibling_of' ? 'Elegir hermanos/as…' : 'Elegir cónyuges/parejas…')}
+        />
         {parentChoice && (
           <label className="flex items-center gap-2 text-xs text-neutral-400">
             <input type="checkbox" checked={adoptive} onChange={(event) => setAdoptive(event.target.checked)} />
@@ -169,10 +164,10 @@ export function KinshipEditor({ person, persons, onChanged, compact = false }: {
           </label>
         )}
         <div className="flex gap-2">
-          <button className="btn btn-primary flex-1" disabled={busy || !primaryId} onClick={() => void connect()}>
+          <button className="btn btn-primary flex-1" disabled={busy || selectedIds.length === 0} onClick={() => void connect()}>
             {busy ? t('Guardando…') : editingRelId ? t('Guardar cambios') : t('Añadir parentesco')}
           </button>
-          {editingRelId && <button className="btn btn-ghost border border-neutral-700 px-2 text-xs" onClick={() => { setEditingRelId(null); setPrimaryId(''); setSecondaryId(''); setAdoptive(false); }}>{t('Cancelar')}</button>}
+          {editingRelId && <button className="btn btn-ghost border border-neutral-700 px-2 text-xs" onClick={() => { setEditingRelId(null); setSelectedIds([]); setAdoptive(false); }}>{t('Cancelar')}</button>}
         </div>
         <p className="text-[11px] text-neutral-500">
           {choice === 'child_of'

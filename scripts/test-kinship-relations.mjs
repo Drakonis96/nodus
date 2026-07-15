@@ -14,7 +14,7 @@ const bundle = path.join(outDir, 'kinshipRelations.cjs');
 execFileSync(path.join(repoRoot, 'node_modules/.bin/esbuild'), [
   path.join(repoRoot, 'shared/kinshipRelations.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
 ], { cwd: repoRoot, stdio: 'inherit' });
-const { kinshipRelationshipSpecs, parentAgeWarning } = require(bundle);
+const { kinshipRelationshipSpecs, kinshipRelationshipSpecsForPeople, parentAgeWarning } = require(bundle);
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
@@ -36,6 +36,17 @@ test('parent, sibling and spouse choices preserve their direction/symmetry types
   ]);
   assert.equal(kinshipRelationshipSpecs('person', 'sibling_of', 'other')[0].type, 'sibling');
   assert.equal(kinshipRelationshipSpecs('person', 'spouse_of', 'other')[0].type, 'spouse');
+});
+
+test('bulk selection creates one canonical relationship per selected relative', () => {
+  assert.deepEqual(kinshipRelationshipSpecsForPeople('person', 'parent_of', ['child-a', 'child-b', 'child-a'], true), [
+    { fromPerson: 'person', toPerson: 'child-a', type: 'parent', subtype: 'adoptive' },
+    { fromPerson: 'person', toPerson: 'child-b', type: 'parent', subtype: 'adoptive' },
+  ]);
+  assert.deepEqual(kinshipRelationshipSpecsForPeople('person', 'sibling_of', ['sibling-a', 'sibling-b']), [
+    { fromPerson: 'person', toPerson: 'sibling-a', type: 'sibling', subtype: null },
+    { fromPerson: 'person', toPerson: 'sibling-b', type: 'sibling', subtype: null },
+  ]);
 });
 
 test('parent chronology flags inverted/implausible edges without guessing missing dates', () => {

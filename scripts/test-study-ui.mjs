@@ -57,13 +57,14 @@ test('left sidebar is resizable and remembers the selected width', async () => {
   assert.match(css, /cursor: col-resize/);
 });
 
-test('sidebar header keeps the Nodus brand centered and makes its full area clickable', async () => {
+test('sidebar header keeps the Nodus brand centered, stable when hidden and fully clickable', async () => {
   const app = await read('src/App.tsx');
   assert.match(app, /data-testid="sidebar-header-toggle"/);
   assert.match(
     app,
-    /data-testid="sidebar-header-toggle"[\s\S]*?className="[^"]*h-full[^"]*justify-center[^"]*"[\s\S]*?style=\{\{ width: navCollapsed \? 112 : sidebarWidth \}\}/,
+    /data-testid="sidebar-header-toggle"[\s\S]*?className="[^"]*h-full[^"]*justify-center[^"]*"[\s\S]*?style=\{\{ width: sidebarWidth \}\}/,
   );
+  assert.doesNotMatch(app, /style=\{\{ width: navCollapsed \?/);
   assert.ok(
     app.indexOf('data-testid="sidebar-header-toggle"') < app.indexOf('data-testid="nodus-logo"'),
     'the Nodus logo should remain inside the full-width sidebar header control',

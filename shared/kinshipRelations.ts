@@ -30,22 +30,31 @@ export function kinshipRelationshipSpecs(
   secondaryId = '',
   adoptive = false
 ): KinshipRelationshipSpec[] {
-  const primary = primaryId.trim();
-  const secondary = secondaryId.trim();
-  if (!subjectId || !primary || primary === subjectId) return [];
+  return kinshipRelationshipSpecsForPeople(subjectId, choice, [primaryId, secondaryId], adoptive);
+}
+
+/** Translate a bulk selection from one person's point of view into stored edges. */
+export function kinshipRelationshipSpecsForPeople(
+  subjectId: string,
+  choice: KinshipChoice,
+  relatedIds: string[],
+  adoptive = false
+): KinshipRelationshipSpec[] {
+  if (!subjectId) return [];
+  const selected = [...new Set(relatedIds.map((id) => id.trim()).filter((id) => id && id !== subjectId))];
+  if (selected.length === 0) return [];
   const subtype: RelationshipSubtype = adoptive ? 'adoptive' : null;
 
   if (choice === 'child_of') {
-    const parents = [...new Set([primary, secondary].filter((id) => id && id !== subjectId))];
-    return parents.map((parentId) => ({ fromPerson: parentId, toPerson: subjectId, type: 'parent', subtype }));
+    return selected.map((parentId) => ({ fromPerson: parentId, toPerson: subjectId, type: 'parent', subtype }));
   }
   if (choice === 'parent_of') {
-    return [{ fromPerson: subjectId, toPerson: primary, type: 'parent', subtype }];
+    return selected.map((childId) => ({ fromPerson: subjectId, toPerson: childId, type: 'parent', subtype }));
   }
-  return [{
+  return selected.map((relatedId) => ({
     fromPerson: subjectId,
-    toPerson: primary,
+    toPerson: relatedId,
     type: choice === 'sibling_of' ? 'sibling' : 'spouse',
     subtype: null,
-  }];
+  }));
 }
