@@ -113,7 +113,7 @@ export function PersonasView({ initialPersonId }: { initialPersonId?: { id: stri
             )}
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
+        <div data-testid="persons-list" className="min-h-0 flex-1 overflow-y-auto px-2 pb-4 pt-2">
           {persons.length === 0 && (
             <p className="px-2 py-6 text-center text-sm text-neutral-500">
               {t('Aún no hay personas. Se crean al analizar fuentes primarias o añadiéndolas a mano.')}

@@ -66,3 +66,7 @@ test('relationship editor keeps chronology review and repair actions', () => {
   assert.match(editor, /Editar parentesco/);
   assert.match(people, /Parentesco inicial \(opcional\)/);
 });
+
+test('people list leaves room above the first selectable person', () => {
+  assert.match(people, /data-testid="persons-list"[^>]*className="[^"]*overflow-y-auto[^"]*pt-2[^"]*"/);
+});
