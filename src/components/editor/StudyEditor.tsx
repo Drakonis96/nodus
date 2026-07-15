@@ -271,6 +271,10 @@ export function StudyEditor({
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
   const baselineRef = useRef('');
+  const activeIdRef = useRef(active?.id ?? '');
+  const latestSignatureRef = useRef('');
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const rawRef = useRef(raw);
   const milkdownRef = useRef<MilkdownCanvasHandle>(null);
   const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
   const turndown = useMemo(() => new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' }), []);
@@ -384,6 +388,9 @@ export function StudyEditor({
   };
 
   const currentSignature = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
+  activeIdRef.current = active?.id ?? '';
+  latestSignatureRef.current = currentSignature;
+  rawRef.current = raw;
   useEffect(() => {
     if (!active || !data || improveStreamingStyleId || currentSignature === baselineRef.current) return;
     setSaveState('dirty');
@@ -393,23 +400,39 @@ export function StudyEditor({
 
   const save = async (reason: 'autosave' | 'manual' | 'command') => {
     if (!active || currentSignature === baselineRef.current) return;
-    setSaveState('saving');
-    try {
-      const updated = await window.nodus.updateStudyDoc(active.id, {
-        title,
-        contentMarkdown: draft,
-        style,
-        spellcheckLanguage: data?.spellcheckLanguage,
-        customDictionary: data?.customDictionary,
-        reason,
-      });
-      baselineRef.current = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
-      setSaveState('saved');
-      onSaved(updated);
-      await loadData(active.id);
-    } catch {
-      setSaveState('error');
-    }
+    const snapshot = {
+      id: active.id,
+      signature: currentSignature,
+      title,
+      contentMarkdown: draft,
+      style,
+      spellcheckLanguage: data?.spellcheckLanguage,
+      customDictionary: data?.customDictionary,
+      reason,
+    };
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      if (snapshot.id !== activeIdRef.current || snapshot.signature !== latestSignatureRef.current) return;
+      setSaveState('saving');
+      try {
+        const updated = await window.nodus.updateStudyDoc(snapshot.id, {
+          title: snapshot.title,
+          contentMarkdown: snapshot.contentMarkdown,
+          style: snapshot.style,
+          spellcheckLanguage: snapshot.spellcheckLanguage,
+          customDictionary: snapshot.customDictionary,
+          reason: snapshot.reason,
+        });
+        if (snapshot.id !== activeIdRef.current || snapshot.signature !== latestSignatureRef.current) return;
+        baselineRef.current = snapshot.signature;
+        setSaveState('saved');
+        onSaved(updated);
+        await loadData(snapshot.id);
+      } catch {
+        if (snapshot.id === activeIdRef.current && snapshot.signature === latestSignatureRef.current) setSaveState('error');
+      }
+    });
+    saveQueueRef.current = operation;
+    await operation;
   };
 
   useEffect(() => {
@@ -719,7 +742,7 @@ export function StudyEditor({
                 }} />
             ) : (
               <MilkdownCanvas ref={milkdownRef} key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft}
-                spellcheck language={data.spellcheckLanguage} onChange={setDraft} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
+                spellcheck language={data.spellcheckLanguage} onChange={(value) => { if (!rawRef.current) setDraft(value); }} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
             )}
           </div>
           {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={onOpenLinkedDocument} onStudyRecording={onOpenRecording} /></div>}

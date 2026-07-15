@@ -612,11 +612,19 @@ try {
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
   await page.locator('.study-editor-shell textarea').fill(editorMarkdown);
-  // Dispatch from the renderer instead of Playwright's pointer action. On the
-  // headless macOS runner the save handler completes, but the pointer action
-  // can remain pending until Playwright's 30 s action timeout.
-  await page.getByRole('button', { name: /^Guardar$/ }).evaluate((button) => button.click());
-  await page.waitForFunction(() => document.body.textContent?.includes('Guardado'), { timeout: 30_000 });
+  // Exercise the editor's real autosave and poll the persisted state directly;
+  // dispatching a second manual save would make this smoke assertion depend on
+  // runner timing instead of the durability contract it is meant to verify.
+  await page.evaluate(async (expected) => {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const workspace = await window.nodus.getStudyWorkspace();
+      const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
+      if (document?.contentMarkdown === expected) return;
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    throw new Error('El autoguardado del editor no persistió el Markdown a tiempo.');
+  }, editorMarkdown);
   const editorRoundTrip = await page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
     const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
@@ -626,7 +634,7 @@ try {
   });
   assert.equal(editorRoundTrip?.content, editorMarkdown, 'raw Markdown round-trips exactly through the editor');
   assert.ok((editorRoundTrip?.versions ?? 0) >= 1, 'editor save creates a recoverable version');
-  console.log('[e2e] study editor raw Markdown save + version ok');
+  console.log('[e2e] study editor raw Markdown autosave + version ok');
 
   if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY !== '1') {
   // Compact prompt manager + contextual streaming actions. The smoke profile
