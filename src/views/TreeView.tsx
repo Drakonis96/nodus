@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
-import { buildTreeFamilies } from '@shared/treeFamilies';
+import { buildTreeFamilies, treeFamilyLaneY } from '@shared/treeFamilies';
 import { branchColorForTheme, deriveTreeKinship, TREE_KINSHIP_ROLE_LABEL_ES } from '@shared/treeKinship';
+import { matchesTreeSearch } from '@shared/treeSearch';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { parentAgeWarning } from '@shared/kinshipRelations';
 import { mirrorDefaultPortrait } from '@shared/treePortraits';
@@ -47,6 +48,7 @@ export function TreeView({
   const [selected, setSelected] = useState<string | null>(null);
   const [dossierId, setDossierId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
   const light = useIsLightTheme();
   // SVG <text> fills can't inherit the .light utility remaps (they're not utility
   // classes), so pick readable ink colours for the active theme explicitly.
@@ -88,6 +90,10 @@ export function TreeView({
   const spouseEdges = useMemo(() => rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })), [rels]);
   const siblingEdges = useMemo(() => rels.filter((r) => r.type === 'sibling').map((r) => ({ a: r.fromPerson, b: r.toPerson })), [rels]);
   const treePersons = useMemo(() => persons.map((p) => ({ id: p.personId, sex: p.sex, birthYear: parseHistoricalDate(p.birthDate).year })), [persons]);
+  const kinship = useMemo(() => deriveTreeKinship({ focusId, parentEdges, spouseEdges, siblingEdges, persons: treePersons }), [focusId, parentEdges, siblingEdges, spouseEdges, treePersons]);
+  const branchByPerson = useMemo(() => Object.fromEntries(
+    [...kinship].map(([personId, context]) => [personId, context.branch])
+  ), [kinship]);
 
   const layout: TreeLayoutResult = useMemo(
     () =>
@@ -101,13 +107,20 @@ export function TreeView({
         nodeHeight: NODE_H,
         vGap: 52,
         orientation,
+        branchByPerson,
       }),
-    [focusId, orientation, parentEdges, siblingEdges, spouseEdges, treePersons]
+    [branchByPerson, focusId, orientation, parentEdges, siblingEdges, spouseEdges, treePersons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
   const families = useMemo(() => buildTreeFamilies(parentEdges, layout.nodes), [layout.nodes, parentEdges]);
-  const kinship = useMemo(() => deriveTreeKinship({ focusId, parentEdges, spouseEdges, siblingEdges, persons: treePersons }), [focusId, parentEdges, siblingEdges, spouseEdges, treePersons]);
+  const searchActive = searchQuery.trim().length > 0;
+  const searchMatches = useMemo(() => new Set(layout.nodes.flatMap((node) => {
+    const person = personById.get(node.personId);
+    const relation = kinship.get(node.personId);
+    const relationLabel = relation ? t(TREE_KINSHIP_ROLE_LABEL_ES[relation.role]) : t('Pariente');
+    return person && matchesTreeSearch(searchQuery, [person.displayName, dates(person), relationLabel]) ? [node.personId] : [];
+  })), [kinship, layout.nodes, personById, searchQuery]);
   const familyPairSet = useMemo(() => {
     const pairs = new Set<string>();
     for (const family of families) for (let i = 0; i < family.parentIds.length; i++) {
@@ -165,6 +178,30 @@ export function TreeView({
             </option>
           ))}
         </select>
+        <div className="relative min-w-[12rem] max-w-[18rem] flex-1" title={t('Buscar personas en el árbol')}>
+          <Icon name="search" size={14} className="pointer-events-none absolute left-2.5 top-1/2 z-10 -translate-y-1/2 text-neutral-500" />
+          <input
+            type="text"
+            role="searchbox"
+            className="input h-9 w-full pl-8 pr-8 text-sm"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder={t('Buscar en el árbol…')}
+            aria-label={t('Buscar personas en el árbol')}
+            data-testid="tree-search-input"
+          />
+          {searchActive && (
+            <button
+              type="button"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-500 hover:bg-neutral-800 hover:text-neutral-200"
+              onClick={() => setSearchQuery('')}
+              aria-label={t('Limpiar búsqueda')}
+              title={t('Limpiar búsqueda')}
+            >
+              <Icon name="x" size={12} />
+            </button>
+          )}
+        </div>
         <button
           className="btn btn-ghost h-9 gap-1.5 border border-neutral-700 px-2 text-xs"
           title={t('Invertir la orientación vertical del árbol')}
@@ -229,10 +266,9 @@ export function TreeView({
             const anchorX = orderedParents.length > 1
               ? (frameSide(orderedParents[0], 'right').x + frameSide(orderedParents[orderedParents.length - 1], 'left').x) / 2
               : parentCenters[0].x;
-            const childY = childPoints[0].y;
-            // Every family crossing the same generation pair gets a distinct lane.
-            const laneFraction = 0.3 + 0.4 * ((family.laneIndex + 1) / (family.laneCount + 1));
-            const laneY = parentMidY + (childY - parentMidY) * laneFraction;
+            // Every family gets a distinct lane inside the empty inter-row band,
+            // never in the area occupied by names, tags or dates.
+            const laneY = treeFamilyLaneY(family, layout.nodes, NODE_H, PAD);
             const childXs = childPoints.map((point) => point.x);
             const minChildX = Math.min(...childXs);
             const maxChildX = Math.max(...childXs);
@@ -250,7 +286,11 @@ export function TreeView({
             const parentNames = orderedParents.map((id) => personById.get(id)?.displayName ?? id).join(' + ');
             const childNames = family.childIds.map((id) => personById.get(id)?.displayName ?? id).join(', ');
             return (
-              <g key={family.id} data-tree-family={family.id}>
+              <g
+                key={family.id}
+                data-tree-family={family.id}
+                opacity={searchActive && ![...family.parentIds, ...family.childIds].some((id) => searchMatches.has(id)) ? 0.18 : 1}
+              >
                 <title>{t('Familia: {parents} → {children}').replace('{parents}', parentNames).replace('{children}', childNames)}</title>
                 <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={Math.min(...parentCenters.map((point) => point.x), minChildX)} x2={Math.max(...parentCenters.map((point) => point.x), maxChildX)}>
                   {(parentColors.length > 0 ? parentColors : [fallbackColor]).map((color, index, colors) => (
@@ -291,7 +331,7 @@ export function TreeView({
             const color = edge.kind === 'spouse' ? '#8a5a2b' : light ? '#64748b' : '#94a3b8';
             const label = edge.kind === 'spouse' ? t('Cónyuges/pareja') : t('Hermanos sin progenitores conocidos');
             return (
-              <g key={`${edge.kind}${index}`}>
+              <g key={`${edge.kind}${index}`} opacity={searchActive && !searchMatches.has(edge.from) && !searchMatches.has(edge.to) ? 0.18 : 1}>
                 <title>{label}: {personById.get(edge.from)?.displayName} — {personById.get(edge.to)?.displayName}</title>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={light ? '#ffffffcc' : '#09090bdd'} strokeWidth={5} strokeLinecap="round" />
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={2} strokeDasharray={edge.kind === 'spouse' ? '3 4' : '7 4'} strokeLinecap="round" />
@@ -314,14 +354,31 @@ export function TreeView({
             const relationLabel = relation ? t(TREE_KINSHIP_ROLE_LABEL_ES[relation.role]) : t('Pariente');
             const relationColor = relation && relation.branch !== 'neutral' ? branchColorFor(n.personId) : dateFill;
             const relationTagWidth = Math.min(NODE_W - 8, Math.max(44, relationLabel.length * 5.8 + 14));
+            const isSearchMatch = searchActive && searchMatches.has(n.personId);
             return (
               <g
                 key={n.personId}
-                style={{ cursor: 'pointer', transition: 'transform 300ms ease' }}
+                opacity={searchActive && !isSearchMatch ? 0.22 : 1}
+                style={{ cursor: 'pointer', transition: 'opacity 180ms ease, filter 180ms ease' }}
                 onClick={() => setSelected(n.personId)}
                 onDoubleClick={() => changeFocus(n.personId)}
               >
                 <title>{p.displayName} · {relationLabel}</title>
+                {isSearchMatch && (
+                  <rect
+                    data-testid={`tree-search-match-${n.personId}`}
+                    x={x + 2}
+                    y={y - 8}
+                    width={NODE_W - 4}
+                    height={NODE_H + 12}
+                    rx={18}
+                    fill="#fbbf24"
+                    fillOpacity={light ? 0.12 : 0.08}
+                    stroke="#fbbf24"
+                    strokeWidth={2.5}
+                    style={{ filter: 'drop-shadow(0 0 7px rgba(251, 191, 36, .8))' }}
+                  />
+                )}
                 {(isFocus || isSel) && (
                   <rect
                     x={frameX - 4}
@@ -343,10 +400,29 @@ export function TreeView({
                   sex={p.sex}
                   portrait={<PersonPortrait person={p} fill mirror={mirror} rounded="none" />}
                 />
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 18} textAnchor="middle" fill={nameFill} fontSize={13} fontWeight={600}>
+                <text
+                  x={x + NODE_W / 2}
+                  y={y + FRAME_H + 18}
+                  textAnchor="middle"
+                  fill={nameFill}
+                  stroke={light ? '#fafafa' : '#09090b'}
+                  strokeWidth={3.5}
+                  strokeLinejoin="round"
+                  paintOrder="stroke"
+                  fontSize={13}
+                  fontWeight={600}
+                >
                   {p.displayName.length > max ? `${p.displayName.slice(0, max - 1)}…` : p.displayName}
                 </text>
                 <g data-testid={`tree-kinship-tag-${n.personId}`}>
+                  <rect
+                    x={x + (NODE_W - relationTagWidth) / 2 - 2}
+                    y={y + FRAME_H + 20}
+                    width={relationTagWidth + 4}
+                    height={20}
+                    rx={10}
+                    fill={light ? '#fafafa' : '#09090b'}
+                  />
                   <rect
                     x={x + (NODE_W - relationTagWidth) / 2}
                     y={y + FRAME_H + 22}
@@ -362,7 +438,16 @@ export function TreeView({
                     {relationLabel}
                   </text>
                 </g>
-                <text x={x + NODE_W / 2} y={y + FRAME_H + 50} textAnchor="middle" fill={dateFill} fontSize={11}>
+                <text
+                  x={x + NODE_W / 2}
+                  y={y + FRAME_H + 50}
+                  textAnchor="middle"
+                  fill={dateFill}
+                  stroke={light ? '#fafafa' : '#09090b'}
+                  strokeWidth={3}
+                  paintOrder="stroke"
+                  fontSize={11}
+                >
                   {dates(p)}
                 </text>
               </g>

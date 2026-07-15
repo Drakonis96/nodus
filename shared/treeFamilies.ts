@@ -73,3 +73,24 @@ export function buildTreeFamilies(
   }
   return result;
 }
+
+/** Keeps the horizontal sibling bar inside the empty band between generations. */
+export function treeFamilyLaneY(
+  family: Pick<TreeFamily, 'parentIds' | 'childIds' | 'laneIndex' | 'laneCount'>,
+  nodes: TreeNode[],
+  nodeHeight: number,
+  padding: number
+): number {
+  const nodeById = new Map(nodes.map((node) => [node.personId, node]));
+  const parentRows = family.parentIds.map((id) => nodeById.get(id)?.y).filter((value): value is number => value != null);
+  const childRows = family.childIds.map((id) => nodeById.get(id)?.y).filter((value): value is number => value != null);
+  if (parentRows.length === 0 || childRows.length === 0) return padding;
+  const parentY = parentRows.reduce((sum, value) => sum + value, 0) / parentRows.length;
+  const childY = childRows.reduce((sum, value) => sum + value, 0) / childRows.length;
+  const upperRowY = Math.min(parentY, childY);
+  const lowerRowY = Math.max(parentY, childY);
+  const gapStart = upperRowY + padding + nodeHeight;
+  const gapEnd = lowerRowY + padding;
+  const available = Math.max(0, gapEnd - gapStart);
+  return gapStart + available * ((family.laneIndex + 1) / (family.laneCount + 1));
+}

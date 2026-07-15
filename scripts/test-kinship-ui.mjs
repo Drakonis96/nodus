@@ -28,7 +28,7 @@ test('tree sidebar and person dossier share the persistent relationship editor',
 test('tree routes parentage by family units instead of overlapping independent elbows', () => {
   assert.match(tree, /buildTreeFamilies/);
   assert.match(tree, /families\.map/);
-  assert.match(tree, /laneIndex/);
+  assert.match(tree, /treeFamilyLaneY/);
   assert.match(tree, /layout\.edges\.filter\(\(edge\) => edge\.kind !== 'parent'\)/);
   assert.doesNotMatch(tree, /const midY = \(a\.y \+ b\.y\) \/ 2/);
 });

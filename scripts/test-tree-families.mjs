@@ -14,7 +14,7 @@ const bundle = path.join(outDir, 'treeFamilies.cjs');
 execFileSync(path.join(root, 'node_modules/.bin/esbuild'), [
   path.join(root, 'shared/treeFamilies.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
 ], { cwd: root, stdio: 'inherit' });
-const { buildTreeFamilies } = require(bundle);
+const { buildTreeFamilies, treeFamilyLaneY } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 const nodes = [
@@ -51,4 +51,17 @@ test('siblings with the same parents share one trunk and one sibling group', () 
   const family = buildTreeFamilies(parentEdges, nodes).find((candidate) => candidate.childIds.includes('focus'));
   assert.deepEqual(family.parentIds, ['father', 'mother']);
   assert.deepEqual(family.childIds, ['focus', 'sister']);
+});
+
+test('family lanes stay below labels and above the next generation in both orientations', () => {
+  const normalFamily = buildTreeFamilies(parentEdges, nodes).find((candidate) => candidate.childIds.includes('focus'));
+  const normalLane = treeFamilyLaneY(normalFamily, nodes, 176, 40);
+  assert.ok(normalLane > 220 + 40 + 176, 'normal lane starts below the complete parent card');
+  assert.ok(normalLane < 440 + 40, 'normal lane ends before the child frame');
+
+  const invertedNodes = nodes.map((node) => ({ ...node, y: 440 - node.y }));
+  const invertedFamily = buildTreeFamilies(parentEdges, invertedNodes).find((candidate) => candidate.childIds.includes('focus'));
+  const invertedLane = treeFamilyLaneY(invertedFamily, invertedNodes, 176, 40);
+  assert.ok(invertedLane > 0 + 40 + 176, 'inverted lane starts below the upper child card');
+  assert.ok(invertedLane < 220 + 40, 'inverted lane ends before the lower parent frame');
 });

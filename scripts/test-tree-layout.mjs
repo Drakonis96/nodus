@@ -209,3 +209,33 @@ test('explicit siblings stay in the same generation and receive a sibling connec
   assert.equal(nodes.a.y, nodes.b.y);
   assert.deepEqual(r.edges.filter((edge) => edge.kind === 'sibling'), [{ from: 'a', to: 'b', kind: 'sibling' }]);
 });
+
+test('paternal and maternal extended families remain in separate horizontal blocks', () => {
+  const r = computeTreeLayout({
+    focusId: 'focus',
+    persons: [
+      { id: 'focus', sex: 'male' }, { id: 'father', sex: 'male' }, { id: 'mother', sex: 'female' },
+      { id: 'paternal-uncle', sex: 'male' }, { id: 'paternal-aunt', sex: 'female' },
+      { id: 'maternal-uncle', sex: 'male' }, { id: 'maternal-aunt', sex: 'female' },
+    ],
+    parentEdges: [
+      { parent: 'father', child: 'focus' }, { parent: 'mother', child: 'focus' },
+    ],
+    spouseEdges: [],
+    siblingEdges: [
+      { a: 'father', b: 'paternal-uncle' }, { a: 'father', b: 'paternal-aunt' },
+      { a: 'mother', b: 'maternal-uncle' }, { a: 'mother', b: 'maternal-aunt' },
+    ],
+    branchByPerson: {
+      father: 'paternal', 'paternal-uncle': 'paternal', 'paternal-aunt': 'paternal',
+      mother: 'maternal', 'maternal-uncle': 'maternal', 'maternal-aunt': 'maternal',
+      focus: 'neutral',
+    },
+  });
+  const nodes = byId(r);
+  const paternalMax = Math.max(nodes['paternal-uncle'].x, nodes['paternal-aunt'].x);
+  const maternalMin = Math.min(nodes['maternal-uncle'].x, nodes['maternal-aunt'].x);
+  assert.ok(paternalMax < nodes.father.x, 'paternal siblings stay outside and left of the father');
+  assert.ok(nodes.father.x < nodes.mother.x, 'the parental couple preserves its centre seam');
+  assert.ok(nodes.mother.x < maternalMin, 'maternal siblings stay outside and right of the mother');
+});

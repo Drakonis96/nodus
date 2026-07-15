@@ -23,6 +23,27 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.5',
+    date: '2026-07-16',
+    highlights: [
+      {
+        scope: 'genealogy',
+        es: 'Las ramas extensas ya no se mezclan: tíos, tías y sus parejas permanecen dentro del bloque paterno o materno que les corresponde, con la pareja de progenitores como frontera central y todas las generaciones centradas de forma coherente.',
+        en: 'Extended branches no longer mix: uncles, aunts and their partners remain inside their corresponding paternal or maternal block, with the parental couple as the centre seam and every generation aligned consistently.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'Las líneas horizontales del árbol se trazan únicamente por el espacio libre entre generaciones. Los nombres, las etiquetas de parentesco y las fechas cuentan además con un fondo protector para conservar siempre su legibilidad en modo claro y oscuro.',
+        en: 'Horizontal tree lines are now routed exclusively through the free space between generations. Names, kinship labels and dates also have a protective background so they remain readable in both light and dark mode.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'El árbol incorpora un buscador que localiza personas por nombre, fechas o etiqueta de parentesco, incluso sin escribir los acentos. Las coincidencias quedan iluminadas y el resto del árbol permanece visible de forma atenuada para conservar el contexto familiar.',
+        en: 'The tree now includes search across names, dates and kinship labels, with accent-insensitive matching. Matches are highlighted while the rest of the tree stays visible in a dimmed state to preserve family context.',
+      },
+    ],
+  },
+  {
     version: '2.3.4',
     date: '2026-07-16',
     highlights: [

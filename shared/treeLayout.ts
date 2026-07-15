@@ -47,6 +47,8 @@ export interface TreeLayoutInput {
   hGap?: number;
   vGap?: number;
   orientation?: 'ancestors_top' | 'ancestors_bottom';
+  /** Focus-relative branch assignment used as a hard horizontal constraint. */
+  branchByPerson?: Record<string, 'paternal' | 'maternal' | 'neutral'>;
 }
 
 export interface TreeLayoutResult {
@@ -194,6 +196,13 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
 
   const order = new Map<string, number>();
 
+  const branchRank = (members: string[]): number => {
+    const branches = new Set(members.map((id) => input.branchByPerson?.[id] ?? 'neutral'));
+    if (branches.size === 1 && branches.has('paternal')) return 0;
+    if (branches.size === 1 && branches.has('maternal')) return 2;
+    return 1;
+  };
+
   const orderGeneration = (g: number, neighbourGen: number | null) => {
     const ids = byGen.get(g)!;
     // Components via union of coupleLinks restricted to this generation.
@@ -224,9 +233,9 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
         const seq = orderComponent(members);
         const barys = members.map(nodeBary).filter((b) => b < Number.MAX_SAFE_INTEGER);
         const bary = barys.length ? barys.reduce((s, v) => s + v, 0) / barys.length : Number.MAX_SAFE_INTEGER;
-        return { seq, bary };
+        return { seq, bary, branch: branchRank(members) };
       })
-      .sort((a, b) => a.bary - b.bary);
+      .sort((a, b) => a.branch - b.branch || a.bary - b.bary);
 
     let i = 0;
     for (const comp of ordered) for (const id of comp.seq) order.set(id, i++);
@@ -246,12 +255,13 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
   const nodesById = new Map<string, TreeNode>();
   const nodes: TreeNode[] = [];
   let maxCols = 0;
+  for (const ids of byGen.values()) maxCols = Math.max(maxCols, ids.length);
   for (const g of gens) {
     const ids = byGen.get(g)!.slice().sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
-    maxCols = Math.max(maxCols, ids.length);
+    const rowOffset = ((maxCols - ids.length) * colStep) / 2;
     ids.forEach((id, col) => {
       const verticalGeneration = opts.orientation === 'ancestors_bottom' ? (gens[gens.length - 1] ?? 0) - g : g - minGen;
-      const node: TreeNode = { personId: id, generation: g, x: col * colStep, y: verticalGeneration * rowStep, coupleSide: 'none' };
+      const node: TreeNode = { personId: id, generation: g, x: rowOffset + col * colStep, y: verticalGeneration * rowStep, coupleSide: 'none' };
       nodes.push(node);
       nodesById.set(id, node);
     });
