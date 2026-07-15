@@ -764,6 +764,16 @@ export const EN: Record<string, string> = {
   'sin claves': 'no keys',
   'Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.':
     'API keys and the models you configure are shared across all your vaults.',
+  'Nodus ha encontrado claves de API cifradas que todavía no puede leer.':
+    'Nodus found encrypted API keys that it cannot read yet.',
+  'No se han borrado. Pulsa recuperar y autoriza el acceso al Llavero de macOS si el sistema lo solicita.':
+    'They have not been deleted. Choose recover and authorize macOS Keychain access if the system asks.',
+  'Claves recuperadas y protegidas de nuevo correctamente.':
+    'Keys recovered and securely protected again.',
+  'Algunas claves siguen bloqueadas. Vuelve a intentarlo y acepta el acceso al Llavero.':
+    'Some keys are still locked. Try again and allow Keychain access.',
+  'Recuperando…': 'Recovering…',
+  'Recuperar claves': 'Recover keys',
   // ── Settings ───────────────────────────────────────────────────────────────
   'Lo básico queda separado de los parámetros técnicos de análisis y extracción.':
     'The essentials are kept separate from the technical analysis and extraction parameters.',

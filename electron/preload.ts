@@ -302,6 +302,12 @@ const api: NodusApi = {
   },
   setApiKey: (provider, key) => ipcRenderer.invoke('settings:setApiKey', provider, key),
   clearApiKey: (provider) => ipcRenderer.invoke('settings:clearApiKey', provider),
+  recoverApiKeys: () => ipcRenderer.invoke('settings:recoverApiKeys'),
+  onApiKeysRecovered: (cb) => {
+    const listener = (_e: unknown, result: { recoveredProviders: import('@shared/types').AiProvider[]; remainingLockedProviders: import('@shared/types').AiProvider[] }) => cb(result);
+    ipcRenderer.on('settings:apiKeysRecovered', listener);
+    return () => ipcRenderer.removeListener('settings:apiKeysRecovered', listener);
+  },
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),

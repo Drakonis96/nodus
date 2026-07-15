@@ -12,6 +12,20 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.1',
+    date: '2026-07-15',
+    highlights: [
+      {
+        es: 'Se ha solucionado un error que impedía a Nodus leer algunas claves de API de IA ya guardadas y hacía que no aparecieran en Ajustes. Las claves no se habían borrado: esta versión las recupera de forma segura, conserva sus copias cifradas anteriores y vuelve a incluirlas en la copia protegida del workspace.',
+        en: 'Fixed an issue that prevented Nodus from reading some previously saved AI API keys, making them disappear from Settings. The keys had not been deleted: this version recovers them safely, preserves their previous encrypted copies and includes them again in the protected workspace backup.',
+      },
+      {
+        es: 'En macOS puede aparecer una solicitud del Llavero durante la recuperación. Comprueba que corresponde a Nodus y selecciona «Permitir siempre»; si la cerraste, puedes repetir la recuperación desde Ajustes → Proveedores.',
+        en: 'On macOS, Keychain may ask for permission during recovery. Check that the request belongs to Nodus and choose “Always Allow”; if you dismissed it, retry from Settings → Providers.',
+      },
+    ],
+  },
+  {
     version: '2.3.0',
     date: '2026-07-15',
     highlights: [

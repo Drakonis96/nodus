@@ -168,6 +168,15 @@ try {
   assert.ok(appSettings.lastAutoBackupAt, 'lastAutoBackupAt recorded');
   assert.ok(String(appSettings.lastAutoBackupStatus).startsWith('ok:'), 'status recorded');
 
+  // A blob that exists but cannot be decrypted must never produce a newer
+  // "complete" snapshot with an empty api-keys.json or prune the last good one.
+  globalThis.__backupTestLocked = ['openai'];
+  const lockedRun = await autoBackup.runAutoBackupNow('9.9.9-test');
+  assert.equal(lockedRun.ok, false, 'locked API keys stop the full-state backup');
+  assert.match(lockedRun.message, /proteger tus claves API/);
+  assert.equal((await readdir(backupDir)).filter((f) => f.endsWith('.nodus')).length, 1, 'last good snapshot preserved while secrets are locked');
+  globalThis.__backupTestLocked = [];
+
   // ── maybeRunAutoBackup gating ───────────────────────────────────────────────
   assert.equal(await autoBackup.maybeRunAutoBackup('9.9.9-test'), null, 'disabled → no run');
   settingsRepo.updateSettings({ autoBackupEnabled: true });
@@ -219,6 +228,7 @@ async function bundleModules() {
       'export function setApiKey() {}',
       'export function clearApiKey() {}',
       'export function providerKeyMap() { return {}; }',
+      'export function lockedApiKeyProviders() { return globalThis.__backupTestLocked ?? []; }',
     ].join('\n')
   );
   const entry = path.join(root, 'entry.ts');

@@ -164,6 +164,7 @@ import { clearNodiConversations, deleteNodiConversation, getNodiConversation, li
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword, getBackupRecoveryKey } from './secrets/secretStore';
+import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import { runAutoBackupNow } from './export/autoBackup';
 import { MIN_BACKUP_PASSWORD_LENGTH } from './export/backupCrypto';
 import { listEmbeddingModels, listModels, testLocalProvider } from './ai/providers';
@@ -1396,6 +1397,15 @@ export function registerIpc(
   });
   h('settings:setApiKey', async (_e, provider: AiProvider, key: string) => setApiKey(provider, key));
   h('settings:clearApiKey', async (_e, provider: AiProvider) => clearApiKey(provider));
+  h('settings:recoverApiKeys', async (event) => {
+    const result = await recoverLegacyApiKeys();
+    if (result.recoveredProviders.length > 0) {
+      const settings = getSettings();
+      if (settings.autoBackupEnabled && settings.autoBackupFolder) await runAutoBackupNow(app.getVersion());
+    }
+    event.sender.send('settings:apiKeysRecovered', result);
+    return result;
+  });
 
   // AI model discovery (OpenRouter needs no key; others use the stored key).
   h('ai:listModels', async (_e, provider: AiProvider) => listModels(provider, getApiKey(provider)));

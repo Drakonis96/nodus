@@ -9,7 +9,7 @@ import { closeDb, getDb, replaceDbFile, SCHEMA_VERSION } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import type { VaultType } from '@shared/types';
-import { clearApiKey, getApiKey, getBackupPassword, setApiKey } from '../secrets/secretStore';
+import { getApiKey, getBackupPassword, lockedApiKeyProviders, setApiKey } from '../secrets/secretStore';
 import {
   decryptBackupPayload,
   encryptBackupPayload,
@@ -212,6 +212,10 @@ export async function createBackupArchive(options: {
     date: new Date().toISOString(),
     zoteroUserId: settings.zoteroUserId,
   };
+  const lockedProviders = lockedApiKeyProviders();
+  if (lockedProviders.length > 0) {
+    throw new Error(`La copia se ha detenido para proteger tus claves API: ${lockedProviders.join(', ')} siguen cifradas pero el almacén seguro no permite leerlas.`);
+  }
   const includesSecrets = true;
   const apiKeys = readApiKeys();
 
@@ -829,8 +833,10 @@ function readApiKeys(): Partial<Record<AiProvider, string>> {
 
 function restoreApiKeys(keys: Partial<Record<AiProvider, string>>): void {
   for (const provider of AI_PROVIDERS) {
-    clearApiKey(provider);
     const key = keys[provider];
+    // Merge-only recovery: an absent provider can mean that the source snapshot
+    // was created while its OS keychain was temporarily unavailable. Never erase
+    // a local encrypted blob merely because an archive omits it.
     if (key) setApiKey(provider, key);
   }
 }

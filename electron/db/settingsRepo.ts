@@ -1,7 +1,7 @@
 import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
-import { providerKeyMap } from '../secrets/secretStore';
+import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import {
   GLOBAL_PREF_KEYS,
@@ -17,7 +17,7 @@ const DEFAULT_LOCAL_PROVIDERS: AppSettings['localProviders'] = {
   lmstudio: { baseUrl: DEFAULT_LOCAL_BASE_URLS.lmstudio },
 };
 
-const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
+const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   embeddingProvider: 'openai',
   embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   localProviders: DEFAULT_LOCAL_PROVIDERS,
@@ -230,7 +230,7 @@ export function getSettings(): AppSettings {
     Object.assign(merged, modelMigration.settings);
     // Keep a local fallback for the migrated payload. Common capability values
     // (including mode/version) are mirrored through the global preference store.
-    const { providerKeys: _providerKeys, ...persisted } = merged as AppSettings;
+    const { providerKeys: _providerKeys, lockedProviderKeys: _lockedProviderKeys, ...persisted } = merged as AppSettings;
     writeRaw('app', JSON.stringify(persisted));
     for (const key of SHARED_MODEL_KEYS) {
       if (key in merged) seed[key] = merged[key];
@@ -251,11 +251,11 @@ export function getSettings(): AppSettings {
     }
   }
   if (synchronized && !modelMigration.changed) {
-    const { providerKeys: _providerKeys, ...persisted } = merged as AppSettings;
+    const { providerKeys: _providerKeys, lockedProviderKeys: _lockedProviderKeys, ...persisted } = merged as AppSettings;
     writeRaw('app', JSON.stringify(persisted));
   }
   if (Object.keys(seed).length) writeGlobalPrefs(seed);
-  return { ...merged, providerKeys: providerKeyMap() };
+  return { ...merged, providerKeys: providerKeyMap(), lockedProviderKeys: lockedApiKeyProviders() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
@@ -275,7 +275,7 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const { global, local } = splitGlobalPatch(patch);
   if (Object.keys(global).length) writeGlobalPrefs(global);
   // providerKeys is derived from the secret store, never persisted.
-  const { providerKeys: _ignore, ...rest } = { ...current, ...local };
+  const { providerKeys: _ignore, lockedProviderKeys: _ignoreLocked, ...rest } = { ...current, ...local };
   // Never persist the theme/language keys into the per-vault blob (they'd shadow the
   // shared store and drift), so keep them exclusively in the global prefs file.
   for (const key of GLOBAL_PREF_KEYS) delete (rest as Record<string, unknown>)[key];

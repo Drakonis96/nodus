@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "test:e2e": "node scripts/e2e-smoke.mjs",
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
+    "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",

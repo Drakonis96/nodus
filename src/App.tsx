@@ -421,6 +421,8 @@ export function App() {
     void reloadSettings();
   }, [reloadSettings]);
 
+  useEffect(() => window.nodus?.onApiKeysRecovered(() => { void reloadSettings(); }), [reloadSettings]);
+
   // In "system" theme mode, follow the OS light/dark preference as it changes.
   useEffect(() => {
     if (settings?.theme !== 'system') return;

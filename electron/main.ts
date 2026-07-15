@@ -7,7 +7,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { getDb, closeDb } from './db/database';
 import { reconcileAuthorLayerOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
-import { maybeRunAutoBackup } from './export/autoBackup';
+import { maybeRunAutoBackup, runAutoBackupNow } from './export/autoBackup';
 import { registerIpc } from './ipc';
 import { scanQueue } from './pipeline/scanQueue';
 import { getSettings } from './db/settingsRepo';
@@ -21,14 +21,15 @@ import { applyMascotWindow, destroyMascotWindow } from './mascotWindow';
 import { seedWelcomeNotification } from './notifications';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
 import { restorePersistedDockIcon } from './dockIcon';
+import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
 import type { UpdateCheckResponse, UpdateProgressEvent } from '@shared/types';
 
 const require = createRequire(__filename);
 const { autoUpdater } = require('electron-updater') as typeof import('electron-updater');
 
-// Keep the application identity explicit in development and packaged builds.
-// macOS uses this name when another application (for example Calendar) opens
-// content exported by Nodus.
+// 2.3.0 made the display name explicit, which also changed the macOS Safe Storage
+// service from "nodus" to "Nodus". The normal process keeps the current name;
+// recovery explicitly requests either released credential from macOS Keychain.
 app.setName('Nodus');
 
 if (process.platform === 'linux') {
@@ -375,6 +376,23 @@ app.whenReady().then(() => {
   setCopilotWindowProvider(() => mainWindow);
   registerIpc(() => mainWindow, () => checkForUpdates('manual'), installDownloadedUpdate);
   createWindow();
+
+  // Recover API keys encrypted by the pre-2.3 lowercase Safe Storage identity.
+  // The window is created first so any macOS Keychain authorization prompt has
+  // visible app context. On success the renderer refreshes Settings, and the
+  // configured recovery workspace immediately receives a complete new snapshot.
+  void recoverLegacyApiKeys().then(async (result) => {
+    if (result.recoveredProviders.length > 0) {
+      mainWindow?.webContents.send('settings:apiKeysRecovered', result);
+      const recoverySettings = getSettings();
+      if (recoverySettings.autoBackupEnabled && recoverySettings.autoBackupFolder) {
+        const backup = await runAutoBackupNow(app.getVersion());
+        console.log(`[backup] API-key recovery snapshot: ${backup.ok ? 'ok' : 'error'}: ${backup.message}`);
+      }
+    } else if (result.remainingLockedProviders.length > 0) {
+      mainWindow?.webContents.send('settings:apiKeysRecovered', result);
+    }
+  }).catch((error) => console.error(`[secrets] recovery failed safely: ${error instanceof Error ? error.message : String(error)}`));
 
   const settings = getSettings();
   // Queue resume is opt-in: pending DB state may come from previous automatic versions.

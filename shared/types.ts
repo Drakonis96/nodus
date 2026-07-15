@@ -1026,6 +1026,9 @@ export interface AppSettings {
   embeddingModel: string;
   // Per-provider key presence (the keys themselves never cross IPC).
   providerKeys: Record<AiProvider, boolean>;
+  /** Encrypted key files exist but the current OS secure-storage identity cannot
+   * decrypt them yet. The renderer receives provider ids only, never key data. */
+  lockedProviderKeys: AiProvider[];
   // Connection settings for local providers (Ollama, LM Studio). The base URL is
   // user-editable; an optional access token, when set, is stored like an API key.
   localProviders: Record<LocalProvider, LocalProviderConfig>;
@@ -4940,6 +4943,10 @@ export interface NodusApi {
   onCopilotOpenIdea(cb: (target: CopilotOpenIdeaTarget) => void): () => void;
   setApiKey(provider: AiProvider, key: string): Promise<void>;
   clearApiKey(provider: AiProvider): Promise<void>;
+  recoverApiKeys(): Promise<{ recoveredProviders: AiProvider[]; remainingLockedProviders: AiProvider[] }>;
+  onApiKeysRecovered(
+    cb: (result: { recoveredProviders: AiProvider[]; remainingLockedProviders: AiProvider[] }) => void
+  ): () => void;
 
   // AI model discovery
   listModels(provider: AiProvider): Promise<ModelInfo[]>;

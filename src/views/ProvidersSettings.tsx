@@ -22,6 +22,8 @@ export function ProvidersSettings({
   onChange: () => Promise<unknown>;
 }) {
   const [open, setOpen] = useState<AiProvider | null>(null);
+  const [recoveringKeys, setRecoveringKeys] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   const favorites = settings.favorites ?? [];
   const isFav = (m: ModelRef) => favorites.some((f) => sameModel(f, m));
@@ -40,6 +42,41 @@ export function ProvidersSettings({
       <p className="mb-4 text-xs leading-5 text-neutral-500">
         {t('Las claves de API y los modelos configurados se comparten entre todas tus bóvedas.')}
       </p>
+
+      {(settings.lockedProviderKeys?.length ?? 0) > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-100" data-testid="locked-api-key-recovery">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <b>{t('Nodus ha encontrado claves de API cifradas que todavía no puede leer.')}</b>
+              <p className="mt-1 leading-5 text-amber-800 dark:text-neutral-400">
+                {t('No se han borrado. Pulsa recuperar y autoriza el acceso al Llavero de macOS si el sistema lo solicita.')}
+              </p>
+            </div>
+            <button
+              className="btn btn-primary"
+              disabled={recoveringKeys}
+              onClick={async () => {
+                setRecoveringKeys(true);
+                setRecoveryMessage(null);
+                try {
+                  const result = await window.nodus.recoverApiKeys();
+                  await onChange();
+                  setRecoveryMessage(result.remainingLockedProviders.length === 0
+                    ? t('Claves recuperadas y protegidas de nuevo correctamente.')
+                    : t('Algunas claves siguen bloqueadas. Vuelve a intentarlo y acepta el acceso al Llavero.'));
+                } catch (error) {
+                  setRecoveryMessage(error instanceof Error ? error.message : String(error));
+                } finally {
+                  setRecoveringKeys(false);
+                }
+              }}
+            >
+              {recoveringKeys ? t('Recuperando…') : t('Recuperar claves')}
+            </button>
+          </div>
+          {recoveryMessage && <p className="mt-2 text-amber-800 dark:text-neutral-300">{recoveryMessage}</p>}
+        </div>
+      )}
 
       {/* Favorites feed every independent workload/feature selector. */}
       <div className="mb-4 text-sm">

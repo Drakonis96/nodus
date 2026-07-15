@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AiProvider } from '@shared/types';
 import { AI_PROVIDERS as PROVIDERS } from '@shared/providers';
-import { activeVaultDir } from '../vaults/vaultRegistry';
+import { activeVaultDir, listVaults } from '../vaults/vaultRegistry';
 
 // AI API keys are stored per provider, encrypted-at-rest via Electron safeStorage,
 // never in the renderer and never in plaintext on disk. Keys never cross IPC to the UI.
@@ -25,6 +25,48 @@ function keyFile(provider: AiProvider): string {
   return keyFileInDir(globalSecretsDir(), provider);
 }
 
+function legacyRootKeyFile(provider: AiProvider): string {
+  return keyFileInDir(app.getPath('userData'), provider);
+}
+
+/** Every location used by released Nodus versions. The global file remains the
+ * canonical target; the others are read-only recovery candidates. */
+export function apiKeyCandidateFiles(provider: AiProvider): string[] {
+  const candidates = [keyFile(provider), legacyRootKeyFile(provider)];
+  const currentRoot = app.getPath('userData');
+  const parent = path.dirname(currentRoot);
+  // app.setName('Nodus') also changed the default userData casing on
+  // case-sensitive systems. Scan both released roots on every platform;
+  // inode/path deduplication below makes this harmless on Windows and macOS.
+  const roots = [currentRoot, path.join(parent, 'nodus'), path.join(parent, 'Nodus')];
+  for (const root of [...new Set(roots)]) {
+    candidates.push(keyFileInDir(path.join(root, 'secrets'), provider), keyFileInDir(root, provider));
+    const vaultsRoot = path.join(root, 'vaults');
+    try {
+      for (const name of fs.readdirSync(vaultsRoot)) candidates.push(keyFileInDir(path.join(vaultsRoot, name), provider));
+    } catch { /* no historical vault directory */ }
+  }
+  try {
+    candidates.push(...listVaults().map((vault) => keyFileInDir(path.dirname(vault.path), provider)));
+  } catch {
+    try { candidates.push(keyFileInDir(activeVaultDir(), provider)); } catch { /* no registry yet */ }
+  }
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    if (!fs.existsSync(candidate)) continue;
+    let identity = path.resolve(candidate);
+    try {
+      const stat = fs.statSync(candidate);
+      identity = `${stat.dev}:${stat.ino}`;
+    } catch { /* keep the resolved path identity */ }
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    unique.push(path.resolve(candidate));
+  }
+  return unique;
+}
+
 function readKeyFile(file: string): string | null {
   if (!fs.existsSync(file)) return null;
   const buf = fs.readFileSync(file);
@@ -44,26 +86,34 @@ export function setApiKey(provider: AiProvider, key: string): void {
     return;
   }
   const file = keyFile(provider);
+  const historicalFiles = apiKeyCandidateFiles(provider).filter((candidate) => !sameFile(candidate, file));
   fs.mkdirSync(path.dirname(file), { recursive: true });
+  preserveLockedFile(file);
+  const write = (data: Buffer) => writeSecretAtomically(file, data);
   if (!safeStorage.isEncryptionAvailable()) {
-    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
-    return;
+    write(Buffer.from(`b64:${Buffer.from(key).toString('base64')}`));
+  } else {
+    write(safeStorage.encryptString(key));
   }
-  fs.writeFileSync(file, safeStorage.encryptString(key));
+  // Once the canonical write is verified, retire exact-name copies from older
+  // roots/vaults so a future recovery can never resurrect a stale credential.
+  if (readKeyFile(file) === key) historicalFiles.forEach(retireHistoricalFile);
 }
 
 export function getApiKey(provider: AiProvider): string | null {
-  const fromGlobal = readKeyFile(keyFile(provider));
+  const canonical = keyFile(provider);
+  const fromGlobal = readKeyFile(canonical);
   if (fromGlobal !== null) return fromGlobal;
-  // One-time migration: an older per-vault key is promoted to the shared store.
-  try {
-    const legacy = readKeyFile(keyFileInDir(activeVaultDir(), provider));
+  // One-time migration: any readable key from a released root/vault location
+  // is promoted to the current global store. This also covers Windows/Linux
+  // userData casing changes, where the OS credential itself remains readable.
+  for (const candidate of apiKeyCandidateFiles(provider)) {
+    if (sameFile(candidate, canonical)) continue;
+    const legacy = readKeyFile(candidate);
     if (legacy !== null) {
       setApiKey(provider, legacy);
       return legacy;
     }
-  } catch {
-    /* no active vault (headless) */
   }
   return null;
 }
@@ -73,8 +123,68 @@ export function hasApiKey(provider: AiProvider): boolean {
 }
 
 export function clearApiKey(provider: AiProvider): void {
-  const file = keyFile(provider);
-  if (fs.existsSync(file)) fs.unlinkSync(file);
+  // An explicit delete applies to every released storage location; otherwise an
+  // old per-vault copy could silently recreate the key on the next read.
+  for (const file of apiKeyCandidateFiles(provider)) {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+}
+
+function sameFile(a: string, b: string): boolean {
+  try {
+    const left = fs.statSync(a);
+    const right = fs.statSync(b);
+    return left.dev === right.dev && left.ino === right.ino;
+  } catch {
+    return path.resolve(a) === path.resolve(b);
+  }
+}
+
+function writeSecretAtomically(file: string, data: Buffer): void {
+  const temporary = `${file}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(temporary, data, { mode: 0o600 });
+  fs.renameSync(temporary, file);
+  try { fs.chmodSync(file, 0o600); } catch { /* best effort on Windows */ }
+}
+
+/** Never overwrite the only copy of a blob that exists but the current OS
+ * credential cannot decrypt. This archive is still OS-bound and is not treated
+ * as a portable backup; it is only an emergency rollback for the migration. */
+function preserveLockedFile(file: string): void {
+  if (!fs.existsSync(file) || readKeyFile(file) !== null) return;
+  archiveEncryptedFile(file);
+}
+
+function archiveEncryptedFile(file: string): void {
+  const contents = fs.readFileSync(file);
+  if (contents.toString('utf8').startsWith('b64:')) return;
+  const archiveDir = path.join(globalSecretsDir(), 'locked-archive');
+  fs.mkdirSync(archiveDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const sourceHint = Buffer.from(path.dirname(file)).toString('base64url').slice(-8);
+  const target = path.join(archiveDir, `${path.basename(file, '.bin')}-${stamp}-${sourceHint}.bin`);
+  fs.writeFileSync(target, contents, { flag: 'wx', mode: 0o600 });
+  try { fs.chmodSync(target, 0o600); } catch { /* best effort on Windows */ }
+}
+
+function retireHistoricalFile(file: string): void {
+  try {
+    archiveEncryptedFile(file);
+    fs.unlinkSync(file);
+  } catch {
+    // The verified canonical key remains available; retry cleanup next time.
+  }
+}
+
+export type ApiKeyStorageState = 'available' | 'locked' | 'missing';
+
+export function apiKeyStorageState(provider: AiProvider): ApiKeyStorageState {
+  if (getApiKey(provider) !== null) return 'available';
+  return apiKeyCandidateFiles(provider).length > 0 ? 'locked' : 'missing';
+}
+
+export function lockedApiKeyProviders(): AiProvider[] {
+  return PROVIDERS.filter((provider) => apiKeyStorageState(provider) === 'locked');
 }
 
 // ── Cloud audio-provider keys ────────────────────────────────────────────────
