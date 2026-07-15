@@ -13,6 +13,11 @@ test('E2E IPC waits are polled from Node instead of returning async promises to 
   assert.match(smoke, /async function waitForCondition\(/);
 });
 
+test('generic CSS presence waits select one match instead of relying on Playwright strict mode', () => {
+  assert.doesNotMatch(smoke, /page\.locator\((?:'[^']*'|"[^"]*"|`[^`]*`)\)\.waitFor\(/);
+  assert.match(smoke, /page\.locator\('\.study-editor-shell \.md \.katex'\)\.first\(\)\.waitFor\(/);
+});
+
 test('accessibility controls expose stable selectors used by the E2E smoke', () => {
   for (const testId of ['accessibility-font', 'accessibility-contrast', 'accessibility-motion', 'accessibility-reading']) {
     assert.match(settings, new RegExp(`data-testid=["']${testId}["']`));

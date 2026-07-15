@@ -587,7 +587,7 @@ try {
   console.log('[e2e] study logo, search padding, sidebar flow and creation dialogs ok');
 
   if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY !== '1') {
-  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-toggle').click();
   await page.getByTestId('study-dictation').waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-dictation').innerText(), /ONNX|Local|offline/i, 'dictation panel defaults to the offline ONNX backend');
@@ -683,7 +683,7 @@ try {
   await page.getByTestId('study-improve-dialog').locator('header button').last().click();
 
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
-  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+    await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
@@ -729,16 +729,16 @@ try {
   assert.match(unchangedAfterImprovement ?? '', /Texto \*\*importante\*\* con \$x\^2\$\./, 'failed improvement leaves the selected Markdown untouched');
   console.log('[e2e] compact prompt manager + four contextual streaming shortcuts + failure preservation ok');
 
-  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown .katex').waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown table.children').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .katex').first().waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown table.children').first().waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
     const range = document.createRange();
     range.selectNodeContents(root); range.collapse(false);
     const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
   });
   await page.getByTestId('study-heading-level').selectOption('2');
-  await page.locator('.study-milkdown .ProseMirror h2').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror h2').first().waitFor({ timeout: 30_000 });
   assert.equal(await page.locator('.study-milkdown .ProseMirror').getByText('## Título', { exact: true }).count(), 0, 'visual heading insertion creates a heading node rather than literal Markdown');
   await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -769,7 +769,7 @@ try {
   const splitButton = page.getByRole('button', { name: 'Dividir vista', exact: true });
   await splitButton.click();
   assert.match(await splitButton.getAttribute('class'), /bg-indigo-100/, 'active split-view control uses its light-theme state');
-  await page.locator('.study-editor-shell .md .katex').waitFor({ timeout: 30_000 });
+  await page.locator('.study-editor-shell .md .katex').first().waitFor({ timeout: 30_000 });
   assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
   console.log('[e2e] study Milkdown editor + metadata + raw Markdown + versioning ok');
   }
@@ -798,7 +798,7 @@ try {
   assert.equal(typeof userNoteId, 'string');
   await page.getByTestId(`study-material-note-${userNoteId}`).waitFor();
   await page.getByTestId(`study-material-note-${userNoteId}`).click();
-  await page.locator('.study-editor-shell').waitFor({ timeout: 30_000 });
+  await page.locator('.study-editor-shell').first().waitFor({ timeout: 30_000 });
   assert.match(await page.getByRole('tab', { selected: true }).innerText(), /Apunte smoke/, 'a user-created note opens from Materials');
   await page.getByRole('button', { name: 'Materiales', exact: true }).click();
   await page.getByTestId('study-materials-view').waitFor({ timeout: 30_000 });
@@ -968,7 +968,7 @@ try {
     await page.getByText(label, { exact: true }).last().click();
   }
   await page.getByText('Apunte smoke', { exact: true }).last().click();
-  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
 
   // ── Study narration: selection/cursor modes, formula speech and dictionary ─
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
