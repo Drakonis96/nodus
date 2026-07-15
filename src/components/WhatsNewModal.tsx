@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState, type CSSProperties } from 'react';
-import { releaseNotesSince } from '@shared/releaseNotes';
+import { releaseNotesSince, type ReleaseNoteScope } from '@shared/releaseNotes';
 import { Icon } from './ui';
 import { t } from '../i18n';
 import { Nodi } from './nodi/Nodi';
@@ -11,6 +11,18 @@ import { Nodi } from './nodi/Nodi';
 // the user dismisses the modal, so it never reappears for the same version.
 
 const LAST_SEEN_KEY = 'nodus.lastSeenVersion';
+
+const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string }> = {
+  general: { icon: 'network', color: '#64748b' },
+  academic: { icon: 'network', color: '#6366f1' },
+  estudio: { icon: 'graduation', color: '#0f766e' },
+  primary_sources: { icon: 'archive', color: '#6366f1' },
+  genealogy: { icon: 'tree', color: '#ca8a04' },
+  databases: { icon: 'table', color: '#b30333' },
+  testimonios: { icon: 'microphone', color: '#0891b2' },
+  worldbuilding: { icon: 'globe', color: '#7c3aed' },
+  docencia: { icon: 'presentation', color: '#ea580c' },
+};
 
 function readLastSeen(): string | null {
   try {
@@ -100,12 +112,22 @@ export function WhatsNewModal({ uiLanguage, onSettled }: { uiLanguage: 'es' | 'e
             <section key={note.version} className="whats-new-release-card">
               <div className="whats-new-release-version">v{note.version}</div>
               <ul>
-                {note.highlights.map((h, i) => (
-                  <li key={i}>
-                    <span className="whats-new-check"><Icon name="check" size={13} /></span>
-                    <span>{h[lang]}</span>
-                  </li>
-                ))}
+                {note.highlights.map((h, i) => {
+                  const scope = h.scope ?? 'general';
+                  const scopeMeta = RELEASE_SCOPE_META[scope];
+                  return (
+                    <li key={i}>
+                      <span
+                        className={`whats-new-scope whats-new-scope-${scope}`}
+                        data-testid={`whats-new-scope-${scope}`}
+                        style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
+                      >
+                        <Icon name={scopeMeta.icon} size={13} />
+                      </span>
+                      <span>{h[lang]}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           ))}

@@ -1224,6 +1224,8 @@ export interface AppSettings {
   sidebarCustomized: boolean;
   /** Default wooden frame design for the genealogy tree (per-person overrides win). */
   treeFrame: string;
+  /** Family-tree vertical direction. Legacy vaults default to ancestors on top. */
+  treeOrientation: 'ancestors_top' | 'ancestors_bottom';
   // ── Recovery and automatic encrypted backups ──────────────────────────────
   /** Version of the global recovery-folder onboarding contract completed here. */
   recoverySetupVersion: number;
@@ -1404,7 +1406,7 @@ export type RecordEvidenceTargetKind = 'person' | 'place' | 'event' | 'participa
 export type RecordSourceKind = 'work' | 'archive';
 
 // Kinship (genealogy layer, phase C)
-export type RelationshipType = 'parent' | 'spouse';
+export type RelationshipType = 'parent' | 'spouse' | 'sibling';
 export type RelationshipProvenance = 'user_asserted' | 'ai_confirmed';
 /** Nuance on a parent edge: null = biological/default, 'adoptive' for adoptions. */
 export type RelationshipSubtype = 'adoptive' | null;
@@ -4753,6 +4755,13 @@ export interface NodusApi {
     toPerson: string,
     type: RelationshipType,
     provenance?: RelationshipProvenance,
+    subtype?: RelationshipSubtype
+  ): Promise<Relationship | null>;
+  updateRelationship(
+    relId: string,
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
     subtype?: RelationshipSubtype
   ): Promise<Relationship | null>;
   setPersonFrame(personId: string, frameStyle: string | null): Promise<void>;

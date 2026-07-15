@@ -31,13 +31,14 @@ export interface TreeNode {
 export interface TreeEdge {
   from: string;
   to: string;
-  kind: 'parent' | 'spouse';
+  kind: 'parent' | 'spouse' | 'sibling';
 }
 
 export interface TreeLayoutInput {
   focusId: string;
   parentEdges: { parent: string; child: string }[];
   spouseEdges: { a: string; b: string }[];
+  siblingEdges?: { a: string; b: string }[];
   persons?: TreePersonAttr[];
   ancestorDepth?: number;
   descendantDepth?: number;
@@ -45,6 +46,7 @@ export interface TreeLayoutInput {
   nodeHeight?: number;
   hGap?: number;
   vGap?: number;
+  orientation?: 'ancestors_top' | 'ancestors_bottom';
 }
 
 export interface TreeLayoutResult {
@@ -63,6 +65,7 @@ const DEFAULTS = {
   nodeHeight: 64,
   hGap: 28,
   vGap: 88,
+  orientation: 'ancestors_top' as const,
 };
 
 function pairKey(a: string, b: string): string {
@@ -90,6 +93,11 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
   for (const { a, b } of input.spouseEdges) {
     (spousesOf.get(a) ?? spousesOf.set(a, []).get(a)!).push(b);
     (spousesOf.get(b) ?? spousesOf.set(b, []).get(b)!).push(a);
+  }
+  const siblingsOf = new Map<string, string[]>();
+  for (const { a, b } of input.siblingEdges ?? []) {
+    (siblingsOf.get(a) ?? siblingsOf.set(a, []).get(a)!).push(b);
+    (siblingsOf.get(b) ?? siblingsOf.set(b, []).get(b)!).push(a);
   }
 
   // ── Generations (BFS up + down; nearest-to-focus wins; spouses share a gen) ──
@@ -119,6 +127,12 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
       if (!generation.has(spouse) && Math.abs(g) <= Math.max(opts.ancestorDepth, opts.descendantDepth)) {
         generation.set(spouse, g);
         queue.push(spouse);
+      }
+    }
+    for (const sibling of siblingsOf.get(id) ?? []) {
+      if (!generation.has(sibling)) {
+        generation.set(sibling, g);
+        queue.push(sibling);
       }
     }
   }
@@ -236,7 +250,8 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
     const ids = byGen.get(g)!.slice().sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
     maxCols = Math.max(maxCols, ids.length);
     ids.forEach((id, col) => {
-      const node: TreeNode = { personId: id, generation: g, x: col * colStep, y: (g - minGen) * rowStep, coupleSide: 'none' };
+      const verticalGeneration = opts.orientation === 'ancestors_bottom' ? (gens[gens.length - 1] ?? 0) - g : g - minGen;
+      const node: TreeNode = { personId: id, generation: g, x: col * colStep, y: verticalGeneration * rowStep, coupleSide: 'none' };
       nodes.push(node);
       nodesById.set(id, node);
     });
@@ -256,6 +271,11 @@ export function computeTreeLayout(input: TreeLayoutInput): TreeLayoutResult {
   }
   for (const { a, b } of input.spouseEdges) {
     if (present.has(a) && present.has(b)) edges.push({ from: a, to: b, kind: 'spouse' });
+  }
+  for (const { a, b } of input.siblingEdges ?? []) {
+    if (present.has(a) && present.has(b) && generation.get(a) === generation.get(b)) {
+      edges.push({ from: a, to: b, kind: 'sibling' });
+    }
   }
 
   return {

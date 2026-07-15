@@ -100,7 +100,7 @@ export function buildFamilyFacts(): FamilyFacts {
     if (r.type === 'parent') {
       push(children, r.fromPerson, nameById.get(r.toPerson));
       push(parents, r.toPerson, nameById.get(r.fromPerson));
-    } else {
+    } else if (r.type === 'spouse') {
       push(spouses, r.fromPerson, nameById.get(r.toPerson));
       push(spouses, r.toPerson, nameById.get(r.fromPerson));
     }

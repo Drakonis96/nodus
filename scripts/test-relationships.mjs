@@ -59,6 +59,14 @@ try {
   assert.deepEqual(rel.siblingIdsOf(hijo1), [hijo2], 'sibling derived from shared parents');
   assert.deepEqual(rel.spouseIdsOf(padre), [madre]);
 
+  // Explicit siblings remain representable even when their parents are unknown.
+  const huerfano1 = mk('Hermano sin padres 1');
+  const huerfano2 = mk('Hermano sin padres 2');
+  rel.addRelationship(huerfano1, huerfano2, 'sibling');
+  rel.addRelationship(huerfano2, huerfano1, 'sibling');
+  assert.equal(rel.allRelationships().filter((r) => r.type === 'sibling').length, 1, 'sibling pair stored once');
+  assert.deepEqual(rel.siblingIdsOf(huerfano1), [huerfano2], 'explicit sibling resolves symmetrically');
+
   const kin = rel.kinOf(padre);
   assert.deepEqual(new Set(kin.parents.map((p) => p.displayName)), new Set(['Abuelo', 'Abuela']));
   assert.deepEqual(new Set(kin.children.map((p) => p.displayName)), new Set(['Hijo 1', 'Hijo 2']));
@@ -84,6 +92,18 @@ try {
 
   // Self relationship is rejected.
   assert.equal(rel.addRelationship(padre, padre, 'parent'), null);
+
+  // Existing rows can be edited atomically: reverse direction, change type and
+  // collapse onto a duplicate without leaving a transient missing relationship.
+  const editable = rel.addRelationship(huerfano1, hijo1, 'parent');
+  assert.ok(editable);
+  const reversed = rel.updateRelationship(editable.relId, hijo1, huerfano1, 'parent', 'adoptive');
+  assert.equal(reversed.fromPerson, hijo1);
+  assert.equal(reversed.toPerson, huerfano1);
+  assert.equal(reversed.subtype, 'adoptive');
+  const changedType = rel.updateRelationship(reversed.relId, hijo1, huerfano1, 'sibling');
+  assert.equal(changedType.type, 'sibling');
+  rel.removeRelationship(changedType.relId);
 
   // Cascade: deleting a person removes their relationships.
   ent.deletePerson(hijo2);

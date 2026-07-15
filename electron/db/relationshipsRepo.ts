@@ -1,6 +1,6 @@
 // Kinship layer (genealogy): explicit parent/spouse relationships between persons,
-// the specialisation the family tree is built on. Siblings are derived (shared
-// parent), never stored. Provenance ('user_asserted' | 'ai_confirmed') is tracked so
+// the specialisation the family tree is built on. Siblings are derived when parents
+// are known, or explicitly stored when they are not. Provenance is tracked so
 // every tree edge is auditable back to who asserted it.
 
 import { getDb } from './database';
@@ -36,7 +36,7 @@ function rowToRel(row: RelRow): Relationship {
 
 /**
  * Add a relationship. For 'parent', direction matters (from = parent, to = child).
- * For the symmetric 'spouse', the pair is normalised (smaller id first) so (A,B) and
+ * Symmetric spouse/sibling pairs are normalised (smaller id first), so (A,B) and
  * (B,A) collapse onto one row. Idempotent on the unique (from,to,type) triple.
  */
 export function addRelationship(
@@ -50,7 +50,7 @@ export function addRelationship(
   if (fromPerson === toPerson) return null;
   let a = fromPerson;
   let b = toPerson;
-  if (type === 'spouse' && a > b) [a, b] = [b, a];
+  if ((type === 'spouse' || type === 'sibling') && a > b) [a, b] = [b, a];
 
   const db = getDb();
   const existing = db
@@ -76,6 +76,38 @@ export function addRelationship(
 export function getRelationship(relId: string): Relationship | null {
   const row = getDb().prepare('SELECT * FROM relationships WHERE rel_id = ?').get(relId) as RelRow | undefined;
   return row ? rowToRel(row) : null;
+}
+
+/** Edit a relationship without an intermediate delete, preserving provenance/notes. */
+export function updateRelationship(
+  relId: string,
+  fromPerson: string,
+  toPerson: string,
+  type: RelationshipType,
+  subtype: RelationshipSubtype = null
+): Relationship | null {
+  if (fromPerson === toPerson) return null;
+  const current = getRelationship(relId);
+  if (!current) return null;
+  let a = fromPerson;
+  let b = toPerson;
+  if ((type === 'spouse' || type === 'sibling') && a > b) [a, b] = [b, a];
+  const db = getDb();
+  const duplicate = db
+    .prepare('SELECT rel_id FROM relationships WHERE from_person = ? AND to_person = ? AND type = ? AND rel_id != ?')
+    .get(a, b, type, relId) as { rel_id: string } | undefined;
+  if (duplicate) {
+    const tx = db.transaction(() => {
+      db.prepare('UPDATE relationships SET provenance = ?, subtype = COALESCE(?, subtype), notes = COALESCE(?, notes) WHERE rel_id = ?')
+        .run(current.provenance, subtype, current.notes, duplicate.rel_id);
+      db.prepare('DELETE FROM relationships WHERE rel_id = ?').run(relId);
+    });
+    tx();
+    return getRelationship(duplicate.rel_id);
+  }
+  db.prepare('UPDATE relationships SET from_person = ?, to_person = ?, type = ?, subtype = ? WHERE rel_id = ?')
+    .run(a, b, type, type === 'parent' ? subtype : null, relId);
+  return getRelationship(relId);
 }
 
 export function removeRelationship(relId: string): void {
@@ -127,18 +159,25 @@ export function spouseIdsOf(personId: string): string[] {
   ).map((r) => (r.from_person === personId ? r.to_person : r.from_person));
 }
 
-/** Siblings = persons who share at least one parent, excluding self. */
+/** Siblings = people sharing a parent plus explicit sibling links, without duplicates. */
 export function siblingIdsOf(personId: string): string[] {
   const parents = parentIdsOf(personId);
-  if (parents.length === 0) return [];
-  const placeholders = parents.map(() => '?').join(', ');
-  const rows = getDb()
-    .prepare(
-      `SELECT DISTINCT to_person FROM relationships
-       WHERE type = 'parent' AND from_person IN (${placeholders}) AND to_person != ?`
-    )
-    .all(...parents, personId) as { to_person: string }[];
-  return rows.map((r) => r.to_person);
+  const ids = new Set<string>();
+  if (parents.length > 0) {
+    const placeholders = parents.map(() => '?').join(', ');
+    const rows = getDb()
+      .prepare(
+        `SELECT DISTINCT to_person FROM relationships
+         WHERE type = 'parent' AND from_person IN (${placeholders}) AND to_person != ?`
+      )
+      .all(...parents, personId) as { to_person: string }[];
+    for (const row of rows) ids.add(row.to_person);
+  }
+  const explicit = getDb()
+    .prepare("SELECT from_person, to_person FROM relationships WHERE type = 'sibling' AND (from_person = ? OR to_person = ?)")
+    .all(personId, personId) as { from_person: string; to_person: string }[];
+  for (const row of explicit) ids.add(row.from_person === personId ? row.to_person : row.from_person);
+  return [...ids];
 }
 
 /** A person's immediate kin, resolved to Person objects, for the ficha and the tree. */

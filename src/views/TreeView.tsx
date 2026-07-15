@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, Person, Relationship, RelationshipType } from '@shared/types';
+import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { parseHistoricalDate } from '@shared/genealogyDates';
+import { parentAgeWarning } from '@shared/kinshipRelations';
 import { mirrorDefaultPortrait } from '@shared/treePortraits';
 import { effectiveFrame, TREE_FRAMES } from '@shared/treeFrames';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
 import { PersonDossier } from '../components/PersonDossier';
+import { KinshipEditor } from '../components/KinshipEditor';
 import { useIsLightTheme } from '../hooks';
 import { t } from '../i18n';
 
@@ -45,6 +47,7 @@ export function TreeView({
   const nameFill = light ? '#27272a' : '#e4e4e7';
   const dateFill = light ? '#52525b' : '#a1a1aa';
   const vaultFrame = settings?.treeFrame ?? 'oak';
+  const orientation = settings?.treeOrientation ?? 'ancestors_top';
 
   const reload = useCallback(async () => {
     const [ps, rs] = await Promise.all([window.nodus.listPersons(), window.nodus.allRelationships()]);
@@ -62,6 +65,12 @@ export function TreeView({
     () => new Set(rels.filter((r) => r.type === 'parent' && r.subtype === 'adoptive').map((r) => `${r.fromPerson}->${r.toPerson}`)),
     [rels]
   );
+  const inconsistentParentSet = useMemo(() => new Set(
+    rels.filter((relationship) => relationship.type === 'parent' && parentAgeWarning(
+      personById.get(relationship.fromPerson)?.birthDate,
+      personById.get(relationship.toPerson)?.birthDate
+    ) != null).map((relationship) => `${relationship.fromPerson}->${relationship.toPerson}`)
+  ), [personById, rels]);
 
   const layout: TreeLayoutResult = useMemo(
     () =>
@@ -70,17 +79,22 @@ export function TreeView({
         persons: persons.map((p) => ({ id: p.personId, sex: p.sex, birthYear: parseHistoricalDate(p.birthDate).year })),
         parentEdges: rels.filter((r) => r.type === 'parent').map((r) => ({ parent: r.fromPerson, child: r.toPerson })),
         spouseEdges: rels.filter((r) => r.type === 'spouse').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
+        siblingEdges: rels.filter((r) => r.type === 'sibling').map((r) => ({ a: r.fromPerson, b: r.toPerson })),
         nodeWidth: NODE_W,
         nodeHeight: NODE_H,
         vGap: 52,
+        orientation,
       }),
-    [focusId, rels, persons]
+    [focusId, orientation, rels, persons]
   );
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
-  const center = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + NODE_H / 2 });
   const frameTop = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD });
   const frameBottom = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H });
+  const frameSide = (id: string, side: 'left' | 'right') => ({
+    x: (pos.get(id)?.x ?? 0) + PAD + (NODE_W - FRAME_W) / 2 + (side === 'right' ? FRAME_W : 0),
+    y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H / 2,
+  });
 
   if (persons.length === 0) {
     return (
@@ -113,6 +127,14 @@ export function TreeView({
             </option>
           ))}
         </select>
+        <button
+          className="btn btn-ghost h-9 gap-1.5 border border-neutral-700 px-2 text-xs"
+          title={t('Invertir la orientación vertical del árbol')}
+          onClick={() => void window.nodus.updateSettings({ treeOrientation: orientation === 'ancestors_top' ? 'ancestors_bottom' : 'ancestors_top' }).then(() => onSettingsChange?.())}
+        >
+          <Icon name={orientation === 'ancestors_top' ? 'arrowUp' : 'arrowDown'} size={13} />
+          {orientation === 'ancestors_top' ? t('Ascendientes arriba') : t('Ascendientes abajo')}
+        </button>
         <div className="ml-auto flex items-center gap-1">
           <button className="btn btn-ghost px-2 py-1" onClick={() => setZoom((z) => Math.max(0.4, z - 0.15))}>
             <Icon name="minus" />
@@ -134,24 +156,26 @@ export function TreeView({
         >
           <TreeFrameDefs />
           {layout.edges.map((e, i) => {
-            if (e.kind === 'spouse') {
-              const a = center(e.from);
-              const b = center(e.to);
-              return <line key={`s${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#8a5a2b" strokeWidth={2.5} strokeDasharray="2 4" strokeLinecap="round" />;
+            if (e.kind === 'spouse' || e.kind === 'sibling') {
+              const fromLeft = (pos.get(e.from)?.x ?? 0) < (pos.get(e.to)?.x ?? 0);
+              const a = frameSide(e.from, fromLeft ? 'right' : 'left');
+              const b = frameSide(e.to, fromLeft ? 'left' : 'right');
+              return <line key={`${e.kind}${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={e.kind === 'spouse' ? '#8a5a2b' : '#64748b'} strokeWidth={e.kind === 'spouse' ? 2.5 : 1.5} strokeDasharray={e.kind === 'spouse' ? '2 4' : '7 4'} strokeLinecap="round" />;
             }
-            // parent → child: elbow from the parent's frame bottom to the child's top.
-            const a = frameBottom(e.from);
-            const b = frameTop(e.to);
+            // Parent → child always exits toward the next generation, in either view.
+            const a = orientation === 'ancestors_top' ? frameBottom(e.from) : frameTop(e.from);
+            const b = orientation === 'ancestors_top' ? frameTop(e.to) : frameBottom(e.to);
             const adoptive = adoptiveSet.has(`${e.from}->${e.to}`);
+            const inconsistent = inconsistentParentSet.has(`${e.from}->${e.to}`);
             const midY = (a.y + b.y) / 2;
             return (
               <path
                 key={`p${i}`}
                 d={`M ${a.x} ${a.y} V ${midY} H ${b.x} V ${b.y}`}
                 fill="none"
-                stroke={adoptive ? '#6b7280' : '#4b5563'}
-                strokeWidth={1.5}
-                strokeDasharray={adoptive ? '5 4' : undefined}
+                stroke={inconsistent ? '#d97706' : adoptive ? '#6b7280' : '#4b5563'}
+                strokeWidth={inconsistent ? 2 : 1.5}
+                strokeDasharray={inconsistent ? '3 3' : adoptive ? '5 4' : undefined}
               />
             );
           })}
@@ -265,47 +289,15 @@ function NodePanel({
   onOpenDossier: () => void;
   onChanged: () => Promise<void>;
 }) {
-  const [relType, setRelType] = useState<'father' | 'mother' | 'child' | 'spouse'>('child');
-  const [otherId, setOtherId] = useState('');
-  const [adoptive, setAdoptive] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  const others = persons.filter((p) => p.personId !== person.personId);
   const currentFrame = effectiveFrame(person.frameStyle, vaultFrame);
-  const isParentRel = relType !== 'spouse';
 
   const setFrameForPerson = async (frame: string) => {
     await window.nodus.setPersonFrame(person.personId, frame);
     await onChanged();
   };
 
-  const connect = async () => {
-    if (!otherId) return;
-    setBusy(true);
-    try {
-      // Map the chosen relation to a directed kinship edge from `person`.
-      let from = person.personId;
-      let to = otherId;
-      let type: RelationshipType = 'parent';
-      if (relType === 'child') {
-        type = 'parent'; // person is the parent of the other
-      } else if (relType === 'father' || relType === 'mother') {
-        type = 'parent'; // the other is the parent of person
-        from = otherId;
-        to = person.personId;
-      } else {
-        type = 'spouse';
-      }
-      await window.nodus.addRelationship(from, to, type, 'user_asserted', type === 'parent' && adoptive ? 'adoptive' : null);
-      await onChanged();
-      onClose();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-80 border-l border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
+    <div className="fixed inset-y-0 right-0 z-40 w-80 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h2 className="font-semibold">{person.displayName}</h2>
@@ -352,33 +344,8 @@ function NodePanel({
         </button>
       </div>
 
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Añadir conexión')}</h3>
-      <div className="space-y-2">
-        <select className="input h-9 w-full text-sm" value={relType} onChange={(e) => setRelType(e.target.value as typeof relType)}>
-          <option value="child">{t('…es hijo/a de esta persona')}</option>
-          <option value="father">{t('…es el padre de esta persona')}</option>
-          <option value="mother">{t('…es la madre de esta persona')}</option>
-          <option value="spouse">{t('…es cónyuge de esta persona')}</option>
-        </select>
-        <select className="input h-9 w-full text-sm" value={otherId} onChange={(e) => setOtherId(e.target.value)}>
-          <option value="">{t('Elegir persona…')}</option>
-          {others.map((p) => (
-            <option key={p.personId} value={p.personId}>
-              {p.displayName}
-            </option>
-          ))}
-        </select>
-        {isParentRel && (
-          <label className="flex items-center gap-2 text-xs text-neutral-400">
-            <input type="checkbox" checked={adoptive} onChange={(e) => setAdoptive(e.target.checked)} />
-            {t('Relación adoptiva')}
-          </label>
-        )}
-        <button className="btn btn-primary w-full" disabled={busy || !otherId} onClick={() => void connect()}>
-          {t('Conectar')}
-        </button>
-        <p className="text-xs text-neutral-500">{t('Las conexiones que añades quedan marcadas como afirmadas por ti.')}</p>
-      </div>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Añadir parentesco')}</h3>
+      <KinshipEditor person={person} persons={persons} onChanged={onChanged} compact />
     </div>
   );
 }

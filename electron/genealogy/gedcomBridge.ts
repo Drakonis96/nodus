@@ -144,7 +144,7 @@ export function toGedcomData(persons: Person[], relationships: Relationship[], e
       const list = parentsOf.get(r.toPerson) ?? [];
       list.push(r.fromPerson);
       parentsOf.set(r.toPerson, list);
-    } else {
+    } else if (r.type === 'spouse') {
       spousePairs.add(pairKey(r.fromPerson, r.toPerson));
     }
   }

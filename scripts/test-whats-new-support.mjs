@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modal = await readFile(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
+const releaseNotes = await readFile(path.join(root, 'shared/releaseNotes.ts'), 'utf8');
+const styles = await readFile(path.join(root, 'src/index.css'), 'utf8');
 const translations = await readFile(path.join(root, 'src/i18n.en.ts'), 'utf8');
 const icons = await readFile(path.join(root, 'src/components/ui.tsx'), 'utf8');
 
@@ -19,6 +21,15 @@ assert.equal((modal.match(/https:\/\/paypal\.me\/Jorgepb96/g) ?? []).length, 2);
 assert.match(modal, /<footer className="whats-new-footer">[\s\S]*whats-new-footer-support[\s\S]*Explorar las novedades[\s\S]*<\/footer>/);
 assert.match(modal, /<div className="whats-new-release-version">v\{note\.version\}<\/div>/);
 assert.match(modal, /note\.highlights\.map[\s\S]*<li key=\{i\}>/);
+assert.match(modal, /const scope = h\.scope \?\? 'general'/);
+assert.match(modal, /data-testid=\{`whats-new-scope-\$\{scope\}`\}/);
+assert.match(modal, /genealogy: \{ icon: 'tree', color: '#ca8a04' \}/);
+assert.match(modal, /general: \{ icon: 'network', color: '#64748b' \}/);
+assert.match(releaseNotes, /version: '2\.3\.3'[\s\S]*scope: 'genealogy'[\s\S]*scope: 'general'/);
+assert.match(styles, /\.whats-new-scope \{[\s\S]*border-radius: 7px/);
+assert.match(styles, /\.light \.whats-new-scope-general/);
+assert.match(styles, /\.whats-new-scope-general/);
+assert.doesNotMatch(styles, /\.whats-new-check/);
 assert.doesNotMatch(modal, /<motion\.li/);
 assert.match(modal, /Icon name="paypal"/);
 assert.match(modal, /https:\/\/paypal\.me\/Jorgepb96/);

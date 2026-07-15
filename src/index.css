@@ -2075,8 +2075,9 @@ select.input optgroup {
 .whats-new-release-card li > span:last-child { color: var(--wn-text); opacity: 1; }
 .light .whats-new-release-card li > span:last-child { color: #172033; }
 .whats-new-release-card li + li { border-top: 1px solid var(--wn-border); }
-.whats-new-check { display: grid; width: 23px; height: 23px; flex: 0 0 auto; place-items: center; margin-top: 1px; border-radius: 50%; color: #0f766e; background: #ccfbf1; }
-.dark .whats-new-check { color: #5eead4; background: rgb(13 148 136 / .18); }
+.whats-new-scope { --wn-scope-color: #64748b; display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; margin-top: 1px; border: 1px solid rgb(255 255 255 / .22); border-radius: 7px; color: white; background: var(--wn-scope-color); box-shadow: 0 5px 14px color-mix(in srgb, var(--wn-scope-color) 28%, transparent); }
+.whats-new-scope-general { color: #e2e8f0; background: #475569; box-shadow: 0 5px 14px rgb(15 23 42 / .22); }
+.light .whats-new-scope-general { border-color: #cbd5e1; color: #334155; background: #e2e8f0; box-shadow: 0 5px 12px rgb(15 23 42 / .1); }
 .whats-new-support { display: flex; align-items: center; gap: 14px; border: 1px solid rgb(0 112 186 / .25); border-radius: 17px; padding: 16px 18px; background: linear-gradient(105deg, rgb(0 112 186 / .1), rgb(0 156 222 / .035)); }
 .whats-new-support-icon { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 13px; color: white; background: linear-gradient(145deg, #0089d6, #005ea6); box-shadow: 0 10px 24px rgb(0 112 186 / .25); }
 .whats-new-support-label { color: #0284c7; font-size: 9px; font-weight: 800; letter-spacing: .12em; }

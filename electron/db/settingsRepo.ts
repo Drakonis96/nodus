@@ -126,6 +126,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarHidden: [],
   sidebarCustomized: false,
   treeFrame: 'oak',
+  treeOrientation: 'ancestors_top',
   recoverySetupVersion: 0,
   backupVaultIds: [],
   backupIncludePreferences: true,

@@ -184,3 +184,28 @@ test('depth limits prune far generations; empty focus is empty', () => {
   assert.ok(ids.has('child'));
   assert.deepEqual(computeTreeLayout({ focusId: '', parentEdges: [], spouseEdges: [] }).nodes, []);
 });
+
+test('ancestors are above by default and the optional inverted view mirrors vertical order', () => {
+  const input = {
+    focusId: 'child',
+    parentEdges: [{ parent: 'parent', child: 'child' }],
+    spouseEdges: [],
+  };
+  const normal = byId(computeTreeLayout(input));
+  const inverted = byId(computeTreeLayout({ ...input, orientation: 'ancestors_bottom' }));
+  assert.ok(normal.parent.y < normal.child.y, 'default puts the parent above the child');
+  assert.ok(inverted.parent.y > inverted.child.y, 'inverted view puts the parent below the child');
+});
+
+test('explicit siblings stay in the same generation and receive a sibling connector', () => {
+  const r = computeTreeLayout({
+    focusId: 'a',
+    parentEdges: [],
+    spouseEdges: [],
+    siblingEdges: [{ a: 'a', b: 'b' }],
+  });
+  const nodes = byId(r);
+  assert.equal(nodes.a.generation, nodes.b.generation);
+  assert.equal(nodes.a.y, nodes.b.y);
+  assert.deepEqual(r.edges.filter((edge) => edge.kind === 'sibling'), [{ from: 'a', to: 'b', kind: 'sibling' }]);
+});

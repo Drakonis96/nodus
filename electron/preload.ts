@@ -136,6 +136,8 @@ const api: NodusApi = {
   deleteRecordEvidence: (id) => ipcRenderer.invoke('entities:deleteEvidence', id).then(() => undefined),
   addRelationship: (fromPerson, toPerson, type, provenance, subtype) =>
     ipcRenderer.invoke('entities:addRelationship', fromPerson, toPerson, type, provenance, subtype),
+  updateRelationship: (relId, fromPerson, toPerson, type, subtype) =>
+    ipcRenderer.invoke('entities:updateRelationship', relId, fromPerson, toPerson, type, subtype),
   setPersonFrame: (personId, frameStyle) =>
     ipcRenderer.invoke('entities:setPersonFrame', personId, frameStyle).then(() => undefined),
   generatePersonBiography: (personId) => ipcRenderer.invoke('entities:generateBiography', personId),

@@ -3,14 +3,51 @@
 // UI language. Keep these short and user-facing — they are product notes, not a
 // changelog. Add a new entry at the top whenever the app version bumps.
 
+import type { VaultType } from './vaultTypes';
+
+export type ReleaseNoteScope = 'general' | VaultType;
+
+export interface ReleaseHighlight {
+  es: string;
+  en: string;
+  /** Missing on historical notes means a general, app-wide change. */
+  scope?: ReleaseNoteScope;
+}
+
 export interface ReleaseNote {
   version: string;
   /** ISO date (YYYY-MM-DD) the version shipped. */
   date: string;
-  highlights: { es: string; en: string }[];
+  highlights: ReleaseHighlight[];
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: '2.3.3',
+    date: '2026-07-15',
+    highlights: [
+      {
+        scope: 'genealogy',
+        es: 'Las relaciones familiares se pueden crear desde la ficha de una persona o desde el propio árbol mediante un selector claro: progenitor, hijo o hija, hermano o hermana y pareja. Al añadir descendencia puedes indicar los dos progenitores conocidos o solamente uno.',
+        en: 'Family relationships can now be created from a person dossier or directly from the tree with a clear selector: parent, child, sibling or partner. When adding a child, you can specify both known parents or just one.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'El panel derecho del árbol conserva todas las relaciones de la persona seleccionada para poder editarlas, invertirlas o eliminarlas. También avisa de fechas cronológicamente improbables sin bloquear los casos históricos que necesites documentar.',
+        en: 'The tree sidebar now keeps every relationship for the selected person visible, so you can edit, reverse or delete it. It also warns about chronologically unlikely dates without blocking historical cases you need to document.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'El árbol coloca por defecto a los antepasados arriba y permite invertir la orientación. Se han corregido la disposición y las líneas de progenitores, hijos, hermanos y parejas, manteniendo compatibles las relaciones que ya existían.',
+        en: 'The tree now places ancestors at the top by default and can optionally reverse its orientation. Parent, child, sibling and partner layout and connectors have been corrected while keeping existing relationships compatible.',
+      },
+      {
+        scope: 'general',
+        es: 'El modal de novedades identifica visualmente cada cambio: los cambios generales usan un icono neutro y los específicos de una bóveda muestran su color e icono correspondientes, tanto en modo claro como oscuro.',
+        en: 'The What’s New modal now identifies every change visually: general changes use a neutral icon, while vault-specific changes show the corresponding colour and icon in both light and dark mode.',
+      },
+    ],
+  },
   {
     version: '2.3.2',
     date: '2026-07-15',

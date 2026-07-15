@@ -20,6 +20,7 @@ import { EVENT_TYPE_LABEL, FACT_LABEL } from './personLabels';
 import { MarkdownNotesEditor } from './MarkdownNotesEditor';
 import { RelationsSection } from './RelationsSection';
 import { PersonPlacesSection } from './PersonPlacesSection';
+import { KinshipEditor } from './KinshipEditor';
 import { confirm } from './feedback';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
@@ -75,6 +76,7 @@ export function PersonDossier({
   const [events, setEvents] = useState<HistoricalEvent[]>([]);
   const [evidence, setEvidence] = useState<RecordEvidence[]>([]);
   const [kin, setKin] = useState<Kin | null>(null);
+  const [persons, setPersons] = useState<Person[]>([]);
   const [documents, setDocuments] = useState<ArchiveItem[]>([]);
   const [suggestions, setSuggestions] = useState<MatchCandidatePair[]>([]);
   const [kinSuggestions, setKinSuggestions] = useState<KinSuggestion[]>([]);
@@ -88,6 +90,7 @@ export function PersonDossier({
     void window.nodus.listEvents({ personId: person.personId }).then(setEvents);
     void window.nodus.listRecordEvidence('person', person.personId).then(setEvidence);
     void window.nodus.kinOf(person.personId).then(setKin);
+    void window.nodus.listPersons().then(setPersons);
     void window.nodus.listArchiveItemsForPerson(person.personId).then(setDocuments);
     void window.nodus.findMatches().then((all) =>
       setSuggestions(all.filter((m) => m.aId === person.personId || m.bId === person.personId))
@@ -343,6 +346,15 @@ export function PersonDossier({
           </div>
         </section>
       )}
+
+      <KinshipEditor
+        person={person}
+        persons={persons}
+        onChanged={async () => {
+          await load();
+          await onChanged();
+        }}
+      />
 
       <RelationsSection personId={person.personId} onNavigate={onNavigate} />
 

@@ -421,6 +421,7 @@ import { generatePersonBiography } from './ai/personBiography';
 import { isVisionMime } from '@shared/imageAnalysis';
 import {
   addRelationship,
+  updateRelationship,
   removeRelationship,
   listRelationshipsForPerson,
   allRelationships,
@@ -910,6 +911,14 @@ export function registerIpc(
     provenance?: RelationshipProvenance,
     subtype?: RelationshipSubtype
   ) => addRelationship(fromPerson, toPerson, type, provenance ?? 'user_asserted', subtype ?? null));
+  h('entities:updateRelationship', async (
+    _e,
+    relId: string,
+    fromPerson: string,
+    toPerson: string,
+    type: RelationshipType,
+    subtype?: RelationshipSubtype
+  ) => updateRelationship(relId, fromPerson, toPerson, type, subtype ?? null));
   h('entities:setPersonFrame', async (_e, personId: string, frameStyle: string | null) => {
     setPersonFrame(personId, frameStyle);
   });
