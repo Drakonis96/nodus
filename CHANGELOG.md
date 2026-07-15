@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.3.2 — 2026-07-15
+
+### Fixed
+
+- Restores each vault's embedding provider/model from the metadata attached to
+  its existing vectors when the 2.3 migration replaced that selection with the
+  OpenAI default. The repair does not delete or reindex embeddings, and future
+  intentional model changes are not reverted.
+- Recovers favorite models by merging the per-vault fallback copies that 2.3
+  left intact, without deleting any newer favorite.
+- Restores differentiated task-model choices from the retired 2.2 global fields
+  when 2.3 incorrectly collapsed them into basic mode.
+- Keeps the basic/advanced mode, migration version and embedding selection with
+  the vault they describe. A new or basic vault can no longer overwrite another
+  vault's advanced task configuration or vector-index selection.
+- Includes the 2.3.1 Safe Storage repair that recovers AI API keys hidden by the
+  macOS application-name migration and preserves their encrypted historical
+  copies.
+
+### Notes
+
+- Recovery is evidence-based and one-shot. Existing vector BLOBs and user
+  documents are never rewritten by this settings migration.
+
 ## 2.2.0 — 2026-07-13
 
 ### Added

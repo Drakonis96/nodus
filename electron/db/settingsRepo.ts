@@ -3,6 +3,7 @@ import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
+import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   GLOBAL_PREF_KEYS,
   SHARED_MODEL_KEYS,
@@ -187,6 +188,7 @@ export function getSettings(): AppSettings {
   };
   merged.embeddingProvider = normalizeEmbeddingProvider((parsed as Partial<AppSettings>).embeddingProvider);
   if (!merged.embeddingModel?.trim()) merged.embeddingModel = DEFAULT_EMBEDDING_MODELS[merged.embeddingProvider];
+  Object.assign(merged, recoverV23VaultEmbeddingSelection(merged as AppSettings));
   // v1.4.0 and older exposed one global header selector. Preserve that user's
   // choice once by seeding the workload settings, then retire the global value
   // so future selectors cannot affect one another through a hidden fallback.
@@ -202,7 +204,7 @@ export function getSettings(): AppSettings {
   // App-wide preferences (theme, language) are shared across every vault: overlay the
   // global store, seeding it once from this vault's value so existing users keep their
   // current theme/language when the first new vault is created.
-  const globalPrefs = readGlobalPrefs();
+  const globalPrefs = recoverV23SharedModelPrefs() as ReturnType<typeof readGlobalPrefs>;
   const seed: Record<string, unknown> = {};
   for (const key of GLOBAL_PREF_KEYS) {
     if (globalPrefs[key] === undefined) seed[key] = merged[key];
@@ -225,7 +227,7 @@ export function getSettings(): AppSettings {
     merged.sttProvider = 'transformers';
     seed.sttProvider = 'transformers';
   }
-  const modelMigration = migrateModelSettings(merged);
+  const modelMigration = migrateModelSettings(merged, globalPrefs);
   if (modelMigration.changed) {
     Object.assign(merged, modelMigration.settings);
     // Keep a local fallback for the migrated payload. Common capability values

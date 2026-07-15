@@ -48,8 +48,11 @@ const studyModelKeys = ['improveModel', 'questionGenModel', 'gradingModel', 'fla
 const settingsTypes = await source('shared/types.ts');
 const settingsRepo = await source('electron/db/settingsRepo.ts');
 const appPrefs = await source('electron/db/appPrefs.ts');
-for (const key of ['modelSettingsMode', 'modelSettingsVersion', 'synthesisModel', 'embeddingProvider', 'sttProvider', 'audioProvider']) {
+for (const key of ['synthesisModel', 'sttProvider', 'audioProvider']) {
   assert.ok(appPrefs.includes(`  '${key}',`), `${key} must be shared as a common capability setting`);
+}
+for (const key of ['modelSettingsMode', 'modelSettingsVersion', 'embeddingProvider', 'embeddingModel']) {
+  assert.ok(!appPrefs.includes(`  '${key}',`), `${key} must stay with the vault whose task choices and vector index it describes`);
 }
 for (const key of studyModelKeys) {
   assert.ok(settingsTypes.includes(`${key}: ModelRef | null`), `${key} must be typed independently`);

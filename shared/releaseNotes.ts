@@ -12,6 +12,24 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.2',
+    date: '2026-07-15',
+    highlights: [
+      {
+        es: 'Se ha solucionado un error que impedía a Nodus leer algunas claves de API de IA ya guardadas y hacía que no aparecieran en Ajustes. Las claves no se habían borrado: Nodus las recupera de forma segura y vuelve a incluirlas en la copia protegida del workspace.',
+        en: 'Fixed an issue that prevented Nodus from reading some previously saved AI API keys, making them disappear from Settings. The keys had not been deleted: Nodus recovers them safely and includes them again in the protected workspace backup.',
+      },
+      {
+        es: 'Nodus vuelve a detectar el modelo con el que se creó el índice de cada workspace. Si tus embeddings se generaron, por ejemplo, con BGE-M3 mediante OpenRouter, ese modelo reaparece seleccionado sin borrar ni reindexar ningún vector.',
+        en: 'Nodus now detects the model used to build each workspace index again. If your embeddings were generated, for example, with BGE-M3 through OpenRouter, that model is selected again without deleting or reindexing any vectors.',
+      },
+      {
+        es: 'También se recuperan los modelos destacados y las selecciones por tarea conservadas antes de la migración. El modo básico o avanzado y el modelo de embeddings vuelven a pertenecer a cada workspace, evitando que uno sobrescriba la configuración de otro.',
+        en: 'Favorite models and per-task selections preserved before the migration are recovered too. Basic or advanced mode and the embedding model belong to each workspace again, preventing one workspace from overwriting another.',
+      },
+    ],
+  },
+  {
     version: '2.3.1',
     date: '2026-07-15',
     highlights: [

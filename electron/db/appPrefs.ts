@@ -53,10 +53,6 @@ export type GlobalPrefKey = (typeof GLOBAL_PREF_KEYS)[number];
 export const SHARED_MODEL_KEYS = [
   'favorites',
   'localProviders',
-  'modelSettingsMode',
-  'modelSettingsVersion',
-  'embeddingProvider',
-  'embeddingModel',
   'extractionModel',
   'visionModel',
   'synthesisModel',
@@ -84,21 +80,30 @@ function prefsFile(): string {
   return path.join(app.getPath('userData'), 'app-prefs.json');
 }
 
-export function readGlobalPrefs(): Partial<Pick<AppSettings, SharedPrefKey>> {
+export function readGlobalPrefsRaw(): Record<string, unknown> {
   try {
-    return JSON.parse(fs.readFileSync(prefsFile(), 'utf8'));
+    const parsed = JSON.parse(fs.readFileSync(prefsFile(), 'utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
   } catch {
     return {};
   }
 }
 
-export function writeGlobalPrefs(patch: Partial<Pick<AppSettings, SharedPrefKey>>): void {
-  const next = { ...readGlobalPrefs(), ...patch };
+export function readGlobalPrefs(): Partial<Pick<AppSettings, SharedPrefKey>> {
+  return readGlobalPrefsRaw() as Partial<Pick<AppSettings, SharedPrefKey>>;
+}
+
+export function writeGlobalPrefsRaw(patch: Record<string, unknown>): void {
+  const next = { ...readGlobalPrefsRaw(), ...patch };
   const target = prefsFile();
   fs.mkdirSync(path.dirname(target), { recursive: true });
   const temporary = `${target}.tmp-${process.pid}-${Math.random().toString(36).slice(2)}`;
   fs.writeFileSync(temporary, JSON.stringify(next, null, 2));
   fs.renameSync(temporary, target);
+}
+
+export function writeGlobalPrefs(patch: Partial<Pick<AppSettings, SharedPrefKey>>): void {
+  writeGlobalPrefsRaw(patch as Record<string, unknown>);
 }
 
 /** Split a settings patch into its global (shared) and per-vault parts. Language/theme

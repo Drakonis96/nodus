@@ -46,6 +46,30 @@ try {
   assert.equal(repeated.changed, false, 'migration only runs once');
   assert.strictEqual(repeated.settings, current, 'current settings are not rewritten');
 
+  const integrated = { provider: 'nodus', model: 'qwen3.5-0.8b-q4' };
+  const gemini = { provider: 'gemini', model: 'gemini-3.1-flash-lite' };
+  const brokenV23 = {
+    ...base(),
+    modelSettingsVersion: 2,
+    modelSettingsMode: 'basic',
+    synthesisModel: integrated,
+    ...Object.fromEntries(GRANULAR_MODEL_KEYS.map((key) => [key, integrated])),
+  };
+  const recoveredV23 = migrateModelSettings(brokenV23, {
+    chatModel: gemini,
+    deepResearchModel: gemini,
+    writingModel: integrated,
+  });
+  assert.equal(recoveredV23.settings.modelSettingsVersion, MODEL_SETTINGS_VERSION);
+  assert.equal(recoveredV23.settings.modelSettingsMode, 'advanced', 'ignored 2.2 task choices restore advanced mode');
+  assert.deepEqual(recoveredV23.settings.chatModel, gemini, 'the retired global chat choice is recovered');
+  assert.deepEqual(recoveredV23.settings.deepResearchModel, gemini, 'the retired research choice is recovered');
+  assert.deepEqual(recoveredV23.settings.writingModel, integrated);
+
+  const intentionalAdvanced = { ...brokenV23, modelSettingsMode: 'advanced', chatModel: gemini };
+  const preservedAdvanced = migrateModelSettings(intentionalAdvanced, { chatModel: a });
+  assert.deepEqual(preservedAdvanced.settings.chatModel, gemini, 'a surviving differentiated setup is never replaced by stale evidence');
+
   console.log('simplified model settings migration tests passed');
 } finally {
   await rm(tmp, { recursive: true, force: true });
