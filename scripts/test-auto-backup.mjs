@@ -1,6 +1,6 @@
 // Automatic encrypted backups: drives the REAL autoBackup + exportImport +
 // backupCrypto modules against a scratch DB and proves the contract — one
-// master password for every backup, secret-free v3 archives, atomic writes,
+// master password for every backup, full-state archives, atomic writes,
 // GFS retention scoped per machine, and the due-scheduling logic. Runs under
 // Electron-as-Node so better-sqlite3 matches the app ABI.
 import assert from 'node:assert/strict';
@@ -49,7 +49,8 @@ try {
   const bundle = await bundleModules();
   globalThis.__backupTestDb = db;
   globalThis.__backupTestPassword = 'mi-frase-maestra';
-  const { autoBackup, exportImport, crypto } = require(bundle);
+  globalThis.__backupTestRecoveryKey = null;
+  const { autoBackup, exportImport, crypto, settingsRepo } = require(bundle);
   const AdmZip = require('adm-zip');
 
   // ── Pure scheduling + naming logic ──────────────────────────────────────────
@@ -95,10 +96,19 @@ try {
   assert.ok(doomed.includes(mk('mac-a', 2026, 7, 3)), 'mid-month surplus pruned');
   assert.ok(doomed.length >= 8, `a real chunk of surplus goes (${doomed.length} pruned)`);
 
-  // ── Real backup run: v3 archive, no secrets, atomic write, status persisted ─
+  // ── Real v6 full backup: recovery key, secrets, atomic write ────────────────
   const backupDir = path.join(root, 'backups');
   await mkdir(backupDir, { recursive: true });
-  db.prepare('UPDATE settings SET value = json_set(value, ?, ?) WHERE key = ?').run('$.autoBackupFolder', backupDir, 'app');
+  settingsRepo.updateSettings({
+    autoBackupFolder: backupDir,
+    // Simulate stale granular preferences from an older release. They must not
+    // be able to reduce a new backup under the full-state invariant.
+    backupVaultIds: ['does-not-exist'],
+    backupIncludePreferences: false,
+    backupIncludeHistories: false,
+    backupIncludeGeneratedMedia: false,
+    backupIncludeApiKeys: false,
+  });
 
   const result = await autoBackup.runAutoBackupNow('9.9.9-test');
   assert.equal(result.ok, true, `backup runs: ${result.message}`);
@@ -108,20 +118,35 @@ try {
   const zip = new AdmZip(path.join(backupDir, written[0]));
   const manifest = JSON.parse(zip.readAsText('manifest.json'));
   assert.equal(manifest.format, 'nodus.encrypted-backup');
-  assert.equal(manifest.formatVersion, 4, 'automatic backups are v4 (multi-vault, secret-free)');
-  assert.equal(manifest.includesSecrets, false);
+  assert.equal(manifest.formatVersion, 6, 'automatic backups are v6 (password + independent recovery key)');
+  assert.equal(manifest.includesSecrets, true);
   assert.equal(manifest.appVersion, '9.9.9-test');
   assert.ok(manifest.vaultCount >= 1, 'at least one vault backed up');
 
-  const payload = new AdmZip(crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), 'mi-frase-maestra', manifest.cipher));
+  assert.ok(zip.getEntry('recovery-key.bin'), 'password-wrapped recovery key is present');
+  const recoveredKey = crypto.decryptBackupPayload(
+    zip.getEntry('recovery-key.bin').getData(),
+    'mi-frase-maestra',
+    manifest.recovery.wrappedKeyCipher
+  ).toString('utf8');
+  assert.equal(recoveredKey, globalThis.__backupTestRecoveryKey, 'master password unwraps the stable recovery key');
+  const payload = new AdmZip(crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), recoveredKey, manifest.cipher));
   const names = payload.getEntries().map((e) => e.entryName).sort();
-  assert.ok(!names.includes('api-keys.json'), 'no API keys inside');
+  assert.ok(names.includes('api-keys.json'), 'API keys are protected inside the encrypted full-state payload');
   assert.ok(names.includes('registry.json'), 'the vault registry is included');
   const dbEntryName = names.find((n) => /^vaults\/.+\/database\.sqlite$/.test(n));
   const invEntryName = names.find((n) => /^vaults\/.+\/inventory\.json$/.test(n));
   assert.ok(dbEntryName && invEntryName, 'each vault carries its DB snapshot + inventory');
   const registry = JSON.parse(payload.readAsText('registry.json'));
   assert.ok(Array.isArray(registry.vaults) && registry.vaults.length >= 1, 'registry lists the vaults');
+  const payloadManifest = JSON.parse(payload.readAsText('payload-manifest.json'));
+  assert.deepEqual(payloadManifest.selection, {
+    vaultIds: [],
+    includePreferences: true,
+    includeHistories: true,
+    includeGeneratedMedia: true,
+    includeApiKeys: true,
+  }, 'stale granular settings are overridden by the full-state backup invariant');
 
   // The DB snapshot inside is a valid SQLite file with the scrubbed settings row.
   const snapshotFile = path.join(root, 'snapshot-check.sqlite');
@@ -133,24 +158,21 @@ try {
   snap.close();
 
   assert.throws(
-    () => crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), 'contraseña-equivocada', manifest.cipher),
-    'wrong master password refuses to decrypt'
+    () => crypto.decryptBackupPayload(zip.getEntry('recovery-key.bin').getData(), 'contraseña-equivocada', manifest.recovery.wrappedKeyCipher),
+    'wrong master password refuses to unwrap the recovery key'
   );
+  assert.doesNotThrow(() => crypto.decryptBackupPayload(zip.getEntry('backup.bin').getData(), recoveredKey, manifest.cipher), 'recovery key independently decrypts the payload');
 
   // Status + timestamp persisted for the UI and the scheduler.
-  const appSettings = JSON.parse(db.prepare("SELECT value FROM settings WHERE key = 'app'").get().value);
+  const appSettings = settingsRepo.getSettings();
   assert.ok(appSettings.lastAutoBackupAt, 'lastAutoBackupAt recorded');
   assert.ok(String(appSettings.lastAutoBackupStatus).startsWith('ok:'), 'status recorded');
 
   // ── maybeRunAutoBackup gating ───────────────────────────────────────────────
   assert.equal(await autoBackup.maybeRunAutoBackup('9.9.9-test'), null, 'disabled → no run');
-  db.prepare('UPDATE settings SET value = json_set(value, ?, json(?)) WHERE key = ?').run('$.autoBackupEnabled', 'true', 'app');
+  settingsRepo.updateSettings({ autoBackupEnabled: true });
   assert.equal(await autoBackup.maybeRunAutoBackup('9.9.9-test'), null, 'enabled but fresh → no run');
-  db.prepare('UPDATE settings SET value = json_set(value, ?, ?) WHERE key = ?').run(
-    '$.lastAutoBackupAt',
-    new Date(Date.now() - 48 * 3600e3).toISOString(),
-    'app'
-  );
+  settingsRepo.updateSettings({ lastAutoBackupAt: new Date(Date.now() - 48 * 3600e3).toISOString() });
   const scheduled = await autoBackup.maybeRunAutoBackup('9.9.9-test');
   assert.equal(scheduled?.ok, true, 'overdue → scheduler runs a backup');
 
@@ -159,14 +181,15 @@ try {
   assert.equal(await autoBackup.maybeRunAutoBackup('9.9.9-test'), null, 'no master password → paused, no error');
   globalThis.__backupTestPassword = 'mi-frase-maestra';
 
-  // ── The manual export (with secrets) still produces importable v2 ───────────
-  const manual = await exportImport.createBackupArchive({ password: 'clave-manual-larga', includeSecrets: true, appVersion: 'x' });
+  // ── Manual exports also provide a second independent recovery credential ───
+  const manualRecoveryKey = 'clave-recuperacion-manual-independiente';
+  const manual = await exportImport.createBackupArchive({ password: 'clave-manual-larga', recoveryKey: manualRecoveryKey, appVersion: 'x' });
   const manualZip = new AdmZip(manual);
   const manualManifest = JSON.parse(manualZip.readAsText('manifest.json'));
-  assert.equal(manualManifest.formatVersion, 4, 'manual export is v4 (multi-vault) with secrets');
+  assert.equal(manualManifest.formatVersion, 6, 'manual export is v6 and supports an independent recovery key');
   assert.equal(manualManifest.includesSecrets, true, 'manual export includes secrets');
   const manualPayload = new AdmZip(
-    crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), 'clave-manual-larga', manualManifest.cipher)
+    crypto.decryptBackupPayload(manualZip.getEntry('backup.bin').getData(), manualRecoveryKey, manualManifest.cipher)
   );
   assert.ok(manualPayload.getEntry('api-keys.json'), 'manual export still carries keys');
 
@@ -190,6 +213,8 @@ async function bundleModules() {
     [
       'export function getBackupPassword() { return globalThis.__backupTestPassword ?? null; }',
       'export function hasBackupPassword() { return Boolean(globalThis.__backupTestPassword); }',
+      'export function getBackupRecoveryKey() { return globalThis.__backupTestRecoveryKey ?? null; }',
+      'export function setBackupRecoveryKey(value) { globalThis.__backupTestRecoveryKey = value; }',
       "export function getApiKey(p) { return p === 'openai' ? 'sk-test' : null; }",
       'export function setApiKey() {}',
       'export function clearApiKey() {}',
@@ -203,6 +228,7 @@ async function bundleModules() {
       `export * as autoBackup from ${JSON.stringify(path.join(repoRoot, 'electron/export/autoBackup.ts'))};`,
       `export * as exportImport from ${JSON.stringify(path.join(repoRoot, 'electron/export/exportImport.ts'))};`,
       `export * as crypto from ${JSON.stringify(path.join(repoRoot, 'electron/export/backupCrypto.ts'))};`,
+      `export * as settingsRepo from ${JSON.stringify(path.join(repoRoot, 'electron/db/settingsRepo.ts'))};`,
     ].join('\n')
   );
   const out = path.join(root, 'bundle.cjs');

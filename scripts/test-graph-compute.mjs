@@ -89,6 +89,33 @@ try {
   assert.deepEqual(strip(chunked), strip(oracle), 'chunked fallback identical to sync');
   assert.ok(yields > 0, 'chunked variant actually yields to the event loop');
 
+  // ── Approximate neighbour pipeline (shortlist covers this small fixture) ───
+  const neighborCandidates = candidates.slice(0, 40);
+  const neighborOracle = [];
+  for (const query of centroids) {
+    neighborOracle.push(...neighborCandidates
+      .filter((candidate) => candidate.id !== query.id)
+      .map((candidate) => ({ queryId: query.id, candidateId: candidate.id, similarity: core.cosineF32(query.vector, candidate.vector) }))
+      .filter((match) => match.similarity >= THRESHOLD)
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, MAXPC));
+  }
+  const nearest = core.topApproximateNeighbors(centroids, neighborCandidates, THRESHOLD, MAXPC);
+  assert.deepEqual(stripNeighbors(nearest), stripNeighbors(neighborOracle), 'two-stage neighbours retain exact top-k on a covered shortlist');
+  let neighborYields = 0;
+  const nearestChunked = await core.topApproximateNeighborsChunked(
+    centroids,
+    neighborCandidates,
+    THRESHOLD,
+    MAXPC,
+    async () => { neighborYields += 1; },
+    64,
+    64,
+    20
+  );
+  assert.deepEqual(stripNeighbors(nearestChunked), stripNeighbors(neighborOracle), 'chunked neighbour fallback is identical');
+  assert.ok(neighborYields > 0, 'neighbour fallback yields');
+
   // ── Worker roundtrip with transferable buffers ─────────────────────────────
   const workerMatches = await new Promise((resolve, reject) => {
     const w = new Worker(workerOut);
@@ -112,6 +139,25 @@ try {
   });
   assert.deepEqual(strip(workerMatches), strip(oracle), 'worker roundtrip identical to oracle');
 
+  const workerNeighbors = await new Promise((resolve, reject) => {
+    const w = new Worker(workerOut);
+    const timer = setTimeout(() => reject(new Error('nearest-neighbour worker timed out')), 10_000);
+    w.on('message', (res) => {
+      clearTimeout(timer);
+      w.terminate();
+      res.ok ? resolve(res.matches) : reject(new Error(res.error));
+    });
+    w.on('error', reject);
+    const wire = (list) => list.map((x) => ({ id: x.id, buffer: new Float32Array(x.vector).buffer }));
+    const qw = wire(centroids);
+    const cw = wire(neighborCandidates);
+    w.postMessage(
+      { id: 2, kind: 'nearestNeighbors', centroids: qw, candidates: cw, threshold: THRESHOLD, maxPerCentroid: MAXPC },
+      [...qw, ...cw].map((x) => x.buffer)
+    );
+  });
+  assert.deepEqual(stripNeighbors(workerNeighbors), stripNeighbors(neighborOracle), 'nearest-neighbour worker matches the oracle');
+
   // ── computeHost: real worker path (computeWorker.js lives next to the host) ─
   delete process.env.NODUS_DISABLE_COMPUTE_WORKER;
   const { createRequire } = await import('node:module');
@@ -120,6 +166,8 @@ try {
   assert.equal(host.computeWorkerAvailable(), true, 'host finds the worker file');
   const viaWorker = await host.computeThemeMatches(centroids, candidates, THRESHOLD, MAXPC);
   assert.deepEqual(strip(viaWorker), strip(oracle), 'computeHost worker path identical to oracle');
+  const neighborsViaWorker = await host.computeNearestNeighbors(centroids, neighborCandidates, THRESHOLD, MAXPC);
+  assert.deepEqual(stripNeighbors(neighborsViaWorker), stripNeighbors(neighborOracle), 'computeHost neighbour worker path matches oracle');
 
   // Vectors must survive the transfer (host copies before transferring).
   assert.equal(centroids[0].vector.length, dim, 'caller vectors not detached by transfer');
@@ -139,4 +187,8 @@ try {
 /** Round similarities so float noise between paths can't cause flaky diffs. */
 function strip(matches) {
   return matches.map((m) => ({ c: m.centroidId, i: m.candidateId, s: Number(m.similarity.toFixed(5)) }));
+}
+
+function stripNeighbors(matches) {
+  return matches.map((m) => ({ q: m.queryId, i: m.candidateId, s: Number(m.similarity.toFixed(5)) }));
 }

@@ -29,13 +29,14 @@ installRuntimeHooks(root);
 try {
   const Database = require('better-sqlite3');
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
+  const scheduleRepo = require(path.join(repoRoot, 'electron/db/studyScheduleRepo.ts'));
   const shared = require(path.join(repoRoot, 'shared/studyOrg.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
   assert.ok(SCHEMA_VERSION >= 53, 'phase 1 requires schema v53 or later');
   assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION, `fresh vault migrates through v${SCHEMA_VERSION}`);
-  for (const table of ['study_courses', 'study_subjects', 'study_topics', 'study_folders', 'study_docs', 'study_placements', 'study_tags', 'study_doc_tags', 'study_templates']) {
+  for (const table of ['study_courses', 'study_subjects', 'study_topics', 'study_folders', 'study_docs', 'study_placements', 'study_tags', 'study_doc_tags', 'study_templates', 'study_schedule_periods', 'study_schedule_cells', 'study_schedule_day_styles']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
   }
 
@@ -43,11 +44,24 @@ try {
   assert.match(shared.createStudyShortId('crs', '12345678-abcd'), /^CRS-12345678$/);
   assert.equal(shared.studyPlacementKey({ courseId: 'c', topicId: 't' }), 'c::t:');
 
-  const course = org.createStudyCourse({ name: 'Historia', color: '#0f766e', icon: 'graduation' });
+  const course = org.createStudyCourse({ name: 'Historia', color: '#0f766e', icon: 'graduation', emoji: '🏛️', imageData: 'data:image/png;base64,aA==', year: 2026, description: 'Curso enriquecido' });
+  assert.equal(course.emoji, '🏛️');
+  assert.equal(course.imageData, 'data:image/png;base64,aA==');
+  assert.equal(course.year, 2026);
   const subject = org.createStudySubject({ courseId: course.id, name: 'Historia contemporánea' });
-  const topic = org.createStudyTopic({ subjectId: subject.id, name: 'Revoluciones' });
+  const defaultSchedule = scheduleRepo.getStudySchedule();
+  assert.equal(defaultSchedule.periods.length, 2, 'schedule starts with morning and afternoon rows');
+  assert.deepEqual(defaultSchedule.periods.map((period) => period.section), ['morning', 'afternoon']);
+  const morning = defaultSchedule.periods[0];
+  const savedSchedule = scheduleRepo.saveStudySchedule({ ...defaultSchedule, cells: [{ day: 'monday', periodId: morning.id, subjectId: subject.id, activityTitle: null }, { day: 'tuesday', periodId: morning.id, subjectId: null, activityTitle: 'Tutoría' }], dayColors: { ...defaultSchedule.dayColors, monday: '#0f766e' } });
+  assert.equal(savedSchedule.cells[0].subjectId, subject.id, 'subject assignment persists in the selected cell');
+  assert.equal(savedSchedule.cells.find((cell) => cell.day === 'tuesday').activityTitle, 'Tutoría', 'independent activity persists in the selected cell');
+  assert.equal(savedSchedule.dayColors.monday, '#0f766e', 'weekday header color persists');
+  const folder = org.createStudyFolder({ courseId: course.id, subjectId: subject.id, name: 'Unidad 1' });
+  const topic = org.createStudyTopic({ subjectId: subject.id, folderId: folder.id, name: 'Revoluciones' });
   const subtopic = org.createStudyTopic({ subjectId: subject.id, parentId: topic.id, name: 'Revolución francesa' });
-  const folder = org.createStudyFolder({ name: 'Lecturas libres' });
+  assert.equal(subtopic.folderId, folder.id, 'subtopics inherit their parent folder');
+  assert.throws(() => org.createStudyTopic({ subjectId: subject.id, folderId: 'missing', name: 'Inválido' }), /carpeta/, 'topics reject folders outside their subject');
   assert.throws(() => org.updateStudyEntity('topic', topic.id, { parentId: subtopic.id }), /ciclo/, 'topic cycles rejected');
 
   const document = org.createStudyDocument({
@@ -63,11 +77,14 @@ try {
   assert.equal(org.getStudyWorkspace().placements.length, 2, 'document can appear in two locations');
 
   const updated = org.updateStudyEntity('document', document.id, {
-    favorite: true, color: '#115e59', icon: 'book', title: 'Apuntes revisados',
+    favorite: true, color: '#115e59', icon: 'book', emoji: '📝', imageData: 'data:image/png;base64,Yg==', year: 2025, title: 'Apuntes revisados',
   });
   assert.equal(updated.favorite, true);
   assert.equal(updated.color, '#115e59');
   assert.equal(updated.icon, 'book');
+  assert.equal(updated.emoji, '📝');
+  assert.equal(updated.imageData, 'data:image/png;base64,Yg==');
+  assert.equal(updated.year, 2025);
 
   const tag = org.createStudyTag({ name: 'Examen', color: '#ef4444' });
   assert.equal(org.createStudyTag({ name: 'examen' }).id, tag.id, 'tags are case-insensitive and idempotent');
@@ -91,11 +108,36 @@ try {
   const copiedCourse = org.duplicateStudyTree('course', course.id);
   assert.notEqual(copiedCourse.id, course.id);
   assert.match(copiedCourse.name, /copia/);
+  assert.equal(copiedCourse.imageData, course.imageData, 'rich visual metadata survives duplication');
   const afterCopy = org.getStudyWorkspace();
   assert.equal(afterCopy.courses.length, 2, 'course duplicated');
   assert.equal(afterCopy.subjects.length, 2, 'complete subject tree duplicated');
   assert.equal(afterCopy.topics.length, 4, 'complete topic tree duplicated');
+  assert.equal(afterCopy.folders.length, 2, 'subject folders are duplicated with the course');
+  const copiedFolder = afterCopy.folders.find((item) => item.id !== folder.id);
+  assert.ok(afterCopy.topics.some((item) => item.folderId === copiedFolder.id), 'copied topics point at the copied folder');
   assert.equal(afterCopy.documents.length, 2, 'document inside tree duplicated once');
+
+  const destinationCourse = org.createStudyCourse({ name: 'Historia comparada' });
+  const destinationSubject = org.createStudySubject({ courseId: destinationCourse.id, name: 'Europa' });
+  const copiedSubject = org.duplicateStudyTree('subject', subject.id);
+  org.moveStudyEntity('subject', copiedSubject.id, { courseId: destinationCourse.id });
+  let movedWorkspace = org.getStudyWorkspace();
+  assert.equal(movedWorkspace.subjects.find((item) => item.id === copiedSubject.id).courseId, destinationCourse.id, 'subjects move between courses');
+  assert.ok(movedWorkspace.folders.filter((item) => item.subjectId === copiedSubject.id).every((item) => item.courseId === destinationCourse.id), 'moving a subject updates descendant folder courses');
+  assert.ok(movedWorkspace.placements.filter((item) => item.subjectId === copiedSubject.id).every((item) => item.courseId === destinationCourse.id), 'moving a subject updates document locations');
+
+  const copiedFolderForMove = org.duplicateStudyTree('folder', folder.id);
+  org.moveStudyEntity('folder', copiedFolderForMove.id, { subjectId: destinationSubject.id });
+  movedWorkspace = org.getStudyWorkspace();
+  assert.equal(movedWorkspace.folders.find((item) => item.id === copiedFolderForMove.id).subjectId, destinationSubject.id, 'folders move between subjects');
+  assert.ok(movedWorkspace.topics.filter((item) => item.folderId === copiedFolderForMove.id).every((item) => item.subjectId === destinationSubject.id), 'moving a folder updates descendant topics');
+
+  const copiedTopicForMove = org.duplicateStudyTree('topic', topic.id);
+  org.moveStudyEntity('topic', copiedTopicForMove.id, { subjectId: destinationSubject.id });
+  movedWorkspace = org.getStudyWorkspace();
+  assert.equal(movedWorkspace.topics.find((item) => item.id === copiedTopicForMove.id).subjectId, destinationSubject.id, 'topics move between subjects');
+  assert.ok(movedWorkspace.placements.filter((item) => item.topicId === copiedTopicForMove.id).every((item) => item.courseId === destinationCourse.id && item.subjectId === destinationSubject.id), 'moving a topic updates document locations');
 
   const template = org.createStudyTemplate({
     name: 'Curso trimestral',

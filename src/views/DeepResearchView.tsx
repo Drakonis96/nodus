@@ -13,6 +13,7 @@ import type {
   WritingWorkshopSavedDraft,
   DecorativeImage,
   DecorativeImageStyle,
+  ContentTranslation,
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import type { PendingGraphNavigationTarget } from '../navigation';
@@ -21,7 +22,8 @@ import { ModelPicker } from '../components/ModelPicker';
 import { confirm } from '../components/feedback';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
-import { TranslationModal } from '../components/TranslationModal';
+import { TranslationPanel } from '../components/TranslationModal';
+import { Markdown } from '../components/Markdown';
 import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
@@ -111,7 +113,8 @@ export function DeepResearchView({
   const [showMatrix, setShowMatrix] = useState(false);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [savingToNotes, setSavingToNotes] = useState(false);
-  const [translating, setTranslating] = useState(false);
+  const [showTranslations, setShowTranslations] = useState(true);
+  const [appliedTranslation, setAppliedTranslation] = useState<ContentTranslation | null>(null);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,11 +194,15 @@ export function DeepResearchView({
     setShowMatrix(false);
     setError(null);
     setMessage(null);
+    setShowTranslations(true);
+    setAppliedTranslation(null);
   };
 
   const backToGallery = () => {
     setMode('gallery');
     setOpenDraft(null);
+    setShowTranslations(false);
+    setAppliedTranslation(null);
     void refreshSavedDrafts();
   };
 
@@ -275,7 +282,7 @@ export function DeepResearchView({
 
   const copyDraft = async () => {
     if (!openDraft) return;
-    await navigator.clipboard.writeText(openDraft.draft.draftMarkdown);
+    await navigator.clipboard.writeText(appliedTranslation?.markdown ?? openDraft.draft.draftMarkdown);
     setMessage(t('Borrador copiado.'));
   };
 
@@ -313,11 +320,14 @@ export function DeepResearchView({
           exporting={exporting}
           message={message}
           error={error}
+          appliedTranslation={appliedTranslation}
+          showTranslations={showTranslations}
           onToggleMatrix={() => setShowMatrix((v) => !v)}
           onBack={backToGallery}
           onCopy={() => void copyDraft()}
           onSaveToNotes={() => setSavingToNotes(true)}
-          onTranslate={() => setTranslating(true)}
+          onTranslate={() => setShowTranslations((value) => !value)}
+          onApplyTranslation={setAppliedTranslation}
           onExport={(format) => void exportDraft(format)}
           onCitation={setCitation}
           onImageChange={onImageChange}
@@ -340,17 +350,6 @@ export function DeepResearchView({
             source={{ origin: 'writing', model: openDraft.model, ref: 'deep_research' }}
             allowProjectLink
             onClose={() => setSavingToNotes(false)}
-          />
-        )}
-        {translating && (
-          <TranslationModal
-            entityKind="deep_research"
-            entityId={openDraft.id}
-            sourceTitle={openDraft.draft.title}
-            sourceMarkdown={`# ${openDraft.draft.title}\n\n${openDraft.draft.abstract ? `${openDraft.draft.abstract}\n\n` : ''}${openDraft.draft.draftMarkdown}`}
-            model={openDraft.model}
-            onCitation={setCitation}
-            onClose={() => setTranslating(false)}
           />
         )}
       </>
@@ -786,11 +785,14 @@ function ReaderView({
   exporting,
   message,
   error,
+  appliedTranslation,
+  showTranslations,
   onToggleMatrix,
   onBack,
   onCopy,
   onSaveToNotes,
   onTranslate,
+  onApplyTranslation,
   onExport,
   onCitation,
   onImageChange,
@@ -801,11 +803,14 @@ function ReaderView({
   exporting: boolean;
   message: string | null;
   error: string | null;
+  appliedTranslation: ContentTranslation | null;
+  showTranslations: boolean;
   onToggleMatrix: () => void;
   onBack: () => void;
   onCopy: () => void;
   onSaveToNotes: () => void;
   onTranslate: () => void;
+  onApplyTranslation: (translation: ContentTranslation | null) => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
@@ -818,7 +823,7 @@ function ReaderView({
           <Icon name="chevronLeft" /> {t('Volver a la galería')}
         </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-neutral-100" title={saved.title}>{saved.title}</div>
+          <div className="truncate text-sm font-semibold text-neutral-100" title={appliedTranslation?.title ?? saved.title}>{appliedTranslation?.title ?? saved.title}</div>
           <div className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</div>
         </div>
         <DraftActionBar
@@ -859,7 +864,7 @@ function ReaderView({
               onChange={onImageChange}
             />
             <AudioPanel entityKind="deep_research" entityId={saved.id} />
-            <DraftResultMain
+            {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} /> : <DraftResultMain
               draft={saved.draft}
               exporting={exporting}
               savingDraft={false}
@@ -871,7 +876,8 @@ function ReaderView({
               onSaveToNotes={onSaveToNotes}
               onExport={onExport}
               onCitation={onCitation}
-            />
+            />}
+            {showTranslations && <TranslationPanel entityKind="deep_research" entityId={saved.id} sourceTitle={saved.draft.title} sourceMarkdown={`# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${saved.draft.draftMarkdown}`} model={saved.model} activeTranslationId={appliedTranslation?.id ?? null} onApply={onApplyTranslation} />}
           </div>
         </main>
         {showMatrix && (

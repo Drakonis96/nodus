@@ -10,6 +10,8 @@ export const AI_PROVIDERS: AiProvider[] = [
   'anthropic',
   'openai',
   'openrouter',
+  'groq',
+  'cerebras',
   'deepseek',
   'gemini',
   'xiaomi',
@@ -21,11 +23,14 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   openrouter: 'OpenRouter',
+  groq: 'Groq',
+  cerebras: 'Cerebras',
   deepseek: 'DeepSeek',
   gemini: 'Google Gemini',
   xiaomi: 'Xiaomi MiMo',
   ollama: 'Ollama',
   lmstudio: 'LM Studio',
+  nodus: 'Nodus local',
 };
 
 /** Order two model refs for the pickers: by provider label (A→Z), then model id (A→Z). */
@@ -58,7 +63,7 @@ export const DEFAULT_LOCAL_BASE_URLS: Record<LocalProvider, string> = {
 };
 
 /** Embedding-capable providers, in the order the Settings selector shows them. */
-export const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio'];
+export const EMBEDDING_PROVIDERS: EmbeddingProvider[] = ['openai', 'gemini', 'openrouter', 'ollama', 'lmstudio', 'nodus'];
 
 export const DEFAULT_EMBEDDING_MODELS: Record<EmbeddingProvider, string> = {
   openai: 'text-embedding-3-small',
@@ -66,6 +71,7 @@ export const DEFAULT_EMBEDDING_MODELS: Record<EmbeddingProvider, string> = {
   openrouter: 'baai/bge-m3',
   ollama: 'nomic-embed-text',
   lmstudio: 'text-embedding-nomic-embed-text-v1.5',
+  nodus: 'multilingual-e5-small-int8',
 };
 
 /** Coerce a stored/unknown value to a valid embedding provider ('openai' fallback). */

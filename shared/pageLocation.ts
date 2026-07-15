@@ -21,10 +21,18 @@ export function parsePageNumber(location: string | null | undefined): number | n
 
 /** Zotero deep link that opens a PDF attachment at a specific page. */
 export function zoteroOpenPdfUrl(attachmentKey: string, page: number): string {
-  return `zotero://open-pdf/library/items/${attachmentKey}?page=${page}`;
+  const target = zoteroItemTarget(attachmentKey);
+  return `zotero://open-pdf/${target}?page=${page}`;
 }
 
 /** Zotero deep link that selects an item in the library pane. */
 export function zoteroSelectUrl(itemKey: string): string {
-  return `zotero://select/library/items/${itemKey}`;
+  return `zotero://select/${zoteroItemTarget(itemKey)}`;
+}
+
+function zoteroItemTarget(key: string): string {
+  const group = /^groups:([^:]+):(.+)$/.exec(key);
+  return group
+    ? `groups/${encodeURIComponent(group[1])}/items/${encodeURIComponent(group[2])}`
+    : `library/items/${encodeURIComponent(key)}`;
 }

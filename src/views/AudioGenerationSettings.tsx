@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, AudioProvider } from '@shared/types';
 import { AUDIO_ENGINES, getEngine, type AudioVoice } from '../lib/audio';
 import { Icon } from '../components/ui';
+import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { t, tx } from '../i18n';
 
 const GENDER_LABEL: Record<AudioVoice['gender'], string> = {
@@ -285,28 +286,36 @@ export function AudioGenerationSettings({
 
       {/* Single-model download (Kokoro) */}
       {engine.modelStyle === 'single-model' && (
-        <div className="mt-4 flex items-center gap-3 rounded-lg border border-neutral-800 px-3 py-2.5">
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-neutral-200">{tx('Modelo {label} (inglés)', { label: engine.label })}</div>
-            <div className="text-[10px] text-neutral-500">{tx('~{n} MB · una sola descarga para todas las voces', { n: engine.modelSizeMb ?? 0 })}</div>
-            {progress[MODEL_KEY] != null && (
-              <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-neutral-800">
-                <div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.round((progress[MODEL_KEY] ?? 0) * 100)}%` }} />
+        <SettingsModelList className="mt-4" data-testid="audio-engine-model-list">
+          <div className={settingsModelRowClass(modelReady, false, 'flex flex-col gap-3 sm:flex-row sm:items-center')}>
+            <div className="flex min-w-0 flex-1 items-start gap-3">
+              <SettingsModelDot selected={modelReady} />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{tx('Modelo {label} (inglés)', { label: engine.label })}</div>
+                <div className="text-[10px] text-neutral-500">{tx('~{n} MB · una sola descarga para todas las voces', { n: engine.modelSizeMb ?? 0 })}</div>
+                {progress[MODEL_KEY] != null && (
+                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
+                    <div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.round((progress[MODEL_KEY] ?? 0) * 100)}%` }} />
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${modelReady ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-500'}`}>{modelReady ? t('Descargado') : t('No descargado')}</span>
+              {modelReady ? (
+                <button className="btn btn-ghost text-xs text-red-400" disabled={busy === MODEL_KEY} onClick={() => void remove(MODEL_KEY, MODEL_KEY)}>
+                  {t('Eliminar modelo')}
+                </button>
+              ) : progress[MODEL_KEY] != null ? (
+                <span className="text-xs text-neutral-400">{tx('{n}%', { n: Math.round((progress[MODEL_KEY] ?? 0) * 100) })}</span>
+              ) : (
+                <button className="btn btn-ghost border border-neutral-300 text-xs dark:border-neutral-700" disabled={busy === MODEL_KEY} onClick={() => void download(MODEL_KEY, MODEL_KEY)}>
+                  {t('Descargar modelo')}
+                </button>
+              )}
+            </div>
           </div>
-          {modelReady ? (
-            <button className="btn btn-ghost text-xs text-red-400" disabled={busy === MODEL_KEY} onClick={() => void remove(MODEL_KEY, MODEL_KEY)}>
-              {t('Eliminar modelo')}
-            </button>
-          ) : progress[MODEL_KEY] != null ? (
-            <span className="text-xs text-neutral-400">{tx('{n}%', { n: Math.round((progress[MODEL_KEY] ?? 0) * 100) })}</span>
-          ) : (
-            <button className="btn btn-ghost border border-neutral-700 text-xs" disabled={busy === MODEL_KEY} onClick={() => void download(MODEL_KEY, MODEL_KEY)}>
-              {t('Descargar modelo')}
-            </button>
-          )}
-        </div>
+        </SettingsModelList>
       )}
 
       {/* Search + filters. Shown for local providers always, and for Hume once a
@@ -350,7 +359,7 @@ export function AudioGenerationSettings({
         {grouped.map(([languageLabel, list]) => (
           <div key={languageLabel}>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{languageLabel}</div>
-            <div className="rounded-lg border border-neutral-800">
+            <SettingsModelList data-testid={`audio-voice-list-${languageLabel}`}>
               {list.map((v) => {
                 const perVoice = engine.modelStyle === 'per-voice';
                 const isReady = perVoice ? ready.has(v.id) : isCloud ? true : modelReady;
@@ -361,7 +370,7 @@ export function AudioGenerationSettings({
                 return (
                   <div
                     key={v.id}
-                    className={`flex items-center gap-3 border-b border-neutral-800 px-3 py-2.5 text-sm last:border-b-0 ${selected ? 'bg-indigo-950/40' : ''}`}
+                    className={settingsModelRowClass(selected, false, 'flex items-center gap-3 text-sm')}
                   >
                     <button
                       className="shrink-0"
@@ -369,11 +378,11 @@ export function AudioGenerationSettings({
                       disabled={!isReady}
                       onClick={() => isReady && void selectVoice(v.id)}
                     >
-                      <span className={`inline-block h-3 w-3 rounded-full border ${selected ? 'border-indigo-400 bg-indigo-400' : isReady ? 'border-neutral-500' : 'border-neutral-700'}`} />
+                      <SettingsModelDot selected={selected} />
                     </button>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-neutral-200">{v.name}</span>
+                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{v.name}</span>
                         <span className="text-[10px] text-neutral-500">
                           {isCloud ? v.quality : t(GENDER_LABEL[v.gender])} {!isCloud && `· ${v.quality}`}{v.sizeMb ? ` · ${v.sizeMb} MB` : ''}
                         </span>
@@ -403,7 +412,7 @@ export function AudioGenerationSettings({
                   </div>
                 );
               })}
-            </div>
+            </SettingsModelList>
           </div>
         ))}
         {!isCloud && voices.length === 0 && (query || langFilter) && (

@@ -174,6 +174,7 @@ export function saveStudyAttemptAnswer(attemptId: string, input: StudyAttemptAns
       JSON.stringify(input.response), Math.max(0, input.responseMs ?? existing.responseMs), input.flagged ?? existing.flagged ? 1 : 0, input.confidence ?? existing.confidence,
       !revealEvaluation || evaluation.correct == null ? null : (evaluation.correct ? 1 : 0), revealEvaluation ? evaluation.pointsAwarded : null, JSON.stringify(revealEvaluation ? evaluation : {}), timestamp, existing.id,
     );
+    getDb().prepare('UPDATE study_questions SET last_response=?, last_answered_at=?, updated_at=? WHERE id=?').run(String(input.response.text ?? ''), timestamp, timestamp, item.questionId);
     return toAnswer(getDb().prepare('SELECT * FROM study_attempt_answers WHERE id=?').get(existing.id) as Row);
   }
   const key = ids('ANS');
@@ -182,6 +183,7 @@ export function saveStudyAttemptAnswer(attemptId: string, input: StudyAttemptAns
     key.id, key.shortId, attempt.id, item.id, item.questionId, JSON.stringify(input.response), !revealEvaluation || evaluation.correct == null ? null : (evaluation.correct ? 1 : 0),
     revealEvaluation ? evaluation.pointsAwarded : null, Math.max(0, input.responseMs ?? 0), input.flagged ? 1 : 0, input.confidence ?? null, JSON.stringify(revealEvaluation ? evaluation : {}), timestamp, timestamp,
   );
+  getDb().prepare('UPDATE study_questions SET last_response=?, last_answered_at=?, updated_at=? WHERE id=?').run(String(input.response.text ?? ''), timestamp, timestamp, item.questionId);
   return toAnswer(getDb().prepare('SELECT * FROM study_attempt_answers WHERE id=?').get(key.id) as Row);
 }
 
@@ -196,10 +198,12 @@ export function submitStudyAttempt(id: string, expired = false): StudyAttempt {
       let answer = answersByItem.get(item.id);
       if (!answer) answer = saveStudyAttemptAnswer(id, { assessmentItemId: item.id, response: {} });
       const evaluation = evaluateStudyQuestionResponse(item.question, answer.response, item.points, assessment.config);
-      maxScore += item.points; if (evaluation.pointsAwarded != null) score += evaluation.pointsAwarded;
+      const pointsAwarded = evaluation.gradable ? evaluation.pointsAwarded : answer.pointsAwarded;
+      const feedback = evaluation.gradable ? evaluation : answer.feedback;
+      maxScore += item.points; if (pointsAwarded != null) score += pointsAwarded;
       if (evaluation.omitted) omitted += 1; else if (evaluation.correct === true) correct += 1; else if (evaluation.correct === false) incorrect += 1;
       db.prepare('UPDATE study_attempt_answers SET is_correct=?, points_awarded=?, feedback_json=?, updated_at=? WHERE id=?').run(
-        evaluation.correct == null ? null : (evaluation.correct ? 1 : 0), evaluation.pointsAwarded, JSON.stringify(evaluation), timestamp, answer.id,
+        evaluation.correct == null ? null : (evaluation.correct ? 1 : 0), pointsAwarded, JSON.stringify(feedback), timestamp, answer.id,
       );
       db.prepare(`UPDATE study_questions SET usage_count=usage_count+1, correct_count=correct_count+?, incorrect_count=incorrect_count+?, omitted_count=omitted_count+?,
         total_response_ms=total_response_ms+?, updated_at=? WHERE id=?`).run(evaluation.correct === true ? 1 : 0, !evaluation.omitted && evaluation.correct === false ? 1 : 0, evaluation.omitted ? 1 : 0, answer.responseMs, timestamp, item.questionId);

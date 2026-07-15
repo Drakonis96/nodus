@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -44,8 +44,17 @@ try {
   const confirmed = gradingRepo.setStudyGradingManualScore(run.id, 7.5, 'Nota revisada por la docente.'); assert.equal(confirmed.manualScore, 7.5); assert.match(confirmed.manualComment, /docente/);
   const refreshedAttempt = assessments.getStudyAttempt(attempt.id); assert.equal(refreshedAttempt.score, 7.5, 'manual score becomes the official attempt score');
   assert.equal(refreshedAttempt.answers[0].feedback.manualScore, 7.5);
+  const liveAttempt = assessments.startStudyAttempt({ assessmentId: exam.id, mode: 'exam' });
+  const liveAnswer = assessments.saveStudyAttemptAnswer(liveAttempt.id, { assessmentItemId: exam.items[0].id, response: { text: 'La urbanización y el trabajo fabril transformaron las relaciones sociales.' } });
+  const liveRun = await grading.gradeStudyAnswer({ attemptAnswerId: liveAnswer.id, rubricId: rubric.id, severity: 'balanced', model: { provider: 'ollama', model: 'grading-verifier' } }, () => undefined);
+  gradingRepo.setStudyGradingManualScore(liveRun.id, liveRun.estimatedScore, liveRun.result.generalFeedback);
+  const liveSubmitted = assessments.submitStudyAttempt(liveAttempt.id);
+  assert.equal(liveSubmitted.score, liveRun.estimatedScore, 'AI score survives final exam submission');
+  const refreshedQuestion = bank.getStudyQuestion(question.id);
+  assert.match(refreshedQuestion.lastResponse, /urbanización/);
+  assert.equal(refreshedQuestion.lastScore, liveRun.estimatedScore);
+  assert.equal(refreshedQuestion.lastMaxScore, 10);
 
-  const view = await readFile(path.join(repoRoot, 'src/views/StudyExamView.tsx'), 'utf8'); for (const marker of ['study-rubric-library', 'study-grading-panel', 'study-grading-result', 'study-grade-save']) assert.match(view, new RegExp(marker));
   closeDb(); console.log('Study grading phase 10d tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

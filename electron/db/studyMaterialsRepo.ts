@@ -20,11 +20,13 @@ import type {
   StudyMaterialUpdateInput,
   StudyMaterialVersion,
 } from '@shared/studyMaterials';
+import type { ZoteroAttachmentInfo, ZoteroItem, ZoteroLibrary } from '@shared/types';
 import { EMPTY_STUDY_BIBLIOGRAPHY, STUDY_MATERIAL_EXTENSIONS, studyMaterialPreviewKind } from '@shared/studyMaterials';
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import { extractFromPath } from '../extraction/textExtractor';
 import { getDb } from './database';
 import { createStudyDocument } from './studyOrgRepo';
+import { encodeEmbedding } from './ideasRepo';
 
 type Row = Record<string, unknown>;
 
@@ -59,13 +61,24 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg',
 };
 
-function toSummary(row: Row): StudyMaterialSummary {
+function toSummary(row: Row, placements: StudyMaterialPlacement[] = []): StudyMaterialSummary {
   const extension = String(row.extension ?? '').replace(/^\./, '').toLocaleLowerCase();
   const mimeType = String(row.mime_type ?? MIME_BY_EXTENSION[extension] ?? 'application/octet-stream');
   return {
     id: String(row.id), shortId: String(row.short_id), title: String(row.title), description: String(row.description ?? ''),
     fileName: String(row.file_name ?? ''), mimeType, extension, contentHash: String(row.content_hash),
     extractionStatus: String(row.extraction_status ?? 'pending') as StudyMaterialSummary['extractionStatus'],
+    visualDescription: String(row.visual_description ?? ''),
+    visualAnalysisStatus: String(row.visual_analysis_status ?? (['png', 'jpg', 'jpeg', 'webp', 'tif', 'tiff'].includes(extension) ? 'pending' : 'not_applicable')) as StudyMaterialSummary['visualAnalysisStatus'],
+    visualAnalysisProvider: row.visual_analysis_provider ? String(row.visual_analysis_provider) : null,
+    visualAnalysisModel: row.visual_analysis_model ? String(row.visual_analysis_model) : null,
+    indexStatus: String(row.index_status ?? 'pending') as StudyMaterialSummary['indexStatus'],
+    indexError: row.index_error ? String(row.index_error) : null,
+    embeddingProvider: row.embedding_provider ? String(row.embedding_provider) : null,
+    embeddingModel: row.embedding_model ? String(row.embedding_model) : null,
+    embeddingDim: row.embedding_dim == null ? null : Number(row.embedding_dim),
+    embeddingTextHash: row.embedding_text_hash ? String(row.embedding_text_hash) : null,
+    indexedAt: row.indexed_at ? String(row.indexed_at) : null,
     metadata: metadata(row.metadata_json), bibliography: bibliography(row.bibliography_json),
     readState: String(row.read_state ?? 'pending') as StudyMaterialReadState,
     previewKind: studyMaterialPreviewKind(extension, mimeType),
@@ -74,7 +87,12 @@ function toSummary(row: Row): StudyMaterialSummary {
     sizeBytes: Number(row.size_bytes ?? 0), extractedChars: Number(row.extracted_chars ?? String(row.extracted_text ?? '').length),
     favorite: bool(row.favorite), pinned: bool(row.pinned), position: Number(row.position ?? 0),
     archivedAt: row.archived_at ? String(row.archived_at) : null, deletedAt: row.deleted_at ? String(row.deleted_at) : null,
-    createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    createdAt: String(row.created_at), updatedAt: String(row.updated_at), placements,
+    origin: String(row.origin ?? 'file') as StudyMaterialSummary['origin'],
+    zoteroLibraryType: row.zotero_library_type ? String(row.zotero_library_type) as 'user' | 'group' : null,
+    zoteroLibraryId: row.zotero_library_id ? String(row.zotero_library_id) : null,
+    zoteroItemKey: row.zotero_item_key ? String(row.zotero_item_key) : null,
+    zoteroAttachmentKey: row.zotero_attachment_key ? String(row.zotero_attachment_key) : null,
   };
 }
 
@@ -93,7 +111,9 @@ function toAnnotation(row: Row): StudyMaterialAnnotation {
   return {
     id: String(row.id), shortId: String(row.short_id), materialId: String(row.material_id),
     pageNumber: row.page_number == null ? null : Number(row.page_number),
-    rect: parseJson(row.rect_json, null), from: row.from_pos == null ? null : Number(row.from_pos), to: row.to_pos == null ? null : Number(row.to_pos),
+    rect: parseJson(row.rect_json, null), rects: parseJson(row.rects_json, []), path: parseJson(row.path_json, []),
+    kind: String(row.kind ?? 'highlight') as StudyMaterialAnnotation['kind'], thickness: Number(row.thickness ?? 3),
+    from: row.from_pos == null ? null : Number(row.from_pos), to: row.to_pos == null ? null : Number(row.to_pos),
     selectedText: String(row.selected_text ?? ''), note: String(row.note ?? ''), color: String(row.color ?? '#facc15'),
     position: Number(row.position ?? 0), archivedAt: row.archived_at ? String(row.archived_at) : null,
     deletedAt: row.deleted_at ? String(row.deleted_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at),
@@ -199,6 +219,20 @@ export function addStudyMaterialPlacement(materialId: string, input: StudyMateri
   return toPlacement(db.prepare('SELECT * FROM study_material_placements WHERE id = ?').get(key.id) as Row);
 }
 
+export function setPrimaryStudyMaterialPlacement(materialId: string, input: StudyMaterialImportInput): StudyMaterialPlacement | null {
+  materialRow(materialId);
+  const db = getDb();
+  return db.transaction(() => {
+    db.prepare('DELETE FROM study_material_placements WHERE material_id = ?').run(materialId);
+    return addStudyMaterialPlacement(materialId, input);
+  })();
+}
+
+export function removeStudyMaterialPlacement(materialId: string, placementId: string): void {
+  materialRow(materialId);
+  getDb().prepare('DELETE FROM study_material_placements WHERE id = ? AND material_id = ?').run(placementId, materialId);
+}
+
 export async function importStudyMaterialFile(filePath: string, input: StudyMaterialImportInput = {}): Promise<StudyMaterialImportResult> {
   if (!supportsStudyMaterial(filePath)) throw new Error(`Formato no compatible: .${extOf(filePath) || '?'}`);
   const bytes = fs.readFileSync(filePath);
@@ -223,6 +257,75 @@ export async function importStudyMaterialFile(filePath: string, input: StudyMate
     .run(key.id, key.shortId, title, fileName, MIME_BY_EXTENSION[extension] ?? 'application/octet-stream', extension, bytes,
       contentHash, extracted.text, extracted.status, JSON.stringify(nextMetadata), JSON.stringify(EMPTY_STUDY_BIBLIOGRAPHY),
       input.readState ?? 'pending', extracted.pageCount, bytes.length, nextPosition, timestamp, timestamp);
+  if (studyMaterialPreviewKind(extension, MIME_BY_EXTENSION[extension]) === 'image') {
+    db.prepare("UPDATE study_materials SET visual_analysis_status = 'pending' WHERE id = ?").run(key.id);
+  }
+  addStudyMaterialPlacement(key.id, input);
+  return { material: toSummary(materialRow(key.id)), duplicate: false };
+}
+
+function zoteroAuthors(item: ZoteroItem): string[] {
+  return item.creators.map((creator) => creator.name || [creator.firstName, creator.lastName].filter(Boolean).join(' ')).filter(Boolean);
+}
+
+function zoteroBibliography(item: ZoteroItem): StudyMaterialBibliography {
+  const authors = zoteroAuthors(item);
+  return {
+    ...EMPTY_STUDY_BIBLIOGRAPHY,
+    authors,
+    year: item.year,
+    publisher: item.publisher ?? '',
+    journal: item.publicationTitle ?? '',
+    doi: item.doi ?? '',
+    isbn: item.isbn ?? '',
+    url: item.url ?? '',
+    citation: [authors.join(', '), item.year ? `(${item.year})` : '', item.title].filter(Boolean).join('. '),
+    zoteroKey: item.key,
+  };
+}
+
+export async function importStudyMaterialFromZotero(
+  filePath: string,
+  library: ZoteroLibrary,
+  item: ZoteroItem,
+  attachment: ZoteroAttachmentInfo,
+  input: StudyMaterialImportInput = {},
+): Promise<StudyMaterialImportResult> {
+  const result = await importStudyMaterialFile(filePath, { ...input, tags: [...new Set([...(input.tags ?? []), ...item.tags])] });
+  const timestamp = now();
+  getDb().prepare(`UPDATE study_materials SET title = ?, bibliography_json = ?, origin = 'zotero_import',
+    zotero_library_type = ?, zotero_library_id = ?, zotero_item_key = ?, zotero_attachment_key = ?, updated_at = ? WHERE id = ?`)
+    .run(item.title, JSON.stringify(zoteroBibliography(item)), library.type, library.id, item.itemKey, attachment.itemKey, timestamp, result.material.id);
+  return { ...result, material: toSummary(materialRow(result.material.id)) };
+}
+
+export function linkStudyMaterialFromZotero(
+  library: ZoteroLibrary,
+  item: ZoteroItem,
+  attachment: ZoteroAttachmentInfo | null,
+  input: StudyMaterialImportInput = {},
+): StudyMaterialImportResult {
+  const db = getDb();
+  const existing = db.prepare(`SELECT id FROM study_materials WHERE origin = 'zotero_link' AND zotero_library_type = ?
+    AND zotero_library_id = ? AND zotero_item_key = ? AND IFNULL(zotero_attachment_key, '') = IFNULL(?, '') AND deleted_at IS NULL LIMIT 1`)
+    .get(library.type, library.id, item.itemKey, attachment?.itemKey ?? null) as Row | undefined;
+  if (existing) {
+    addStudyMaterialPlacement(String(existing.id), input);
+    return { material: toSummary(materialRow(String(existing.id))), duplicate: true };
+  }
+  const key = ids('MAT'); const timestamp = now();
+  const extension = attachment?.filename ? extOf(attachment.filename) : 'zotero';
+  const hash = `zotero-link:${library.type}:${library.id}:${item.itemKey}:${attachment?.itemKey ?? ''}`;
+  const nextPosition = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS value FROM study_materials').get() as Row).value);
+  const nextMetadata: StudyMaterialMetadata = { tags: [...new Set([...(input.tags ?? []), ...item.tags])], zoteroLibrary: library.name };
+  db.prepare(`INSERT INTO study_materials
+    (id, short_id, title, file_name, mime_type, extension, content_blob, content_hash, extracted_text, extraction_status,
+     metadata_json, bibliography_json, read_state, size_bytes, position, index_status, origin, zotero_library_type,
+     zotero_library_id, zotero_item_key, zotero_attachment_key, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, NULL, ?, '', 'unsupported', ?, ?, ?, 0, ?, 'unavailable', 'zotero_link', ?, ?, ?, ?, ?, ?)`)
+    .run(key.id, key.shortId, item.title, attachment?.filename ?? '', attachment?.contentType ?? 'application/x-zotero-link', extension,
+      hash, JSON.stringify(nextMetadata), JSON.stringify(zoteroBibliography(item)), input.readState ?? 'pending', nextPosition,
+      library.type, library.id, item.itemKey, attachment?.itemKey ?? null, timestamp, timestamp);
   addStudyMaterialPlacement(key.id, input);
   return { material: toSummary(materialRow(key.id)), duplicate: false };
 }
@@ -243,7 +346,18 @@ export function listStudyMaterials(options: StudyMaterialListOptions = {}): Stud
   for (const [column, value] of scope) if (value) { clauses.push(`EXISTS (SELECT 1 FROM study_material_placements p WHERE p.material_id = m.id AND p.${column} = ? AND p.deleted_at IS NULL)`); values.push(value); }
   const rows = getDb().prepare(`SELECT m.*, length(m.extracted_text) AS extracted_chars FROM study_materials m
     ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY m.pinned DESC, m.favorite DESC, m.position, m.updated_at DESC`).all(...values) as Row[];
-  return rows.map(toSummary).filter((material) => !options.previewKind || options.previewKind === 'all' || material.previewKind === options.previewKind);
+  const materialIds = rows.map((row) => String(row.id));
+  const placementsByMaterial = new Map<string, StudyMaterialPlacement[]>();
+  if (materialIds.length) {
+    const placeholders = materialIds.map(() => '?').join(',');
+    for (const placement of (getDb().prepare(`SELECT * FROM study_material_placements WHERE material_id IN (${placeholders}) AND deleted_at IS NULL ORDER BY material_id, position`).all(...materialIds) as Row[]).map(toPlacement)) {
+      const bucket = placementsByMaterial.get(placement.materialId) ?? [];
+      bucket.push(placement);
+      placementsByMaterial.set(placement.materialId, bucket);
+    }
+  }
+  return rows.map((row) => toSummary(row, placementsByMaterial.get(String(row.id)) ?? []))
+    .filter((material) => !options.previewKind || options.previewKind === 'all' || material.previewKind === options.previewKind);
 }
 
 export function getStudyMaterial(id: string): StudyMaterialDetail {
@@ -273,7 +387,45 @@ export function updateStudyMaterial(id: string, patch: StudyMaterialUpdateInput)
     .run(title, patch.description ?? row.description, readState, patch.favorite ?? bool(row.favorite) ? 1 : 0,
       patch.pinned ?? bool(row.pinned) ? 1 : 0, patch.position ?? Number(row.position), JSON.stringify({ ...currentMetadata, ...(patch.metadata ?? {}) }),
       JSON.stringify({ ...currentBibliography, ...(patch.bibliography ?? {}) }), now(), id);
+  if (patch.title !== undefined || patch.description !== undefined || patch.metadata !== undefined || patch.bibliography !== undefined) {
+    getDb().prepare(`UPDATE study_materials SET embedding = NULL, embedding_provider = NULL, embedding_model = NULL,
+      embedding_dim = NULL, embedding_text_hash = NULL, index_status = 'pending', index_error = NULL, indexed_at = NULL WHERE id = ?`).run(id);
+  }
   return toSummary(materialRow(id));
+}
+
+export function markStudyMaterialIndexing(id: string): void {
+  materialRow(id);
+  getDb().prepare("UPDATE study_materials SET index_status = 'indexing', index_error = NULL, updated_at = ? WHERE id = ?").run(now(), id);
+}
+
+export function restoreStudyMaterialIndexedStatus(id: string): void {
+  materialRow(id);
+  getDb().prepare("UPDATE study_materials SET index_status = 'indexed', index_error = NULL, updated_at = ? WHERE id = ?").run(now(), id);
+}
+
+export function updateStudyMaterialVisualAnalysis(id: string, input: { description: string; status: StudyMaterialSummary['visualAnalysisStatus']; provider?: string | null; model?: string | null; extractedText?: string }): void {
+  const row = materialRow(id);
+  const extractedText = input.extractedText?.trim() ? input.extractedText.trim() : String(row.extracted_text ?? '');
+  getDb().prepare(`UPDATE study_materials SET visual_description = ?, visual_analysis_status = ?, visual_analysis_provider = ?,
+    visual_analysis_model = ?, extracted_text = ?, embedding = NULL, embedding_provider = NULL, embedding_model = NULL,
+    embedding_dim = NULL, embedding_text_hash = NULL, index_status = 'pending', index_error = NULL, indexed_at = NULL,
+    updated_at = ? WHERE id = ?`).run(input.description.trim(), input.status, input.provider ?? null, input.model ?? null, extractedText, now(), id);
+}
+
+export function setStudyMaterialEmbedding(id: string, embedding: number[], meta: { provider: string; model: string; textHash: string }): void {
+  materialRow(id);
+  const timestamp = now();
+  getDb().prepare(`UPDATE study_materials SET embedding = ?, embedding_provider = ?, embedding_model = ?, embedding_dim = ?,
+    embedding_text_hash = ?, index_status = 'indexed', index_error = NULL, indexed_at = ?, updated_at = ? WHERE id = ?`)
+    .run(encodeEmbedding(embedding), meta.provider, meta.model, embedding.length, meta.textHash, timestamp, timestamp, id);
+}
+
+export function setStudyMaterialIndexFailure(id: string, status: 'unavailable' | 'error', error: string): void {
+  materialRow(id);
+  getDb().prepare(`UPDATE study_materials SET embedding = NULL, embedding_provider = NULL, embedding_model = NULL,
+    embedding_dim = NULL, embedding_text_hash = NULL, index_status = ?, index_error = ?, indexed_at = NULL, updated_at = ? WHERE id = ?`)
+    .run(status, error, now(), id);
 }
 
 function snapshotMaterial(row: Row): StudyMaterialVersion {
@@ -297,9 +449,13 @@ export async function replaceStudyMaterialFile(id: string, filePath: string, ocr
   return db.transaction(() => {
     snapshotMaterial(current);
     db.prepare(`UPDATE study_materials SET file_name = ?, mime_type = ?, extension = ?, content_blob = ?, content_hash = ?, extracted_text = ?,
-      extraction_status = ?, metadata_json = ?, page_count = ?, size_bytes = ?, updated_at = ? WHERE id = ?`)
+      extraction_status = ?, metadata_json = ?, page_count = ?, size_bytes = ?, visual_description = '',
+      visual_analysis_status = ?, visual_analysis_provider = NULL, visual_analysis_model = NULL, embedding = NULL,
+      embedding_provider = NULL, embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL,
+      index_status = 'pending', index_error = NULL, indexed_at = NULL, updated_at = ? WHERE id = ?`)
       .run(path.basename(filePath), MIME_BY_EXTENSION[extension] ?? 'application/octet-stream', extension, bytes, hash, extracted.text,
-        extracted.status, JSON.stringify({ ...metadata(current.metadata_json), ...extracted.metadata }), extracted.pageCount, bytes.length, now(), id);
+        extracted.status, JSON.stringify({ ...metadata(current.metadata_json), ...extracted.metadata }), extracted.pageCount, bytes.length,
+        studyMaterialPreviewKind(extension, MIME_BY_EXTENSION[extension]) === 'image' ? 'pending' : 'not_applicable', now(), id);
     return toSummary(materialRow(id));
   })();
 }
@@ -312,9 +468,13 @@ export function restoreStudyMaterialVersion(id: string, versionId: string): Stud
     snapshotMaterial(current);
     const extension = path.extname(String(version.file_name ?? '')).slice(1).toLocaleLowerCase();
     db.prepare(`UPDATE study_materials SET file_name = ?, mime_type = ?, extension = ?, content_blob = ?, content_hash = ?, extracted_text = ?,
-      metadata_json = ?, size_bytes = ?, extraction_status = 'ready', updated_at = ? WHERE id = ?`)
+      metadata_json = ?, size_bytes = ?, extraction_status = 'ready', visual_description = '', visual_analysis_status = ?,
+      visual_analysis_provider = NULL, visual_analysis_model = NULL, embedding = NULL, embedding_provider = NULL,
+      embedding_model = NULL, embedding_dim = NULL, embedding_text_hash = NULL, index_status = 'pending',
+      index_error = NULL, indexed_at = NULL, updated_at = ? WHERE id = ?`)
       .run(version.file_name, version.mime_type, extension, version.content_blob, version.content_hash, version.extracted_text,
-        version.metadata_json, version.size_bytes, now(), id);
+        version.metadata_json, version.size_bytes,
+        studyMaterialPreviewKind(extension, String(version.mime_type ?? '')) === 'image' ? 'pending' : 'not_applicable', now(), id);
     return toSummary(materialRow(id));
   })();
 }
@@ -323,19 +483,23 @@ export function createStudyMaterialAnnotation(materialId: string, input: StudyMa
   materialRow(materialId); const db = getDb(); const key = ids('MAN'); const timestamp = now();
   const position = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS value FROM study_material_annotations WHERE material_id = ?').get(materialId) as Row).value);
   db.prepare(`INSERT INTO study_material_annotations
-    (id, short_id, material_id, page_number, rect_json, from_pos, to_pos, selected_text, note, color, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, short_id, material_id, page_number, rect_json, rects_json, path_json, kind, thickness, from_pos, to_pos, selected_text, note, color, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(key.id, key.shortId, materialId, input.pageNumber ?? null, input.rect ? JSON.stringify(input.rect) : null,
-      input.from ?? null, input.to ?? null, input.selectedText?.trim() ?? '', input.note?.trim() ?? '', input.color ?? '#facc15', position, timestamp, timestamp);
+      JSON.stringify(input.rects ?? (input.rect ? [input.rect] : [])), JSON.stringify(input.path ?? []), input.kind ?? 'highlight',
+      Math.max(1, Math.min(24, input.thickness ?? 3)), input.from ?? null, input.to ?? null, input.selectedText?.trim() ?? '',
+      input.note?.trim() ?? '', input.color ?? '#fde68a', position, timestamp, timestamp);
   return toAnnotation(db.prepare('SELECT * FROM study_material_annotations WHERE id = ?').get(key.id) as Row);
 }
 
 export function updateStudyMaterialAnnotation(id: string, patch: Partial<StudyMaterialAnnotationInput>): StudyMaterialAnnotation {
   const db = getDb(); const row = db.prepare('SELECT * FROM study_material_annotations WHERE id = ?').get(id) as Row | undefined;
   if (!row) throw new Error('Anotación no encontrada.');
-  db.prepare(`UPDATE study_material_annotations SET note = ?, color = ?, selected_text = ?, page_number = ?, rect_json = ?, updated_at = ? WHERE id = ?`)
+  db.prepare(`UPDATE study_material_annotations SET note = ?, color = ?, selected_text = ?, page_number = ?, rect_json = ?, rects_json = ?, path_json = ?, kind = ?, thickness = ?, updated_at = ? WHERE id = ?`)
     .run(patch.note ?? row.note, patch.color ?? row.color, patch.selectedText ?? row.selected_text, patch.pageNumber ?? row.page_number,
-      patch.rect === undefined ? row.rect_json : patch.rect ? JSON.stringify(patch.rect) : null, now(), id);
+      patch.rect === undefined ? row.rect_json : patch.rect ? JSON.stringify(patch.rect) : null,
+      patch.rects === undefined ? row.rects_json : JSON.stringify(patch.rects), patch.path === undefined ? row.path_json : JSON.stringify(patch.path),
+      patch.kind ?? row.kind ?? 'highlight', patch.thickness ?? row.thickness ?? 3, now(), id);
   return toAnnotation(db.prepare('SELECT * FROM study_material_annotations WHERE id = ?').get(id) as Row);
 }
 

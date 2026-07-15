@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, readFile, readdir, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,6 +36,21 @@ if (!existsSync(path.join(repoRoot, 'dist-electron/main.js')) || !existsSync(pat
 }
 
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-'));
+const fakeWhisperPath = path.join(userData, 'fake-whisper-cli.mjs');
+if (process.platform !== 'win32') {
+  await writeFile(fakeWhisperPath, `#!/usr/bin/env node
+process.stderr.write('whisper_print_progress_callback: progress = 25%\\n');
+process.stdout.write('[00:00:00.000 --> 00:00:01.000] Hola\\n');
+setTimeout(() => {
+  process.stderr.write('whisper_print_progress_callback: progress = 100%\\n');
+  process.stdout.write('[00:00:01.000 --> 00:00:02.000] mundo\\n');
+}, 30);
+`, 'utf8');
+  await chmod(fakeWhisperPath, 0o755);
+  const modelDir = path.join(userData, 'whisper.cpp', 'models');
+  await mkdir(modelDir, { recursive: true });
+  await writeFile(path.join(modelDir, 'ggml-base.bin'), 'e2e-placeholder');
+}
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
@@ -49,6 +64,7 @@ try {
 
   // ── Window + renderer mount ─────────────────────────────────────────────────
   const page = await app.firstWindow();
+  page.setDefaultTimeout(30_000);
   const pageErrors = [];
   page.on('pageerror', (err) => pageErrors.push(err));
   await page.waitForLoadState('domcontentloaded');
@@ -75,10 +91,12 @@ try {
     hasStudyImprove: typeof window.nodus?.improveStudyText === 'function' && typeof window.nodus?.listStudyStyles === 'function',
     hasStudyRecordings: typeof window.nodus?.createStudyRecording === 'function' && typeof window.nodus?.saveStudyTranscript === 'function',
     hasStudySearch: typeof window.nodus?.searchStudyCorpus === 'function' && typeof window.nodus?.rebuildStudySearchIndex === 'function',
+    hasStudyKnowledge: typeof window.nodus?.listStudyIdeas === 'function' && typeof window.nodus?.getStudyKnowledgeGraph === 'function' && typeof window.nodus?.reanalyzeStudyKnowledgeSource === 'function',
     hasStudyGrading: typeof window.nodus?.gradeStudyAnswer === 'function' && typeof window.nodus?.listStudyRubrics === 'function',
     hasStudyLearning: typeof window.nodus?.createStudyFlashcard === 'function' && typeof window.nodus?.getStudyPlanner === 'function' && typeof window.nodus?.getStudyProgressDashboard === 'function',
     hasStudyAiPolicy: typeof window.nodus?.getStudyAiUsageSummary === 'function' && typeof window.nodus?.clearStudyAiUsage === 'function',
     hasStudyDemo: typeof window.nodus?.seedStudyDemoData === 'function',
+    hasNodusLocalAi: typeof window.nodus?.getNodusLocalAiStatus === 'function' && typeof window.nodus?.downloadNodusLocalModel === 'function' && typeof window.nodus?.deleteNodusLocalModel === 'function',
   }));
   assert.equal(bridge.hasNodus, true, 'window.nodus bridge exposed');
   assert.equal(bridge.hasGetGraph, true, 'getGraph available');
@@ -90,11 +108,36 @@ try {
   assert.equal(bridge.hasStudyImprove, true, 'study improvement and style bridge available');
   assert.equal(bridge.hasStudyRecordings, true, 'study recording and transcript bridge available');
   assert.equal(bridge.hasStudySearch, true, 'study hybrid-search bridge available');
+  assert.equal(bridge.hasStudyKnowledge, true, 'study ideas and knowledge-graph bridge available');
   assert.equal(bridge.hasStudyGrading, true, 'study grading and rubric bridge available');
   assert.equal(bridge.hasStudyLearning, true, 'study review, progress and planner bridge available');
   assert.equal(bridge.hasStudyAiPolicy, true, 'study AI policy and usage bridge available');
   assert.equal(bridge.hasStudyDemo, true, 'study sample-data bridge available');
+  assert.equal(bridge.hasNodusLocalAi, true, 'integrated local AI model manager bridge available');
   console.log('[e2e] preload bridge ok');
+
+  // ── Essential tutorial: first screen, language preferences, seen-once gate ──
+  await page.getByTestId('basics-tutorial-language').waitFor({ timeout: 30_000 });
+  const languageButtonSizes = await page.locator('.tutorial-language-option').evaluateAll((buttons) =>
+    buttons.map((button) => { const box = button.getBoundingClientRect(); return `${Math.round(box.width)}x${Math.round(box.height)}`; }));
+  assert.equal(new Set(languageButtonSizes).size, 1, `every cinematic tutorial language button has the same dimensions: ${languageButtonSizes.join(', ')}`);
+  await page.getByTestId('tutorial-language-fr').click();
+  await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
+  await page.waitForFunction(async () => {
+    const settings = await window.nodus.getSettings();
+    return settings.uiLanguage === 'en' && settings.promptLanguage === 'fr';
+  });
+  assert.equal(await page.locator('.tutorial-progress button').count(), 13, 'essential guide exposes thirteen novice-friendly chapters');
+  await page.locator('.tutorial-topbar button').click();
+  await page.getByText('Skip the essential guide?', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Skip anyway', exact: true }).click();
+  await page.getByTestId('basics-tutorial').waitFor({ state: 'detached' });
+  assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 3, 'confirmed skip records the current tutorial version globally');
+  await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, uiLanguage: 'es', promptLanguage: 'es' }));
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');
+  console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
   const smokeModel = { provider: 'openai', model: 'smoke-model' };
@@ -114,6 +157,8 @@ try {
   const independent = await page.evaluate(({ model, chat }) =>
     window.nodus.updateSettings({
       onboardingComplete: true,
+      basicsTutorialVersion: 3,
+      recoverySetupVersion: 1,
       tourComplete: true,
       advancedTourComplete: true,
       favorites: [model, chat],
@@ -136,9 +181,53 @@ try {
   await page.waitForFunction(() => document.querySelector('header'));
   assert.equal(await page.locator('header select[data-tour="model"]').count(), 0, 'global header model selector removed');
   await page.locator('[data-tour="nav-settings"]').click();
+  await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByText('Generación de imágenes', { exact: true }).waitFor({ timeout: 30_000 });
   assert.equal(await page.getByText('gemini-3.1-flash-lite-image', { exact: false }).count() > 0, true, 'image settings render selected verified model');
   console.log('[e2e] image provider settings rendered');
+  await page.getByTestId('nodus-local-ai-models').waitFor({ timeout: 30_000 });
+  const localAiStatus = await page.evaluate(() => window.nodus.getNodusLocalAiStatus());
+  assert.equal(localAiStatus.models.length, 6, 'integrated local AI catalog is available over the real preload bridge');
+  assert.equal(await page.getByText('BGE-M3 Q8_0', { exact: true }).count(), 1, 'local embedding catalog renders');
+  assert.equal(await page.getByText('Qwen3.5-0.8B Q4', { exact: true }).count(), 1, 'local multimodal chat catalog renders');
+  assert.equal(await page.getByText('Importante sobre los embeddings:', { exact: false }).count(), 1, 'embedding compatibility warning remains visible');
+  if (process.env.NODUS_E2E_LOCAL_RUNTIME === '1') {
+    const installedRuntime = await page.evaluate(async () => {
+      const progress = [];
+      const status = await window.nodus.installNodusLocalRuntime((fraction) => progress.push(fraction));
+      return { status, progress };
+    });
+    assert.equal(installedRuntime.status.runtime.ready, true, 'Nodus downloads and extracts a working llama.cpp runtime');
+    assert.ok(installedRuntime.progress.some((fraction) => fraction >= 1), 'local runtime installation reports completion progress');
+  }
+  await page.getByTestId('stt-settings').waitFor({ timeout: 30_000 });
+  assert.deepEqual(await page.getByTestId('stt-provider').locator('option').evaluateAll((options) => options.map((option) => option.value)), ['transformers', 'whisper_cpp', 'openai'], 'Settings owns all STT engines');
+  const whisperCppStatus = await page.evaluate(() => window.nodus.getWhisperCppStatus());
+  assert.ok(whisperCppStatus.models.length >= 5, 'whisper.cpp model manager is available over the real preload bridge');
+  await page.getByTestId('stt-provider').selectOption('whisper_cpp');
+  await page.getByTestId('stt-settings').getByRole('button', { name: /Instalar|Desinstalar/, exact: true }).waitFor();
+  if (process.platform !== 'win32') {
+    await page.evaluate(({ executable }) => window.nodus.updateSettings({ sttWhisperCppExecutable: executable, sttWhisperCppModel: 'base' }), { executable: fakeWhisperPath });
+    const streamedCpp = await page.evaluate(async () => {
+      const partials = []; const progress = [];
+      const result = await window.nodus.transcribeStudyAudio({
+        audioBytes: new Uint8Array([82, 73, 70, 70]), mimeType: 'audio/wav', provider: 'whisper_cpp', model: 'base', language: 'auto',
+      }, { onPartial: (text) => partials.push(text), onProgress: (fraction) => progress.push(fraction) });
+      return { result, partials, progress };
+    });
+    assert.equal(streamedCpp.result.text, 'Hola mundo', 'whisper.cpp IPC returns accumulated text');
+    assert.deepEqual(streamedCpp.partials, ['Hola', 'Hola mundo'], 'whisper.cpp IPC streams segments before completion');
+    assert.ok(streamedCpp.progress.some((value) => value >= 1), 'whisper.cpp IPC streams progress');
+  }
+  await page.getByTestId('stt-provider').selectOption('transformers');
+  console.log('[e2e] STT engine/model management rendered in Settings');
+  if (process.env.NODUS_E2E_STT_ONLY === '1') {
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await app.close(); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused STT Settings + whisper.cpp streaming smoke passed');
+    process.exit(0);
+  }
   await page.getByRole('button', { name: 'Asistente', exact: true }).click();
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
   await page.locator('button[title="Cerrar"]').click();
@@ -196,6 +285,26 @@ try {
 
   const authorsGraph = await page.evaluate(() => window.nodus.getGraph('authors'));
   assert.ok(Array.isArray(authorsGraph.nodes), 'authors lens answers too');
+
+  const graphOverview = await page.evaluate(() => window.nodus.getGraphOverview());
+  assert.ok(
+    Array.isArray(graphOverview.nodes) && graphOverview.nodes.every((node) => node.type === 'theme'),
+    'graph:overview returns only compact theme hubs'
+  );
+  if (graphOverview.nodes.length > 0) {
+    const graphTheme = await page.evaluate(
+      ({ label }) => window.nodus.getGraphTheme(label, 90),
+      { label: graphOverview.nodes[0].themes[0] ?? graphOverview.nodes[0].label }
+    );
+    const graphThemeIdeas = graphTheme.nodes.filter((node) => node.type !== 'theme');
+    assert.ok(graphThemeIdeas.length <= 150, 'graph:theme keeps the default scene bounded');
+    const graphThemeNodeIds = new Set(graphTheme.nodes.map((node) => node.id));
+    assert.ok(
+      graphTheme.edges.every((edge) => graphThemeNodeIds.has(edge.source) && graphThemeNodeIds.has(edge.target)),
+      'graph:theme only returns edges whose endpoints are present'
+    );
+  }
+  console.log(`[e2e] progressive graph IPC ok (${graphOverview.nodes.length} overview themes)`);
 
   // ── Records ontology + evidence archive over real IPC ───────────────────────
   const records = await page.evaluate(async () => {
@@ -393,7 +502,7 @@ try {
     const created = await window.nodus.createVault({ name: 'Study smoke', type: 'estudio' });
     const switched = await window.nodus.switchVault(created.vault.id);
     if (!switched.ok) throw new Error(switched.message);
-    await window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true });
+    await window.nodus.updateSettings({ onboardingComplete: true, basicsTutorialVersion: 3, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, theme: 'light' });
   });
   await page.reload();
   await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).first().click();
@@ -401,11 +510,18 @@ try {
   assert.equal(await page.getByText('Crea tu primer curso para empezar.', { exact: true }).count(), 0, 'empty-state guidance stays out of the sidebar');
   assert.equal(await page.getByTestId('nodus-logo').getAttribute('data-vault-logo'), 'estudio', 'study vault uses the teal Nodus logo');
 
-  const searchPadding = await page.getByPlaceholder('Buscar materiales…').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
-  assert.ok(searchPadding >= 30, `study search reserves space for its leading icon (${searchPadding}px)`);
   const organizationBox = await page.getByTestId('study-sidebar-organization').boundingBox();
   const analyzeBox = await page.getByRole('button', { name: 'Analizar', exact: true }).boundingBox();
   assert.ok(organizationBox && analyzeBox && analyzeBox.y - (organizationBox.y + organizationBox.height) < 40, 'Analyze follows Organization without a flex spacer');
+  assert.equal(await page.getByRole('button', { name: 'Banco de preguntas', exact: true }).isDisabled(), false, 'question bank is enabled');
+  for (const removed of ['Tests', 'Exámenes', 'Repaso', 'Planificador', 'Progreso']) {
+    assert.equal(await page.getByRole('button', { name: removed, exact: true }).count(), 0, `${removed} is not rendered`);
+  }
+  await page.getByTestId('study-sidebar-organization-toggle').click();
+  assert.equal(await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).count(), 0, 'Organization can be collapsed');
+  assert.equal(await page.getByTestId('study-sidebar-organization-toggle').getAttribute('aria-expanded'), 'false');
+  await page.getByTestId('study-sidebar-organization-toggle').click();
+  await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).waitFor();
 
   const createStudyItem = async (buttonTestId, name) => {
     await page.getByTestId(buttonTestId).click();
@@ -417,8 +533,9 @@ try {
   await createStudyItem('study-create-course', 'Curso smoke');
   await createStudyItem('study-create-subject', 'Asignatura smoke');
   await createStudyItem('study-create-folder', 'Carpeta smoke');
-  await page.getByText('Asignatura smoke', { exact: true }).first().click();
   await createStudyItem('study-create-topic', 'Tema smoke');
+  const searchPadding = await page.getByTestId('study-organization-search').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
+  assert.ok(searchPadding >= 30, `study search reserves space for its leading icon (${searchPadding}px)`);
   await createStudyItem('study-create-document', 'Apunte smoke');
 
   const study = await page.evaluate(async () => {
@@ -430,20 +547,45 @@ try {
     };
   });
   assert.deepEqual(study.counts, [1, 1, 1, 1, 1], 'all organization buttons create through the real renderer and IPC bridge');
-  assert.ok(study.placement?.courseId && study.placement?.subjectId && study.placement?.topicId, 'UI-created material keeps the selected hierarchy placement');
+  assert.ok(study.placement?.courseId && study.placement?.subjectId && study.placement?.folderId && study.placement?.topicId, 'UI-created material keeps the selected hierarchy placement');
   assert.match(await page.locator('body').innerText(), /Cursos y asignaturas/, 'study-specific sidebar is rendered');
   console.log('[e2e] study logo, search padding, sidebar flow and creation dialogs ok');
 
+  if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY !== '1') {
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-toggle').click();
   await page.getByTestId('study-dictation').waitFor({ timeout: 30_000 });
-  assert.match(await page.getByTestId('study-dictation').innerText(), /Local|offline/i, 'dictation panel defaults to the offline backend');
+  assert.match(await page.getByTestId('study-dictation').innerText(), /ONNX|Local|offline/i, 'dictation panel defaults to the offline ONNX backend');
+  await page.getByTestId('study-dictation').getByRole('button', { name: 'Dictado', exact: true }).click();
+  const dictationLanguage = page.getByTestId('study-dictation-language');
+  await dictationLanguage.waitFor();
+  assert.equal(await dictationLanguage.locator('option').first().getAttribute('value'), 'auto', 'dictation supports automatic language detection');
+  assert.ok(await dictationLanguage.locator('option').count() >= 100, 'dictation exposes every language supported by multilingual Whisper');
+  await dictationLanguage.selectOption('es');
+  await page.getByTestId('study-dictation').getByRole('button', { name: 'Dictado', exact: true }).click();
   await page.getByTestId('study-dictation-start').click();
   await page.getByTestId('study-dictation-discard').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-discard').click();
   await page.getByTestId('study-dictation-start').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-toggle').click();
   console.log('[e2e] study dictation panel + fake microphone capture ok');
+  if (process.env.NODUS_E2E_STT_UI_ONLY === '1') {
+    const recordingId = await page.evaluate(async () => (await window.nodus.createStudyRecording({
+      fileName: 'idioma-smoke.wav', mimeType: 'audio/wav', bytes: new Uint8Array([82, 73, 70, 70]), language: 'auto',
+    })).recording.id);
+    await page.getByRole('button', { name: 'Grabaciones', exact: true }).click();
+    await page.getByTestId('study-recordings-view').waitFor();
+    await page.locator(`[data-testid="study-recording-${recordingId}"]`).click();
+    const recordingLanguage = page.getByTestId('study-recording-language');
+    await recordingLanguage.waitFor();
+    assert.equal(await recordingLanguage.inputValue(), 'auto', 'recordings preserve per-audio automatic detection');
+    assert.ok(await recordingLanguage.locator('option').count() >= 100, 'recordings expose every language supported by multilingual Whisper');
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await app.close(); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused dictation + recording language UI smoke passed');
+    process.exit(0);
+  }
   await page.getByTestId('study-doc-favorite').click();
   await page.getByTestId('study-doc-style').click();
   await page.getByTestId('study-doc-kind').selectOption('manual');
@@ -453,10 +595,11 @@ try {
     const document = workspace.documents.find((item) => item.title === 'Apunte smoke');
     return document?.favorite === true && document.kind === 'manual' && document.color === '#22c55e';
   }, { timeout: 30_000 });
+  console.log('[e2e] study editor metadata controls ok');
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
   await page.locator('.study-editor-shell textarea').fill(editorMarkdown);
-  await page.getByRole('button', { name: /^Guardar$/ }).click();
+  await page.getByRole('button', { name: /^Guardar$/ }).click({ force: true, noWaitAfter: true });
   await page.waitForFunction(() => document.body.textContent?.includes('Guardado'), { timeout: 30_000 });
   const editorRoundTrip = await page.evaluate(async () => {
     const workspace = await window.nodus.getStudyWorkspace();
@@ -467,40 +610,94 @@ try {
   });
   assert.equal(editorRoundTrip?.content, editorMarkdown, 'raw Markdown round-trips exactly through the editor');
   assert.ok((editorRoundTrip?.versions ?? 0) >= 1, 'editor save creates a recoverable version');
+  console.log('[e2e] study editor raw Markdown save + version ok');
 
-  // Selection-only improvement UI, style CRUD and failure preservation. The smoke
-  // profile intentionally has no API key, so generation must fail without touching
-  // the original — provider success is covered by the shared AI client tests.
-  await page.locator('.study-editor-shell textarea').evaluate((element) => {
-    element.focus();
-    element.setSelectionRange(15, 32);
-    element.dispatchEvent(new Event('select', { bubbles: true }));
-  });
+  if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY !== '1') {
+  // Compact prompt manager + contextual streaming actions. The smoke profile
+  // intentionally has no usable provider, so the direct action must restore
+  // the original selection after the streamed request fails.
   await page.getByTestId('study-improve-toggle').click();
   await page.getByTestId('study-improve-dialog').waitFor();
+  const improveDialogBox = await page.getByTestId('study-improve-dialog').locator('section').first().boundingBox();
+  assert.ok(improveDialogBox && improveDialogBox.width <= 680, `prompt manager stays compact (${improveDialogBox?.width}px)`);
   assert.equal(await page.locator('[data-testid^="study-style-builtin-"]').count(), 13, 'all predefined improvement styles are visible');
-  await page.getByRole('button', { name: 'Estilos', exact: true }).click();
+  await page.getByTestId('study-style-builtin-academic').click();
+  await page.getByText('Registro académico preciso y argumentación ordenada.', { exact: true }).waitFor();
+  assert.equal(await page.getByText('Conservar significado', { exact: true }).count(), 0);
+  assert.equal(await page.getByText('Transformación libre', { exact: true }).count(), 0);
+  await page.getByTestId('study-style-toolbar-builtin-proofread').click();
+  await page.getByText('Puedes mostrar un máximo de cuatro prompts en la barra.', { exact: true }).waitFor();
   await page.getByTestId('study-style-new').click();
-  await page.getByTestId('study-style-name').fill('Estilo smoke');
-  await page.getByTestId('study-style-prompt').fill('Aclara el texto seleccionado sin añadir ninguna información nueva.');
-  await page.getByTestId('study-style-save').click();
-  await page.waitForFunction(async () => (await window.nodus.listStudyStyles()).some((style) => style.name === 'Estilo smoke'), { timeout: 30_000 });
-  await page.getByRole('button', { name: 'Mejora', exact: true }).click();
-  await page.getByText('Estilo smoke', { exact: true }).click();
-  await page.getByTestId('study-improve-run').click();
-  await page.getByText('El original permanece intacto.', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-prompt-title').fill('Pulir smoke');
+  await page.getByTestId('study-prompt-text').fill('Reescribe el texto seleccionado con mayor fluidez sin añadir información nueva.');
+  await page.getByTestId('study-create-icon-emoji').click();
+  await page.getByRole('button', { name: 'Emoji 🧪', exact: true }).click();
+  await page.getByTestId('study-prompt-save').click();
+  await page.getByText('Prompt guardado.', { exact: true }).waitFor();
   await page.getByTestId('study-improve-dialog').locator('header button').last().click();
-  assert.equal(await page.locator('.study-editor-shell textarea').inputValue(), editorMarkdown, 'failed improvement leaves original Markdown untouched');
-  console.log('[e2e] study improvement dialog + custom styles + failure preservation ok');
 
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
+  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const index = node.textContent?.indexOf('Texto') ?? -1;
+      if (index < 0) continue;
+      const range = document.createRange(); range.setStart(node, index); range.setEnd(node, index + 5);
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
+      root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 420, clientY: 420 })); return;
+    }
+    throw new Error('Improvement selection fixture not found');
+  });
+  await page.getByTestId('study-selection-text-color').waitFor();
+  assert.equal(await page.locator('[data-testid^="study-quick-improve-"]').count(), 4, 'the selection exposes exactly the four configured prompt shortcuts');
+  await page.getByTestId('study-quick-improve-builtin-academic').click();
+  await page.getByText('El original permanece intacto.', { exact: true }).waitFor({ timeout: 30_000 });
+  const unchangedAfterImprovement = await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.find((item) => item.title === 'Apunte smoke')?.contentMarkdown);
+  assert.equal(unchangedAfterImprovement, editorMarkdown, 'failed improvement leaves original Markdown untouched');
+  console.log('[e2e] compact prompt manager + four contextual streaming shortcuts + failure preservation ok');
+
+  await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown .katex').waitFor({ timeout: 30_000 });
   await page.locator('.study-milkdown table.children').waitFor({ timeout: 30_000 });
-  await page.getByRole('button', { name: /^Dividir$/ }).click();
+  await page.getByTestId('study-heading-level').selectOption('2');
+  await page.locator('.study-milkdown .ProseMirror h2').waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator('.study-milkdown .ProseMirror').getByText('## Título', { exact: true }).count(), 0, 'visual heading insertion creates a heading node rather than literal Markdown');
+  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const index = node.textContent?.indexOf('Texto') ?? -1;
+      if (index < 0) continue;
+      const range = document.createRange(); range.setStart(node, index); range.setEnd(node, index + 5);
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return;
+    }
+    throw new Error('Text selection fixture not found');
+  });
+  await page.getByTestId('study-inline-code').click();
+  assert.ok(await page.locator('.study-milkdown .ProseMirror code').count() > 0, 'inline-code button formats the visual selection');
+  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const index = node.textContent?.indexOf('importante') ?? -1;
+      if (index < 0) continue;
+      const range = document.createRange(); range.setStart(node, index); range.setEnd(node, index + 10);
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return;
+    }
+    throw new Error('Formula selection fixture not found');
+  });
+  await page.getByTestId('study-inline-formula').click();
+  assert.ok(await page.locator('.study-milkdown .ProseMirror [data-type="math_inline"]').count() > 0, 'formula button converts selected visual text into inline math');
+  const splitButton = page.getByRole('button', { name: 'Dividir vista', exact: true });
+  await splitButton.click();
+  assert.match(await splitButton.getAttribute('class'), /bg-indigo-100/, 'active split-view control uses its light-theme state');
   await page.locator('.study-editor-shell .md .katex').waitFor({ timeout: 30_000 });
   assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
   console.log('[e2e] study Milkdown editor + metadata + raw Markdown + versioning ok');
+  }
+  }
 
   // ── Study materials: native import dialog + embedded PDF + source note ─────
   const pdfPath = path.join(userData, 'fuente-smoke.pdf');
@@ -515,38 +712,100 @@ try {
   await app.evaluate(({ dialog }, filePath) => {
     dialog.showOpenDialog = async (_window, options) => {
       const actual = options ?? _window;
-      if (actual?.title === 'Añadir materiales de estudio') return { canceled: false, filePaths: [filePath] };
+      if (actual?.title === 'Seleccionar materiales de estudio') return { canceled: false, filePaths: [filePath] };
       return { canceled: true, filePaths: [] };
     };
   }, pdfPath);
   await page.getByRole('button', { name: 'Materiales', exact: true }).click();
   await page.getByTestId('study-materials-view').waitFor({ timeout: 30_000 });
+  const userNoteId = await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.find((document) => document.title === 'Apunte smoke')?.id);
+  assert.equal(typeof userNoteId, 'string');
+  await page.getByTestId(`study-material-note-${userNoteId}`).waitFor();
+  await page.getByTestId(`study-material-note-${userNoteId}`).click();
+  await page.locator('.study-editor-shell').waitFor({ timeout: 30_000 });
+  assert.match(await page.getByRole('tab', { selected: true }).innerText(), /Apunte smoke/, 'a user-created note opens from Materials');
+  await page.getByRole('button', { name: 'Materiales', exact: true }).click();
+  await page.getByTestId('study-materials-view').waitFor({ timeout: 30_000 });
   const materialSearchPadding = await page.getByTestId('study-material-search').evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft));
   assert.ok(materialSearchPadding >= 30, 'material search keeps its icon and text separated');
   await page.getByTestId('study-material-import').click();
+  await page.getByTestId('study-material-import-dialog').waitFor();
+  await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
+  await page.getByTestId('study-material-import-dialog').getByText('fuente-smoke.pdf', { exact: true }).waitFor();
+  await page.getByTestId('study-material-import-confirm').click();
+  await page.getByTestId('study-material-import-dialog').waitFor({ state: 'detached' });
   await page.getByText('fuente-smoke', { exact: true }).waitFor({ timeout: 30_000 });
   const importedMaterial = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'fuente-smoke'));
   assert.equal(importedMaterial?.previewKind, 'pdf', 'PDF import stores an embedded material');
   assert.ok((importedMaterial?.extractedChars ?? 0) > 20, 'PDF text is extracted for search and citations');
   await page.getByText('fuente-smoke', { exact: true }).click();
   await page.getByTestId('study-pdf-viewer').waitFor({ timeout: 30_000 });
-  await page.waitForFunction(() => document.querySelector('[data-testid="study-pdf-text-layer"] span')?.textContent?.length, { timeout: 30_000 });
-  assert.ok(await page.locator('[data-testid="study-pdf-viewer"] canvas').evaluate((canvas) => canvas.width > 0 && canvas.height > 0), 'embedded PDF page rendered to canvas');
-  await page.getByTestId('study-pdf-text-layer').evaluate((layer) => {
+  await page.waitForFunction(() => document.querySelector('[data-pdf-page] .select-text span')?.textContent?.length, { timeout: 30_000 });
+  assert.ok(await page.locator('[data-testid="study-pdf-viewer"] canvas').evaluateAll((canvases) => canvases.some((canvas) => canvas.width > 0 && canvas.height > 0)), 'embedded PDF page rendered to canvas');
+  await page.locator('[data-pdf-page] .select-text').first().evaluate((layer) => {
     const span = [...layer.querySelectorAll('span')].find((item) => item.textContent?.includes('Fragmento')) ?? layer.querySelector('span');
     if (!span) throw new Error('PDF text layer has no selectable text');
     const range = document.createRange(); range.selectNodeContents(span);
     const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
     layer.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await page.getByTestId('study-pdf-annotation-dialog').waitFor();
-  await page.getByTestId('study-pdf-annotation-dialog').locator('textarea').fill('Evidencia importante');
-  await page.getByRole('button', { name: 'Guardar subrayado', exact: true }).click();
-  await page.getByText('Evidencia importante', { exact: true }).waitFor();
+  await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight' && annotation.selectedText.length > 0), importedMaterial.id, { timeout: 30_000 });
+  await page.getByTestId('study-material-annotations-sidebar').waitFor();
+  for (const tool of ['highlight', 'underline', 'brush', 'sticky', 'comment']) await page.getByTestId(`study-pdf-tool-${tool}`).waitFor();
+  await page.getByTestId('study-pdf-tool-brush').click();
+  await page.getByTestId('study-pdf-brush-thickness').fill('7');
+  const annotationCanvas = page.locator('[data-pdf-page] > svg[class*="z-20"]').first();
+  const annotationCanvasBox = await annotationCanvas.boundingBox();
+  assert.ok(annotationCanvasBox);
+  await page.mouse.move(annotationCanvasBox.x + 80, annotationCanvasBox.y + 100);
+  await page.mouse.down(); await page.mouse.move(annotationCanvasBox.x + 150, annotationCanvasBox.y + 130, { steps: 4 }); await page.mouse.up();
+  await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'brush' && annotation.thickness === 7), importedMaterial.id, { timeout: 30_000 });
+  await page.getByTestId('study-pdf-tool-sticky').click();
+  await annotationCanvas.click({ position: { x: 180, y: 160 } });
+  await page.getByTestId('study-pdf-sticky-dialog').locator('textarea').fill('Sticker smoke');
+  await page.getByRole('button', { name: 'Guardar sticker', exact: true }).click();
+  await page.getByText('Sticker smoke', { exact: true }).waitFor();
+  await page.getByTestId('study-pdf-tool-comment').click();
+  await annotationCanvas.click({ position: { x: 220, y: 210 } });
+  await page.getByTestId('study-pdf-inline-comment').locator('textarea').fill('Comentario smoke');
+  await page.getByTestId('study-pdf-inline-comment').getByRole('button', { name: 'Guardar', exact: true }).click();
+  await page.getByText('Comentario smoke', { exact: true }).waitFor();
   await page.getByText('Crear apunte', { exact: true }).last().click();
   await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke')), { timeout: 30_000 });
   assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');
   console.log('[e2e] study material import + embedded PDF + highlight-to-note provenance ok');
+  if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY === '1') {
+    const AdmZip = require('adm-zip');
+    const epubPath = path.join(userData, 'libro-smoke.epub');
+    const epub = new AdmZip();
+    epub.addFile('mimetype', Buffer.from('application/epub+zip'));
+    epub.addFile('META-INF/container.xml', Buffer.from('<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>'));
+    epub.addFile('OEBPS/content.opf', Buffer.from('<?xml version="1.0"?><package><manifest><item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="chapter"/></spine></package>'));
+    epub.addFile('OEBPS/chapter.xhtml', Buffer.from('<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Libro smoke</h1><p>Fragmento EPUB seleccionable y verificable.</p></body></html>'));
+    await writeFile(epubPath, epub.toBuffer());
+    await app.evaluate(({ dialog }, filePath) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filePath] }); }, epubPath);
+    await page.getByRole('button', { name: 'Materiales', exact: true }).click();
+    await page.getByTestId('study-material-import').click();
+    await page.getByRole('button', { name: 'Seleccionar archivos o ZIP', exact: true }).click();
+    await page.getByTestId('study-material-import-confirm').click();
+    await page.getByText('libro-smoke', { exact: true }).waitFor({ timeout: 30_000 });
+    const importedEpub = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'libro-smoke'));
+    assert.equal(importedEpub?.extension, 'epub');
+    await page.getByText('libro-smoke', { exact: true }).click();
+    await page.getByTestId('study-epub-viewer').waitFor();
+    for (const tool of ['highlight', 'underline', 'brush', 'sticky', 'comment']) await page.getByTestId(`study-epub-tool-${tool}`).waitFor();
+    await page.locator('[data-testid="study-epub-viewer"] .font-serif').evaluate((root) => {
+      const node = [...root.childNodes].flatMap((child) => child.nodeType === Node.TEXT_NODE ? [child] : [...child.childNodes]).find((child) => child.textContent?.includes('Fragmento'));
+      if (!node) throw new Error('EPUB text fixture not found');
+      const range = document.createRange(); range.selectNodeContents(node); const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    await page.waitForFunction(async (materialId) => (await window.nodus.getStudyMaterial(materialId)).annotations.some((annotation) => annotation.kind === 'highlight'), importedEpub.id, { timeout: 30_000 });
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await app.close(); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused PDF + EPUB annotation toolbar smoke passed');
+    process.exit(0);
+  }
 
   // ── Study recordings: direct microphone capture + timed transcript UI ─────
   await page.getByRole('button', { name: 'Grabaciones', exact: true }).click();
@@ -568,6 +827,7 @@ try {
     throw new Error('Timed out waiting for the captured study recording');
   });
   assert.equal(typeof capturedRecordingId, 'string');
+  await page.getByTestId('study-recording-detail').getByRole('button', { name: 'Cerrar', exact: true }).click();
   const recordingFixture = await page.evaluate(async (recordingId) => {
     const literal = await window.nodus.saveStudyTranscript(recordingId, {
       kind: 'literal', contentMarkdown: 'Definición literal de memoria de trabajo.', status: 'ready', progress: 1,
@@ -587,20 +847,20 @@ try {
   await page.getByTestId('study-transcript-segments').waitFor();
   assert.equal(await page.getByTestId('study-transcript-segments').locator('input').first().inputValue(), 'Docente', 'speaker label persists');
   assert.match(await page.getByTestId('study-transcript-segments').locator('textarea').first().inputValue(), /Definición literal/, 'timestamped transcript block renders and remains linked to audio');
-  await page.getByRole('button', { name: 'Crear apunte', exact: true }).click();
-  await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/recording/')), { timeout: 30_000 });
-  console.log('[e2e] direct class capture + recording player + timestamped transcript provenance ok');
+  await page.getByTestId('study-recording-detail').getByRole('button', { name: 'Cerrar', exact: true }).click();
+  console.log('[e2e] direct class capture + recording modal + timestamped transcript ok');
 
   // ── Study hybrid search: local index, saved search and direct seek ─────────
   await page.getByRole('button', { name: 'Buscar', exact: true }).click();
   await page.getByTestId('study-search-view').waitFor({ timeout: 30_000 });
   const hybridInput = page.getByTestId('study-search-input');
   assert.ok(await hybridInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'hybrid search keeps its icon and text separated');
+  await page.getByRole('button', { name: 'Filtros', exact: true }).click();
   await page.getByTestId('study-search-view').locator('select').first().selectOption('transcript');
   await hybridInput.fill('memoria de trabajo');
   await page.getByTestId('study-search-result').first().waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-search-result').first().innerText(), /Definición literal de memoria de trabajo/, 'literal transcript is found through the unified local index');
-  await page.getByRole('button', { name: 'Guardar búsqueda', exact: true }).click();
+  await page.getByTestId('study-search-view').getByRole('button', { name: 'Guardar', exact: true }).click();
   const savedSearchDialog = page.getByRole('dialog', { name: 'Guardar búsqueda' });
   await savedSearchDialog.locator('input').fill('Memoria smoke');
   await savedSearchDialog.getByRole('button', { name: 'Guardar', exact: true }).click();
@@ -611,44 +871,28 @@ try {
   await page.waitForFunction(() => (document.querySelector('[data-testid="study-recording-player"] audio')?.currentTime ?? 0) >= 0.19, { timeout: 30_000 });
   console.log('[e2e] hybrid study search + saved query + timestamp navigation ok');
 
-  // ── Study assistant: strict manual scope, durable history and evidence links ─
-  await page.getByRole('button', { name: 'Chat de estudio', exact: true }).click();
-  await page.getByTestId('study-chat-view').waitFor({ timeout: 30_000 });
-  await page.getByTestId('study-chat-new').click();
-  await page.getByTestId('study-chat-scope').selectOption('manual');
-  const sourceSearch = page.getByTestId('study-chat-source-search');
-  assert.ok(await sourceSearch.evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingLeft)) >= 30, 'assistant source search keeps icon and text separated');
-  await page.getByTestId('study-chat-input').fill('¿Qué dicen mis fuentes sobre la memoria?');
-  await page.getByTestId('study-chat-send').click();
-  await page.getByText('No hay información suficiente en las fuentes seleccionadas para responder con seguridad.', { exact: false }).waitFor({ timeout: 30_000 });
-  assert.equal(await page.getByTestId('study-chat-message-user').count(), 1, 'an insufficient-context response preserves the user question');
-  const seededStudyChat = await page.evaluate(async () => {
-    const source = (await window.nodus.listStudyAssistantSources()).find((item) => item.kind === 'document' && item.title === 'Apunte smoke');
-    const conversation = (await window.nodus.listStudyAssistantConversations())[0];
-    if (!source || !conversation) throw new Error('Study assistant fixture source/conversation unavailable');
-    const citation = {
-      id: 'S1', sourceKey: source.sourceKey, indexId: `${source.sourceKey}:0`, kind: source.kind, sourceId: source.sourceId,
-      title: source.title, subtitle: source.subtitle, quote: 'Texto importante con una fórmula y una tabla.',
-      location: { documentId: source.sourceId, from: 0, to: 48 }, scope: source.scope,
-    };
-    await window.nodus.updateStudyAssistantConversation(conversation.id, {
-      title: 'Cita smoke', selection: { scope: 'manual', sourceKeys: [source.sourceKey] },
-      messages: [
-        { id: crypto.randomUUID(), role: 'user', content: 'Abre la evidencia.', createdAt: new Date().toISOString() },
-        { id: crypto.randomUUID(), role: 'assistant', content: 'La evidencia está en el apunte [S1](nodus://study/evidence/S1).', citations: [citation], createdAt: new Date().toISOString() },
-      ],
-    });
-    return conversation.id;
-  });
-  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-  await page.getByRole('button', { name: 'Chat de estudio', exact: true }).click();
-  await page.getByText('Cita smoke', { exact: true }).click();
-  await page.getByTestId('study-chat-message-assistant').waitFor({ timeout: 30_000 });
-  assert.match(await page.getByTestId('study-chat-message-assistant').innerText(), /S1/, 'persisted assistant response keeps a verified evidence citation');
-  await page.getByRole('button', { name: /S1 · Apunte smoke/ }).click();
+  // Analysis destinations are intentionally inaccessible in v2.3. Return from
+  // the search evidence modal to the note through the supported Organization UI.
+  await page.getByTestId('study-recording-detail').getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByRole('button', { name: 'Grabaciones', exact: true }).click();
+  const capturedRecordingRow = page.getByTestId(`study-recording-${recordingFixture.id}`);
+  await capturedRecordingRow.waitFor();
+  await page.getByTestId(`study-recording-trash-${recordingFixture.id}`).click();
+  const recordingDeleteDialog = page.getByRole('dialog').filter({ hasText: 'Mover grabación a la papelera' });
+  await recordingDeleteDialog.waitFor();
+  await recordingDeleteDialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await capturedRecordingRow.waitFor();
+  await page.getByTestId(`study-recording-trash-${recordingFixture.id}`).click();
+  await recordingDeleteDialog.getByRole('button', { name: 'Mover a la papelera', exact: true }).click();
+  await capturedRecordingRow.waitFor({ state: 'detached' });
+  assert.equal((await page.evaluate(async () => window.nodus.listStudyRecordings())).some((recording) => recording.id === recordingFixture.id), false, 'recording is deleted only after confirmation');
+  console.log('[e2e] study recording deletion requires explicit confirmation');
+  await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).click();
+  for (const label of ['Curso smoke', 'Asignatura smoke', 'Carpeta smoke', 'Tema smoke']) {
+    await page.getByText(label, { exact: true }).last().click();
+  }
+  await page.getByText('Apunte smoke', { exact: true }).last().click();
   await page.locator('.study-milkdown .ProseMirror').waitFor({ timeout: 30_000 });
-  assert.ok(seededStudyChat, 'study conversation persists in the local vault history');
-  console.log('[e2e] grounded study chat + insufficient-context guard + direct evidence navigation ok');
 
   // ── Study narration: selection/cursor modes, formula speech and dictionary ─
   await page.getByRole('button', { name: /Markdown crudo/ }).click();
@@ -683,6 +927,10 @@ try {
   await page.getByText('La lectura de estudio requiere una voz local de Piper o Kokoro.', { exact: true }).waitFor({ timeout: 30_000 });
   console.log('[e2e] local study narration modes + formula speech + pronunciation dictionary ok');
 
+  // These flows remain ready for reactivation, but the corresponding renderer
+  // routes are intentionally locked for users in v2.3.
+  const studyAnalysisUiEnabled = false;
+  if (studyAnalysisUiEnabled) {
   // ── Study question bank: manual authoring, validation and source metadata ─
   await page.getByRole('button', { name: 'Banco de preguntas', exact: true }).click();
   await page.getByTestId('study-question-bank').waitFor({ timeout: 30_000 });
@@ -803,22 +1051,36 @@ try {
   assert.ok(learningFixture.planner.blocks.some((block) => block.title === 'Repaso smoke de procedencia'));
   assert.ok(learningFixture.progress.overall.reviews >= 1, 'progress dashboard is backed by review evidence');
   console.log('[e2e] planner, Pomodoro registration and evidence-backed progress ok');
+  }
 
-  await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+  await page.locator('[data-tour="nav-studyIdeas"]').click();
+  await page.getByTestId('study-ideas-view').waitFor({ timeout: 30_000 });
+  await page.getByTestId('study-ideas-subject').waitFor();
+  const knowledgeThemeColors = await page.getByTestId('study-ideas-view').evaluate(async (element) => {
+    const light = getComputedStyle(element).backgroundColor;
+    document.documentElement.classList.add('dark');
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+    const dark = getComputedStyle(element).backgroundColor;
+    document.documentElement.classList.remove('dark');
+    return { light, dark };
+  });
+  assert.notEqual(knowledgeThemeColors.light, knowledgeThemeColors.dark, 'study ideas surface adapts between light and dark themes');
+  await page.getByRole('button', { name: 'Abrir grafo', exact: true }).click();
+  await page.getByTestId('study-graph-view').waitFor();
+  await page.getByTestId('study-graph-subject').waitFor();
+  console.log('[e2e] subject-scoped Ideas and Graph views render in light and dark themes');
+
+  await page.locator('[data-tour="nav-settings"]').click();
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
-  await page.getByTestId('study-ai-settings').waitFor({ timeout: 30_000 });
-  await page.getByTestId('study-ai-budget').fill('12');
-  await page.waitForFunction(async () => (await window.nodus.getSettings()).studyAiMonthlyBudgetUsd === 12, { timeout: 30_000 });
+  assert.equal(await page.getByTestId('study-ai-settings').count(), 0, 'redundant study AI settings section is not rendered');
   const aiPolicyFixture = await page.evaluate(async () => ({ settings: await window.nodus.getSettings(), usage: await window.nodus.getStudyAiUsageSummary() }));
-  assert.equal(aiPolicyFixture.settings.studyAiMonthlyBudgetUsd, 12);
-  assert.ok(aiPolicyFixture.usage.failedCalls >= 1, 'failed grading request is auditable in task usage');
+  assert.ok(aiPolicyFixture.usage.failedCalls >= 1, 'failed improvement request is auditable in task usage');
   assert.equal(aiPolicyFixture.usage.knownCostUsd, 0, 'unknown provider price is never guessed');
-  console.log('[e2e] independent study AI policy, budget and truthful usage accounting ok');
+  console.log('[e2e] study AI policy remains active without redundant settings UI');
 
-  await page.getByTestId('study-privacy-settings').waitFor({ timeout: 30_000 });
   assert.equal(aiPolicyFixture.settings.studyAiPrivacyMode, 'hybrid');
   assert.equal(aiPolicyFixture.settings.studyAiConfirmExternal, true);
-  await page.getByRole('button', { name: 'Datos', exact: true }).click();
+  await page.getByRole('button', { name: 'Backup / copia de seguridad', exact: true }).click();
   await page.getByTestId('study-data-admin').waitFor({ timeout: 30_000 });
   const dataFixture = await page.evaluate(async () => await window.nodus.getStudyDataOverview());
   assert.equal(dataFixture.integrityOk, true, 'study data panel runs SQLite integrity checks');
@@ -868,11 +1130,17 @@ try {
     questions: await window.nodus.listStudyQuestions(),
     cards: await window.nodus.listStudyFlashcards(),
     planner: await window.nodus.getStudyPlanner(),
+    cellIdeas: await window.nodus.listStudyIdeas('demo-study-subject-cell'),
+    cellGraph: await window.nodus.getStudyKnowledgeGraph('demo-study-subject-cell'),
+    ecologyIdeas: await window.nodus.listStudyIdeas('demo-study-subject-ecology'),
   }));
   assert.equal(demoFixture.settings.demoMode, true);
   assert.equal(demoFixture.questions.length, 1);
   assert.equal(demoFixture.cards.length, 1);
   assert.equal(demoFixture.planner.plans.length, 1);
+  assert.equal(demoFixture.cellIdeas.length, 4);
+  assert.equal(demoFixture.cellGraph.edges.length, 3);
+  assert.equal(demoFixture.ecologyIdeas.length, 3);
   await page.getByRole('button', { name: 'Salir del modo demo', exact: true }).click();
   await page.waitForFunction(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0, { timeout: 30_000 });
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });

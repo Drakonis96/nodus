@@ -2,6 +2,7 @@ import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
 import { providerKeyMap } from '../secrets/secretStore';
+import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import {
   GLOBAL_PREF_KEYS,
   SHARED_MODEL_KEYS,
@@ -22,12 +23,15 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   localProviders: DEFAULT_LOCAL_PROVIDERS,
   favorites: [],
   defaultModel: null,
+  modelSettingsMode: 'basic',
+  modelSettingsVersion: 0,
   extractionModel: null,
   visionModel: null,
   synthesisModel: null,
   summaryModel: null,
   fusionModel: null,
   chatModel: null,
+  nodiModel: null,
   deepResearchModel: null,
   immersionModel: null,
   writingModel: null,
@@ -37,6 +41,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   tutorModel: null,
   hypothesisModel: null,
   improveModel: null,
+  studyImproveToolbarStyleIds: ['builtin:formal', 'builtin:academic', 'builtin:clear', 'builtin:concise'],
   questionGenModel: null,
   gradingModel: null,
   flashcardModel: null,
@@ -57,7 +62,10 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   studyAiMaxOutputTokens: 4000,
   studyAiTemperature: 0.15,
   studyAiRetryCount: 1,
-  sttProvider: 'local',
+  sttProvider: 'transformers',
+  sttTransformersModel: 'Xenova/whisper-tiny',
+  sttWhisperCppModel: 'base',
+  sttWhisperCppExecutable: '',
   imageProvider: 'google',
   imageModel: 'gemini-3.1-flash-lite-image',
   imageStyle: 'antique_book',
@@ -91,6 +99,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   openRouterThroughput: true,
   unpaywallEmail: '',
   onboardingComplete: false,
+  basicsTutorialVersion: 0,
   tourComplete: false,
   advancedTourComplete: true,
   demoMode: false,
@@ -116,6 +125,12 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys'> = {
   sidebarHidden: [],
   sidebarCustomized: false,
   treeFrame: 'oak',
+  recoverySetupVersion: 0,
+  backupVaultIds: [],
+  backupIncludePreferences: true,
+  backupIncludeHistories: true,
+  backupIncludeGeneratedMedia: true,
+  backupIncludeApiKeys: true,
   autoBackupEnabled: false,
   autoBackupFolder: '',
   autoBackupIntervalHours: 24,
@@ -158,6 +173,10 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
+  // Pre-2.3 builds called the Transformers.js worker simply "local".
+  if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';
   if (parsed.studyAiPrivacyMode === undefined && parsed.studyAiLocalOnly) merged.studyAiPrivacyMode = 'local';
   merged.studyAiLocalOnly = merged.studyAiPrivacyMode === 'local';
   // Deep-merge local-provider config so a stored partial (or a newly added
@@ -202,11 +221,50 @@ export function getSettings(): AppSettings {
       seed[key] = merged[key];
     }
   }
+  if ((merged.sttProvider as string) === 'local') {
+    merged.sttProvider = 'transformers';
+    seed.sttProvider = 'transformers';
+  }
+  const modelMigration = migrateModelSettings(merged);
+  if (modelMigration.changed) {
+    Object.assign(merged, modelMigration.settings);
+    // Keep a local fallback for the migrated payload. Common capability values
+    // (including mode/version) are mirrored through the global preference store.
+    const { providerKeys: _providerKeys, ...persisted } = merged as AppSettings;
+    writeRaw('app', JSON.stringify(persisted));
+    for (const key of SHARED_MODEL_KEYS) {
+      if (key in merged) seed[key] = merged[key];
+    }
+  }
+  // Modes are exclusive. Basic mode synchronizes every text task to one model;
+  // advanced mode materializes any old empty slot so its picker is always concrete.
+  let synchronized = false;
+  for (const key of GRANULAR_MODEL_KEYS) {
+    const current = merged[key];
+    const general = merged.synthesisModel;
+    const differsFromGeneral = current?.provider !== general?.provider || current?.model !== general?.model;
+    const shouldMaterialize = merged.modelSettingsMode === 'advanced' && current == null && general != null;
+    if ((merged.modelSettingsMode === 'basic' && differsFromGeneral) || shouldMaterialize) {
+      merged[key] = general;
+      synchronized = true;
+      if ((SHARED_MODEL_KEYS as readonly string[]).includes(key)) seed[key] = general;
+    }
+  }
+  if (synchronized && !modelMigration.changed) {
+    const { providerKeys: _providerKeys, ...persisted } = merged as AppSettings;
+    writeRaw('app', JSON.stringify(persisted));
+  }
   if (Object.keys(seed).length) writeGlobalPrefs(seed);
   return { ...merged, providerKeys: providerKeyMap() };
 }
 
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (patch.studyImproveToolbarStyleIds) {
+    patch = { ...patch, studyImproveToolbarStyleIds: [...new Set(patch.studyImproveToolbarStyleIds.filter((value) => typeof value === 'string' && value.trim()))].slice(0, 4) };
+  }
+  if (patch.modelSettingsMode === undefined && GRANULAR_MODEL_KEYS.some((key) => patch[key] != null)) {
+    patch = { ...patch, modelSettingsMode: 'advanced' };
+  }
   if (patch.studyAiLocalOnly !== undefined && patch.studyAiPrivacyMode === undefined) {
     patch = { ...patch, studyAiPrivacyMode: patch.studyAiLocalOnly ? 'local' : 'hybrid' };
   }

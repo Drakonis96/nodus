@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  AcademicHomeSnapshot,
+  AcademicHomeStats,
   AppSettings,
   CorpusHealth,
   CorpusHealthBucket,
   CorpusHealthBucketId,
   DatabaseSummary,
-  EdgeDetail,
-  GapAggregate,
-  GraphData,
-  QueueProgress,
   SyncLogEntry,
-  WorkEmbeddingStatus,
-  WorkView,
 } from '@shared/types';
 import { Badge, Icon, Spinner } from '../components/ui';
 import { useDataRefresh, useScanComplete } from '../hooks';
 import { t, tx } from '../i18n';
+import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 type HomeTarget =
   | 'library'
@@ -32,6 +29,7 @@ type HomeTarget =
   | 'map';
 
 interface HomeViewProps {
+  vaultId: string | null;
   settings: AppSettings;
   lastSync: SyncLogEntry | null;
   syncing: boolean;
@@ -48,18 +46,8 @@ interface HomeViewProps {
   onLoadDatabasesDemo: () => Promise<void>;
 }
 
-interface HomeSnapshot {
-  works: WorkView[];
-  graph: GraphData;
-  gaps: GapAggregate[];
-  contradictions: EdgeDetail[];
-  embeddings: WorkEmbeddingStatus[];
-  queue: QueueProgress | null;
-  syncLog: SyncLogEntry[];
-  health: CorpusHealth | null;
-}
-
 export function HomeView({
+  vaultId,
   settings,
   lastSync,
   syncing,
@@ -73,33 +61,41 @@ export function HomeView({
   onLoadGenealogyDemo,
   onLoadDatabasesDemo,
 }: HomeViewProps) {
-  const [snapshot, setSnapshot] = useState<HomeSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialSnapshot = getVaultQueryCache<AcademicHomeSnapshot>(vaultId, 'academic-home');
+  const [snapshot, setSnapshot] = useState<AcademicHomeSnapshot | null>(initialSnapshot ?? null);
+  const [loading, setLoading] = useState(!initialSnapshot);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reloadPromise = useRef<Promise<void> | null>(null);
 
-  const reload = useCallback(async () => {
-    setRefreshing(true);
-    setError(null);
-    try {
-      const [works, graph, gaps, contradictions, embeddings, queue, syncLog, health] = await Promise.all([
-        window.nodus.listWorks(),
-        window.nodus.getGraph('ideas'),
-        window.nodus.getGaps(),
-        window.nodus.getContradictions(),
-        window.nodus.getWorkEmbeddingStatuses(),
-        window.nodus.getQueue(),
-        window.nodus.getSyncLog(),
-        window.nodus.getCorpusHealth(),
-      ]);
-      setSnapshot({ works, graph, gaps, contradictions, embeddings, queue, syncLog, health });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+  const reload = useCallback((force = true): Promise<void> => {
+    if (!force) {
+      const cached = getVaultQueryCache<AcademicHomeSnapshot>(vaultId, 'academic-home');
+      if (cached) {
+        setSnapshot(cached);
+        setLoading(false);
+        return Promise.resolve();
+      }
     }
-  }, []);
+    if (reloadPromise.current) return reloadPromise.current;
+    const run = (async () => {
+      setRefreshing(true);
+      setError(null);
+      try {
+        const next = await window.nodus.getAcademicHomeSnapshot();
+        setSnapshot(next);
+        setVaultQueryCache(vaultId, 'academic-home', next);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        reloadPromise.current = null;
+      }
+    })();
+    reloadPromise.current = run;
+    return run;
+  }, [vaultId]);
 
   // Defer the (potentially heavy) snapshot load until after the home shell has painted,
   // so switching into this vault / view stays responsive instead of freezing behind the
@@ -108,7 +104,7 @@ export function HomeView({
     let cancelled = false;
     const id = requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        if (!cancelled) void reload();
+        if (!cancelled) void reload(false);
       })
     );
     return () => {
@@ -120,14 +116,19 @@ export function HomeView({
 
   useEffect(() => {
     return window.nodus.onQueueProgress((queue) => {
-      setSnapshot((current) => (current ? { ...current, queue } : current));
+      setSnapshot((current) => {
+        if (!current) return current;
+        const next = { ...current, queue };
+        setVaultQueryCache(vaultId, 'academic-home', next);
+        return next;
+      });
     });
-  }, []);
+  }, [vaultId]);
 
   useScanComplete(reload);
 
-  const stats = useMemo(() => buildStats(snapshot), [snapshot]);
-  const latestSync = lastSync ?? snapshot?.syncLog[0] ?? null;
+  const stats = useMemo(() => buildDashboardStats(snapshot), [snapshot]);
+  const latestSync = lastSync ?? snapshot?.latestSync ?? null;
   const recommendation = useMemo(
     () => getRecommendation(settings, stats),
     [settings, stats]
@@ -157,17 +158,20 @@ export function HomeView({
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="flex flex-wrap items-start gap-3 mb-5">
-        <div>
-          <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            {t('Estado operativo de Zotero, análisis, grafo y próximos pasos.')}
-          </p>
-        </div>
+      <div className="mx-auto max-w-5xl">
+      <div className="mb-6">
+        <HomeIntroCard
+          eyebrow={t('Vault académico')}
+          title={t('Tu espacio de investigación')}
+          description={t('Organiza tu corpus, conecta ideas y convierte el análisis en próximos pasos desde un espacio local y privado.')}
+          icon="book"
+        />
       </div>
 
       {showDemoOffer && (
-        <DemoOfferCard variant="academic" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
+        <div className="mb-6">
+          <DemoOfferCard variant="academic" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
+        </div>
       )}
 
       {error && (
@@ -323,9 +327,9 @@ export function HomeView({
 
         <StatusCard
           title={t('Configuración IA')}
-          icon={settings.extractionModel && settings.synthesisModel ? 'check' : 'alert'}
-          tone={settings.extractionModel && settings.synthesisModel ? 'green' : 'red'}
-          metric={settings.extractionModel && settings.synthesisModel ? t('lista') : t('pendiente')}
+          icon={settings.synthesisModel ? 'check' : 'alert'}
+          tone={settings.synthesisModel ? 'green' : 'red'}
+          metric={settings.synthesisModel ? t('lista') : t('pendiente')}
           metricLabel={t('modelos por tarea')}
           action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
@@ -338,65 +342,46 @@ export function HomeView({
           </div>
         </StatusCard>
       </div>
+      </div>
     </div>
   );
 }
 
-function buildStats(snapshot: HomeSnapshot | null) {
-  const works = snapshot?.works ?? [];
-  const queue = snapshot?.queue ?? null;
-  const embeddings = snapshot?.embeddings ?? [];
-  const graph = snapshot?.graph ?? { nodes: [], edges: [] };
+const EMPTY_HOME_STATS: AcademicHomeStats = {
+  totalWorks: 0,
+  readTaggedWorks: 0,
+  manualDeepWorks: 0,
+  unreadWorks: 0,
+  deepTarget: 0,
+  lightDone: 0,
+  lightPending: 0,
+  lightMissing: 0,
+  deepDone: 0,
+  deepPending: 0,
+  deepMissing: 0,
+  skippedNoText: 0,
+  failedWorks: 0,
+  ideaNodes: 0,
+  themeNodes: 0,
+  semanticEdges: 0,
+  totalEmbeddableIdeas: 0,
+  embeddedIdeas: 0,
+  embeddingIncompleteWorks: 0,
+  gaps: 0,
+  contradictions: 0,
+};
 
-  const totalWorks = works.length;
-  const readTaggedWorks = works.filter((w) => w.read_tag === 1).length;
-  const manualDeepWorks = works.filter((w) => w.manual_deep === 1).length;
-  const unreadWorks = works.filter((w) => w.read_tag !== 1).length;
-  const deepTarget = works.filter((w) => w.read_tag === 1 || w.manual_deep === 1 || w.deep_status === 'done').length;
-  const lightDone = works.filter((w) => w.light_status === 'done').length;
-  const lightPending = works.filter((w) => w.light_status === 'pending').length;
-  const lightMissing = works.filter((w) => w.light_status === 'none').length;
-  const deepDone = works.filter((w) => w.deep_status === 'done').length;
-  const deepPending = works.filter((w) => w.deep_status === 'pending').length;
-  const deepMissing = works.filter((w) => w.deep_status === 'none').length;
-  const skippedNoText = works.filter((w) => w.deep_status === 'skipped_no_text').length;
-  const failedWorks = works.filter((w) => w.light_status === 'failed' || w.deep_status === 'failed').length;
-  const ideaNodes = graph.nodes.filter((n) => n.type !== 'theme' && n.type !== 'author').length;
-  const themeNodes = graph.nodes.filter((n) => n.type === 'theme').length;
-  const semanticEdges = graph.edges.filter((e) => e.type !== 'contains').length;
-  const totalEmbeddableIdeas = embeddings.reduce((sum, s) => sum + s.totalIdeas, 0);
-  const embeddedIdeas = embeddings.reduce((sum, s) => sum + s.embeddedIdeas, 0);
-  const embeddingIncompleteWorks = embeddings.filter((s) => s.totalIdeas > 0 && !s.complete).length;
+function buildDashboardStats(snapshot: AcademicHomeSnapshot | null) {
+  const queue = snapshot?.queue ?? null;
   const queueDone = queue?.done ?? 0;
   const queueFailed = queue?.failed ?? 0;
   const queueTotal = queue?.total ?? 0;
-  const queueActive = queueTotal > 0 && queueDone + queueFailed < queueTotal;
 
   return {
-    totalWorks,
-    readTaggedWorks,
-    manualDeepWorks,
-    unreadWorks,
-    deepTarget,
-    lightDone,
-    lightPending,
-    lightMissing,
-    deepDone,
-    deepPending,
-    deepMissing,
-    skippedNoText,
-    failedWorks,
-    ideaNodes,
-    themeNodes,
-    semanticEdges,
-    totalEmbeddableIdeas,
-    embeddedIdeas,
-    embeddingIncompleteWorks,
+    ...(snapshot?.stats ?? EMPTY_HOME_STATS),
     queueDone,
     queueFailed,
-    queueActive,
-    gaps: snapshot?.gaps.length ?? 0,
-    contradictions: snapshot?.contradictions.length ?? 0,
+    queueActive: queueTotal > 0 && queueDone + queueFailed < queueTotal,
   };
 }
 
@@ -464,8 +449,8 @@ function renderPrimaryAction(
   }
 }
 
-function getRecommendation(settings: AppSettings, stats: ReturnType<typeof buildStats>): Recommendation {
-  if (!settings.extractionModel || !settings.synthesisModel) {
+function getRecommendation(settings: AppSettings, stats: AcademicHomeStats): Recommendation {
+  if (!settings.synthesisModel) {
     return {
       title: t('Configura los modelos de IA'),
       body: t('La sincronización puede funcionar, pero Nodus necesita modelos separados de extracción y síntesis para analizar el corpus.'),
@@ -810,10 +795,32 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
-/** The empty-vault "load sample data" card, shared by the academic and genealogy homes. */
+export function HomeIntroCard({
+  eyebrow,
+  title,
+  description,
+  icon,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: string;
+}) {
+  return (
+    <header className="rounded-2xl border border-indigo-800/60 bg-indigo-950/25 p-6">
+      <div className="mb-2 flex items-center gap-2 text-indigo-300">
+        <Icon name={icon} size={20} />
+        <span className="text-xs font-semibold uppercase tracking-[0.2em]">{eyebrow}</span>
+      </div>
+      <h1 className="text-2xl font-semibold text-neutral-100">{title}</h1>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">{description}</p>
+    </header>
+  );
+}
+
 /**
  * The "load sample data" card for a vault's Home. Each vault only offers ITS OWN demo
- * (academic / genealogy / databases) — a genealogy home never offers the academic demo,
+ * (academic / genealogy / databases / study) — a genealogy home never offers the academic demo,
  * etc. `variant` picks which one; the matching onLoad… handler seeds it.
  */
 export function DemoOfferCard({
@@ -822,45 +829,59 @@ export function DemoOfferCard({
   onLoadDemo,
   onLoadGenealogyDemo,
   onLoadDatabasesDemo,
+  onLoadStudyDemo,
 }: {
-  variant?: 'academic' | 'genealogy' | 'databases';
+  variant?: 'academic' | 'genealogy' | 'databases' | 'study';
   demoBusy: boolean;
-  onLoadDemo: () => Promise<void>;
-  onLoadGenealogyDemo: () => Promise<void>;
+  onLoadDemo?: () => Promise<void>;
+  onLoadGenealogyDemo?: () => Promise<void>;
   onLoadDatabasesDemo?: () => Promise<void>;
+  onLoadStudyDemo?: () => void | Promise<void>;
 }) {
   const card =
     variant === 'genealogy'
       ? {
-          title: t('Demo de genealogía'),
-          desc: t('Una familia del siglo XIX con árbol, retratos de época, archivo de documentos, evidencia citada y parentescos sugeridos por la IA para revisar. Incluye un tutorial guiado.'),
+          title: t('Explora una historia familiar de ejemplo'),
+          desc: t('Una familia del siglo XIX con árbol, cronología, mapa, archivo, biblioteca, notas, relaciones y un informe de investigación guardado. Incluye un tutorial guiado.'),
           icon: 'tree',
           label: t('Cargar demo de genealogía'),
-          onClick: onLoadGenealogyDemo,
+          onClick: onLoadGenealogyDemo ?? (async () => {}),
         }
       : variant === 'databases'
         ? {
-            title: t('Demo de bases de datos'),
-            desc: t('Tres tablas de investigación (muestras, experimentos y lecturas) con columnas de todo tipo, opciones de color y decenas de registros. Incluye un tutorial guiado.'),
+            title: t('Explora unas bases de datos de ejemplo'),
+            desc: t('Tres tablas de investigación con todos los tipos de columna, relaciones, registros, análisis, una conversación y notas de ejemplo. Incluye un tutorial guiado.'),
             icon: 'table',
             label: t('Cargar demo de bases de datos'),
             onClick: onLoadDatabasesDemo ?? (async () => {}),
           }
+        : variant === 'study'
+          ? {
+              title: t('Explora un espacio de estudio de ejemplo'),
+              desc: t('Carga un curso completo con carpetas, apuntes, materiales anotados, grabación transcrita, horario, calendario, preguntas, test, repasos, progreso y chat de ejemplo.'),
+              icon: 'graduation',
+              label: t('Cargar datos de ejemplo'),
+              onClick: onLoadStudyDemo ?? (async () => {}),
+            }
         : {
-            title: t('Demo académica'),
-            desc: t('Seis obras sobre la ciencia del aprendizaje: grafo de ideas, debates, huecos y notas, sin conectar Zotero ni configurar IA.'),
+            title: t('Explora una investigación de ejemplo'),
+            desc: t('Seis obras sobre la ciencia del aprendizaje con grafo, notas, mapa de investigación, inmersión, borradores, informe profundo y proyecto guardado; sin conectar Zotero ni configurar IA.'),
             icon: 'play',
             label: t('Cargar demo académica'),
-            onClick: onLoadDemo,
+            onClick: onLoadDemo ?? (async () => {}),
           };
   return (
-    <section className="card p-4 mb-4 border border-indigo-800/60 bg-indigo-950/20">
-      <div className="text-xs uppercase text-indigo-400 mb-1">{t('Prueba sin configurar nada')}</div>
-      <h2 className="text-lg font-semibold">{t('Explora con datos de ejemplo')}</h2>
-      <p className="text-xs text-neutral-400 mt-1 max-w-2xl">{card.desc}</p>
-      <button className="btn btn-primary gap-1.5 mt-3 self-start" onClick={() => void card.onClick()} disabled={demoBusy}>
-        <Icon name={card.icon} /> {demoBusy ? t('Cargando…') : card.label}
-      </button>
+    <section className="rounded-xl border border-indigo-800/60 bg-indigo-950/20 p-5" data-testid={`${variant}-demo-offer`}>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-indigo-200">{card.title}</h2>
+          <p className="mt-1 text-xs leading-5 text-neutral-400">{card.desc}</p>
+        </div>
+        <button className="btn btn-primary shrink-0" onClick={() => void card.onClick()} disabled={demoBusy}>
+          <Icon name={demoBusy ? 'sync' : card.icon} className={demoBusy ? 'animate-spin' : ''} />
+          {demoBusy ? t('Cargando…') : card.label}
+        </button>
+      </div>
     </section>
   );
 }
@@ -975,15 +996,20 @@ export function GenealogyHome({
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
-        <p className="text-sm text-neutral-400 mt-1">
-          {t('Tu historia familiar: personas, árbol, línea temporal y archivo de evidencias.')}
-        </p>
+      <div className="mx-auto max-w-5xl">
+      <div className="mb-6">
+        <HomeIntroCard
+          eyebrow={t('Vault de genealogía')}
+          title={t('Tu historia familiar')}
+          description={t('Reúne personas, parentescos, documentos y lugares para reconstruir una historia familiar respaldada por evidencias.')}
+          icon="tree"
+        />
       </div>
 
       {showDemoOffer && (
-        <DemoOfferCard variant="genealogy" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
+        <div className="mb-6">
+          <DemoOfferCard variant="genealogy" demoBusy={demoBusy} onLoadDemo={onLoadDemo} onLoadGenealogyDemo={onLoadGenealogyDemo} onLoadDatabasesDemo={onLoadDatabasesDemo} />
+        </div>
       )}
 
       <section className="card p-4 mb-4">
@@ -1102,9 +1128,9 @@ export function GenealogyHome({
 
         <StatusCard
           title={t('Configuración IA')}
-          icon={settings.extractionModel ? 'check' : 'alert'}
-          tone={settings.extractionModel ? 'green' : 'red'}
-          metric={settings.extractionModel ? t('lista') : t('pendiente')}
+          icon={settings.synthesisModel ? 'check' : 'alert'}
+          tone={settings.synthesisModel ? 'green' : 'red'}
+          metric={settings.synthesisModel ? t('lista') : t('pendiente')}
           metricLabel={t('modelo de extracción')}
           action={<button className="btn btn-ghost border border-neutral-700" onClick={() => onNavigate('settings')}>{t('Ajustes')}</button>}
         >
@@ -1112,6 +1138,7 @@ export function GenealogyHome({
             {t('La IA extrae personas y eventos de tus documentos, sugiere parentescos, redacta biografías y genera retratos. Configura los modelos en Ajustes.')}
           </p>
         </StatusCard>
+      </div>
       </div>
     </div>
   );
@@ -1143,14 +1170,23 @@ export function DatabasesHome({
   const totalRows = databases.reduce((sum, d) => sum + d.rowCount, 0);
   return (
     <div className="h-full overflow-y-auto">
-     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold">{t('Inicio')}</h1>
-          <p className="text-sm text-neutral-400 mt-1">
-            {t('Tus datos estructurados: tablas con columnas tipadas, análisis y chat.')}
-          </p>
+     <div className="mx-auto max-w-5xl p-6">
+      <div className="mb-6">
+        <HomeIntroCard
+          eyebrow={t('Vault de bases de datos')}
+          title={t('Tu espacio de datos')}
+          description={t('Organiza información estructurada, analiza patrones y conversa con tus tablas desde un espacio local y privado.')}
+          icon="table"
+        />
+      </div>
+
+      {databases.length === 0 && onLoadDatabasesDemo && (
+        <div className="mb-6">
+          <DemoOfferCard variant="databases" demoBusy={demoBusy} onLoadDatabasesDemo={onLoadDatabasesDemo} />
         </div>
+      )}
+
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-2">
         <div className="flex gap-2">
           {onImportCsv && (
             <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={onImportCsv}>
@@ -1173,11 +1209,6 @@ export function DatabasesHome({
               <button className="btn btn-primary gap-1.5" onClick={onNewDatabase}>
                 <Icon name="plus" /> {t('Crear la primera')}
               </button>
-              {onLoadDatabasesDemo && (
-                <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => void onLoadDatabasesDemo()} disabled={demoBusy}>
-                  <Icon name="table" /> {demoBusy ? t('Cargando…') : t('Cargar demo de bases de datos')}
-                </button>
-              )}
             </div>
           </div>
         ) : (

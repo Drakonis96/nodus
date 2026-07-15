@@ -2,20 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings } from '@shared/types';
 import type { StudyDictationAction, StudySttProvider } from '@shared/sttModels';
 import {
-  STUDY_STT_MODELS,
+  STUDY_STT_LANGUAGES,
   buildStudySttPrompt,
   getStudySttModel,
   recommendStudySttModel,
   transformStudyDictation,
 } from '@shared/sttModels';
 import { Icon, Spinner } from '../ui';
-import { ModelPicker } from '../ModelPicker';
 import { t } from '../../i18n';
 import {
-  ensureLocalWhisperModel,
+  audioBlobToWhisperWav,
   isLocalWhisperModelReady,
-  localWhisperStorageBytes,
-  removeLocalWhisperModel,
   transcribeLocalWhisper,
 } from '../../lib/stt/localWhisper';
 import {
@@ -47,7 +44,7 @@ function AudioClipRow({ clip, onDelete, onReprocess }: {
         <button className="btn btn-ghost h-7 px-2 text-red-400" title={t('Eliminar audio local')} onClick={onDelete}><Icon name="trash" size={11} /></button>
       </div>
       <p className="mt-1 line-clamp-2 text-[10px] text-neutral-600">{clip.transcript}</p>
-      <p className="mt-1 text-[9px] text-neutral-700">{clip.provider === 'local' ? t('Local') : 'OpenAI'} · {clip.model} · {new Date(clip.createdAt).toLocaleString()}</p>
+      <p className="mt-1 text-[9px] text-neutral-700">{clip.provider === 'openai' ? 'OpenAI' : clip.provider === 'whisper_cpp' ? 'whisper.cpp' : 'ONNX'} · {clip.model} · {new Date(clip.createdAt).toLocaleString()}</p>
     </div>
   );
 }
@@ -69,11 +66,12 @@ export function StudyDictation({
 }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [state, setState] = useState<CaptureState>('idle');
-  const [provider, setProvider] = useState<StudySttProvider>('local');
+  const [provider, setProvider] = useState<StudySttProvider>('transformers');
   const [model, setModel] = useState(() => recommendStudySttModel({
     memoryGb: (navigator as Navigator & { deviceMemory?: number }).deviceMemory,
     logicalCores: navigator.hardwareConcurrency,
   }).id);
+  const [audioLanguage, setAudioLanguage] = useState(language || 'auto');
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState('');
   const [level, setLevel] = useState(0);
@@ -87,10 +85,7 @@ export function StudyDictation({
   const [removeFillers, setRemoveFillers] = useState(false);
   const [preserveAudio, setPreserveAudio] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  const [showModels, setShowModels] = useState(false);
   const [clips, setClips] = useState<StudyDictationClip[]>([]);
-  const [modelBytes, setModelBytes] = useState<Record<string, number>>({});
-  const [downloading, setDownloading] = useState<string | null>(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -102,8 +97,8 @@ export function StudyDictation({
   const stateRef = useRef<CaptureState>('idle');
   const silenceSinceRef = useRef<number | null>(null);
   const silenceStoppingRef = useRef(false);
-  const configRef = useRef({ autoStop, silenceSeconds, provider, model, language, removeFillers });
-  configRef.current = { autoStop, silenceSeconds, provider, model, language, removeFillers };
+  const configRef = useRef({ autoStop, silenceSeconds, provider, model, language: audioLanguage, removeFillers });
+  configRef.current = { autoStop, silenceSeconds, provider, model, language: audioLanguage, removeFillers };
   stateRef.current = state;
 
   const prompt = useMemo(() => buildStudySttPrompt([...customDictionary, ...vocabulary]), [customDictionary, vocabulary]);
@@ -114,13 +109,13 @@ export function StudyDictation({
     setDevices(listed);
     if (!deviceId && listed[0]) setDeviceId(listed[0].deviceId);
   };
-  const refreshModelStorage = async () => {
-    const entries = await Promise.all(STUDY_STT_MODELS.map(async (entry) => [entry.id, await localWhisperStorageBytes(entry.id)] as const));
-    setModelBytes(Object.fromEntries(entries));
-  };
-
   useEffect(() => {
-    void window.nodus.getSettings().then((next) => { setSettings(next); setProvider(next.sttProvider); });
+    const applySettings = (next: AppSettings) => {
+      setSettings(next); setProvider(next.sttProvider);
+      setModel(next.sttProvider === 'whisper_cpp' ? next.sttWhisperCppModel : next.sttTransformersModel);
+    };
+    void window.nodus.getSettings().then(applySettings);
+    const unsubscribe = window.nodus.onSettingsChanged(applySettings);
     void reloadClips();
     void refreshDevices().catch(() => undefined);
     return () => {
@@ -129,14 +124,9 @@ export function StudyDictation({
       if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       void audioContextRef.current?.close();
+      unsubscribe();
     };
   }, [documentId]);
-
-  const setBackend = async (next: StudySttProvider) => {
-    setProvider(next);
-    const updated = await window.nodus.updateSettings({ sttProvider: next });
-    setSettings(updated);
-  };
 
   const cleanupCapture = async () => {
     if (previewTimerRef.current) window.clearInterval(previewTimerRef.current);
@@ -160,18 +150,22 @@ export function StudyDictation({
     try {
       let rawText = '';
       let usedModel = model;
-      if (provider === 'local') {
-        if (!isLocalWhisperModelReady(model)) await ensureLocalWhisperModel(model, setProgress);
-        rawText = await transcribeLocalWhisper(blob, model, language, setProgress);
+      const partial = (text: string) => setProvisional(transformStudyDictation(text, { removeFillers, customDictionary }).text);
+      if (provider === 'transformers') {
+        if (!isLocalWhisperModelReady(model)) throw new Error(t('Descarga el modelo ONNX seleccionado desde Ajustes antes de transcribir.'));
+        rawText = await transcribeLocalWhisper(blob, model, audioLanguage, setProgress, partial);
       } else {
-        const bytes = new Uint8Array(await blob.arrayBuffer());
+        const bytes = provider === 'whisper_cpp'
+          ? await audioBlobToWhisperWav(blob)
+          : new Uint8Array(await blob.arrayBuffer());
         const result = await window.nodus.transcribeStudyAudio({
           audioBytes: bytes,
-          mimeType: blob.type || 'audio/webm',
-          model: settings?.transcriptionModel?.provider === 'openai' ? settings.transcriptionModel.model : null,
-          language,
+          mimeType: provider === 'whisper_cpp' ? 'audio/wav' : (blob.type || 'audio/webm'),
+          provider,
+          model: provider === 'whisper_cpp' ? settings?.sttWhisperCppModel : settings?.transcriptionModel?.provider === 'openai' ? settings.transcriptionModel.model : null,
+          language: audioLanguage,
           prompt,
-        });
+        }, { onProgress: setProgress, onPartial: partial });
         rawText = result.text;
         usedModel = result.model;
       }
@@ -259,7 +253,7 @@ export function StudyDictation({
       startLevelMeter(stream);
       previewTimerRef.current = window.setInterval(() => {
         const current = configRef.current;
-        if (current.provider !== 'local' || !isLocalWhisperModelReady(current.model) || previewBusyRef.current || chunksRef.current.length < 4) return;
+        if (current.provider !== 'transformers' || !isLocalWhisperModelReady(current.model) || previewBusyRef.current || chunksRef.current.length < 4) return;
         previewBusyRef.current = true;
         const previewBlob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
         void transcribeLocalWhisper(previewBlob, current.model, current.language)
@@ -281,13 +275,6 @@ export function StudyDictation({
     else if (recorder.state === 'paused') { recorder.resume(); setState('recording'); }
   };
 
-  const downloadModel = async (id: string) => {
-    setDownloading(id); setProgress(0); setError('');
-    try { await ensureLocalWhisperModel(id, setProgress); await refreshModelStorage(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setDownloading(null); }
-  };
-
   return (
     <div className="border-b border-neutral-800 bg-neutral-950/95 px-3 py-2" data-testid="study-dictation">
       <div className="flex flex-wrap items-center gap-2">
@@ -303,8 +290,8 @@ export function StudyDictation({
             </span>
           </>
         )}
-        <span className={`rounded-full px-2 py-1 text-[10px] ${provider === 'local' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-sky-900/30 text-sky-300'}`}>
-          {provider === 'local' ? `${t('Local y sin conexión')} · ${getStudySttModel(model).label}` : `OpenAI · ${settings?.transcriptionModel?.model ?? 'gpt-4o-transcribe'}`}
+        <span className={`rounded-full px-2 py-1 text-[10px] ${provider !== 'openai' ? 'bg-emerald-900/30 text-emerald-300' : 'bg-sky-900/30 text-sky-300'}`}>
+          {provider === 'transformers' ? `ONNX · ${getStudySttModel(model).label}` : provider === 'whisper_cpp' ? `whisper.cpp · ${settings?.sttWhisperCppModel}` : `OpenAI · ${settings?.transcriptionModel?.model ?? 'gpt-4o-transcribe'}`}
         </span>
         <select className="input h-8" value={scope} onChange={(event) => setScope(event.target.value as InsertScope)}>
           <option value="cursor">{t('Insertar en el cursor')}</option><option value="selection">{t('Sustituir selección/bloque')}</option>
@@ -312,17 +299,15 @@ export function StudyDictation({
         <button className="btn btn-ghost ml-auto h-8 px-2" onClick={() => setShowSettings(!showSettings)}><Icon name="settings" size={12} /> {t('Dictado')}</button>
       </div>
 
-      {(state === 'transcribing' || downloading) && <div className="mt-2 h-1 overflow-hidden rounded bg-neutral-800"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>}
+      {state === 'transcribing' && <div className="mt-2 h-1 overflow-hidden rounded bg-neutral-800"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(4, progress * 100)}%` }} /></div>}
       {provisional && <div className="mt-2 flex items-start gap-2 rounded-lg border border-indigo-900/50 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-200"><span className="min-w-0 flex-1"><span className="mr-2 text-[9px] uppercase text-indigo-500">{t('Texto provisional')}</span>{provisional}</span><button className="text-[10px] text-indigo-400" onClick={() => onInsert(provisional, scope)}>{t('Insertar')}</button></div>}
       {error && <p className="mt-2 rounded bg-red-950/30 px-3 py-2 text-xs text-red-300">{error}</p>}
 
       {showSettings && (
         <div className="mt-2 grid gap-3 rounded-xl border border-neutral-800 bg-neutral-900/30 p-3 lg:grid-cols-3">
           <div className="space-y-2">
-            <label className="block text-[10px] text-neutral-500">{t('Motor de transcripción')}<select className="input mt-1 w-full" value={provider} onChange={(event) => void setBackend(event.target.value as StudySttProvider)}><option value="local">{t('Whisper local (offline)')}</option><option value="openai">OpenAI API</option></select></label>
-            {provider === 'local' ? <label className="block text-[10px] text-neutral-500">{t('Modelo Whisper')}<select className="input mt-1 w-full" value={model} onChange={(event) => setModel(event.target.value)}>{STUDY_STT_MODELS.map((entry) => <option key={entry.id} value={entry.id}>{entry.label} · ~{entry.sizeMb} MB</option>)}</select></label>
-              : settings && <label className="block text-[10px] text-neutral-500">{t('Modelo externo')}<ModelPicker compact settings={settings} value={settings.transcriptionModel} emptyLabel="gpt-4o-transcribe (predeterminado)" onChange={(transcriptionModel) => void window.nodus.updateSettings({ transcriptionModel }).then(setSettings)} /></label>}
-            <button className="text-[10px] text-indigo-400 hover:text-indigo-300" onClick={() => { setShowModels(!showModels); if (!showModels) void refreshModelStorage(); }}>{showModels ? t('Ocultar gestor de modelos') : t('Gestionar modelos locales')}</button>
+            <label className="block text-[10px] text-neutral-500">{t('Idioma del audio')}<select data-testid="study-dictation-language" className="input mt-1 w-full" value={audioLanguage} onChange={(event) => setAudioLanguage(event.target.value)}>{STUDY_STT_LANGUAGES.map((entry) => <option key={entry.code} value={entry.code}>{t(entry.label)}</option>)}</select></label>
+            <p className="text-[10px] leading-4 text-neutral-600">{t('El motor, el modelo y las descargas se gestionan desde Ajustes → Modelos IA.')}</p>
           </div>
           <div className="space-y-2">
             <label className="block text-[10px] text-neutral-500">{t('Micrófono')}<select className="input mt-1 w-full" value={deviceId} onChange={(event) => setDeviceId(event.target.value)}>{devices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `${t('Micrófono')} ${index + 1}`}</option>)}</select></label>
@@ -334,11 +319,6 @@ export function StudyDictation({
             <label className="flex items-center gap-2 text-xs text-neutral-400"><input type="checkbox" checked={preserveAudio} onChange={(event) => setPreserveAudio(event.target.checked)} />{t('Conservar audio original local')}</label>
             <p className="text-[10px] leading-4 text-neutral-600">{t('El vocabulario del apunte y el diccionario personal se usan como contexto. Los audios se guardan solo en este dispositivo y se excluyen de sync y backups.')}</p>
           </div>
-
-          {showModels && <div className="space-y-2 lg:col-span-3">{STUDY_STT_MODELS.map((entry) => {
-            const ready = isLocalWhisperModelReady(entry.id);
-            return <div key={entry.id} className="flex items-center gap-3 rounded-lg border border-neutral-800 px-3 py-2"><span className="min-w-0 flex-1"><span className="block text-xs text-neutral-300">{entry.label}</span><span className="text-[10px] text-neutral-600">{t(entry.speed)} · {t(entry.accuracy)} · ~{entry.ramMb} MB RAM · {modelBytes[entry.id] ? `${(modelBytes[entry.id] / 1024 / 1024).toFixed(0)} MB ${t('ocupados')}` : `~${entry.sizeMb} MB`}</span></span>{ready ? <button className="btn btn-ghost h-7 text-xs text-red-400" onClick={() => void removeLocalWhisperModel(entry.id).then(refreshModelStorage)}><Icon name="trash" size={11} /> {t('Eliminar')}</button> : <button disabled={downloading != null} className="btn btn-ghost h-7 text-xs" onClick={() => void downloadModel(entry.id)}><Icon name="download" size={11} /> {downloading === entry.id ? t('Descargando…') : t('Descargar')}</button>}</div>;
-          })}</div>}
 
           {clips.length > 0 && <div className="space-y-2 lg:col-span-3"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Audios de dictado de este apunte')}</h4>{clips.map((clip) => <AudioClipRow key={clip.id} clip={clip} onDelete={() => void deleteStudyDictationClip(clip.id).then(reloadClips)} onReprocess={() => void transcribe(clip.blob, false, clip)} />)}</div>}
         </div>

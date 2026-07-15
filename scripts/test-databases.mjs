@@ -28,6 +28,7 @@ installRuntimeHooks(root);
 
 try {
   const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
+  const databaseChatHistory = require(path.join(repoRoot, 'electron/db/databaseChatRepo.ts'));
   const shared = require(path.join(repoRoot, 'shared/databases.ts'));
   const csv = require(path.join(repoRoot, 'shared/databaseCsv.ts'));
   const aiShared = require(path.join(repoRoot, 'shared/databaseAi.ts'));
@@ -73,6 +74,18 @@ try {
   assert.match(db1.shortId, /^DB-[A-Z0-9]{4}$/);
   assert.notEqual(db1.shortId, db2.shortId, 'short ids are unique');
   assert.equal(db1.rowCount, 0);
+
+  // ── Persisted database-chat history ────────────────────────────────────────
+  const conversation = databaseChatHistory.createDatabaseChatConversation({ title: 'Comparar muestras', databaseIds: [db1.id, db2.id] });
+  assert.deepEqual(conversation.databaseIds, [db1.id, db2.id]);
+  assert.equal(conversation.messageCount, 0);
+  const turns = [{ role: 'user', content: 'Compara' }, { role: 'assistant', content: 'Resultado' }];
+  const savedConversation = databaseChatHistory.saveDatabaseChatConversation(conversation.id, turns, [db1.id]);
+  assert.equal(savedConversation.messageCount, 2);
+  assert.deepEqual(savedConversation.databaseIds, [db1.id]);
+  assert.equal(databaseChatHistory.listDatabaseChatConversations()[0].id, conversation.id);
+  databaseChatHistory.deleteDatabaseChatConversation(conversation.id);
+  assert.equal(databaseChatHistory.getDatabaseChatConversation(conversation.id), null);
   assert.equal(dbmode.listDatabases().length, 2);
 
   // ── Columns + options ──────────────────────────────────────────────────────
@@ -609,6 +622,16 @@ try {
   assert.equal(exp.fileName, 'Importada.csv');
   assert.equal(exp.content[0], 0xef, 'CSV export starts with a UTF-8 BOM');
 
+  const chatView = fs.readFileSync(path.join(repoRoot, 'src/views/DatabasesChatView.tsx'), 'utf8');
+  assert.match(chatView, /database-chat-history-toggle/);
+  assert.match(chatView, /database-chat-history-sidebar/);
+  assert.match(chatView, /listDatabaseChatConversations/);
+  assert.match(chatView, /saveDatabaseChatConversation/);
+  assert.match(chatView, /<ConfirmModal/);
+  const preloadSource = fs.readFileSync(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
+  const ipcSource = fs.readFileSync(path.join(repoRoot, 'electron/ipc.ts'), 'utf8');
+  assert.match(preloadSource, /db:chatHistory:list/);
+  assert.match(ipcSource, /db:chatHistory:delete/);
   console.log('Databases mode test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });

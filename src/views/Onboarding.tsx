@@ -9,7 +9,6 @@ type OnboardingExit = 'home' | 'library' | 'settings';
 export function Onboarding({
   activeVault,
   providerKeys,
-  onLanguageChosen,
   onDone,
   onCancel,
   discardsVault,
@@ -17,17 +16,11 @@ export function Onboarding({
   activeVault: VaultSummary | null;
   /** Which providers already have a (globally shared) key configured. */
   providerKeys?: Partial<Record<AiProvider, boolean>>;
-  /** Reload settings so the interface language switches once the user picks it. */
-  onLanguageChosen: () => Promise<unknown>;
   onDone: (view?: OnboardingExit) => void;
   /** Cancel the wizard (discards a freshly-created vault when `discardsVault`). */
   onCancel?: () => void | Promise<unknown>;
   discardsVault?: boolean;
 }) {
-  // The very first thing a new user does is pick the interface language. Until
-  // then the wizard is shown in English (this screen is intentionally not
-  // translated); afterwards the rest of the wizard follows the chosen language.
-  const [langChosen, setLangChosen] = useState(false);
   const [step, setStep] = useState(0);
   const [ping, setPing] = useState<{ ok: boolean; userId?: string; message?: string } | null>(null);
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
@@ -46,27 +39,43 @@ export function Onboarding({
   const [syncedWorks, setSyncedWorks] = useState<number | null>(null);
 
   const [confirmExit, setConfirmExit] = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const [exitError, setExitError] = useState<string | null>(null);
 
-  // The onboarding adapts to the active vault: academic vaults get the Zotero flow;
-  // genealogy / databases vaults skip Zotero and get a short intro → AI → done flow.
+  // The onboarding adapts to the active vault: only academic research starts with
+  // Zotero. Genealogy, databases and study use a short intro → AI → done flow.
   const vaultType = activeVault?.type ?? 'academic';
-  const simple = vaultType === 'genealogy' || vaultType === 'databases';
+  const simple = vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
   // Providers already configured (keys are shared across all vaults).
   const configuredProviders = providerKeys ? AI_PROVIDERS.filter((p) => providerKeys[p]) : [];
 
+  const exitOnboarding = async () => {
+    if (!onCancel || exiting) return;
+    setExiting(true);
+    setExitError(null);
+    try {
+      await onCancel();
+    } catch (error) {
+      setExitError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExiting(false);
+    }
+  };
+
   const checkZotero = async () => {
     const res = await window.nodus.zoteroPing();
     setPing(res);
     if (res.ok) {
-      const cols = await window.nodus.zoteroCollections().catch(() => []);
-      setCollections(cols);
+      const libs = await window.nodus.zoteroLibraries().catch(() => []);
+      const groups = await Promise.all(libs.map((library) => window.nodus.zoteroCollections(library).catch(() => [])));
+      setCollections(groups.flat());
     }
   };
 
   useEffect(() => {
-    void checkZotero();
+    if (!simple) void checkZotero();
   }, []);
 
   const toggleCollection = (key: string) => {
@@ -105,14 +114,13 @@ export function Onboarding({
       await window.nodus.updateSettings({
         ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
         favorites: ref ? [ref] : [],
-        extractionModel: ref,
         synthesisModel: ref,
-        summaryModel: ref,
-        fusionModel: ref,
+        modelSettingsMode: 'basic',
         onboardingComplete: true,
       });
       setStep(doneStep);
-      // Only academic vaults ingest Zotero; genealogy/databases have nothing to sync here.
+      // Only academic vaults ingest Zotero during setup. Study can import files or
+      // connect Zotero later from its own Materials section.
       if (!simple) {
         const sync = await window.nodus.syncNow();
         const works = await window.nodus.listWorks();
@@ -126,36 +134,6 @@ export function Onboarding({
       setFinishing(false);
     }
   };
-
-  const chooseLanguage = async (lang: 'en' | 'es') => {
-    await window.nodus.updateSettings({ uiLanguage: lang, promptLanguage: lang });
-    await onLanguageChosen();
-    setLangChosen(true);
-  };
-
-  if (!langChosen) {
-    return (
-      <div className="h-full flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="card w-full max-w-md p-8 text-center"
-        >
-          <div className="text-2xl font-semibold mb-1">Welcome to Nodus</div>
-          <p className="text-neutral-400 text-sm mb-6">Choose your language to get started.</p>
-          <div className="grid grid-cols-2 gap-3">
-            <button className="btn btn-primary !py-3 text-base" onClick={() => void chooseLanguage('en')}>
-              English
-            </button>
-            <button className="btn btn-primary !py-3 text-base" onClick={() => void chooseLanguage('es')}>
-              Español
-            </button>
-          </div>
-          <p className="mt-5 text-xs text-neutral-500">You can change this later in Settings.</p>
-        </motion.div>
-      </div>
-    );
-  }
 
   const steps = simple
     ? [t('Introducción'), t('Proveedor de IA'), t('Listo')]
@@ -171,6 +149,11 @@ export function Onboarding({
             subtitle: t('Organiza tus datos en tablas tipo Notion con columnas tipadas, relaciones, rollups y análisis con IA. Todo es local.'),
             body: t('Crea bases de datos con columnas de texto, número, selección, adjuntos, relaciones y rollups; impórtalas desde CSV y analízalas o conversa con ellas. Configura un modelo de IA para las columnas y el chat.'),
           }
+        : vaultType === 'estudio'
+          ? {
+              subtitle: t('Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local.'),
+              body: t('Empieza creando tus cursos y asignaturas. Después podrás importar archivos o enlazar materiales de Zotero de forma opcional, grabar clases, generar preguntas y repasar con ayuda de la IA.'),
+            }
         : { subtitle: '', body: '' };
 
   return (
@@ -205,10 +188,11 @@ export function Onboarding({
               <button className="btn btn-ghost text-xs" onClick={() => setConfirmExit(false)}>
                 {t('Seguir configurando')}
               </button>
-              <button className="btn bg-red-600 text-xs text-white hover:bg-red-500" onClick={() => void onCancel?.()}>
-                {t('Salir y descartar')}
+              <button className="btn bg-red-600 text-xs text-white hover:bg-red-500 disabled:opacity-50" disabled={exiting} onClick={() => void exitOnboarding()}>
+                {exiting ? t('Saliendo…') : t('Salir y descartar')}
               </button>
             </div>
+            {exitError && <p role="alert" className="mt-2 text-xs text-red-300">{exitError}</p>}
           </div>
         )}
 
@@ -482,6 +466,7 @@ function OnboardingCollectionNode({
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
           <input type="checkbox" className="shrink-0" checked={selected.has(col.key)} onChange={() => onToggle(col.key)} />
           <span className="truncate">{col.name}</span>
+          {depth === 0 && <span className="shrink-0 text-[10px] text-neutral-500">{col.library.type === 'group' ? col.library.name : t('Mi biblioteca')}</span>}
           <span className="shrink-0 text-neutral-600">
             ({col.itemCount} {t('ítems')}{col.subCount ? `, ${col.subCount} ${t('subcol.')}` : ''})
           </span>

@@ -99,9 +99,12 @@ try {
     assert.equal(brief.materials.ideas.length, 70, 'pool trimmed to POOL_LIMITS.ideas');
     assert.ok(brief.materials.ideas.every((i) => /\]\(nodus:\/\/idea\/g-\d+\)$/.test(i.token)), 'idea tokens are real nodus citations');
     assert.ok(brief.sections.target >= 3 && brief.sections.hardCap >= brief.sections.target, 'section scope resolved');
+    assert.equal(brief.sections.target, 4, 'standard client brief defaults to four deep sections');
     assert.deepEqual(brief.targetPages, { min: 9, max: 14 }, 'standard length → 9–14 pp');
     assert.equal(brief.finalizeWith, 'nodus_finalize_deep_research', 'points the writer at the finalize tool');
     assert.ok(brief.citationPolicy.length > 0 && brief.method.length > 0, 'ships a citation policy + method');
+    assert.ok(brief.method.some((rule) => rule.includes('dos puntos') && rule.includes('guion largo')), 'client writer receives the narrative punctuation contract');
+    assert.ok(brief.method.some((rule) => rule.includes('no añadas subtítulos')), 'client writer receives the single-epigraph contract');
   }
 
   // ── 2. Finalize: strip hallucinations, build references from cited works ────

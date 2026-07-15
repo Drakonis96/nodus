@@ -10,6 +10,7 @@ import type {
   StudyCourse,
   StudyDocument,
   StudyDocumentTag,
+  StudyEntityMoveInput,
   StudyEntityKind,
   StudyFolder,
   StudyLifecycleAction,
@@ -71,6 +72,9 @@ function named(row: Row) {
     description: row.description ? String(row.description) : null,
     color: row.color ? String(row.color) : null,
     icon: row.icon ? String(row.icon) : null,
+    emoji: row.emoji ? String(row.emoji) : null,
+    imageData: row.image_data ? String(row.image_data) : null,
+    year: row.year == null ? null : Number(row.year),
     favorite: bool(row.favorite),
   };
 }
@@ -80,6 +84,7 @@ const toSubject = (row: Row): StudySubject => ({ ...named(row), courseId: String
 const toTopic = (row: Row): StudyTopic => ({
   ...named(row),
   subjectId: String(row.subject_id),
+  folderId: row.folder_id ? String(row.folder_id) : null,
   parentId: row.parent_id ? String(row.parent_id) : null,
 });
 const toFolder = (row: Row): StudyFolder => ({
@@ -96,6 +101,9 @@ const toDocument = (row: Row): StudyDocument => ({
   description: row.description ? String(row.description) : null,
   color: row.color ? String(row.color) : null,
   icon: row.icon ? String(row.icon) : null,
+  emoji: row.emoji ? String(row.emoji) : null,
+  imageData: row.image_data ? String(row.image_data) : null,
+  year: row.year == null ? null : Number(row.year),
   favorite: bool(row.favorite),
   pinned: bool(row.pinned),
   locked: bool(row.locked),
@@ -167,10 +175,10 @@ export function createStudyCourse(input: CreateStudyCourseInput): StudyCourse {
   const key = ids('course');
   const timestamp = now();
   db.prepare(`INSERT INTO study_courses
-    (id, short_id, name, description, color, icon, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, short_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(key.id, key.shortId, normalizeStudyName(input.name), input.description ?? null, input.color ?? null, input.icon ?? null,
-      nextPosition('study_courses'), timestamp, timestamp);
+      input.emoji ?? null, input.imageData ?? null, input.year ?? null, nextPosition('study_courses'), timestamp, timestamp);
   return toCourse(db.prepare('SELECT * FROM study_courses WHERE id = ?').get(key.id) as Row);
 }
 
@@ -179,10 +187,11 @@ export function createStudySubject(input: CreateStudySubjectInput): StudySubject
   const key = ids('subject');
   const timestamp = now();
   db.prepare(`INSERT INTO study_subjects
-    (id, short_id, course_id, name, description, color, icon, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, short_id, course_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(key.id, key.shortId, input.courseId, normalizeStudyName(input.name), input.description ?? null, input.color ?? null,
-      input.icon ?? null, nextPosition('study_subjects', 'course_id', input.courseId), timestamp, timestamp);
+      input.icon ?? null, input.emoji ?? null, input.imageData ?? null, input.year ?? null,
+      nextPosition('study_subjects', 'course_id', input.courseId), timestamp, timestamp);
   return toSubject(db.prepare('SELECT * FROM study_subjects WHERE id = ?').get(key.id) as Row);
 }
 
@@ -205,12 +214,23 @@ export function createStudyTopic(input: CreateStudyTopicInput): StudyTopic {
   const db = getDb();
   const key = ids('topic');
   assertNoTopicCycle(key.id, input.parentId ?? null);
+  let folderId = input.folderId ?? null;
+  if (input.parentId) {
+    const parent = db.prepare('SELECT subject_id, folder_id FROM study_topics WHERE id = ?').get(input.parentId) as Row | undefined;
+    if (!parent || String(parent.subject_id) !== input.subjectId) throw new Error('El tema superior no pertenece a la asignatura seleccionada.');
+    folderId = parent.folder_id ? String(parent.folder_id) : null;
+  }
+  if (folderId) {
+    const folder = db.prepare('SELECT subject_id FROM study_folders WHERE id = ?').get(folderId) as Row | undefined;
+    if (!folder || String(folder.subject_id ?? '') !== input.subjectId) throw new Error('La carpeta no pertenece a la asignatura seleccionada.');
+  }
   const timestamp = now();
   db.prepare(`INSERT INTO study_topics
-    (id, short_id, subject_id, parent_id, name, description, color, icon, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(key.id, key.shortId, input.subjectId, input.parentId ?? null, normalizeStudyName(input.name), input.description ?? null,
-      input.color ?? null, input.icon ?? null, nextPosition('study_topics', 'subject_id', input.subjectId), timestamp, timestamp);
+    (id, short_id, subject_id, folder_id, parent_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(key.id, key.shortId, input.subjectId, folderId, input.parentId ?? null, normalizeStudyName(input.name), input.description ?? null,
+      input.color ?? null, input.icon ?? null, input.emoji ?? null, input.imageData ?? null, input.year ?? null,
+      nextPosition('study_topics', 'subject_id', input.subjectId), timestamp, timestamp);
   return toTopic(db.prepare('SELECT * FROM study_topics WHERE id = ?').get(key.id) as Row);
 }
 
@@ -233,12 +253,28 @@ export function createStudyFolder(input: CreateStudyFolderInput): StudyFolder {
   const db = getDb();
   const key = ids('folder');
   assertNoFolderCycle(key.id, input.parentId ?? null);
+  let courseId = input.courseId ?? null;
+  let subjectId = input.subjectId ?? null;
+  if (input.parentId) {
+    const parent = db.prepare('SELECT course_id, subject_id FROM study_folders WHERE id = ?').get(input.parentId) as Row | undefined;
+    if (!parent) throw new Error('La carpeta superior no existe.');
+    courseId = parent.course_id ? String(parent.course_id) : null;
+    subjectId = parent.subject_id ? String(parent.subject_id) : null;
+  }
+  if (subjectId) {
+    const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ?').get(subjectId) as Row | undefined;
+    if (!subject) throw new Error('La asignatura de destino no existe.');
+    const subjectCourseId = String(subject.course_id);
+    if (courseId && courseId !== subjectCourseId) throw new Error('La asignatura no pertenece al curso seleccionado.');
+    courseId = subjectCourseId;
+  }
   const timestamp = now();
   db.prepare(`INSERT INTO study_folders
-    (id, short_id, parent_id, course_id, subject_id, name, description, color, icon, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(key.id, key.shortId, input.parentId ?? null, input.courseId ?? null, input.subjectId ?? null,
-      normalizeStudyName(input.name), input.description ?? null, input.color ?? null, input.icon ?? null,
+    (id, short_id, parent_id, course_id, subject_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(key.id, key.shortId, input.parentId ?? null, courseId, subjectId,
+      normalizeStudyName(input.name), input.description ?? null, input.color ?? null, input.icon ?? null, input.emoji ?? null,
+      input.imageData ?? null, input.year ?? null,
       nextPosition('study_folders', 'parent_id', input.parentId ?? null), timestamp, timestamp);
   return toFolder(db.prepare('SELECT * FROM study_folders WHERE id = ?').get(key.id) as Row);
 }
@@ -249,10 +285,11 @@ export function createStudyDocument(input: CreateStudyDocumentInput): StudyDocum
     const key = ids('document');
     const timestamp = now();
     db.prepare(`INSERT INTO study_docs
-      (id, short_id, title, kind, content_markdown, description, color, icon, position, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, short_id, title, kind, content_markdown, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(key.id, key.shortId, normalizeStudyName(input.title), input.kind ?? 'apunte', input.contentMarkdown ?? '',
-        input.description ?? null, input.color ?? null, input.icon ?? null, nextPosition('study_docs'), timestamp, timestamp);
+        input.description ?? null, input.color ?? null, input.icon ?? null, input.emoji ?? null, input.imageData ?? null,
+        input.year ?? null, nextPosition('study_docs'), timestamp, timestamp);
     if (input.placement) addStudyPlacement(key.id, input.placement);
     return toDocument(db.prepare('SELECT * FROM study_docs WHERE id = ?').get(key.id) as Row);
   });
@@ -262,10 +299,17 @@ export function createStudyDocument(input: CreateStudyDocumentInput): StudyDocum
 export function addStudyPlacement(documentId: string, input: StudyPlacementInput): StudyPlacement {
   const db = getDb();
   const normalized: StudyPlacementInput = { ...input };
+  if (normalized.folderId) {
+    const folder = db.prepare('SELECT course_id, subject_id FROM study_folders WHERE id = ?').get(normalized.folderId) as Row | undefined;
+    if (!folder) throw new Error('La carpeta de destino no existe.');
+    normalized.courseId ??= folder.course_id ? String(folder.course_id) : null;
+    normalized.subjectId ??= folder.subject_id ? String(folder.subject_id) : null;
+  }
   if (normalized.topicId) {
-    const topic = db.prepare('SELECT subject_id FROM study_topics WHERE id = ?').get(normalized.topicId) as Row | undefined;
+    const topic = db.prepare('SELECT subject_id, folder_id FROM study_topics WHERE id = ?').get(normalized.topicId) as Row | undefined;
     if (!topic) throw new Error('El tema de destino no existe.');
     normalized.subjectId ??= String(topic.subject_id);
+    normalized.folderId ??= topic.folder_id ? String(topic.folder_id) : null;
   }
   if (normalized.subjectId) {
     const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ?').get(normalized.subjectId) as Row | undefined;
@@ -307,8 +351,8 @@ export function updateStudyEntity(kind: StudyEntityKind, id: string, patch: Reco
   const db = getDb();
   const table = TABLES[kind];
   const allowed = kind === 'document'
-    ? new Set(['title', 'kind', 'contentMarkdown', 'description', 'color', 'icon', 'favorite', 'pinned', 'locked', 'position'])
-    : new Set(['name', 'description', 'color', 'icon', 'favorite', 'position', 'courseId', 'subjectId', 'parentId']);
+    ? new Set(['title', 'kind', 'contentMarkdown', 'description', 'color', 'icon', 'emoji', 'imageData', 'year', 'favorite', 'pinned', 'locked', 'position'])
+    : new Set(['name', 'description', 'color', 'icon', 'emoji', 'imageData', 'year', 'favorite', 'position', 'courseId', 'subjectId', 'parentId', ...(kind === 'topic' ? ['folderId'] : [])]);
   const column = (key: string) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
   const entries = Object.entries(patch).filter(([key]) => allowed.has(key));
   if (!entries.length) return getStudyEntity(kind, id);
@@ -391,6 +435,9 @@ function descendantIds(kind: StudyEntityKind, id: string): Record<StudyEntityKin
       }
       frontier = next;
     }
+    for (const folderId of result.folder) {
+      for (const row of db.prepare('SELECT id FROM study_topics WHERE folder_id = ?').all(folderId) as Row[]) result.topic.add(String(row.id));
+    }
   }
   if (kind !== 'document') {
     const placements = (db.prepare('SELECT * FROM study_placements').all() as Row[]).map(toPlacement);
@@ -406,6 +453,93 @@ function descendantIds(kind: StudyEntityKind, id: string): Record<StudyEntityKin
     }
   }
   return result;
+}
+
+function updateStudyScopeReferences(scopeColumn: 'subject_id' | 'folder_id' | 'topic_id', ids: string[], patch: { courseId?: string; subjectId?: string; folderId?: string | null }): void {
+  if (!ids.length) return;
+  const db = getDb();
+  const placeholders = ids.map(() => '?').join(',');
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'study_%'").all() as Row[])
+    .map((row) => String(row.name)).filter((name) => /^study_[a-z0-9_]+$/.test(name));
+  for (const table of tables) {
+    const columns = new Set((db.prepare(`PRAGMA table_info(${table})`).all() as Row[]).map((row) => String(row.name)));
+    if (!columns.has(scopeColumn)) continue;
+    const assignments: string[] = [];
+    const values: unknown[] = [];
+    if (patch.courseId !== undefined && columns.has('course_id')) { assignments.push('course_id = ?'); values.push(patch.courseId); }
+    if (patch.subjectId !== undefined && columns.has('subject_id') && scopeColumn !== 'subject_id') { assignments.push('subject_id = ?'); values.push(patch.subjectId); }
+    if (patch.folderId !== undefined && columns.has('folder_id') && scopeColumn !== 'folder_id') { assignments.push('folder_id = ?'); values.push(patch.folderId); }
+    if (!assignments.length) continue;
+    if (columns.has('updated_at')) { assignments.push('updated_at = ?'); values.push(now()); }
+    db.prepare(`UPDATE ${table} SET ${assignments.join(', ')} WHERE ${scopeColumn} IN (${placeholders})`).run(...values, ...ids);
+  }
+}
+
+export function moveStudyEntity(kind: 'subject' | 'folder' | 'topic', id: string, input: StudyEntityMoveInput): StudySubject | StudyFolder | StudyTopic {
+  const db = getDb();
+  return db.transaction(() => {
+    if (kind === 'subject') {
+      const courseId = input.courseId ?? '';
+      if (!db.prepare('SELECT 1 FROM study_courses WHERE id = ? AND deleted_at IS NULL').get(courseId)) throw new Error('El curso de destino no existe.');
+      if (!getStudyEntity('subject', id)) throw new Error('La asignatura no existe.');
+      db.prepare('UPDATE study_subjects SET course_id = ?, updated_at = ? WHERE id = ?').run(courseId, now(), id);
+      db.prepare('UPDATE study_folders SET course_id = ?, updated_at = ? WHERE subject_id = ?').run(courseId, now(), id);
+      updateStudyScopeReferences('subject_id', [id], { courseId });
+      return getStudyEntity('subject', id) as StudySubject;
+    }
+
+    if (kind === 'folder') {
+      const scope = descendantIds('folder', id);
+      if (!scope.folder.has(id) || !getStudyEntity('folder', id)) throw new Error('La carpeta no existe.');
+      let subjectId = input.subjectId ?? '';
+      const parentId = input.parentId ?? null;
+      if (parentId) {
+        if (scope.folder.has(parentId)) throw new Error('La carpeta no puede moverse dentro de sí misma.');
+        const parent = db.prepare('SELECT subject_id FROM study_folders WHERE id = ? AND deleted_at IS NULL').get(parentId) as Row | undefined;
+        if (!parent?.subject_id) throw new Error('La carpeta de destino no existe.');
+        const parentSubjectId = String(parent.subject_id);
+        if (subjectId && subjectId !== parentSubjectId) throw new Error('La carpeta de destino no pertenece a la asignatura seleccionada.');
+        subjectId = parentSubjectId;
+      }
+      const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ? AND deleted_at IS NULL').get(subjectId) as Row | undefined;
+      if (!subject) throw new Error('La asignatura de destino no existe.');
+      const courseId = String(subject.course_id);
+      const folderIds = [...scope.folder];
+      const placeholders = folderIds.map(() => '?').join(',');
+      db.prepare(`UPDATE study_folders SET course_id = ?, subject_id = ?, updated_at = ? WHERE id IN (${placeholders})`).run(courseId, subjectId, now(), ...folderIds);
+      db.prepare('UPDATE study_folders SET parent_id = ?, updated_at = ? WHERE id = ?').run(parentId, now(), id);
+      updateStudyScopeReferences('folder_id', folderIds, { courseId, subjectId });
+      return getStudyEntity('folder', id) as StudyFolder;
+    }
+
+    const scope = descendantIds('topic', id);
+    if (!scope.topic.has(id) || !getStudyEntity('topic', id)) throw new Error('El tema no existe.');
+    let subjectId = input.subjectId ?? '';
+    let folderId = input.folderId ?? null;
+    const parentId = input.parentId ?? null;
+    if (parentId) {
+      if (scope.topic.has(parentId)) throw new Error('El tema no puede moverse dentro de sí mismo.');
+      const parent = db.prepare('SELECT subject_id, folder_id FROM study_topics WHERE id = ? AND deleted_at IS NULL').get(parentId) as Row | undefined;
+      if (!parent) throw new Error('El tema superior de destino no existe.');
+      const parentSubjectId = String(parent.subject_id);
+      if (subjectId && subjectId !== parentSubjectId) throw new Error('El tema superior no pertenece a la asignatura seleccionada.');
+      subjectId = parentSubjectId;
+      folderId = parent.folder_id ? String(parent.folder_id) : null;
+    }
+    const subject = db.prepare('SELECT course_id FROM study_subjects WHERE id = ? AND deleted_at IS NULL').get(subjectId) as Row | undefined;
+    if (!subject) throw new Error('La asignatura de destino no existe.');
+    if (folderId) {
+      const folder = db.prepare('SELECT subject_id FROM study_folders WHERE id = ? AND deleted_at IS NULL').get(folderId) as Row | undefined;
+      if (!folder || String(folder.subject_id ?? '') !== subjectId) throw new Error('La carpeta no pertenece a la asignatura seleccionada.');
+    }
+    const courseId = String(subject.course_id);
+    const topicIds = [...scope.topic];
+    const placeholders = topicIds.map(() => '?').join(',');
+    db.prepare(`UPDATE study_topics SET subject_id = ?, folder_id = ?, updated_at = ? WHERE id IN (${placeholders})`).run(subjectId, folderId, now(), ...topicIds);
+    db.prepare('UPDATE study_topics SET parent_id = ?, updated_at = ? WHERE id = ?').run(parentId, now(), id);
+    updateStudyScopeReferences('topic_id', topicIds, { courseId, subjectId, folderId });
+    return getStudyEntity('topic', id) as StudyTopic;
+  })();
 }
 
 export function setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction): void {
@@ -538,7 +672,8 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
       if (!original) throw new Error('Documento no encontrado.');
       const copy = createStudyDocument({
         title: `${original.title} (copia)`, kind: original.kind, contentMarkdown: original.contentMarkdown,
-        description: original.description, color: original.color, icon: original.icon,
+        description: original.description, color: original.color, icon: original.icon, emoji: original.emoji,
+        imageData: original.imageData, year: original.year,
       });
       const placements = db.prepare('SELECT * FROM study_placements WHERE document_id = ?').all(id) as Row[];
       for (const placementRow of placements) {
@@ -557,13 +692,13 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
 
     for (const oldId of scope.course) {
       const old = getStudyEntity('course', oldId) as StudyCourse;
-      const copy = createStudyCourse({ name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon });
+      const copy = createStudyCourse({ name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
       courseMap.set(oldId, copy.id); if (oldId === id) root = copy;
     }
     for (const oldId of scope.subject) {
       const old = getStudyEntity('subject', oldId) as StudySubject;
       const targetCourse = courseMap.get(old.courseId) ?? old.courseId;
-      const copy = createStudySubject({ courseId: targetCourse, name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon });
+      const copy = createStudySubject({ courseId: targetCourse, name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
       subjectMap.set(oldId, copy.id); if (oldId === id) root = copy;
     }
     const pendingTopics = [...scope.topic];
@@ -571,8 +706,10 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
       const oldId = pendingTopics.shift()!;
       const old = getStudyEntity('topic', oldId) as StudyTopic;
       if (old.parentId && scope.topic.has(old.parentId) && !topicMap.has(old.parentId)) { pendingTopics.push(oldId); continue; }
-      const copy = createStudyTopic({ subjectId: subjectMap.get(old.subjectId) ?? old.subjectId, parentId: old.parentId ? topicMap.get(old.parentId) ?? old.parentId : null,
-        name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon });
+      const copy = createStudyTopic({ subjectId: subjectMap.get(old.subjectId) ?? old.subjectId,
+        folderId: old.folderId && !scope.folder.has(old.folderId) ? old.folderId : null,
+        parentId: old.parentId ? topicMap.get(old.parentId) ?? old.parentId : null,
+        name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
       topicMap.set(oldId, copy.id); if (oldId === id) root = copy;
     }
     const pendingFolders = [...scope.folder];
@@ -583,8 +720,12 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
       const copy = createStudyFolder({ parentId: old.parentId ? folderMap.get(old.parentId) ?? old.parentId : null,
         courseId: old.courseId ? courseMap.get(old.courseId) ?? old.courseId : null,
         subjectId: old.subjectId ? subjectMap.get(old.subjectId) ?? old.subjectId : null,
-        name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon });
+        name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
       folderMap.set(oldId, copy.id); if (oldId === id) root = copy;
+    }
+    for (const [oldTopicId, newTopicId] of topicMap) {
+      const old = getStudyEntity('topic', oldTopicId) as StudyTopic;
+      if (old.folderId && folderMap.has(old.folderId)) updateStudyEntity('topic', newTopicId, { folderId: folderMap.get(old.folderId) });
     }
 
     const placements = db.prepare('SELECT * FROM study_placements').all() as Row[];
@@ -599,7 +740,7 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
       if (!copyId) {
         const old = getStudyEntity('document', placement.documentId) as StudyDocument;
         const copy = createStudyDocument({ title: old.title, kind: old.kind, contentMarkdown: old.contentMarkdown,
-          description: old.description, color: old.color, icon: old.icon });
+          description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
         copyId = copy.id; docMap.set(old.id, copy.id);
       }
       const mapped: StudyPlacementInput = {

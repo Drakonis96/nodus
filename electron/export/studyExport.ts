@@ -15,15 +15,89 @@ function slug(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'sin-titulo';
 }
 
+type StudyLocation = { courseId?: string | null; subjectId?: string | null; topicId?: string | null; folderId?: string | null };
+
+function folderChain(workspace: StudyWorkspace, folderId: string | null | undefined): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  let current = folderId ? workspace.folders.find((item) => item.id === folderId) : undefined;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    result.unshift(current.name);
+    current = current.parentId ? workspace.folders.find((item) => item.id === current?.parentId) : undefined;
+  }
+  return result;
+}
+
+function topicChain(workspace: StudyWorkspace, topicId: string | null | undefined): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  let current = topicId ? workspace.topics.find((item) => item.id === topicId) : undefined;
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    result.unshift(current.name);
+    current = current.parentId ? workspace.topics.find((item) => item.id === current?.parentId) : undefined;
+  }
+  return result;
+}
+
+function hierarchyDirectory(workspace: StudyWorkspace, location: StudyLocation): string {
+  const topic = location.topicId ? workspace.topics.find((item) => item.id === location.topicId) : undefined;
+  const folder = (location.folderId ? workspace.folders.find((item) => item.id === location.folderId) : undefined)
+    ?? (topic?.folderId ? workspace.folders.find((item) => item.id === topic.folderId) : undefined);
+  const subject = (location.subjectId ? workspace.subjects.find((item) => item.id === location.subjectId) : undefined)
+    ?? (topic ? workspace.subjects.find((item) => item.id === topic.subjectId) : undefined)
+    ?? (folder?.subjectId ? workspace.subjects.find((item) => item.id === folder.subjectId) : undefined);
+  const course = (location.courseId ? workspace.courses.find((item) => item.id === location.courseId) : undefined)
+    ?? (subject ? workspace.courses.find((item) => item.id === subject.courseId) : undefined)
+    ?? (folder?.courseId ? workspace.courses.find((item) => item.id === folder.courseId) : undefined);
+  const parts = [course?.name, subject?.name, ...folderChain(workspace, folder?.id), ...topicChain(workspace, topic?.id)]
+    .filter((value): value is string => Boolean(value)).map(slug);
+  return parts.length ? parts.join('/') : '_Sin-organizar';
+}
+
+function isFolderWithin(workspace: StudyWorkspace, folderId: string | null | undefined, ancestorId: string): boolean {
+  const seen = new Set<string>();
+  let current = folderId ? workspace.folders.find((item) => item.id === folderId) : undefined;
+  while (current && !seen.has(current.id)) {
+    if (current.id === ancestorId) return true;
+    seen.add(current.id);
+    current = current.parentId ? workspace.folders.find((item) => item.id === current?.parentId) : undefined;
+  }
+  return false;
+}
+
+function isTopicWithin(workspace: StudyWorkspace, topicId: string | null | undefined, ancestorId: string): boolean {
+  const seen = new Set<string>();
+  let current = topicId ? workspace.topics.find((item) => item.id === topicId) : undefined;
+  while (current && !seen.has(current.id)) {
+    if (current.id === ancestorId) return true;
+    seen.add(current.id);
+    current = current.parentId ? workspace.topics.find((item) => item.id === current?.parentId) : undefined;
+  }
+  return false;
+}
+
+function locationMatchesScope(workspace: StudyWorkspace, location: StudyLocation, scope: StudyExportScope): boolean {
+  if (scope.kind === 'workspace') return true;
+  if (!scope.id) return false;
+  if (scope.kind === 'course') return location.courseId === scope.id
+    || workspace.subjects.some((item) => item.id === location.subjectId && item.courseId === scope.id);
+  if (scope.kind === 'subject') return location.subjectId === scope.id
+    || workspace.topics.some((item) => item.id === location.topicId && item.subjectId === scope.id)
+    || workspace.folders.some((item) => item.id === location.folderId && item.subjectId === scope.id);
+  if (scope.kind === 'folder') {
+    const topic = location.topicId ? workspace.topics.find((item) => item.id === location.topicId) : undefined;
+    return isFolderWithin(workspace, location.folderId ?? topic?.folderId, scope.id);
+  }
+  if (scope.kind === 'topic') return isTopicWithin(workspace, location.topicId, scope.id);
+  return false;
+}
+
 function scopeDocuments(workspace: StudyWorkspace, scope: StudyExportScope): StudyDocument[] {
   if (scope.kind === 'workspace') return workspace.documents;
   if (scope.kind === 'document') return workspace.documents.filter((document) => document.id === scope.id);
-  const ids = new Set(workspace.placements.filter((placement) => (
-    (scope.kind === 'course' && placement.courseId === scope.id) ||
-    (scope.kind === 'subject' && placement.subjectId === scope.id) ||
-    (scope.kind === 'topic' && placement.topicId === scope.id) ||
-    (scope.kind === 'folder' && placement.folderId === scope.id)
-  )).map((placement) => placement.documentId));
+  const ids = new Set(workspace.placements.filter((placement) => locationMatchesScope(workspace, placement, scope)).map((placement) => placement.documentId));
   return workspace.documents.filter((document) => ids.has(document.id));
 }
 
@@ -63,15 +137,22 @@ function portableRows(table: string): DbRow[] {
   return (getDb().prepare(`SELECT * FROM "${table}"`).all() as DbRow[]).map((row) => Object.fromEntries(Object.entries(row).filter(([, value]) => !Buffer.isBuffer(value))));
 }
 
-function documentPath(workspace: StudyWorkspace, document: StudyDocument): string {
-  const placement = workspace.placements.find((item) => item.documentId === document.id);
-  const parts = [
-    workspace.courses.find((item) => item.id === placement?.courseId)?.name,
-    workspace.subjects.find((item) => item.id === placement?.subjectId)?.name,
-    workspace.topics.find((item) => item.id === placement?.topicId)?.name,
-    workspace.folders.find((item) => item.id === placement?.folderId)?.name,
-  ].filter(Boolean).map((value) => slug(String(value)));
-  return ['documentos', ...parts, `${slug(document.title)}-${document.shortId}.md`].join('/');
+function fileName(row: DbRow, fallback: string): string {
+  const original = String(row.file_name ?? '').trim();
+  if (original) return slug(original);
+  const extension = String(row.extension ?? '').replace(/^\./, '').trim();
+  return `${slug(String(row.title ?? fallback))}${extension ? `.${slug(extension)}` : ''}`;
+}
+
+function addUniqueFile(zip: AdmZip, usedPaths: Set<string>, directory: string, name: string, bytes: Buffer): void {
+  const dot = name.lastIndexOf('.');
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : '';
+  let candidate = `${directory}/${name}`;
+  let copy = 2;
+  while (usedPaths.has(candidate)) candidate = `${directory}/${base}-${copy++}${extension}`;
+  usedPaths.add(candidate);
+  zip.addFile(candidate, bytes);
 }
 
 /** Read-only local-sharing package: human-readable Markdown keeps the academic
@@ -82,28 +163,33 @@ export function buildStudyBundle(scope: StudyExportScope): Buffer {
   const documents = scopeDocuments(workspace, scope);
   const documentIds = new Set(documents.map((document) => document.id));
   const zip = new AdmZip();
-  for (const document of documents) zip.addFile(documentPath(workspace, document), Buffer.from(`${document.contentMarkdown}\n`, 'utf8'));
+  const usedPaths = new Set<string>();
+  for (const document of documents) {
+    const placements = workspace.placements.filter((item) => item.documentId === document.id && locationMatchesScope(workspace, item, scope));
+    for (const placement of placements.length ? placements : [{}]) {
+      addUniqueFile(zip, usedPaths, hierarchyDirectory(workspace, placement), `${slug(document.title)}-${document.shortId}.md`, Buffer.from(`${document.contentMarkdown}\n`, 'utf8'));
+    }
+  }
 
-  const matchesDirectScope = (row: DbRow): boolean => scope.kind === 'workspace' || (scope.id != null && (
-    (scope.kind === 'course' && String(row.course_id ?? '') === scope.id) ||
-    (scope.kind === 'subject' && String(row.subject_id ?? '') === scope.id) ||
-    (scope.kind === 'topic' && String(row.topic_id ?? '') === scope.id) ||
-    (scope.kind === 'folder' && String(row.folder_id ?? '') === scope.id) ||
-    (scope.kind === 'document' && String(row.document_id ?? '') === scope.id)
-  ));
+  const matchesDirectScope = (row: DbRow): boolean => scope.kind === 'document'
+    ? String(row.document_id ?? '') === scope.id
+    : locationMatchesScope(workspace, { courseId: String(row.course_id ?? '') || null, subjectId: String(row.subject_id ?? '') || null, topicId: String(row.topic_id ?? '') || null, folderId: String(row.folder_id ?? '') || null }, scope);
   const materialRows = portableRows('study_materials');
   const materialPlacements = portableRows('study_material_placements');
   const materialIds = new Set(materialPlacements.filter((row) => documentIds.has(String(row.document_id ?? '')) || matchesDirectScope(row)).map((row) => String(row.material_id)));
   const selectedMaterials = materialRows.filter((row) => scope.kind === 'workspace' || materialIds.has(String(row.id)));
   for (const material of selectedMaterials) {
     const blob = getDb().prepare('SELECT content_blob FROM study_materials WHERE id = ?').get(material.id) as { content_blob: Buffer | null } | undefined;
-    if (blob?.content_blob) zip.addFile(`recursos/materiales/${slug(String(material.file_name ?? material.title ?? material.id))}`, blob.content_blob);
+    if (blob?.content_blob) {
+      const placements = materialPlacements.filter((row) => String(row.material_id) === String(material.id) && matchesDirectScope(row));
+      for (const placement of placements.length ? placements : [{}]) addUniqueFile(zip, usedPaths, hierarchyDirectory(workspace, { courseId: String(placement.course_id ?? '') || null, subjectId: String(placement.subject_id ?? '') || null, topicId: String(placement.topic_id ?? '') || null, folderId: String(placement.folder_id ?? '') || null }), fileName(material, String(material.id)), blob.content_blob);
+    }
   }
   const recordingRows = portableRows('study_recordings').filter((row) => documentIds.has(String(row.document_id ?? '')) || matchesDirectScope(row));
   const recordingIds = new Set(recordingRows.map((row) => String(row.id)));
   for (const recording of recordingRows) {
     const blob = getDb().prepare('SELECT audio_blob FROM study_recordings WHERE id = ?').get(recording.id) as { audio_blob: Buffer | null } | undefined;
-    if (blob?.audio_blob) zip.addFile(`recursos/grabaciones/${slug(String(recording.file_name ?? recording.title ?? recording.id))}`, blob.audio_blob);
+    if (blob?.audio_blob) addUniqueFile(zip, usedPaths, hierarchyDirectory(workspace, { courseId: String(recording.course_id ?? '') || null, subjectId: String(recording.subject_id ?? '') || null, topicId: String(recording.topic_id ?? '') || null }), fileName(recording, String(recording.id)), blob.audio_blob);
   }
 
   const transcripts = portableRows('study_transcripts').filter((row) => recordingIds.has(String(row.recording_id)));
@@ -116,6 +202,19 @@ export function buildStudyBundle(scope: StudyExportScope): Buffer {
   const assessmentIdsFromQuestions = new Set(allAssessmentItems.filter((row) => questionIds.has(String(row.question_id))).map((row) => String(row.assessment_id)));
   const assessments = portableRows('study_assessments').filter((row) => matchesDirectScope(row) || assessmentIdsFromQuestions.has(String(row.id)));
   const assessmentIds = new Set(assessments.map((row) => String(row.id)));
+  const subjectIds = new Set(scope.kind === 'workspace' ? workspace.subjects.map((subject) => subject.id)
+    : scope.kind === 'course' ? workspace.subjects.filter((subject) => subject.courseId === scope.id).map((subject) => subject.id)
+    : scope.kind === 'subject' && scope.id ? [scope.id]
+    : scope.kind === 'topic' ? workspace.topics.filter((topic) => topic.id === scope.id).map((topic) => topic.subjectId)
+    : scope.kind === 'folder' ? workspace.folders.filter((folder) => folder.id === scope.id && folder.subjectId).map((folder) => String(folder.subjectId))
+    : scope.kind === 'document' ? workspace.placements.filter((placement) => placement.documentId === scope.id && placement.subjectId).map((placement) => String(placement.subjectId)) : []);
+  const scopedStudyIdeas = portableRows('study_ideas').filter((row) => subjectIds.has(String(row.subject_id)));
+  const scopedStudyIdeaIds = new Set(scopedStudyIdeas.map((row) => String(row.id)));
+  const studyIdeaOccurrences = portableRows('study_idea_occurrences').filter((row) => scopedStudyIdeaIds.has(String(row.idea_id))
+    && (scope.kind === 'workspace' || (String(row.source_kind) === 'material' ? materialIds.has(String(row.source_id)) : documentIds.has(String(row.source_id)))));
+  const studyIdeaIds = new Set(studyIdeaOccurrences.map((row) => String(row.idea_id)));
+  const studyIdeas = scopedStudyIdeas.filter((row) => studyIdeaIds.has(String(row.id)));
+  const studyOccurrenceIds = new Set(studyIdeaOccurrences.map((row) => String(row.id)));
   const data = {
     documents, placements: workspace.placements.filter((placement) => documentIds.has(placement.documentId)),
     materials: selectedMaterials, materialPlacements: materialPlacements.filter((row) => materialIds.has(String(row.material_id))),
@@ -126,16 +225,22 @@ export function buildStudyBundle(scope: StudyExportScope): Buffer {
     assessments, assessmentItems: allAssessmentItems.filter((row) => assessmentIds.has(String(row.assessment_id))),
     rubrics: portableRows('study_rubrics').filter((row) => scope.kind === 'workspace' || assessments.some((assessment) => String(assessment.rubric_id ?? '') === String(row.id))),
     flashcards: portableRows('study_flashcards').filter((row) => scope.kind === 'workspace' || questionIds.has(String(row.question_id ?? '')) || documentIds.has(String(row.document_id ?? '')) || matchesDirectScope(row)),
+    ideas: studyIdeas,
+    ideaOccurrences: studyIdeaOccurrences,
+    ideaEvidence: portableRows('study_idea_evidence').filter((row) => studyOccurrenceIds.has(String(row.occurrence_id))),
+    ideaEdges: portableRows('study_idea_edges').filter((row) => studyIdeaIds.has(String(row.from_id)) && studyIdeaIds.has(String(row.to_id))),
+    knowledgeJobs: portableRows('study_knowledge_jobs').filter((row) => subjectIds.has(String(row.subject_id))
+      && (scope.kind === 'workspace' || (String(row.source_kind) === 'material' ? materialIds.has(String(row.source_id)) : documentIds.has(String(row.source_id))))),
   };
-  const manifest = { format: 'nodus-study-readonly', formatVersion: 1, exportedAt: new Date().toISOString(), readOnly: true, scope, title: scopeTitle(workspace, scope), documentCount: documents.length, materialCount: selectedMaterials.length, recordingCount: recordingRows.length };
-  zip.addFile('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)));
-  zip.addFile('datos/estudio.json', Buffer.from(JSON.stringify(data, null, 2)));
-  zip.addFile('LEEME.txt', Buffer.from('Paquete local de solo lectura exportado por Nodus. Los apuntes están en documentos/ y los ficheros originales en recursos/.\n'));
+  const manifest = { format: 'nodus-study-readonly', formatVersion: 1, exportedAt: new Date().toISOString(), readOnly: true, scope, title: scopeTitle(workspace, scope), documentCount: documents.length, materialCount: selectedMaterials.length, recordingCount: recordingRows.length, ideaCount: studyIdeas.length };
+  zip.addFile('_Nodus/manifest.json', Buffer.from(JSON.stringify(manifest, null, 2)));
+  zip.addFile('_Nodus/estudio.json', Buffer.from(JSON.stringify(data, null, 2)));
+  zip.addFile('LEEME.txt', Buffer.from('Exportación de Nodus organizada por cursos, asignaturas, carpetas y temas. La carpeta _Nodus contiene datos de referencia para conservar el contexto de la exportación.\n'));
   return zip.toBuffer();
 }
 
 function extension(format: StudyExportFormat): string {
-  return format === 'markdown' ? 'md' : format === 'bundle' ? 'nodusstudy' : format;
+  return format === 'markdown' ? 'md' : format === 'bundle' ? 'zip' : format;
 }
 
 export async function exportStudyScope(scope: StudyExportScope, format: StudyExportFormat): Promise<{ path: string } | null> {
@@ -143,7 +248,7 @@ export async function exportStudyScope(scope: StudyExportScope, format: StudyExp
   const ext = extension(format);
   const picked = await dialog.showSaveDialog({
     title: 'Exportar estudio', defaultPath: path.join(app.getPath('documents'), `${slug(built.title)}.${ext}`),
-    filters: [{ name: format === 'bundle' ? 'Paquete de estudio Nodus' : format.toUpperCase(), extensions: [ext] }],
+    filters: [{ name: format === 'bundle' ? 'Archivo ZIP' : format.toUpperCase(), extensions: [ext] }],
   });
   if (picked.canceled || !picked.filePath) return null;
   let bytes: Buffer | string;

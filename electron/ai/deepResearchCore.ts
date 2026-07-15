@@ -30,22 +30,33 @@ const MAX_TARGET_PAGES = 20;
  * A section aims for roughly this many words. Deliberately high so a report is a few
  * long, well-developed sections rather than many thin ones — depth over fragmentation.
  */
-const SECTION_TARGET_WORDS = 1000;
+const SECTION_TARGET_WORDS = 1400;
 /** Never fewer than this many sections (intro · body · synthesis at the very least). */
 export const MIN_SECTIONS = 3;
 /** Absolute safety ceiling on total sections (planned + coverage top-ups) — stops runaway loops. */
 export const MAX_SECTIONS = 14;
 /** The heuristic never *targets* more than this many sections before the +1 grace. */
-const MAX_PLAN_SECTIONS = 10;
+const MAX_PLAN_SECTIONS = 7;
 /** A numeric user cap is allowed to be exceeded by at most this many sections. */
 const SECTION_GRACE = 1;
 /** Coverage top-up may add at most this many extra sections beyond the plan. */
 const MAX_TOPUP_SECTIONS = 2;
 /** Per-section word budget is clamped to this window (min, max). Upper end allows deep sections. */
-const SECTION_WORDS_RANGE = { min: 500, max: 1500 } as const;
+const SECTION_WORDS_RANGE = { min: 800, max: 1800 } as const;
 /** Trim the material pool handed to the planner so the prompt stays within limits. */
 export const POOL_LIMITS = { ideas: 70, themes: 20, gaps: 20, contradictions: 16, works: 40, passages: 20 } as const;
 const MAX_MATRIX_ROWS = 80;
+
+/** Shared prose contract for every Deep Research writer, including genealogy and
+ * MCP-client mode. These are writing constraints, not a locale-specific UI copy. */
+export const DEEP_RESEARCH_NARRATIVE_RULES = [
+  'Prioriza una narración argumental continua, bien hilada y razonada. Cada párrafo debe avanzar desde el anterior mediante transiciones naturales.',
+  'Usa pocos epígrafes amplios. Dentro de cada sección no añadas subtítulos, microsecciones, rótulos temáticos ni encabezados adicionales.',
+  'No conviertas cada idea, fuente, autor, periodo o matiz en una sección independiente. Intégralos dentro de una misma línea argumental cuando formen parte del mismo movimiento del razonamiento.',
+  'Evita los dos puntos, el punto y coma y el guion largo. Úsalos únicamente cuando sean estrictamente necesarios, por ejemplo dentro de una cita literal o una referencia que deba conservarse.',
+  'Prefiere frases completas enlazadas con puntos, comas y conectores discursivos. Evita párrafos que comiencen con etiquetas como «Contexto:», «Evidencia:» o «Conclusión:».',
+  'No uses listas salvo que la información no pueda expresarse con claridad como prosa continua.',
+] as const;
 
 export interface DeepResearchPlanSection {
   id: string;
@@ -201,7 +212,11 @@ export async function orchestrateDeepResearch(
   let totalWords = 0;
   let stoppedReason: string | null = null;
 
-  const runSection = async (section: DeepResearchPlanSection, isConclusion: boolean): Promise<void> => {
+  const runSection = async (
+    section: DeepResearchPlanSection,
+    isConclusion: boolean,
+    mergeIntoIndex: number | null = null
+  ): Promise<void> => {
     // Spread the page budget across the planned sections → fewer sections means each
     // one gets a bigger, deeper word target (clamped so it stays writable in one pass).
     const targetWords = clamp(
@@ -232,8 +247,14 @@ export async function orchestrateDeepResearch(
       }
     }
 
-    const { markdown, cited } = applyCitationPolicy(ensureHeading(raw, section.title), maps);
-    written.push({ section, markdown });
+    const { markdown, cited } = applyCitationPolicy(normalizeNarrativeSection(raw, section.title), maps);
+    if (mergeIntoIndex != null && written[mergeIntoIndex]) {
+      const existing = written[mergeIntoIndex];
+      existing.markdown = `${existing.markdown.trim()}\n\n${stripInitialHeading(markdown)}`.trim();
+      existing.section = mergePlanSections(existing.section, section);
+    } else {
+      written.push({ section, markdown });
+    }
     for (const id of cited.ideas) {
       citedIds.ideas.add(id);
       coveredIdeaIds.add(id);
@@ -279,7 +300,10 @@ export async function orchestrateDeepResearch(
       wordsSoFar: totalWords,
       pagesSoFar: pagesFromWords(totalWords),
     });
-    await runSection(coverageSection(topups, uncovered), false);
+    // Expand the last body section instead of creating a new "development
+    // complement" epigraph. Coverage grows the argument, not the outline.
+    const mergeIntoIndex = Math.max(0, written.length - (written.length > 1 ? 2 : 1));
+    await runSection(coverageSection(topups, uncovered), false, mergeIntoIndex);
   }
 
   emit({
@@ -470,7 +494,9 @@ async function planWithFallback(
   const input = buildPlanInput(request, language, snapshot, sectionPlan, targetPages);
   let plan: DeepResearchPlan | null = null;
   try {
-    plan = normalizePlan(await deps.planReport(input), snapshot, sectionPlan.hardCap);
+    // The grace slot is reserved for a genuine coverage expansion. A planner
+    // cannot spend it merely by returning one more short heading.
+    plan = normalizePlan(await deps.planReport(input), snapshot, sectionPlan.target);
   } catch {
     plan = null;
   }
@@ -617,6 +643,44 @@ function coverageSection(index: number, uncovered: WritingWorkshopIdeaCandidate[
     contradictionIds: [],
     passageIds: [],
   };
+}
+
+function mergePlanSections(a: DeepResearchPlanSection, b: DeepResearchPlanSection): DeepResearchPlanSection {
+  const unique = (values: string[]) => [...new Set(values)];
+  return {
+    ...a,
+    purpose: [a.purpose, b.purpose].filter(Boolean).join(' '),
+    keyClaims: unique([...a.keyClaims, ...b.keyClaims]).slice(0, 8),
+    ideaIds: unique([...a.ideaIds, ...b.ideaIds]),
+    workIds: unique([...a.workIds, ...b.workIds]),
+    gapIds: unique([...a.gapIds, ...b.gapIds]),
+    contradictionIds: unique([...a.contradictionIds, ...b.contradictionIds]),
+    passageIds: unique([...a.passageIds, ...b.passageIds]),
+  };
+}
+
+/** Enforce one visible epigraph per generated section. Models occasionally add
+ * several `###` headings despite the prompt, producing artificial fragmentation.
+ * Their labels become ordinary prose leads while citations and paragraphs remain. */
+export function normalizeNarrativeSection(markdown: string, title: string): string {
+  const trimmed = (markdown ?? '').trim();
+  const withoutFirstHeading = trimmed.replace(/^#{1,6}\s+[^\n]+\n*/u, '');
+  const body = withoutFirstHeading
+    .replace(/\n{1,2}#{1,6}\s+([^\n]+)\n*/gu, (_match, label: string) => `\n\n${sentenceLead(label)} `)
+    .replace(/^\s*#{1,6}\s+([^\n]+)\n*/gmu, (_match, label: string) => `${sentenceLead(label)} `)
+    .replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gmu, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return `## ${title}\n\n${body}`.trim();
+}
+
+function stripInitialHeading(markdown: string): string {
+  return markdown.replace(/^#{1,6}\s+[^\n]+\n*/u, '').trim();
+}
+
+function sentenceLead(label: string): string {
+  const clean = label.trim().replace(/[.:;—-]+$/u, '');
+  return clean ? `${clean}.` : '';
 }
 
 /** Deterministic, source-anchored prose used when the model fails twice on a section. */
@@ -953,12 +1017,6 @@ function summarizePrior(written: { section: DeepResearchPlanSection; markdown: s
   return written
     .map((w, i) => `${i + 1}. ${w.section.title}: ${clip(firstSentence(stripMarkdown(w.markdown)), 160)}`)
     .join('\n');
-}
-
-function ensureHeading(markdown: string, title: string): string {
-  const trimmed = (markdown ?? '').trim();
-  if (/^#{1,3}\s/.test(trimmed)) return trimmed;
-  return `## ${title}\n\n${trimmed}`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

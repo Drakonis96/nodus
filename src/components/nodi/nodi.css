@@ -85,6 +85,22 @@
 .nodi-svg[data-state="waving"] .arm-r .thread { d: path("M168 150 C 190 120 206 90 214 68"); }
 .nodi-svg[data-state="waving"] .arm-r .hand { transform: translate(216px, 66px); }
 
+.nodi-svg[data-state="celebrating"] .eyes-open,
+.nodi-svg[data-state="celebrating"] .mouth-smile { display: none; }
+.nodi-svg[data-state="celebrating"] .eyes-happy,
+.nodi-svg[data-state="celebrating"] .mouth-open { display: inline; }
+.nodi-svg[data-state="celebrating"] .nodi-core { animation: nodi-celebration-jump .72s cubic-bezier(.2,.8,.3,1) infinite; }
+.nodi-svg[data-state="celebrating"] .arm-l .thread { d: path("M94 151 C 76 122 62 92 54 66"); }
+.nodi-svg[data-state="celebrating"] .arm-l .hand { transform: translate(53px, 64px); }
+.nodi-svg[data-state="celebrating"] .arm-r .thread { d: path("M166 151 C 184 122 198 92 206 66"); }
+.nodi-svg[data-state="celebrating"] .arm-r .hand { transform: translate(207px, 64px); }
+
+@keyframes nodi-celebration-jump {
+  0%, 100% { transform: translateY(4px) rotate(-2deg); }
+  45% { transform: translateY(-24px) rotate(2deg); }
+  62% { transform: translateY(-20px) rotate(0deg); }
+}
+
 .nodi-svg[data-state="loading"] .limbs { animation: nodi-spin 1.9s cubic-bezier(.6,.15,.4,.85) infinite; transform-box: view-box; transform-origin: 130px 140px; }
 .nodi-svg[data-state="loading"] .limb { animation: none; }
 .nodi-svg[data-state="loading"] .halo { animation: nodi-halo 1.4s ease-in-out infinite; }

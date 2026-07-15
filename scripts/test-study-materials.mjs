@@ -28,12 +28,19 @@ try {
   const shared = require(path.join(repoRoot, 'shared/studyMaterials.ts'));
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const materials = require(path.join(repoRoot, 'electron/db/studyMaterialsRepo.ts'));
+  const annotationExport = require(path.join(repoRoot, 'electron/export/studyMaterialAnnotations.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
-  assert.ok(SCHEMA_VERSION >= 57);
+  assert.ok(SCHEMA_VERSION >= 73);
   for (const table of ['study_materials', 'study_material_placements', 'study_material_annotations', 'study_material_fragment_links', 'study_material_versions']) {
     assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
+  }
+  for (const column of ['visual_description', 'visual_analysis_status', 'embedding', 'embedding_provider', 'embedding_model', 'embedding_dim', 'embedding_text_hash', 'index_status', 'index_error', 'indexed_at']) {
+    assert.ok(getDb().prepare('PRAGMA table_info(study_materials)').all().some((info) => info.name === column), `study_materials.${column} exists`);
+  }
+  for (const column of ['kind', 'rects_json', 'path_json', 'thickness']) {
+    assert.ok(getDb().prepare('PRAGMA table_info(study_material_annotations)').all().some((info) => info.name === column), `study_material_annotations.${column} exists`);
   }
   assert.equal(shared.studyMaterialPreviewKind('pdf'), 'pdf');
   assert.equal(shared.studyMaterialPreviewKind('mp3'), 'audio');
@@ -42,6 +49,7 @@ try {
 
   const course = org.createStudyCourse({ name: 'Curso materiales' });
   const subject = org.createStudySubject({ courseId: course.id, name: 'Asignatura materiales' });
+  const folder = org.createStudyFolder({ courseId: course.id, subjectId: subject.id, name: 'Carpeta fuentes' });
   const topic = org.createStudyTopic({ subjectId: subject.id, name: 'Tema fuentes' });
 
   const textPath = path.join(root, 'manual.txt');
@@ -63,10 +71,24 @@ try {
   assert.equal(first.material.previewKind, 'document');
   assert.equal(first.material.extractionStatus, 'ready');
   assert.ok(first.material.extractedChars > 20);
+  assert.equal(first.material.indexStatus, 'pending');
+  materials.setStudyMaterialEmbedding(first.material.id, [0.1, 0.2, 0.3], { provider: 'openai', model: 'embedding-test', textHash: 'hash-test' });
+  assert.equal(materials.getStudyMaterial(first.material.id).indexStatus, 'indexed');
+  assert.equal(materials.getStudyMaterial(first.material.id).embeddingDim, 3);
   const duplicate = await materials.importStudyMaterialFile(textPath, { courseId: course.id });
   assert.equal(duplicate.duplicate, true, 'same bytes dedupe by SHA-256');
   assert.equal(materials.getStudyMaterial(first.material.id).placements.length, 2, 'duplicate import adds a missing placement without copying the blob');
   assert.deepEqual(Buffer.from(materials.getStudyMaterialContent(first.material.id).bytes), fs.readFileSync(textPath));
+
+  const zoteroLibrary = { type: 'group', id: '42', name: 'Research team' };
+  const zoteroItem = { key: 'groups:42:ITEM', itemKey: 'ITEM', library: zoteroLibrary, version: 1, title: 'Shared Zotero source', creators: [{ firstName: 'Ada', lastName: 'Lovelace', creatorType: 'author' }], year: 2025, itemType: 'journalArticle', doi: null, abstract: null, tags: ['shared'], collections: ['groups:42:COLL'], publisher: null, publicationTitle: 'Journal', isbn: null, url: null };
+  const zoteroAttachment = { key: 'groups:42:ATT', itemKey: 'ATT', library: zoteroLibrary, title: 'PDF', contentType: 'application/pdf', linkMode: 'imported_file', filename: 'paper.pdf', available: true };
+  const linked = materials.linkStudyMaterialFromZotero(zoteroLibrary, zoteroItem, zoteroAttachment, { courseId: course.id });
+  assert.equal(linked.material.origin, 'zotero_link');
+  assert.equal(linked.material.zoteroLibraryId, '42');
+  assert.equal(linked.material.zoteroItemKey, 'ITEM');
+  assert.equal(materials.linkStudyMaterialFromZotero(zoteroLibrary, zoteroItem, zoteroAttachment, { subjectId: subject.id }).duplicate, true, 'same Zotero target is linked once and gains another placement');
+  assert.equal(materials.getStudyMaterial(linked.material.id).bibliography.zoteroKey, 'groups:42:ITEM');
 
   const updated = materials.updateStudyMaterial(first.material.id, {
     readState: 'reviewed', favorite: true, metadata: { tags: ['manual', 'examen'], comments: ['Útil'] },
@@ -74,10 +96,27 @@ try {
   });
   assert.equal(updated.readState, 'reviewed');
   assert.equal(updated.favorite, true);
+  assert.equal(updated.indexStatus, 'pending', 'metadata changes invalidate the material embedding');
   assert.deepEqual(updated.metadata.tags, ['manual', 'examen']);
   assert.equal(updated.bibliography.citation, 'Autora (2026). Manual.');
   assert.equal(materials.listStudyMaterials({ search: 'concepto de prueba' })[0].id, first.material.id, 'extracted text is searchable');
   assert.equal(materials.listStudyMaterials({ readState: 'reviewed', favorite: true }).length, 1);
+  assert.equal(materials.listStudyMaterials()[0].placements.length, 2, 'global list exposes every placement for table columns');
+  materials.setPrimaryStudyMaterialPlacement(first.material.id, { courseId: course.id, subjectId: subject.id, folderId: folder.id });
+  assert.deepEqual(materials.listStudyMaterials()[0].placements.map((placement) => placement.folderId), [folder.id], 'moving replaces the prior locations');
+  materials.addStudyMaterialPlacement(first.material.id, { courseId: course.id, subjectId: subject.id, topicId: topic.id });
+  assert.equal(materials.listStudyMaterials()[0].placements.length, 2, 'duplicating a location keeps the same material in both destinations');
+  const removablePlacement = materials.listStudyMaterials()[0].placements.find((placement) => placement.folderId === folder.id && !placement.topicId);
+  assert.ok(removablePlacement, 'the folder-only placement can be selected for removal');
+  materials.removeStudyMaterialPlacement(first.material.id, removablePlacement.id);
+  assert.equal(materials.listStudyMaterials()[0].placements.some((placement) => placement.id === removablePlacement.id), false, 'a single material placement can be removed');
+  materials.addStudyMaterialPlacement(first.material.id, { courseId: course.id, subjectId: subject.id, folderId: folder.id });
+  const destinationCourse = org.createStudyCourse({ name: 'Curso de destino' });
+  const destinationSubject = org.createStudySubject({ courseId: destinationCourse.id, name: 'Asignatura de destino' });
+  org.moveStudyEntity('topic', topic.id, { subjectId: destinationSubject.id });
+  const movedMaterialPlacement = materials.listStudyMaterials()[0].placements.find((placement) => placement.topicId === topic.id);
+  assert.equal(movedMaterialPlacement.courseId, destinationCourse.id, 'moving a topic updates linked material course locations');
+  assert.equal(movedMaterialPlacement.subjectId, destinationSubject.id, 'moving a topic updates linked material subject locations');
 
   await materials.replaceStudyMaterialFile(first.material.id, replacementPath);
   let detail = materials.getStudyMaterial(first.material.id);
@@ -90,17 +129,38 @@ try {
   assert.ok(detail.versions.length >= 2, 'restoring also preserves the replaced version');
 
   const annotation = materials.createStudyMaterialAnnotation(first.material.id, {
-    pageNumber: 1, rect: { x: 0.1, y: 0.2, width: 0.4, height: 0.03 }, selectedText: 'concepto de prueba', note: 'Convertir en apunte',
+    kind: 'highlight', pageNumber: 1, rect: { x: 0.1, y: 0.2, width: 0.4, height: 0.03 }, rects: [{ x: 0.1, y: 0.2, width: 0.4, height: 0.03 }], selectedText: 'concepto de prueba', note: 'Convertir en apunte', thickness: 5,
   });
   assert.equal(annotation.pageNumber, 1);
+  assert.equal(annotation.kind, 'highlight');
+  assert.equal(annotation.rects.length, 1);
+  assert.equal(annotation.thickness, 5);
   assert.equal(materials.updateStudyMaterialAnnotation(annotation.id, { color: '#00ff00' }).color, '#00ff00');
+  const brush = materials.createStudyMaterialAnnotation(first.material.id, { kind: 'brush', path: [{ x: .1, y: .1 }, { x: .2, y: .2 }], color: '#2563eb', thickness: 7 });
+  assert.deepEqual(brush.path, [{ x: .1, y: .1 }, { x: .2, y: .2 }]);
   const note = materials.createStudyNoteFromMaterial(first.material.id, annotation.id, 'Nota enlazada');
   const noteDoc = org.getStudyWorkspace().documents.find((document) => document.id === note.documentId);
   assert.ok(noteDoc);
   assert.match(noteDoc.contentMarkdown, /nodus:\/\/study\/material/);
   assert.match(noteDoc.contentMarkdown, /concepto de prueba/);
   assert.equal(materials.getStudyMaterial(first.material.id).fragmentLinks[0].documentId, note.documentId, 'fragment-to-note provenance is durable');
+
+  const { PDFDocument } = require('pdf-lib');
+  const sourcePdf = await PDFDocument.create(); sourcePdf.addPage([400, 500]);
+  const sourcePdfBytes = await sourcePdf.save();
+  const exportedPdf = await annotationExport.annotatedPdfBytes({ bytes: sourcePdfBytes, mimeType: 'application/pdf', fileName: 'manual.pdf' }, materials.getStudyMaterial(first.material.id));
+  const checkedPdf = await PDFDocument.load(exportedPdf);
+  assert.ok(checkedPdf.getPageCount() >= 2, 'portable PDF export flattens marks and appends comment notes');
+
+  const epubZip = new AdmZip();
+  epubZip.addFile('META-INF/container.xml', Buffer.from('<?xml version="1.0"?><container><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>'));
+  epubZip.addFile('OEBPS/content.opf', Buffer.from('<?xml version="1.0"?><package><manifest></manifest><spine></spine></package>'));
+  const exportedEpub = annotationExport.annotatedEpubBytes({ bytes: epubZip.toBuffer(), mimeType: 'application/epub+zip', fileName: 'manual.epub' }, materials.getStudyMaterial(first.material.id));
+  const checkedEpub = new AdmZip(Buffer.from(exportedEpub));
+  assert.match(checkedEpub.readAsText('OEBPS/nodus-annotations.xhtml'), /Anotaciones de Nodus/);
+  assert.match(checkedEpub.readAsText('OEBPS/content.opf'), /nodus-annotations/);
   materials.deleteStudyMaterialAnnotation(annotation.id);
+  materials.deleteStudyMaterialAnnotation(brush.id);
   assert.equal(materials.getStudyMaterial(first.material.id).annotations.length, 0);
 
   const html = await materials.importStudyMaterialFile(htmlPath);

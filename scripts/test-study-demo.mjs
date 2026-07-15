@@ -26,16 +26,18 @@ try {
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const questions = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts'));
   const learning = require(path.join(repoRoot, 'electron/db/studyLearningRepo.ts'));
+  const knowledge = require(path.join(repoRoot, 'electron/db/studyKnowledgeRepo.ts'));
   const settings = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
 
   const active = vaults.getActiveVault();
   vaults.setVaultType(active.id, 'estudio');
-  assert.equal(demo.seedStudyDemoData(), true, 'an empty study vault accepts the sample workspace');
-  assert.equal(demo.seedStudyDemoData(), false, 'seeding is idempotent and never overlays existing data');
+  const userCourse = org.createStudyCourse({ name: 'Curso del usuario' });
+  assert.equal(demo.seedStudyDemoData(), true, 'a study vault can add the isolated sample workspace alongside user data');
+  assert.equal(demo.seedStudyDemoData(), false, 'seeding is idempotent and never duplicates the sample data');
 
   const workspace = org.getStudyWorkspace();
-  assert.equal(workspace.courses.length, 1);
+  assert.equal(workspace.courses.length, 2);
   assert.equal(workspace.subjects.length, 2);
   assert.equal(workspace.topics.length, 2);
   assert.equal(workspace.documents.length, 2);
@@ -45,12 +47,18 @@ try {
   assert.equal(learning.getStudyPlanner().plans.length, 1);
   assert.equal(learning.getStudyPlanner().blocks.length, 1);
   assert.equal(learning.getStudyProgressDashboard().dueCards, 1);
+  const cellIdeas = knowledge.listStudyIdeas('demo-study-subject-cell');
+  const ecologyIdeas = knowledge.listStudyIdeas('demo-study-subject-ecology');
+  assert.equal(cellIdeas.length, 4, 'sample cellular biology includes a useful placeholder idea map');
+  assert.equal(ecologyIdeas.length, 3, 'sample ecology includes a useful placeholder idea map');
+  assert.equal(knowledge.getStudyKnowledgeGraph('demo-study-subject-cell').edges.length, 3, 'cell placeholders include explicit conceptual connections');
+  assert.equal(knowledge.getStudyKnowledgeGraph('demo-study-subject-ecology').edges.length, 2, 'ecology placeholders include explicit conceptual connections');
+  assert.ok(knowledge.getStudyIdeaDetail(cellIdeas[0].id).evidence.length > 0, 'placeholder ideas remain grounded in sample notes');
   assert.equal(settings.getSettings().demoMode, true);
   assert.equal(generalDemo.hasAnyData(), true, 'study content participates in the global presence check');
   assert.deepEqual(getDb().pragma('foreign_key_check'), [], 'sample hierarchy satisfies every foreign key');
 
-  // A user-owned row added after the sample must survive demo cleanup.
-  const userCourse = org.createStudyCourse({ name: 'Curso del usuario' });
+  // A user-owned row present before the sample must survive demo cleanup.
   generalDemo.clearDemoData();
   const remaining = org.getStudyWorkspace({ includeArchived: true, includeDeleted: true });
   assert.deepEqual(remaining.courses.map((course) => course.id), [userCourse.id]);
@@ -58,6 +66,7 @@ try {
   assert.equal(questions.listStudyQuestions({ archived: true }).length, 0);
   assert.equal(learning.listStudyFlashcards({ includeArchived: true }).length, 0);
   assert.equal(learning.getStudyPlanner().plans.length, 0);
+  assert.equal(knowledge.listStudyIdeas('demo-study-subject-cell').length, 0, 'sample knowledge is removed with its subject');
   assert.equal(settings.getSettings().demoMode, false);
   assert.deepEqual(getDb().pragma('foreign_key_check'), []);
 

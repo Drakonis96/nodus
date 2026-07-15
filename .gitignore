@@ -22,6 +22,7 @@ release/
 
 # esbuild smoke-test bundles (generated at repo root)
 .smoke-*.mjs
+build/NodusDockTile.docktileplugin/
 
 # Local tooling / caches
 .claude/

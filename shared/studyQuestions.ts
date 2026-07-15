@@ -35,6 +35,7 @@ export interface StudyQuestion {
   tags: string[];
   courseId: string | null;
   subjectId: string | null;
+  folderId: string | null;
   topicId: string | null;
   documentId: string | null;
   materialId: string | null;
@@ -50,6 +51,11 @@ export interface StudyQuestion {
   incorrectCount: number;
   omittedCount: number;
   totalResponseMs: number;
+  lastResponse: string;
+  lastScore: number | null;
+  lastMaxScore: number | null;
+  lastFeedback: string;
+  lastAnsweredAt: string | null;
   position: number;
   archivedAt: string | null;
   createdAt: string;
@@ -70,6 +76,7 @@ export interface StudyQuestionInput {
   tags?: string[];
   courseId?: string | null;
   subjectId?: string | null;
+  folderId?: string | null;
   topicId?: string | null;
   documentId?: string | null;
   materialId?: string | null;
@@ -86,6 +93,7 @@ export interface StudyQuestionFilters {
   search?: string;
   courseId?: string;
   subjectId?: string;
+  folderId?: string;
   topicId?: string;
   type?: StudyQuestionType | 'all';
   difficulty?: Exclude<StudyQuestionDifficulty, 'mixed'> | 'all';
@@ -103,7 +111,10 @@ export interface StudyQuestionGenerationRequest {
   types: StudyQuestionType[];
   courseId?: string | null;
   subjectId?: string | null;
+  folderId?: string | null;
   topicId?: string | null;
+  optionCount?: number;
+  customPrompt?: string;
   selection?: string;
   weakConcepts?: string[];
   model?: ModelRef | null;
@@ -113,6 +124,8 @@ export interface StudyQuestionGenerationResult {
   questions: StudyQuestionInput[];
   rejectedDuplicates: number;
   sourceCount: number;
+  ideaCount?: number;
+  connectionCount?: number;
   model: ModelRef;
 }
 
@@ -164,9 +177,19 @@ export function validateStudyQuestionInput(input: StudyQuestionInput): string[] 
   if (input.prompt.trim().length < 8) errors.push('El enunciado debe tener al menos 8 caracteres.');
   if (!STUDY_QUESTION_TYPES.includes(input.type)) errors.push('Tipo de pregunta no válido.');
   if (['single_choice', 'multiple_choice'].includes(input.type)) {
-    if ((input.options?.length ?? 0) < 2) errors.push('Las preguntas de elección necesitan al menos dos opciones.');
-    if (!(input.options ?? []).some((option) => option.correct)) errors.push('Marca al menos una respuesta correcta.');
-    if (input.type === 'single_choice' && (input.options ?? []).filter((option) => option.correct).length !== 1) errors.push('La elección simple debe tener una sola respuesta correcta.');
+    const options = input.options ?? [];
+    const correctOptions = options.filter((option) => option.correct);
+    const normalizedOptionTexts = options.map((option) => normalize(option.text));
+    if (options.length < 2) errors.push('Las preguntas de elección necesitan al menos dos opciones.');
+    if (options.some((option) => !option.text.trim())) errors.push('Todas las opciones deben tener texto.');
+    if (new Set(normalizedOptionTexts.filter(Boolean)).size !== normalizedOptionTexts.length) errors.push('Las opciones no pueden estar vacías ni repetidas.');
+    if (!correctOptions.length) errors.push('Marca al menos una respuesta correcta.');
+    if (input.type === 'single_choice' && correctOptions.length !== 1) errors.push('La elección simple debe tener una sola respuesta correcta.');
+    const answerText = normalize(input.answer?.text ?? '');
+    const answerValue = input.answer?.value == null ? '' : String(input.answer.value);
+    const answerMatchesCorrectOption = correctOptions.some((option) =>
+      (answerText && normalize(option.text) === answerText) || (answerValue && option.id === answerValue));
+    if (correctOptions.length && !answerMatchesCorrectOption) errors.push('La respuesta correcta debe coincidir con una de las opciones marcadas.');
   }
   if (input.type === 'true_false' && typeof input.answer?.value !== 'boolean') errors.push('Verdadero/falso necesita una respuesta booleana.');
   if (!input.answer?.text?.trim() && input.answer?.value == null && !['ordering', 'matching'].includes(input.type)) errors.push('Añade una respuesta correcta o modelo.');
@@ -198,4 +221,51 @@ export function normalizeGeneratedStudyQuestions(value: unknown): StudyQuestionI
     };
     return validateStudyQuestionInput(question).length ? [] : [question];
   });
+}
+
+/** Parses the deliberately simple, portable question format used by the test
+ * generator. A block is accepted only when it has one `Q:`, exactly one `* `
+ * answer and the requested total number of answers. */
+export function parseStudyQuestionBlocks(text: string, optionCount: number): StudyQuestionInput[] {
+  const expected = Math.max(2, Math.min(10, Math.round(optionCount)));
+  const lines = text.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).filter(Boolean);
+  const blocks: string[][] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (/^Q\s*:/i.test(line)) {
+      if (current.length) blocks.push(current);
+      current = [line];
+    } else if (current.length && (/^\*\s+/.test(line) || /^-\s+/.test(line))) current.push(line);
+  }
+  if (current.length) blocks.push(current);
+  return blocks.flatMap((block) => {
+    const prompt = block[0].replace(/^Q\s*:\s*/i, '').replace(/:\s*$/, '').trim();
+    const correct = block.filter((line) => /^\*\s+/.test(line)).map((line) => line.replace(/^\*\s+/, '').trim());
+    const incorrect = block.filter((line) => /^-\s+/.test(line)).map((line) => line.replace(/^-\s+/, '').trim());
+    const answers = [...correct, ...incorrect];
+    if (prompt.length < 8 || correct.length !== 1 || answers.length !== expected || answers.some((answer) => !answer)) return [];
+    const options = answers.map((answer, index) => ({ id: `O${index + 1}`, text: answer, correct: index === 0 }));
+    return [{
+      prompt, type: 'single_choice' as const, difficulty: 'medium' as const, cognitiveLevel: 'understand' as const,
+      status: 'approved' as const, answer: { text: correct[0], value: options[0].id }, options,
+      explanation: 'Generada a partir del contenido indexado del vault.',
+      source: { title: 'Contenido indexado', excerpt: 'Pregunta generada a partir de las fuentes seleccionadas.' },
+    }];
+  });
+}
+
+/** Development-question format: one Q line followed by one model answer line. */
+export function parseStudyDevelopmentQuestionBlocks(text: string): StudyQuestionInput[] {
+  const lines = text.replace(/\r\n?/g, '\n').split('\n').map((line) => line.trim()).filter(Boolean);
+  const result: StudyQuestionInput[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^Q\s*:/i.test(lines[index])) continue;
+    const prompt = lines[index].replace(/^Q\s*:\s*/i, '').replace(/:\s*$/, '').trim();
+    const answerLine = lines[index + 1] ?? '';
+    if (prompt.length < 8 || !/^\*\s+/.test(answerLine)) continue;
+    const answer = answerLine.replace(/^\*\s+/, '').trim();
+    if (!answer) continue;
+    result.push({ prompt, type: 'essay', difficulty: 'medium', cognitiveLevel: 'understand', status: 'approved', answer: { text: answer }, options: [], explanation: answer, source: { title: 'Contenido indexado', excerpt: answer } });
+  }
+  return result;
 }

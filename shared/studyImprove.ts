@@ -115,6 +115,7 @@ export interface StudyProtectedText {
 
 export interface StudyImproveRequest {
   documentId: string;
+  subjectId?: string | null;
   text: string;
   styleId: string;
   scope: StudyImproveScope;

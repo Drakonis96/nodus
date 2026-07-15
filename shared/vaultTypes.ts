@@ -15,7 +15,15 @@
  * canonical nav list in src/navigation.ts.
  */
 
-export type VaultType = 'academic' | 'estudio' | 'primary_sources' | 'genealogy' | 'databases';
+export type VaultType =
+  | 'academic'
+  | 'estudio'
+  | 'primary_sources'
+  | 'genealogy'
+  | 'databases'
+  | 'testimonios'
+  | 'worldbuilding'
+  | 'docencia';
 
 /** Existing vaults (and anything unrecognised) resolve to this type. */
 export const DEFAULT_VAULT_TYPE: VaultType = 'academic';
@@ -68,7 +76,6 @@ export const VAULT_TYPES: VaultTypeDef[] = [
       'ideas',
       'authors',
       'graph',
-      'study',
       'immersion',
       'hypothesis',
       'reading',
@@ -88,8 +95,7 @@ Este vault reconstruye historia familiar a partir de fuentes primarias (censos, 
     id: 'estudio',
     available: true,
     // The dedicated study surfaces replace the research and authoring workspace in
-    // this mode. Keep the existing guided study route as a corpus-learning tool.
-    // Users can still opt universal sections back in from Settings.
+    // this mode. Users can still opt universal sections back in from Settings.
     defaultHiddenViews: [
       'search',
       'library',
@@ -118,9 +124,9 @@ Este vault se usa para APRENDER y ESTUDIAR, no para investigación original. Pri
     available: false,
     // A primary-source corpus mixes secondary literature (ideas/authors stay) with
     // archival records (persons/timeline/archive come in via scoping). Hide the
-    // argument-debate and study surfaces that don't fit source/record work; keep
+    // argument and debate surfaces that don't fit source/record work; keep
     // gaps/coverage/deep-research (reframed by the prompt pack).
-    defaultHiddenViews: ['argument', 'debate', 'study', 'immersion', 'hypothesis', 'reading'],
+    defaultHiddenViews: ['argument', 'debate', 'immersion', 'hypothesis', 'reading'],
     promptPack: `
 
 ═══ CONTEXTO DEL VAULT — MODO FUENTES PRIMARIAS ═══
@@ -141,7 +147,6 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
       'argument',
       'ideas',
       'authors',
-      'study',
       'immersion',
       'gaps',
       'debate',
@@ -157,7 +162,32 @@ Este vault trabaja con FUENTES PRIMARIAS y documentos de archivo (censos, padron
 ═══ CONTEXTO DEL VAULT — MODO BASES DE DATOS ═══
 Este vault es un gestor de bases de datos estructuradas (tablas con columnas tipadas: texto, número, fecha, selección, adjuntos, etc.). Tu tarea es ayudar a ANALIZAR, RESUMIR, CLASIFICAR y CONSULTAR datos tabulares. Sé riguroso con números y categorías: no inventes valores, filas ni columnas que no estén en los datos; cuando falte un dato o el conjunto no permita responder, dilo. Cuando produzcas análisis o gráficos, básate únicamente en los datos proporcionados y explica de forma reproducible qué cálculo o criterio has aplicado (para qué columnas, con qué filtro), de modo que el usuario pueda verificarlo.`,
   },
+  {
+    id: 'testimonios',
+    available: false,
+    defaultHiddenViews: [],
+    promptPack: '',
+  },
+  {
+    id: 'worldbuilding',
+    available: true,
+    defaultHiddenViews: [],
+    promptPack: '',
+  },
+  {
+    id: 'docencia',
+    available: true,
+    defaultHiddenViews: [],
+    promptPack: '',
+  },
 ];
+
+/** Selectable shells whose product sections are visible but intentionally inert. */
+export const PREVIEW_VAULT_TYPES: VaultType[] = ['docencia', 'worldbuilding'];
+
+export function isPreviewVaultType(value: unknown): boolean {
+  return PREVIEW_VAULT_TYPES.includes(normalizeVaultType(value));
+}
 
 /**
  * Views that exist ONLY for specific vault types. A view listed here shows only
@@ -182,19 +212,19 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   dbSearch: ['databases'],
   dbAnalysis: ['databases'],
   dbChat: ['databases'],
-  // Study mode owns its academic organisation, materials, assessment and
-  // planning surfaces. They must never leak into research/records/database vaults.
+  // Study mode owns its academic organisation, materials and question bank.
+  // They must never leak into research/records/database vaults.
   studyCourses: ['estudio'],
+  studySchedule: ['estudio'],
+  studyCalendar: ['estudio'],
   studySearch: ['estudio'],
   studyLibrary: ['estudio'],
   studyRecordings: ['estudio'],
-  studyQuestions: ['estudio'],
-  studyTests: ['estudio'],
-  studyExams: ['estudio'],
-  studyPlanner: ['estudio'],
-  studyReview: ['estudio'],
-  studyProgress: ['estudio'],
   studyChat: ['estudio'],
+  studyIdeas: ['estudio'],
+  studyGraph: ['estudio'],
+  studyQuestions: ['estudio'],
+  studyReview: ['estudio'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));
@@ -251,6 +281,7 @@ export function effectiveSidebarHidden(userHidden: string[], customized: boolean
 
 /** Whether a view may appear for the given vault type (universal views always may). */
 export function isViewAllowedForVaultType(viewId: string, type: unknown): boolean {
+  if (isPreviewVaultType(type)) return viewId === 'home';
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];
   return allowed ? allowed.includes(normalizeVaultType(type)) : true;
 }

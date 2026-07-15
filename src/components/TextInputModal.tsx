@@ -6,6 +6,7 @@ export function TextInputModal({
   title,
   label,
   placeholder,
+  initialValue = '',
   submitLabel,
   multiline = false,
   testId,
@@ -15,13 +16,14 @@ export function TextInputModal({
   title: string;
   label?: string;
   placeholder?: string;
+  initialValue?: string;
   submitLabel?: string;
   multiline?: boolean;
   testId?: string;
   onSubmit: (value: string) => Promise<void> | void;
   onCancel: () => void;
 }) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(initialValue);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

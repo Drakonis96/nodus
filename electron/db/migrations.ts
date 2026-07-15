@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 63;
+export const SCHEMA_VERSION = 78;
 
 export const migrations: Migration[] = [
   {
@@ -2385,6 +2385,314 @@ export const migrations: Migration[] = [
         fallback_used INTEGER NOT NULL DEFAULT 0, error TEXT, started_at TEXT NOT NULL, finished_at TEXT NOT NULL
       );
       CREATE INDEX idx_study_ai_usage_month ON study_ai_usage(started_at, task, status);
+    `,
+  },
+  {
+    version: 64,
+    up: /* sql */ `
+      -- Study organization browser: topics may live directly in a subject or
+      -- inside one of that subject's folders.
+      ALTER TABLE study_topics ADD COLUMN folder_id TEXT REFERENCES study_folders(id) ON DELETE SET NULL;
+      CREATE INDEX idx_study_topics_folder ON study_topics(folder_id, parent_id, position);
+    `,
+  },
+  {
+    version: 65,
+    up: /* sql */ `
+      -- Rich visual metadata for the study organization browser. Images are
+      -- stored as local data URLs so they remain part of the vault and work
+      -- without an external file path.
+      ALTER TABLE study_courses ADD COLUMN emoji TEXT;
+      ALTER TABLE study_courses ADD COLUMN image_data TEXT;
+      ALTER TABLE study_courses ADD COLUMN year INTEGER;
+      ALTER TABLE study_subjects ADD COLUMN emoji TEXT;
+      ALTER TABLE study_subjects ADD COLUMN image_data TEXT;
+      ALTER TABLE study_subjects ADD COLUMN year INTEGER;
+      ALTER TABLE study_topics ADD COLUMN emoji TEXT;
+      ALTER TABLE study_topics ADD COLUMN image_data TEXT;
+      ALTER TABLE study_topics ADD COLUMN year INTEGER;
+      ALTER TABLE study_folders ADD COLUMN emoji TEXT;
+      ALTER TABLE study_folders ADD COLUMN image_data TEXT;
+      ALTER TABLE study_folders ADD COLUMN year INTEGER;
+      ALTER TABLE study_docs ADD COLUMN emoji TEXT;
+      ALTER TABLE study_docs ADD COLUMN image_data TEXT;
+      ALTER TABLE study_docs ADD COLUMN year INTEGER;
+    `,
+  },
+  {
+    version: 66,
+    up: /* sql */ `
+      -- Semantic material index. The visual description is persisted separately so
+      -- image analysis remains inspectable and can be re-embedded without another
+      -- multimodal request when the embedding model changes.
+      ALTER TABLE study_materials ADD COLUMN visual_description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_status TEXT NOT NULL DEFAULT 'not_applicable';
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_provider TEXT;
+      ALTER TABLE study_materials ADD COLUMN visual_analysis_model TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding BLOB;
+      ALTER TABLE study_materials ADD COLUMN embedding_provider TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding_model TEXT;
+      ALTER TABLE study_materials ADD COLUMN embedding_dim INTEGER;
+      ALTER TABLE study_materials ADD COLUMN embedding_text_hash TEXT;
+      ALTER TABLE study_materials ADD COLUMN index_status TEXT NOT NULL DEFAULT 'pending';
+      ALTER TABLE study_materials ADD COLUMN index_error TEXT;
+      ALTER TABLE study_materials ADD COLUMN indexed_at TEXT;
+      CREATE INDEX idx_study_materials_index_status ON study_materials(index_status, deleted_at, archived_at);
+    `,
+  },
+  {
+    version: 67,
+    up: /* sql */ `
+      -- Keep generated questions attached to the complete study hierarchy.
+      ALTER TABLE study_questions ADD COLUMN folder_id TEXT REFERENCES study_folders(id) ON DELETE SET NULL;
+      CREATE INDEX idx_study_questions_folder ON study_questions(folder_id, created_at DESC);
+    `,
+  },
+  {
+    version: 68,
+    up: /* sql */ `
+      -- Translation jobs become visible and recoverable as soon as they start.
+      ALTER TABLE content_translations ADD COLUMN status TEXT NOT NULL DEFAULT 'ready';
+      ALTER TABLE content_translations ADD COLUMN error TEXT;
+      CREATE INDEX idx_content_translations_status ON content_translations(entity_kind, entity_id, status, updated_at DESC);
+    `,
+  },
+  {
+    version: 69,
+    up: /* sql */ `
+      -- Surface the learner's latest written answer and AI evaluation in the bank.
+      ALTER TABLE study_questions ADD COLUMN last_response TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_questions ADD COLUMN last_score REAL;
+      ALTER TABLE study_questions ADD COLUMN last_max_score REAL;
+      ALTER TABLE study_questions ADD COLUMN last_feedback TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_questions ADD COLUMN last_answered_at TEXT;
+    `,
+  },
+  {
+    version: 70,
+    up: /* sql */ `
+      -- Editable weekly timetable for the study organization workspace.
+      CREATE TABLE study_schedule_periods (
+        id TEXT PRIMARY KEY,
+        section TEXT NOT NULL CHECK(section IN ('morning', 'afternoon')),
+        label TEXT NOT NULL DEFAULT '',
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE TABLE study_schedule_cells (
+        day TEXT NOT NULL CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
+        period_id TEXT NOT NULL REFERENCES study_schedule_periods(id) ON DELETE CASCADE,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        PRIMARY KEY(day, period_id)
+      );
+      CREATE TABLE study_schedule_day_styles (
+        day TEXT PRIMARY KEY CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
+        color TEXT
+      );
+      CREATE INDEX idx_study_schedule_cells_subject ON study_schedule_cells(subject_id);
+    `,
+  },
+  {
+    version: 71,
+    up: /* sql */ `
+      -- Remove objective questions left unusable by the former permissive validator.
+      -- They are soft-deleted so a backup can still recover the original row.
+      UPDATE study_questions
+      SET deleted_at = COALESCE(deleted_at, datetime('now')),
+          updated_at = datetime('now')
+      WHERE deleted_at IS NULL
+        AND question_type IN ('single_choice', 'multiple_choice')
+        AND (
+          json_valid(options_json) = 0
+          OR json_array_length(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) < 2
+          OR EXISTS (
+            SELECT 1 FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+            WHERE trim(COALESCE(json_extract(
+              CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+              '$[' || option.key || '].text'
+            ), '')) = ''
+          )
+          OR NOT EXISTS (
+            SELECT 1 FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+            WHERE json_extract(
+              CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+              '$[' || option.key || '].correct'
+            ) = 1
+          )
+          OR (
+            question_type = 'single_choice'
+            AND (SELECT COUNT(*)
+              FROM json_each(CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END) AS option
+              WHERE json_extract(
+                CASE WHEN json_valid(options_json) THEN options_json ELSE '[]' END,
+                '$[' || option.key || '].correct'
+              ) = 1
+            ) <> 1
+          )
+        );
+    `,
+  },
+  {
+    version: 72,
+    up: /* sql */ `
+      -- Subject-scoped knowledge graph for study vaults. Sources remain polymorphic
+      -- so imported materials and editable study notes use the same pipeline.
+      CREATE TABLE study_ideas (
+        id                  TEXT PRIMARY KEY,
+        subject_id          TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        type                TEXT NOT NULL,
+        label               TEXT NOT NULL,
+        normalized_label    TEXT NOT NULL,
+        statement           TEXT NOT NULL,
+        embedding           BLOB,
+        embedding_provider  TEXT,
+        embedding_model     TEXT,
+        embedding_dim       INTEGER,
+        embedding_text_hash TEXT,
+        created_at          TEXT NOT NULL,
+        updated_at          TEXT NOT NULL,
+        UNIQUE(subject_id, type, normalized_label)
+      );
+      CREATE INDEX idx_study_ideas_subject ON study_ideas(subject_id, updated_at DESC);
+
+      CREATE TABLE study_idea_occurrences (
+        id           TEXT PRIMARY KEY,
+        idea_id      TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        source_kind  TEXT NOT NULL CHECK(source_kind IN ('material', 'document')),
+        source_id    TEXT NOT NULL,
+        source_title TEXT NOT NULL DEFAULT '',
+        source_hash  TEXT NOT NULL DEFAULT '',
+        role         TEXT NOT NULL DEFAULT 'secondary',
+        confidence   REAL NOT NULL DEFAULT 0,
+        created_at   TEXT NOT NULL,
+        updated_at   TEXT NOT NULL,
+        UNIQUE(idea_id, source_kind, source_id)
+      );
+      CREATE INDEX idx_study_idea_occ_source ON study_idea_occurrences(source_kind, source_id);
+      CREATE INDEX idx_study_idea_occ_idea ON study_idea_occurrences(idea_id);
+
+      CREATE TABLE study_idea_evidence (
+        id            TEXT PRIMARY KEY,
+        occurrence_id TEXT NOT NULL REFERENCES study_idea_occurrences(id) ON DELETE CASCADE,
+        quote         TEXT NOT NULL,
+        location      TEXT NOT NULL DEFAULT '',
+        position      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL
+      );
+      CREATE INDEX idx_study_idea_evidence_occ ON study_idea_evidence(occurrence_id, position);
+
+      CREATE TABLE study_idea_edges (
+        id                 TEXT PRIMARY KEY,
+        subject_id         TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        from_id            TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        to_id              TEXT NOT NULL REFERENCES study_ideas(id) ON DELETE CASCADE,
+        type               TEXT NOT NULL,
+        basis              TEXT NOT NULL DEFAULT '',
+        confidence         REAL NOT NULL DEFAULT 0,
+        source_kind        TEXT,
+        source_id          TEXT,
+        created_at         TEXT NOT NULL,
+        updated_at         TEXT NOT NULL,
+        CHECK(from_id <> to_id),
+        UNIQUE(subject_id, from_id, to_id, type)
+      );
+      CREATE INDEX idx_study_idea_edges_subject ON study_idea_edges(subject_id, confidence DESC);
+      CREATE INDEX idx_study_idea_edges_from ON study_idea_edges(from_id);
+      CREATE INDEX idx_study_idea_edges_to ON study_idea_edges(to_id);
+
+      CREATE TABLE study_knowledge_jobs (
+        subject_id    TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        source_kind   TEXT NOT NULL CHECK(source_kind IN ('material', 'document')),
+        source_id     TEXT NOT NULL,
+        status        TEXT NOT NULL DEFAULT 'pending',
+        phase         TEXT NOT NULL DEFAULT 'pending',
+        source_hash   TEXT NOT NULL DEFAULT '',
+        model_provider TEXT,
+        model_name    TEXT,
+        error         TEXT,
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY(subject_id, source_kind, source_id)
+      );
+      CREATE INDEX idx_study_knowledge_jobs_status ON study_knowledge_jobs(status, updated_at);
+    `,
+  },
+  {
+    version: 73,
+    up: /* sql */ `
+      ALTER TABLE study_material_annotations ADD COLUMN kind TEXT NOT NULL DEFAULT 'highlight';
+      ALTER TABLE study_material_annotations ADD COLUMN rects_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE study_material_annotations ADD COLUMN path_json TEXT NOT NULL DEFAULT '[]';
+      ALTER TABLE study_material_annotations ADD COLUMN thickness REAL NOT NULL DEFAULT 3;
+    `,
+  },
+  {
+    version: 74,
+    up: /* sql */ `
+      CREATE TABLE database_chat_conversations (
+        id                TEXT PRIMARY KEY,
+        title             TEXT NOT NULL,
+        database_ids_json TEXT NOT NULL DEFAULT '[]',
+        messages_json     TEXT NOT NULL DEFAULT '[]',
+        created_at        TEXT NOT NULL,
+        updated_at        TEXT NOT NULL
+      );
+      CREATE INDEX idx_database_chat_conversations_updated
+        ON database_chat_conversations(updated_at DESC);
+    `,
+  },
+  {
+    version: 75,
+    up: /* sql */ `
+      -- Timetable cells may contain either a subject or an independent activity.
+      ALTER TABLE study_schedule_cells ADD COLUMN activity_title TEXT;
+    `,
+  },
+  {
+    version: 76,
+    up: /* sql */ `
+      -- Full student calendar metadata and durable reminder delivery state.
+      ALTER TABLE study_calendar_events ADD COLUMN icon TEXT NOT NULL DEFAULT 'calendar';
+      ALTER TABLE study_calendar_events ADD COLUMN emoji TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN description TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN url TEXT NOT NULL DEFAULT '';
+      ALTER TABLE study_calendar_events ADD COLUMN reminder_at TEXT;
+      ALTER TABLE study_calendar_events ADD COLUMN notified_at TEXT;
+      CREATE INDEX idx_study_calendar_events_reminder ON study_calendar_events(reminder_at, notified_at, deleted_at);
+    `,
+  },
+  {
+    version: 77,
+    up: /* sql */ `
+      -- Zotero-backed study materials can either copy an attachment into the
+      -- vault or remain a lightweight link opened by the Zotero desktop app.
+      ALTER TABLE study_materials ADD COLUMN origin TEXT NOT NULL DEFAULT 'file';
+      ALTER TABLE study_materials ADD COLUMN zotero_library_type TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_library_id TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_item_key TEXT;
+      ALTER TABLE study_materials ADD COLUMN zotero_attachment_key TEXT;
+      CREATE INDEX idx_study_materials_zotero_source
+        ON study_materials(zotero_library_type, zotero_library_id, zotero_item_key, zotero_attachment_key);
+    `,
+  },
+  {
+    version: 78,
+    up: /* sql */ `
+      -- Cover the bounded list queries used by the performance-sensitive
+      -- academic views and current-model vector maintenance.
+      CREATE INDEX idx_works_active_year_title
+        ON works(archived, year DESC, title COLLATE NOCASE);
+      CREATE INDEX idx_works_active_analysis_status
+        ON works(archived, light_status, deep_status, summary_status);
+      CREATE INDEX idx_ideas_current_embedding
+        ON ideas(embedding_provider, embedding_model, orphaned_at)
+        WHERE embedding IS NOT NULL;
+      CREATE INDEX idx_idea_theme_links_work
+        ON idea_theme_links(nodus_id, global_id, theme_id);
+      CREATE INDEX idx_edges_type_endpoints
+        ON edges(type, from_id, to_id);
+      CREATE INDEX idx_gaps_kind_statement
+        ON gaps(kind, statement);
     `,
   },
 ];

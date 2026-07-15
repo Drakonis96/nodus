@@ -4,6 +4,7 @@ export type StudySearchSort = 'relevance' | 'date' | 'title';
 export interface StudySearchScope {
   courseId: string | null;
   subjectId: string | null;
+  folderId: string | null;
   topicId: string | null;
 }
 
@@ -41,6 +42,7 @@ export interface StudySearchOptions {
   kinds?: StudySearchKind[];
   courseId?: string;
   subjectId?: string;
+  folderId?: string;
   topicId?: string;
   tags?: string[];
   dateFrom?: string;
@@ -170,6 +172,7 @@ function matchesOptions(entry: StudySearchIndexEntry, options: StudySearchOption
   if (options.kinds?.length && !options.kinds.includes(entry.kind)) return false;
   if (options.courseId && entry.scope.courseId !== options.courseId) return false;
   if (options.subjectId && entry.scope.subjectId !== options.subjectId) return false;
+  if (options.folderId && entry.scope.folderId !== options.folderId) return false;
   if (options.topicId && entry.scope.topicId !== options.topicId) return false;
   if (options.sourceId && entry.sourceId !== options.sourceId) return false;
   if (options.tags?.length && !options.tags.every((tag) => entry.tags.some((entryTag) => normalizeStudySearchText(entryTag) === normalizeStudySearchText(tag)))) return false;

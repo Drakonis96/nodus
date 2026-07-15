@@ -63,7 +63,7 @@ export async function runAiCell(rowId: string, columnId: string, deps: AiCellDep
 
   const settings = getSettings();
   const model = deps.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
-  const visionModel = deps.visionModel ?? settings.visionModel ?? settings.extractionModel ?? model;
+  const visionModel = deps.visionModel ?? settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? model;
   if (!deps.complete && images.length === 0 && !model) {
     throw new Error('No hay un modelo de IA configurado. Elígelo en Ajustes.');
   }

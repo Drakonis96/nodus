@@ -29,11 +29,12 @@ export async function transcribeStudyAudio(request: StudySttRequest): Promise<St
   const model = resolveStudyTranscriptionModel(request.model);
   const client = new OpenAI({ apiKey: key, timeout: 180_000, maxRetries: 1 });
   const file = await toFile(bytes, `dictation.${studyAudioFileExtension(request.mimeType)}`, { type: request.mimeType || 'audio/webm' });
+  const language = request.language?.trim().toLocaleLowerCase();
   const result = await client.audio.transcriptions.create({
     file,
     model,
     response_format: 'json',
-    language: request.language?.split('-')[0] || undefined,
+    language: language && language !== 'auto' ? language.split('-')[0] : undefined,
     prompt: request.prompt?.trim() || undefined,
   } as Parameters<typeof client.audio.transcriptions.create>[0]);
   const responseText = (result as { text?: unknown }).text;

@@ -95,6 +95,15 @@ interface ThemeMembership {
   labelsByIdea: Map<string, Set<string>>;
 }
 
+interface VisibleIdeaEdgeRow {
+  id: string;
+  from_id: string;
+  to_id: string;
+  type: string;
+  basis: 'explicit' | 'inferred';
+  confidence: number;
+}
+
 /** Build the ideas-lens graph: idea nodes + typed edges, enriched for filtering. */
 export async function buildIdeaGraph(): Promise<GraphData> {
   const db = getDb();
@@ -228,22 +237,7 @@ export async function buildIdeaGraph(): Promise<GraphData> {
 
   const nodes = [...themeNodes, ...ideaNodes];
 
-  const edgeRows = db
-    .prepare(
-      `SELECT e.*
-       FROM visible_edges e
-       LEFT JOIN works w ON w.nodus_id = e.source_work
-       WHERE e.source_work IS NULL
-          OR (w.archived = 0 AND w.deep_status = 'done')`
-    )
-    .all() as {
-    id: string;
-    from_id: string;
-    to_id: string;
-    type: string;
-    basis: 'explicit' | 'inferred';
-    confidence: number;
-  }[];
+  const edgeRows = listVisibleIdeaEdgeRows();
   const nodeIds = new Set(nodes.map((n) => n.id));
   // Rejected relations never arrive (the query reads visible_edges); confirmed
   // ones carry their verdict so the UI can render them as user-audited.
@@ -275,6 +269,238 @@ export async function buildIdeaGraph(): Promise<GraphData> {
   const edges = [...themeEdges, ...inferredThemeEdges, ...ideaEdges];
 
   return { nodes, edges };
+}
+
+function listVisibleIdeaEdgeRows(): VisibleIdeaEdgeRow[] {
+  return getDb()
+    .prepare(
+      `SELECT e.id, e.from_id, e.to_id, e.type, e.basis, e.confidence
+       FROM visible_edges e
+       LEFT JOIN works w ON w.nodus_id = e.source_work
+       WHERE e.source_work IS NULL
+          OR (w.archived = 0 AND w.deep_status = 'done')`
+    )
+    .all() as VisibleIdeaEdgeRow[];
+}
+
+function compactThemeNodes(
+  themeRows: ReturnType<typeof listGraphThemes>,
+  memberships: ThemeMembership
+): GraphNode[] {
+  const memberCount = new Map<string, number>();
+  for (const edge of memberships.edges) {
+    memberCount.set(edge.source, (memberCount.get(edge.source) ?? 0) + 1);
+  }
+  return themeRows.map((theme) => ({
+    id: `theme:${theme.theme_id}`,
+    label: theme.label.toUpperCase(),
+    type: 'theme',
+    createdAt: theme.created_at,
+    workCount: memberCount.get(`theme:${theme.theme_id}`) ?? theme.idea_count ?? theme.work_count,
+    workIds: [],
+    read: false,
+    themes: [theme.label],
+    years: [],
+    authors: [],
+    maxConfidence: 1,
+  }));
+}
+
+/** Initial Sigma scene: theme hubs plus aggregated cross-theme relations only.
+ * It deliberately omits every idea statement/work/author payload. */
+export function buildIdeaGraphOverview(): GraphData {
+  const themeRows = listGraphThemes();
+  const memberships = buildThemeMemberships();
+  const nodes = compactThemeNodes(themeRows, memberships);
+  const themeIdByLabel = new Map(
+    themeRows.map((theme) => [normalizeThemeLabel(theme.label), `theme:${theme.theme_id}`])
+  );
+  const primaryThemeByIdea = new Map<string, string>();
+  for (const [ideaId, labels] of memberships.labelsByIdea) {
+    const primary = [...labels]
+      .sort((a, b) => a.localeCompare(b))
+      .map((label) => themeIdByLabel.get(normalizeThemeLabel(label)))
+      .find((value): value is string => Boolean(value));
+    if (primary) primaryThemeByIdea.set(ideaId, primary);
+  }
+
+  const weights = new Map<string, { source: string; target: string; weight: number }>();
+  for (const edge of listVisibleIdeaEdgeRows()) {
+    const sourceTheme = primaryThemeByIdea.get(edge.from_id);
+    const targetTheme = primaryThemeByIdea.get(edge.to_id);
+    if (!sourceTheme || !targetTheme || sourceTheme === targetTheme) continue;
+    const [source, target] = sourceTheme < targetTheme
+      ? [sourceTheme, targetTheme]
+      : [targetTheme, sourceTheme];
+    const key = `${source}\0${target}`;
+    const current = weights.get(key);
+    if (current) current.weight += 1;
+    else weights.set(key, { source, target, weight: 1 });
+  }
+  const maxWeight = Math.max(1, ...[...weights.values()].map((value) => value.weight));
+  const edges: GraphEdge[] = [...weights.values()].map(({ source, target, weight }) => ({
+    id: `theme-overview:${source}:${target}`,
+    source,
+    target,
+    type: 'related',
+    basis: 'inferred',
+    confidence: weight / maxWeight,
+  }));
+  return { nodes, edges };
+}
+
+function largestConnectedComponent(ids: Set<string>, adjacency: Map<string, Set<string>>): Set<string> {
+  const seen = new Set<string>();
+  let largest = new Set<string>();
+  for (const start of ids) {
+    if (seen.has(start)) continue;
+    const component = new Set<string>();
+    const pending = [start];
+    seen.add(start);
+    while (pending.length) {
+      const current = pending.pop()!;
+      component.add(current);
+      for (const neighbor of adjacency.get(current) ?? []) {
+        if (!ids.has(neighbor) || seen.has(neighbor)) continue;
+        seen.add(neighbor);
+        pending.push(neighbor);
+      }
+    }
+    if (component.size > largest.size) largest = component;
+  }
+  return largest;
+}
+
+function loadBoundedIdeaNodes(ideaIds: string[], memberships: ThemeMembership): GraphNode[] {
+  if (!ideaIds.length) return [];
+  const db = getDb();
+  const placeholders = ideaIds.map(() => '?').join(',');
+  const ideas = db.prepare(
+    `SELECT DISTINCT i.global_id, i.type, i.label, i.statement, i.created_at
+     FROM ideas i
+     JOIN idea_occurrences io ON io.global_id=i.global_id
+     JOIN works w ON w.nodus_id=io.nodus_id
+     WHERE i.global_id IN (${placeholders})
+       AND w.archived=0 AND w.deep_status='done'`
+  ).all(...ideaIds) as IdeaRow[];
+  const workRows = db.prepare(
+    `SELECT io.global_id, io.confidence, w.nodus_id, w.year, w.authors_json, w.read_tag
+     FROM idea_occurrences io
+     JOIN works w ON w.nodus_id=io.nodus_id
+     WHERE io.global_id IN (${placeholders})
+       AND w.archived=0 AND w.deep_status='done'`
+  ).all(...ideaIds) as Array<{
+    global_id: string; confidence: number | null; nodus_id: string; year: number | null;
+    authors_json: string; read_tag: number;
+  }>;
+  const aggregates = new Map<string, {
+    works: Set<string>; unread: boolean; years: number[]; authors: Set<string>; maxConfidence: number;
+  }>();
+  for (const row of workRows) {
+    const aggregate = aggregates.get(row.global_id) ?? {
+      works: new Set<string>(), unread: false, years: [], authors: new Set<string>(), maxConfidence: 0,
+    };
+    aggregate.works.add(row.nodus_id);
+    if (row.read_tag !== 1) aggregate.unread = true;
+    if (row.year != null) aggregate.years.push(row.year);
+    aggregate.maxConfidence = Math.max(aggregate.maxConfidence, Number(row.confidence ?? 0));
+    try {
+      for (const author of JSON.parse(row.authors_json || '[]')) aggregate.authors.add(String(author));
+    } catch {
+      /* ignore malformed legacy author metadata */
+    }
+    aggregates.set(row.global_id, aggregate);
+  }
+  return ideas.map((idea) => {
+    const aggregate = aggregates.get(idea.global_id);
+    return {
+      id: idea.global_id,
+      label: idea.label,
+      type: idea.type,
+      createdAt: idea.created_at,
+      statement: idea.statement,
+      workCount: aggregate?.works.size ?? 0,
+      workIds: aggregate ? [...aggregate.works] : [],
+      read: Boolean(aggregate?.works.size) && !aggregate?.unread,
+      themes: [...(memberships.labelsByIdea.get(idea.global_id) ?? [])].sort(),
+      years: aggregate?.years ?? [],
+      authors: aggregate ? [...aggregate.authors] : [],
+      maxConfidence: aggregate?.maxConfidence ?? 0,
+    };
+  });
+}
+
+/** Bounded second-level scene for one theme. Selection happens in the main
+ * process so the renderer never receives the other ~10k ideas. */
+export function buildIdeaThemeGraph(themeLabel: string, requestedCap = 90): GraphData {
+  const cap = Math.max(20, Math.min(250, Math.round(requestedCap) || 90));
+  const themeRows = listGraphThemes();
+  const memberships = buildThemeMemberships();
+  const wantedTheme = themeRows.find(
+    (theme) => normalizeThemeLabel(theme.label) === normalizeThemeLabel(themeLabel)
+  );
+  const themeNodes = compactThemeNodes(themeRows, memberships);
+  if (!wantedTheme) return { nodes: themeNodes, edges: [] };
+  const wantedSource = `theme:${wantedTheme.theme_id}`;
+  const memberIds = new Set(
+    memberships.edges.filter((edge) => edge.source === wantedSource).map((edge) => edge.target)
+  );
+  if (!memberIds.size) return { nodes: themeNodes, edges: [] };
+
+  const allEdges = listVisibleIdeaEdgeRows();
+  const adjacency = new Map<string, Set<string>>([...memberIds].map((id) => [id, new Set<string>()]));
+  for (const edge of allEdges) {
+    if (!memberIds.has(edge.from_id) || !memberIds.has(edge.to_id) || edge.from_id === edge.to_id) continue;
+    adjacency.get(edge.from_id)!.add(edge.to_id);
+    adjacency.get(edge.to_id)!.add(edge.from_id);
+  }
+  const connected = new Set([...memberIds].filter((id) => (adjacency.get(id)?.size ?? 0) > 0));
+  let core = largestConnectedComponent(connected.size ? connected : memberIds, adjacency);
+  if (!core.size) core = new Set([...memberIds].slice(0, cap));
+  if (core.size > cap) {
+    core = new Set(
+      [...core]
+        .sort((a, b) => (adjacency.get(b)?.size ?? 0) - (adjacency.get(a)?.size ?? 0) || a.localeCompare(b))
+        .slice(0, cap)
+    );
+  }
+
+  const bridgeStats = new Map<string, { count: number; confidence: number }>();
+  for (const edge of allEdges) {
+    for (const [inside, outside] of [[edge.from_id, edge.to_id], [edge.to_id, edge.from_id]] as const) {
+      if (!core.has(inside) || core.has(outside) || memberIds.has(outside)) continue;
+      const current = bridgeStats.get(outside) ?? { count: 0, confidence: 0 };
+      current.count += 1;
+      current.confidence = Math.max(current.confidence, edge.confidence);
+      bridgeStats.set(outside, current);
+    }
+  }
+  const bridgeIds = [...bridgeStats]
+    .sort((a, b) => b[1].count - a[1].count || b[1].confidence - a[1].confidence || a[0].localeCompare(b[0]))
+    .slice(0, 60)
+    .map(([id]) => id);
+  const selectedIds = new Set([...core, ...bridgeIds]);
+  const ideaNodes = loadBoundedIdeaNodes([...selectedIds], memberships);
+  const loadedIds = new Set(ideaNodes.map((node) => node.id));
+  const feedback = edgeFeedbackMap();
+  const semanticEdges: GraphEdge[] = allEdges
+    .filter((edge) => loadedIds.has(edge.from_id) && loadedIds.has(edge.to_id))
+    .map((edge) => {
+      const verdict = feedback.get(`${edge.from_id}|${edge.to_id}|${edge.type}`);
+      return {
+        id: edge.id,
+        source: edge.from_id,
+        target: edge.to_id,
+        type: edge.type,
+        basis: edge.basis,
+        confidence: edge.confidence,
+        ...(verdict === 'confirmed' ? { verdict } : {}),
+      };
+    });
+  const membershipEdges = memberships.edges.filter(
+    (edge) => loadedIds.has(edge.target) && themeNodes.some((node) => node.id === edge.source)
+  );
+  return { nodes: [...themeNodes, ...ideaNodes], edges: [...membershipEdges, ...semanticEdges] };
 }
 
 function buildThemeMemberships(): ThemeMembership {

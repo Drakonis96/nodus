@@ -458,6 +458,64 @@ export function seedDemoData(): boolean {
       insNote.run(note.id, note.folderId, note.title[L], 'markdown', note.body[L].join('\n'), note.order, now, now);
     }
 
+    // Persisted examples for the sections that otherwise only show a composer.
+    db.prepare(`INSERT INTO research_questions
+      (id,question,notes,model_json,status,corpus_ideas,corpus_works,created_at,updated_at,mapped_at)
+      VALUES (?,?,?,NULL,'mapped',9,6,?,?,?)`)
+      .run('demo-research-question', L === 'es' ? '¿Cómo se combinan el espaciado y la práctica de recuperación para mejorar la retención?' : 'How do spacing and retrieval practice combine to improve retention?', L === 'es' ? 'Mapa de cobertura de ejemplo, editable y respaldado por el corpus demo.' : 'Editable sample coverage map backed by the demo corpus.', now, now, now);
+    const insertSubQuestion = db.prepare('INSERT INTO research_subquestions (id,rq_id,text,rationale,order_idx,coverage_status,justification,created_at) VALUES (?,?,?,?,?,?,?,?)');
+    insertSubQuestion.run('demo-research-subq-1', 'demo-research-question', L === 'es' ? '¿Qué evidencia compara recuperación y relectura?' : 'What evidence compares retrieval and rereading?', L === 'es' ? 'Establece el efecto principal.' : 'Establishes the main effect.', 0, 'covered', L === 'es' ? 'Dos ideas y una obra ofrecen evidencia directa.' : 'Two ideas and one work provide direct evidence.', now);
+    insertSubQuestion.run('demo-research-subq-2', 'demo-research-question', L === 'es' ? '¿Qué intervalo de espaciado es óptimo a largo plazo?' : 'What spacing interval is optimal in the long term?', L === 'es' ? 'Identifica la frontera del corpus.' : 'Identifies the corpus frontier.', 1, 'partial', L === 'es' ? 'Hay evidencia del beneficio, pero no un intervalo universal.' : 'There is evidence of benefit, but no universal interval.', now);
+    const insertCoverage = db.prepare('INSERT INTO research_coverage_links (id,subq_id,kind,ref_id,label,score,read_state,created_at) VALUES (?,?,?,?,?,?,?,?)');
+    insertCoverage.run('demo-research-link-1', 'demo-research-subq-1', 'idea', 'demo-i1', IDEAS[0].label[L], 0.94, 'read', now);
+    insertCoverage.run('demo-research-link-2', 'demo-research-subq-2', 'gap', 'demo-g3', GAPS[2].statement[L], 0.82, 'read', now);
+
+    const selection = { ideaIds: ['demo-i1', 'demo-i3'], themeIds: ['demo-t1', 'demo-t2'], gapIds: ['demo-g3'], contradictionIds: [], workIds: ['demo-w1', 'demo-w3'], passageIds: [], tutorRouteIds: [] };
+    const draftStats = { selectedIdeas: 2, selectedThemes: 2, selectedGaps: 1, selectedContradictions: 0, selectedWorks: 2, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: 1_420, truncated: false };
+    const savedDrafts = [
+      {
+        id: 'demo-writing-draft', kind: 'literature_review',
+        title: L === 'es' ? 'Espaciado y recuperación: revisión breve' : 'Spacing and retrieval: a short review',
+        objective: L === 'es' ? 'Sintetizar dos estrategias de aprendizaje con evidencia.' : 'Synthesize two evidence-based learning strategies.',
+        abstract: L === 'es' ? 'Borrador de ejemplo para explorar el taller de escritura, su matriz y la bibliografía.' : 'A sample draft for exploring the writing workshop, its matrix, and bibliography.',
+        markdown: L === 'es' ? '## Síntesis\n\nLa recuperación activa mejora la retención frente a la relectura, mientras que el espaciado distribuye el esfuerzo para favorecer la consolidación. Ambas estrategias pueden combinarse en sesiones breves y repetidas.' : '## Synthesis\n\nActive retrieval improves retention over rereading, while spacing distributes effort to support consolidation. Both strategies can be combined in short, repeated sessions.',
+      },
+      {
+        id: 'demo-deep-research-draft', kind: 'deep_research',
+        title: L === 'es' ? 'Informe profundo · ciencia del aprendizaje' : 'Deep report · learning science',
+        objective: L === 'es' ? 'Examinar beneficios, límites y preguntas abiertas del corpus.' : 'Examine benefits, limits, and open questions in the corpus.',
+        abstract: L === 'es' ? 'Informe guardado de demostración que permite abrir directamente la experiencia de investigación profunda.' : 'A saved demo report that opens the deep-research experience directly.',
+        markdown: L === 'es' ? '## Hallazgos\n\nEl corpus respalda la recuperación y el espaciado, pero también señala límites: ansiedad ante los exámenes, transferencia desde el laboratorio y falta de seguimientos longitudinales.\n\n## Agenda futura\n\nComparar intervalos y perfiles de alumnado en contextos reales.' : '## Findings\n\nThe corpus supports retrieval and spacing, while also identifying limits: test anxiety, transfer from laboratory settings, and missing longitudinal follow-up.\n\n## Future agenda\n\nCompare intervals and learner profiles in real settings.',
+      },
+    ];
+    const insertDraft = db.prepare('INSERT INTO writing_saved_drafts (id,title,brief_json,selection_json,model_json,draft_json,created_at,updated_at) VALUES (?,?,?,?,NULL,?,?,?)');
+    for (const item of savedDrafts) {
+      const brief = { kind: item.kind, objective: item.objective, tone: 'critical', language: L };
+      const draft = { generatedAt: now, brief, selection, title: item.title, abstract: item.abstract, outline: [{ id: `${item.id}-section`, title: L === 'es' ? 'Síntesis' : 'Synthesis', purpose: item.objective, keyClaims: [IDEAS[0].statement[L]], sources: ['demo-w1', 'demo-w3'] }], draftMarkdown: item.markdown, matrix: [{ claim: IDEAS[0].statement[L], role: 'support', sourceLabel: WORKS[0].title[L], citation: '(Roediger & Karpicke, 2006)', evidence: IDEAS[0].evidence.quote, notes: '' }], bibliography: [`Roediger, H. L. & Karpicke, J. D. (2006). ${WORKS[0].title[L]}.`], nextSteps: [L === 'es' ? 'Añadir evidencia longitudinal.' : 'Add longitudinal evidence.'], limitations: [GAPS[3].statement[L]], stats: draftStats };
+      insertDraft.run(item.id, item.title, JSON.stringify(brief), JSON.stringify(selection), JSON.stringify(draft), now, now);
+    }
+
+    const immersionPlan = {
+      topic: L === 'es' ? 'Práctica de recuperación' : 'Retrieval practice', title: L === 'es' ? 'Ruta guiada · aprender recuperando' : 'Guided route · learning by retrieval', language: L, minutes: 90, generatedAt: now, model: null,
+      overview: L === 'es' ? 'Una ruta de ejemplo que conecta efecto de prueba, generación y espaciado.' : 'A sample route connecting the testing effect, generation, and spacing.',
+      keyTerms: [{ term: L === 'es' ? 'recuperación activa' : 'active retrieval', definition: IDEAS[1].statement[L] }],
+      stations: [{ id: 'demo-immersion-station', title: L === 'es' ? 'Recuperar frente a releer' : 'Retrieval versus rereading', question: L === 'es' ? '¿Por qué recordar activamente deja una huella más duradera?' : 'Why does active recall leave a more durable trace?', minutes: 28, context: IDEAS[1].statement[L], synthesis: IDEAS[0].development[L], citations: [], positions: [{ authorId: 'demo-a1', name: 'Roediger, H. L.', position: IDEAS[0].statement[L], ideaIds: ['demo-i1'] }], takeaways: [IDEAS[0].statement[L]], ideaIds: ['demo-i1', 'demo-i2'], quiz: [{ id: 'demo-immersion-quiz', kind: 'choice', question: L === 'es' ? '¿Qué estrategia produjo mejor retención a largo plazo?' : 'Which strategy produced better long-term retention?', options: [L === 'es' ? 'Relectura' : 'Rereading', L === 'es' ? 'Recuperación activa' : 'Active retrieval'], correctIndex: 1, explanation: IDEAS[0].statement[L], expected: '', ideaIds: ['demo-i1'] }] }],
+      contrasts: { authors: ['Roediger, H. L.'], rows: [] }, frontiers: [{ kind: 'gap', statement: GAPS[3].statement[L], detail: L === 'es' ? 'El corpus invita a ampliar el seguimiento temporal.' : 'The corpus calls for longer follow-up.', workTitle: WORKS[0].title[L] }], exam: { questions: [], feynman: L === 'es' ? 'Explica con tus palabras por qué recuperar no equivale a releer.' : 'Explain in your own words why retrieval is not the same as rereading.' },
+      graph: { nodes: [], edges: [] }, ideaIndex: [{ id: 'demo-i1', label: IDEAS[0].label[L], statement: IDEAS[0].statement[L], authors: WORKS[0].authors, workTitles: [WORKS[0].title[L]] }], stats: { stations: 1, ideas: 2, works: 1, authors: 1, citations: 0, quizQuestions: 1 }, stoppedReason: null,
+    };
+    const immersionProgress = { currentStep: 1, furthestStep: 1, completedSteps: [0], answers: [], startedAt: now, finishedAt: null };
+    db.prepare('INSERT INTO immersion_sessions (id,topic,title,language,minutes,model_json,plan_json,progress_json,stats_json,created_at,updated_at) VALUES (?,?,?,?,?,NULL,?,?,?,?,?)')
+      .run('demo-immersion-session', immersionPlan.topic, immersionPlan.title, L, 90, JSON.stringify(immersionPlan), JSON.stringify(immersionProgress), JSON.stringify(immersionPlan.stats), now, now);
+
+    db.prepare(`INSERT INTO projects
+      (id,title,kind,status,brief,research_question_id,root_folder_id,model_json,target_words,created_at,updated_at)
+      VALUES (?,?,?,'active',?,?,?,NULL,2500,?,?)`)
+      .run('demo-project-learning', L === 'es' ? 'Capítulo · estrategias de aprendizaje' : 'Chapter · learning strategies', 'chapter', L === 'es' ? 'Convertir el corpus demo en un capítulo académico estructurado.' : 'Turn the demo corpus into a structured academic chapter.', 'demo-research-question', FOLDER.id, now, now);
+    db.prepare('INSERT INTO project_sections (id,project_id,folder_id,title,role,status,target_words,order_idx,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .run('demo-project-section', 'demo-project-learning', FOLDER.id, L === 'es' ? 'Revisión de evidencia' : 'Evidence review', 'body', 'drafting', 1200, 0, now, now);
+    db.prepare('INSERT INTO project_links (id,project_id,section_id,kind,ref_id,label,role,created_at) VALUES (?,?,?,?,?,?,?,?)')
+      .run('demo-project-link', 'demo-project-learning', 'demo-project-section', 'work', 'demo-w1', WORKS[0].title[L], 'evidence', now);
+
     updateSettings({ demoMode: true });
   });
   tx();
@@ -477,6 +535,15 @@ export function clearDemoData(): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.exec(`
+      DELETE FROM project_links WHERE id LIKE 'demo-%';
+      DELETE FROM project_chapters WHERE id LIKE 'demo-%';
+      DELETE FROM project_sections WHERE id LIKE 'demo-%';
+      DELETE FROM projects WHERE id LIKE 'demo-%';
+      DELETE FROM immersion_sessions WHERE id LIKE 'demo-%';
+      DELETE FROM writing_saved_drafts WHERE id LIKE 'demo-%';
+      DELETE FROM research_coverage_links WHERE id LIKE 'demo-%';
+      DELETE FROM research_subquestions WHERE id LIKE 'demo-%';
+      DELETE FROM research_questions WHERE id LIKE 'demo-%';
       DELETE FROM idea_theme_links WHERE global_id LIKE 'demo-%';
       DELETE FROM idea_occurrences WHERE global_id LIKE 'demo-%';
       DELETE FROM evidence WHERE id LIKE 'demo-%';

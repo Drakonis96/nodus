@@ -30,6 +30,9 @@ export interface StudyNamedEntity extends StudyBaseEntity {
   description: string | null;
   color: string | null;
   icon: string | null;
+  emoji: string | null;
+  imageData: string | null;
+  year: number | null;
   favorite: boolean;
 }
 
@@ -41,6 +44,7 @@ export interface StudySubject extends StudyNamedEntity {
 
 export interface StudyTopic extends StudyNamedEntity {
   subjectId: string;
+  folderId: string | null;
   parentId: string | null;
 }
 
@@ -57,6 +61,9 @@ export interface StudyDocument extends StudyBaseEntity {
   description: string | null;
   color: string | null;
   icon: string | null;
+  emoji: string | null;
+  imageData: string | null;
+  year: number | null;
   favorite: boolean;
   pinned: boolean;
   locked: boolean;
@@ -131,6 +138,9 @@ export interface CreateStudyCourseInput {
   description?: string | null;
   color?: string | null;
   icon?: string | null;
+  emoji?: string | null;
+  imageData?: string | null;
+  year?: number | null;
 }
 
 export interface CreateStudySubjectInput extends CreateStudyCourseInput {
@@ -139,6 +149,7 @@ export interface CreateStudySubjectInput extends CreateStudyCourseInput {
 
 export interface CreateStudyTopicInput extends CreateStudyCourseInput {
   subjectId: string;
+  folderId?: string | null;
   parentId?: string | null;
 }
 
@@ -148,6 +159,13 @@ export interface CreateStudyFolderInput extends CreateStudyCourseInput {
   subjectId?: string | null;
 }
 
+export interface StudyEntityMoveInput {
+  courseId?: string | null;
+  subjectId?: string | null;
+  folderId?: string | null;
+  parentId?: string | null;
+}
+
 export interface CreateStudyDocumentInput {
   title: string;
   kind?: StudyDocumentKind;
@@ -155,6 +173,9 @@ export interface CreateStudyDocumentInput {
   description?: string | null;
   color?: string | null;
   icon?: string | null;
+  emoji?: string | null;
+  imageData?: string | null;
+  year?: number | null;
   placement?: StudyPlacementInput | null;
 }
 

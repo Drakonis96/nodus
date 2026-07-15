@@ -10,8 +10,8 @@ import type {
 } from '@shared/types';
 import { DECORATIVE_IMAGE_STYLES } from '@shared/imageStyles';
 import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
-import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { AI_PROVIDERS, PROVIDER_LABELS, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
+import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { t, tx } from '../i18n';
 
 export function ProvidersSettings({
@@ -89,8 +89,6 @@ export function ProvidersSettings({
         )}
       </div>
     </section>
-    <ImageGenerationSettings settings={settings} onChange={onChange} />
-    <AudioGenerationSettings settings={settings} onChange={onChange} />
     </>
   );
 }
@@ -102,7 +100,7 @@ const IMAGE_PROVIDER_LABELS: Record<ImageModelInfo['provider'], string> = {
   openrouter: 'OpenRouter',
 };
 
-function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
+export function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings; onChange: () => Promise<unknown> }) {
   const [models, setModels] = useState<ImageModelInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,21 +207,21 @@ function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings
       {error && <div className="mt-3 text-xs text-red-400">{error}</div>}
       {loading && <div className="mt-4 text-sm text-neutral-500">{t('Consultando catálogos oficiales…')}</div>}
       {!loading && (
-        <div className="mt-3 max-h-[32rem] overflow-y-auto rounded-lg border border-neutral-800">
+        <SettingsModelList className="mt-3 max-h-[32rem] overflow-y-auto" data-testid="image-generation-model-list">
           {shown.map((model) => {
             const selected = settings.imageProvider === model.provider && settings.imageModel === model.id;
             return (
               <button
                 key={`${model.provider}:${model.id}`}
-                className={`grid w-full grid-cols-[minmax(14rem,1.5fr)_repeat(3,minmax(7rem,1fr))] gap-3 border-b border-neutral-800 px-3 py-3 text-left text-xs last:border-b-0 max-xl:grid-cols-2 ${selected ? 'bg-indigo-950/40' : 'hover:bg-neutral-900/60'}`}
+                className={settingsModelRowClass(selected, true, 'grid w-full grid-cols-[minmax(14rem,1.5fr)_repeat(3,minmax(7rem,1fr))] gap-3 text-left text-xs max-xl:grid-cols-2')}
                 onClick={() => void select(model)}
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${selected ? 'bg-indigo-400' : 'bg-neutral-700'}`} />
-                    <span className="font-medium text-neutral-200">{model.name}</span>
+                <div className="flex min-w-0 items-start gap-3">
+                  <SettingsModelDot selected={selected} />
+                  <div className="min-w-0">
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">{model.name}</span>
+                    <div className="mt-1 truncate font-mono text-[10px] text-neutral-500 dark:text-neutral-600" title={model.id}>{IMAGE_PROVIDER_LABELS[model.provider]} · {model.id}</div>
                   </div>
-                  <div className="mt-1 truncate font-mono text-[10px] text-neutral-500" title={model.id}>{IMAGE_PROVIDER_LABELS[model.provider]} · {model.id}</div>
                 </div>
                 <PriceCell label={t('Entrada')} value={money(model.inputPriceUsdPerMillion)} />
                 <PriceCell label={t('Salida')} value={money(model.outputPriceUsdPerMillion)} />
@@ -232,7 +230,7 @@ function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings
             );
           })}
           {shown.length === 0 && <div className="p-4 text-sm text-neutral-500">{t('No hay modelos compatibles que coincidan.')}</div>}
-        </div>
+        </SettingsModelList>
       )}
       <div className="mt-2 flex items-center justify-between text-[10px] text-neutral-600">
         <span>{tx('{n} modelos compatibles con salida de imagen', { n: shown.length })}</span>
@@ -243,7 +241,7 @@ function ImageGenerationSettings({ settings, onChange }: { settings: AppSettings
 }
 
 function PriceCell({ label, value }: { label: string; value: string }) {
-  return <div><div className="text-[10px] uppercase tracking-wide text-neutral-600">{label}</div><div className="mt-1 text-neutral-400">{value}</div></div>;
+  return <div><div className="text-[10px] uppercase tracking-wide text-neutral-500 dark:text-neutral-600">{label}</div><div className="mt-1 text-neutral-600 dark:text-neutral-400">{value}</div></div>;
 }
 
 function ProviderRow({
@@ -339,12 +337,12 @@ function ProviderRow({
           {error && <div className="text-xs text-red-400">{error}</div>}
 
           {models && (
-            <div className="max-h-64 overflow-y-auto border border-neutral-800 rounded">
+            <SettingsModelList className="max-h-64 overflow-y-auto" data-testid={`provider-model-list-${provider}`}>
               <ModelList provider={provider} models={shown} isFav={isFav} toggleFav={toggleFav} />
               {filtered.length > shown.length && (
                 <div className="text-xs text-neutral-600 p-2">{tx('Mostrando {n}; refina la búsqueda para ver más.', { n: shown.length })}</div>
               )}
-            </div>
+            </SettingsModelList>
           )}
         </div>
       )}
@@ -507,7 +505,7 @@ function LocalProviderRow({
           {error && <div className="text-xs text-red-400">{error}</div>}
 
           {models && (
-            <div className="max-h-64 overflow-y-auto border border-neutral-800 rounded">
+            <SettingsModelList className="max-h-64 overflow-y-auto" data-testid={`provider-model-list-${provider}`}>
               <ModelList provider={provider} models={shown} isFav={isFav} toggleFav={toggleFav} />
               {models.length === 0 && (
                 <div className="p-3 text-xs text-neutral-500">{t('El servidor no reporta modelos. Descarga o carga uno primero.')}</div>
@@ -515,7 +513,7 @@ function LocalProviderRow({
               {filtered.length > shown.length && (
                 <div className="text-xs text-neutral-600 p-2">{tx('Mostrando {n}; refina la búsqueda para ver más.', { n: shown.length })}</div>
               )}
-            </div>
+            </SettingsModelList>
           )}
         </div>
       )}
@@ -560,7 +558,7 @@ function ModelList({
     if (provider === 'openrouter' && m.group && m.group !== lastGroup) {
       lastGroup = m.group;
       rows.push(
-        <div key={`g-${m.group}`} className="px-2 py-1 text-[10px] uppercase tracking-wide text-neutral-500 bg-neutral-900 sticky top-0">
+        <div key={`g-${m.group}`} className="sticky top-0 border-b border-neutral-200 bg-neutral-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900">
           {m.group}
         </div>
       );
@@ -568,7 +566,7 @@ function ModelList({
     const fav = isFav(ref);
     const meta = modelMetaParts(m);
     rows.push(
-      <div key={m.id} className="flex items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-900/60">
+      <div key={m.id} className={settingsModelRowClass(false, true, 'flex items-center gap-2 !px-3 !py-2 text-xs')}>
         <button className={fav ? 'text-amber-400' : 'text-neutral-600 hover:text-amber-300'} title={t('Favorito')} onClick={() => toggleFav(ref)}>
           {fav ? '⭐' : '☆'}
         </button>

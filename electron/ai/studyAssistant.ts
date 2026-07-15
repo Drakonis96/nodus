@@ -31,6 +31,7 @@ const EMPTY_STORE: StudyAssistantStore = { version: 1, conversations: [] };
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_CONTEXT_CHARS = 52_000;
 const MAX_SOURCE_CHARS = 3_600;
+const DEMO_CONVERSATION_ID = 'demo-study-chat-membrane';
 
 function now(): string { return new Date().toISOString(); }
 function storePath(): string { return path.join(activeVaultDir(), 'study-chat-history.json'); }
@@ -97,6 +98,38 @@ export function updateStudyAssistantConversation(id: string, patch: StudyAssista
 
 export function deleteStudyAssistantConversation(id: string): void {
   const store = readStore(); store.conversations = store.conversations.filter((conversation) => conversation.id !== id); writeStore(store);
+}
+
+/** Add one fully local conversation so the demo chat is useful before an AI key is configured. */
+export function seedStudyAssistantDemoConversation(): void {
+  const store = readStore();
+  if (store.conversations.some((conversation) => conversation.id === DEMO_CONVERSATION_ID)) return;
+  const timestamp = now();
+  const sourceKey = 'document:demo-study-doc-cell';
+  const citation: StudyAssistantCitation = {
+    id: 'S1', sourceKey, indexId: 'demo-study-chat-evidence', kind: 'document', sourceId: 'demo-study-doc-cell',
+    title: 'Membrana plasmática · resumen', subtitle: 'Biología celular',
+    quote: 'El transporte activo mueve solutos contra gradiente y requiere energía.',
+    location: { documentId: 'demo-study-doc-cell', from: 190, to: 260 },
+    scope: { courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', folderId: 'demo-study-folder-cell', topicId: 'demo-study-topic-membrane' },
+  };
+  const conversation: StudyAssistantConversation = {
+    id: DEMO_CONVERSATION_ID, title: 'Dudas sobre la membrana plasmática', createdAt: timestamp, updatedAt: timestamp,
+    archived: false,
+    selection: { scope: 'subject', courseId: 'demo-study-course-biology', subjectId: 'demo-study-subject-cell', topicId: null, sourceKeys: [sourceKey] },
+    model: null, messageCount: 2, task: 'explain', level: 'standard', tone: 'guided', language: 'es', allowExternalKnowledge: false,
+    messages: [
+      { id: 'demo-study-chat-user', role: 'user', content: '¿En qué se diferencian el transporte pasivo y el activo?', createdAt: timestamp },
+      { id: 'demo-study-chat-assistant', role: 'assistant', content: 'El transporte pasivo ocurre a favor del gradiente y no consume ATP. El transporte activo desplaza sustancias contra el gradiente y necesita energía [S1](nodus://study/evidence/S1).', createdAt: timestamp, citations: [citation] },
+    ],
+  };
+  store.conversations.unshift(conversation); writeStore(store);
+}
+
+export function clearStudyAssistantDemoConversation(): void {
+  const store = readStore();
+  const next = store.conversations.filter((conversation) => conversation.id !== DEMO_CONVERSATION_ID);
+  if (next.length !== store.conversations.length) writeStore({ ...store, conversations: next });
 }
 
 export function getStudyAssistantSources(): StudyAssistantSourceOption[] { return listStudyAssistantSourceOptions(); }

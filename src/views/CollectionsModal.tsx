@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import type { ZoteroCollection, ZoteroItem, WorkView, AppSettings } from '@shared/types';
+import type { ZoteroCollection, ZoteroItem, ZoteroLibrary, WorkView, AppSettings } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
 import { t, tx } from '../i18n';
@@ -115,6 +115,8 @@ export function CollectionsModal({
 }) {
   const readTag = settings.readTag;
   const [roots, setRoots] = useState<ZoteroCollection[]>([]);
+  const [libraries, setLibraries] = useState<ZoteroLibrary[]>([]);
+  const [library, setLibrary] = useState<ZoteroLibrary | null>(null);
   const [selected, setSelected] = useState<ZoteroCollection | null>(null);
   const [items, setItems] = useState<ZoteroItem[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -133,11 +135,17 @@ export function CollectionsModal({
   const [statusFilter, setStatusFilter] = useState<'all' | 'unscanned' | 'light' | 'deep' | 'summary'>('all');
 
   useEffect(() => {
-    void window.nodus.zoteroCollections().then(setRoots);
+    void window.nodus.zoteroLibraries().then((next) => { setLibraries(next); setLibrary(next[0] ?? null); });
     void window.nodus.listWorks({ includeArchived: true }).then((ws) => {
       setWorksByKey(new Map(ws.map((w) => [w.zotero_key, w])));
     });
   }, []);
+
+  useEffect(() => {
+    if (!library) return;
+    setRoots([]); setSelected(null); setItems([]);
+    void window.nodus.zoteroCollections(library).then(setRoots);
+  }, [library?.type, library?.id]);
 
   useEffect(() => {
     setMonitoringKeys(settings.monitoredCollections ?? []);
@@ -347,6 +355,7 @@ export function CollectionsModal({
         <div className="flex-1 flex min-h-0">
           {/* Tree */}
           <div className="w-72 border-r border-neutral-800 overflow-y-auto p-2">
+            <label className="mb-2 block text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{t('Biblioteca')}<select data-testid="zotero-library-select" className="input mt-1 w-full text-xs" value={library ? `${library.type}:${library.id}` : ''} onChange={(event) => setLibrary(libraries.find((candidate) => `${candidate.type}:${candidate.id}` === event.target.value) ?? null)}>{libraries.map((candidate) => <option key={`${candidate.type}:${candidate.id}`} value={`${candidate.type}:${candidate.id}`}>{candidate.type === 'group' ? `${t('Grupo')}: ` : ''}{candidate.name}</option>)}</select></label>
             {roots.map((c) => (
               <CollectionNode
                 key={c.key}

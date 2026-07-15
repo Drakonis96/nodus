@@ -3,6 +3,7 @@ import type { AppSettings, ModelRef } from '@shared/types';
 
 export type FeatureModelSettingKey =
   | 'chatModel'
+  | 'nodiModel'
   | 'deepResearchModel'
   | 'immersionModel'
   | 'writingModel'
@@ -22,7 +23,8 @@ function resolveFeatureModel(settings: AppSettings, key: FeatureModelSettingKey)
 }
 
 /**
- * Feature-local model selection persisted in the active vault's settings.
+ * Feature-local model selection persisted in the active vault's settings. An
+ * unset override inherits the app-wide general text model.
  * Reading fresh settings on mount avoids stale App props after navigating away
  * and back without coupling the feature to a global selector.
  */
@@ -50,7 +52,10 @@ export function useFeatureModel(
     (next: ModelRef | null) => {
       changedLocallyRef.current = true;
       setModelState(next);
-      void window.nodus.updateSettings({ [key]: next } as Partial<AppSettings>);
+      void window.nodus.updateSettings({
+        ...(next ? { modelSettingsMode: 'advanced' as const } : {}),
+        [key]: next,
+      } as Partial<AppSettings>);
     },
     [key]
   );

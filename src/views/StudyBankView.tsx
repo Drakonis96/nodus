@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   StudyAssistantSourceOption,
   StudyQuestion,
@@ -10,6 +11,7 @@ import type {
   StudyQuestionSimilar,
   StudyQuestionType,
   StudyQuestionVersion,
+  StudyFlashcard,
   StudyWorkspace,
 } from '@shared/types';
 import { STUDY_QUESTION_TYPES } from '@shared/studyQuestions';
@@ -45,14 +47,10 @@ export function StudyBankView({
   onOpenDocument,
   onOpenMaterial,
   onOpenRecording,
-  onOpenTests,
-  onOpenExams,
 }: {
   onOpenDocument: (id: string) => void;
   onOpenMaterial: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number) => void;
-  onOpenTests: () => void;
-  onOpenExams: () => void;
 }) {
   const [questions, setQuestions] = useState<StudyQuestion[]>([]);
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
@@ -61,7 +59,10 @@ export function StudyBankView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [semanticSearch, setSemanticSearch] = useState(false);
-  const [type, setType] = useState<StudyQuestionType | 'all'>('all');
+  const [type] = useState<StudyQuestionType | 'all'>('all');
+  const [category, setCategory] = useState<'all' | 'test' | 'exam' | 'flashcards'>('all');
+  const [flashcards, setFlashcards] = useState<StudyFlashcard[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
   const [status, setStatus] = useState<StudyQuestionStatus | 'all'>('all');
   const [subjectId, setSubjectId] = useState('');
@@ -82,21 +83,38 @@ export function StudyBankView({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [allQuestions, nextWorkspace, nextSources, nextCollections, hybrid] = await Promise.all([
+    const [allQuestions, nextWorkspace, nextSources, nextCollections, hybrid, nextCards] = await Promise.all([
       window.nodus.listStudyQuestions({ search: semanticSearch ? undefined : search, type, difficulty, status, subjectId: subjectId || undefined }),
       window.nodus.getStudyWorkspace(), window.nodus.listStudyAssistantSources(), window.nodus.listStudyQuestionCollections(),
       semanticSearch && search.trim().length >= 2
         ? window.nodus.searchStudyCorpus(search, { kinds: ['question'], subjectId: subjectId || undefined, limit: 100 })
         : null,
+      window.nodus.listStudyFlashcards({ search, subjectId: subjectId || undefined }),
     ]);
     const resultIds = hybrid ? new Set(hybrid.results.map((result) => result.sourceId)) : null;
-    const nextQuestions = resultIds ? allQuestions.filter((question) => resultIds.has(question.id)) : allQuestions;
+    const categoryTag = `nodus:${category}`;
+    const categorized = category === 'all' || category === 'flashcards' ? (category === 'all' ? allQuestions : []) : allQuestions.filter((question) => question.tags.includes(categoryTag) || (!question.tags.some((tag) => tag.startsWith('nodus:')) && (category === 'test' ? ['single_choice', 'multiple_choice', 'true_false'].includes(question.type) : true)));
+    const nextQuestions = resultIds ? categorized.filter((question) => resultIds.has(question.id)) : categorized;
+    const filteredCards = (category === 'all' || category === 'flashcards')
+      ? nextCards.filter((card) => difficulty === 'all' || card.difficulty === difficulty)
+      : [];
     setQuestions(nextQuestions); setWorkspace(nextWorkspace); setSources(nextSources); setCollections(nextCollections);
-    setSelectedId((current) => current && nextQuestions.some((question) => question.id === current) ? current : nextQuestions[0]?.id ?? null);
-  }, [difficulty, search, semanticSearch, status, subjectId, type]);
+    setFlashcards(filteredCards);
+    setSelectedCardId((current) => current && filteredCards.some((card) => card.id === current) ? current : null);
+    setSelectedId((current) => current && nextQuestions.some((question) => question.id === current) ? current : (category !== 'flashcards' ? nextQuestions[0]?.id ?? null : null));
+  }, [category, difficulty, search, semanticSearch, status, subjectId, type]);
 
   useEffect(() => { void load().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, [load]);
   const selected = questions.find((question) => question.id === selectedId) ?? null;
+  const selectedCard = flashcards.find((card) => card.id === selectedCardId) ?? null;
+  useEffect(() => {
+    if (!selectedCard) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedCardId(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [selectedCard]);
   useEffect(() => {
     if (!selectedId) { setAnalytics(null); setSimilar([]); setVersions([]); return; }
     void Promise.all([
@@ -152,19 +170,17 @@ export function StudyBankView({
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="study-question-bank">
-      <header className="border-b border-neutral-800 bg-neutral-950/70 px-4 py-3">
+      <header className="study-question-bank-header border-b border-neutral-800 bg-neutral-950/70 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="mr-auto"><p className="text-[10px] font-medium uppercase tracking-[0.18em] text-teal-400">{t('Evaluación')}</p><h1 className="text-xl font-semibold">{t('Banco de preguntas')}</h1></div>
           <button className="btn btn-ghost" onClick={() => void window.nodus.importStudyQuestions().then(load)}><Icon name="upload" />{t('Importar')}</button>
           <button className="btn btn-ghost" onClick={() => void window.nodus.exportStudyQuestions()}><Icon name="download" />{t('Exportar')}</button>
-          <button className="btn btn-ghost" onClick={onOpenTests}>{t('Usar en test')}</button>
-          <button className="btn btn-ghost" onClick={onOpenExams}>{t('Usar en examen')}</button>
           <button data-testid="study-question-generate" className="btn btn-secondary" onClick={() => { setShowGenerator(!showGenerator); setDraft(null); setDraftId(null); }}><Icon name="wand" />{t('Generar')}</button>
           <button data-testid="study-question-new" className="btn btn-primary" onClick={() => { setDraft(emptyDraft()); setDraftId(null); setShowGenerator(false); }}><Icon name="plus" />{t('Nueva pregunta')}</button>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-[minmax(220px,1.8fr)_repeat(4,minmax(0,1fr))]">
           <div className="relative"><Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" /><input className="input input-with-leading-icon w-full pr-20" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Buscar enunciado, explicación o etiqueta…')} /><button data-testid="study-question-search-mode" type="button" className={`absolute right-2 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[9px] ${semanticSearch ? 'bg-teal-900/50 text-teal-200' : 'bg-neutral-800 text-neutral-400'}`} onClick={() => setSemanticSearch((value) => !value)}>{t(semanticSearch ? 'Híbrida' : 'Literal')}</button></div>
-          <select className="input" value={type} onChange={(event) => setType(event.target.value as typeof type)}><option value="all">{t('Todos los tipos')}</option>{STUDY_QUESTION_TYPES.map((value) => <option key={value} value={value}>{t(TYPE_LABELS[value])}</option>)}</select>
+          <select data-testid="study-bank-category" className="input" value={category} onChange={(event) => setCategory(event.target.value as typeof category)}><option value="all">{t('Todos')}</option><option value="test">{t('Test')}</option><option value="exam">{t('Examen')}</option><option value="flashcards">{t('Flashcards')}</option></select>
           <select className="input" value={difficulty} onChange={(event) => setDifficulty(event.target.value as typeof difficulty)}><option value="all">{t('Toda dificultad')}</option>{(['easy', 'medium', 'hard'] as const).map((value) => <option key={value} value={value}>{t(DIFFICULTY_LABELS[value])}</option>)}</select>
           <select className="input" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}><option value="all">{t('Todos los estados')}</option>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select>
           <select className="input" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">{t('Todas las asignaturas')}</option>{workspace?.subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
@@ -197,23 +213,34 @@ export function StudyBankView({
         {generated.length > 0 && <div className="mt-3 space-y-2"><div className="flex items-center"><strong className="text-xs">{generated.length} {t('borradores para revisar')}</strong><button className="btn btn-primary ml-auto" onClick={() => void saveGenerated()}>{t('Aprobar y guardar todo')}</button></div>{generated.map((question, index) => <article key={`${question.prompt}-${index}`} className="rounded-lg border border-neutral-800 bg-neutral-950/50 p-3"><p className="text-sm">{question.prompt}</p><p className="mt-1 text-xs text-emerald-300">{question.answer?.text ?? String(question.answer?.value ?? '')}</p><p className="mt-1 text-[10px] text-neutral-600">{question.source?.title} · {question.explanation}</p></article>)}</div>}
       </section>}
 
-      {!draft && !showGenerator && <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.4fr)]">
-        <aside className="min-h-0 overflow-y-auto border-r border-neutral-800 p-3">
-          <div className="mb-3 flex items-center gap-2"><span className="text-xs text-neutral-500">{questions.length} {t('preguntas')}</span><span className="ml-auto text-[10px] text-neutral-700">{collections.length} {t('colecciones')}</span></div>
-          {questions.map((question) => <button data-testid={`study-question-${question.id}`} key={question.id} className={`mb-2 w-full rounded-xl border p-3 text-left ${selectedId === question.id ? 'border-teal-700 bg-teal-950/25' : 'border-neutral-800 bg-neutral-900/30 hover:border-neutral-700'}`} onClick={() => setSelectedId(question.id)}>
-            <div className="flex items-center gap-2"><span className="rounded bg-neutral-800 px-1.5 py-0.5 text-[9px] text-neutral-400">{t(TYPE_LABELS[question.type])}</span><span className="text-[9px] text-neutral-600">{t(DIFFICULTY_LABELS[question.difficulty])}</span>{question.favorite && <Icon name="star" size={10} className="ml-auto text-amber-400" />}</div>
-            <p className="mt-2 line-clamp-3 text-sm text-neutral-200">{question.prompt}</p><p className="mt-1 truncate text-[10px] text-neutral-600">{question.source.title || t('Sin fuente enlazada')}</p>
-          </button>)}
-          {!questions.length && <div className="rounded-xl border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-600">{t('No hay preguntas con estos filtros.')}</div>}
-        </aside>
-        <main className="min-h-0 overflow-y-auto p-4">{selected ? <>
+      {!draft && !showGenerator && <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <section className="study-question-table-shell overflow-hidden rounded-xl border border-neutral-800" data-testid="study-question-table">
+          <div className="mb-3 flex items-center gap-2"><span className="text-xs text-neutral-500">{questions.length + flashcards.length} {t('elementos')}</span><span className="ml-auto text-[10px] text-neutral-700">{collections.length} {t('colecciones')}</span></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[920px] border-collapse text-left text-xs">
+            <thead className="study-question-table-head border-y border-neutral-800 bg-neutral-900/60 text-[10px] uppercase tracking-wider text-neutral-500"><tr><th className="w-10 px-3 py-2.5"></th><th className="px-3 py-2.5">{t('Pregunta')}</th><th className="px-3 py-2.5">{t('Tipo')}</th><th className="px-3 py-2.5">{t('Dificultad')}</th><th className="px-3 py-2.5">{t('Estado')}</th><th className="px-3 py-2.5">{t('Asignatura')}</th><th className="px-3 py-2.5">{t('Fuente')}</th><th className="px-3 py-2.5">{t('Creada')}</th></tr></thead>
+            <tbody className="divide-y divide-neutral-800">{questions.map((question) => {
+              const subject = workspace?.subjects.find((entry) => entry.id === question.subjectId);
+              return <tr data-testid={`study-question-${question.id}`} key={question.id} className={`study-question-table-row cursor-pointer ${selectedId === question.id ? 'is-selected bg-teal-950/25' : 'hover:bg-neutral-900/40'}`} onClick={() => { setSelectedId(question.id); setSelectedCardId(null); }}>
+                <td className="px-3 py-3 text-center">{question.favorite && <Icon name="star" size={12} className="text-amber-400" />}</td><td className="max-w-[420px] px-3 py-3"><p className="line-clamp-2 font-medium text-neutral-200">{question.prompt}</p><span className="mt-1 block text-[10px] text-neutral-600">{question.shortId}</span></td><td className="whitespace-nowrap px-3 py-3">{t(TYPE_LABELS[question.type])}</td><td className="whitespace-nowrap px-3 py-3">{t(DIFFICULTY_LABELS[question.difficulty])}</td><td className="whitespace-nowrap px-3 py-3"><span className="rounded-full bg-teal-900/30 px-2 py-1 text-[10px] text-teal-300">{t(STATUS_LABELS[question.status])}</span></td><td className="max-w-40 truncate px-3 py-3 text-neutral-400">{subject?.name ?? '—'}</td><td className="max-w-48 truncate px-3 py-3 text-neutral-400">{question.source.title || t('Sin fuente enlazada')}</td><td className="whitespace-nowrap px-3 py-3 text-neutral-500">{new Date(question.createdAt).toLocaleDateString()}</td>
+              </tr>;
+            })}{flashcards.map((card) => {
+              const subject = workspace?.subjects.find((entry) => entry.id === card.subjectId);
+              return <tr data-testid={`study-flashcard-${card.id}`} key={card.id} className={`study-question-table-row cursor-pointer ${selectedCardId === card.id ? 'is-selected bg-teal-950/25' : 'hover:bg-neutral-900/40'}`} onClick={() => setSelectedCardId(card.id)}>
+                <td className="px-3 py-3 text-center">{card.favorite && <Icon name="star" size={12} className="text-amber-400" />}</td><td className="max-w-[420px] px-3 py-3"><p className="line-clamp-2 font-medium text-neutral-200">{card.front}</p><span className="mt-1 block text-[10px] text-neutral-600">{card.shortId}</span></td><td className="whitespace-nowrap px-3 py-3"><span className="inline-flex items-center gap-1 text-teal-300"><Icon name="flashcards" size={12} />{t('Flashcard')}</span></td><td className="whitespace-nowrap px-3 py-3">{t(DIFFICULTY_LABELS[card.difficulty])}</td><td className="whitespace-nowrap px-3 py-3"><span className="rounded-full bg-indigo-900/30 px-2 py-1 text-[10px] text-indigo-300">{t(card.srs.mastered ? 'Dominada' : 'En revisión')}</span></td><td className="max-w-40 truncate px-3 py-3 text-neutral-400">{subject?.name ?? '—'}</td><td className="max-w-48 truncate px-3 py-3 text-neutral-400">{card.sourceExcerpt || t('Sin fuente enlazada')}</td><td className="whitespace-nowrap px-3 py-3 text-neutral-500">{new Date(card.createdAt).toLocaleDateString()}</td>
+              </tr>;
+            })}</tbody>
+          </table></div>
+          {!questions.length && !flashcards.length && <div className="rounded-xl border border-dashed border-neutral-800 p-6 text-center text-xs text-neutral-600">{t('No hay elementos con estos filtros.')}</div>}
+        </section>
+        <main className="study-question-detail mt-4 rounded-xl border border-neutral-800 bg-white p-4 dark:bg-transparent">{selected ? <>
           <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-teal-900/30 px-2 py-1 text-[10px] text-teal-300">{t(STATUS_LABELS[selected.status])}</span>{selected.locked && <span className="text-[10px] text-neutral-500"><Icon name="lock" size={10} /> {t('Validada y bloqueada')}</span>}<span className="ml-auto text-[10px] text-neutral-600">{selected.shortId}</span></div>
           <h2 className="mt-3 text-lg font-medium leading-7">{selected.prompt}</h2>
           {selected.options.length > 0 && <div className="mt-4 space-y-2">{selected.options.map((option) => {
             const selection = analytics?.optionSelections.find((entry) => entry.optionId === option.id);
             return <div key={option.id} className={`flex items-center rounded-lg border px-3 py-2 text-sm ${option.correct ? 'border-emerald-800 bg-emerald-950/20 text-emerald-200' : 'border-neutral-800 text-neutral-400'}`}><span>{option.text}</span><span className="ml-auto text-[10px] text-neutral-600">{selection?.selectedCount ?? 0} {t('selecciones')}</span></div>;
           })}</div>}
-          <section className="mt-5 rounded-xl border border-neutral-800 bg-neutral-900/30 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Respuesta y explicación')}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-emerald-200">{selected.answer.text ?? String(selected.answer.value ?? '')}</p><p className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">{selected.explanation}</p></section>
+          <section className="study-question-answer-card mt-5 rounded-xl border border-neutral-800 bg-neutral-900/30 p-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Respuesta y explicación')}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-emerald-200">{selected.answer.text ?? String(selected.answer.value ?? '')}</p><p className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">{selected.explanation}</p></section>
+          {(selected.lastAnsweredAt || selected.lastResponse || selected.lastScore != null) && <section className="mt-3 rounded-xl border border-indigo-900/50 bg-indigo-950/15 p-4"><div className="flex items-center gap-2"><h3 className="text-xs font-semibold uppercase tracking-wider text-indigo-300">{t('Último intento')}</h3>{selected.lastAnsweredAt && <time className="ml-auto text-[10px] text-neutral-600">{new Date(selected.lastAnsweredAt).toLocaleString()}</time>}</div><p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{selected.lastResponse || t('Sin respuesta guardada')}</p><div className="mt-3 flex items-center gap-3"><strong className="text-lg text-indigo-200">{selected.lastScore == null ? '—' : `${selected.lastScore.toFixed(2)} / ${(selected.lastMaxScore ?? 0).toFixed(2)}`}</strong><span className="text-xs text-neutral-500">{t('Última calificación')}</span></div>{selected.lastFeedback && <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-400">{selected.lastFeedback}</p>}</section>}
           <section className="mt-3 rounded-xl border border-neutral-800 p-4"><div className="flex items-center gap-2"><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('Fuente justificativa')}</h3>{(selected.documentId || selected.materialId || selected.recordingId) && <button className="btn btn-ghost ml-auto h-7 text-xs" onClick={() => openSource(selected)}><Icon name="external" size={11} />{t('Abrir fuente')}</button>}</div><p className="mt-2 text-xs text-neutral-500">{selected.source.title}</p><blockquote className="mt-2 border-l-2 border-teal-800 pl-3 text-sm leading-6 text-neutral-300">{selected.source.excerpt}</blockquote></section>
           <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-5"><div className="rounded-lg bg-neutral-900 p-2"><b className="block text-base">{selected.usageCount}</b>{t('Usos')}</div><div className="rounded-lg bg-neutral-900 p-2"><b className="block text-base text-emerald-300">{selected.correctCount}</b>{t('Aciertos')}</div><div className="rounded-lg bg-neutral-900 p-2"><b className="block text-base text-red-300">{selected.incorrectCount}</b>{t('Errores')}</div><div className="rounded-lg bg-neutral-900 p-2"><b className="block text-base">{analytics?.successRate == null ? '—' : `${Math.round(analytics.successRate * 100)}%`}</b>{t(analytics?.observedDifficulty === 'too_easy' ? 'Demasiado fácil' : analytics?.observedDifficulty === 'too_hard' ? 'Demasiado difícil' : 'Dificultad real')}</div><div className="rounded-lg bg-neutral-900 p-2"><b className="block text-base">{analytics?.averageResponseMs ? `${Math.round(analytics.averageResponseMs / 1000)} s` : '—'}</b>{t('Tiempo medio')}</div></div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -224,7 +251,7 @@ export function StudyBankView({
             <button className="btn btn-ghost" onClick={() => void mutate(() => window.nodus.setStudyQuestionLifecycle(selected.id, 'archive'))}><Icon name="archive" />{t('Archivar')}</button>
             {confirmDelete === selected.id ? <><button className="btn btn-ghost text-red-300" onClick={() => void mutate(() => window.nodus.setStudyQuestionLifecycle(selected.id, 'delete')).then(() => setConfirmDelete(null))}>{t('Confirmar eliminación')}</button><button className="btn btn-ghost" onClick={() => setConfirmDelete(null)}>{t('Cancelar')}</button></> : <button className="btn btn-ghost text-red-400" onClick={() => setConfirmDelete(selected.id)}><Icon name="trash" />{t('Eliminar')}</button>}
           </div>
-          {similar.length > 0 && <section className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4" data-testid="study-question-similar"><h3 className="text-xs font-semibold uppercase tracking-wider text-amber-500">{t('Preguntas similares')}</h3><div className="mt-2 space-y-1">{similar.map((entry) => <button key={entry.question.id} className="flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs hover:bg-neutral-900" onClick={() => setSelectedId(entry.question.id)}><span className="truncate">{entry.question.prompt}</span><span className="ml-auto pl-2 text-amber-500">{Math.round(entry.similarity * 100)}%</span></button>)}</div></section>}
+          {similar.length > 0 && <section className="mt-5 rounded-xl border border-amber-900/50 bg-amber-950/10 p-4" data-testid="study-question-similar"><h3 className="text-xs font-semibold uppercase tracking-wider text-amber-500">{t('Preguntas similares')}</h3><div className="mt-2 space-y-1">{similar.map((entry) => <button key={entry.question.id} className="flex w-full items-center rounded-lg px-2 py-1.5 text-left text-xs hover:bg-neutral-900" onClick={() => { setSelectedId(entry.question.id); setSelectedCardId(null); }}><span className="truncate">{entry.question.prompt}</span><span className="ml-auto pl-2 text-amber-500">{Math.round(entry.similarity * 100)}%</span></button>)}</div></section>}
           {versions.length > 0 && <section className="mt-5 rounded-xl border border-neutral-800 p-4" data-testid="study-question-versions"><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-600">{t('Historial de versiones')}</h3><div className="mt-2 space-y-1">{versions.map((version) => <div key={version.id} className="flex items-center rounded-lg bg-neutral-900/60 px-2 py-1.5 text-xs"><span>v{version.versionNo} · {t(version.reason)}</span><time className="ml-2 text-neutral-600">{new Date(version.createdAt).toLocaleString()}</time>{version.versionNo !== versions[0]?.versionNo && <button className="btn btn-ghost ml-auto h-7 text-[10px]" onClick={() => void mutate(() => window.nodus.restoreStudyQuestionVersion(selected.id, version.id))}>{t('Restaurar')}</button>}</div>)}</div></section>}
           <section className="mt-6 border-t border-neutral-800 pt-4"><h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-600">{t('Colecciones')}</h3><div className="mt-2 flex gap-2"><input className="input flex-1" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder={t('Nueva colección')} /><button className="btn btn-ghost" disabled={!collectionName.trim()} onClick={() => void mutate(() => window.nodus.createStudyQuestionCollection(collectionName)).then(() => setCollectionName(''))}><Icon name="folderPlus" />{t('Crear')}</button></div>{collections.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{collections.map((collection) => {
             const included = collection.questionIds.includes(selected.id);
@@ -232,6 +259,14 @@ export function StudyBankView({
           })}</div>}</section>
         </> : <div className="flex h-full items-center justify-center text-sm text-neutral-600">{t('Selecciona o crea una pregunta.')}</div>}</main>
       </div>}
+      {selectedCard && createPortal(<div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4" data-testid="study-bank-flashcard-modal" role="dialog" aria-modal="true" aria-labelledby="study-bank-flashcard-title" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedCardId(null); }}>
+        <div className="card max-h-[90vh] w-full max-w-3xl overflow-y-auto p-5 shadow-2xl" data-testid="study-bank-flashcard-detail">
+          <div className="flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2 py-1 text-[10px] text-teal-700 dark:bg-teal-950 dark:text-teal-300"><Icon name="flashcards" size={11} />{t('Flashcard')}</span><span className="rounded-full bg-indigo-100 px-2 py-1 text-[10px] text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">{t(selectedCard.srs.mastered ? 'Dominada' : 'En revisión')}</span><span className="ml-auto text-[10px] text-neutral-500">{selectedCard.shortId}</span><button type="button" className="btn btn-ghost h-8 w-8 p-0" aria-label={t('Cerrar')} onClick={() => setSelectedCardId(null)}><Icon name="x" /></button></div>
+          <section className="mt-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-7 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900/45"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">{t('Anverso')}</p><h2 id="study-bank-flashcard-title" className="mt-4 text-xl font-semibold leading-8">{selectedCard.front}</h2><div className="mx-auto my-6 h-px max-w-md bg-neutral-200 dark:bg-neutral-700"/><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">{t('Reverso')}</p><p className="mt-4 whitespace-pre-wrap text-lg leading-7 text-emerald-700 dark:text-emerald-300">{selectedCard.back}</p>{selectedCard.hint && <p className="mt-5 text-sm text-neutral-500">{t('Pista')}: {selectedCard.hint}</p>}</section>
+          {selectedCard.sourceExcerpt && <blockquote className="mt-4 rounded-xl border border-neutral-200 border-l-4 border-l-teal-500 bg-neutral-50 p-4 text-sm leading-6 text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900/30 dark:text-neutral-400">{selectedCard.sourceExcerpt}</blockquote>}
+          <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4"><div className="rounded-lg bg-neutral-100 p-2 dark:bg-neutral-900"><b className="block text-base">{selectedCard.srs.repetitions}</b>{t('Repeticiones')}</div><div className="rounded-lg bg-neutral-100 p-2 dark:bg-neutral-900"><b className="block text-base">{selectedCard.srs.intervalDays}</b>{t('Días de intervalo')}</div><div className="rounded-lg bg-neutral-100 p-2 dark:bg-neutral-900"><b className="block text-base">{selectedCard.srs.lapses}</b>{t('Fallos')}</div><div className="rounded-lg bg-neutral-100 p-2 dark:bg-neutral-900"><b className="block text-base">{new Date(selectedCard.srs.dueAt).toLocaleDateString()}</b>{t('Próxima revisión')}</div></div>
+        </div>
+      </div>, document.body)}
     </div>
   );
 }

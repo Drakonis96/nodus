@@ -19,13 +19,12 @@ import {
   addEdge,
   canonicalEdgeKey,
   currentEmbeddingConfig,
-  findSimilarIdeas,
-  ideasWithEmbeddings,
+  ideaVectorsForCompute,
   normalizeEdgeType,
 } from '../db/ideasRepo';
 import { loadCheckpoints, saveCheckpoint, clearCheckpoints } from '../db/scanCheckpointRepo';
 import { completeJson } from './aiClient';
-import { yieldToEventLoop, YIELD_EVERY } from '../util/async';
+import { computeNearestNeighbors } from '../graph/computeHost';
 
 const THEME_BATCH = 30;
 const RELATION_TOP_K_PER_IDEA = 10;
@@ -160,7 +159,7 @@ export async function reprocessConnections(
   const db = getDb();
   const settings = getSettings();
   const locked = settings.themesLocked;
-  const themeModel = model ?? settings.extractionModel ?? null;
+  const themeModel = model ?? settings.extractionModel ?? settings.synthesisModel ?? null;
   const relationModel = model ?? settings.fusionModel ?? settings.synthesisModel ?? null;
 
   const ideas = db
@@ -189,13 +188,21 @@ export async function reprocessConnections(
     )
     .all() as { global_id: string; nodus_id: string }[];
   const worksByIdea = new Map<string, string[]>();
-  const ideasByWork = new Map<string, string[]>();
   for (const row of occRows) {
     (worksByIdea.get(row.global_id) ?? worksByIdea.set(row.global_id, []).get(row.global_id)!).push(row.nodus_id);
-    (ideasByWork.get(row.nodus_id) ?? ideasByWork.set(row.nodus_id, []).get(row.nodus_id)!).push(row.global_id);
   }
 
-  const activeIdeas = ideas.filter((idea) => (worksByIdea.get(idea.global_id)?.length ?? 0) > 0);
+  let scopedIdeaIds: Set<string> | null = null;
+  if (options.nodusIds && options.nodusIds.length > 0) {
+    const placeholders = options.nodusIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(`SELECT DISTINCT global_id FROM idea_occurrences WHERE nodus_id IN (${placeholders})`)
+      .all(...options.nodusIds) as Array<{ global_id: string }>;
+    scopedIdeaIds = new Set(rows.map((row) => row.global_id));
+  }
+  const activeIdeas = ideas.filter(
+    (idea) => (worksByIdea.get(idea.global_id)?.length ?? 0) > 0 && (!scopedIdeaIds || scopedIdeaIds.has(idea.global_id))
+  );
   if (activeIdeas.length === 0) {
     return { ideas: 0, themedIdeas: 0, newThemes: 0, relationsAdded: 0 };
   }
@@ -296,21 +303,20 @@ export async function reprocessConnections(
       replaceIdeaThemeLinks(idea.global_id, works, labels, 0.8, 'explicit');
       if (labels.length > 0) themedIdeas++;
     }
-    // Rebuild each analysed work's theme hubs as the union of its ideas' themes (capped).
-    for (const [nodusId, ideaIds] of ideasByWork) {
-      const counts = new Map<string, { label: string; n: number }>();
-      for (const ideaId of ideaIds) {
-        for (const label of themesByIdea.get(ideaId) ?? []) {
-          const norm = normalizeThemeLabel(label);
-          const entry = counts.get(norm) ?? { label, n: 0 };
-          entry.n += 1;
-          counts.set(norm, entry);
-        }
-      }
-      const topLabels = [...counts.values()]
-        .sort((a, b) => b.n - a.n)
-        .slice(0, 4)
-        .map((c) => c.label);
+    // Rebuild only works touched by this pass. Querying the persisted links keeps
+    // unchanged ideas in those works represented during an incremental run.
+    const affectedWorks = new Set(activeIdeas.flatMap((idea) => worksByIdea.get(idea.global_id) ?? []));
+    for (const nodusId of affectedWorks) {
+      const topLabels = (db
+        .prepare(
+          `SELECT t.label, COUNT(DISTINCT l.global_id) AS n
+             FROM idea_theme_links l JOIN themes t ON t.theme_id = l.theme_id
+            WHERE l.nodus_id = ?
+            GROUP BY t.theme_id, t.label
+            ORDER BY n DESC, t.label COLLATE NOCASE
+            LIMIT 4`
+        )
+        .all(nodusId) as Array<{ label: string }>).map((row) => row.label);
       setWorkThemes(nodusId, topLabels);
     }
     pruneOrphanThemes();
@@ -321,7 +327,22 @@ export async function reprocessConnections(
 
   let relationsAdded = 0;
   if (options.relations) {
-    relationsAdded = await reprocessRelations(activeIdeas, themesByIdea, relationModel, contentHash, onProgress);
+    if (scopedIdeaIds) {
+      const existingThemeRows = db
+        .prepare(
+          `SELECT DISTINCT l.global_id, t.label
+             FROM idea_theme_links l JOIN themes t ON t.theme_id = l.theme_id
+            ORDER BY t.label COLLATE NOCASE`
+        )
+        .all() as Array<{ global_id: string; label: string }>;
+      for (const row of existingThemeRows) {
+        if (scopedIdeaIds.has(row.global_id)) continue;
+        const labels = themesByIdea.get(row.global_id) ?? [];
+        labels.push(row.label);
+        themesByIdea.set(row.global_id, labels);
+      }
+    }
+    relationsAdded = await reprocessRelations(activeIdeas, ideas, themesByIdea, relationModel, contentHash, onProgress, Boolean(scopedIdeaIds));
   }
 
   return {
@@ -339,17 +360,20 @@ export async function reprocessConnections(
  * compared, and it keeps model work bounded by candidate count rather than N².
  */
 async function reprocessRelations(
-  ideas: IdeaRow[],
+  queryIdeas: IdeaRow[],
+  allIdeas: IdeaRow[],
   themesByIdea: Map<string, string[]>,
   model?: ModelRef | null,
   contentHash?: string,
-  onProgress?: (p: ReprocessProgress) => void
+  onProgress?: (p: ReprocessProgress) => void,
+  incremental = false
 ): Promise<number> {
   const db = getDb();
-  const ideaById = new Map(ideas.map((idea) => [idea.global_id, idea]));
-  const activeIds = new Set(ideas.map((idea) => idea.global_id));
-  const embeddedIdeas = ideasWithEmbeddings().filter((idea) => activeIds.has(idea.global_id));
-  if (embeddedIdeas.length < 2) return 0;
+  const ideaById = new Map(allIdeas.map((idea) => [idea.global_id, idea]));
+  const queryIds = new Set(queryIdeas.map((idea) => idea.global_id));
+  const vectors = ideaVectorsForCompute().filter((idea) => ideaById.has(idea.global_id));
+  const queryVectors = vectors.filter((idea) => queryIds.has(idea.global_id));
+  if (queryVectors.length === 0 || vectors.length < 2) return 0;
 
   const existingPairs = new Set<string>();
   const existingRows = db
@@ -361,23 +385,23 @@ async function reprocessRelations(
 
   const candidates: RelationCandidate[] = [];
   const seenPairs = new Set<string>();
-  // Each findSimilarIdeas() is a synchronous full-table vec_cosine scan, so this
-  // loop is O(N²) on the single main-thread event loop. Yield periodically so the
-  // UI and IPC stay responsive while the batch runs in the background.
-  let scanned = 0;
-  for (const idea of embeddedIdeas) {
-    if (++scanned % YIELD_EVERY === 0) await yieldToEventLoop();
-    const similar = findSimilarIdeas(idea.embedding, 0.68, RELATION_TOP_K_PER_IDEA, { excludeIds: [idea.global_id] });
-    for (const hit of similar) {
-      if (!activeIds.has(hit.global_id)) continue;
-      const other = ideaById.get(hit.global_id);
+  const matches = await computeNearestNeighbors(
+    queryVectors.map((idea) => ({ id: idea.global_id, vector: idea.vector })),
+    vectors.map((idea) => ({ id: idea.global_id, vector: idea.vector })),
+    0.68,
+    RELATION_TOP_K_PER_IDEA
+  );
+  for (const match of matches) {
+      const idea = ideaById.get(match.queryId);
+      const other = ideaById.get(match.candidateId);
+      if (!idea) continue;
       if (!other) continue;
-      const pairKey = [idea.global_id, hit.global_id].sort().join('|');
+      const pairKey = [idea.global_id, match.candidateId].sort().join('|');
       if (seenPairs.has(pairKey) || existingPairs.has(pairKey)) continue;
       seenPairs.add(pairKey);
       candidates.push({
         fromId: idea.global_id,
-        toId: hit.global_id,
+        toId: match.candidateId,
         fromType: idea.type,
         toType: other.type,
         fromLabel: idea.label,
@@ -385,10 +409,9 @@ async function reprocessRelations(
         fromStatement: idea.statement,
         toStatement: other.statement,
         fromThemes: themesByIdea.get(idea.global_id) ?? [],
-        toThemes: themesByIdea.get(hit.global_id) ?? [],
-        similarity: hit.similarity,
+        toThemes: themesByIdea.get(match.candidateId) ?? [],
+        similarity: match.similarity,
       });
-    }
   }
 
   candidates.sort((a, b) => b.similarity - a.similarity);
@@ -475,9 +498,17 @@ async function reprocessRelations(
   let added = 0;
   const config = currentEmbeddingConfig();
   const insert = db.transaction(() => {
-    // Clear old reproc edges only now — after all batches completed successfully.
-    db.prepare(`DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%')`).run();
-    db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
+    // An incremental pass replaces only relations touching changed ideas. A
+    // manual full pass retains the original all-reprocess semantics.
+    if (incremental) {
+      const ids = [...queryIds];
+      const placeholders = ids.map(() => '?').join(',');
+      db.prepare(`DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%' AND (from_id IN (${placeholders}) OR to_id IN (${placeholders})))`).run(...ids, ...ids);
+      db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%' AND (from_id IN (${placeholders}) OR to_id IN (${placeholders}))`).run(...ids, ...ids);
+    } else {
+      db.prepare(`DELETE FROM edge_traces WHERE edge_id IN (SELECT id FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%')`).run();
+      db.prepare(`DELETE FROM edges WHERE id LIKE '${REPROC_EDGE_PREFIX}%'`).run();
+    }
     for (const edge of proposed.values()) {
       const id = addEdge({
         id: `${REPROC_EDGE_PREFIX}${uuid()}`,

@@ -7,4 +7,4 @@ export interface StudyAiUsageSummary { month: string; knownCostUsd: number; unkn
 
 export function estimateStudyTokensFromChars(chars: number): number { return Math.max(0, Math.ceil(chars / 4)); }
 export function studyAiBudgetState(knownCostUsd: number, budgetUsd: number): { percent: number | null; exceeded: boolean } { if (budgetUsd <= 0) return { percent: null, exceeded: false }; const percent = knownCostUsd / budgetUsd * 100; return { percent, exceeded: knownCostUsd >= budgetUsd }; }
-export function isLocalStudyModel(model: ModelRef): boolean { return model.provider === 'ollama' || model.provider === 'lmstudio'; }
+export function isLocalStudyModel(model: ModelRef): boolean { return model.provider === 'ollama' || model.provider === 'lmstudio' || model.provider === 'nodus'; }

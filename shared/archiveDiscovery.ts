@@ -97,3 +97,18 @@ export function personProfileText(p: PersonProfileSource): string {
   for (const pl of p.places ?? []) lines.push(pl);
   return lines.filter(Boolean).join('\n').slice(0, 8000);
 }
+
+/** High-precision genealogy guard for semantic document suggestions. Moderate
+ * embedding similarity must share a dated or geographic anchor with the profile;
+ * otherwise generic historical documents tend to look deceptively close. */
+export function documentHasGenealogyAnchor(p: PersonProfileSource, text: string): boolean {
+  const folded = fold(text);
+  const years = [p.birthDate, p.deathDate, ...(p.events ?? []).map((event) => event.date)]
+    .flatMap((value) => String(value ?? '').match(/\b(?:1[5-9]|20)\d{2}\b/g) ?? []);
+  if (years.some((year) => folded.includes(year))) return true;
+  const places = [...(p.places ?? []), ...(p.events ?? []).map((event) => event.place).filter((place): place is string => Boolean(place))];
+  return places.some((place) => {
+    const tokens = nameTokens(place);
+    return tokens.length > 0 && tokens.every((token) => new RegExp(`(^|\\s)${token}(?=\\s|$)`).test(folded.replace(/[^a-z0-9\s]/g, ' ')));
+  });
+}

@@ -73,12 +73,12 @@ try {
   assert.ok(word.length > 1000, 'Word export is a real DOCX archive');
   const AdmZip = require('adm-zip');
   const bundle = new AdmZip(studyExport.buildStudyBundle({ kind: 'workspace' }));
-  const manifest = JSON.parse(bundle.readAsText('manifest.json'));
+  const manifest = JSON.parse(bundle.readAsText('_Nodus/manifest.json'));
   assert.equal(manifest.format, 'nodus-study-readonly');
   assert.equal(manifest.readOnly, true);
-  assert.ok(bundle.getEntries().some((entry) => entry.entryName.startsWith('documentos/') && entry.entryName.endsWith('.md')), 'bundle preserves document hierarchy');
-  assert.ok(bundle.getEntries().some((entry) => entry.entryName.startsWith('recursos/materiales/')), 'bundle includes original material bytes');
-  assert.ok(bundle.getEntries().some((entry) => entry.entryName.startsWith('recursos/grabaciones/')), 'bundle includes original recording bytes');
+  assert.ok(bundle.getEntries().some((entry) => entry.entryName.startsWith('Historia/') && entry.entryName.endsWith('.md')), 'ZIP places notes inside their course hierarchy');
+  assert.ok(bundle.getEntry('Historia/fuente.txt'), 'ZIP places original materials inside their course hierarchy');
+  assert.ok(bundle.getEntry('_Sin-organizar/clase.wav'), 'ZIP keeps unassigned recordings in an explicit folder');
   closeDb();
   console.log('Study data administration phase 13 tests passed!');
 } finally {

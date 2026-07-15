@@ -76,6 +76,12 @@ try {
   assert.equal(graph.edges.length, 2);
   assert.ok(graph.edges.some((e) => e.role === 'cliente' && e.fromId === tomas.personId && e.toId === notario.contactId));
 
+  const genealogyChat = require(path.join(repoRoot, 'electron/ai/genealogyChatContext.ts'));
+  const genealogyDeep = require(path.join(repoRoot, 'electron/ai/genealogyDeepResearch.ts'));
+  const chatContext = await genealogyChat.buildGenealogyContext('¿Quién fue Antonio Ruiz para Tomás Serrano?');
+  assert.ok(chatContext.relaciones_sociales.some((relation) => relation.persona === 'Tomás Serrano' && relation.contacto === 'Antonio Ruiz' && relation.relacion === 'cliente'), 'genealogy chat receives the social-relations graph');
+  assert.ok(genealogyDeep.buildFamilyFacts().relaciones_sociales.some((relation) => relation.contacto === 'Antonio Ruiz'), 'genealogy Deep Research receives the social-relations graph');
+
   // A freshly-created, relation-less contact does NOT appear in the graph (only
   // relations create graph presence — see RelationsView's "always via a ficha" design).
   const lonely = social.createSocialContact({ displayName: 'Nadie los conoce' });

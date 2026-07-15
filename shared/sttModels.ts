@@ -1,4 +1,4 @@
-export type StudySttProvider = 'local' | 'openai';
+export type StudySttProvider = 'transformers' | 'whisper_cpp' | 'openai';
 
 export interface StudySttModel {
   id: string;
@@ -17,6 +17,63 @@ export const STUDY_STT_MODELS: readonly StudySttModel[] = [
   { id: 'Xenova/whisper-medium', label: 'Whisper Medium', sizeMb: 1500, ramMb: 3900, speed: 'preciso', accuracy: 'muy_alta', multilingual: true },
 ] as const;
 
+export interface WhisperCppModel {
+  id: string;
+  label: string;
+  sizeMb: number;
+  multilingual: boolean;
+}
+
+/** Official multilingual GGML files published by whisper.cpp. English-only
+ * variants are deliberately omitted because the UI allows per-audio language
+ * selection. */
+export const WHISPER_CPP_MODELS: readonly WhisperCppModel[] = [
+  { id: 'tiny', label: 'Whisper Tiny', sizeMb: 75, multilingual: true },
+  { id: 'base', label: 'Whisper Base', sizeMb: 142, multilingual: true },
+  { id: 'small', label: 'Whisper Small', sizeMb: 466, multilingual: true },
+  { id: 'medium', label: 'Whisper Medium', sizeMb: 1536, multilingual: true },
+  { id: 'large-v3-turbo-q5_0', label: 'Whisper Large v3 Turbo Q5', sizeMb: 547, multilingual: true },
+] as const;
+
+const WHISPER_LANGUAGE_ENTRIES = [
+  ['en', 'English'], ['zh', 'Chinese'], ['de', 'German'], ['es', 'Spanish'], ['ru', 'Russian'],
+  ['ko', 'Korean'], ['fr', 'French'], ['ja', 'Japanese'], ['pt', 'Portuguese'], ['tr', 'Turkish'],
+  ['pl', 'Polish'], ['ca', 'Catalan'], ['nl', 'Dutch'], ['ar', 'Arabic'], ['sv', 'Swedish'],
+  ['it', 'Italian'], ['id', 'Indonesian'], ['hi', 'Hindi'], ['fi', 'Finnish'], ['vi', 'Vietnamese'],
+  ['he', 'Hebrew'], ['uk', 'Ukrainian'], ['el', 'Greek'], ['ms', 'Malay'], ['cs', 'Czech'],
+  ['ro', 'Romanian'], ['da', 'Danish'], ['hu', 'Hungarian'], ['ta', 'Tamil'], ['no', 'Norwegian'],
+  ['th', 'Thai'], ['ur', 'Urdu'], ['hr', 'Croatian'], ['bg', 'Bulgarian'], ['lt', 'Lithuanian'],
+  ['la', 'Latin'], ['mi', 'Maori'], ['ml', 'Malayalam'], ['cy', 'Welsh'], ['sk', 'Slovak'],
+  ['te', 'Telugu'], ['fa', 'Persian'], ['lv', 'Latvian'], ['bn', 'Bengali'], ['sr', 'Serbian'],
+  ['az', 'Azerbaijani'], ['sl', 'Slovenian'], ['kn', 'Kannada'], ['et', 'Estonian'], ['mk', 'Macedonian'],
+  ['br', 'Breton'], ['eu', 'Basque'], ['is', 'Icelandic'], ['hy', 'Armenian'], ['ne', 'Nepali'],
+  ['mn', 'Mongolian'], ['bs', 'Bosnian'], ['kk', 'Kazakh'], ['sq', 'Albanian'], ['sw', 'Swahili'],
+  ['gl', 'Galician'], ['mr', 'Marathi'], ['pa', 'Punjabi'], ['si', 'Sinhala'], ['km', 'Khmer'],
+  ['sn', 'Shona'], ['yo', 'Yoruba'], ['so', 'Somali'], ['af', 'Afrikaans'], ['oc', 'Occitan'],
+  ['ka', 'Georgian'], ['be', 'Belarusian'], ['tg', 'Tajik'], ['sd', 'Sindhi'], ['gu', 'Gujarati'],
+  ['am', 'Amharic'], ['yi', 'Yiddish'], ['lo', 'Lao'], ['uz', 'Uzbek'], ['fo', 'Faroese'],
+  ['ht', 'Haitian Creole'], ['ps', 'Pashto'], ['tk', 'Turkmen'], ['nn', 'Nynorsk'], ['mt', 'Maltese'],
+  ['sa', 'Sanskrit'], ['lb', 'Luxembourgish'], ['my', 'Myanmar'], ['bo', 'Tibetan'], ['tl', 'Tagalog'],
+  ['mg', 'Malagasy'], ['as', 'Assamese'], ['tt', 'Tatar'], ['haw', 'Hawaiian'], ['ln', 'Lingala'],
+  ['ha', 'Hausa'], ['ba', 'Bashkir'], ['jw', 'Javanese'], ['su', 'Sundanese'],
+] as const;
+
+export const STUDY_STT_LANGUAGES = [
+  { code: 'auto', label: 'Detectar automáticamente' },
+  ...WHISPER_LANGUAGE_ENTRIES.map(([code, label]) => ({ code, label })),
+] as const;
+
+export interface WhisperCppStatus {
+  executablePath: string | null;
+  executableReady: boolean;
+  models: Array<{ id: string; path: string; downloaded: boolean; bytes: number }>;
+}
+
+export interface StudySttStreamHandlers {
+  onProgress?: (fraction: number) => void;
+  onPartial?: (text: string) => void;
+}
+
 export interface StudySttDeviceProfile {
   memoryGb?: number | null;
   logicalCores?: number | null;
@@ -34,14 +91,11 @@ export function getStudySttModel(id: string): StudySttModel {
   return STUDY_STT_MODELS.find((model) => model.id === id) ?? STUDY_STT_MODELS[0];
 }
 
-const WHISPER_LANGUAGES: Record<string, string> = {
-  es: 'spanish', 'es-es': 'spanish', en: 'english', 'en-us': 'english', 'en-gb': 'english',
-  fr: 'french', 'fr-fr': 'french', pt: 'portuguese', 'pt-pt': 'portuguese', 'pt-br': 'portuguese',
-  de: 'german', it: 'italian', ca: 'catalan', eu: 'basque', gl: 'galician',
-};
+const WHISPER_LANGUAGES = Object.fromEntries(WHISPER_LANGUAGE_ENTRIES.map(([code, label]) => [code, label.toLocaleLowerCase()]));
 
 export function whisperLanguageName(language: string): string | undefined {
   const normalized = language.trim().toLocaleLowerCase();
+  if (!normalized || normalized === 'auto') return undefined;
   return WHISPER_LANGUAGES[normalized] ?? WHISPER_LANGUAGES[normalized.split('-')[0]];
 }
 
@@ -134,13 +188,16 @@ export function buildStudySttPrompt(vocabulary: string[], limit = 80): string {
 export interface StudySttRequest {
   audioBytes: Uint8Array;
   mimeType: string;
+  provider?: StudySttProvider | null;
   model?: string | null;
   language?: string | null;
   prompt?: string | null;
+  requestId?: string | null;
 }
 
 export interface StudySttResult {
   text: string;
   provider: StudySttProvider;
   model: string;
+  chunks?: Array<{ text: string; timestamp: [number | null, number | null] | null }>;
 }

@@ -29,6 +29,7 @@ try {
   const improve = require(path.join(repoRoot, 'electron/ai/studyImprove.ts'));
   const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
   const styles = require(path.join(repoRoot, 'electron/db/studyStylesRepo.ts'));
+  const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
   const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
 
@@ -48,6 +49,9 @@ try {
   assert.match(shared.renderStudyStylePrompt('Para {{subject}}: {{selectedText}}', { subject: 'Historia', selectedText: 'Texto' }), /Historia: Texto/);
   assert.ok(shared.validateStudyStylePrompt('Inventa nuevas citas y datos para ampliar el texto seleccionado.').length > 0, 'unsafe custom prompt is warned');
   assert.ok(shared.studyImprovementWarnings('Hubo 37 casos.', 'Hubo 41 casos.', [], 'preserve').length >= 2, 'changed and new numbers are warned');
+  settingsRepo.updateSettings({ studyImproveToolbarStyleIds: ['builtin:formal', 'builtin:academic', 'builtin:clear', 'builtin:concise', 'builtin:summary'] });
+  assert.deepEqual(settingsRepo.getSettings().studyImproveToolbarStyleIds,
+    ['builtin:formal', 'builtin:academic', 'builtin:clear', 'builtin:concise'], 'the prompt toolbar persists at most four styles');
 
   const document = org.createStudyDocument({ title: 'Apunte para mejorar', contentMarkdown: original });
   const custom = styles.createStudyStyle({
@@ -117,6 +121,17 @@ try {
   const exported = styles.exportStudyStyles([custom.id]);
   assert.equal(exported.format, 'nodus-study-styles');
   assert.equal(styles.importStudyStyles(exported).length, 1, 'style files round-trip');
+
+  const dialogSource = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyImproveDialog.tsx'), 'utf8');
+  const editorSource = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyEditor.tsx'), 'utf8');
+  assert.match(dialogSource, /max-h-\[78vh\].*max-w-2xl/);
+  assert.match(dialogSource, /Puedes mostrar un máximo de cuatro prompts en la barra/);
+  assert.match(dialogSource, /study-prompt-title/); assert.match(dialogSource, /study-prompt-text/); assert.match(dialogSource, /IconEmojiPicker/);
+  for (const removed of ['Conservar significado', 'Transformación libre', "t('Nivel')", "t('Longitud')"]) assert.doesNotMatch(dialogSource, new RegExp(removed));
+  assert.match(editorSource, /createPortal/); assert.match(editorSource, /milkdown-toolbar/);
+  assert.match(editorSource, /study-selection-text-color/); assert.match(editorSource, /study-selection-heading/); assert.match(editorSource, /study-selection-tools-host/); assert.match(editorSource, /study-toolbar-quick-improve/);
+  assert.doesNotMatch(editorSource, /study-improve-selection-toolbar/); assert.match(editorSource, /requestAnimationFrame\(flush\)/);
+  assert.match(editorSource, /updateStudyImprovementAction\(result\.logId, 'replace'\)/); assert.match(editorSource, /Ctrl\/⌘\+Z/);
 
   // Upgrade a genuine v54 file and prove documents survive the reserved v55/v56
   // schema plus the phase's v57 tables.

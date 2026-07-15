@@ -10,6 +10,7 @@ import { listPersons, listEvents, listEvidenceFor } from '../db/entitiesRepo';
 import { allRelationships } from '../db/relationshipsRepo';
 import { listItems, listItemsForPerson, findArchiveItemsSimilar } from '../db/archiveRepo';
 import { listOpenSuggestions } from '../db/kinshipSuggestionsRepo';
+import { allSocialRelations } from '../db/socialRepo';
 import { embed } from './aiClient';
 import { nameTokens } from '@shared/archiveDiscovery';
 
@@ -28,9 +29,10 @@ function snippet(text: string | null | undefined, max = DOC_SNIPPET): string | n
 }
 
 export interface GenealogyChatContext {
-  resumen: { personas: number; eventos: number; documentos: number; parentescos_sugeridos: number };
+  resumen: { personas: number; eventos: number; documentos: number; relaciones_sociales: number; parentescos_sugeridos: number };
   personas: unknown[];
   eventos: unknown[];
+  relaciones_sociales: unknown[];
   documentos: unknown[];
   evidencia: unknown[];
   parentescos_sugeridos: unknown[];
@@ -130,15 +132,25 @@ export async function buildGenealogyContext(question: string): Promise<Genealogy
       evidencia: s.evidence.filter((ev) => ev.quote).map((ev) => ({ cita: ev.quote, localizacion: ev.location, señal: ev.signal })),
     }));
 
+  const relaciones_sociales = allSocialRelations().slice(0, 200).map((relation) => ({
+    persona: relation.personName,
+    contacto: relation.targetName,
+    tipo_contacto: relation.targetKind,
+    relacion: relation.role,
+    notas: snippet(relation.notes, 400),
+  }));
+
   return {
     resumen: {
       personas: persons.length,
       eventos: eventos.length,
       documentos: documentos.length,
+      relaciones_sociales: relaciones_sociales.length,
       parentescos_sugeridos: parentescos_sugeridos.length,
     },
     personas,
     eventos,
+    relaciones_sociales,
     documentos,
     evidencia,
     parentescos_sugeridos,

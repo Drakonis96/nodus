@@ -5,26 +5,25 @@ import type {
   EmbeddingProvider,
   McpServerStatus,
   ModelInfo,
-  ModelRef,
-  StudyAiTask,
-  StudyAiUsageSummary,
   StudyDataOverview,
-  StudySubject,
   UpdateProgressEvent,
   VaultSummary,
   VaultType,
 } from '@shared/types';
-import { ProvidersSettings } from './ProvidersSettings';
+import { ImageGenerationSettings, ProvidersSettings } from './ProvidersSettings';
+import { AudioGenerationSettings } from './AudioGenerationSettings';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { SttSettings } from '../components/SttSettings';
+import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { NAV_GROUPS, orderedNav } from '../navigation';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
-type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data';
+type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data' | 'about';
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
@@ -33,8 +32,9 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
-  { id: 'system', label: 'Sistema', icon: 'settings', keywords: 'ayuda tutorial actualizaciones update version' },
-  { id: 'data', label: 'Datos', icon: 'download', keywords: 'backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
+  { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial actualizaciones update version' },
+  { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia' },
 ];
 
 function normalizeSettingsText(value: string): string {
@@ -47,10 +47,10 @@ function normalizeSettingsText(value: string): string {
 
 export function Settings({
   settings,
-  vaults,
+  vaults: _vaults,
   activeVault,
   onChange,
-  onVaultsChanged,
+  onVaultsChanged: _onVaultsChanged,
 }: {
   settings: AppSettings;
   vaults: VaultSummary[];
@@ -70,13 +70,24 @@ export function Settings({
   const [updateMessage, setUpdateMessage] = useState<string | null>(null);
   const [updateProgress, setUpdateProgress] = useState<UpdateProgressEvent | null>(null);
   const [confirmReindex, setConfirmReindex] = useState(false);
-  const [backupResult, setBackupResult] = useState<{ path: string; password: string } | null>(null);
+  const [pendingModelSettingsMode, setPendingModelSettingsMode] = useState<AppSettings['modelSettingsMode'] | null>(null);
+  const [pendingEmbeddingChange, setPendingEmbeddingChange] = useState<{ provider: EmbeddingProvider; model: string } | null>(null);
+  const [backupResult, setBackupResult] = useState<{ path: string; password: string; recoveryKey: string } | null>(null);
   const [backupCopied, setBackupCopied] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem('nodus.settingsTarget') !== 'nodi') return;
+    localStorage.removeItem('nodus.settingsTarget');
+    setSettingsTab('interface');
+    setSettingsQuery('Nodi');
+  }, []);
   const [importPassword, setImportPassword] = useState('');
+  const [showImportPassword, setShowImportPassword] = useState(false);
   const [importingBackup, setImportingBackup] = useState(false);
   const [autoBackupHasPassword, setAutoBackupHasPassword] = useState(false);
   const [autoBackupPasswordInput, setAutoBackupPasswordInput] = useState('');
+  const [showAutoBackupPassword, setShowAutoBackupPassword] = useState(false);
   const [autoBackupRunning, setAutoBackupRunning] = useState(false);
   const [mcpStatus, setMcpStatus] = useState<McpServerStatus>({ running: false, port: null, url: null, error: null });
   const [copilotStatus, setCopilotStatus] = useState<CopilotServerStatus>({ running: false, port: null, addinUrl: null, certReady: false, error: null });
@@ -222,7 +233,7 @@ export function Settings({
 
   const copyBackupPassword = async () => {
     if (!backupResult) return;
-    await navigator.clipboard.writeText(backupResult.password);
+    await navigator.clipboard.writeText(`${t('Contraseña')}: ${backupResult.password}\n${t('Clave de recuperación')}: ${backupResult.recoveryKey}`);
     setBackupCopied(true);
   };
 
@@ -289,10 +300,11 @@ export function Settings({
     visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion'),
     visibleSettingsSection('integrations', 'Copiloto de escritura Word', 'word copilot addin certificado token localhost'),
     visibleSettingsSection('integrations', 'Copiloto de escritura LibreOffice', 'libreoffice copilot macro python install instalacion instalando'),
-    visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña'),
-    visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia'),
+    visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
+    visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
+    visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador'),
   ].filter(Boolean).length;
 
   return (
@@ -508,6 +520,11 @@ export function Settings({
               <label className="text-sm text-neutral-300">{t('Mostrar a Nodi')}</label>
               <input type="checkbox" checked={settings.mascotEnabled} onChange={(e) => void patch({ mascotEnabled: e.target.checked })} />
             </div>
+            <label className="block text-sm text-neutral-300">
+              {t('Modelo del chat de Nodi')}
+              <span className="mt-0.5 block text-xs font-normal text-neutral-500">{t('Este selector es independiente del asistente de investigación y del resto de funciones de IA.')}</span>
+              <div className="mt-2 max-w-md"><ModelPicker settings={settings} value={settings.nodiModel ?? settings.synthesisModel} onChange={(nodiModel) => void patch({ nodiModel })} compact menu emptyLabel="Usar modelo de síntesis" /></div>
+            </label>
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <label className="text-sm text-neutral-300">{t('Mantener siempre visible sobre otras apps')}</label>
@@ -556,6 +573,19 @@ export function Settings({
 
       {visibleSettingsSection('system', 'Ayuda', 'tutorial uso avanzado actualizaciones version update reiniciar') && (
           <Section title={t('Ayuda')}>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="text-sm text-neutral-300">{t('Guía esencial de Nodus e IA')}</label>
+                <p className="text-xs text-neutral-500 mt-0.5">{t('Bóvedas, modelos locales, API keys, costes, embeddings y voz explicados desde cero.')}</p>
+              </div>
+              <button
+                data-testid="basics-tutorial-replay"
+                className="btn btn-primary"
+                onClick={() => patch({ basicsTutorialVersion: 0 }).then(() => flash(t('Se mostrará la guía esencial.')))}
+              >
+                <Icon name="play" /> {t('Empezar')}
+              </button>
+            </div>
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Tutorial de uso')}</label>
@@ -608,6 +638,21 @@ export function Settings({
                 </button>
               </div>
             )}
+            {activeVault?.type === 'estudio' && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="text-sm text-neutral-300">{t('Tutorial de estudio')}</label>
+                  <p className="text-xs text-neutral-500 mt-0.5">{t('Cursos, horarios, materiales, grabaciones, chat, ideas, preguntas y repaso.')}</p>
+                </div>
+                <button
+                  data-testid="study-tour-replay"
+                  className="btn btn-ghost border border-neutral-700"
+                  onClick={() => patch({ studyTourComplete: false }).then(() => flash(t('Se mostrará el tutorial de estudio.')))}
+                >
+                  <Icon name="graduation" /> {t('Ver de nuevo')}
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm text-neutral-300">{t('Actualizaciones')}</label>
@@ -641,6 +686,43 @@ export function Settings({
               </div>
             </div>
           </Section>
+      )}
+
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador') && (
+        <Section title={t('Acerca de Nodus')}>
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                <Icon name="network" size={22} />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Nodus</h2>
+                <p className="mt-0.5 text-xs text-neutral-500">v{__APP_VERSION__}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 max-w-3xl space-y-3 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+              <p>
+                {t('Nodus es un proyecto independiente de código abierto, desarrollado y mantenido principalmente por una sola persona. No es un servicio comercial ni un producto de pago: la aplicación seguirá siendo gratuita y su código permanecerá abierto.')}
+              </p>
+              <p>
+                {t('Si Nodus te ayuda a estudiar, investigar o escribir y quieres contribuir voluntariamente a su desarrollo, puedes apoyar el proyecto mediante PayPal. La donación es completamente opcional: no desbloquea funciones ni cambia el acceso a la aplicación.')}
+              </p>
+            </div>
+
+            <button
+              data-testid="support-nodus-paypal"
+              className="btn btn-primary mt-5"
+              onClick={() => void window.nodus.openExternal('https://paypal.me/Jorgepb96')}
+            >
+              <Icon name="paypal" size={17} /> {t('Apoyar con PayPal')}
+              <Icon name="external" size={13} className="opacity-70" />
+            </button>
+            <p className="mt-2 text-xs text-neutral-500">
+              {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
+            </p>
+          </div>
+        </Section>
       )}
 
       {visibleSettingsSection('integrations', 'Servidor MCP', 'mcp servidor puerto token cliente conexion') && (
@@ -792,8 +874,8 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('data', 'Datos', 'demo exportar importar copia backup cifrada contraseña') && (
-          <Section title={t('Datos')}>
+      {visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña') && (
+          <Section title={t('Backup / copia de seguridad')}>
             {settings.demoMode && (
               <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-950/20">
                 <div>
@@ -876,7 +958,7 @@ export function Settings({
                 <div>
                   <label className="text-sm">{t('Copias de seguridad automáticas')}</label>
                   <p className="text-xs text-neutral-500 mt-0.5">
-                    {t('Copias cifradas periódicas en una carpeta a tu elección (apúntala a iCloud Drive o Google Drive para tenerlas fuera de este equipo). No incluyen claves API.')}
+                    {t('Copias cifradas periódicas en una carpeta a tu elección. Cada copia incluye todo Nodus; puedes usar iCloud Drive, Google Drive o Dropbox para mantenerla fuera de este equipo.')}
                   </p>
                 </div>
                 <input
@@ -891,16 +973,18 @@ export function Settings({
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       className="btn btn-ghost border border-neutral-700"
-                      onClick={async () => {
-                        const folder = await window.nodus.chooseBackupFolder();
-                        if (folder) await patch({ autoBackupFolder: folder });
-                      }}
+                      onClick={() => void patch({ recoverySetupVersion: 0 })}
                     >
-                      <Icon name="folder" /> {t('Elegir carpeta')}
+                      <Icon name="folder" /> {settings.autoBackupFolder ? t('Cambiar carpeta o recuperar') : t('Configurar carpeta segura')}
                     </button>
                     <span className="min-w-0 flex-1 truncate text-xs text-neutral-400" title={settings.autoBackupFolder}>
                       {settings.autoBackupFolder || t('Sin carpeta elegida')}
                     </span>
+                  </div>
+
+                  <div className="flex items-start gap-2 rounded-md border border-emerald-900/60 bg-emerald-950/15 p-3 text-xs text-emerald-200">
+                    <Icon name="lock" className="mt-0.5 shrink-0" />
+                    <div><span className="font-medium">{t('Cada copia protege todo Nodus automáticamente.')}</span><p className="mt-1 text-[11px] text-neutral-400">{t('Incluye todas las bóvedas, documentos, preferencias, historiales, archivos generados y claves API. No existen exclusiones configurables.')}</p></div>
                   </div>
 
                   {/* Schedule: which day(s) of the week + at what time. If the machine
@@ -957,7 +1041,7 @@ export function Settings({
                   </div>
                   {autoBackupHasPassword ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-emerald-400">{t('Contraseña maestra configurada (guardada en el llavero del sistema).')}</span>
+                      <span className="text-xs text-emerald-400">{t('Contraseña maestra y clave de recuperación configuradas.')}</span>
                       <button
                         className="btn btn-ghost border border-neutral-700 text-xs"
                         onClick={async () => {
@@ -980,13 +1064,16 @@ export function Settings({
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="password"
-                        className="input w-64"
-                        placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
-                        value={autoBackupPasswordInput}
-                        onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
-                      />
+                      <div className="relative w-64">
+                        <input
+                          type={showAutoBackupPassword ? 'text' : 'password'}
+                          className="input w-full pr-10"
+                          placeholder={t('Contraseña maestra (mín. 8 caracteres)')}
+                          value={autoBackupPasswordInput}
+                          onChange={(e) => setAutoBackupPasswordInput(e.target.value)}
+                        />
+                        <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100" onClick={() => setShowAutoBackupPassword((value) => !value)} aria-label={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')} title={t(showAutoBackupPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}><Icon name={showAutoBackupPassword ? 'eyeOff' : 'eye'} size={17} /></button>
+                      </div>
                       <button
                         className="btn btn-ghost border border-neutral-700"
                         disabled={autoBackupPasswordInput.trim().length < 8}
@@ -995,7 +1082,7 @@ export function Settings({
                             await window.nodus.setBackupPassword(autoBackupPasswordInput);
                             setAutoBackupPasswordInput('');
                             setAutoBackupHasPassword(true);
-                            flash(t('Contraseña maestra guardada. Descarga el kit de recuperación: sin la contraseña, las copias no se pueden restaurar.'));
+                            flash(t('Contraseña maestra guardada. Descarga el kit: permite recuperar incluso si olvidas la contraseña.'));
                           } catch (e) {
                             flash(e instanceof Error ? e.message : String(e));
                           }
@@ -1036,29 +1123,52 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('models', 'IA avanzada', 'modelo extraccion sintesis tutor resumen fusion embeddings indexacion razonamiento openrouter unpaywall contexto concurrencia') && (
-          <Section title={t('IA avanzada')}>
-            <p className="mb-4 text-sm leading-6 text-neutral-400">
-              {t('Cada tarea usa su propio modelo. Los escaneos, resúmenes, fusión y embeddings obedecen estos ajustes; Chat, Deep Research, Inmersión y las demás herramientas conservan el modelo elegido dentro de su propia sección.')}
+      {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen') && (<>
+          <Section title={t('Modelos de IA')}>
+            <p className="mb-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+              {t('Solo puede haber un modo de configuración activo. Cambiar de modo modifica qué selección de modelos utiliza Nodus, no solo la vista de este formulario.')}
             </p>
-            <Row label={t('Modelo de extracción (extrae temas, ideas, evidencias y huecos)')}>
-              <ModelPicker settings={settings} value={settings.extractionModel} onChange={(m) => patch({ extractionModel: m })} />
-            </Row>
-            <Row label={t('Modelo de visión (describe imágenes del archivo y transcribe su texto; usa uno con soporte de imagen)')}>
-              <ModelPicker settings={settings} value={settings.visionModel} onChange={(m) => patch({ visionModel: m })} emptyLabel="Usar modelo de extracción" />
-            </Row>
-            <Row label={t('Modelo de síntesis general (fallback inicial para herramientas con selector propio)')}>
+            <div className="mb-5 flex rounded-lg border border-neutral-200 bg-neutral-100 p-1 dark:border-neutral-800 dark:bg-neutral-950" data-testid="model-settings-mode">
+              {(['basic', 'advanced'] as const).map((mode) => <button
+                key={mode}
+                className={`flex-1 rounded-md px-3 py-2 text-sm ${settings.modelSettingsMode === mode ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200'}`}
+                aria-pressed={settings.modelSettingsMode === mode}
+                onClick={() => {
+                  if (settings.modelSettingsMode !== mode) setPendingModelSettingsMode(mode);
+                }}
+              >{t(mode === 'basic' ? 'Configuración básica' : 'Configuración avanzada')}</button>)}
+            </div>
+            <p className="mb-4 text-sm leading-6 text-neutral-600 dark:text-neutral-400">
+              {settings.modelSettingsMode === 'basic'
+                ? t('Un modelo general atiende conversación, análisis, resúmenes y las demás tareas de texto. Las capacidades especializadas se configuran debajo.')
+                : t('Cada tarea utiliza el modelo concreto seleccionado. Los modelos de las herramientas se guardan solo en el vault actual.')}
+            </p>
+            {settings.modelSettingsMode === 'basic' && <Row label={t('Modelo general de texto')} hint={t('Conversación, análisis, resúmenes y demás tareas de texto.')}>
               <ModelPicker settings={settings} value={settings.synthesisModel} onChange={(m) => patch({ synthesisModel: m })} />
-            </Row>
-            <Row label={t('Modelo de resúmenes (orientación por obra; no genera evidencia citable)')}>
-              <ModelPicker settings={settings} value={settings.summaryModel} onChange={(m) => patch({ summaryModel: m })} emptyLabel="Usar modelo de síntesis" />
-            </Row>
-            <Row label={t('Modelo de fusión (deduplica y relaciona ideas; muchas llamadas pequeñas, conviene uno rápido)')}>
-              <ModelPicker settings={settings} value={settings.fusionModel} onChange={(m) => patch({ fusionModel: m })} emptyLabel="Usar modelo de síntesis" />
-            </Row>
+            </Row>}
             <Row label={t('Modelo de embeddings (similitud semántica multilingüe)')}>
-              <EmbeddingModelControl settings={settings} onPatch={patch} />
+              <EmbeddingModelControl
+                settings={settings}
+                onEmbeddingChange={(provider, model) => setPendingEmbeddingChange({ provider, model })}
+              />
             </Row>
+            <LocalAiModelsSettings
+              settings={settings}
+              patch={patch}
+              onSelectEmbedding={(model) => setPendingEmbeddingChange({ provider: 'nodus', model })}
+            />
+            <SttSettings settings={settings} patch={patch} />
+            {settings.modelSettingsMode === 'advanced' && <>
+              <div className="mt-5 space-y-3 border-t border-neutral-800 pt-4" data-testid="common-model-overrides">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ajustes avanzados comunes')}</h3>
+                <Row label={t('Extracción de temas, ideas y evidencias')}><ModelPicker allowEmpty={false} settings={settings} value={settings.extractionModel} onChange={(extractionModel) => void patch({ extractionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Visión y OCR de imágenes')}><ModelPicker allowEmpty={false} settings={settings} value={settings.visionModel} onChange={(visionModel) => void patch({ visionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Resúmenes de obras')}><ModelPicker allowEmpty={false} settings={settings} value={settings.summaryModel} onChange={(summaryModel) => void patch({ summaryModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Fusión y deduplicación')}><ModelPicker allowEmpty={false} settings={settings} value={settings.fusionModel} onChange={(fusionModel) => void patch({ fusionModel })} emptyLabel="Seleccionar modelo" /></Row>
+                <Row label={t('Asistente Nodi')}><ModelPicker allowEmpty={false} settings={settings} value={settings.nodiModel} onChange={(nodiModel) => void patch({ nodiModel })} menu emptyLabel="Seleccionar modelo" /></Row>
+              </div>
+              <VaultModelOverrides settings={settings} vaultType={activeVault?.type ?? 'academic'} vaultName={activeVault?.name ?? t('Vault actual')} patch={patch} />
+            </>}
             <Row label={t('Indexación de embeddings')}>
               <div className="flex gap-2">
                 <button
@@ -1079,7 +1189,6 @@ export function Settings({
                 </button>
               </div>
             </Row>
-            <StudyAiModelSettings settings={settings} patch={patch} />
             <Row label={t('Llamadas simultáneas')}>
               <input
                 type="number"
@@ -1140,7 +1249,9 @@ export function Settings({
               />
             </Row>
           </Section>
-      )}
+          <ImageGenerationSettings settings={settings} onChange={onChange} />
+          <AudioGenerationSettings settings={settings} onChange={onChange} />
+      </>)}
 
       {visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas') && (
           <Section title={t('Extracción de texto (PDFs grandes)')}>
@@ -1246,12 +1357,17 @@ export function Settings({
       {backupResult && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-6" onClick={() => setBackupResult(null)}>
           <div className="card w-full max-w-lg p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <h2 className="font-semibold mb-2">{t('Contraseña de la copia')}</h2>
+            <h2 className="font-semibold mb-2">{t('Credenciales de recuperación de la copia')}</h2>
             <p className="text-sm text-neutral-400 mb-4">
-              {t('Guarda esta contraseña. Nodus no puede recuperarla y será necesaria para importar la copia en otro ordenador.')}
+              {t('Guarda ambas fuera de este dispositivo. Podrás importar la copia con cualquiera de ellas.')}
             </p>
+            <div className="mb-1 text-xs font-medium text-neutral-400">{t('Contraseña')}</div>
             <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3 font-mono text-sm break-all">
               {backupResult.password}
+            </div>
+            <div className="mb-1 mt-3 text-xs font-medium text-neutral-400">{t('Clave de recuperación')}</div>
+            <div className="rounded-lg border border-emerald-900/70 bg-emerald-950/20 p-3 font-mono text-sm break-all text-emerald-300">
+              {backupResult.recoveryKey}
             </div>
             <div className="mt-2 text-xs text-neutral-500 truncate">{backupResult.path}</div>
             <div className="mt-5 flex justify-end gap-2">
@@ -1259,7 +1375,7 @@ export function Settings({
                 {t('Cerrar')}
               </button>
               <button className="btn btn-primary" onClick={() => void copyBackupPassword()}>
-                <Icon name={backupCopied ? 'check' : 'copy'} /> {backupCopied ? t('Copiada') : t('Copiar contraseña')}
+                <Icon name={backupCopied ? 'check' : 'copy'} /> {backupCopied ? t('Copiadas') : t('Copiar credenciales')}
               </button>
             </div>
           </div>
@@ -1270,18 +1386,21 @@ export function Settings({
           <div className="card w-full max-w-md p-5" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <h2 className="font-semibold mb-2">{t('Importar copia cifrada')}</h2>
             <p className="text-sm text-neutral-400 mb-4">
-              {t('Introduce la contraseña generada al exportar. Después selecciona el archivo .nodus.')}
+              {t('Introduce la contraseña o la clave de recuperación. Después selecciona el archivo .nodus.')}
             </p>
-            <input
-              className="input w-full"
-              type="password"
-              value={importPassword}
-              onChange={(e) => setImportPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void importBackup();
-              }}
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                className="input w-full pr-10"
+                type={showImportPassword ? 'text' : 'password'}
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void importBackup();
+                }}
+                autoFocus
+              />
+              <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-100" onClick={() => setShowImportPassword((value) => !value)} aria-label={t(showImportPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')} title={t(showImportPassword ? 'Ocultar contraseña' : 'Mostrar contraseña')}><Icon name={showImportPassword ? 'eyeOff' : 'eye'} size={17} /></button>
+            </div>
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setImportOpen(false)} disabled={importingBackup}>
                 {t('Cancelar')}
@@ -1305,6 +1424,43 @@ export function Settings({
             void window.nodus.reindexAll();
           }}
           onCancel={() => setConfirmReindex(false)}
+        />
+      )}
+
+      {pendingModelSettingsMode && (
+        <ConfirmModal
+          title={t(pendingModelSettingsMode === 'basic' ? '¿Cambiar a la configuración básica?' : '¿Cambiar a la configuración avanzada?')}
+          message={pendingModelSettingsMode === 'basic' ? (
+            <div data-testid="confirm-model-settings-mode" className="space-y-2">
+              <p>{t('Solo un modo puede estar activo. El modelo general pasará a utilizarse en las tareas de texto y las selecciones avanzadas dejarán de aplicarse.')}</p>
+              <p>{t('Después del cambio, revisa y completa «Modelo general de texto» antes de utilizar las funciones de IA. Una configuración incompleta puede hacer que esas funciones fallen.')}</p>
+            </div>
+          ) : (
+            <div data-testid="confirm-model-settings-mode" className="space-y-2">
+              <p>{t('Solo un modo puede estar activo. Cada tarea pasará a utilizar el modelo seleccionado en su propio campo en lugar de depender únicamente del modelo general.')}</p>
+              <p>{t('Después del cambio, revisa y completa los modelos de «Ajustes avanzados comunes» y del vault actual. Una tarea sin un modelo válido puede fallar.')}</p>
+            </div>
+          )}
+          confirmLabel={t(pendingModelSettingsMode === 'basic' ? 'Cambiar a configuración básica' : 'Cambiar a configuración avanzada')}
+          onConfirm={() => {
+            const mode = pendingModelSettingsMode;
+            setPendingModelSettingsMode(null);
+            void patch({ modelSettingsMode: mode });
+          }}
+          onCancel={() => setPendingModelSettingsMode(null)}
+        />
+      )}
+      {pendingEmbeddingChange && (
+        <ConfirmModal
+          title={t('Cambiar modelo de embeddings')}
+          message={t('Los embeddings creados con el modelo anterior no son compatibles con el nuevo. Nodus conservará los datos, pero tendrás que reindexar para que la búsqueda semántica y las relaciones usen el nuevo modelo. ¿Cambiar de todos modos?')}
+          confirmLabel={t('Cambiar modelo')}
+          onConfirm={() => {
+            const next = pendingEmbeddingChange;
+            setPendingEmbeddingChange(null);
+            void patch({ embeddingProvider: next.provider, embeddingModel: next.model });
+          }}
+          onCancel={() => setPendingEmbeddingChange(null)}
         />
       )}
     </div>
@@ -1543,13 +1699,68 @@ function SidebarOrderEditor({
   );
 }
 
-const STUDY_TASK_MODELS: Array<{ task: StudyAiTask; label: string; key: 'chatModel' | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel' }> = [
+type VaultModelKey = 'chatModel' | 'deepResearchModel' | 'immersionModel' | 'writingModel' | 'argumentMapModel' | 'authorModel' | 'studyModel' | 'tutorModel' | 'hypothesisModel';
+
+const VAULT_MODEL_FIELDS: Record<VaultModelKey, string> = {
+  chatModel: 'Chat con el corpus',
+  deepResearchModel: 'Deep Research',
+  immersionModel: 'Inmersión',
+  writingModel: 'Taller de escritura',
+  argumentMapModel: 'Mapa argumental',
+  authorModel: 'Autores y biografías',
+  studyModel: 'Guías de estudio',
+  tutorModel: 'Tutor',
+  hypothesisModel: 'Laboratorio de hipótesis',
+};
+
+function vaultModelKeys(type: VaultType): VaultModelKey[] {
+  if (type === 'genealogy') return ['chatModel', 'deepResearchModel', 'authorModel'];
+  if (type === 'databases') return ['chatModel'];
+  if (type === 'estudio') return [];
+  return Object.keys(VAULT_MODEL_FIELDS) as VaultModelKey[];
+}
+
+function VaultModelOverrides({ settings, vaultType, vaultName, patch }: {
+  settings: AppSettings;
+  vaultType: VaultType;
+  vaultName: string;
+  patch: (value: Partial<AppSettings>) => Promise<void>;
+}) {
+  const keys = vaultModelKeys(vaultType);
+  return <div className="mt-5 border-t border-neutral-800 pt-4" data-testid="vault-model-overrides">
+    <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{tx('Ajustes avanzados del vault {vault}', { vault: vaultName })}</h3>
+    <p className="mb-3 mt-1 text-xs text-neutral-600">{t('Estos cambios no modifican los demás vaults.')}</p>
+    {vaultType === 'estudio' ? <StudyVaultModelOverrides settings={settings} patch={patch} /> : <div className="space-y-3">
+      {keys.map((key) => <Row key={key} label={t(VAULT_MODEL_FIELDS[key])}>
+        <ModelPicker allowEmpty={false} settings={settings} value={settings[key]} onChange={(model) => void patch({ [key]: model })} emptyLabel="Seleccionar modelo" />
+      </Row>)}
+    </div>}
+  </div>;
+}
+
+const STUDY_VAULT_MODEL_FIELDS = [
   { task: 'chat', label: 'Chat con el corpus', key: 'chatModel' },
   { task: 'improve', label: 'Mejora de texto', key: 'improveModel' },
   { task: 'questions', label: 'Generación de preguntas', key: 'questionGenModel' },
   { task: 'grading', label: 'Corrección de exámenes', key: 'gradingModel' },
   { task: 'flashcards', label: 'Generación de flashcards', key: 'flashcardModel' },
-];
+] as const;
+
+function StudyVaultModelOverrides({ settings, patch }: {
+  settings: AppSettings;
+  patch: (value: Partial<AppSettings>) => Promise<void>;
+}) {
+  return <div className="grid grid-cols-[minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(11rem,1fr)] gap-x-4 gap-y-3 text-xs">
+    <b className="text-neutral-600">{t('Tarea')}</b>
+    <b className="text-neutral-600">{t('Principal')}</b>
+    <b className="text-neutral-600">{t('Alternativo ante error')}</b>
+    {STUDY_VAULT_MODEL_FIELDS.map((item) => <div key={item.task} className="contents">
+      <span className="self-center text-neutral-300">{t(item.label)}</span>
+      <ModelPicker compact allowEmpty={false} settings={settings} value={settings[item.key]} onChange={(model) => void patch({ [item.key]: model })} emptyLabel="Seleccionar modelo" />
+      <ModelPicker compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [item.task]: model } })} emptyLabel="Sin modelo alternativo" />
+    </div>)}
+  </div>;
+}
 
 function formatDataBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -1581,21 +1792,6 @@ function StudyDataAdministration() {
       </div></>}
     <div className="mt-3 flex flex-wrap gap-2"><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('repair')}><Icon name="settings" />{t('Verificar y optimizar')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('rebuild-indexes')}><Icon name="refresh" />{t('Reconstruir índices')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={() => void run('clear-embeddings', true)}>{t('Limpiar índices vectoriales')}</button><button className="btn btn-ghost border border-red-900 text-red-400" disabled={busy || !overview?.trashRows} onClick={() => void run('empty-trash', true)}><Icon name="trash" />{t('Vaciar papelera')}</button><button className="btn btn-ghost border border-neutral-700" disabled={busy} onClick={async () => { const result = await window.nodus.exportStudyDiagnostic(); if (result) setMessage(result.path); }}><Icon name="download" />{t('Exportar diagnóstico')}</button></div>
     {message && <p className="mt-2 text-xs text-amber-300">{message}</p>}
-  </div>;
-}
-
-function StudyAiModelSettings({ settings, patch }: { settings: AppSettings; patch: (value: Partial<AppSettings>) => Promise<void> }) {
-  const [summary, setSummary] = useState<StudyAiUsageSummary | null>(null); const [subjects, setSubjects] = useState<StudySubject[]>([]); const [subjectId, setSubjectId] = useState('');
-  const refreshUsage = () => window.nodus.getStudyAiUsageSummary().then(setSummary);
-  useEffect(() => { void refreshUsage(); void window.nodus.getStudyWorkspace().then((workspace) => setSubjects(workspace.subjects)); }, []);
-  const setPrimary = (key: typeof STUDY_TASK_MODELS[number]['key'], model: ModelRef | null) => patch({ [key]: model });
-  const setFallback = (task: StudyAiTask, model: ModelRef | null) => patch({ studyAiFallbackModels: { ...settings.studyAiFallbackModels, [task]: model } });
-  const setSubjectModel = (task: StudyAiTask, model: ModelRef | null) => { if (!subjectId) return; void patch({ studyAiSubjectModels: { ...settings.studyAiSubjectModels, [subjectId]: { ...settings.studyAiSubjectModels[subjectId], [task]: model } } }); };
-  return <div className="my-5 rounded-xl border border-teal-900/50 bg-teal-950/10 p-4" data-testid="study-ai-settings"><div className="flex flex-wrap items-start gap-2"><div className="mr-auto"><h3 className="text-sm font-semibold text-teal-200">{t('Modelos del vault de estudio')}</h3><p className="mt-1 text-xs text-neutral-500">{t('Cada tarea conserva un modelo principal y un alternativo independiente. Los estilos personalizados pueden seguir fijando su propio modelo.')}</p></div><span className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-500">{summary?.calls ?? 0} {t('llamadas este mes')}</span></div>
-    <div className="mt-4 grid grid-cols-[minmax(9rem,1fr)_minmax(11rem,1fr)_minmax(11rem,1fr)] gap-2 text-xs"><b className="text-neutral-600">{t('Tarea')}</b><b className="text-neutral-600">{t('Principal')}</b><b className="text-neutral-600">{t('Alternativo ante error')}</b>{STUDY_TASK_MODELS.map((item) => <div key={item.task} className="contents"><span className="self-center text-neutral-300">{t(item.label)}</span><ModelPicker compact settings={settings} value={settings[item.key]} onChange={(model) => void setPrimary(item.key, model)} emptyLabel="Usar modelo de estudio/síntesis" /><ModelPicker compact settings={settings} value={settings.studyAiFallbackModels[item.task] ?? null} onChange={(model) => void setFallback(item.task, model)} emptyLabel="Sin modelo alternativo" /></div>)}</div>
-    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-2"><label className="text-xs text-neutral-500">{t('Transcripción externa')}<div className="mt-1 flex gap-2"><select className="input" value={settings.sttProvider} onChange={(event) => void patch({ sttProvider: event.target.value as AppSettings['sttProvider'] })}><option value="local">{t('Whisper local (offline)')}</option><option value="openai">OpenAI</option></select><ModelPicker compact settings={settings} value={settings.transcriptionModel} onChange={(model) => void patch({ transcriptionModel: model })} emptyLabel="Modelo del proveedor" /></div></label><label className="text-xs text-neutral-500">{t('Modelo por asignatura')}<select className="input mt-1 w-full" value={subjectId} onChange={(event) => setSubjectId(event.target.value)}><option value="">{t('Selecciona una asignatura')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>{subjectId && STUDY_TASK_MODELS.map((item) => <label key={item.task} className="text-xs text-neutral-500">{t(item.label)}<ModelPicker compact settings={settings} value={settings.studyAiSubjectModels[subjectId]?.[item.task] ?? null} onChange={(model) => setSubjectModel(item.task, model)} emptyLabel="Heredar modelo principal" /></label>)}{subjectId && <label className="flex items-center gap-2 rounded-lg border border-neutral-800 p-3 text-xs text-neutral-400"><input type="checkbox" checked={settings.studyAiExcludedSubjectIds.includes(subjectId)} onChange={(event) => void patch({ studyAiExcludedSubjectIds: event.target.checked ? [...new Set([...settings.studyAiExcludedSubjectIds, subjectId])] : settings.studyAiExcludedSubjectIds.filter((id) => id !== subjectId) })} />{t('Excluir esta asignatura de todo procesamiento externo')}</label>}</div>
-    <div className="mt-4 grid gap-3 border-t border-neutral-800 pt-4 sm:grid-cols-3"><label className="text-xs text-neutral-500">{t('Presupuesto mensual (USD)')}<input data-testid="study-ai-budget" className="input mt-1 w-full" type="number" min="0" step="1" value={settings.studyAiMonthlyBudgetUsd} onChange={(event) => void patch({ studyAiMonthlyBudgetUsd: Math.max(0, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Avisar al porcentaje')}<input className="input mt-1 w-full" type="number" min="1" max="100" value={settings.studyAiBudgetWarningPercent} onChange={(event) => void patch({ studyAiBudgetWarningPercent: Math.max(1, Math.min(100, Number(event.target.value))) })} /></label><div className="rounded-lg bg-neutral-900 p-3 text-xs"><span className="text-neutral-500">{t('Coste conocido del mes')}</span><b className="mt-1 block text-lg">${(summary?.knownCostUsd ?? 0).toFixed(4)}</b><span className="text-[10px] text-neutral-600">{summary?.unknownCostCalls ?? 0} {t('llamadas sin precio publicado; no se estiman')}</span></div><label className="text-xs text-neutral-500">{t('Máx. caracteres de entrada')}<input className="input mt-1 w-full" type="number" min="1000" value={settings.studyAiMaxInputChars} onChange={(event) => void patch({ studyAiMaxInputChars: Math.max(1000, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Máx. tokens de salida')}<input className="input mt-1 w-full" type="number" min="128" value={settings.studyAiMaxOutputTokens} onChange={(event) => void patch({ studyAiMaxOutputTokens: Math.max(128, Number(event.target.value)) })} /></label><label className="text-xs text-neutral-500">{t('Reintentos antes del alternativo')}<input className="input mt-1 w-full" type="number" min="0" max="2" value={settings.studyAiRetryCount} onChange={(event) => void patch({ studyAiRetryCount: Math.max(0, Math.min(2, Number(event.target.value))) })} /></label></div>
-    <div className="mt-3 rounded-lg border border-neutral-800 p-3 text-xs" data-testid="study-privacy-settings"><div className="flex flex-wrap items-center gap-4"><label className="text-neutral-500">{t('Procesamiento')}<select className="input ml-2 h-8 w-32" value={settings.studyAiPrivacyMode} onChange={(event) => { const mode = event.target.value as AppSettings['studyAiPrivacyMode']; void patch({ studyAiPrivacyMode: mode, studyAiLocalOnly: mode === 'local' }); }}><option value="local">{t('Solo local')}</option><option value="hybrid">{t('Híbrido')}</option><option value="external">{t('Externo')}</option></select></label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiEnabled} onChange={(event) => void patch({ studyAiEnabled: event.target.checked })} />{t('Funciones IA')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAnalyticsEnabled} onChange={(event) => void patch({ studyAnalyticsEnabled: event.target.checked })} />{t('Analíticas locales')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studySyncEnabled} onChange={(event) => void patch({ studySyncEnabled: event.target.checked })} />{t('Sync de estudio')}</label><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studySharingEnabled} onChange={(event) => void patch({ studySharingEnabled: event.target.checked })} />{t('Exportar para compartir')}</label></div><div className="mt-3 flex flex-wrap gap-4"><label className="flex items-center gap-2"><input type="checkbox" checked={settings.studyAiConfirmExternal} disabled={settings.studyAiPrivacyMode === 'local'} onChange={(event) => void patch({ studyAiConfirmExternal: event.target.checked })} />{t('Confirmar antes de enviar datos fuera del dispositivo')}</label><button className="ml-auto text-red-400 hover:text-red-300" onClick={() => void window.nodus.clearStudyAiUsage().then(refreshUsage)}>{t('Borrar historial de consumo')}</button></div></div>
   </div>;
 }
 
@@ -1648,20 +1844,29 @@ function SettingsTabButton({
 
 function EmbeddingModelControl({
   settings,
-  onPatch,
+  onEmbeddingChange,
 }: {
   settings: AppSettings;
-  onPatch: (patch: Partial<AppSettings>) => Promise<void>;
+  onEmbeddingChange: (provider: EmbeddingProvider, model: string) => void;
 }) {
   const [models, setModels] = useState<ModelInfo[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const provider = settings.embeddingProvider ?? 'openai';
+  const [modelInput, setModelInput] = useState(settings.embeddingModel);
+
+  useEffect(() => setModelInput(settings.embeddingModel), [settings.embeddingModel]);
+
+  const commitModelInput = () => {
+    const model = modelInput.trim() || DEFAULT_EMBEDDING_MODELS[provider];
+    setModelInput(model);
+    if (model !== settings.embeddingModel) onEmbeddingChange(provider, model);
+  };
 
   const setProvider = (next: EmbeddingProvider) => {
     setModels(null);
     setError(null);
-    void onPatch({ embeddingProvider: next, embeddingModel: DEFAULT_EMBEDDING_MODELS[next] });
+    onEmbeddingChange(next, DEFAULT_EMBEDDING_MODELS[next]);
   };
 
   const loadModels = async () => {
@@ -1690,8 +1895,10 @@ function EmbeddingModelControl({
         </select>
         <input
           className="input w-full min-w-0"
-          value={settings.embeddingModel}
-          onChange={(e) => onPatch({ embeddingModel: e.target.value })}
+          value={modelInput}
+          onChange={(e) => setModelInput(e.target.value)}
+          onBlur={commitModelInput}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
           placeholder={DEFAULT_EMBEDDING_MODELS[provider]}
         />
         <button className="btn btn-ghost justify-center border border-neutral-700" onClick={loadModels} disabled={loading}>
@@ -1702,7 +1909,7 @@ function EmbeddingModelControl({
         <select
           className="input w-full"
           value={settings.embeddingModel}
-          onChange={(e) => onPatch({ embeddingModel: e.target.value })}
+          onChange={(e) => onEmbeddingChange(provider, e.target.value)}
         >
           {!shown.some((m) => m.id === settings.embeddingModel) && (
             <option value={settings.embeddingModel}>{settings.embeddingModel}</option>
@@ -1717,6 +1924,9 @@ function EmbeddingModelControl({
       {error && <div className="text-xs text-red-400">{error}</div>}
       <p className="text-xs text-neutral-500">
         {t('OpenRouter acepta IDs como baai/bge-m3; si escribes BAAI:bge-m3 se normaliza automáticamente.')}
+      </p>
+      <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-xs leading-5 text-amber-200">
+        {t('Si cambias de modelo de embeddings, los vectores anteriores no servirán con el nuevo modelo y tendrás que reindexar.')}
       </p>
     </div>
   );

@@ -3,16 +3,18 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AutoBackupResult } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
-import { getBackupPassword } from '../secrets/secretStore';
+import { getBackupPassword, getBackupRecoveryKey, setBackupRecoveryKey } from '../secrets/secretStore';
+import { generateBackupPassword } from './backupCrypto';
 import { createBackupArchive } from './exportImport';
+import { resolveBackupOutputDir } from '../recovery/recoveryPaths';
 
 /**
  * Scheduled encrypted backups. Every run encrypts with the ONE master password
  * from the keychain (no per-file passwords to write down), writes into the
  * user-chosen folder — point it at iCloud Drive / Google Drive and the cloud
  * client does the off-machine transport — and prunes old copies with a
- * grandfather-father-son policy. Automatic backups never contain API keys, so
- * restoring one on another machine preserves that machine's own credentials.
+ * grandfather-father-son policy. Every automatic backup contains the complete
+ * Nodus state, including API keys, inside the encrypted payload.
  */
 
 const KEEP_DAILY = 7;
@@ -174,7 +176,7 @@ function pruneBackups(folder: string, hostname: string): number {
 /** Run one backup now (manual "Probar ahora" or the scheduler). */
 export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupResult> {
   const settings = getSettings();
-  const folder = settings.autoBackupFolder;
+  const configuredFolder = settings.autoBackupFolder;
   const finish = (result: AutoBackupResult): AutoBackupResult => {
     updateSettings({
       lastAutoBackupAt: result.ok ? new Date().toISOString() : settings.lastAutoBackupAt,
@@ -183,12 +185,22 @@ export async function runAutoBackupNow(appVersion: string): Promise<AutoBackupRe
     return result;
   };
 
-  if (!folder) return finish({ ok: false, message: 'No hay carpeta de destino configurada.' });
+  if (!configuredFolder) return finish({ ok: false, message: 'No hay carpeta de destino configurada.' });
   const password = getBackupPassword();
   if (!password) return finish({ ok: false, message: 'No hay contraseña maestra de copias configurada.' });
   try {
+    const folder = resolveBackupOutputDir(configuredFolder);
     fs.mkdirSync(folder, { recursive: true });
-    const archive = await createBackupArchive({ password, includeSecrets: false, appVersion });
+    let recoveryKey = getBackupRecoveryKey();
+    if (!recoveryKey) {
+      recoveryKey = generateBackupPassword();
+      setBackupRecoveryKey(recoveryKey);
+    }
+    const archive = await createBackupArchive({
+      password,
+      appVersion,
+      recoveryKey,
+    });
     const hostname = os.hostname();
     const target = path.join(folder, backupFileName(hostname, new Date()));
     // Write via temp + rename so cloud clients never sync a half-written file.

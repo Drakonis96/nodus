@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { GapAggregate, EdgeDetail, GapKind, GapSearchSuggestions } from '@shared/types';
+import type { GapAggregate, GapKind, GapSearchSuggestions } from '@shared/types';
 import { Badge, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
 import { SaveToNotesModal } from '../components/SaveToNotesModal';
@@ -11,6 +11,7 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
+import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 const KIND_LABELS: Record<GapKind, string> = {
   future_work: 'trabajo futuro',
@@ -27,30 +28,56 @@ const KIND_COLOR: Record<GapKind, 'amber' | 'red' | 'cyan' | 'indigo'> = {
 };
 
 const GAP_ROW_HEIGHT = 188;
+const GAPS_PAGE_SIZE = 50;
 const GAP_PROMPT_WORK_LIMIT = 8;
 
 export function GapsView({
+  vaultId,
   onOpenGraph,
   onOpenAssistant,
   onOpenDebates,
 }: {
+  vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
   onOpenDebates: () => void;
 }) {
   const [gaps, setGaps] = useState<GapAggregate[]>([]);
-  const [contradictions, setContradictions] = useState<EdgeDetail[]>([]);
+  const [totalGaps, setTotalGaps] = useState(0);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [contradictionCount, setContradictionCount] = useState(0);
   const [tab, setTab] = useState<'mined' | 'contradictions'>('mined');
   const [savingGap, setSavingGap] = useState<GapAggregate | null>(null);
   const [searchingGap, setSearchingGap] = useState<GapAggregate | null>(null);
 
-  const reload = useCallback(() => {
-    void window.nodus.getGaps().then(setGaps);
-    void window.nodus.getContradictions().then(setContradictions);
-  }, []);
+  const reload = useCallback((force = true) => {
+    const cacheKey = `gaps:${pageOffset}`;
+    if (!force) {
+      const cached = getVaultQueryCache<{ items: GapAggregate[]; total: number; contradictions: number }>(vaultId, cacheKey);
+      if (cached) {
+        setGaps(cached.items);
+        setTotalGaps(cached.total);
+        setContradictionCount(cached.contradictions);
+        return;
+      }
+    }
+    void Promise.all([
+      window.nodus.getGapsPage(pageOffset, GAPS_PAGE_SIZE),
+      window.nodus.getContradictionCount(),
+    ]).then(([page, contradictions]) => {
+      if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
+        setPageOffset(Math.max(0, Math.floor((page.total - 1) / GAPS_PAGE_SIZE) * GAPS_PAGE_SIZE));
+        return;
+      }
+      setGaps(page.items);
+      setTotalGaps(page.total);
+      setContradictionCount(contradictions);
+      setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total, contradictions });
+    });
+  }, [pageOffset, vaultId]);
 
   useEffect(() => {
-    reload();
+    reload(false);
   }, [reload]);
   useDataRefresh(reload);
   useScanComplete(reload);
@@ -71,18 +98,19 @@ export function GapsView({
             className={`btn ${tab === 'mined' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setTab('mined')}
           >
-            {tx('Minados ({n})', { n: gaps.length })}
+            {tx('Minados ({n})', { n: totalGaps })}
           </button>
           <button
             className={`btn ${tab === 'contradictions' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => setTab('contradictions')}
           >
-            {tx('Contradicciones ({n})', { n: contradictions.length })}
+            {tx('Contradicciones ({n})', { n: contradictionCount })}
           </button>
         </div>
       </div>
 
       {tab === 'mined' && (
+        <div className="flex flex-1 min-h-0 flex-col">
         <VirtualList
           items={gaps}
           itemHeight={GAP_ROW_HEIGHT}
@@ -143,6 +171,20 @@ export function GapsView({
             </div>
           )}
         />
+        {totalGaps > GAPS_PAGE_SIZE && (
+          <div className="mt-2 flex items-center justify-between text-xs text-neutral-500">
+            <span>{pageOffset + 1}–{Math.min(pageOffset + gaps.length, totalGaps)} / {totalGaps}</span>
+            <div className="flex gap-2">
+              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - GAPS_PAGE_SIZE))}>
+                <Icon name="arrowLeft" size={13} /> {t('Anterior')}
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs" disabled={pageOffset + gaps.length >= totalGaps} onClick={() => setPageOffset((offset) => offset + GAPS_PAGE_SIZE)}>
+                {t('Siguiente')} <Icon name="arrowRight" size={13} />
+              </button>
+            </div>
+          </div>
+        )}
+        </div>
       )}
 
       {tab === 'contradictions' && (
@@ -155,7 +197,7 @@ export function GapsView({
             <p className="text-sm text-neutral-400 mb-4">
               {tx(
                 'La vista de Debates enfrenta cada contradicción o refutación ({n}) mostrando las dos posiciones, los autores de cada bando, su evidencia y la cronología de la disputa.',
-                { n: contradictions.length }
+                { n: contradictionCount }
               )}
             </p>
             <button className="btn btn-primary text-sm gap-1.5" onClick={onOpenDebates}>

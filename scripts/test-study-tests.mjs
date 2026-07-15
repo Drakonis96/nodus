@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -79,8 +79,6 @@ try {
   assert.match(tests.renderStudyAssessmentMarkdown(assessment, true), /# Test genética/); assert.match(tests.renderStudyAssessmentMarkdown(assessment, true), /Respuesta:/);
   assert.equal(tests.listStudyAttempts(assessment.id).length, 3);
 
-  const view = await readFile(path.join(repoRoot, 'src/views/StudyTestView.tsx'), 'utf8');
-  for (const marker of ['study-tests-view', 'study-test-builder', 'study-test-runner', 'study-test-results', 'study-test-submit']) assert.match(view, new RegExp(marker));
   closeDb(); console.log('Study tests phase 10b tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

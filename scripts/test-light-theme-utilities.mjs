@@ -7,6 +7,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const css = await readFile(path.join(repoRoot, 'src/index.css'), 'utf8');
 
 const requiredLightOverrides = [
+  '.light .bg-neutral-950\\/25',
   '.light .bg-neutral-950\\/70',
   '.light .bg-indigo-950\\/40',
   '.light .hover\\:bg-neutral-900\\/80:hover',
@@ -21,6 +22,7 @@ const requiredLightOverrides = [
   '.light .hover\\:bg-neutral-900\\/70:hover',
   '.light .hover\\:bg-neutral-700:hover',
   '.light .bg-violet-950\\/15',
+  '.light .text-amber-200',
 ];
 
 for (const selector of requiredLightOverrides) {

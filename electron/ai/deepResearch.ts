@@ -9,6 +9,7 @@ import {
   type DeepResearchDeps,
   type DeepResearchPlan,
   type DeepResearchPlanSection,
+  DEEP_RESEARCH_NARRATIVE_RULES,
   type FinalizeInput,
   type FinalizeResult,
   type PlanInput,
@@ -57,12 +58,13 @@ function isAiPlan(v: unknown): v is AiPlan {
 async function aiPlanReport(input: PlanInput, model: ModelRef | null): Promise<DeepResearchPlan> {
   const countRule =
     input.sectionMode === 'user'
-      ? `El usuario ha fijado un máximo de ${input.sectionCount} secciones. Planifica EXACTAMENTE ${input.sectionCount} salvo que sea imprescindible una más: nunca superes ${input.sectionHardCap}.`
-      : `Elige tú el número de secciones, pero mantenlo bajo: en torno a ${input.sectionCount} y nunca por encima de ${input.sectionHardCap}.`;
+      ? `El usuario ha fijado un máximo de ${input.sectionCount} secciones. No tienes que agotarlo. Usa menos si el argumento gana continuidad y nunca lo superes en el plan inicial.`
+      : `Planifica en torno a ${input.sectionCount} secciones amplias y nunca superes esa cifra en el plan inicial. Usa menos si el material no justifica un corte argumental independiente.`;
   const system = [
     'Eres el planificador del modo Deep Research de Nodus.',
     'Diseñas el esqueleto de un informe académico riguroso y bien referenciado a partir de un grafo local de ideas, obras, huecos y contradicciones.',
     'PRINCIPIO CLAVE: prefiere POCAS secciones LARGAS y de gran profundidad antes que muchas secciones cortas. Cada sección debe agrupar varias ideas afines y desarrollarlas relacionándolas entre sí, no una idea por sección.',
+    'Cada título debe nombrar una línea argumental amplia. Evita títulos partidos por dos puntos, punto y coma o guion largo.',
     countRule,
     `El cuerpo del informe debe ocupar entre ${input.targetPages.min} y ${input.targetPages.max} páginas repartidas entre esas pocas secciones (introducción, cuerpo por líneas argumentales amplias y síntesis/conclusión). La bibliografía final NO cuenta para esa extensión.`,
     'Agrupa las ideas por afinidad temática o argumental: cada sección reúne un CONJUNTO de ideas relacionadas, no una sola. Reparte TODAS las ideas relevantes entre las secciones. Asigna huecos y contradicciones donde aporten tensión.',
@@ -116,6 +118,7 @@ async function aiWriteSection(input: SectionInput, model: ModelRef | null): Prom
     'Desarrolla la sección con profundidad real: no te limites a enunciar cada idea; contrástalas, encadénalas y construye un argumento continuo que atraviese todas las ideas asignadas.',
     'Relaciona las ideas entre sí: continuidad, diferencias, niveles de abstracción, consecuencias metodológicas, tensiones y huecos.',
     'No repitas lo ya dicho en secciones anteriores (se te da un resumen). Aporta desarrollo nuevo.',
+    ...DEEP_RESEARCH_NARRATIVE_RULES,
     input.isConclusion
       ? 'Esta es la sección de cierre: integra las líneas del informe, nombra los huecos y perfila la contribución.'
       : 'Desarrolla la línea argumental de esta sección con profundidad.',
@@ -151,6 +154,7 @@ async function aiFinalize(input: FinalizeInput, model: ModelRef | null): Promise
     'Escribe en español salvo que el idioma pida otra lengua.',
     'Devuelve SOLO JSON válido: {"title":"título académico breve","abstract":"resumen de 6-10 líneas con la tesis del informe","limitations":["..."],"nextSteps":["..."]}',
     'El resumen debe reflejar el objetivo y las líneas del informe. Las limitaciones deben ser honestas (p. ej. ideas del corpus no desarrolladas).',
+    'Redacta el título y el resumen como prosa fluida. Evita dos puntos, punto y coma y guion largo salvo necesidad estricta.',
   ].join('\n');
   const user = JSON.stringify(
     {

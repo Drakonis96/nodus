@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -58,6 +58,7 @@
     "mammoth": "^1.8.0",
     "mkcert": "^3.2.0",
     "openai": "^4.73.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.8.69",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -119,10 +120,18 @@
         "releaseType": "release"
       }
     ],
+    "beforePack": "build/beforePack.cjs",
     "afterPack": "build/afterPack.cjs",
     "mac": {
+      "extraFiles": [
+        {
+          "from": "build/NodusDockTile.docktileplugin",
+          "to": "PlugIns/NodusDockTile.docktileplugin"
+        }
+      ],
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio."
+        "NSMicrophoneUsageDescription": "Nodus usa el micrófono únicamente cuando inicias un dictado o una grabación de estudio.",
+        "NSDockTilePlugIn": "NodusDockTile.docktileplugin"
       },
       "target": [
         {

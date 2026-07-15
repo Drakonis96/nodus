@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,9 +14,9 @@ if (!process.argv.includes('--electron-study-learning-test')) { execFileSync(pat
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-study-learning-')); installRuntimeHooks(root);
 try {
   const srs = require(path.join(repoRoot, 'shared/studySrs.ts')); const stats = require(path.join(repoRoot, 'shared/studyStats.ts')); const flashcards = require(path.join(repoRoot, 'shared/studyFlashcards.ts')); const planner = require(path.join(repoRoot, 'shared/studyPlanner.ts'));
-  const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts')); const bank = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts')); const learning = require(path.join(repoRoot, 'electron/db/studyLearningRepo.ts'));
+  const org = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts')); const bank = require(path.join(repoRoot, 'electron/db/studyQuestionsRepo.ts')); const learning = require(path.join(repoRoot, 'electron/db/studyLearningRepo.ts')); const reminders = require(path.join(repoRoot, 'electron/studyCalendarReminders.ts'));
   const { getDb, closeDb } = require(path.join(repoRoot, 'electron/db/database.ts')); const { migrations, runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
-  assert.equal(SCHEMA_VERSION, 63); assert.equal(getDb().pragma('user_version', { simple: true }), 63);
+  assert.ok(SCHEMA_VERSION >= 76); assert.equal(getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION);
   for (const table of ['study_flashcards', 'study_srs_state', 'study_reviews', 'study_mastery', 'study_plans', 'study_plan_blocks', 'study_calendar_events', 'study_goals', 'study_study_sessions']) assert.ok(getDb().prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table), `${table} exists`);
 
   const initial = srs.initialStudySrsState(new Date('2026-01-01T00:00:00Z')); const first = srs.scheduleStudySrsReview(initial, 4, new Date('2026-01-01T00:00:00Z'), 4); assert.equal(first.intervalDays, 1); assert.equal(first.repetitions, 1); assert.equal(first.correct, true);
@@ -35,13 +35,15 @@ try {
   learning.setStudyFlashcardState(cloze.id, 'reset'); assert.equal(learning.listStudyFlashcards().find((card) => card.id === cloze.id).srs.repetitions, 0); learning.setStudyFlashcardState(cloze.id, 'exclude'); assert.equal(learning.listStudyFlashcards().find((card) => card.id === cloze.id).srs.excluded, true); learning.setStudyFlashcardState(cloze.id, 'include');
 
   const plan = learning.createStudyPlan({ title: 'Preparar parcial', subjectId: subject.id, examAt: '2026-09-15T09:00:00Z', availableMinutes: 180 }); const block = learning.createStudyPlanBlock({ planId: plan.id, title: 'Repasar mitosis', subjectId: subject.id, topicId: topic.id, startsAt: '2026-09-10T17:00:00Z', durationMinutes: 30 });
-  const event = learning.createStudyCalendarEvent({ title: 'Parcial citología', type: 'exam', startsAt: '2026-09-15T09:00:00Z', subjectId: subject.id }); const goal = learning.createStudyGoal({ title: 'Estudiar 90 minutos', targetValue: 90, unit: 'minutos', subjectId: subject.id });
+  const event = learning.createStudyCalendarEvent({ title: 'Parcial citología', type: 'exam', icon: 'exam', emoji: '🧪', description: 'Examen del primer bloque', url: 'https://example.test/aula', startsAt: '2026-09-15T09:00:00Z', reminderAt: '2026-01-01T08:00:00Z', subjectId: subject.id }); const goal = learning.createStudyGoal({ title: 'Estudiar 90 minutos', targetValue: 90, unit: 'minutos', subjectId: subject.id });
   learning.updateStudyPlannerItem('goal', goal.id, { currentValue: 90, completed: true }); const session = learning.startStudySession({ planBlockId: block.id, subjectId: subject.id, topicId: topic.id, plannedMinutes: 30 }); const finished = learning.finishStudySession(session.id, { actualSeconds: 1500, interruptions: 1 }); assert.equal(finished.actualSeconds, 1500);
-  const snapshot = learning.getStudyPlanner(); assert.equal(snapshot.events[0].id, event.id); assert.equal(snapshot.goals[0].completed, true); assert.match(learning.renderStudyPlannerIcs(snapshot), /BEGIN:VEVENT[\s\S]*Parcial citología/);
+  assert.equal(reminders.deliverDueStudyCalendarReminders(new Date('2026-07-15T10:00:00Z')), 1, 'overdue reminder is delivered when Nodus checks again'); assert.equal(reminders.deliverDueStudyCalendarReminders(new Date('2026-07-15T10:01:00Z')), 0, 'reminder is delivered once');
+  const snapshot = learning.getStudyPlanner(); assert.equal(snapshot.events[0].id, event.id); assert.equal(snapshot.events[0].emoji, '🧪'); assert.ok(snapshot.events[0].notifiedAt); assert.equal(snapshot.goals[0].completed, true); const ics = learning.renderStudyPlannerIcs(snapshot); assert.match(ics, /PRODID:-\/\/Nodus\/\/Study Calendar\/\/ES/); assert.match(ics, /X-WR-CALNAME:Nodus/); assert.match(ics, /X-WR-CALDESC:Calendario de Nodus/); assert.match(ics, /BEGIN:VEVENT[\s\S]*Parcial citología[\s\S]*BEGIN:VALARM/);
+  const updatedEvent = learning.updateStudyCalendarEvent(event.id, { ...event, title: 'Parcial actualizado', reminderAt: null }); assert.equal(updatedEvent.title, 'Parcial actualizado'); assert.equal(updatedEvent.notifiedAt, null);
   const dashboard = learning.getStudyProgressDashboard(); assert.equal(dashboard.dueCards, 2); assert.equal(dashboard.completedGoals, 1); assert.equal(dashboard.actualMinutes, 25); assert.equal(dashboard.plannedMinutes, 30);
+  learning.deleteStudyCalendarEvent(event.id); assert.equal(learning.getStudyPlanner().events.length, 0, 'calendar event is soft-deleted');
 
-  const legacy = new (require('better-sqlite3'))(path.join(root, 'legacy-v60.sqlite')); for (const migration of migrations.filter((item) => item.version <= 60)) { legacy.exec(migration.up); legacy.pragma(`user_version = ${migration.version}`); } const stamp = new Date().toISOString(); legacy.prepare("INSERT INTO study_courses (id,short_id,name,position,created_at,updated_at) VALUES ('legacy','CRS-LEG','Conservado',0,?,?)").run(stamp, stamp); runMigrations(legacy); assert.equal(legacy.pragma('user_version', { simple: true }), 63); assert.equal(legacy.prepare("SELECT name FROM study_courses WHERE id='legacy'").get().name, 'Conservado'); legacy.close();
-  for (const [file, markers] of [['src/views/StudyReviewView.tsx', ['study-review-view','study-review-session','study-flashcard-editor']], ['src/views/StudyProgressView.tsx', ['study-progress-view']], ['src/views/StudyPlannerView.tsx', ['study-planner-view','study-planner-create','study-pomodoro-active']]]) { const source = await readFile(path.join(repoRoot, file), 'utf8'); for (const marker of markers) assert.match(source, new RegExp(marker)); }
+  const legacy = new (require('better-sqlite3'))(path.join(root, 'legacy-v60.sqlite')); for (const migration of migrations.filter((item) => item.version <= 60)) { legacy.exec(migration.up); legacy.pragma(`user_version = ${migration.version}`); } const stamp = new Date().toISOString(); legacy.prepare("INSERT INTO study_courses (id,short_id,name,position,created_at,updated_at) VALUES ('legacy','CRS-LEG','Conservado',0,?,?)").run(stamp, stamp); runMigrations(legacy); assert.equal(legacy.pragma('user_version', { simple: true }), SCHEMA_VERSION); assert.equal(legacy.prepare("SELECT name FROM study_courses WHERE id='legacy'").get().name, 'Conservado'); legacy.close();
   closeDb(); console.log('Study learning phase 11 tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

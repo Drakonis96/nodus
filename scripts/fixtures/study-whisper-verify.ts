@@ -8,6 +8,8 @@ type VerifyResult = {
   text: string;
   chunks: Array<{ text: string; timestamp: [number | null, number | null] | null }>;
   downloadProgress: number;
+  partialUpdates: number;
+  lastPartial: string;
   durationMs: number;
 };
 
@@ -19,14 +21,21 @@ declare global {
 
 window.verifyStudyWhisper = async ({ audioUrl, model, language }) => {
   let downloadProgress = 0;
+  let partialUpdates = 0;
+  let lastPartial = '';
   const startedAt = performance.now();
   await ensureLocalWhisperModel(model, (fraction) => { downloadProgress = Math.max(downloadProgress, fraction); });
   const response = await fetch(audioUrl);
   if (!response.ok) throw new Error(`Could not load fixture ${audioUrl}: ${response.status}`);
-  const result = await transcribeLocalWhisperDetailed(await response.blob(), model, language);
+  const result = await transcribeLocalWhisperDetailed(await response.blob(), model, language, undefined, (text) => {
+    partialUpdates += 1;
+    lastPartial = text;
+  });
   return {
     ...result,
     downloadProgress,
+    partialUpdates,
+    lastPartial,
     durationMs: Math.round(performance.now() - startedAt),
   };
 };

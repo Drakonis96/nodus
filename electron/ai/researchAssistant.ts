@@ -613,6 +613,24 @@ async function buildResearchContext(
   };
 }
 
+/** A deliberately small, query-relevant slice for Nodi's optional active-vault
+ * context. Heavy full documents and graph topology stay out; semantic passages,
+ * ideas and the most relevant derived sections remain available. */
+export async function buildNodiResearchContext(question: string, maxContextChars = 28_000): Promise<BuildResult> {
+  return buildResearchContext({
+    ideas: true,
+    themes: true,
+    contradictions: true,
+    gaps: true,
+    readingPath: false,
+    authors: true,
+    documents: false,
+    passages: true,
+    graph: false,
+    graphParts: { ideaNodes: false, themeNodes: false, ideaEdges: false, authorGraph: false },
+  }, question, maxContextChars);
+}
+
 function listIdeas(linkedWorkIds: Set<string>, scope: RelevanceScope) {
   const db = getDb();
   const ideaIds = resolveIdeaIds(scope, TOP_K_IDEAS);

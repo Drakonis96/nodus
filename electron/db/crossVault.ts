@@ -104,6 +104,75 @@ export interface CrossVaultHit {
   vaultName: string;
 }
 
+type NodiVaultItem = { kind: string; label: string; excerpt?: string };
+
+function safeCount(db: Database.Database, table: string): number {
+  try { return Number((db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count); }
+  catch { return 0; }
+}
+
+function selectNodiItems(
+  db: Database.Database,
+  sql: string,
+  kind: string,
+  terms: string[],
+  limit = 8
+): NodiVaultItem[] {
+  try {
+    const rows = db.prepare(sql).all() as Array<{ label?: unknown; excerpt?: unknown }>;
+    return rows
+      .map((row) => ({ kind, label: String(row.label ?? '').trim(), excerpt: String(row.excerpt ?? '').trim() || undefined }))
+      .filter((row) => row.label && (terms.length === 0 || terms.some((term) => `${row.label} ${row.excerpt ?? ''}`.toLocaleLowerCase().includes(term))))
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Bounded, read-only inventory for Nodi's explicit "all vaults" context. Unlike
+ * relation search, this includes study and database surfaces as well as academic
+ * and genealogy entities. No active-vault switch is performed.
+ */
+export function buildNodiAllVaultsContext(question: string): unknown {
+  const ignored = new Set(['vault', 'vaults', 'boveda', 'bovedas', 'sobre', 'todos', 'todas', 'donde', 'cuales', 'cuantos', 'tengo', 'contiene', 'resume', 'resumen', 'cuatro', 'menciona', 'elemento', 'verificable', 'cada', 'alguno']);
+  const terms = [...new Set(question.toLocaleLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((term) => term.length >= 4 && !ignored.has(term)))].slice(0, 6);
+  const activeId = safeActiveId();
+  const inventories = [];
+  for (const { vaultId, vaultName, db } of eachVaultDb()) {
+    let type = 'unknown';
+    try { type = getVault(vaultId)?.type ?? 'unknown'; } catch { /* headless fallback */ }
+    const items = [
+      ...selectNodiItems(db, 'SELECT title AS label, title AS excerpt FROM works WHERE archived = 0 ORDER BY updated_at DESC LIMIT 40', 'obra', terms),
+      ...selectNodiItems(db, 'SELECT label, statement AS excerpt FROM ideas ORDER BY created_at DESC LIMIT 40', 'idea', terms),
+      ...selectNodiItems(db, 'SELECT display_name AS label, biography AS excerpt FROM persons ORDER BY updated_at DESC LIMIT 40', 'persona', terms),
+      ...selectNodiItems(db, 'SELECT title AS label, extracted_text AS excerpt FROM archive_items ORDER BY updated_at DESC LIMIT 40', 'archivo', terms),
+      ...selectNodiItems(db, 'SELECT name AS label, description AS excerpt FROM study_courses ORDER BY updated_at DESC LIMIT 40', 'curso', terms),
+      ...selectNodiItems(db, 'SELECT name AS label, description AS excerpt FROM study_subjects ORDER BY updated_at DESC LIMIT 40', 'asignatura', terms),
+      ...selectNodiItems(db, 'SELECT title AS label, content_markdown AS excerpt FROM study_docs ORDER BY updated_at DESC LIMIT 40', 'apunte', terms),
+      ...selectNodiItems(db, 'SELECT name AS label, name AS excerpt FROM db_databases ORDER BY updated_at DESC LIMIT 40', 'base de datos', terms),
+    ].slice(0, 14).map((item) => ({ ...item, excerpt: item.excerpt?.slice(0, 500) }));
+    inventories.push({
+      id: vaultId,
+      name: vaultName,
+      type,
+      active: vaultId === activeId,
+      counts: {
+        works: safeCount(db, 'works'), ideas: safeCount(db, 'ideas'), persons: safeCount(db, 'persons'),
+        archive_items: safeCount(db, 'archive_items'), courses: safeCount(db, 'study_courses'),
+        subjects: safeCount(db, 'study_subjects'), study_documents: safeCount(db, 'study_docs'),
+        databases: safeCount(db, 'db_databases'),
+      },
+      matching_or_recent_items: items,
+    });
+  }
+  return {
+    note: 'Inventario transversal de solo lectura. Los conteos son completos; los elementos son una muestra acotada por la pregunta.',
+    query_terms: terms,
+    vaults: inventories,
+  };
+}
+
 /** Search one entity kind across every vault. */
 export function searchEntitiesAcrossVaults(kind: EntityKind, query: string, limit = 20): CrossVaultHit[] {
   const qy = ENTITY_QUERIES[kind];

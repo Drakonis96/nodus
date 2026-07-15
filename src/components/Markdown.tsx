@@ -29,6 +29,7 @@ export function Markdown({
   className = '',
   onCitation,
   onStudyDocument,
+  onStudyRecording,
   onStudyEvidence,
   verify = true,
 }: {
@@ -36,6 +37,7 @@ export function Markdown({
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
   onStudyDocument?: (documentId: string) => void;
+  onStudyRecording?: (recordingId: string, timestamp?: number | null) => void;
   onStudyEvidence?: (citationId: string) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
   verify?: boolean;
@@ -75,6 +77,12 @@ export function Markdown({
             const studyDocument = href?.match(/^nodus:\/\/study\/doc\/(.+)$/);
             if (studyDocument && onStudyDocument) {
               return <button className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300" onClick={() => onStudyDocument(decodeURIComponent(studyDocument[1]))}>{children}</button>;
+            }
+            const studyRecording = href?.match(/^nodus:\/\/study\/recording\/([^?]+)(?:\?(.*))?$/);
+            if (studyRecording && onStudyRecording) {
+              const params = new URLSearchParams(studyRecording[2] ?? '');
+              const timestamp = params.get('t');
+              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyRecording(decodeURIComponent(studyRecording[1]), timestamp == null ? null : Number(timestamp))}>{children}</button>;
             }
             const citation = parseCitation(href);
             if (citation && onCitation) {

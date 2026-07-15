@@ -33,6 +33,7 @@ function toQuestion(row: Row): StudyQuestion {
     answer: json(row.answer_json, {}), options: json(row.options_json, []), explanation: String(row.explanation ?? ''),
     rubric: json(row.rubric_json, {}), competence: String(row.competence ?? ''), tags: json(row.tags_json, []),
     courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null,
+    folderId: row.folder_id ? String(row.folder_id) : null,
     topicId: row.topic_id ? String(row.topic_id) : null, documentId: row.document_id ? String(row.document_id) : null,
     materialId: row.material_id ? String(row.material_id) : null, recordingId: row.recording_id ? String(row.recording_id) : null,
     transcriptId: row.transcript_id ? String(row.transcript_id) : null,
@@ -42,6 +43,9 @@ function toQuestion(row: Row): StudyQuestion {
     usageCount: Number(row.usage_count ?? 0), correctCount: Number(row.correct_count ?? 0),
     incorrectCount: Number(row.incorrect_count ?? 0), omittedCount: Number(row.omitted_count ?? 0),
     totalResponseMs: Number(row.total_response_ms ?? 0), position: Number(row.position ?? 0),
+    lastResponse: String(row.last_response ?? ''), lastScore: row.last_score == null ? null : Number(row.last_score),
+    lastMaxScore: row.last_max_score == null ? null : Number(row.last_max_score), lastFeedback: String(row.last_feedback ?? ''),
+    lastAnsweredAt: row.last_answered_at ? String(row.last_answered_at) : null,
     archivedAt: row.archived_at ? String(row.archived_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at),
   };
 }
@@ -51,7 +55,7 @@ function toInput(question: StudyQuestion): StudyQuestionInput {
     prompt: question.prompt, type: question.type, difficulty: question.difficulty, cognitiveLevel: question.cognitiveLevel,
     status: question.status, answer: question.answer, options: question.options, explanation: question.explanation,
     rubric: question.rubric, competence: question.competence, tags: question.tags, courseId: question.courseId,
-    subjectId: question.subjectId, topicId: question.topicId, documentId: question.documentId, materialId: question.materialId,
+    subjectId: question.subjectId, folderId: question.folderId, topicId: question.topicId, documentId: question.documentId, materialId: question.materialId,
     recordingId: question.recordingId, transcriptId: question.transcriptId, source: question.source, model: question.model,
     generationPrompt: question.generationPrompt, favorite: question.favorite, locked: question.locked,
   };
@@ -79,6 +83,7 @@ export function listStudyQuestions(filters: StudyQuestionFilters = {}): StudyQue
   if (!filters.archived) conditions.push('archived_at IS NULL');
   if (filters.courseId) { conditions.push('course_id = ?'); params.push(filters.courseId); }
   if (filters.subjectId) { conditions.push('subject_id = ?'); params.push(filters.subjectId); }
+  if (filters.folderId) { conditions.push('folder_id = ?'); params.push(filters.folderId); }
   if (filters.topicId) { conditions.push('topic_id = ?'); params.push(filters.topicId); }
   if (filters.type && filters.type !== 'all') { conditions.push('question_type = ?'); params.push(filters.type); }
   if (filters.difficulty && filters.difficulty !== 'all') { conditions.push('difficulty = ?'); params.push(filters.difficulty); }
@@ -117,12 +122,12 @@ export function createStudyQuestion(input: StudyQuestionInput, reason: StudyQues
   const position = Number((db.prepare('SELECT COALESCE(MAX(position), -1) + 1 AS value FROM study_questions').get() as Row).value);
   db.prepare(`INSERT INTO study_questions
     (id, short_id, prompt, question_type, difficulty, cognitive_level, status, answer_json, options_json, explanation, rubric_json,
-     competence, tags_json, course_id, subject_id, topic_id, document_id, material_id, recording_id, transcript_id,
+     competence, tags_json, course_id, subject_id, folder_id, topic_id, document_id, material_id, recording_id, transcript_id,
      source_title, source_excerpt, source_location_json, model_provider, model_name, generation_prompt, favorite, locked, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     key.id, key.shortId, clean.prompt, clean.type, clean.difficulty, clean.cognitiveLevel, clean.status, JSON.stringify(clean.answer),
     JSON.stringify(clean.options), clean.explanation, JSON.stringify(clean.rubric), clean.competence || null, JSON.stringify(clean.tags),
-    clean.courseId ?? null, clean.subjectId ?? null, clean.topicId ?? null, clean.documentId ?? null, clean.materialId ?? null,
+    clean.courseId ?? null, clean.subjectId ?? null, clean.folderId ?? null, clean.topicId ?? null, clean.documentId ?? null, clean.materialId ?? null,
     clean.recordingId ?? null, clean.transcriptId ?? null, clean.source?.title?.trim() || null, clean.source?.excerpt?.trim() ?? '',
     JSON.stringify(clean.source?.location ?? {}), clean.model?.provider ?? null, clean.model?.model ?? null, clean.generationPrompt?.trim() || null,
     clean.favorite ? 1 : 0, clean.locked ? 1 : 0, position, timestamp, timestamp,
@@ -137,11 +142,11 @@ export function updateStudyQuestion(id: string, patch: Partial<StudyQuestionInpu
   const clean = normalizedInput({ ...toInput(current), ...patch, prompt: patch.prompt ?? current.prompt, type: patch.type ?? current.type }, current);
   const timestamp = now();
   getDb().prepare(`UPDATE study_questions SET prompt=?, question_type=?, difficulty=?, cognitive_level=?, status=?, answer_json=?, options_json=?,
-    explanation=?, rubric_json=?, competence=?, tags_json=?, course_id=?, subject_id=?, topic_id=?, document_id=?, material_id=?, recording_id=?, transcript_id=?,
+    explanation=?, rubric_json=?, competence=?, tags_json=?, course_id=?, subject_id=?, folder_id=?, topic_id=?, document_id=?, material_id=?, recording_id=?, transcript_id=?,
     source_title=?, source_excerpt=?, source_location_json=?, model_provider=?, model_name=?, generation_prompt=?, favorite=?, locked=?, updated_at=? WHERE id=?`).run(
     clean.prompt, clean.type, clean.difficulty, clean.cognitiveLevel, clean.status, JSON.stringify(clean.answer), JSON.stringify(clean.options),
     clean.explanation, JSON.stringify(clean.rubric), clean.competence || null, JSON.stringify(clean.tags), clean.courseId ?? null,
-    clean.subjectId ?? null, clean.topicId ?? null, clean.documentId ?? null, clean.materialId ?? null, clean.recordingId ?? null,
+    clean.subjectId ?? null, clean.folderId ?? null, clean.topicId ?? null, clean.documentId ?? null, clean.materialId ?? null, clean.recordingId ?? null,
     clean.transcriptId ?? null, clean.source?.title?.trim() || null, clean.source?.excerpt?.trim() ?? '', JSON.stringify(clean.source?.location ?? {}),
     clean.model?.provider ?? null, clean.model?.model ?? null, clean.generationPrompt?.trim() || null, clean.favorite ? 1 : 0,
     clean.locked ? 1 : 0, timestamp, id,

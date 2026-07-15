@@ -18,10 +18,11 @@ import type {
   StudyTranscriptSegment,
   StudyTranscriptSegmentInput,
 } from '@shared/studyRecordings';
+import type { StudyPlacementInput } from '@shared/studyOrg';
 import { STUDY_RECORDING_EXTENSIONS, normalizeStudyTranscriptSegments } from '@shared/studyRecordings';
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import { getDb } from './database';
-import { createStudyDocument } from './studyOrgRepo';
+import { addStudyPlacement, createStudyDocument } from './studyOrgRepo';
 
 type Row = Record<string, unknown>;
 
@@ -255,19 +256,22 @@ export function updateStudyTranscriptSegment(id: string, patch: Partial<StudyTra
   return toSegment(db.prepare('SELECT * FROM study_transcript_segments WHERE id = ?').get(id) as Row);
 }
 
-export function createStudyNoteFromTranscript(recordingId: string, transcriptId: string): { documentId: string } {
+export function createStudyNoteFromTranscript(recordingId: string, transcriptId: string, placements?: StudyPlacementInput[]): { documentId: string } {
   const recording = getStudyRecording(recordingId);
   const transcript = recording.transcripts.find((entry) => entry.id === transcriptId);
   if (!transcript) throw new Error('Transcripción no encontrada.');
   const link = `nodus://study/recording/${recordingId}?transcript=${transcriptId}`;
+  const requestedPlacements = (placements ?? []).filter((placement) => placement.courseId || placement.subjectId || placement.topicId || placement.folderId);
+  const fallbackPlacement = recording.courseId || recording.subjectId || recording.topicId
+    ? { courseId: recording.courseId, subjectId: recording.subjectId, topicId: recording.topicId }
+    : null;
   const document = createStudyDocument({
     title: `${recording.title} — ${transcript.kind === 'notes' ? 'apuntes' : 'transcripción'}`,
-    kind: transcript.kind === 'notes' ? 'apunte' : 'transcripcion',
+    kind: 'apunte',
     contentMarkdown: `${transcript.contentMarkdown}\n\n---\n\n[Escuchar grabación](${link})`,
-    placement: recording.courseId || recording.subjectId || recording.topicId
-      ? { courseId: recording.courseId, subjectId: recording.subjectId, topicId: recording.topicId }
-      : undefined,
+    placement: requestedPlacements[0] ?? fallbackPlacement ?? undefined,
   });
+  for (const placement of requestedPlacements.slice(1)) addStudyPlacement(document.id, placement);
   updateStudyRecording(recordingId, { documentId: document.id });
   return { documentId: document.id };
 }

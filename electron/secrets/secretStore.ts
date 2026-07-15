@@ -115,11 +115,20 @@ export function clearAudioKey(name: string): void {
 }
 
 // ── Master backup password ───────────────────────────────────────────────────
-// One user-chosen password encrypts every automatic backup. Stored like the AI
-// keys: encrypted-at-rest via safeStorage in the active vault dir, never sent
-// to the renderer (the UI only learns whether one exists).
+// One user-chosen password encrypts every automatic backup. It is app-global, not
+// vault-local: changing vault must never pause the user's recovery policy. Older
+// builds stored it beside the active vault DB; getBackupPassword promotes that file
+// once so existing users keep their password without reconfiguration.
 
 function backupPasswordFile(): string {
+  return path.join(globalSecretsDir(), 'backup_password.bin');
+}
+
+function backupRecoveryKeyFile(): string {
+  return path.join(globalSecretsDir(), 'backup_recovery_key.bin');
+}
+
+function legacyBackupPasswordFile(): string {
   return path.join(activeVaultDir(), 'backup_password.bin');
 }
 
@@ -139,7 +148,18 @@ export function setBackupPassword(password: string): void {
 }
 
 export function getBackupPassword(): string | null {
-  return readKeyFile(backupPasswordFile());
+  const global = readKeyFile(backupPasswordFile());
+  if (global !== null) return global;
+  try {
+    const legacy = readKeyFile(legacyBackupPasswordFile());
+    if (legacy !== null) {
+      setBackupPassword(legacy);
+      return legacy;
+    }
+  } catch {
+    /* no active vault yet */
+  }
+  return null;
 }
 
 export function hasBackupPassword(): boolean {
@@ -148,6 +168,30 @@ export function hasBackupPassword(): boolean {
 
 export function clearBackupPassword(): void {
   const file = backupPasswordFile();
+  if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+export function setBackupRecoveryKey(recoveryKey: string): void {
+  const clean = recoveryKey.trim();
+  if (!clean) {
+    clearBackupRecoveryKey();
+    return;
+  }
+  const file = backupRecoveryKeyFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!safeStorage.isEncryptionAvailable()) {
+    fs.writeFileSync(file, Buffer.from(`b64:${Buffer.from(clean).toString('base64')}`));
+    return;
+  }
+  fs.writeFileSync(file, safeStorage.encryptString(clean));
+}
+
+export function getBackupRecoveryKey(): string | null {
+  return readKeyFile(backupRecoveryKeyFile());
+}
+
+export function clearBackupRecoveryKey(): void {
+  const file = backupRecoveryKeyFile();
   if (fs.existsSync(file)) fs.unlinkSync(file);
 }
 

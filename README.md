@@ -1,353 +1,107 @@
-# Nodus
-
-Desktop app that turns a local Zotero library into a navigable idea graph.
-Extracts typed claims, evidence and relations from your readings, then lets you
-browse contradictions, detect research gaps, map coverage of a thesis question,
-and generate structured academic drafts — all grounded in verbatim citations from
-your sources.
-
-Everything runs locally. The only external calls are to the AI provider you
-configure. Your data, API keys and embeddings stay on your machine.
-
-> **See it first** — the **[Nodus website](https://drakonis96.github.io/nodus/)** has a
-> cinematic tour and a **[live in-browser demo](https://drakonis96.github.io/nodus/demo/)**
-> of every view, no install needed.
-
-> **New here?** Start with **[Your first day with Nodus](docs/GETTING_STARTED.md)** —
-> a step-by-step walkthrough from install to your first cited report, plus a map of
-> every sidebar section.
-
-> **New in v1.7** — the Word writing copilot graduates to an official **beta**,
-> installable straight from the app (Settings → Integrations): while you write, a
-> side panel shows how the current paragraph relates to your library, backed by an
-> auto-renewing local certificate and a Spanish/English pane. Local models via
-> **Ollama and LM Studio** are now first-class providers everywhere a cloud model
-> is, with prompts sized to each model's real context window.
-
----
-
-## Screenshots
-
-A tour of the main sections, shown with the built-in demo corpus (a small
-science-of-learning sample — no real library required).
-
-<table>
-  <tr>
-    <td width="33%"><a href="docs/screenshots/01-home.png"><img src="docs/screenshots/01-home.png" alt="Home dashboard"></a><br/><sub><b>Home</b> — corpus status, analysis and next steps</sub></td>
-    <td width="33%"><a href="docs/screenshots/02-graph.png"><img src="docs/screenshots/02-graph.png" alt="Idea graph"></a><br/><sub><b>Idea graph</b> — typed relations between claims, findings and themes</sub></td>
-    <td width="33%"><a href="docs/screenshots/03-ideas.png"><img src="docs/screenshots/03-ideas.png" alt="Ideas"></a><br/><sub><b>Ideas</b> — extracted claims and findings with evidence and confidence</sub></td>
-  </tr>
-  <tr>
-    <td width="33%"><a href="docs/screenshots/04-debates.png"><img src="docs/screenshots/04-debates.png" alt="Debates"></a><br/><sub><b>Debates</b> — contradictions head to head, with verbatim evidence</sub></td>
-    <td width="33%"><a href="docs/screenshots/05-gaps.png"><img src="docs/screenshots/05-gaps.png" alt="Research gaps"></a><br/><sub><b>Research gaps</b> — future work, limitations and open questions</sub></td>
-    <td width="33%"><a href="docs/screenshots/09-argument-map.png"><img src="docs/screenshots/09-argument-map.png" alt="Argument map"></a><br/><sub><b>Argument map</b> — the logical structure around an idea</sub></td>
-  </tr>
-  <tr>
-    <td width="33%"><a href="docs/screenshots/07-library.png"><img src="docs/screenshots/07-library.png" alt="Library"></a><br/><sub><b>Library</b> — your Zotero works with scan and analysis status</sub></td>
-    <td width="33%"><a href="docs/screenshots/06-notes.png"><img src="docs/screenshots/06-notes.png" alt="Notes"></a><br/><sub><b>Notes</b> — Markdown workspace with clickable nodus:// citations</sub></td>
-    <td width="33%"><a href="docs/screenshots/08-writing.png"><img src="docs/screenshots/08-writing.png" alt="Writing workshop"></a><br/><sub><b>Writing workshop</b> — outline and draft from selected graph nodes</sub></td>
-  </tr>
-</table>
-
----
-
-## What it does
-
-| Phase | What Nodus provides |
-|-------|---------------------|
-| **Read** | Two-level scanning: light (title + abstract, cheap) and deep (full text, ideas + evidence + relations). Automatic or manual, your choice. |
-| **Understand** | Idea graph (Cytoscape.js), author graph, debate view (contradictions as two-sided face-offs), Tutor mode (AI-guided step-by-step walkthrough). |
-| **Orient** | Research gap mining, reading path planner, research coverage map (decompose a thesis question, map which sub-questions your corpus covers). |
-| **Write** | Writing workshop (outline + draft + support matrix + bibliography from selected graph nodes), Deep Research mode (an orchestrated, coverage-guided 5–20 page academic report over the whole corpus with every source cited), notes workspace with folders, Markdown editor, and clickable `nodus://` citations. A Word add-in (beta) shows, live while you type, how the current paragraph relates to your library — installable from Settings → Integrations (see [word-addin/README.md](word-addin/README.md)). |
-| **Converse** | Research assistant chat grounded in your corpus (ideas, passages, contradictions, gaps, author graph — you pick the context). |
-
-### Demo mode
-
-On a fresh install with an empty database, Nodus offers to load a curated
-sample corpus: six works on the science of learning, nine ideas, six relations,
-four research gaps, and notes. The sample text follows the interface language
-(English or Spanish). You can explore every static view without Zotero or an API
-key. Exit demo mode from the banner or Settings > Data to clear the sample and
-start with your own library.
-
----
-
-## Stack
-
-| Layer | Technology |
-|-------|------------|
-| Shell | Electron + electron-builder (DMG / NSIS), `contextIsolation: true`, `nodeIntegration: false` |
-| Renderer | React 18 + TypeScript + Vite |
-| UI | Tailwind CSS, Framer Motion (respects `prefers-reduced-motion`) |
-| Graph | Cytoscape.js |
-| Database | SQLite via `better-sqlite3` (main process, transactional, versioned migrations) |
-| Embeddings | Per-idea Float32 vectors; in-memory cosine similarity for fusion (sqlite-vec ready) |
-| AI | Anthropic, OpenAI, OpenRouter, DeepSeek, Gemini clients in main process; keys stored with Electron `safeStorage` |
-| Text extraction | `pdfjs-dist` (text), `mammoth` (docx), Tesseract OCR (opt-in, local) |
-
-## Architecture
-
-```
-electron/                Main process (Node)
-  db/                    better-sqlite3, migrations, repository pattern
-  zotero/                Read-only Zotero 7 local API client (pagination + diff)
-  ai/                    Providers, prompts, light/deep scan, fusion, tutor,
-                         debate, research map, writing workshop, embedding pipeline
-  extraction/            PDF/MD/docx text extraction + chunking + Unpaywall fallback
-  pipeline/              Priority queue, retries with backoff, resume-after-restart
-  sync/                  Full + realtime incremental sync with Zotero
-  graph/                 Idea graph, author graph, contradictions, reading path
-  export/                .nodus encrypted backup, notes export, research coverage export
-  secrets/               safeStorage-backed API key encryption (never crosses IPC)
-  mcp/                   Local Model Context Protocol server for external AI clients
-  ipc.ts, preload.ts, main.ts
-shared/types.ts          Domain types + typed window.nodus IPC contract
-src/                     React renderer (views, components, i18n)
-```
+<p align="center">
+  <img src="docs/assets/nodus-logo.svg" width="104" alt="Nodus logo">
+</p>
 
-The renderer never touches Node, the filesystem, or the network. Every
-sensitive operation goes through the typed `window.nodus` bridge exposed by the
-preload script.
+<h1 align="center">Nodus</h1>
 
----
+<p align="center"><strong>One place for research, teaching and study</strong></p>
 
-## Prerequisites
+<p align="center">
+  <a href="https://github.com/Drakonis96/nodus/releases/latest">Download Nodus</a> ·
+  <a href="https://drakonis96.github.io/nodus/">Visit the website</a> ·
+  <a href="https://drakonis96.github.io/nodus/demo/">Try the interactive tour</a>
+</p>
 
-- **Zotero 7+** running with the local API enabled (`http://localhost:23119/api/`).
-  Nodus is read-only and never writes to Zotero.
-- An **AI API key** for at least one provider (Anthropic, OpenAI, OpenRouter,
-  DeepSeek, or Gemini). Embeddings currently require OpenAI, OpenRouter, or
-  Gemini; with Anthropic only, fusion falls back to a conservative "new idea"
-  policy.
-- Optional decorative images require a Google/Gemini, OpenAI, or OpenRouter key.
-  They reuse the provider keys stored in Settings; no new environment variable
-  is required.
-- Node.js 20+.
+Nodus is a desktop centre for university work. It brings sources, notes, data, ideas and learning materials together without forcing every project into the same shape.
 
-Or skip all of the above: launch the app, click **Load demo**, and explore.
+Each vault is a focused workspace. Researchers can build a connected corpus, historians can document a family tree, teams can explore structured data and students can organise an entire degree. You can move between them from one calm, consistent app.
 
-## Setup
-
-```bash
-npm install
-npm run dev      # Vite + Electron in development
-```
-
-## Build
-
-```bash
-npm run dist:mac   # .dmg + .zip (arm64)
-npm run dist:win   # NSIS installer
-npm run dist       # current platform
-```
-
----
-
-## Features
-
-### Two-level scanning
-
-**Light scan** — title + abstract only, for every monitored work. Assigns
-coarse-grained parent themes. Cheap, incremental, and what keeps unread works
-visible on the map so gaps stay visible.
-
-**Deep scan** — full clean text. Triggered per-work by a configurable read tag
-or by manual selection. Extracts typed ideas (claim, finding,
-construct, method, framework), verbatim evidence anchored to exact passages,
-then fuses each idea against the global graph. The author layer is derived
-post-process — the model is never asked to infer global author relations.
-
-### Idea graph
+Nodus is local first. Your vaults and search indexes live on your computer. You decide when a feature may use an online AI provider, and you can also work with compatible local models.
 
-Interactive Cytoscape.js graph with multiple lenses (ideas, authors), presets
-(contradictions, gaps, reading focus, unread works), theme-based filtering,
-search, and history playback. Every node opens a detail sidebar with occurrences,
-evidence and relations.
-
-### Tutor mode
+## Install Nodus
 
-AI-guided, step-by-step walkthrough of your idea graph. A long-context model
-analyses all ideas, themes and connections and proposes weighted routes:
+Download the installer for your computer and open it. There is no server to configure and no account is required to begin.
 
-- **Full tour** — full coverage, ordered by weight.
-- **From a goal** — routes traced from a specific research interest.
+| Platform | Latest installer |
+| --- | --- |
+| macOS with Apple silicon | [Download DMG](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-mac-arm64.dmg) |
+| Windows 10 and 11 | [Download EXE](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-win-x64.exe) |
+| Ubuntu and Debian | [Download DEB](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-amd64.deb) |
+| Other Linux distributions | [Download AppImage](https://github.com/Drakonis96/nodus/releases/download/v2.2.0/Nodus-2.2.0-linux-x86_64.AppImage) |
 
-No artificial stop cap. Narration streams as one continuous discourse grounded
-in the node's evidence. The graph spotlights and frames each stop live.
+The [latest release page](https://github.com/Drakonis96/nodus/releases/latest) always contains the newest available installers and release notes.
 
-### Debates
+## One app, four working vaults
 
-Contradiction and refutation edges rendered as two-sided face-offs with authors,
-evidence, and a chronology. Optional AI synthesis (streamed) to understand the
-tension and decide how your work fits.
+### Academic vault
 
-### Research coverage map
+Build a research corpus from Zotero and turn reading into connected knowledge. Nodus can surface themes, ideas, agreements, contradictions and unanswered questions while keeping every claim close to its source.
 
-Write a thesis question; Nodus decomposes it into sub-questions and maps each
-against your corpus: covered, partially covered, uncovered, or internally
-disputed. Tracks corpus growth and flags stale mappings. Exports to Markdown.
+Its strongest tools include semantic search, an idea graph, author profiles, coverage and gap analysis, reading paths, argument maps, Deep Research and a writing workshop with verifiable citations. A Word companion is available for bringing Nodus context into a manuscript.
 
-### Reading path
+![Academic vault demo in Nodus](docs/screenshots/readme-academic-demo.jpg)
 
-Describe your research priorities; Nodus orders what to read and in what phase,
-justifying each choice with gap, foundational, recency, and connectivity scores.
+### Genealogy vault
 
-### Writing workshop
+Document people, relationships and evidence in a research-led family archive. The tree, timeline, map and records library stay connected so that a family story never loses its documentary basis.
 
-Choose the target form (literature review, theoretical framework, debate
-synthesis, gap justification, chapter section, research question), describe the
-objective, select from the suggested materials (ideas, themes, gaps,
-contradictions, works, passages, saved Tutor routes), and generate a structured
-result: outline, Markdown draft, support matrix, bibliography, next steps and
-limitations. All citations use `nodus://` links that resolve to the real
-source/evidence inside Nodus. Exports to Markdown. Drafts can be saved locally
-and re-opened.
+You can import and export GEDCOM, attach records to people and events, review suggested relationships before accepting them and investigate a lineage with dedicated research tools.
 
-The **Deep Research** toggle turns the same panel into an orchestrated report
-builder: write a research idea and Nodus plans an outline, writes it section by
-section guided by how much of the corpus each pass has covered, and assembles a
-professional 5–20 page academic report with an inline `(Author, year)` citation
-for every substantive claim and a full reference list. The loop is bounded
-(page-budget and section caps), never fabricates a source (hallucinated
-citations are stripped and every reference traces to a really-cited work), and
-degrades gracefully if the model fails on a section. Length is adaptive by
-default or pinned (concise / standard / exhaustive). The report reuses the
-workshop's viewer, export, local-save and clickable-citation stack.
+![Genealogy vault demo in Nodus](docs/screenshots/readme-genealogy-demo.jpg)
 
-### Decorative images
+### Databases vault
 
-Inmersión and Deep Research can optionally request one landscape illustration.
-The text model first produces a compact visual scene; Nodus combines it with a
-centralized style template that forbids visible text, letters, logos, and watermarks.
-The default is a powerful, richly colored antique-book illustration, with
-hand-colored engraving, classic scientific plate, watercolor, historical collage,
-modernist poster, and contemporary editorial alternatives.
+Create approachable databases for projects that do not fit a spreadsheet. Tables support typed fields, relations, formulas, rollups, filters and reusable views.
 
-Image generation starts only after the immersion or report is stored. It has a
-separate status and a two-minute provider timeout: failure never rolls back,
-blocks, or hides the main content. There are no automatic retries. Users can
-retry a failed image, delete it, or confirm a potentially billable regeneration.
-The optimized full image and a small list thumbnail are stored once in SQLite
-and included in encrypted full backups.
+CSV import makes it easy to begin with existing material. Analysis, chat and AI-assisted columns help you classify records, find patterns and answer questions across the dataset.
 
-Provider/model selection lives in **Settings → AI providers and models → Image
-generation**. The model browser shows published input, output, and direct
-per-image prices where the provider exposes them, explicitly marks unavailable
-metrics, supports live search, and keeps price sorting within each provider when
-published units or sizes are not comparable. See
-[image provider details and limitations](docs/IMAGE_GENERATION.md).
+![Databases vault demo in Nodus](docs/screenshots/readme-databases-demo.jpg)
 
-### Notes workspace
+### Study vault
 
-Folders and subfolders with a Markdown editor. Capture content from the research
-assistant, writing workshop, debate view, and individual ideas with one click.
-`nodus://` citations stay clickable inside the editor. Manual ideas created from
-notes are integrated into the graph. Supports export (structured Markdown or
-JSON), AI-assisted reordering, and folder-level idea suggestions.
+Organise subjects, reading, class notes, recordings and deadlines in one place. Materials can include documents, PDFs, EPUB books and audio, with tools for transcription and focused reading.
 
-### Argument map
+Nodus turns those materials into study support grounded in your own course content. It includes course planning, connected ideas, a subject graph, question banks, practice tests, exams, flashcards and spaced review.
 
-Trace the logical structure around any idea. Two modes: **AI** (model-driven
-hierarchical outline) or **auto** (structural, using real graph edges — no
-model needed). Surfaces debate hubs and connectivity-ranked seed candidates.
+![Study vault demo in Nodus](docs/screenshots/readme-study-demo.jpg)
 
-### Global search
+## Meet Nodi
 
-Keyword and semantic search across notes, ideas, works, passages, gaps, themes,
-and authors. Selecting any result opens the same type-adaptive detail modal with
-all locally available metadata and content. Opening/locating the item in the
-graph or its owning view is an explicit secondary action, never automatic.
+Nodi is the friendly guide that lives inside Nodus. It helps new users understand a vault, points out useful next steps and keeps notifications easy to follow without taking over the workspace.
 
-### Research assistant
+<p align="center">
+  <img src="docs/screenshots/readme-nodi-demo.jpg" width="900" alt="Nodi introducing itself inside an English demo vault">
+</p>
 
-Conversational AI grounded in your corpus. Pick the context: ideas, themes,
-contradictions, gaps, reading path, authors, documents, passages, and the full
-graph. Answers render as Markdown with `nodus://` citations. Streamed with
-optional reasoning trace. Conversation history is persisted.
+## Made for serious academic work
 
-### Sync
+- Separate vaults keep unrelated projects and roles from becoming one large, confusing library
+- Local storage and encrypted backups help institutions retain control of their work
+- Demo modes let anyone explore realistic workspaces before importing personal material
+- English, Spanish, French and other interface languages support international teams and classrooms
+- Light and dark themes make long reading and writing sessions more comfortable
 
-Manual (button) or realtime (polls the Zotero library version every ~25s and
-diffs with `?since=`). Each sync writes a log entry.
+Nodus is useful for individual work today and is designed with universities, research groups, teaching teams and learning communities in mind.
 
-### Large-PDF handling
+## Roadmap
 
-Deep-scan text resolution escalates only as far as needed:
+Nodus is growing through new vaults rather than adding every possible tool to one menu.
 
-1. **Zotero indexed full text** — reuse if substantial (≥90% of pages).
-2. **PDF analyzer** — samples pages, classifies as digital / hybrid / scanned.
-3. **Streaming extraction** — page-by-page, `[[p. N]]` markers for model grounding.
-4. **OCR** (opt-in) — only image pages of scanned/hybrid PDFs, locally via Tesseract.
-5. **Fallbacks** — Unpaywall (by DOI) → abstract-only → none.
+| Vault | What it will bring |
+| --- | --- |
+| Teaching | Course planning, learning materials, assessment and feedback in one teaching workspace |
+| Primary sources | Archival description, source criticism and evidence-led work with historical material |
+| Testimonies | Interviews, transcription, coding and oral history workflows |
+| Worldbuilding | Characters, places, rules and narratives for research-based creative projects |
 
-All phases report live progress through the queue bar.
+Teaching and Worldbuilding can already be opened as previews. Primary Sources and Testimonies are planned next. Preview vaults are clearly marked in the app and are not presented as finished features.
 
-### MCP server
+## Explore before importing anything
 
-Optional local Model Context Protocol server (Streamable HTTP) for external AI
-clients (Claude Desktop, ChatGPT, generic MCP clients). Bearer-token auth,
-localhost only. It exposes the derived graph **read-only** (ideas, debates,
-gaps, authors, coverage) plus write access to your own notes, folders and saved
-drafts.
+Every working vault includes a demo mode with sample content. It is the quickest way to understand how Nodus feels and what each workspace can do.
 
-The **writing copilot** is part of this surface, mirroring the Word add-in so any
-MCP client can situate a draft passage in your corpus:
+You can also visit the [interactive browser tour](https://drakonis96.github.io/nodus/demo/) without installing the app.
 
-- `nodus_analyze_passage` — takes an arbitrary passage and returns its typed
-  relations with the whole corpus (supports, contradicts, refines, extends …),
-  each with similarity, confidence, a rationale and the Zotero item to cite.
-- `nodus_get_copilot_idea` — one idea shaped for writing: statement, evidence,
-  connections and the ready-to-cite Zotero bridge (key + author-year).
-- `nodus_compose_insertion` — drafts a short, academic sentence that integrates
-  a chosen idea into your paragraph with the parenthetical citation in place.
+## Open and evolving
 
-### Export / import
-
-Settings > Data > Export produces a self-contained `*.nodus` archive encrypted
-with a generated password: transactionally consistent SQLite snapshot, selected
-model settings, API keys, embeddings, chat history, extracted text, summaries
-and passages. Import restores the complete state without rescanning.
-
----
-
-## Data schema
-
-See `electron/db/migrations.ts` for the authoritative schema. Core tables:
-
-- `works` — central registry; stable `nodus_id` (UUID), tracks `light_status` / `deep_status`, hashes.
-- `themes` / `work_themes` — light-scan theme clusters.
-- `ideas` — canonical idea nodes with embeddings.
-- `idea_occurrences` — how each work develops an idea.
-- `evidence` — anchored quotes with location and kind (explicit / paraphrased).
-- `edges` — typed, directed relations (solid = explicit, dashed = inferred).
-- `authors` / `author_relations` / `work_authors` — derived author layer.
-- `gaps` — future work, limitation, open question, unresolved contradiction.
-- `notes` / `note_folders` — user-structured workspace.
-- `research_questions` / `rq_sub_questions` — thesis decomposition + coverage map.
-- `chat_conversations` / `chat_messages` — research assistant history.
-
-## Security
-
-- API keys are encrypted with Electron `safeStorage` and stored in `userData`
-  (outside the repo). They never cross the IPC boundary; the renderer only sees
-  a boolean `providerKeys` map.
-- The `.gitignore` excludes `*.sqlite`, `*.nodus`, `.env`, and key material.
-- Backups strip `providerKeys` from settings; the encrypted archive carries the
-  keys separately.
-- The MCP server binds to localhost only and requires a bearer token.
-
-## The three core prompts
-
-The verbatim system prompts live in `electron/ai/prompts.ts`:
-
-- **Prompt 0** — light scan (themes).
-- **Prompt 1** — deep extraction (ideas, evidence, relations, gaps, authors).
-- **Prompt 2** — fusion / idea resolution against the global graph.
-
-All free-text fields are produced in the configured prompt language (Spanish or
-English); `quote` fields stay verbatim in the source language. JSON output is
-validated and retried at `temperature 0` on parse failure.
-
-## License
-
-MIT
+Nodus is released under the [MIT License](LICENSE). Ideas, bug reports and academic use cases are welcome through [GitHub Issues](https://github.com/Drakonis96/nodus/issues).

@@ -6,6 +6,7 @@ import { getSettings } from '../db/settingsRepo';
 import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtractor';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
+import { addNotification } from '../notifications';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -195,6 +196,15 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
   } finally {
     state.running = false;
     emit();
+    if (!state.stopRequested && state.totalPassages > 0) {
+      const english = getSettings().uiLanguage === 'en';
+      addNotification({
+        title: state.error ? (english ? 'Text indexing needs attention' : 'La indexación de textos necesita atención') : (english ? 'Text index completed' : 'Índice de textos completado'),
+        body: state.error ? state.error : (english ? `${state.passagesEmbedded} passages indexed across ${state.works.length} work(s).` : `${state.passagesEmbedded} fragmentos indexados en ${state.works.length} obra(s).`),
+        kind: state.error ? 'warning' : 'success',
+        dedupeKey: `passage-embeddings:${state.error ? 'error' : 'complete'}`,
+      });
+    }
   }
 }
 

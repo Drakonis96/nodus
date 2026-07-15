@@ -214,7 +214,7 @@ export function AudioPanel({
   const segmentText = new Map(segments.map((segment) => [segment.index, segment.text]));
 
   return (
-    <div className={`rounded-lg border border-neutral-800 bg-neutral-900/40 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900/40 ${compact ? 'p-3' : 'p-4'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-medium text-neutral-200">
           <span aria-hidden>🎧</span>
@@ -231,7 +231,7 @@ export function AudioPanel({
             <option value="selection" disabled={!selectionText?.trim()}>{t('Selección actual')}</option>
             <option value="cursor">{t('Desde el cursor')}</option>
           </select>}
-          {study && <button data-testid="study-audio-tools" className={`btn btn-ghost h-8 px-2 text-xs ${showStudyTools ? 'bg-teal-950 text-teal-300' : ''}`} onClick={() => setShowStudyTools((value) => !value)}>{t('Pronunciación y lista')}</button>}
+          {study && <button data-testid="study-audio-tools" className={`btn btn-ghost h-8 px-2 text-xs ${showStudyTools ? 'bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => setShowStudyTools((value) => !value)}>{t('Pronunciación y lista')}</button>}
           {hasClips && !generating && (
             <>
               <button className="btn btn-ghost border border-neutral-700 text-xs" onClick={() => player.play(playable, 0)} disabled={playable.length === 0}>
@@ -260,7 +260,7 @@ export function AudioPanel({
         </div>
       )}
 
-      {showStudyTools && study && <div className="mt-3 rounded-lg border border-neutral-800 bg-neutral-950/50 p-3" data-testid="study-audio-study-tools">
+      {showStudyTools && study && <div className="mt-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-950/50" data-testid="study-audio-study-tools">
         <div className="flex items-center justify-between"><h4 className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Diccionario de pronunciación')}</h4>{subjectId && <span className="text-[9px] text-neutral-700">{t('Guardado por asignatura')}</span>}</div>
         {subjectId ? <><div className="mt-2 flex gap-1"><input className="input h-8 min-w-0 flex-1 text-xs" value={dictionaryDraft.written} onChange={(event) => setDictionaryDraft((current) => ({ ...current, written: event.target.value }))} placeholder={t('Texto escrito')} /><input className="input h-8 min-w-0 flex-1 text-xs" value={dictionaryDraft.spoken} onChange={(event) => setDictionaryDraft((current) => ({ ...current, spoken: event.target.value }))} placeholder={t('Cómo debe sonar')} /><button className="btn btn-ghost h-8 px-2" onClick={() => {
           if (!dictionaryDraft.written.trim() || !dictionaryDraft.spoken.trim()) return;
@@ -276,7 +276,7 @@ export function AudioPanel({
             <span className="truncate">{run.label}</span>
             <span className="shrink-0 font-mono">{Math.min(run.done + 1, run.total)}/{run.total}</span>
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded bg-neutral-800">
+          <div className="h-1.5 w-full overflow-hidden rounded bg-neutral-200 dark:bg-neutral-800">
             <div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(pct, 4)}%` }} />
           </div>
         </div>
@@ -298,7 +298,7 @@ export function AudioPanel({
             return (
               <li
                 key={clip.id}
-                className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${isCurrent ? 'bg-indigo-950/40' : 'hover:bg-neutral-900/60'}`}
+                className={`flex items-center gap-2 rounded px-2 py-1.5 text-xs ${isCurrent ? 'bg-indigo-50 dark:bg-indigo-950/40' : 'hover:bg-neutral-100 dark:hover:bg-neutral-900/60'}`}
               >
                 <button
                   className="shrink-0 text-neutral-300 disabled:text-neutral-600"
@@ -310,7 +310,7 @@ export function AudioPanel({
                 </button>
                 <span className="min-w-0 flex-1 text-neutral-300" title={clip.segmentLabel}>
                   <span className="block truncate">{clip.segmentLabel}</span>
-                  {isCurrent && segmentText.get(clip.segmentIndex) && <mark className="mt-0.5 block line-clamp-2 bg-teal-950/70 text-[10px] leading-4 text-teal-200" data-testid="study-audio-active-phrase">{segmentText.get(clip.segmentIndex)}</mark>}
+                  {isCurrent && segmentText.get(clip.segmentIndex) && <mark className="mt-0.5 block line-clamp-2 bg-teal-100 text-[10px] leading-4 text-teal-800 dark:bg-teal-950/70 dark:text-teal-200" data-testid="study-audio-active-phrase">{segmentText.get(clip.segmentIndex)}</mark>}
                 </span>
                 {clip.missing ? (
                   <span className="shrink-0 text-[10px] text-amber-500/80">{t('sin archivo')}</span>

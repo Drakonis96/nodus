@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type {
   NodusApi,
   QueueProgress,
@@ -19,6 +19,7 @@ let activeNodiChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
 let activeStudyGradingRequestId: string | null = null;
+let activeStudySttRequestId: string | null = null;
 
 // Minimal, typed surface exposed to the renderer. No Node, no direct IPC names leak.
 const api: NodusApi = {
@@ -29,6 +30,11 @@ const api: NodusApi = {
   listNotifications: () => ipcRenderer.invoke('nodi:notifications:list'),
   markNotificationsRead: () => ipcRenderer.invoke('nodi:notifications:markRead'),
   clearNotifications: () => ipcRenderer.invoke('nodi:notifications:clear'),
+  listNodiConversations: () => ipcRenderer.invoke('nodi:conversations:list'),
+  getNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:get', id),
+  saveNodiConversation: (input) => ipcRenderer.invoke('nodi:conversations:save', input),
+  deleteNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:delete', id).then(() => undefined),
+  clearNodiConversations: () => ipcRenderer.invoke('nodi:conversations:clear').then(() => undefined),
   onNotificationsChanged: (cb) => {
     const listener = (_e: unknown, list: Parameters<typeof cb>[0]) => cb(list);
     ipcRenderer.on('nodi:notifications:changed', listener);
@@ -52,8 +58,23 @@ const api: NodusApi = {
   cancelNodiChat: async () => {
     if (activeNodiChatRequestId) await ipcRenderer.invoke('nodi:chatStream:cancel', activeNodiChatRequestId);
   },
+  setNodiViewContext: (context) => ipcRenderer.invoke('nodi:viewContext:set', context).then(() => undefined),
+  getNodiViewContext: () => ipcRenderer.invoke('nodi:viewContext:get'),
+  setNodiTutorialVisible: (visible) => ipcRenderer.invoke('nodi:tutorialVisible', visible).then(() => undefined),
   nodiSetMouseIgnore: (ignore) => ipcRenderer.invoke('nodi:setMouseIgnore', ignore),
+  nodiSetExpanded: (expanded) => ipcRenderer.invoke('nodi:setExpanded', expanded),
+  onNodiDismiss: (cb) => {
+    const listener = () => cb();
+    ipcRenderer.on('nodi:dismiss', listener);
+    return () => ipcRenderer.removeListener('nodi:dismiss', listener);
+  },
   nodiOpenMainWindow: () => ipcRenderer.invoke('nodi:openMainWindow'),
+  nodiOpenSettings: () => ipcRenderer.invoke('nodi:openSettings'),
+  onNodiNavigate: (cb) => {
+    const listener = (_e: unknown, view: Parameters<typeof cb>[0]) => cb(view);
+    ipcRenderer.on('nodi:navigate', listener);
+    return () => ipcRenderer.removeListener('nodi:navigate', listener);
+  },
   nodiMoveWindow: (dx, dy) => ipcRenderer.invoke('nodi:moveWindow', dx, dy),
   onVaultChanged: (cb) => {
     const listener = (_e: unknown, vault: Parameters<typeof cb>[0]) => cb(vault);
@@ -246,6 +267,11 @@ const api: NodusApi = {
   cancelDbChat: async () => {
     if (activeDbChatRequestId) await ipcRenderer.invoke('db:chatStream:cancel', activeDbChatRequestId);
   },
+  listDatabaseChatConversations: () => ipcRenderer.invoke('db:chatHistory:list'),
+  getDatabaseChatConversation: (id) => ipcRenderer.invoke('db:chatHistory:get', id),
+  createDatabaseChatConversation: (input) => ipcRenderer.invoke('db:chatHistory:create', input),
+  saveDatabaseChatConversation: (id, messages, databaseIds) => ipcRenderer.invoke('db:chatHistory:save', id, messages, databaseIds),
+  deleteDatabaseChatConversation: (id) => ipcRenderer.invoke('db:chatHistory:delete', id).then(() => undefined),
   listDatabaseViews: (databaseId) => ipcRenderer.invoke('db:listViews', databaseId),
   createDatabaseView: (databaseId, input) => ipcRenderer.invoke('db:createView', databaseId, input),
   updateDatabaseView: (id, patch) => ipcRenderer.invoke('db:updateView', id, patch),
@@ -281,6 +307,22 @@ const api: NodusApi = {
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
   testLocalProvider: (provider) => ipcRenderer.invoke('ai:testLocalProvider', provider),
   listImageModels: () => ipcRenderer.invoke('ai:listImageModels'),
+  getNodusLocalAiStatus: () => ipcRenderer.invoke('ai:nodusLocal:status'),
+  installNodusLocalRuntime: async (onProgress) => {
+    const requestId = `nodus-local-runtime-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, fraction: number) => { if (id === requestId) onProgress?.(fraction); };
+    ipcRenderer.on('ai:nodusLocal:progress', listener);
+    try { return await ipcRenderer.invoke('ai:nodusLocal:installRuntime', requestId); }
+    finally { ipcRenderer.removeListener('ai:nodusLocal:progress', listener); }
+  },
+  downloadNodusLocalModel: async (model, onProgress) => {
+    const requestId = `nodus-local-model-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, fraction: number) => { if (id === requestId) onProgress?.(fraction); };
+    ipcRenderer.on('ai:nodusLocal:progress', listener);
+    try { return await ipcRenderer.invoke('ai:nodusLocal:downloadModel', requestId, model); }
+    finally { ipcRenderer.removeListener('ai:nodusLocal:progress', listener); }
+  },
+  deleteNodusLocalModel: (model) => ipcRenderer.invoke('ai:nodusLocal:deleteModel', model),
   getDecorativeImage: (entityKind, entityId) => ipcRenderer.invoke('images:get', entityKind, entityId),
   getDecorativeImageDataUrl: (entityKind, entityId, thumbnail) =>
     ipcRenderer.invoke('images:data', entityKind, entityId, thumbnail),
@@ -326,12 +368,17 @@ const api: NodusApi = {
   deleteContentTranslation: (id) => ipcRenderer.invoke('translations:delete', id).then(() => undefined),
 
   zoteroPing: () => ipcRenderer.invoke('zotero:ping'),
-  zoteroCollections: () => ipcRenderer.invoke('zotero:collections'),
-  zoteroChildCollections: (parentKey) => ipcRenderer.invoke('zotero:childCollections', parentKey),
+  zoteroLibraries: () => ipcRenderer.invoke('zotero:libraries'),
+  zoteroCollections: (library) => ipcRenderer.invoke('zotero:collections', library),
+  zoteroChildCollections: (parentKey, library) => ipcRenderer.invoke('zotero:childCollections', parentKey, library),
   zoteroCollectionItems: (collectionKey, opts) =>
     ipcRenderer.invoke('zotero:collectionItems', collectionKey, opts),
+  zoteroSearchItems: (library, query) => ipcRenderer.invoke('zotero:searchItems', library, query),
+  zoteroItemAttachments: (itemKey, library) => ipcRenderer.invoke('zotero:itemAttachments', itemKey, library),
 
+  getAcademicHomeSnapshot: () => ipcRenderer.invoke('home:academicSnapshot'),
   listWorks: (filter) => ipcRenderer.invoke('works:list', filter),
+  listWorksPage: (filter, request) => ipcRenderer.invoke('works:listPage', filter, request),
   listZoteroTags: () => ipcRenderer.invoke('works:listZoteroTags'),
   getWork: (nodusId) => ipcRenderer.invoke('works:get', nodusId),
   ingestZoteroItems: (items) => ipcRenderer.invoke('works:ingestZoteroItems', items),
@@ -380,6 +427,10 @@ const api: NodusApi = {
   },
 
   getGraph: (lens) => ipcRenderer.invoke('graph:get', lens),
+  getGraphOverview: () => ipcRenderer.invoke('graph:overview'),
+  getGraphTheme: (theme, cap) => ipcRenderer.invoke('graph:theme', theme, cap),
+  listIdeasPage: (request) => ipcRenderer.invoke('ideas:listPage', request),
+  listIdeaConnections: (globalId) => ipcRenderer.invoke('ideas:connections', globalId),
   getIdeaDetail: (globalId) => ipcRenderer.invoke('graph:ideaDetail', globalId),
   getEdgeDetail: (edgeId) => ipcRenderer.invoke('graph:edgeDetail', edgeId),
   getIdeaEdges: (globalId) => ipcRenderer.invoke('graph:ideaEdges', globalId),
@@ -391,6 +442,7 @@ const api: NodusApi = {
   getThemes: () => ipcRenderer.invoke('graph:themes'),
 
   listAuthors: () => ipcRenderer.invoke('authors:list'),
+  listAuthorsPage: (request) => ipcRenderer.invoke('authors:listPage', request),
   getAuthorDossier: (authorId) => ipcRenderer.invoke('authors:dossier', authorId),
   synthesizeAuthor: (authorId, model) => ipcRenderer.invoke('authors:synthesize', authorId, model),
   getSynthesisMatrix: () => ipcRenderer.invoke('authors:matrix'),
@@ -399,12 +451,15 @@ const api: NodusApi = {
   exportAuthorSyntheses: (request) => ipcRenderer.invoke('authors:exportSyntheses', request),
 
   getStudyWorkspace: (options) => ipcRenderer.invoke('study:workspace', options),
+  getStudySchedule: () => ipcRenderer.invoke('study:schedule:get'),
+  saveStudySchedule: (schedule) => ipcRenderer.invoke('study:schedule:save', schedule),
   createStudyCourse: (input) => ipcRenderer.invoke('study:course:create', input),
   createStudySubject: (input) => ipcRenderer.invoke('study:subject:create', input),
   createStudyTopic: (input) => ipcRenderer.invoke('study:topic:create', input),
   createStudyFolder: (input) => ipcRenderer.invoke('study:folder:create', input),
   createStudyDocument: (input) => ipcRenderer.invoke('study:document:create', input),
   updateStudyEntity: (kind, id, patch) => ipcRenderer.invoke('study:entity:update', kind, id, patch),
+  moveStudyEntity: (kind, id, input) => ipcRenderer.invoke('study:entity:move', kind, id, input),
   addStudyPlacement: (documentId, input) => ipcRenderer.invoke('study:placement:add', documentId, input),
   setPrimaryStudyPlacement: (documentId, input) => ipcRenderer.invoke('study:placement:setPrimary', documentId, input),
   removeStudyPlacement: (id) => ipcRenderer.invoke('study:placement:remove', id).then(() => undefined),
@@ -424,7 +479,36 @@ const api: NodusApi = {
   createStudyAnnotation: (documentId, input) => ipcRenderer.invoke('study:annotation:create', documentId, input),
   updateStudyAnnotation: (id, patch) => ipcRenderer.invoke('study:annotation:update', id, patch),
   deleteStudyAnnotation: (id) => ipcRenderer.invoke('study:annotation:delete', id).then(() => undefined),
-  transcribeStudyAudio: (request) => ipcRenderer.invoke('study:stt:transcribe', request),
+  transcribeStudyAudio: async (request, handlers = {}) => {
+    const requestId = `study-stt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onProgress = (_event: unknown, id: string, fraction: number) => { if (id === requestId) handlers.onProgress?.(fraction); };
+    const onPartial = (_event: unknown, id: string, text: string) => { if (id === requestId) handlers.onPartial?.(text); };
+    ipcRenderer.on('study:stt:progress', onProgress);
+    ipcRenderer.on('study:stt:partial', onPartial);
+    activeStudySttRequestId = requestId;
+    try {
+      return await ipcRenderer.invoke('study:stt:transcribe', { ...request, requestId });
+    } finally {
+      if (activeStudySttRequestId === requestId) activeStudySttRequestId = null;
+      ipcRenderer.removeListener('study:stt:progress', onProgress);
+      ipcRenderer.removeListener('study:stt:partial', onPartial);
+    }
+  },
+  cancelStudyTranscription: async () => {
+    if (activeStudySttRequestId) await ipcRenderer.invoke('study:stt:cancel', activeStudySttRequestId);
+  },
+  getWhisperCppStatus: () => ipcRenderer.invoke('study:stt:whisperCpp:status'),
+  installWhisperCpp: () => ipcRenderer.invoke('study:stt:whisperCpp:install'),
+  uninstallWhisperCpp: () => ipcRenderer.invoke('study:stt:whisperCpp:uninstall'),
+  chooseWhisperCppExecutable: () => ipcRenderer.invoke('study:stt:whisperCpp:chooseExecutable'),
+  downloadWhisperCppModel: async (model, onProgress) => {
+    const requestId = `whisper-model-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const listener = (_event: unknown, id: string, fraction: number) => { if (id === requestId) onProgress?.(fraction); };
+    ipcRenderer.on('study:stt:modelProgress', listener);
+    try { return await ipcRenderer.invoke('study:stt:whisperCpp:download', requestId, model); }
+    finally { ipcRenderer.removeListener('study:stt:modelProgress', listener); }
+  },
+  deleteWhisperCppModel: (model) => ipcRenderer.invoke('study:stt:whisperCpp:delete', model),
   listStudyStyles: (options) => ipcRenderer.invoke('study:styles:list', options),
   createStudyStyle: (input) => ipcRenderer.invoke('study:styles:create', input),
   updateStudyStyle: (id, patch) => ipcRenderer.invoke('study:styles:update', id, patch),
@@ -462,13 +546,27 @@ const api: NodusApi = {
   getStudyMaterialContent: (id) => ipcRenderer.invoke('study:materials:content', id),
   importStudyMaterials: (input) => ipcRenderer.invoke('study:materials:import', input),
   importStudyMaterialFolder: (input) => ipcRenderer.invoke('study:materials:importFolder', input),
+  chooseStudyMaterialPaths: (folder) => ipcRenderer.invoke('study:materials:choosePaths', folder),
+  getPathForDroppedFile: (file) => webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0]),
+  importStudyMaterialPaths: (paths, input) => ipcRenderer.invoke('study:materials:importPaths', paths, input),
+  importZoteroStudyMaterial: (input) => ipcRenderer.invoke('study:materials:importZotero', input),
+  openStudyMaterialInZotero: (id) => ipcRenderer.invoke('study:materials:openZotero', id).then(() => undefined),
+  reindexStudyMaterial: (id) => ipcRenderer.invoke('study:materials:reindex', id),
+  onStudyMaterialIndexChanged: (cb) => {
+    const listener = (_event: unknown, id: string) => cb(id);
+    ipcRenderer.on('study:materials:indexChanged', listener);
+    return () => ipcRenderer.removeListener('study:materials:indexChanged', listener);
+  },
   replaceStudyMaterialFile: (id, ocr) => ipcRenderer.invoke('study:materials:replace', id, ocr),
   updateStudyMaterial: (id, patch) => ipcRenderer.invoke('study:materials:update', id, patch),
   restoreStudyMaterialVersion: (id, versionId) => ipcRenderer.invoke('study:materials:version:restore', id, versionId),
   addStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:add', id, input),
+  setPrimaryStudyMaterialPlacement: (id, input) => ipcRenderer.invoke('study:materials:placement:setPrimary', id, input),
+  removeStudyMaterialPlacement: (id, placementId) => ipcRenderer.invoke('study:materials:placement:remove', id, placementId).then(() => undefined),
   createStudyMaterialAnnotation: (materialId, input) => ipcRenderer.invoke('study:materials:annotation:create', materialId, input),
   updateStudyMaterialAnnotation: (id, patch) => ipcRenderer.invoke('study:materials:annotation:update', id, patch),
   deleteStudyMaterialAnnotation: (id) => ipcRenderer.invoke('study:materials:annotation:delete', id).then(() => undefined),
+  exportAnnotatedStudyMaterial: (id) => ipcRenderer.invoke('study:materials:annotation:export', id),
   createStudyNoteFromMaterial: (materialId, annotationId, title) => ipcRenderer.invoke('study:materials:note:create', materialId, annotationId, title),
   setStudyMaterialLifecycle: (id, action) => ipcRenderer.invoke('study:materials:lifecycle', id, action).then(() => undefined),
   listStudyRecordings: (options) => ipcRenderer.invoke('study:recordings:list', options),
@@ -484,7 +582,7 @@ const api: NodusApi = {
   updateStudyTranscript: (id, contentMarkdown, segments) => ipcRenderer.invoke('study:recordings:transcript:update', id, contentMarkdown, segments),
   updateStudyTranscriptSegment: (id, patch) => ipcRenderer.invoke('study:recordings:segment:update', id, patch),
   deleteStudyTranscript: (id) => ipcRenderer.invoke('study:recordings:transcript:delete', id).then(() => undefined),
-  createStudyNoteFromTranscript: (recordingId, transcriptId) => ipcRenderer.invoke('study:recordings:note:create', recordingId, transcriptId),
+  createStudyNoteFromTranscript: (recordingId, transcriptId, placements) => ipcRenderer.invoke('study:recordings:note:create', recordingId, transcriptId, placements),
   deleteStudyRecordingAudio: (id) => ipcRenderer.invoke('study:recordings:audio:delete', id),
   setStudyRecordingLifecycle: (id, action) => ipcRenderer.invoke('study:recordings:lifecycle', id, action).then(() => undefined),
   searchStudyCorpus: (query, options) => ipcRenderer.invoke('study:search:query', query, options),
@@ -504,6 +602,17 @@ const api: NodusApi = {
     const listener = (_e: unknown, next: Parameters<typeof cb>[0]) => cb(next);
     ipcRenderer.on('study:search:progress', listener);
     return () => ipcRenderer.removeListener('study:search:progress', listener);
+  },
+  listStudyIdeas: (subjectId, query) => ipcRenderer.invoke('study:knowledge:ideas', subjectId, query),
+  getStudyIdeaDetail: (id) => ipcRenderer.invoke('study:knowledge:idea', id),
+  getStudyKnowledgeGraph: (subjectId) => ipcRenderer.invoke('study:knowledge:graph', subjectId),
+  listStudyKnowledgeJobs: (subjectId) => ipcRenderer.invoke('study:knowledge:jobs', subjectId),
+  getStudyKnowledgeProgress: () => ipcRenderer.invoke('study:knowledge:progress'),
+  reanalyzeStudyKnowledgeSource: (sourceKind, sourceId) => ipcRenderer.invoke('study:knowledge:reanalyze', sourceKind, sourceId).then(() => undefined),
+  onStudyKnowledgeChanged: (cb) => {
+    const listener = (_event: unknown, next: Parameters<typeof cb>[0]) => cb(next);
+    ipcRenderer.on('study:knowledge:changed', listener);
+    return () => ipcRenderer.removeListener('study:knowledge:changed', listener);
   },
   listStudyAssistantSources: () => ipcRenderer.invoke('study:assistant:sources'),
   listStudyAssistantConversations: (includeArchived) => ipcRenderer.invoke('study:assistant:list', includeArchived),
@@ -584,6 +693,9 @@ const api: NodusApi = {
   createStudyPlan: (input) => ipcRenderer.invoke('study:planner:create', input),
   createStudyPlanBlock: (input) => ipcRenderer.invoke('study:planner:block:create', input),
   createStudyCalendarEvent: (input) => ipcRenderer.invoke('study:planner:event:create', input),
+  updateStudyCalendarEvent: (id, input) => ipcRenderer.invoke('study:planner:event:update', id, input),
+  deleteStudyCalendarEvent: (id) => ipcRenderer.invoke('study:planner:event:delete', id).then(() => undefined),
+  addStudyCalendarEventToExternal: (id, target) => ipcRenderer.invoke('study:planner:event:external', id, target).then(() => undefined),
   createStudyGoal: (input) => ipcRenderer.invoke('study:planner:goal:create', input),
   updateStudyPlannerItem: (kind, id, patch) => ipcRenderer.invoke('study:planner:item:update', kind, id, patch).then(() => undefined),
   startStudySession: (input) => ipcRenderer.invoke('study:planner:session:start', input),
@@ -613,6 +725,7 @@ const api: NodusApi = {
   },
   listImmersionSessions: () => ipcRenderer.invoke('immersion:list'),
   getImmersionSession: (id) => ipcRenderer.invoke('immersion:get', id),
+  restartImmersionSession: (id) => ipcRenderer.invoke('immersion:restart', id),
   setImmersionProgress: (id, progress) => ipcRenderer.invoke('immersion:progress:set', id, progress).then(() => undefined),
   answerImmersionQuestion: (request) => ipcRenderer.invoke('immersion:answer', request),
   deleteImmersionSession: (id) => ipcRenderer.invoke('immersion:delete', id).then(() => undefined),
@@ -633,6 +746,8 @@ const api: NodusApi = {
   },
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
+  getGapsPage: (offset, limit) => ipcRenderer.invoke('gaps:listPage', offset, limit),
+  getContradictionCount: () => ipcRenderer.invoke('gaps:contradictionCount'),
   getGapDetail: (gapId) => ipcRenderer.invoke('gaps:detail', gapId),
   getContradictions: () => ipcRenderer.invoke('gaps:contradictions'),
   getReadingPath: (request) => ipcRenderer.invoke('reading:path', request),
@@ -838,6 +953,10 @@ const api: NodusApi = {
   chooseBackupFolder: () => ipcRenderer.invoke('backup:chooseFolder'),
   runBackupNow: () => ipcRenderer.invoke('backup:runNow'),
   saveBackupRecoveryKit: () => ipcRenderer.invoke('backup:saveRecoveryKit'),
+  getRecoveryStatus: () => ipcRenderer.invoke('recovery:status'),
+  chooseRecoveryFolder: (mode, language) => ipcRenderer.invoke('recovery:chooseFolder', mode, language),
+  initializeRecoveryFolder: (folder, password, language) => ipcRenderer.invoke('recovery:initialize', folder, password, language),
+  restoreRecoverySnapshot: (root, fileName, password, language) => ipcRenderer.invoke('recovery:restore', root, fileName, password, language),
   resetGraph: () => ipcRenderer.invoke('data:resetGraph').then(() => undefined),
 
   hasAnyData: () => ipcRenderer.invoke('data:hasData'),

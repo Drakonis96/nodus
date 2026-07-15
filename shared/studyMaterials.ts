@@ -5,6 +5,9 @@ export const STUDY_MATERIAL_EXTENSIONS = [
 
 export type StudyMaterialReadState = 'pending' | 'reading' | 'read' | 'reviewed';
 export type StudyMaterialPreviewKind = 'pdf' | 'document' | 'presentation' | 'image' | 'audio' | 'unknown';
+export type StudyMaterialIndexStatus = 'pending' | 'indexing' | 'indexed' | 'unavailable' | 'error';
+export type StudyMaterialVisualAnalysisStatus = 'not_applicable' | 'pending' | 'ready' | 'unsupported' | 'error';
+export type StudyMaterialOrigin = 'file' | 'zotero_import' | 'zotero_link';
 
 export interface StudyMaterialBibliography {
   authors: string[];
@@ -40,6 +43,17 @@ export interface StudyMaterialSummary {
   extension: string;
   contentHash: string;
   extractionStatus: 'pending' | 'ready' | 'partial' | 'unsupported' | 'error';
+  visualDescription: string;
+  visualAnalysisStatus: StudyMaterialVisualAnalysisStatus;
+  visualAnalysisProvider: string | null;
+  visualAnalysisModel: string | null;
+  indexStatus: StudyMaterialIndexStatus;
+  indexError: string | null;
+  embeddingProvider: string | null;
+  embeddingModel: string | null;
+  embeddingDim: number | null;
+  embeddingTextHash: string | null;
+  indexedAt: string | null;
   metadata: StudyMaterialMetadata;
   bibliography: StudyMaterialBibliography;
   readState: StudyMaterialReadState;
@@ -55,6 +69,12 @@ export interface StudyMaterialSummary {
   deletedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  placements: StudyMaterialPlacement[];
+  origin: StudyMaterialOrigin;
+  zoteroLibraryType: 'user' | 'group' | null;
+  zoteroLibraryId: string | null;
+  zoteroItemKey: string | null;
+  zoteroAttachmentKey: string | null;
 }
 
 export interface StudyMaterialPlacement {
@@ -80,12 +100,23 @@ export interface StudyMaterialRect {
   height: number;
 }
 
+export interface StudyMaterialPoint {
+  x: number;
+  y: number;
+}
+
+export type StudyMaterialAnnotationKind = 'highlight' | 'underline' | 'brush' | 'sticky' | 'comment';
+
 export interface StudyMaterialAnnotation {
   id: string;
   shortId: string;
   materialId: string;
   pageNumber: number | null;
   rect: StudyMaterialRect | null;
+  rects: StudyMaterialRect[];
+  path: StudyMaterialPoint[];
+  kind: StudyMaterialAnnotationKind;
+  thickness: number;
   from: number | null;
   to: number | null;
   selectedText: string;
@@ -161,6 +192,21 @@ export interface StudyMaterialImportResult {
   duplicate: boolean;
 }
 
+export interface ZoteroStudyMaterialImportInput extends StudyMaterialImportInput {
+  itemKey: string;
+  attachmentKey?: string | null;
+  library: { type: 'user' | 'group'; id: string; name: string };
+  mode: 'import' | 'link';
+}
+
+export interface StudyMaterialIndexResult {
+  materialId: string;
+  status: StudyMaterialIndexStatus;
+  indexed: boolean;
+  visualDescriptionGenerated: boolean;
+  error: string | null;
+}
+
 export interface StudyMaterialUpdateInput {
   title?: string;
   description?: string;
@@ -175,6 +221,10 @@ export interface StudyMaterialUpdateInput {
 export interface StudyMaterialAnnotationInput {
   pageNumber?: number | null;
   rect?: StudyMaterialRect | null;
+  rects?: StudyMaterialRect[];
+  path?: StudyMaterialPoint[];
+  kind?: StudyMaterialAnnotationKind;
+  thickness?: number;
   from?: number | null;
   to?: number | null;
   selectedText?: string;

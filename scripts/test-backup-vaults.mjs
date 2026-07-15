@@ -33,6 +33,8 @@ try {
   const entities = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
   const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
   const { createBackupArchive, restoreBackupArchive } = require(path.join(repoRoot, 'electron/export/exportImport.ts'));
+  const { decryptBackupPayload } = require(path.join(repoRoot, 'electron/export/backupCrypto.ts'));
+  const AdmZip = require('adm-zip');
 
   const switchTo = (id) => {
     vaults.setActiveVault(id);
@@ -70,11 +72,26 @@ try {
   dbmode.addRelation(dbRow.id, relCol.id, 'db_row', dbRow2.id);
   dbmode.createView(database.id, { name: 'Vista X', layout: 'gallery', filter: { conjunction: 'and', conditions: [] }, sorts: [] });
   assert.equal(dbmode.databaseStats(database.id).rowCount, 2, 'rows seeded in databases vault');
+
+  // Every other selectable vault type uses the same complete SQLite contract and
+  // must be present too, including the two preview workspaces.
+  const extraVaults = [];
+  for (const [name, type] of [['Estudio', 'estudio'], ['Mundo', 'worldbuilding'], ['Docencia', 'docencia']]) {
+    const vault = vaults.createVault(name, type);
+    switchTo(vault.id);
+    const person = entities.createPerson({ displayName: `Dato ${name}` });
+    extraVaults.push({ vault, person });
+  }
+  const studyVault = extraVaults.find((item) => item.vault.type === 'estudio').vault;
+  const studyDir = path.dirname(studyVault.path);
+  fs.writeFileSync(path.join(studyDir, 'study-chat-history.json'), JSON.stringify([{ text: 'historial estudio' }]));
+  fs.mkdirSync(path.join(studyDir, 'audio'), { recursive: true });
+  fs.writeFileSync(path.join(studyDir, 'audio', 'lesson.wav'), Buffer.from('STUDY-AUDIO'));
   // Restore the genealogy vault as active so the backup's active matches the assertion below.
   switchTo(gene.id);
 
   // Back up the WHOLE app (all vaults) while the genealogy vault is active.
-  const archive = await createBackupArchive({ password: 'clave-larga-de-prueba', includeSecrets: false, appVersion: '9.9.9-test' });
+  const archive = await createBackupArchive({ password: 'clave-larga-de-prueba', appVersion: '9.9.9-test' });
   assert.ok(Buffer.isBuffer(archive) && archive.length > 0, 'archive produced');
 
   // ── Wipe both vaults' data ──────────────────────────────────────────────────
@@ -86,6 +103,12 @@ try {
   switchTo(legacy.id);
   entities.deletePerson(alice.personId); // vault A
   assert.equal(entities.getPerson(alice.personId), null, 'Alice deleted from vault A');
+  for (const item of extraVaults) {
+    switchTo(item.vault.id);
+    entities.deletePerson(item.person.personId);
+  }
+  fs.rmSync(path.join(studyDir, 'study-chat-history.json'), { force: true });
+  fs.rmSync(path.join(studyDir, 'audio'), { recursive: true, force: true });
 
   // ── Restore the whole app from the single archive ───────────────────────────
   const result = restoreBackupArchive(archive, 'clave-larga-de-prueba');
@@ -113,6 +136,27 @@ try {
 
   switchTo(legacy.id);
   assert.ok(entities.getPerson(alice.personId), 'Alice restored in the academic vault');
+  for (const item of extraVaults) {
+    switchTo(item.vault.id);
+    assert.ok(entities.getPerson(item.person.personId), `${item.vault.type} vault data restored`);
+  }
+  assert.match(fs.readFileSync(path.join(studyDir, 'study-chat-history.json'), 'utf8'), /historial estudio/, 'study history restored');
+  assert.equal(fs.readFileSync(path.join(studyDir, 'audio', 'lesson.wav'), 'utf8'), 'STUDY-AUDIO', 'study generated audio restored');
+
+  // Full-state scope is enforced in the main process. Even a stale/hostile caller
+  // passing the removed legacy selection cannot exclude vaults or auxiliary data.
+  const scoped = await createBackupArchive({
+    password: 'clave-de-seleccion',
+    appVersion: '9.9.9-test',
+    selection: { vaultIds: [gene.id], includePreferences: false, includeHistories: false, includeGeneratedMedia: false, includeApiKeys: false },
+  });
+  const scopedZip = new AdmZip(scoped);
+  const scopedManifest = JSON.parse(scopedZip.readAsText('manifest.json'));
+  assert.equal(scopedManifest.vaultCount, vaults.listVaults().length, 'legacy selection cannot reduce the protected vault set');
+  const scopedPayload = new AdmZip(decryptBackupPayload(scopedZip.getEntry('backup.bin').getData(), 'clave-de-seleccion', scopedManifest.cipher));
+  const scopedRegistry = JSON.parse(scopedPayload.readAsText('registry.json'));
+  assert.deepEqual(new Set(scopedRegistry.vaults.map((vault) => vault.id)), new Set(vaults.listVaults().map((vault) => vault.id)), 'every vault remains in the payload');
+  assert.equal(scopedPayload.getEntries().some((entry) => entry.entryName.startsWith('aux/')), true, 'legacy exclusions cannot omit auxiliary data');
 
   // ── A wrong password refuses cleanly ────────────────────────────────────────
   const bad = restoreBackupArchive(archive, 'contraseña-incorrecta');

@@ -1,7 +1,10 @@
+import { encodeWavPcm16 } from '../audio/wav';
+
 type Pending = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
   onProgress?: (fraction: number) => void;
+  onPartial?: (text: string) => void;
 };
 
 export interface LocalWhisperResult {
@@ -15,10 +18,11 @@ const pending = new Map<string, Pending>();
 function getWorker(): Worker {
   if (worker) return worker;
   worker = new Worker(new URL('./stt.worker.ts', import.meta.url), { type: 'module' });
-  worker.onmessage = (event: MessageEvent<{ id: string; type: 'progress' | 'result' | 'error'; fraction?: number; result?: unknown; error?: string }>) => {
+  worker.onmessage = (event: MessageEvent<{ id: string; type: 'progress' | 'partial' | 'result' | 'error'; fraction?: number; text?: string; result?: unknown; error?: string }>) => {
     const current = pending.get(event.data.id);
     if (!current) return;
     if (event.data.type === 'progress') current.onProgress?.(event.data.fraction ?? 0);
+    if (event.data.type === 'partial') current.onPartial?.(event.data.text ?? '');
     if (event.data.type === 'result') { pending.delete(event.data.id); current.resolve(event.data.result); }
     if (event.data.type === 'error') { pending.delete(event.data.id); current.reject(new Error(event.data.error ?? 'Whisper local failed')); }
   };
@@ -30,10 +34,10 @@ function getWorker(): Worker {
   return worker;
 }
 
-function request<T>(message: Record<string, unknown>, transfer: Transferable[] = [], onProgress?: (fraction: number) => void): Promise<T> {
+function request<T>(message: Record<string, unknown>, transfer: Transferable[] = [], onProgress?: (fraction: number) => void, onPartial?: (text: string) => void): Promise<T> {
   const id = crypto.randomUUID();
   return new Promise<T>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as (value: unknown) => void, reject, onProgress });
+    pending.set(id, { resolve: resolve as (value: unknown) => void, reject, onProgress, onPartial });
     getWorker().postMessage({ ...message, id }, transfer);
   });
 }
@@ -43,7 +47,7 @@ export async function ensureLocalWhisperModel(model: string, onProgress?: (fract
   localStorage.setItem(`nodus.stt.model.${model}`, '1');
 }
 
-async function decodeMono(blob: Blob): Promise<Float32Array> {
+export async function decodeWhisperAudio(blob: Blob): Promise<Float32Array> {
   const context = new AudioContext({ sampleRate: 16_000 });
   try {
     const decoded = await context.decodeAudioData(await blob.arrayBuffer());
@@ -60,14 +64,18 @@ async function decodeMono(blob: Blob): Promise<Float32Array> {
   }
 }
 
-export async function transcribeLocalWhisper(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void): Promise<string> {
-  return (await transcribeLocalWhisperDetailed(blob, model, language, onProgress)).text;
+export async function transcribeLocalWhisper(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void, onPartial?: (text: string) => void): Promise<string> {
+  return (await transcribeLocalWhisperDetailed(blob, model, language, onProgress, onPartial)).text;
 }
 
-export async function transcribeLocalWhisperDetailed(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void): Promise<LocalWhisperResult> {
-  const samples = await decodeMono(blob);
-  const result = await request<LocalWhisperResult | string>({ type: 'transcribe', model, samples, language }, [samples.buffer], onProgress);
+export async function transcribeLocalWhisperDetailed(blob: Blob, model: string, language?: string | null, onProgress?: (fraction: number) => void, onPartial?: (text: string) => void): Promise<LocalWhisperResult> {
+  const samples = await decodeWhisperAudio(blob);
+  const result = await request<LocalWhisperResult | string>({ type: 'transcribe', model, samples, language }, [samples.buffer], onProgress, onPartial);
   return typeof result === 'string' ? { text: result, chunks: [] } : result;
+}
+
+export async function audioBlobToWhisperWav(blob: Blob): Promise<Uint8Array> {
+  return encodeWavPcm16(await decodeWhisperAudio(blob), 16_000);
 }
 
 export function cancelLocalWhisper(): void {

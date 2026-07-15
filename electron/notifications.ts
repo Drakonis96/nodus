@@ -9,6 +9,8 @@ import type { NodiNotification } from '@shared/types';
 // the renderer is told to refresh through the notifier callback below.
 
 const MAX = 50;
+const DEFAULT_COOLDOWN_MS = 30_000;
+const lastEmitted = new Map<string, number>();
 
 function file(): string {
   return path.join(app.getPath('userData'), 'nodi-notifications.json');
@@ -47,13 +49,20 @@ export function addNotification(input: {
   title: string;
   body?: string;
   kind?: NodiNotification['kind'];
-}): NodiNotification {
+  dedupeKey?: string;
+  cooldownMs?: number;
+}): NodiNotification | null {
+  const dedupeKey = input.dedupeKey ?? `${input.title}\0${input.body ?? ''}`;
+  const cooldownMs = Math.max(0, input.cooldownMs ?? DEFAULT_COOLDOWN_MS);
+  const timestamp = Date.now();
+  if (timestamp - (lastEmitted.get(dedupeKey) ?? 0) < cooldownMs) return null;
+  lastEmitted.set(dedupeKey, timestamp);
   const item: NodiNotification = {
-    id: `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `ntf-${timestamp}-${Math.random().toString(36).slice(2, 8)}`,
     title: input.title,
     body: input.body ?? '',
     kind: input.kind ?? 'info',
-    createdAt: Date.now(),
+    createdAt: timestamp,
     read: false,
   };
   write([item, ...read()]);
@@ -73,6 +82,7 @@ export function markAllNotificationsRead(): void {
 
 export function clearNotifications(): void {
   write([]);
+  lastEmitted.clear();
   notify?.();
 }
 

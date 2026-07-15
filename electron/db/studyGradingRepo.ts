@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import type {
   StudyGradingAnnotation,
-  StudyGradingAnnotationInput,
   StudyGradingResult,
   StudyGradingRun,
   StudyGradingSeverity,
@@ -84,6 +83,8 @@ export function saveStudyGradingRun(input: { attemptAnswerId: string; rubricId: 
     db.prepare(`INSERT INTO study_grading_runs (id, short_id, attempt_answer_id, rubric_id, severity, model_provider, model_name, sources_json, result_json, estimated_score, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(key.id, key.shortId, input.attemptAnswerId, input.rubricId, input.severity, input.model.provider, input.model.model, JSON.stringify(input.sources), JSON.stringify(input.result), input.result.estimatedScore, timestamp, timestamp);
     const insert = db.prepare(`INSERT INTO study_grading_annotations (id, short_id, grading_run_id, from_pos, to_pos, kind, severity, message, suggestion, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const annotation of input.result.annotations) { const annotationId = ids('GAN'); insert.run(annotationId.id, annotationId.shortId, key.id, annotation.from, annotation.to, annotation.kind, annotation.severity, annotation.message, annotation.suggestion ?? null, timestamp); }
+    db.prepare('UPDATE study_questions SET last_score=?, last_max_score=?, last_feedback=?, last_answered_at=?, updated_at=? WHERE id=?')
+      .run(input.result.estimatedScore, input.result.maxScore, input.result.generalFeedback, timestamp, timestamp, context.question.id);
   })();
   return getStudyGradingRun(key.id)!;
 }

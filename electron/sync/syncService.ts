@@ -13,8 +13,8 @@ import {
   setDeepPending,
 } from '../db/worksRepo';
 import { setWorkCollections, addWorkCollections, upsertCollections } from '../db/collectionsRepo';
-import { collectionItemsRecursive, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
-import type { ZoteroCollection } from '@shared/types';
+import { collectionItemsRecursive, libraries as zoteroLibraries, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
+import type { ZoteroCollection, ZoteroLibrary } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
 import { linkZoteroAuthors } from '../db/authorsRepo';
@@ -108,7 +108,8 @@ async function refreshCollectionTree(userId: string, monitored: string[]): Promi
   const all = new Map<string, ZoteroCollection>();
   let top: ZoteroCollection[] = [];
   try {
-    top = await topCollections(userId);
+    const libs = await zoteroLibraries();
+    top = (await Promise.all(libs.map((library) => topCollections(userId, library).catch(() => [])))).flat();
   } catch {
     return;
   }
@@ -234,10 +235,9 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
     }
   }
 
-  // Persist the library version so realtime polling can diff against it.
+  // Persist every monitored library version so group-library edits also trigger realtime sync.
   try {
-    const version = await libraryVersion(userId);
-    setLibraryVersion(version);
+    setLibraryVersions(await fetchLibraryVersions(userId, settings.monitoredCollections));
   } catch {
     /* ignore */
   }
@@ -246,17 +246,36 @@ export async function fullSync(mode: 'manual' | 'realtime'): Promise<SyncLogEntr
   return addSyncLog(mode, summary);
 }
 
-function setLibraryVersion(version: number): void {
-  getDb()
-    .prepare("INSERT INTO settings (key, value) VALUES ('library_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-    .run(String(version));
+function monitoredLibraries(collections: string[]): ZoteroLibrary[] {
+  const out = new Map<string, ZoteroLibrary>();
+  out.set('user:0', { type: 'user', id: '0', name: 'Mi biblioteca' });
+  for (const key of collections) {
+    const match = /^groups:([^:]+):/.exec(key);
+    if (match) out.set(`group:${match[1]}`, { type: 'group', id: match[1], name: `Grupo ${match[1]}` });
+  }
+  return [...out.values()];
 }
 
-function getLibraryVersion(): number {
-  const row = getDb().prepare("SELECT value FROM settings WHERE key = 'library_version'").get() as
+async function fetchLibraryVersions(userId: string, collections: string[]): Promise<Record<string, number>> {
+  const entries = await Promise.all(monitoredLibraries(collections).map(async (library) => [
+    `${library.type}:${library.id}`,
+    await libraryVersion(userId, library),
+  ] as const));
+  return Object.fromEntries(entries);
+}
+
+function setLibraryVersions(versions: Record<string, number>): void {
+  getDb()
+    .prepare("INSERT INTO settings (key, value) VALUES ('library_versions', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(JSON.stringify(versions));
+}
+
+function getLibraryVersions(): Record<string, number> {
+  const row = getDb().prepare("SELECT value FROM settings WHERE key = 'library_versions'").get() as
     | { value: string }
     | undefined;
-  return row ? parseInt(row.value, 10) : 0;
+  if (!row) return {};
+  try { return JSON.parse(row.value) as Record<string, number>; } catch { return {}; }
 }
 
 // ── Realtime polling ──────────────────────────────────────────────────────────
@@ -269,8 +288,9 @@ export function startRealtimeSync(): void {
     const settings = getSettings();
     if (settings.syncMode !== 'realtime') return;
     try {
-      const version = await libraryVersion(settings.zoteroUserId);
-      if (version > getLibraryVersion()) {
+      const versions = await fetchLibraryVersions(settings.zoteroUserId, settings.monitoredCollections);
+      const previous = getLibraryVersions();
+      if (Object.entries(versions).some(([key, version]) => version > (previous[key] ?? 0))) {
         await fullSync('realtime');
       }
     } catch {

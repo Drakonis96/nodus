@@ -15,6 +15,7 @@ export function ConfirmModal({
   confirmLabel,
   cancelLabel,
   danger = false,
+  zIndex = 120,
   onConfirm,
   onCancel,
 }: {
@@ -23,6 +24,7 @@ export function ConfirmModal({
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  zIndex?: number;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -35,7 +37,7 @@ export function ConfirmModal({
   }, [onCancel]);
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[120] p-6" onClick={onCancel}>
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-6" style={{ zIndex }} onClick={onCancel}>
       <motion.div
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}

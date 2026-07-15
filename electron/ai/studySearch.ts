@@ -126,7 +126,7 @@ function nameMaps() {
   return { courses, subjects, topics };
 }
 
-function scopeSubtitle(scope: { courseId: string | null; subjectId: string | null; topicId: string | null }, maps: ReturnType<typeof nameMaps>): string {
+function scopeSubtitle(scope: { courseId: string | null; subjectId: string | null; folderId: string | null; topicId: string | null }, maps: ReturnType<typeof nameMaps>): string {
   return [scope.courseId ? maps.courses.get(scope.courseId) : '', scope.subjectId ? maps.subjects.get(scope.subjectId) : '', scope.topicId ? maps.topics.get(scope.topicId) : ''].filter(Boolean).join(' · ');
 }
 
@@ -149,19 +149,19 @@ function textChunks(text: string, size = 1400, overlap = 180): Array<{ text: str
 
 function addDocumentEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeof nameMaps>): void {
   const db = getDb();
-  const rows = db.prepare(`SELECT d.*, p.course_id, p.subject_id, p.topic_id,
-    GROUP_CONCAT(t.name, '||') AS tag_names FROM study_docs d
+  const rows = db.prepare(`SELECT d.*, p.id AS placement_id, p.course_id, p.subject_id, p.folder_id, p.topic_id,
+    (SELECT GROUP_CONCAT(t.name, '||') FROM study_doc_tags dt JOIN study_tags t ON t.id=dt.tag_id WHERE dt.document_id=d.id) AS tag_names FROM study_docs d
     LEFT JOIN study_placements p ON p.document_id = d.id AND p.deleted_at IS NULL
-    LEFT JOIN study_doc_tags dt ON dt.document_id = d.id LEFT JOIN study_tags t ON t.id = dt.tag_id
-    WHERE d.archived_at IS NULL AND d.deleted_at IS NULL GROUP BY d.id ORDER BY d.updated_at DESC`).all() as Row[];
+    WHERE d.archived_at IS NULL AND d.deleted_at IS NULL ORDER BY d.updated_at DESC, p.position`).all() as Row[];
   for (const row of rows) {
     const sourceId = String(row.id); const title = String(row.title); const content = String(row.content_markdown ?? '');
-    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const placementKey = row.placement_id ? String(row.placement_id) : 'unplaced';
+    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, folderId: row.folder_id ? String(row.folder_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
     const tags = String(row.tag_names ?? '').split('||').filter(Boolean);
     for (const [index, chunk] of textChunks(content).entries()) entries.push({
-      indexId: `document:${sourceId}:${index}`, kind: 'document', sourceId, title, text: chunk.text,
+      indexId: `document:${sourceId}:${placementKey}:${index}`, kind: 'document', sourceId, title, text: chunk.text,
       subtitle: scopeSubtitle(scope, maps), tags, scope, location: { documentId: sourceId, from: chunk.from, to: chunk.to },
-      createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`${title}\0${chunk.text}`), embedding: null, excluded: false,
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`study-document-fragment-v2\0${title}\0${chunk.text}`), embedding: null, excluded: false,
     });
   }
 }
@@ -177,20 +177,24 @@ function materialLocations(text: string): Array<{ text: string; from: number; to
 }
 
 function addMaterialEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeof nameMaps>): void {
-  const rows = getDb().prepare(`SELECT m.*, p.course_id, p.subject_id, p.topic_id FROM study_materials m
+  const rows = getDb().prepare(`SELECT m.*, p.id AS placement_id, p.course_id, p.subject_id, p.folder_id, p.topic_id FROM study_materials m
     LEFT JOIN study_material_placements p ON p.material_id = m.id AND p.deleted_at IS NULL
-    WHERE m.archived_at IS NULL AND m.deleted_at IS NULL GROUP BY m.id ORDER BY m.updated_at DESC`).all() as Row[];
+    WHERE m.archived_at IS NULL AND m.deleted_at IS NULL ORDER BY m.updated_at DESC, p.position`).all() as Row[];
   for (const row of rows) {
-    const text = String(row.extracted_text ?? ''); if (!text.trim()) continue;
+    const text = [String(row.visual_description ?? ''), String(row.extracted_text ?? '')].filter((part) => part.trim()).join('\n\n'); if (!text.trim()) continue;
     const sourceId = String(row.id); const title = String(row.title);
-    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const placementKey = row.placement_id ? String(row.placement_id) : 'unplaced';
+    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, folderId: row.folder_id ? String(row.folder_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
     const metadata = parseJson<{ tags?: string[] }>(row.metadata_json, {}); const tags = metadata.tags?.filter(Boolean) ?? [];
     const chunks = materialLocations(text).flatMap((located) => textChunks(located.text).map((chunk) => ({ ...chunk, from: located.from + chunk.from, to: located.from + chunk.to, pageNumber: located.pageNumber, slideNumber: located.slideNumber })));
     for (const [index, chunk] of chunks.entries()) entries.push({
-      indexId: `material:${sourceId}:${index}`, kind: 'material', sourceId, title, text: chunk.text,
+      indexId: `material:${sourceId}:${placementKey}:${index}`, kind: 'material', sourceId, title, text: chunk.text,
       subtitle: scopeSubtitle(scope, maps), tags, scope,
       location: { materialId: sourceId, pageNumber: chunk.pageNumber, slideNumber: chunk.slideNumber, from: chunk.from, to: chunk.to },
-      createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`${title}\0${chunk.text}`), embedding: null, excluded: false,
+      // A material-level vector cannot represent every page of a long source. The
+      // v2 hash deliberately invalidates legacy cache entries that copied that one
+      // vector onto every chunk; rebuildStudySearchIndex now embeds each fragment.
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`study-fragment-v2\0${title}\0${chunk.text}`), embedding: null, excluded: false,
     });
   }
 }
@@ -205,7 +209,7 @@ function addTranscriptEntries(entries: StudySearchIndexEntry[], maps: ReturnType
     ORDER BY r.updated_at DESC, s.t_start`).all() as Row[];
   for (const row of rows) {
     const sourceId = String(row.transcript_id); const recordingId = String(row.recording_id); const title = String(row.title);
-    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, folderId: null, topicId: row.topic_id ? String(row.topic_id) : null };
     const text = String(row.text ?? '');
     entries.push({
       indexId: `transcript:${sourceId}:${row.id}`, kind: 'transcript', sourceId, title, text,
@@ -219,7 +223,7 @@ function addTranscriptEntries(entries: StudySearchIndexEntry[], maps: ReturnType
 function addQuestionEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeof nameMaps>): void {
   const rows = getDb().prepare(`SELECT * FROM study_questions WHERE archived_at IS NULL AND deleted_at IS NULL ORDER BY updated_at DESC`).all() as Row[];
   for (const row of rows) {
-    const sourceId = String(row.id); const title = String(row.prompt); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const sourceId = String(row.id); const title = String(row.prompt); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, folderId: row.folder_id ? String(row.folder_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
     const answer = parseJson<{ text?: string; value?: unknown }>(row.answer_json, {}); const options = parseJson<Array<{ text?: string }>>(row.options_json, []);
     const text = [title, answer.text ?? String(answer.value ?? ''), String(row.explanation ?? ''), String(row.source_excerpt ?? ''), ...options.map((option) => option.text ?? '')].filter(Boolean).join('\n');
     entries.push({
@@ -236,7 +240,7 @@ function addExamEntries(entries: StudySearchIndexEntry[], maps: ReturnType<typeo
     LEFT JOIN study_assessment_items i ON i.assessment_id=a.id LEFT JOIN study_questions q ON q.id=i.question_id
     WHERE a.kind='exam' AND a.archived_at IS NULL AND a.deleted_at IS NULL GROUP BY a.id ORDER BY a.updated_at DESC`).all() as Row[];
   for (const row of rows) {
-    const sourceId = String(row.id); const title = String(row.title); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, topicId: row.topic_id ? String(row.topic_id) : null };
+    const sourceId = String(row.id); const title = String(row.title); const scope = { courseId: row.course_id ? String(row.course_id) : null, subjectId: row.subject_id ? String(row.subject_id) : null, folderId: null, topicId: row.topic_id ? String(row.topic_id) : null };
     const text = [title, String(row.description ?? ''), String(row.prompts ?? '')].filter(Boolean).join('\n');
     entries.push({ indexId: `exam:${sourceId}`, kind: 'exam', sourceId, title, text, subtitle: scopeSubtitle(scope, maps), tags: [], scope, location: {}, createdAt: String(row.created_at), updatedAt: String(row.updated_at), contentHash: hash(`${title}\0${text}`), embedding: null, excluded: false });
   }
@@ -303,7 +307,7 @@ export async function rebuildStudySearchIndex(): Promise<StudySearchProgress> {
     const oldByHash = new Map(old.modelProvider === config.provider && old.modelName === config.model
       ? old.entries.filter((entry) => entry.embedding?.length).map((entry) => [entry.contentHash, entry.embedding]) : []);
     const excluded = new Set(old.excludedSourceIds);
-    for (const entry of entries) { entry.embedding = oldByHash.get(entry.contentHash) ?? null; entry.excluded = excluded.has(entry.sourceId); }
+    for (const entry of entries) { entry.embedding = oldByHash.get(entry.contentHash) ?? entry.embedding ?? null; entry.excluded = excluded.has(entry.sourceId); }
     emit({ ...old, entries });
     const pending = entries.filter((entry) => !entry.excluded && !entry.embedding?.length);
     for (let offset = 0; offset < pending.length; offset += 16) {
@@ -324,6 +328,22 @@ export async function rebuildStudySearchIndex(): Promise<StudySearchProgress> {
   } finally { runtime.paused = false; runtime.stopRequested = false; }
 }
 
+let queuedRefresh = false;
+let refreshTask: Promise<void> | null = null;
+
+/** Incremental, de-duplicated refresh used after source changes. Existing vectors
+ * are retained by content hash and only new or changed fragments are embedded. */
+export function queueStudySearchIndexRefresh(): void {
+  queuedRefresh = true;
+  if (refreshTask) return;
+  refreshTask = (async () => {
+    while (queuedRefresh) {
+      queuedRefresh = false;
+      await rebuildStudySearchIndex();
+    }
+  })().finally(() => { refreshTask = null; if (queuedRefresh) queueStudySearchIndexRefresh(); });
+}
+
 function ensureLexicalIndex(): StudySearchStore {
   const store = readStore();
   const config = modelConfig();
@@ -332,7 +352,7 @@ function ensureLexicalIndex(): StudySearchStore {
   const excluded = new Set(store.excludedSourceIds);
   const entries = collected.map((entry) => {
     const old = oldByHash.get(entry.contentHash);
-    return { ...entry, embedding: old?.embedding ?? null, excluded: excluded.has(entry.sourceId) };
+    return { ...entry, embedding: old?.embedding ?? entry.embedding ?? null, excluded: excluded.has(entry.sourceId) };
   });
   const unchanged = entries.length === store.entries.length && entries.every((entry, index) => entry.contentHash === store.entries[index]?.contentHash && entry.excluded === store.entries[index]?.excluded);
   if (unchanged) return store;

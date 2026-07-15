@@ -1,9 +1,11 @@
+import type { StudySttProvider } from '@shared/sttModels';
+
 export interface StudyDictationClip {
   id: string;
   documentId: string;
   createdAt: string;
   mimeType: string;
-  provider: 'local' | 'openai';
+  provider: StudySttProvider | 'local';
   model: string;
   transcript: string;
   anchorText: string;

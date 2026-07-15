@@ -44,6 +44,7 @@ try {
   const course = org.createStudyCourse({ name: 'Curso audio' });
   const subject = org.createStudySubject({ courseId: course.id, name: 'Psicología' });
   const topic = org.createStudyTopic({ subjectId: subject.id, name: 'Memoria' });
+  const secondTopic = org.createStudyTopic({ subjectId: subject.id, name: 'Aprendizaje' });
   const bytes = new Uint8Array(Buffer.from('RIFF-recording-WAVE-audio'));
   const first = recordings.createStudyRecording({
     title: 'Clase de memoria', fileName: 'clase.wav', mimeType: 'audio/wav', bytes, durationSeconds: 62,
@@ -83,11 +84,16 @@ try {
   assert.equal(recordings.getStudyRecording(first.recording.id).transcripts.filter((item) => item.kind === 'literal')[0].versionNo, 2, 'reprocessing preserves literal history');
   assert.equal(recordings.listStudyRecordings({ search: 'procedimental' })[0].id, first.recording.id, 'transcript is searchable');
 
-  const note = recordings.createStudyNoteFromTranscript(first.recording.id, notes.id);
-  const noteDoc = org.getStudyWorkspace().documents.find((document) => document.id === note.documentId);
+  const note = recordings.createStudyNoteFromTranscript(first.recording.id, notes.id, [
+    { courseId: course.id, subjectId: subject.id, topicId: topic.id },
+    { courseId: course.id, subjectId: subject.id, topicId: secondTopic.id },
+  ]);
+  const noteWorkspace = org.getStudyWorkspace();
+  const noteDoc = noteWorkspace.documents.find((document) => document.id === note.documentId);
   assert.ok(noteDoc);
   assert.match(noteDoc.contentMarkdown, /nodus:\/\/study\/recording/);
   assert.equal(noteDoc.kind, 'apunte');
+  assert.equal(noteWorkspace.placements.filter((placement) => placement.documentId === note.documentId).length, 2, 'recording note is visible in every selected materials location');
 
   recordings.deleteStudyRecordingAudio(first.recording.id);
   assert.throws(() => recordings.getStudyRecordingContent(first.recording.id), /audio se eliminó/);

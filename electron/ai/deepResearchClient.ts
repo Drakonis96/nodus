@@ -20,6 +20,7 @@ import {
   resolveSectionPlan,
   resolveTargetPages,
   WORDS_PER_PAGE,
+  DEEP_RESEARCH_NARRATIVE_RULES,
   type CitationCatalog,
   type DeepResearchPlanSection,
 } from './deepResearchCore';
@@ -97,6 +98,7 @@ export async function buildDeepResearchBrief(
     method: [
       `El cuerpo debe ocupar entre ${targetPages.min} y ${targetPages.max} páginas (~${WORDS_PER_PAGE} palabras/página), repartidas en torno a ${sectionPlan.target} secciones (máximo ${sectionPlan.hardCap}).`,
       'Prefiere POCAS secciones LARGAS y profundas antes que muchas cortas: cada sección agrupa varias ideas afines y las relaciona (continuidad, tensiones, consecuencias), no una idea por sección.',
+      ...DEEP_RESEARCH_NARRATIVE_RULES,
       'Reparte TODAS las ideas relevantes del catálogo entre las secciones. Sitúa los huecos y contradicciones donde aporten tensión argumental. Cierra con una síntesis.',
       'Empieza cada sección con un encabezado Markdown "## Título". No incluyas el resumen, las limitaciones ni las referencias en `sectionsMarkdown`: pásalos como campos aparte a la herramienta de ensamblado.',
       `Cuando termines de redactar, llama a \`${'nodus_finalize_deep_research'}\` con tu markdown para validar las citas, construir las referencias y (si quieres) guardar el borrador.`,

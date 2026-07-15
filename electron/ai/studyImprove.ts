@@ -100,7 +100,7 @@ export async function improveStudyText(
   const aiSettings = getSettings();
   let streamed = '';
   let visibleStreamed = '';
-  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => completeTextStream({
+  const completed = await runStudyAiTask<string>({ task: 'improve', explicitModel: requestedModel, subjectId: request.subjectId, inputChars: prompt.system.length + prompt.user.length, outputChars: (value) => value.length, allowFallback: () => !streamed }, (model) => completeTextStream({
     system: prompt.system,
     user: prompt.user,
     temperature: request.mode === 'free' ? Math.max(style.temperature, style.creativity) : Math.min(style.temperature, 0.45),
@@ -121,7 +121,12 @@ export async function improveStudyText(
   }, model, signal));
   const raw = completed.value; const model = completed.model;
   const protectedResult = stripWrappingFence(raw || streamed);
-  const missing = missingProtectedSpans(protectedResult, protectedValue.spans);
+  // Some small local models helpfully expand a placeholder back to the exact
+  // protected value even though the prompt asks them not to touch it. That is
+  // still a successful preservation, so only reject spans for which neither the
+  // marker nor its byte-for-byte original value survives.
+  const missing = missingProtectedSpans(protectedResult, protectedValue.spans)
+    .filter((span) => !protectedResult.includes(span.value));
   if (missing.length) {
     throw new Error(`La mejora alteró ${missing.length} fragmento(s) protegido(s). El original no se ha modificado.`);
   }

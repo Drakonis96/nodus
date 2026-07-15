@@ -1,67 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, SyncLogEntry, VaultSummary } from '@shared/types';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
-import { DatabasesView, CsvImportModal, type CsvImportPlanData } from './views/DatabasesView';
-import { DatabasesAnalysisView } from './views/DatabasesAnalysisView';
-import { DatabasesChatView } from './views/DatabasesChatView';
-import { DatabasesSearchView } from './views/DatabasesSearchView';
-import { StudyHome } from './views/StudyHome';
-import { StudyOrganizationView } from './views/StudyOrganizationView';
-import { StudyMaterialsView } from './views/StudyMaterialsView';
-import { StudyRecordingsView } from './views/StudyRecordingsView';
-import { StudySearchView } from './views/StudySearchView';
-import { StudyChatView } from './views/StudyChatView';
-import { StudyBankView } from './views/StudyBankView';
-import { StudyTestView } from './views/StudyTestView';
-import { StudyExamView } from './views/StudyExamView';
-import { StudyReviewView } from './views/StudyReviewView';
-import { StudyProgressView } from './views/StudyProgressView';
-import { StudyPlannerView } from './views/StudyPlannerView';
-import { Library } from './views/Library';
-import { GraphView } from './views/GraphView';
-import { GapsView } from './views/GapsView';
-import { DebateView } from './views/DebateView';
-import { ResearchMapView } from './views/ResearchMapView';
-import { HypothesisLabView } from './views/HypothesisLabView';
-import { ReadingPathView } from './views/ReadingPathView';
-import { WritingWorkshopView } from './views/WritingWorkshopView';
-import { DeepResearchView } from './views/DeepResearchView';
-import { ProjectsView } from './views/ProjectsView';
-import { NotesView } from './views/NotesView';
-import { SearchView } from './views/SearchView';
-import { ArgumentMapView } from './views/ArgumentMapView';
-import { IdeasView } from './views/IdeasView';
-import { AuthorsView } from './views/AuthorsView';
-import { PersonasView } from './views/PersonasView';
-import { TimelineView } from './views/TimelineView';
-import { TreeView } from './views/TreeView';
-import { RelationsView } from './views/RelationsView';
-import { MapView } from './views/MapView';
-import { ArchiveView } from './views/ArchiveView';
-import { StudyGuideView } from './views/StudyGuideView';
-import { ImmersionView } from './views/ImmersionView';
-import { Settings } from './views/Settings';
-import { CollectionsModal } from './views/CollectionsModal';
-import { ResearchAssistantModal } from './views/ResearchAssistantModal';
+import type { CsvImportPlanData } from './views/DatabasesView';
 import { FeedbackModal } from './views/FeedbackModal';
+import { RoadmapModal } from './views/RoadmapModal';
 import { QueueBar } from './components/QueueBar';
 import { EmbeddingProgressBar } from './components/EmbeddingProgressBar';
 import { PassageProgressBar } from './components/PassageProgressBar';
-import { VaultSwitcher, vaultTypeLabel } from './components/VaultSwitcher';
+import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
+import { PreviewVaultSidebar } from './components/PreviewVaultSidebar';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
 import { AdvancedTour } from './views/AdvancedTour';
 import { GenealogyTour } from './views/GenealogyTour';
 import { DatabasesTour } from './views/DatabasesTour';
-import { WhatsNewModal } from './components/WhatsNewModal';
+import { StudyTour } from './views/StudyTour';
+import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
+import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
+import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
+import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
 import { notifyDataChanged, useDataRefresh } from './hooks';
+import { setActiveVaultQueryScope } from './vaultQueryCache';
 import type {
   PendingAssistantNavigationTarget,
   PendingGraphNavigationTarget,
@@ -69,13 +35,56 @@ import type {
   View,
 } from './navigation';
 import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
-import { effectiveSidebarHidden, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
+import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import nodusLogoTeal from './assets/nodus-logo-teal.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
+
+const DatabasesView = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.DatabasesView })));
+const CsvImportModal = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.CsvImportModal })));
+const DatabasesAnalysisView = lazy(() => import('./views/DatabasesAnalysisView').then((module) => ({ default: module.DatabasesAnalysisView })));
+const DatabasesChatView = lazy(() => import('./views/DatabasesChatView').then((module) => ({ default: module.DatabasesChatView })));
+const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
+const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
+const StudyOrganizationView = lazy(() => import('./views/StudyOrganizationView').then((module) => ({ default: module.StudyOrganizationView })));
+const StudyScheduleView = lazy(() => import('./views/StudyScheduleView').then((module) => ({ default: module.StudyScheduleView })));
+const StudyCalendarView = lazy(() => import('./views/StudyCalendarView').then((module) => ({ default: module.StudyCalendarView })));
+const StudyMaterialsView = lazy(() => import('./views/StudyMaterialsView').then((module) => ({ default: module.StudyMaterialsView })));
+const StudyRecordingsView = lazy(() => import('./views/StudyRecordingsView').then((module) => ({ default: module.StudyRecordingsView })));
+const StudySearchView = lazy(() => import('./views/StudySearchView').then((module) => ({ default: module.StudySearchView })));
+const StudyBankView = lazy(() => import('./views/StudyBankView').then((module) => ({ default: module.StudyBankView })));
+const StudyIdeasView = lazy(() => import('./views/StudyIdeasView').then((module) => ({ default: module.StudyIdeasView })));
+const StudyGraphView = lazy(() => import('./views/StudyGraphView').then((module) => ({ default: module.StudyGraphView })));
+const StudyChatView = lazy(() => import('./views/StudyChatView').then((module) => ({ default: module.StudyChatView })));
+const StudyReviewView = lazy(() => import('./views/StudyReviewView').then((module) => ({ default: module.StudyReviewView })));
+const Library = lazy(() => import('./views/Library').then((module) => ({ default: module.Library })));
+const GraphView = lazy(() => import('./views/GraphView').then((module) => ({ default: module.GraphView })));
+const GapsView = lazy(() => import('./views/GapsView').then((module) => ({ default: module.GapsView })));
+const DebateView = lazy(() => import('./views/DebateView').then((module) => ({ default: module.DebateView })));
+const ResearchMapView = lazy(() => import('./views/ResearchMapView').then((module) => ({ default: module.ResearchMapView })));
+const HypothesisLabView = lazy(() => import('./views/HypothesisLabView').then((module) => ({ default: module.HypothesisLabView })));
+const ReadingPathView = lazy(() => import('./views/ReadingPathView').then((module) => ({ default: module.ReadingPathView })));
+const WritingWorkshopView = lazy(() => import('./views/WritingWorkshopView').then((module) => ({ default: module.WritingWorkshopView })));
+const DeepResearchView = lazy(() => import('./views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
+const ProjectsView = lazy(() => import('./views/ProjectsView').then((module) => ({ default: module.ProjectsView })));
+const NotesView = lazy(() => import('./views/NotesView').then((module) => ({ default: module.NotesView })));
+const SearchView = lazy(() => import('./views/SearchView').then((module) => ({ default: module.SearchView })));
+const ArgumentMapView = lazy(() => import('./views/ArgumentMapView').then((module) => ({ default: module.ArgumentMapView })));
+const IdeasView = lazy(() => import('./views/IdeasView').then((module) => ({ default: module.IdeasView })));
+const AuthorsView = lazy(() => import('./views/AuthorsView').then((module) => ({ default: module.AuthorsView })));
+const PersonasView = lazy(() => import('./views/PersonasView').then((module) => ({ default: module.PersonasView })));
+const TimelineView = lazy(() => import('./views/TimelineView').then((module) => ({ default: module.TimelineView })));
+const TreeView = lazy(() => import('./views/TreeView').then((module) => ({ default: module.TreeView })));
+const RelationsView = lazy(() => import('./views/RelationsView').then((module) => ({ default: module.RelationsView })));
+const MapView = lazy(() => import('./views/MapView').then((module) => ({ default: module.MapView })));
+const ArchiveView = lazy(() => import('./views/ArchiveView').then((module) => ({ default: module.ArchiveView })));
+const ImmersionView = lazy(() => import('./views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
+const Settings = lazy(() => import('./views/Settings').then((module) => ({ default: module.Settings })));
+const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
+const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
 
 // Shortcut label for the command palette: ⌘K on macOS, Ctrl K elsewhere.
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '');
@@ -131,7 +140,7 @@ function HeaderAction({
       disabled={disabled}
       title={title ?? label}
       aria-label={label}
-      className={`group btn ${primary ? 'btn-primary' : 'btn-ghost'} h-9 min-h-9 justify-center gap-0 px-2.5 py-0 leading-none ${tone}`}
+      className={`header-action group btn ${primary ? 'btn-primary' : 'btn-ghost'} h-9 min-h-9 justify-center px-2.5 py-0 leading-none ${tone}`}
     >
       <Icon name={icon} className={`shrink-0 ${spinning ? 'animate-spin' : ''}`} />
       <span
@@ -152,12 +161,19 @@ export function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
+  const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
+  const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
+  useEffect(() => setActiveVaultQueryScope(activeVault?.id ?? null), [activeVault?.id]);
   // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
   const [isDark, setIsDark] = useState<boolean>(() =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
   const [view, setView] = useState<View>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = Number(localStorage.getItem('nodus.sidebarWidth'));
+    return Number.isFinite(stored) ? Math.max(176, Math.min(360, stored)) : 176;
+  });
   // Per-group collapse state for the sidebar (Explorar · Analizar · Escribir),
   // persisted so a user's folded groups survive restarts.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -170,6 +186,7 @@ export function App() {
   const [collectionsOpen, setCollectionsOpen] = useState(false);
   const [researchOpen, setResearchOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [roadmapOpen, setRoadmapOpen] = useState(false);
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
   const [vaultAnchor, setVaultAnchor] = useState<HTMLElement | null>(null);
@@ -195,6 +212,26 @@ export function App() {
   const [hasData, setHasData] = useState<boolean | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
+  const beginSidebarResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = sidebarWidth;
+    document.body.classList.add('is-resizing-sidebar');
+    const move = (pointerEvent: PointerEvent) => setSidebarWidth(Math.max(176, Math.min(360, startWidth + pointerEvent.clientX - startX)));
+    const finish = (pointerEvent: PointerEvent) => {
+      const width = Math.max(176, Math.min(360, startWidth + pointerEvent.clientX - startX));
+      setSidebarWidth(width);
+      localStorage.setItem('nodus.sidebarWidth', String(width));
+      document.body.classList.remove('is-resizing-sidebar');
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+  };
+
   // Sidebar sections grouped for rendering (Explorar · Analizar · Escribir),
   // each group in the user's chosen order, minus any hidden sections. Home is
   // pinned first and Settings last, both outside every group and never hidden.
@@ -218,6 +255,63 @@ export function App() {
     if (activeVault && !isViewAllowedForVaultType(view, activeVault.type)) setView('home');
   }, [activeVault?.type, view]);
 
+  // Publish a bounded snapshot of the visible main view for Nodi's opt-in
+  // "Vista actual" context. It remains in memory only and is never added to chat
+  // history unless the user explicitly sends a message with that context enabled.
+  useEffect(() => {
+    if (!settings?.mascotEnabled) return;
+    let timer: number | null = null;
+    let idleId: number | null = null;
+    let observer: MutationObserver | null = null;
+    let lastText = '';
+    const publish = () => {
+      timer = null;
+      idleId = null;
+      const main = document.querySelector<HTMLElement>('main[data-nodi-view]');
+      if (!main) return;
+      const text = (main.innerText || '').slice(0, 12_000);
+      if (text === lastText) return;
+      lastText = text;
+      const item = NAV_ITEMS.find((candidate) => candidate.id === view);
+      void window.nodus.setNodiViewContext({
+        viewId: view,
+        title: item ? t(item.label) : view,
+        text,
+        capturedAt: Date.now(),
+      });
+    };
+    const schedule = () => {
+      if (timer !== null) window.clearTimeout(timer);
+      if (idleId !== null && window.cancelIdleCallback) window.cancelIdleCallback(idleId);
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (window.requestIdleCallback) idleId = window.requestIdleCallback(publish, { timeout: 1_000 });
+        else publish();
+      }, 500);
+    };
+    const attach = () => {
+      const main = document.querySelector<HTMLElement>('main[data-nodi-view]');
+      if (!main) { schedule(); return; }
+      observer = new MutationObserver(schedule);
+      observer.observe(main, { subtree: true, childList: true, characterData: true });
+      schedule();
+    };
+    const attachTimer = window.setTimeout(attach, 0);
+    return () => {
+      window.clearTimeout(attachTimer);
+      if (timer !== null) window.clearTimeout(timer);
+      if (idleId !== null && window.cancelIdleCallback) window.cancelIdleCallback(idleId);
+      observer?.disconnect();
+    };
+  }, [settings?.mascotEnabled, view]);
+
+  useEffect(() => window.nodus.onNodiNavigate((target) => {
+    if (target === 'settings') {
+      localStorage.setItem('nodus.settingsTarget', 'nodi');
+      setView('settings');
+    }
+  }), []);
+
   // Genealogy vaults wear a golden accent + logo instead of the indigo default.
   const isGenealogy = activeVault?.type === 'genealogy';
   useEffect(() => {
@@ -230,6 +324,7 @@ export function App() {
   }, [isDatabases]);
   // Study vaults use a calm teal accent and expose only their local learning tools.
   const isEstudio = activeVault?.type === 'estudio';
+  const isPreviewVault = isPreviewVaultType(activeVault?.type);
   useEffect(() => {
     document.documentElement.classList.toggle('estudio', isEstudio);
   }, [isEstudio]);
@@ -317,6 +412,11 @@ export function App() {
     }
   }, []);
 
+  const toggleTheme = useCallback(async () => {
+    await window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' });
+    await reloadSettings();
+  }, [isDark, reloadSettings]);
+
   useEffect(() => {
     void reloadSettings();
   }, [reloadSettings]);
@@ -355,6 +455,18 @@ export function App() {
   useEffect(() => {
     void reloadVaults();
   }, [reloadVaults]);
+
+  const reloadRecoveryStatus = useCallback(async () => {
+    if (!window.nodus) return null;
+    const next = await window.nodus.getRecoveryStatus();
+    setRecoveryStatus(next);
+    return next;
+  }, []);
+
+  useEffect(() => {
+    if (!settings || settings.basicsTutorialVersion === 0) return;
+    void reloadRecoveryStatus();
+  }, [reloadRecoveryStatus, settings?.basicsTutorialVersion, settings?.recoverySetupVersion, vaults.length]);
 
   const refreshHasData = useCallback(async () => {
     if (!window.nodus) return;
@@ -434,8 +546,10 @@ export function App() {
   const cancelOnboarding = useCallback(async () => {
     const other = vaults.find((v) => v.id !== activeVault?.id);
     if (activeVault && !activeVault.legacy && other) {
-      await window.nodus.deleteVault(activeVault.id, true);
-      await window.nodus.switchVault(other.id);
+      const discardedVaultId = activeVault.id;
+      const switched = await window.nodus.switchVault(other.id);
+      if (!switched.ok) throw new Error(switched.message);
+      await window.nodus.deleteVault(discardedVaultId, true);
       await reloadVaults();
     } else {
       await window.nodus.updateSettings({ onboardingComplete: true });
@@ -577,6 +691,7 @@ export function App() {
     const actions: Command[] = [
       { id: 'act:assistant', label: t('Asistente de investigación'), section: t('Acciones'), icon: 'chat', keywords: 'assistant chat', run: () => openAssistant() },
       { id: 'act:feedback', label: t('Sugerir función o reportar error'), section: t('Acciones'), icon: 'gitPr', keywords: 'feedback github pr bug feature sugerencia error', run: () => setFeedbackOpen(true) },
+      { id: 'act:roadmap', label: t('Roadmap'), section: t('Acciones'), icon: 'route', keywords: 'roadmap hoja ruta futuro próximos pasos', run: () => setRoadmapOpen(true) },
       { id: 'act:theme', label: isDark ? t('Usar tema claro') : t('Usar tema oscuro'), section: t('Acciones'), icon: 'palette', keywords: 'tema theme claro oscuro', run: () => void window.nodus.updateSettings({ theme: isDark ? 'light' : 'dark' }).then(reloadSettings) },
       { id: 'act:motion', label: settings?.reduceMotion ? t('Activar animaciones') : t('Reducir animaciones'), section: t('Acciones'), icon: 'settings', keywords: 'accesibilidad movimiento animaciones motion', run: () => void window.nodus.updateSettings({ reduceMotion: !settings?.reduceMotion }).then(reloadSettings) },
     ];
@@ -612,12 +727,48 @@ export function App() {
   // (including in plain helper functions) reads the current language.
   setActiveLang(settings.uiLanguage);
 
-  if (!settings.onboardingComplete) {
+  // The cinematic guide owns first-run language selection. A positive value means
+  // it has been seen and remains authoritative across every future app update;
+  // Settings deliberately resets it to zero when the user asks to replay it.
+  if (!isPreviewVault && settings.basicsTutorialVersion === 0) {
+    return (
+      <BasicsTutorial
+        language={settings.uiLanguage}
+        onLanguageChosen={async (language) => {
+          await window.nodus.updateSettings(preferencesForTutorialLanguage(language));
+          await reloadSettings();
+        }}
+        onComplete={async () => {
+          await window.nodus.updateSettings({ basicsTutorialVersion: BASICS_TUTORIAL_VERSION });
+          await reloadSettings();
+        }}
+      />
+    );
+  }
+
+  if (!isPreviewVault && recoveryStatus === null) {
+    return <div className="h-full flex items-center justify-center text-neutral-500">{t('Verificando la protección de tus datos…')}</div>;
+  }
+
+  // New installs see this immediately after the cinematic tutorial. Existing
+  // installs first dismiss the release notes and then receive the migration wizard.
+  if (!isPreviewVault && recoveryStatus?.needsSetup && (!recoveryStatus.previousInstallation || whatsNewSettled)) {
+    return (
+      <RecoverySetupWizard
+        status={recoveryStatus}
+        language={settings.uiLanguage === 'en' ? 'en' : 'es'}
+        onComplete={async () => {
+          await Promise.all([reloadSettings(), reloadVaults(), reloadRecoveryStatus()]);
+        }}
+      />
+    );
+  }
+
+  if (!isPreviewVault && !settings.onboardingComplete) {
     return (
       <Onboarding
         activeVault={activeVault}
         providerKeys={settings.providerKeys}
-        onLanguageChosen={reloadSettings}
         onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
         onCancel={cancelOnboarding}
         discardsVault={onboardingDiscardsVault}
@@ -637,11 +788,14 @@ export function App() {
       {/* Top bar. `app-titlebar` makes the empty header area a drag region so the
           window can be moved (its interactive children are auto-marked no-drag in
           index.css). On macOS the traffic lights sit at the very top-left. */}
-      <header className="app-titlebar relative flex items-center gap-4 px-4 py-2 border-b border-neutral-800">
+      <header className="app-titlebar relative flex h-11 items-center border-b border-neutral-800">
         <button
-          className="flex items-center gap-2 font-semibold text-lg tracking-tight rounded-lg px-1 -mx-1 hover:bg-neutral-900 transition-colors"
+          data-testid="sidebar-header-toggle"
+          className="flex h-full shrink-0 items-center justify-center gap-2 px-2 font-semibold text-lg tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
+          style={{ width: navCollapsed ? 112 : sidebarWidth }}
           onClick={toggleNav}
           title={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
+          aria-label={navCollapsed ? t('Mostrar el menú lateral') : t('Ocultar el menú lateral (más espacio para el grafo)')}
         >
           <img
             data-testid="nodus-logo"
@@ -664,7 +818,7 @@ export function App() {
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           >
-            <Icon name={isGenealogy ? 'tree' : isDatabases ? 'table' : isEstudio ? 'graduation' : 'network'} size={13} />
+            <Icon name={vaultTypeIcon(activeVault.type)} size={13} />
             {vaultTypeLabel(activeVault.type)}
             <Icon name="chevronDown" size={12} className={`transition-transform ${vaultAnchor ? 'rotate-180' : ''}`} />
           </button>
@@ -673,12 +827,12 @@ export function App() {
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, each button reveals its
             label on hover/focus so the header reads as a clean row of icons. */}
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 pr-4">
           <HeaderAction
             dataTour="vaults"
             vaultTrigger
             icon="archive"
-            label={activeVault?.name ?? t('Bóveda')}
+            label={t('Bóvedas')}
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           />
@@ -690,7 +844,7 @@ export function App() {
             tone="text-neutral-400"
             onClick={() => setPaletteOpen(true)}
           />
-          {(!settings.extractionModel || !settings.synthesisModel) && (
+          {!settings.synthesisModel && (
             <HeaderAction
               dataTour="model"
               icon="alert"
@@ -734,6 +888,25 @@ export function App() {
               onClick={onSync}
             />
           )}
+          <HeaderAction
+            icon="route"
+            label={t('Roadmap')}
+            title={t('Ver roadmap de Nodus')}
+            onClick={() => setRoadmapOpen(true)}
+          />
+          <HeaderAction
+            icon={isDark ? 'sun' : 'moon'}
+            label={isDark ? t('Usar tema claro') : t('Usar tema oscuro')}
+            title={isDark ? t('Cambiar a modo claro') : t('Cambiar a modo oscuro')}
+            onClick={() => void toggleTheme()}
+            dataTour="theme-toggle"
+          />
+          <HeaderAction
+            icon="settings"
+            label={t('Ajustes')}
+            title={t('Ajustes de la bóveda actual')}
+            onClick={() => setView('settings')}
+          />
         </div>
 
         <VaultSwitcher
@@ -761,19 +934,24 @@ export function App() {
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
         {!navCollapsed && (
-          <nav className="w-44 border-r border-neutral-800 p-2 flex flex-col gap-1 overflow-y-auto">
-            {(() => {
-              const navButton = (n: { id: View; icon: string; label: string }) => (
+          <nav data-testid="resizable-sidebar" className="relative shrink-0 overflow-hidden border-r border-neutral-800" style={{ width: sidebarWidth }}>
+            <div data-testid="sidebar-scroll-region" className="mr-[6px] flex h-full min-h-0 flex-col gap-1 overflow-y-auto p-2">
+              {(() => {
+              const navButton = (n: { id: View; icon: string; label: string }, disabled = false) => (
                 <button
                   key={n.id}
                   data-tour={`nav-${n.id}`}
-                  onClick={() => setView(n.id)}
+                  disabled={disabled}
+                  aria-disabled={disabled}
+                  title={disabled ? t('Próximamente') : undefined}
+                  onClick={() => { if (!disabled) setView(n.id); }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                    view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
+                    disabled ? 'cursor-not-allowed text-neutral-700 opacity-65' : view === n.id ? 'bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-900'
                   }`}
                 >
                   <Icon name={n.icon} className="opacity-70" />
                   {t(n.label)}
+                  {disabled && <span className="ml-auto text-[9px] font-semibold uppercase tracking-wide">{t('Próximamente')}</span>}
                 </button>
               );
               // A collapsible group header (chevron + label), optionally with a control
@@ -805,6 +983,9 @@ export function App() {
                   </div>
                 );
               };
+              if (isPreviewVault && activeVault) {
+                return <PreviewVaultSidebar type={activeVault.type} />;
+              }
               if (isDatabases) {
                 // A databases vault keeps the same Explorar · Analizar · Escribir
                 // structure as every other vault: the user's databases are the
@@ -849,10 +1030,8 @@ export function App() {
                   <>
                     {navButton(homeItem)}
                     <StudySidebar
-                      activeTarget={studyTarget}
                       activeView={view}
-                      onOpen={(target) => { setStudyTarget(target); setView('studyCourses'); }}
-                      onNavigate={(targetView) => { if (targetView === 'studyLibrary' || targetView === 'studyRecordings' || targetView === 'studySearch') setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setView(targetView); }}
+                      onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setView(targetView); }}
                     />
                     {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
@@ -866,12 +1045,23 @@ export function App() {
                   <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
                 </>
               );
-            })()}
+              })()}
+            </div>
+            <button
+              data-testid="sidebar-resize-handle"
+              type="button"
+              className="sidebar-resize-handle"
+              aria-label={t('Cambiar el ancho del menú lateral')}
+              title={t('Arrastra para cambiar el ancho. Haz doble clic para restablecerlo.')}
+              onPointerDown={beginSidebarResize}
+              onDoubleClick={() => { setSidebarWidth(176); localStorage.setItem('nodus.sidebarWidth', '176'); }}
+            />
           </nav>
         )}
 
         {/* Main view */}
-        <main className="flex-1 min-w-0 overflow-hidden">
+        <main className="flex-1 min-w-0 overflow-hidden" data-nodi-view={view}>
+          <Suspense fallback={<div className="grid h-full place-items-center text-sm text-neutral-500"><span className="flex items-center gap-2"><Icon name="sync" className="animate-spin" /> {t('Cargando...')}</span></div>}>
           {/* Per-view crash isolation: a render error in one section shows a
               recovery card here instead of blanking the whole window. key={view}
               clears the error automatically when the user switches sections. */}
@@ -907,12 +1097,17 @@ export function App() {
             <StudyHome
               onNavigate={setView}
               onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+              showDemoOffer={!settings.demoMode}
               demoBusy={demoBusy}
               onLoadDemo={loadStudyDemo}
             />
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && (
+          {view === 'home' && isPreviewVault && activeVault && (
+            <div className="grid h-full place-items-center bg-neutral-50 p-8 text-center dark:bg-neutral-950" data-testid={`preview-vault-home-${activeVault.type}`}><div className="max-w-md"><Icon name={vaultTypeIcon(activeVault.type)} size={34} className="mx-auto mb-4 text-violet-500" /><span className="rounded border border-violet-500/50 bg-violet-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">PREVIEW</span><h1 className="mt-4 text-xl font-semibold">{vaultTypeLabel(activeVault.type)}</h1><p className="mt-2 text-sm leading-6 text-neutral-500">{t('Este vault muestra la estructura prevista. Sus secciones todavía no permiten realizar acciones.')}</p></div></div>
+          )}
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isPreviewVault && (
             <HomeView
+              vaultId={activeVault?.id ?? null}
               settings={settings}
               lastSync={lastSync}
               syncing={syncing}
@@ -929,6 +1124,7 @@ export function App() {
           )}
           {view === 'library' && (
             <Library
+              vaultId={activeVault?.id ?? null}
               target={libraryTarget}
               vaultType={activeVault?.type}
               onOpenCollections={() => setCollectionsOpen(true)}
@@ -939,8 +1135,8 @@ export function App() {
           )}
           {view === 'graph' && <GraphView settings={settings} onSettingsChange={reloadSettings} target={graphTarget} />}
           {view === 'argument' && <ArgumentMapView settings={settings} />}
-          {view === 'ideas' && <IdeasView onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
-          {view === 'authors' && <AuthorsView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
+          {view === 'ideas' && <IdeasView vaultId={activeVault?.id ?? null} onOpenGraph={(target) => navigate('graph', target)} onOpenAssistant={openAssistant} />}
+          {view === 'authors' && <AuthorsView vaultId={activeVault?.id ?? null} settings={settings} onOpenGraph={(target) => navigate('graph', target)} />}
           {view === 'persons' && <PersonasView initialPersonId={personsTarget} />}
           {view === 'timeline' && <TimelineView />}
           {view === 'tree' && <TreeView settings={settings} onSettingsChange={reloadSettings} />}
@@ -967,7 +1163,9 @@ export function App() {
           )}
           {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
-          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} />}
+          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }} />}
+          {view === 'studySchedule' && <StudyScheduleView />}
+          {view === 'studyCalendar' && <StudyCalendarView />}
           {view === 'studySearch' && <StudySearchView
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
@@ -979,32 +1177,22 @@ export function App() {
             settings={settings}
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
-            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+            onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
+          {view === 'studyIdeas' && <StudyIdeasView onOpenGraph={() => setView('studyGraph')} />}
+          {view === 'studyGraph' && <StudyGraphView onOpenIdeas={() => setView('studyIdeas')} />}
           {view === 'studyQuestions' && <StudyBankView
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
-            onOpenTests={() => setView('studyTests')}
-            onOpenExams={() => setView('studyExams')}
           />}
-          {view === 'studyTests' && <StudyTestView onOpenQuestionBank={() => setView('studyQuestions')} />}
-          {view === 'studyExams' && <StudyExamView onOpenQuestionBank={() => setView('studyQuestions')} />}
           {view === 'studyReview' && <StudyReviewView />}
-          {view === 'studyProgress' && <StudyProgressView onOpenReview={() => setView('studyReview')} onOpenPlanner={() => setView('studyPlanner')} />}
-          {view === 'studyPlanner' && <StudyPlannerView />}
-          {view === 'study' && (
-            <StudyGuideView
-              settings={settings}
-              onOpenGraph={(target) => navigate('graph', target)}
-              onOpenAssistant={openAssistant}
-            />
-          )}
           {view === 'immersion' && (
             <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />
           )}
           {view === 'gaps' && (
             <GapsView
+              vaultId={activeVault?.id ?? null}
               onOpenGraph={(target) => navigate('graph', target)}
               onOpenAssistant={openAssistant}
               onOpenDebates={() => setView('debate')}
@@ -1060,6 +1248,7 @@ export function App() {
             />
           )}
           </AppErrorBoundary>
+          </Suspense>
         </main>
       </div>
 
@@ -1073,6 +1262,7 @@ export function App() {
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
 
+      <Suspense fallback={null}>
       {collectionsOpen && (
         <CollectionsModal
           settings={settings}
@@ -1090,8 +1280,9 @@ export function App() {
         />
       )}
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
+      {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {settings.onboardingComplete && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
@@ -1101,7 +1292,7 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && isGenealogy && !settings.genealogyTourComplete && (
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isGenealogy && !settings.genealogyTourComplete && (
         <GenealogyTour
           onNavigate={setView}
           onClose={async () => {
@@ -1111,11 +1302,21 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete && isDatabases && !settings.databasesTourComplete && (
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isDatabases && !settings.databasesTourComplete && (
         <DatabasesTour
           onNavigate={setView}
           onClose={async () => {
             await window.nodus.updateSettings({ databasesTourComplete: true });
+            void reloadSettings();
+          }}
+        />
+      )}
+
+      {settings.onboardingComplete && settings.basicsTutorialVersion > 0 && isEstudio && !settings.studyTourComplete && (
+        <StudyTour
+          onNavigate={setView}
+          onClose={async () => {
+            await window.nodus.updateSettings({ studyTourComplete: true });
             void reloadSettings();
           }}
         />
@@ -1133,8 +1334,9 @@ export function App() {
           }}
         />
       )}
+      </Suspense>
 
-      {settings.onboardingComplete && settings.tourComplete && !settings.advancedTourComplete && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && settings.tourComplete && !settings.advancedTourComplete && (
         <AdvancedTour
           onNavigate={setView}
           onClose={async () => {
@@ -1144,13 +1346,23 @@ export function App() {
         />
       )}
 
-      {settings.onboardingComplete &&
+      {!isPreviewVault && settings.onboardingComplete &&
+        settings.basicsTutorialVersion > 0 &&
+        !recoveryStatus?.needsSetup &&
         (isGenealogy || isDatabases || isEstudio || settings.tourComplete) &&
         settings.advancedTourComplete &&
         (!isGenealogy || settings.genealogyTourComplete) &&
-        (!isDatabases || settings.databasesTourComplete) && (
+        (!isDatabases || settings.databasesTourComplete) &&
+        (!isEstudio || settings.studyTourComplete) && (
           <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
         )}
+
+      {!isPreviewVault && recoveryStatus?.needsSetup && recoveryStatus.previousInstallation && !whatsNewSettled && (
+        <WhatsNewModal
+          uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'}
+          onSettled={() => setWhatsNewSettled(true)}
+        />
+      )}
 
       <NodiMascot settings={settings} />
     </div>

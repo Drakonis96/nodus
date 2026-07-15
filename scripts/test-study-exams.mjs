@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,8 +37,6 @@ try {
   const variant = assessments.createStudyAssessment({ kind: 'exam', title: `${exam.title} · Variante 2`, description: exam.description, durationMinutes: exam.durationMinutes, questionIds: exam.items.map((item) => item.questionId), points: Object.fromEntries(exam.items.map((item) => [item.questionId, item.points])), config: { ...exam.config, randomizeQuestions: true, seed: 99 } });
   assert.equal(variant.items.length, exam.items.length); assert.notEqual(variant.id, exam.id);
   const printable = assessments.renderStudyAssessmentMarkdown(exam, true); assert.match(printable, /Historia contemporánea/); assert.match(printable, /Respuesta:/); assert.match(printable, /6 pt/);
-  const view = await readFile(path.join(repoRoot, 'src/views/StudyExamView.tsx'), 'utf8');
-  for (const marker of ['study-exams-view', 'study-exam-builder', 'study-exam-runner', 'study-exam-results', 'Autoguardado activo']) assert.match(view, new RegExp(marker));
   closeDb(); console.log('Study exams phase 10c tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

@@ -82,7 +82,9 @@ try {
       assert.ok(wordCount >= 12, `${model} produced too little text for ${fixture.name}: ${result.text}`);
       assert.ok(matched.length >= 2, `${model} missed expected content in ${fixture.name}: ${result.text}`);
       assert.ok(result.chunks.length > 0, `${model} did not return timestamped chunks for ${fixture.name}`);
-      report.push({ model, fixture: fixture.name, wordCount, matched, durationMs: result.durationMs, text: result.text });
+      assert.ok(result.partialUpdates > 0, `${model} did not stream partial text for ${fixture.name}`);
+      assert.ok(result.lastPartial.trim().length > 0, `${model} streamed only empty partial text for ${fixture.name}`);
+      report.push({ model, fixture: fixture.name, wordCount, matched, partialUpdates: result.partialUpdates, durationMs: result.durationMs, text: result.text });
       console.log(`ok (${wordCount} words, ${matched.join(', ')}, ${(result.durationMs / 1000).toFixed(1)} s)`);
     }
   }

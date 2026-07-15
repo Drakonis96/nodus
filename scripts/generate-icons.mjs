@@ -26,55 +26,43 @@ function drawIcon(size) {
   const ctx = canvas.getContext('2d');
   const s = size / 1024;
 
-  const bg = ctx.createLinearGradient(128 * s, 96 * s, 900 * s, 940 * s);
-  bg.addColorStop(0, '#15131f');
-  bg.addColorStop(0.52, '#111118');
-  bg.addColorStop(1, '#1d1830');
-  drawRoundedRect(ctx, 64 * s, 64 * s, 896 * s, 896 * s, 212 * s);
-  ctx.fillStyle = bg;
+  // Static fallback matches the current dynamic icon system. The renderer will
+  // replace it with the active vault/theme variant and macOS persists that last
+  // selection after Nodus exits.
+  drawRoundedRect(ctx, 61 * s, 61 * s, 902 * s, 902 * s, 212 * s);
+  ctx.fillStyle = '#ffffff';
   ctx.fill();
-
-  ctx.strokeStyle = 'rgba(196, 181, 253, 0.18)';
-  ctx.lineWidth = 2 * s;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.10)';
+  ctx.lineWidth = 6 * s;
   ctx.stroke();
 
-  const stroke = ctx.createLinearGradient(240 * s, 210 * s, 795 * s, 810 * s);
-  stroke.addColorStop(0, '#ddd6fe');
-  stroke.addColorStop(0.46, '#a78bfa');
-  stroke.addColorStop(1, '#7c3aed');
+  const stroke = ctx.createLinearGradient(260 * s, 235 * s, 765 * s, 790 * s);
+  stroke.addColorStop(0, '#b1b3f5');
+  stroke.addColorStop(0.45, '#6366f1');
+  stroke.addColorStop(1, '#3b3d91');
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = 86 * s;
+  ctx.lineWidth = 92 * s;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   ctx.beginPath();
-  ctx.moveTo(300 * s, 724 * s);
-  ctx.lineTo(300 * s, 300 * s);
-  ctx.lineTo(724 * s, 724 * s);
-  ctx.lineTo(724 * s, 300 * s);
+  ctx.moveTo(286 * s, 737 * s);
+  ctx.lineTo(286 * s, 287 * s);
+  ctx.lineTo(738 * s, 737 * s);
+  ctx.lineTo(738 * s, 287 * s);
   ctx.stroke();
 
   const nodes = [
-    [300, 300, '#ddd6fe'],
-    [300, 724, '#a78bfa'],
-    [724, 724, '#8b5cf6'],
-    [724, 300, '#7c3aed'],
+    [286, 287, '#b1b3f5'],
+    [286, 737, '#6366f1'],
+    [738, 737, '#5557cd'],
+    [738, 287, '#3b3d91'],
   ];
 
   for (const [x, y, color] of nodes) {
     ctx.beginPath();
-    ctx.arc(x * s, y * s, 82 * s, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(8, 7, 14, 0.42)';
-    ctx.fill();
-  }
-  for (const [x, y, color] of nodes) {
-    ctx.beginPath();
-    ctx.arc(x * s, y * s, 66 * s, 0, Math.PI * 2);
+    ctx.arc(x * s, y * s, 69 * s, 0, Math.PI * 2);
     ctx.fillStyle = color;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc((x - 18) * s, (y - 22) * s, 18 * s, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.34)';
     ctx.fill();
   }
 

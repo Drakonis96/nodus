@@ -310,6 +310,20 @@ export function seedDatabasesDemoData(): boolean {
       ['demo-row-experiments-5', 'demo-row-samples-3'],
     ];
     links.forEach(([rowId, targetId], i) => insRel.run(`demo-drel-${i + 1}`, rowId, relCol, 'db_row', targetId, 0, now));
+
+    // Universal Notes and the dedicated data chat should also teach by example.
+    db.prepare('INSERT INTO note_folders (id,parent_id,name,order_idx,created_at,updated_at,summary) VALUES (?,?,?,?,?,?,?)')
+      .run('demo-db-note-folder', null, loc({ es: 'Cuaderno de análisis', en: 'Analysis notebook' }), 0, now, now, loc({ es: 'Conclusiones y decisiones derivadas de las bases de demostración.', en: 'Findings and decisions derived from the demo databases.' }));
+    db.prepare('INSERT INTO notes (id,folder_id,title,kind,content,source_json,order_idx,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run('demo-db-note-summary', 'demo-db-note-folder', loc({ es: 'Primeras observaciones', en: 'Initial observations' }), 'markdown', loc({
+        es: '# Primeras observaciones\n\n- Las muestras costeras todavía tienen análisis pendientes.\n- Conviene priorizar los experimentos de salinidad y perfil pigmentario.\n- La tabla **Lecturas** reúne la bibliografía metodológica.',
+        en: '# Initial observations\n\n- Coastal samples still have pending analyses.\n- Prioritize the salinity and pigment-profile experiments.\n- The **Reading list** table gathers the methodological literature.',
+      }), JSON.stringify({ origin: 'database', ref: 'demo-db-samples' }), 0, now, now);
+    db.prepare('INSERT INTO database_chat_conversations (id,title,database_ids_json,messages_json,created_at,updated_at) VALUES (?,?,?,?,?,?)')
+      .run('demo-db-chat-overview', loc({ es: 'Resumen del trabajo de campo', en: 'Fieldwork overview' }), JSON.stringify(['demo-db-samples', 'demo-db-experiments']), JSON.stringify([
+        { role: 'user', content: loc({ es: '¿Qué debería revisar primero?', en: 'What should I review first?' }) },
+        { role: 'assistant', content: loc({ es: 'Empieza por las muestras aún no analizadas y por los experimentos en curso. En esta demo puedes seleccionar varias bases para compararlas en una sola conversación.', en: 'Start with samples that are not yet analyzed and experiments in progress. In this demo you can select multiple databases and compare them in one conversation.' }) },
+      ]), now, now);
   });
   tx();
   // Flag demo mode (so the exit-demo banner shows and the data is never mistaken
@@ -324,6 +338,9 @@ export function clearDatabasesDemoData(): void {
   const tx = db.transaction(() => {
     // Cells/options cascade via FKs, but delete explicitly so a partial demo also clears.
     db.exec(`
+      DELETE FROM database_chat_conversations WHERE id LIKE 'demo-%';
+      DELETE FROM notes WHERE id LIKE 'demo-db-%';
+      DELETE FROM note_folders WHERE id LIKE 'demo-db-%';
       DELETE FROM db_relations WHERE id LIKE 'demo-%' OR row_id LIKE 'demo-%' OR column_id LIKE 'demo-%';
       DELETE FROM db_attachments WHERE id LIKE 'demo-%' OR row_id LIKE 'demo-%' OR column_id LIKE 'demo-%';
       DELETE FROM db_cells WHERE row_id LIKE 'demo-%' OR column_id LIKE 'demo-%';

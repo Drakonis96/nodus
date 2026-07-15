@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { env, pipeline } from '@huggingface/transformers';
+import { env, pipeline, WhisperTextStreamer } from '@huggingface/transformers';
 import { whisperLanguageName } from '@shared/sttModels';
 
 env.allowLocalModels = false;
@@ -9,10 +9,10 @@ type WorkerRequest =
   | { id: string; type: 'ensure'; model: string }
   | { id: string; type: 'transcribe'; model: string; samples: Float32Array; language?: string | null };
 
-type AsrPipeline = (samples: Float32Array, options: Record<string, unknown>) => Promise<{
+type AsrPipeline = ((samples: Float32Array, options: Record<string, unknown>) => Promise<{
   text?: string;
   chunks?: Array<{ text?: string; timestamp?: [number | null, number | null] }>;
-}>;
+}>) & { tokenizer: ConstructorParameters<typeof WhisperTextStreamer>[0] };
 const pipelines = new Map<string, AsrPipeline>();
 
 async function getPipeline(id: string, model: string) {
@@ -41,12 +41,25 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       self.postMessage({ id: request.id, type: 'result', result: true });
       return;
     }
+    let partial = '';
+    const durationSeconds = request.samples.length / 16_000;
+    const streamer = new WhisperTextStreamer(transcriber.tokenizer, {
+      skip_prompt: true,
+      callback_function: (delta) => {
+        partial += delta;
+        self.postMessage({ id: request.id, type: 'partial', text: partial.trimStart() });
+      },
+      on_chunk_end: (seconds) => {
+        if (durationSeconds > 0) self.postMessage({ id: request.id, type: 'progress', fraction: Math.min(0.98, seconds / durationSeconds) });
+      },
+    });
     const output = await transcriber(request.samples, {
       language: request.language ? whisperLanguageName(request.language) : undefined,
       task: 'transcribe',
       chunk_length_s: 25,
       stride_length_s: 4,
       return_timestamps: true,
+      streamer,
     });
     self.postMessage({
       id: request.id,

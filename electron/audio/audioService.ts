@@ -4,8 +4,8 @@
  * cage that blocks native TTS addons). The main process owns the two things that
  * must live here: turning a saved Deep Research report or an immersion into
  * per-segment speakable text, and persisting the WAV bytes the renderer produces
- * as clip files in the vault's audio directory (excluded from backups/sync) with
- * compact metadata in SQLite.
+ * as clip files in the vault's audio directory (included by full backups, omitted
+ * by lightweight sync packages) with compact metadata in SQLite.
  */
 import fs from 'node:fs';
 import path from 'node:path';

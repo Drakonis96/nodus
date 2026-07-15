@@ -1,0 +1,198 @@
+import crypto from 'node:crypto';
+import type {
+  ExtractedStudyIdea,
+  ExtractedStudyRelation,
+  StudyAssessmentKnowledgeContext,
+  StudyIdeaConnection,
+  StudyKnowledgeExtraction,
+  StudyKnowledgeProgress,
+  StudyKnowledgeSourceKind,
+} from '@shared/studyKnowledge';
+import { completeJson, embed, embedMany } from './aiClient';
+import { runStudyAiTask } from './studyAiPolicy';
+import { currentEmbeddingConfig } from '../db/ideasRepo';
+import { getDb } from '../db/database';
+import { getStudyMaterial } from '../db/studyMaterialsRepo';
+import {
+  connectStudySourceIdeasSemantically,
+  getStudyKnowledgeJob,
+  listStudyConnectionsForIdeas,
+  listStudyIdeaVectors,
+  listStudyKnowledgeJobs,
+  normalizeStudyIdeaLabel,
+  replaceStudySourceKnowledge,
+  setStudyKnowledgeJob,
+  sourceSubjectIds,
+  syncStudyKnowledgeSourceScopes,
+} from '../db/studyKnowledgeRepo';
+
+type Listener = (progress: StudyKnowledgeProgress) => void;
+interface QueuedSource { kind: StudyKnowledgeSourceKind; id: string; force: boolean }
+interface SourceData { kind: StudyKnowledgeSourceKind; id: string; title: string; text: string; hash: string }
+
+const listeners = new Set<Listener>();
+const queue = new Map<string, QueuedSource>();
+let draining = false;
+let currentTitle: string | null = null;
+
+const IDEA_TYPES = new Set(['concept', 'definition', 'principle', 'process', 'cause', 'consequence', 'example', 'debate']);
+const RELATION_TYPES = new Set(['related', 'supports', 'contrasts', 'causes', 'depends_on', 'part_of', 'applies']);
+
+export function isStudyKnowledgeExtraction(value: unknown): value is StudyKnowledgeExtraction {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as StudyKnowledgeExtraction;
+  return Array.isArray(candidate.ideas) && Array.isArray(candidate.relations)
+    && candidate.ideas.every((idea) => idea && typeof idea.key === 'string' && typeof idea.label === 'string'
+      && typeof idea.statement === 'string' && IDEA_TYPES.has(idea.type) && Array.isArray(idea.evidence))
+    && candidate.relations.every((relation) => relation && typeof relation.from === 'string' && typeof relation.to === 'string'
+      && RELATION_TYPES.has(relation.type));
+}
+
+export function buildStudyKnowledgePrompt(title: string, text: string) {
+  return {
+    system: `Analiza material docente y devuelve un mapa conceptual trazable. Extrae solo ideas respaldadas por el texto.
+Cada idea necesita una etiqueta breve, un enunciado autosuficiente y una o más citas textuales exactas.
+Usa tipos: concept, definition, principle, process, cause, consequence, example, debate.
+Usa relaciones: related, supports, contrasts, causes, depends_on, part_of, applies.
+Las relaciones solo pueden referirse a las claves de ideas devueltas. No inventes páginas ni citas.
+Devuelve JSON: {"ideas":[{"key":"i1","type":"concept","label":"...","statement":"...","role":"principal|secondary","confidence":0.8,"evidence":[{"quote":"...","location":"p. 2"}]}],"relations":[{"from":"i1","to":"i2","type":"related","basis":"...","confidence":0.8}]}`,
+    user: `TÍTULO: ${title}\n\nTEXTO:\n${text}`,
+  };
+}
+
+export function chunkStudyKnowledgeText(text: string, maxChars = 14_000, maxChunks = 8): string[] {
+  const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean); const chunks: string[] = []; let current = '';
+  for (const paragraph of paragraphs) {
+    if (current && current.length + paragraph.length + 2 > maxChars) { chunks.push(current); current = ''; if (chunks.length >= maxChunks) break; }
+    if (paragraph.length > maxChars) {
+      if (current) { chunks.push(current); current = ''; }
+      for (let start = 0; start < paragraph.length && chunks.length < maxChunks; start += maxChars) chunks.push(paragraph.slice(start, start + maxChars));
+    } else current += `${current ? '\n\n' : ''}${paragraph}`;
+  }
+  if (current && chunks.length < maxChunks) chunks.push(current);
+  return chunks;
+}
+
+export function mergeStudyKnowledgeExtractions(parts: StudyKnowledgeExtraction[]): StudyKnowledgeExtraction {
+  const ideas = new Map<string, ExtractedStudyIdea>(); const relations: ExtractedStudyRelation[] = [];
+  for (const part of parts) {
+    const localKey = new Map<string, string>();
+    for (const idea of part.ideas) {
+      const normalized = normalizeStudyIdeaLabel(idea.label); if (!normalized) continue;
+      localKey.set(idea.key, normalized);
+      const prior = ideas.get(normalized);
+      if (!prior) ideas.set(normalized, { ...idea, key: normalized, confidence: Number.isFinite(idea.confidence) ? idea.confidence : 0.6,
+        role: idea.role === 'principal' ? 'principal' : 'secondary', evidence: idea.evidence.slice(0, 8) });
+      else {
+        prior.confidence = Math.max(prior.confidence, Number(idea.confidence) || 0);
+        if (idea.statement.length > prior.statement.length) prior.statement = idea.statement;
+        if (idea.role === 'principal') prior.role = 'principal';
+        const seen = new Set(prior.evidence.map((item) => item.quote.trim()));
+        prior.evidence.push(...idea.evidence.filter((item) => item.quote.trim() && !seen.has(item.quote.trim())).slice(0, 8 - prior.evidence.length));
+      }
+    }
+    for (const relation of part.relations) {
+      const from = localKey.get(relation.from); const to = localKey.get(relation.to);
+      if (from && to && from !== to) relations.push({ ...relation, from, to, confidence: Number.isFinite(relation.confidence) ? relation.confidence : 0.5 });
+    }
+  }
+  const uniqueRelations = new Map<string, ExtractedStudyRelation>();
+  for (const relation of relations) {
+    const key = `${relation.from}\0${relation.to}\0${relation.type}`; const prior = uniqueRelations.get(key);
+    if (!prior || relation.confidence > prior.confidence) uniqueRelations.set(key, relation);
+  }
+  return { ideas: [...ideas.values()].slice(0, 80), relations: [...uniqueRelations.values()].slice(0, 160) };
+}
+
+function sourceData(kind: StudyKnowledgeSourceKind, id: string): SourceData | null {
+  if (kind === 'material') {
+    const material = getStudyMaterial(id); const text = [material.visualDescription, material.extractedText].filter(Boolean).join('\n\n').trim();
+    return { kind, id, title: material.title, text, hash: crypto.createHash('sha256').update(text).digest('hex') };
+  }
+  const row = getDb().prepare('SELECT title,content_markdown FROM study_docs WHERE id=? AND deleted_at IS NULL AND archived_at IS NULL').get(id) as { title: string; content_markdown: string } | undefined;
+  if (!row) return null; const text = String(row.content_markdown ?? '').trim();
+  return { kind, id, title: String(row.title), text, hash: crypto.createHash('sha256').update(text).digest('hex') };
+}
+
+function progress(): StudyKnowledgeProgress {
+  const jobs = listStudyKnowledgeJobs();
+  return { pending: queue.size + jobs.filter((job) => job.status === 'pending').length, running: draining ? 1 : 0,
+    done: jobs.filter((job) => job.status === 'done').length, errors: jobs.filter((job) => job.status === 'error').length, currentTitle };
+}
+function emit(): void { const value = progress(); for (const listener of listeners) listener(value); }
+export function getStudyKnowledgeProgress(): StudyKnowledgeProgress { return progress(); }
+export function onStudyKnowledgeChanged(listener: Listener): () => void { listeners.add(listener); return () => listeners.delete(listener); }
+
+async function analyzeSource(source: SourceData, force: boolean): Promise<void> {
+  syncStudyKnowledgeSourceScopes(source.kind, source.id);
+  const subjectIds = sourceSubjectIds(source.kind, source.id); if (!subjectIds.length) return;
+  if (source.text.length < 80) {
+    for (const subjectId of subjectIds) setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'unavailable', phase: 'empty', sourceHash: source.hash, error: 'La fuente no contiene suficiente texto para extraer ideas.' });
+    return;
+  }
+  const pendingSubjects = subjectIds.filter((subjectId) => force || getStudyKnowledgeJob(subjectId, source.kind, source.id)?.sourceHash !== source.hash
+    || getStudyKnowledgeJob(subjectId, source.kind, source.id)?.status !== 'done');
+  if (!pendingSubjects.length) return;
+  for (const subjectId of pendingSubjects) setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'analyzing', phase: 'extracting', sourceHash: source.hash });
+  emit();
+  try {
+    const chunks = chunkStudyKnowledgeText(source.text); const parts: StudyKnowledgeExtraction[] = [];
+    for (const chunk of chunks) {
+      const prompt = buildStudyKnowledgePrompt(source.title, chunk);
+      const completed = await runStudyAiTask<StudyKnowledgeExtraction>({ task: 'questions', subjectId: pendingSubjects[0], inputChars: prompt.system.length + prompt.user.length },
+        (model) => completeJson({ system: prompt.system, user: prompt.user, temperature: 0.1, maxTokens: 7000 }, isStudyKnowledgeExtraction, model));
+      parts.push(completed.value);
+    }
+    const merged = mergeStudyKnowledgeExtractions(parts); const embeddingTexts = merged.ideas.map((idea) => `${idea.type}\n${idea.label}\n${idea.statement}`);
+    const vectors = await embedMany(embeddingTexts); const config = currentEmbeddingConfig();
+    for (const subjectId of pendingSubjects) {
+      setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'relating', phase: 'relating', sourceHash: source.hash }); emit();
+      replaceStudySourceKnowledge({ subjectId, sourceKind: source.kind, sourceId: source.id, sourceTitle: source.title, sourceHash: source.hash,
+        ideas: merged.ideas, relations: merged.relations, embeddings: vectors, embeddingProvider: config.provider, embeddingModel: config.model });
+      connectStudySourceIdeasSemantically(subjectId, source.kind, source.id);
+      setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'done', phase: 'done', sourceHash: source.hash });
+    }
+  } catch (cause) {
+    const error = cause instanceof Error ? cause.message : String(cause);
+    for (const subjectId of pendingSubjects) setStudyKnowledgeJob({ subjectId, sourceKind: source.kind, sourceId: source.id, status: 'error', phase: 'error', sourceHash: source.hash, error });
+  }
+}
+
+async function drain(): Promise<void> {
+  if (draining) return; draining = true; emit();
+  try {
+    while (queue.size) {
+      const [key, item] = queue.entries().next().value as [string, QueuedSource]; queue.delete(key);
+      try { const source = sourceData(item.kind, item.id); currentTitle = source?.title ?? null; if (source) await analyzeSource(source, item.force); }
+      catch { /* Per-source errors are persisted by analyzeSource; deleted sources are simply skipped. */ }
+      emit();
+    }
+  } finally { currentTitle = null; draining = false; emit(); }
+}
+
+export function queueStudyKnowledgeSources(kind: StudyKnowledgeSourceKind, ids: string[], force = false): void {
+  for (const id of ids) if (id) queue.set(`${kind}:${id}`, { kind, id, force: force || queue.get(`${kind}:${id}`)?.force === true });
+  void drain();
+}
+export function reanalyzeStudyKnowledgeSource(kind: StudyKnowledgeSourceKind, id: string): void { queueStudyKnowledgeSources(kind, [id], true); }
+
+function cosine(a: number[] | null, b: number[] | null): number {
+  if (!a || !b) return 0; const length = Math.min(a.length, b.length); let dot = 0; let aa = 0; let bb = 0;
+  for (let index = 0; index < length; index += 1) { dot += a[index] * b[index]; aa += a[index] ** 2; bb += b[index] ** 2; }
+  return aa && bb ? dot / Math.sqrt(aa * bb) : 0;
+}
+
+export async function retrieveStudyKnowledgeContext(subjectId: string, query: string, sourceKeys: string[] = [], limit = 10): Promise<StudyAssessmentKnowledgeContext> {
+  const candidates = listStudyIdeaVectors(subjectId, sourceKeys); if (!candidates.length) return { ideas: [], connections: [], outline: '', embeddingAvailable: false };
+  const queryVector = await embed(query).catch(() => null);
+  const ranked = candidates.map((idea) => ({ idea, score: queryVector ? cosine(queryVector, idea.embedding) : 0 }))
+    .sort((a, b) => queryVector ? b.score - a.score || b.idea.sourceCount - a.idea.sourceCount : b.idea.sourceCount - a.idea.sourceCount)
+    .slice(0, limit).map((item) => item.idea);
+  const connections = listStudyConnectionsForIdeas(subjectId, ranked.map((idea) => idea.id)).slice(0, 16);
+  const label = new Map(ranked.map((idea) => [idea.id, idea.label]));
+  const outline = [
+    ...ranked.map((idea) => `- [${idea.id}] ${idea.label}: ${idea.statement}`),
+    ...connections.map((edge: StudyIdeaConnection) => `- Conexión: ${label.get(edge.fromId) ?? edge.fromId} ${edge.type} ${label.get(edge.toId) ?? edge.toId}. ${edge.basis}`),
+  ].join('\n');
+  return { ideas: ranked.map(({ embedding: _embedding, ...idea }) => idea), connections, outline, embeddingAvailable: Boolean(queryVector) };
+}

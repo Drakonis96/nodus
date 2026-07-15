@@ -14,6 +14,8 @@ import type {
   AuthorDossierSynthesis,
   AuthorDossierWork,
   AuthorSummary,
+  AuthorPage,
+  AuthorPageRequest,
   Evidence,
   IdeaType,
   ModelRef,
@@ -164,6 +166,32 @@ export function listAuthors(): AuthorSummary[] {
     })
     .filter((a) => a.workCount > 0)
     .sort((a, b) => b.ideaCount - a.ideaCount || a.name.localeCompare(b.name));
+}
+
+export function listAuthorsPage(request: AuthorPageRequest): AuthorPage {
+  const query = request.query?.trim().toLowerCase() ?? '';
+  let authors = listAuthors();
+  if (query) authors = authors.filter((author) => author.fullName.toLowerCase().includes(query) || author.name.toLowerCase().includes(query));
+  if (request.synthesis === 'with') authors = authors.filter((author) => author.hasSynthesis);
+  else if (request.synthesis === 'without') authors = authors.filter((author) => !author.hasSynthesis);
+  authors.sort((a, b) => {
+    switch (request.sort) {
+      case 'name':
+        return a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
+      case 'surname':
+        return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
+      case 'works':
+        return b.workCount - a.workCount || a.lastName.localeCompare(b.lastName);
+      case 'ideas':
+        return b.ideaCount - a.ideaCount || a.lastName.localeCompare(b.lastName);
+      case 'connections':
+        return b.relationCount - a.relationCount || a.lastName.localeCompare(b.lastName);
+    }
+  });
+  const total = authors.length;
+  const offset = Math.max(0, Math.trunc(request.offset));
+  const limit = Math.min(100, Math.max(1, Math.trunc(request.limit)));
+  return { items: authors.slice(offset, offset + limit), total, offset, limit };
 }
 
 // ─── Full dossier assembly (pure DB) ──────────────────────────────────────────

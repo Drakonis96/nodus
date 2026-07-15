@@ -7,6 +7,7 @@ import type {
 } from '@shared/types';
 import { getSettings } from '../db/settingsRepo';
 import { DEFAULT_LOCAL_BASE_URLS } from '@shared/providers';
+import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 
@@ -31,6 +32,10 @@ export function openAiCompatBase(provider: AiProvider): string | null {
       return 'https://api.openai.com/v1';
     case 'openrouter':
       return 'https://openrouter.ai/api/v1';
+    case 'groq':
+      return 'https://api.groq.com/openai/v1';
+    case 'cerebras':
+      return 'https://api.cerebras.ai/v1';
     case 'deepseek':
       return 'https://api.deepseek.com';
     case 'gemini':
@@ -44,6 +49,7 @@ export function openAiCompatBase(provider: AiProvider): string | null {
       // Local servers expose an OpenAI-compatible surface under {baseUrl}/v1.
       return `${localBaseUrl(provider)}/v1`;
     case 'anthropic':
+    case 'nodus':
       return null;
   }
 }
@@ -60,8 +66,11 @@ export function supportsJsonMode(provider: AiProvider): boolean {
     provider === 'openai' ||
     provider === 'deepseek' ||
     provider === 'openrouter' ||
+    provider === 'groq' ||
+    provider === 'cerebras' ||
     provider === 'gemini' ||
     provider === 'xiaomi' ||
+    provider === 'nodus' ||
     // Ollama and LM Studio both accept OpenAI's response_format on their compat
     // surface. A small model that ignores it is caught by the caller's 400 retry.
     provider === 'ollama' ||
@@ -99,8 +108,14 @@ export function reasoningBody(provider: AiProvider, effort: ReasoningEffort): Re
       // Xiaomi MiMo is likewise a reasoning model with a thinking toggle (default ON).
       // Disable it for scans; leave the model's default for explicit efforts.
       return effort === 'off' ? { thinking: { type: 'disabled' } } : {};
+    case 'groq':
+    case 'cerebras':
+      // Reasoning controls vary by hosted model. Keep the portable request shape;
+      // JSON mode is handled independently and unsupported extras have a 400 retry.
+      return {};
     case 'ollama':
     case 'lmstudio':
+    case 'nodus':
       // Local reasoning toggles vary per model (deepseek-r1, gpt-oss, qwen…) and
       // have no consistent OpenAI-compat knob. Send none and let the model decide.
       return {};
@@ -139,6 +154,10 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listOpenAiStyle('https://api.deepseek.com/models', key, false);
     case 'openrouter':
       return listOpenRouter();
+    case 'groq':
+      return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true);
+    case 'cerebras':
+      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true);
     case 'gemini':
       return listGemini(key);
     case 'xiaomi':
@@ -147,6 +166,8 @@ export async function listModels(provider: AiProvider, key: string | null): Prom
       return listOllama(key);
     case 'lmstudio':
       return listLmStudio(key, false);
+    case 'nodus':
+      return listNodusLocalChatModels();
   }
 }
 
@@ -163,6 +184,8 @@ export async function listEmbeddingModels(provider: EmbeddingProvider, key: stri
       return listOllamaEmbeddingModels(key);
     case 'lmstudio':
       return listLmStudio(key, true);
+    case 'nodus':
+      return listNodusLocalEmbeddingModels();
   }
 }
 
@@ -180,11 +203,27 @@ async function listOpenAiStyle(url: string, key: string | null, filterChat: bool
   if (!key) throw new Error('Falta la clave del proveedor.');
   const res = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
   if (!res.ok) throw new Error(`/models HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: { id: string }[] };
-  let models = (data.data ?? []).map((m) => ({ id: m.id }) as ModelInfo);
+  const data = (await res.json()) as {
+    data?: {
+      id: string;
+      name?: string;
+      context_window?: number;
+      max_context_length?: number;
+      capabilities?: { vision?: boolean; reasoning?: boolean };
+      supported_parameters?: string[];
+    }[];
+  };
+  let models = (data.data ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    contextLength: m.context_window ?? m.max_context_length,
+    vision: m.capabilities?.vision,
+    reasoning: m.capabilities?.reasoning ?? (m.supported_parameters ?? []).includes('reasoning'),
+  }) as ModelInfo);
   if (filterChat) {
-    // Hide non-chat OpenAI models (embeddings, audio, image, moderation, legacy).
-    const exclude = /embedding|whisper|tts|dall-e|audio|realtime|moderation|image|davinci|babbage|computer-use|transcribe|search/i;
+    // Hide non-chat models. Groq's endpoint also returns Whisper, speech and
+    // prompt-guard models alongside its conversational catalog.
+    const exclude = /embedding|whisper|tts|speech|orpheus|guard|dall-e|audio|realtime|moderation|image|davinci|babbage|computer-use|transcribe|search/i;
     models = models.filter((m) => !exclude.test(m.id));
   }
   return models.sort(byId);

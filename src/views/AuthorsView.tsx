@@ -17,6 +17,7 @@ import { useDataRefresh, useScanComplete } from '../hooks';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import type { PendingGraphNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
+import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 
 type Tab = 'dossier' | 'matrix';
 
@@ -40,6 +41,7 @@ const RELATION_COLORS: Record<string, 'red' | 'amber' | 'green' | 'cyan' | 'neut
 
 type SortKey = 'name' | 'surname' | 'works' | 'ideas' | 'connections';
 type SynthFilter = 'all' | 'with' | 'without';
+const AUTHORS_PAGE_SIZE = 80;
 
 const SORT_LABELS: Record<SortKey, string> = {
   name: 'Nombre',
@@ -56,9 +58,11 @@ const SYNTH_FILTER_LABELS: Record<SynthFilter, string> = {
 };
 
 export function AuthorsView({
+  vaultId,
   settings,
   onOpenGraph,
 }: {
+  vaultId: string | null;
   settings: AppSettings;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
 }) {
@@ -94,7 +98,7 @@ export function AuthorsView({
       </div>
 
       {tab === 'dossier' ? (
-        <DossierTab onOpenGraph={onOpenGraph} model={model} />
+        <DossierTab vaultId={vaultId} onOpenGraph={onOpenGraph} model={model} />
       ) : (
         <MatrixTab onOpenGraph={onOpenGraph} model={model} />
       )}
@@ -105,19 +109,24 @@ export function AuthorsView({
 // ─── Tab 1: Author dossiers ───────────────────────────────────────────────────
 
 function DossierTab({
+  vaultId,
   onOpenGraph,
   model,
 }: {
+  vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   model: ModelRef | null;
 }) {
   const [authors, setAuthors] = useState<AuthorSummary[]>([]);
+  const [totalAuthors, setTotalAuthors] = useState(0);
+  const [pageOffset, setPageOffset] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dossier, setDossier] = useState<AuthorDossier | null>(null);
   const [loadingDossier, setLoadingDossier] = useState(false);
   const [synthesizing, setSynthesizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [queryFilter, setQueryFilter] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('surname');
   const [synthFilter, setSynthFilter] = useState<SynthFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -125,14 +134,48 @@ function DossierTab({
   const [exporting, setExporting] = useState(false);
   const [exportMsg, setExportMsg] = useState<string | null>(null);
 
-  const reloadAuthors = useCallback(async () => {
-    const list = await window.nodus.listAuthors();
-    setAuthors(list);
-    setSelectedId((cur) => cur ?? list[0]?.author_id ?? null);
-  }, []);
+  const reloadAuthors = useCallback(async (force = true) => {
+    const request = {
+      offset: pageOffset,
+      limit: AUTHORS_PAGE_SIZE,
+      query: queryFilter || undefined,
+      sort: sortBy,
+      synthesis: synthFilter,
+    } as const;
+    const cacheKey = `authors:${JSON.stringify(request)}`;
+    if (!force) {
+      const cached = getVaultQueryCache<{ items: AuthorSummary[]; total: number }>(vaultId, cacheKey);
+      if (cached) {
+        setAuthors(cached.items);
+        setTotalAuthors(cached.total);
+        setSelectedId((current) => current ?? cached.items[0]?.author_id ?? null);
+        return;
+      }
+    }
+    const page = await window.nodus.listAuthorsPage({
+      ...request,
+    });
+    if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
+      setPageOffset(Math.max(0, Math.floor((page.total - 1) / AUTHORS_PAGE_SIZE) * AUTHORS_PAGE_SIZE));
+      return;
+    }
+    setAuthors(page.items);
+    setTotalAuthors(page.total);
+    setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
+    setSelectedId((cur) => cur ?? page.items[0]?.author_id ?? null);
+  }, [pageOffset, queryFilter, sortBy, synthFilter, vaultId]);
 
   useEffect(() => {
-    void reloadAuthors();
+    const handle = setTimeout(() => setQueryFilter(query.trim()), 250);
+    return () => clearTimeout(handle);
+  }, [query]);
+
+  useEffect(() => {
+    setPageOffset(0);
+  }, [queryFilter, sortBy, synthFilter]);
+
+  useEffect(() => {
+    void reloadAuthors(false);
   }, [reloadAuthors]);
   useDataRefresh(reloadAuthors);
   useScanComplete(reloadAuthors);
@@ -144,10 +187,20 @@ function DossierTab({
     }
     let cancelled = false;
     setLoadingDossier(true);
+    const cacheKey = `author-dossier:${selectedId}`;
+    const cached = getVaultQueryCache<AuthorDossier | null>(vaultId, cacheKey);
+    if (cached !== undefined) {
+      setDossier(cached);
+      setLoadingDossier(false);
+      return;
+    }
     void window.nodus
       .getAuthorDossier(selectedId)
       .then((d) => {
-        if (!cancelled) setDossier(d);
+        if (!cancelled) {
+          setDossier(d);
+          setVaultQueryCache(vaultId, cacheKey, d);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingDossier(false);
@@ -155,7 +208,7 @@ function DossierTab({
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, vaultId]);
 
   const synthesize = useCallback(async () => {
     if (!selectedId) return;
@@ -172,29 +225,7 @@ function DossierTab({
     }
   }, [selectedId, model]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = authors;
-    if (q) list = list.filter((a) => a.fullName.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
-    if (synthFilter === 'with') list = list.filter((a) => a.hasSynthesis);
-    else if (synthFilter === 'without') list = list.filter((a) => !a.hasSynthesis);
-    const sorted = [...list];
-    sorted.sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName);
-        case 'surname':
-          return a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName);
-        case 'works':
-          return b.workCount - a.workCount || a.lastName.localeCompare(b.lastName);
-        case 'ideas':
-          return b.ideaCount - a.ideaCount || a.lastName.localeCompare(b.lastName);
-        case 'connections':
-          return b.relationCount - a.relationCount || a.lastName.localeCompare(b.lastName);
-      }
-    });
-    return sorted;
-  }, [authors, query, synthFilter, sortBy]);
+  const filtered = authors;
 
   const toggleSelect = useCallback((id: string) => {
     setSelected((cur) => {
@@ -341,6 +372,19 @@ function DossierTab({
             </div>
           ))}
         </div>
+        {totalAuthors > AUTHORS_PAGE_SIZE && (
+          <div className="mt-2 flex items-center justify-between text-[11px] text-neutral-500">
+            <span>{pageOffset + 1}–{Math.min(pageOffset + authors.length, totalAuthors)} / {totalAuthors}</span>
+            <div className="flex gap-1">
+              <button className="btn btn-ghost border border-neutral-700 p-1" title={t('Anterior')} disabled={pageOffset === 0} onClick={() => setPageOffset((offset) => Math.max(0, offset - AUTHORS_PAGE_SIZE))}>
+                <Icon name="arrowLeft" size={12} />
+              </button>
+              <button className="btn btn-ghost border border-neutral-700 p-1" title={t('Siguiente')} disabled={pageOffset + authors.length >= totalAuthors} onClick={() => setPageOffset((offset) => offset + AUTHORS_PAGE_SIZE)}>
+                <Icon name="arrowRight" size={12} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dossier detail */}
