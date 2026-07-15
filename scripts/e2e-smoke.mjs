@@ -67,7 +67,12 @@ async function closeElectronApp(instance) {
 let app = null;
 try {
   // The child must run as a real GUI app: strip the runner's as-Node flag.
-  const childEnv = { ...process.env, NODUS_USERDATA: userData, NODUS_DISABLE_AUTO_UPDATE: '1' };
+  const childEnv = {
+    ...process.env,
+    NODUS_USERDATA: userData,
+    NODUS_DISABLE_AUTO_UPDATE: '1',
+    NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
+  };
   delete childEnv.ELECTRON_RUN_AS_NODE;
   app = await electron.launch({
     executablePath: require('electron'),

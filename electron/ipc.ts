@@ -1873,10 +1873,20 @@ export function registerIpc(
   h('study:template:apply', async (_e, id: string, name?: string) => studyOrg.applyStudyTemplate(id, name));
   h('study:editor:data', async (_e, documentId: string) => studyEditor.getStudyDocEditorData(documentId));
   h('study:editor:update', async (_e, documentId: string, input: StudyDocUpdateInput) => {
-    const result = studyEditor.updateStudyDoc(documentId, input); queueStudyKnowledgeSources('document', [documentId]); studySearch.queueStudySearchIndexRefresh(); return result;
+    const result = studyEditor.updateStudyDoc(documentId, input);
+    if (process.env.NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI !== '1') {
+      queueStudyKnowledgeSources('document', [documentId]);
+      studySearch.queueStudySearchIndexRefresh();
+    }
+    return result;
   });
   h('study:editor:restore', async (_e, documentId: string, versionId: string) => {
-    const result = studyEditor.restoreStudyDocVersion(documentId, versionId); queueStudyKnowledgeSources('document', [documentId]); studySearch.queueStudySearchIndexRefresh(); return result;
+    const result = studyEditor.restoreStudyDocVersion(documentId, versionId);
+    if (process.env.NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI !== '1') {
+      queueStudyKnowledgeSources('document', [documentId]);
+      studySearch.queueStudySearchIndexRefresh();
+    }
+    return result;
   });
   h('study:annotation:create', async (_e, documentId: string, input: StudyAnnotationInput) => studyEditor.createStudyAnnotation(documentId, input));
   h('study:annotation:update', async (_e, id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }) =>
