@@ -83,10 +83,10 @@ assert.ok(summary.includes('settings.summaryModel ?? settings.synthesisModel'), 
 assert.ok(reprocess.includes('settings.extractionModel') && reprocess.includes('settings.fusionModel'), 'theme/relation reprocessing must split models');
 
 const onboarding = await source('src/views/Onboarding.tsx');
-assert.ok(!onboarding.includes('defaultModel: ref'), 'onboarding must not recreate the global selector');
-assert.ok(onboarding.includes('synthesisModel: ref'), 'onboarding must initialize the general model');
+assert.ok(!onboarding.includes('defaultModel: aiModel'), 'onboarding must not recreate the global selector');
+assert.ok(onboarding.includes('synthesisModel: aiModel'), 'onboarding must initialize the general model');
 assert.ok(onboarding.includes("modelSettingsMode: 'basic'"), 'onboarding must keep simplified settings active');
-for (const field of ['extractionModel', 'summaryModel', 'fusionModel']) assert.ok(!onboarding.includes(`${field}: ref`), `${field} must inherit after onboarding`);
+for (const field of ['extractionModel', 'summaryModel', 'fusionModel']) assert.ok(!onboarding.includes(`${field}: aiModel`), `${field} must inherit after onboarding`);
 
 const settingsView = await source('src/views/Settings.tsx');
 for (const marker of ['model-settings-mode', 'common-model-overrides', 'vault-model-overrides', 'Ajustes avanzados del vault {vault}']) {

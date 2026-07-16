@@ -928,7 +928,6 @@ export function App() {
           anchorEl={vaultAnchor}
           onClose={() => setVaultAnchor(null)}
           vaults={vaults}
-          settings={settings}
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
         />

@@ -76,24 +76,50 @@ test('the create-vault modal shows an inline accessible name error', async () =>
   assert.match(picker, /aria-invalid=\{Boolean\(addNameError\)\}/);
 });
 
-test('every available vault type requires independent AI and embedding models during creation', async () => {
-  const [picker, modelSetup, types] = await Promise.all([
+test('the create-vault modal asks for a name and a type, never for models', async () => {
+  // Model choice belongs to the setup wizard, where Nodus can discover the models
+  // from the stored keys. Asking again here is the duplication this replaced.
+  const [picker, types] = await Promise.all([
     read('src/components/VaultSwitcher.tsx'),
-    read('src/components/VaultCreationModels.tsx'),
     read('shared/vaultTypes.ts'),
   ]);
-  assert.match(picker, /data-testid="vault-creation-models"|<VaultCreationModels/);
-  assert.match(picker, /aiModel: \{ provider: addAiProvider, model: addAiModel\.trim\(\) \}/);
-  assert.match(picker, /embeddingProvider: addEmbeddingProvider/);
-  assert.match(picker, /embeddingModel: addEmbeddingModel\.trim\(\)/);
-  assert.match(picker, /installNodusLocalRuntime/);
-  assert.match(picker, /downloadNodusLocalModel/);
-  assert.match(modelSetup, /data-testid="vault-ai-provider"/);
-  assert.match(modelSetup, /data-testid="vault-embedding-provider"/);
-  assert.match(modelSetup, /NODUS_LOCAL_MODELS\.filter/);
+  assert.doesNotMatch(picker, /VaultCreationModels/, 'the creation modal must not embed the model picker');
+  assert.doesNotMatch(picker, /aiModel|embeddingProvider|embeddingModel/, 'creation must not send a model payload');
+  assert.doesNotMatch(picker, /downloadNodusLocalModel|installNodusLocalRuntime/, 'downloading belongs to the wizard, not to creation');
+  assert.match(picker, /createVault\(\{ name, type: addType \}\)/);
+  // The create button must depend on the name alone now that models are gone.
+  assert.match(picker, /onClick=\{\(\) => void createVault\(\)\} disabled=\{busy\}/);
+  assert.match(picker, /data-testid="vault-models-next-step"/);
   for (const type of ['academic', 'genealogy', 'estudio', 'databases']) {
     assert.match(types, new RegExp(`id: '${type}'[\\s\\S]{0,180}available: true`));
   }
+});
+
+test('the wizard discovers models by itself and requires one of each role', async () => {
+  const [onboarding, step, select] = await Promise.all([
+    read('src/views/Onboarding.tsx'),
+    read('src/components/OnboardingModelStep.tsx'),
+    read('src/components/SearchableModelSelect.tsx'),
+  ]);
+  // Discovery runs on mount against every reachable provider — no button to press.
+  assert.match(step, /useEffect\(\(\) => \{\s*void discover\(keys\)/);
+  assert.match(step, /autoDiscoverableAiProviders\(active\)/);
+  assert.match(step, /autoDiscoverableEmbeddingProviders\(active\)/);
+  assert.match(step, /listModels\(provider\)/);
+  assert.match(step, /listEmbeddingModels\(provider as EmbeddingProvider\)/);
+  // Both roles are picked separately, and each picker has a searchbox.
+  assert.match(step, /testId="onboarding-ai-model"/);
+  assert.match(step, /testId="onboarding-embedding-model"/);
+  assert.match(select, /data-testid=\{`\$\{testId\}-search`\}/);
+  assert.match(select, /filterModelChoices\(choices, query\)/);
+  // Adding a key re-runs discovery rather than asking the user to reload.
+  assert.match(step, /await window\.nodus\.setApiKey\(keyProvider, keyValue\.trim\(\)\)[\s\S]{0,200}await discover\(next\)/);
+  // The wizard, not vault creation, now persists both models and fetches local ones.
+  assert.match(onboarding, /synthesisModel: aiModel/);
+  assert.match(onboarding, /embeddingProvider,/);
+  assert.match(onboarding, /embeddingModel: normalizeEmbeddingModel\(embeddingProvider, embeddingModel\.model\)/);
+  assert.match(onboarding, /await downloadLocalModels\(\[aiModel, embeddingModel\]\)/);
+  assert.match(onboarding, /disabled=\{finishing \|\| !aiModel \|\| !embeddingModel\}/);
 });
 
 test('vault creation persists the complete model selection and keeps legacy callers compatible', async () => {

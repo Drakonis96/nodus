@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, AppSettings, ZoteroCollection, ModelInfo, VaultSummary } from '@shared/types';
-import { AI_PROVIDERS, PROVIDER_LABELS, Spinner, Icon } from '../components/ui';
+import type { AiProvider, AppSettings, ZoteroCollection, ModelRef, VaultSummary } from '@shared/types';
+import { normalizeEmbeddingModel, normalizeEmbeddingProvider } from '@shared/providers';
+import { getNodusLocalModel } from '@shared/localAiModels';
+import { Spinner, Icon } from '../components/ui';
+import { OnboardingModelStep } from '../components/OnboardingModelStep';
 import { t, tx } from '../i18n';
 
 type OnboardingExit = 'home' | 'library' | 'settings';
@@ -28,14 +31,17 @@ export function Onboarding({
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [readTag, setReadTag] = useState('leído');
-  const [provider, setProvider] = useState<AiProvider>(settings.synthesisModel?.provider ?? 'anthropic');
-  const [apiKey, setApiKey] = useState('');
-  const [models, setModels] = useState<ModelInfo[]>(settings.synthesisModel ? [{ id: settings.synthesisModel.model }] : []);
-  const [selectedModel, setSelectedModel] = useState(settings.synthesisModel?.model ?? '');
+  // The two models the vault needs. Seeded from what this vault already has so a
+  // re-run of the wizard shows the current choice instead of resetting it.
+  const [aiModel, setAiModel] = useState<ModelRef | null>(settings.synthesisModel);
+  const [embeddingModel, setEmbeddingModel] = useState<ModelRef | null>(
+    settings.embeddingModel ? { provider: settings.embeddingProvider, model: settings.embeddingModel } : null
+  );
   const [modelError, setModelError] = useState<string | null>(null);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [storagePath, setStoragePath] = useState('');
   const [finishing, setFinishing] = useState(false);
+  const [downloadLabel, setDownloadLabel] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const [finishError, setFinishError] = useState<string | null>(null);
   const [syncSummary, setSyncSummary] = useState<string | null>(null);
   const [syncedWorks, setSyncedWorks] = useState<number | null>(null);
@@ -50,8 +56,6 @@ export function Onboarding({
   const simple = vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
-  // Providers already configured (keys are shared across all vaults).
-  const configuredProviders = providerKeys ? AI_PROVIDERS.filter((p) => providerKeys[p]) : [];
 
   const exitOnboarding = async () => {
     if (!onCancel || exiting) return;
@@ -89,41 +93,60 @@ export function Onboarding({
     });
   };
 
-  const loadModels = async () => {
-    setLoadingModels(true);
-    setModelError(null);
-    try {
-      if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
-      const list = await window.nodus.listModels(provider);
-      setModels(list);
-      if (list[0]) setSelectedModel(list[0].id);
-    } catch (e) {
-      setModelError((e as Error).message);
-      setModels([]);
-    } finally {
-      setLoadingModels(false);
+  /** Built-in models are chosen here but only fetched now, so the wizard stays
+   *  responsive while browsing and the download runs once the choice is final. */
+  const downloadLocalModels = async (refs: (ModelRef | null)[]) => {
+    const definitions = [...new Set(refs.filter((ref) => ref?.provider === 'nodus').map((ref) => ref!.model))]
+      .map((id) => {
+        const definition = getNodusLocalModel(id);
+        if (!definition) throw new Error(t('El modelo local seleccionado ya no está disponible.'));
+        return definition;
+      });
+    if (!definitions.length) return;
+    const status = await window.nodus.getNodusLocalAiStatus();
+    const needsRuntime = definitions.some((model) => model.runtime === 'llama_cpp') && !status.runtime.ready;
+    const pending = definitions.filter((model) => !status.models.find((entry) => entry.id === model.id)?.downloaded);
+    const total = (needsRuntime ? 1 : 0) + pending.length;
+    if (!total) return;
+    let done = 0;
+    const onProgress = (fraction: number) => setDownloadProgress((done + fraction) / total);
+    if (needsRuntime) {
+      setDownloadLabel(t('Preparando el motor local…'));
+      await window.nodus.installNodusLocalRuntime(onProgress);
+      done += 1;
     }
+    for (const model of pending) {
+      setDownloadLabel(tx('Descargando {model}…', { model: model.label }));
+      await window.nodus.downloadNodusLocalModel(model.id, onProgress);
+      done += 1;
+    }
+    setDownloadProgress(1);
+    setDownloadLabel('');
   };
 
   const finish = async () => {
-    if (!selectedModel.trim()) {
-      setModelError(t('Elige un modelo de IA para continuar.'));
+    if (!aiModel || !embeddingModel) {
+      setModelError(t('Elige un modelo de IA y uno de embeddings para continuar.'));
       return;
     }
     setFinishing(true);
     setFinishError(null);
+    setModelError(null);
     setSyncSummary(null);
     setSyncedWorks(null);
+    setDownloadProgress(0);
     try {
-      if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
-      const ref = selectedModel ? { provider, model: selectedModel } : null;
-      const favorites = ref && !settings.favorites.some((model) => model.provider === ref.provider && model.model === ref.model)
-        ? [...settings.favorites, ref]
-        : settings.favorites;
+      await downloadLocalModels([aiModel, embeddingModel]);
+      const favorites = settings.favorites.some((model) => model.provider === aiModel.provider && model.model === aiModel.model)
+        ? settings.favorites
+        : [...settings.favorites, aiModel];
+      const embeddingProvider = normalizeEmbeddingProvider(embeddingModel.provider);
       await window.nodus.updateSettings({
         ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
         favorites,
-        synthesisModel: ref,
+        synthesisModel: aiModel,
+        embeddingProvider,
+        embeddingModel: normalizeEmbeddingModel(embeddingProvider, embeddingModel.model),
         modelSettingsMode: 'basic',
         onboardingComplete: true,
       });
@@ -221,7 +244,7 @@ export function Onboarding({
         {step === 0 && simple && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-300">{intro.body}</p>
-            <p className="text-xs text-neutral-500">{t('Los modelos de IA y embeddings elegidos al crear el vault ya están preparados. Puedes revisar aquí el modelo de IA antes de empezar.')}</p>
+            <p className="text-xs text-neutral-500">{t('En el siguiente paso elegirás el modelo de IA y el de embeddings. Nodus detecta tus claves y carga los modelos disponibles por ti.')}</p>
           </div>
         )}
 
@@ -278,76 +301,27 @@ export function Onboarding({
 
         {step === aiStep && (
           <div className="space-y-4">
-            {/* Billing notice — shown for every vault mode. */}
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/20 dark:text-amber-200">
-              {t('El uso de IA se factura según tu proveedor (OpenAI, Anthropic, Google, OpenRouter…), no por Nodus. Revisa el precio por token y, si quieres evitar sorpresas, establece un límite de gasto (spend limit) desde el panel del proveedor antes de empezar.')}
-            </div>
-            {configuredProviders.length > 0 && (
-              <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/20 dark:text-emerald-300">
-                {tx('Ya tienes claves configuradas ({list}). Las claves se comparten entre todas tus bóvedas, así que puedes continuar sin volver a introducirlas.', {
-                  list: configuredProviders.map((p) => PROVIDER_LABELS[p]).join(', '),
-                })}
+            <OnboardingModelStep
+              settings={settings}
+              providerKeys={providerKeys ?? {}}
+              aiModel={aiModel}
+              embeddingModel={embeddingModel}
+              onAiChange={(ref) => { setAiModel(ref); setModelError(null); }}
+              onEmbeddingChange={(ref) => { setEmbeddingModel(ref); setModelError(null); }}
+              disabled={finishing}
+            />
+            {modelError && <p role="alert" className="text-sm text-red-400">{modelError}</p>}
+            {finishing && downloadLabel && (
+              <div className="rounded-lg border border-indigo-800/60 bg-indigo-950/25 p-3" data-testid="onboarding-model-download-progress">
+                <div className="flex items-center justify-between gap-3 text-xs text-indigo-200">
+                  <span>{downloadLabel}</span>
+                  {downloadProgress > 0 && <span className="tabular-nums">{Math.round(downloadProgress * 100)}%</span>}
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-800">
+                  <div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${Math.max(3, downloadProgress * 100)}%` }} />
+                </div>
               </div>
             )}
-            <label className="block text-sm">
-              {t('Proveedor')}
-              <select
-                className="input w-full mt-1"
-                value={provider}
-                onChange={(e) => {
-                  setProvider(e.target.value as AiProvider);
-                  setModels([]);
-                  setSelectedModel('');
-                }}
-              >
-                {(['nodus', ...AI_PROVIDERS] as AiProvider[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PROVIDER_LABELS[p]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {provider === 'nodus' || provider === 'ollama' || provider === 'lmstudio' ? (
-              <p className="text-sm text-neutral-500">
-                {provider === 'nodus'
-                  ? t('Modelo local integrado: ya está descargado en este equipo y no necesita clave.')
-                  : t('Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.')}
-              </p>
-            ) : (
-              <label className="block text-sm">
-                {t('Clave de IA (se guarda cifrada, nunca se exporta)')}
-                {provider === 'openrouter' && (
-                  <span className="text-neutral-500"> {t('— opcional para listar, necesaria para escanear')}</span>
-                )}
-                <input
-                  type="password"
-                  className="input w-full mt-1"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-              </label>
-            )}
-            <button className="btn btn-ghost border border-neutral-700" onClick={loadModels} disabled={loadingModels}>
-              {loadingModels ? t('Cargando modelos…') : t('Cargar modelos')}
-            </button>
-            {modelError && <div className="text-sm text-red-400">{modelError}</div>}
-            {models.length > 0 && (
-              <label className="block text-sm">
-                {tx('Modelo inicial para las tareas de IA ({n} disponibles)', { n: models.length })}
-                <select className="input w-full mt-1" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.group ? `[${m.group}] ` : ''}
-                      {m.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <p className="text-xs text-neutral-500">
-              {t('Podrás añadir más proveedores y marcar favoritos en Ajustes.')}
-            </p>
-            {!selectedModel && <p className="text-xs text-amber-400">{t('Elige un modelo para continuar.')}</p>}
           </div>
         )}
 
@@ -394,7 +368,7 @@ export function Onboarding({
               {t('Siguiente')}
             </button>
           ) : step === aiStep ? (
-            <button className="btn btn-primary" onClick={finish} disabled={finishing || !selectedModel.trim()}>
+            <button className="btn btn-primary" data-testid="onboarding-start" onClick={finish} disabled={finishing || !aiModel || !embeddingModel}>
               {finishing ? t('Preparando...') : t('Empezar')}
             </button>
           ) : (
@@ -405,8 +379,8 @@ export function Onboarding({
                 </button>
               )}
               {!simple && (
-                <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(selectedModel ? 'library' : 'settings')} disabled={finishing}>
-                  {selectedModel ? t('Ir a Biblioteca') : t('Configurar IA')}
+                <button className="btn btn-ghost border border-neutral-700" onClick={() => onDone(aiModel ? 'library' : 'settings')} disabled={finishing}>
+                  {aiModel ? t('Ir a Biblioteca') : t('Configurar IA')}
                 </button>
               )}
               <button className="btn btn-primary" onClick={() => onDone('home')} disabled={finishing}>

@@ -1,14 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { AiProvider, AppSettings, EmbeddingProvider, VaultSummary, VaultType } from '@shared/types';
+import type { VaultSummary, VaultType } from '@shared/types';
 import { isPreviewVaultType, VAULT_TYPES } from '@shared/vaultTypes';
-import { DEFAULT_EMBEDDING_MODELS } from '@shared/providers';
-import { getNodusLocalModel, type NodusLocalAiStatus } from '@shared/localAiModels';
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
-import { VaultCreationModels } from './VaultCreationModels';
 
 interface VaultSwitcherProps {
   /** Trigger element the panel anchors under (centre badge or right-rail icon);
@@ -18,7 +15,6 @@ interface VaultSwitcherProps {
   vaults: VaultSummary[];
   onVaultsChanged: () => Promise<unknown>;
   onActiveVaultChanged: () => Promise<unknown>;
-  settings: AppSettings;
 }
 
 type DestructiveKind = 'delete' | 'reset';
@@ -116,7 +112,7 @@ function vaultTypeDescription(type: VaultType): string {
   }
 }
 
-export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onActiveVaultChanged, settings }: VaultSwitcherProps) {
+export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onActiveVaultChanged }: VaultSwitcherProps) {
   const open = anchorEl != null;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -135,14 +131,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const [addName, setAddName] = useState('');
   const [addNameError, setAddNameError] = useState<string | null>(null);
   const [addType, setAddType] = useState<VaultType>('academic');
-  const [addAiProvider, setAddAiProvider] = useState<AiProvider | ''>('');
-  const [addAiModel, setAddAiModel] = useState('');
-  const [addEmbeddingProvider, setAddEmbeddingProvider] = useState<EmbeddingProvider>('openai');
-  const [addEmbeddingModel, setAddEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODELS.openai);
   const [addError, setAddError] = useState<string | null>(null);
-  const [addProgress, setAddProgress] = useState(0);
-  const [addProgressLabel, setAddProgressLabel] = useState('');
-  const [localAiStatus, setLocalAiStatus] = useState<NodusLocalAiStatus | null>(null);
 
   // Rename / duplicate modals.
   const [renameTarget, setRenameTarget] = useState<VaultSummary | null>(null);
@@ -230,14 +219,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const openAddVault = () => {
     setAddNameError(null);
     setAddError(null);
-    setAddProgress(0);
-    setAddProgressLabel('');
-    setAddAiProvider(settings.synthesisModel?.provider ?? '');
-    setAddAiModel(settings.synthesisModel?.model ?? '');
-    setAddEmbeddingProvider(settings.embeddingProvider);
-    setAddEmbeddingModel(settings.embeddingModel || DEFAULT_EMBEDDING_MODELS[settings.embeddingProvider]);
     setAddOpen(true);
-    void window.nodus.getNodusLocalAiStatus().then(setLocalAiStatus).catch(() => setLocalAiStatus(null));
   };
 
   const loadVault = (vaultId: string) =>
@@ -256,8 +238,6 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
     if (busy) return;
     let createdVaultId: string | null = null;
     setAddError(null);
-    setAddProgress(0);
-    setAddProgressLabel('');
     setBusy(true);
     try {
       const name = addName.trim();
@@ -265,52 +245,11 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
         setAddNameError(t('Escribe un nombre para la bóveda.'));
         return;
       }
-      if (!addAiProvider || !addAiModel.trim()) {
-        setAddError(t('Elige un modelo de IA antes de crear la bóveda.'));
-        return;
-      }
-      if (!addEmbeddingModel.trim()) {
-        setAddError(t('Elige un modelo de embeddings antes de crear la bóveda.'));
-        return;
-      }
       setAddNameError(null);
-      let status = await window.nodus.getNodusLocalAiStatus();
-      setLocalAiStatus(status);
-      const localIds = [...new Set([
-        addAiProvider === 'nodus' ? addAiModel.trim() : null,
-        addEmbeddingProvider === 'nodus' ? addEmbeddingModel.trim() : null,
-      ].filter((id): id is string => Boolean(id)))];
-      const localModels = localIds.map((id) => {
-        const definition = getNodusLocalModel(id);
-        if (!definition) throw new Error(t('El modelo local seleccionado ya no está disponible.'));
-        return definition;
-      });
-      const needsRuntime = localModels.some((model) => model.runtime === 'llama_cpp') && !status.runtime.ready;
-      const pendingModels = localModels.filter((model) => !status.models.find((entry) => entry.id === model.id)?.downloaded);
-      const operationCount = (needsRuntime ? 1 : 0) + pendingModels.length;
-      let completedOperations = 0;
-      const progressFor = (fraction: number) => setAddProgress(operationCount ? (completedOperations + fraction) / operationCount : 1);
-      if (needsRuntime) {
-        setAddProgressLabel(t('Preparando el motor local…'));
-        status = await window.nodus.installNodusLocalRuntime(progressFor);
-        setLocalAiStatus(status);
-        completedOperations += 1;
-      }
-      for (const model of pendingModels) {
-        setAddProgressLabel(tx('Descargando {model}…', { model: model.label }));
-        status = await window.nodus.downloadNodusLocalModel(model.id, progressFor);
-        setLocalAiStatus(status);
-        completedOperations += 1;
-      }
-      if (operationCount) setAddProgress(1);
-      setAddProgressLabel(t('Creando y configurando la bóveda…'));
-      const created = await window.nodus.createVault({
-        name,
-        type: addType,
-        aiModel: { provider: addAiProvider, model: addAiModel.trim() },
-        embeddingProvider: addEmbeddingProvider,
-        embeddingModel: addEmbeddingModel.trim(),
-      });
+      // The vault is created bare: its AI and embedding models are chosen in the
+      // setup wizard that opens right after, where Nodus can discover them from
+      // the keys already stored instead of asking here.
+      const created = await window.nodus.createVault({ name, type: addType });
       createdVaultId = created.vault.id;
       const result = await window.nodus.switchVault(created.vault.id);
       if (!result.ok) throw new Error(result.message);
@@ -329,7 +268,6 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       await onVaultsChanged();
     } finally {
       setBusy(false);
-      setAddProgressLabel('');
     }
   };
 
@@ -604,35 +542,16 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
             </div>
             {vaultTypePhase(addType) && <VaultPhaseNotice phase={vaultTypePhase(addType)!} />}
             {isPreviewVaultType(addType) && <PreviewNotice />}
-            <VaultCreationModels
-              settings={settings}
-              aiProvider={addAiProvider}
-              aiModel={addAiModel}
-              embeddingProvider={addEmbeddingProvider}
-              embeddingModel={addEmbeddingModel}
-              localStatus={localAiStatus}
-              disabled={busy}
-              onAiChange={(provider, model) => { setAddAiProvider(provider); setAddAiModel(model); setAddError(null); }}
-              onEmbeddingChange={(provider, model) => { setAddEmbeddingProvider(provider); setAddEmbeddingModel(model); setAddError(null); }}
-            />
-            <p className="mt-3 text-xs text-neutral-500">{t('Las claves de IA se comparten entre todas las bóvedas; la elección de embeddings se guarda en este vault.')}</p>
-            {busy && addProgressLabel && (
-              <div className="mt-3 rounded-lg border border-indigo-800/60 bg-indigo-950/25 p-3" data-testid="vault-model-download-progress">
-                <div className="flex items-center justify-between gap-3 text-xs text-indigo-200">
-                  <span>{addProgressLabel}</span>
-                  {addProgress > 0 && <span className="tabular-nums">{Math.round(addProgress * 100)}%</span>}
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded bg-neutral-800">
-                  <div className="h-full bg-indigo-500 transition-[width]" style={{ width: `${Math.max(3, addProgress * 100)}%` }} />
-                </div>
-              </div>
-            )}
+            <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-neutral-500" data-testid="vault-models-next-step">
+              <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+              <span>{t('Al crear la bóveda, el asistente te llevará a elegir su modelo de IA y su modelo de embeddings, con los modelos de tus proveedores ya cargados.')}</span>
+            </p>
             {addError && <p role="alert" data-testid="vault-creation-error" className="mt-3 rounded-lg border border-red-900/60 bg-red-950/20 px-3 py-2 text-xs text-red-300">{addError}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button className="btn btn-ghost" onClick={() => setAddOpen(false)} disabled={busy}>
                 {t('Cancelar')}
               </button>
-              <button className="btn btn-primary gap-1.5" onClick={() => void createVault()} disabled={busy || !addAiProvider || !addAiModel.trim() || !addEmbeddingModel.trim()}>
+              <button className="btn btn-primary gap-1.5" onClick={() => void createVault()} disabled={busy}>
                 <Icon name={busy ? 'sync' : 'plus'} className={busy ? 'animate-spin' : ''} /> {busy ? t('Preparando…') : t('Crear')}
               </button>
             </div>

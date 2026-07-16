@@ -5,35 +5,32 @@
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
 export const FR: Record<string, string> = {
-  'Modelos iniciales': 'Modèles initiaux',
-  'Elige por separado el modelo de IA y el modelo que creará los embeddings del vault. Ambos son obligatorios.':
-    'Choisissez séparément le modèle d\'IA et le modèle qui créera les embeddings de l\'espace. Les deux sont obligatoires.',
   'Modelo de embeddings': 'Modèle d\'embeddings',
-  'Elige local o nube': 'Choisissez local ou cloud',
-  'ID del modelo': 'ID du modèle',
-  'Consultar modelos': 'Parcourir les modèles',
-  'Selecciona un modelo': 'Sélectionnez un modèle',
-  'Puedes escribir un ID o elegir uno de tus modelos favoritos.': 'Vous pouvez saisir un ID ou choisir l\'un de vos modèles favoris.',
-  'Ya está descargado y listo para usar.': 'Déjà téléchargé et prêt à l\'emploi.',
-  'Se descargará al crear la bóveda. La creación terminará cuando el modelo esté listo.':
-    'Il sera téléchargé lors de la création de l\'espace. La création se terminera une fois le modèle prêt.',
-  'Selecciona primero dónde se ejecutará la IA.': 'Choisissez d\'abord où l\'IA s\'exécutera.',
-  'Los proveedores en la nube usan las claves configuradas en Nodus. Ollama y LM Studio usan tu servidor local; Nodus local descarga el modelo en este equipo.':
-    'Les fournisseurs cloud utilisent les clés configurées dans Nodus. Ollama et LM Studio utilisent votre serveur local ; Nodus local télécharge le modèle sur cet ordinateur.',
-  'Las claves de IA se comparten entre todas las bóvedas; la elección de embeddings se guarda en este vault.':
-    'Les clés d\'IA sont partagées entre tous les espaces ; le choix des embeddings est enregistré dans cet espace.',
-  'Elige un modelo de IA antes de crear la bóveda.': 'Choisissez un modèle d\'IA avant de créer l\'espace.',
-  'Elige un modelo de embeddings antes de crear la bóveda.': 'Choisissez un modèle d\'embeddings avant de créer l\'espace.',
   'El modelo local seleccionado ya no está disponible.': 'Le modèle local sélectionné n\'est plus disponible.',
   'Preparando el motor local…': 'Préparation du moteur local…',
   'Descargando {model}…': 'Téléchargement de {model}…',
-  'Creando y configurando la bóveda…': 'Création et configuration de l\'espace…',
-  'Los modelos de IA y embeddings elegidos al crear el vault ya están preparados. Puedes revisar aquí el modelo de IA antes de empezar.':
-    'Les modèles d\'IA et d\'embeddings choisis lors de la création de l\'espace sont déjà prêts. Vous pouvez vérifier ici le modèle d\'IA avant de commencer.',
-  'Modelo local integrado: ya está descargado en este equipo y no necesita clave.':
-    'Modèle local intégré : déjà téléchargé sur cet ordinateur et ne nécessite pas de clé.',
-  'Elige un modelo para continuar.': 'Choisissez un modèle pour continuer.',
-  'Elige un modelo de IA para continuar.': 'Choisissez un modèle d\'IA pour continuer.',
+  'Al crear la bóveda, el asistente te llevará a elegir su modelo de IA y su modelo de embeddings, con los modelos de tus proveedores ya cargados.':
+    'Une fois l\'espace créé, l\'assistant vous mènera au choix de son modèle d\'IA et de son modèle d\'embeddings, avec les modèles de vos fournisseurs déjà chargés.',
+  'En el siguiente paso elegirás el modelo de IA y el de embeddings. Nodus detecta tus claves y carga los modelos disponibles por ti.':
+    'À l\'étape suivante, vous choisirez le modèle d\'IA et celui d\'embeddings. Nodus détecte vos clés et charge les modèles disponibles pour vous.',
+  'Elige un modelo de IA y uno de embeddings para continuar.': 'Choisissez un modèle d\'IA et un modèle d\'embeddings pour continuer.',
+  'Hemos detectado tus claves ({list}) y cargado sus modelos automáticamente. Las claves se comparten entre todas tus bóvedas.':
+    'Nous avons détecté vos clés ({list}) et chargé leurs modèles automatiquement. Les clés sont partagées entre tous vos espaces.',
+  'Analiza, escribe y responde.': 'Analyse, rédige et répond.',
+  'Indexa el vault para buscar por significado.': 'Indexe l\'espace pour rechercher par signification.',
+  'Ningún proveedor respondió todavía.': 'Aucun fournisseur n\'a encore répondu.',
+  'Sin respuesta de {list}. Puedes continuar con el resto y revisarlo luego en Ajustes → Proveedores.':
+    'Aucune réponse de {list}. Vous pouvez continuer avec les autres et vérifier plus tard dans Réglages → Fournisseurs.',
+  'Añadir la clave de otro proveedor': 'Ajouter la clé d\'un autre fournisseur',
+  'Guardar y buscar modelos': 'Enregistrer et chercher les modèles',
+  'Buscando modelos…': 'Recherche des modèles…',
+  'Los modelos marcados como locales se ejecutan en este equipo y no tienen coste por token. Podrás cambiar ambos modelos y añadir favoritos en Ajustes.':
+    'Les modèles marqués comme locaux s\'exécutent sur cet ordinateur et n\'ont aucun coût par token. Vous pourrez changer les deux modèles et ajouter des favoris dans les Réglages.',
+  'ya descargado': 'déjà téléchargé',
+  'se descargará al terminar': 'sera téléchargé à la fin',
+  'Buscando modelos disponibles…': 'Recherche des modèles disponibles…',
+  'Elige un modelo': 'Choisissez un modèle',
+  'Ningún modelo coincide con «{query}».': 'Aucun modèle ne correspond à « {query} ».',
   'Mi biblioteca': 'Ma bibliothèque',
   'Importar desde Zotero': 'Importer depuis Zotero',
   'Busca en tu biblioteca personal o en una biblioteca de grupo, elige un elemento y uno de sus adjuntos.':
