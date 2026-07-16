@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MapPlacePoint } from '@shared/types';
 import { pointsYearRange, filterPointsByYear } from '@shared/mapProjection';
 import { PlacesMap } from '../components/PlacesMap';
+import { PersonDossierModal } from '../components/PersonDossierModal';
 import { Icon } from '../components/ui';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
@@ -21,6 +22,7 @@ export function MapView() {
   const [selected, setSelected] = useState<Set<string>>(new Set()); // empty = all
   const [year, setYear] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [dossierId, setDossierId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setAllPoints(await window.nodus.mapPoints());
@@ -128,9 +130,10 @@ export function MapView() {
             </p>
           </div>
         ) : (
-          <PlacesMap points={shownPoints} fitPoints={personFiltered} showRoutes />
+          <PlacesMap points={shownPoints} fitPoints={personFiltered} showRoutes onPersonClick={setDossierId} />
         )}
       </div>
+      {dossierId && <PersonDossierModal personId={dossierId} onClose={() => setDossierId(null)} onChanged={reload} />}
     </div>
   );
 }

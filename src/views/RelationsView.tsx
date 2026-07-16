@@ -12,7 +12,7 @@ import type { NodeLabelDrawingFunction } from 'sigma/rendering';
 import type { SocialGraphData } from '@shared/types';
 import { seedMissingPositions, settleSync, resolveOverlaps } from './graph/layout';
 import { Icon } from '../components/ui';
-import { PersonDossier } from '../components/PersonDossier';
+import { PersonDossierModal } from '../components/PersonDossierModal';
 import { ContactDossier } from '../components/ContactDossier';
 import { t, tx } from '../i18n';
 
@@ -234,9 +234,7 @@ export function RelationsView({ onOpenPersons }: { onOpenPersons?: () => void })
       </div>
 
       {dossierId && personMap.has(dossierId) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setDossierId(null)}>
-          <PersonDossierLoader personId={dossierId} onClose={() => setDossierId(null)} onChanged={load} onNavigate={setDossierId} />
-        </div>
+        <PersonDossierModal personId={dossierId} onClose={() => setDossierId(null)} onChanged={load} />
       )}
 
       {contactId && (
@@ -250,36 +248,6 @@ export function RelationsView({ onOpenPersons }: { onOpenPersons?: () => void })
           }}
         />
       )}
-    </div>
-  );
-}
-
-/** The graph only carries id + name for a person node; the dossier needs the full
- *  record, so this fetches it on open rather than threading the whole Person list
- *  through the graph-building pass. */
-function PersonDossierLoader({
-  personId,
-  onClose,
-  onChanged,
-  onNavigate,
-}: {
-  personId: string;
-  onClose: () => void;
-  onChanged: () => Promise<void>;
-  onNavigate: (id: string) => void;
-}) {
-  const [person, setPerson] = useState<Awaited<ReturnType<typeof window.nodus.getPerson>>>(null);
-
-  useEffect(() => {
-    void window.nodus.getPerson(personId).then(setPerson);
-  }, [personId]);
-
-  if (!person) return null;
-  return (
-    <div className="card-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <PersonDossier key={personId} person={person} onChanged={onChanged} onClose={onClose} onNavigate={onNavigate} />
-      </div>
     </div>
   );
 }

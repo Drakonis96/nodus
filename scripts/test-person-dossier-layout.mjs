@@ -31,8 +31,9 @@ test('every person dossier area uses the shared section block', () => {
 });
 
 test('all dossier add actions share exactly one size contract', () => {
-  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-7 min-w-36/);
-  assert.match(layout, /whitespace-nowrap/);
+  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-auto min-h-9 min-w-44/);
+  assert.match(layout, /whitespace-normal/);
+  assert.match(layout, /px-4 py-2 text-center/);
   assert.match(dossier, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(dossier, /Biografía'[\s\S]{0,240}PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(kinship, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
@@ -40,6 +41,14 @@ test('all dossier add actions share exactly one size contract', () => {
   assert.match(places, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.doesNotMatch(dossier, /Añadir variante'[\s\S]{0,180}h-6/);
   assert.doesNotMatch(dossier, /Añadir evento'[\s\S]{0,180}h-6/);
+});
+
+test('portrait actions keep side padding and grow for translated labels', () => {
+  assert.match(dossier, /relative w-44 shrink-0/);
+  assert.match(dossier, /h-auto min-h-9[\s\S]{0,300}Regenerar con IA/);
+  assert.match(dossier, /h-auto min-h-9[\s\S]{0,300}Ajustar encuadre/);
+  assert.match(dossier, /px-3 py-2[\s\S]{0,260}Cambiar/);
+  assert.match(dossier, /px-3 py-2[\s\S]{0,260}Quitar/);
 });
 
 test('name variants, life events and places are created through accessible modals', () => {

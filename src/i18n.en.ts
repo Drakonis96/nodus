@@ -3556,6 +3556,10 @@ export const EN: Record<string, string> = {
   'Línea temporal': 'Timeline',
   '{n} eventos': '{n} events',
   'Todas las personas': 'All people',
+  'Buscar tipo de evento…': 'Search event type…',
+  'Ver detalles del evento': 'View event details',
+  'Abrir ficha de {name}': 'Open record for {name}',
+  'Ficha de persona': 'Person record',
   'No hay eventos. Se crean al analizar fuentes primarias con la lente de registros.':
     'No events. They appear when you analyse primary sources with the records lens.',
   'sin fecha': 'no date',

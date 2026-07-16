@@ -11,7 +11,7 @@ import { effectiveFrame, TREE_FRAMES } from '@shared/treeFrames';
 import { Icon } from '../components/ui';
 import { PersonPortrait } from '../components/PersonPortrait';
 import { TreeFrame, TreeFrameDefs } from '../components/TreeFrame';
-import { PersonDossier } from '../components/PersonDossier';
+import { PersonDossierModal } from '../components/PersonDossierModal';
 import { KinshipEditor } from '../components/KinshipEditor';
 import { useIsLightTheme } from '../hooks';
 import { getActiveLang, t } from '../i18n';
@@ -550,19 +550,7 @@ export function TreeView({
       )}
 
       {dossierId && personById.get(dossierId) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={() => setDossierId(null)}>
-          <div className="card-modal flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <PersonDossier
-                key={dossierId}
-                person={personById.get(dossierId)!}
-                onChanged={reload}
-                onClose={() => setDossierId(null)}
-                onNavigate={(id) => setDossierId(id)}
-              />
-            </div>
-          </div>
-        </div>
+        <PersonDossierModal personId={dossierId} onChanged={reload} onClose={() => setDossierId(null)} />
       )}
     </div>
   );

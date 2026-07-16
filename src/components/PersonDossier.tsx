@@ -170,7 +170,7 @@ export function PersonDossier({
           <Icon name="trash" size={15} />
         </button>
         {onClose && (
-          <button className="btn btn-ghost px-2 py-1" onClick={onClose}>
+          <button className="btn btn-ghost h-8 w-8 shrink-0 p-0" onClick={onClose} aria-label={t('Cerrar')} title={t('Cerrar')}>
             <Icon name="x" />
           </button>
         )}
@@ -874,7 +874,7 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
   });
 
   return (
-    <div className="relative w-36 shrink-0" ref={editorRef}>
+    <div className="relative w-44 shrink-0" ref={editorRef}>
       <div
         className="flex justify-center"
         onPointerDown={onPointerDown}
@@ -889,11 +889,11 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
       <div className="mt-2 space-y-1">
         {!hasPortrait ? (
           <>
-            <button className="btn btn-ghost h-7 w-full justify-center gap-1.5 whitespace-nowrap border border-neutral-700 px-2 text-xs" onClick={() => void upload()}>
+            <button className="btn btn-ghost h-auto min-h-9 w-full justify-center gap-1.5 border border-neutral-700 px-3 py-2 text-center text-xs leading-snug" onClick={() => void upload()}>
               <Icon name="upload" size={12} /> {t('Subir foto')}
             </button>
             <button
-              className="btn btn-ghost h-7 w-full justify-center gap-1.5 whitespace-nowrap border border-neutral-700 px-2 text-xs"
+              className="btn btn-ghost h-auto min-h-9 w-full justify-center gap-1.5 border border-neutral-700 px-3 py-2 text-center text-xs leading-snug"
               onClick={() => setShowGenerate((v) => !v)}
             >
               <Icon name="wand" size={12} /> {t('Generar con IA')}
@@ -902,22 +902,22 @@ function PortraitEditor({ person, onChanged }: { person: Person; onChanged: () =
         ) : (
           <>
             <button
-              className={`btn min-h-7 w-full justify-center gap-1.5 border px-2 py-1 text-center text-xs leading-tight ${adjusting ? 'border-indigo-600 bg-indigo-900/30 text-indigo-200' : 'btn-ghost border-neutral-700'}`}
+              className={`btn h-auto min-h-9 w-full justify-center gap-1.5 border px-3 py-2 text-center text-xs leading-snug ${adjusting ? 'border-indigo-600 bg-indigo-900/30 text-indigo-200' : 'btn-ghost border-neutral-700'}`}
               onClick={() => setAdjusting((v) => !v)}
             >
               <Icon name="fit" size={12} /> {t('Ajustar encuadre')}
             </button>
             <button
-              className="btn btn-ghost h-7 w-full justify-center gap-1.5 whitespace-nowrap border border-neutral-700 px-2 text-xs"
+              className="btn btn-ghost h-auto min-h-9 w-full justify-center gap-1.5 border border-neutral-700 px-3 py-2 text-center text-xs leading-snug"
               onClick={() => setShowGenerate((v) => !v)}
             >
               <Icon name="wand" size={12} /> {t('Regenerar con IA')}
             </button>
             <div className="flex gap-1">
-              <button className="btn btn-ghost h-7 flex-1 justify-center border border-neutral-700 px-1 text-xs" onClick={() => void upload()}>
+              <button className="btn btn-ghost h-auto min-h-9 flex-1 justify-center border border-neutral-700 px-3 py-2 text-center text-xs leading-snug" onClick={() => void upload()}>
                 {t('Cambiar')}
               </button>
-              <button className="btn btn-ghost h-7 flex-1 justify-center border border-neutral-700 px-1 text-xs text-red-300" onClick={() => void remove()}>
+              <button className="btn btn-ghost h-auto min-h-9 flex-1 justify-center border border-neutral-700 px-3 py-2 text-center text-xs leading-snug text-red-300" onClick={() => void remove()}>
                 {t('Quitar')}
               </button>
             </div>

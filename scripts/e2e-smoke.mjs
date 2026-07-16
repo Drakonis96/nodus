@@ -1357,6 +1357,33 @@ try {
   assert.equal(await page.locator('[data-tree-line-role="focus_descendants"]').count(), 2, 'the complete gold descendant line follows the newly focused co-parent');
   console.log('[e2e] genealogy parental colour blend + focus descendant gold rendered and recalculated');
 
+  // Timeline filters are true multiselects, and person mentions across both the
+  // timeline and map open the exact same full-record dossier.
+  await page.locator('[data-tour="nav-timeline"]').click();
+  await page.getByTestId('timeline-person-filter').waitFor({ timeout: 30_000 });
+  await page.getByTestId('timeline-person-filter').getByRole('button').click();
+  const peopleChecks = page.locator('.person-multi-select-popover input[type="checkbox"]');
+  await peopleChecks.nth(0).check();
+  await peopleChecks.nth(1).check();
+  assert.equal(await page.locator('.person-multi-select-popover input[type="checkbox"]:checked').count(), 2, 'timeline person filter accepts multiple values');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('timeline-type-filter').getByRole('button').click();
+  const typeChecks = page.locator('.person-multi-select-popover input[type="checkbox"]');
+  await typeChecks.nth(0).check();
+  await typeChecks.nth(1).check();
+  assert.equal(await page.locator('.person-multi-select-popover input[type="checkbox"]:checked').count(), 2, 'timeline type filter accepts multiple values');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-timeline-person-id]').first().click();
+  await page.getByTestId('person-dossier-modal').waitFor({ timeout: 30_000 });
+  await page.getByTestId('person-dossier-modal').getByRole('button', { name: 'Cerrar' }).click();
+
+  await page.locator('[data-tour="nav-map"]').click();
+  await page.getByTestId('places-map').waitFor({ timeout: 30_000 });
+  await page.locator('.pm-marker [data-person-id]').first().click({ force: true });
+  await page.getByTestId('person-dossier-modal').waitFor({ timeout: 30_000 });
+  await page.getByTestId('person-dossier-modal').getByRole('button', { name: 'Cerrar' }).click();
+  console.log('[e2e] genealogy timeline multiselects + shared dossier from timeline and map work');
+
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
     pageErrors.map((e) => String(e?.message ?? e)),

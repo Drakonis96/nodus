@@ -39,17 +39,21 @@ function esc(s: string): string {
 }
 
 /** Small circular portrait as an HTML string (for Leaflet marker/popup DOM). */
-function portraitHtml(person: Person | undefined, url: string | undefined, size: number): string {
+function portraitHtml(person: Person | undefined, url: string | undefined, size: number, personId?: string): string {
   const box = `width:${size}px;height:${size}px`;
+  const interaction = personId
+    ? ` data-person-id="${esc(personId)}" role="button" tabindex="0" title="${esc(t('Abrir ficha'))}"`
+    : '';
+  const pointer = personId ? 'cursor:pointer;' : '';
   if (person?.portrait && url) {
     const f = person.portrait;
-    return `<span style="${box};display:inline-block;overflow:hidden;border-radius:9999px;background:#0a0a0a;box-shadow:0 0 0 1px rgba(0,0,0,.5)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;object-position:${f.focusX * 100}% ${f.focusY * 100}%;transform:scale(${f.scale})"/></span>`;
+    return `<span${interaction} style="${box};${pointer}display:inline-block;overflow:hidden;border-radius:9999px;background:#0a0a0a;box-shadow:0 0 0 1px rgba(0,0,0,.5)"><img src="${url}" style="width:100%;height:100%;object-fit:cover;object-position:${f.focusX * 100}% ${f.focusY * 100}%;transform:scale(${f.scale})"/></span>`;
   }
   const sil = person?.sex === 'female' ? womanPortrait : person?.sex === 'male' ? manPortrait : null;
   if (sil) {
-    return `<span style="${box};display:inline-block;overflow:hidden;border-radius:9999px;background:#27272a;box-shadow:0 0 0 1px rgba(0,0,0,.5)"><img src="${sil}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%"/></span>`;
+    return `<span${interaction} style="${box};${pointer}display:inline-block;overflow:hidden;border-radius:9999px;background:#27272a;box-shadow:0 0 0 1px rgba(0,0,0,.5)"><img src="${sil}" style="width:100%;height:100%;object-fit:cover;object-position:50% 20%"/></span>`;
   }
-  return `<span style="${box};display:inline-block;border-radius:9999px;background:#3f3f46;box-shadow:0 0 0 1px rgba(0,0,0,.5)"></span>`;
+  return `<span${interaction} style="${box};${pointer}display:inline-block;border-radius:9999px;background:#3f3f46;box-shadow:0 0 0 1px rgba(0,0,0,.5)"></span>`;
 }
 
 export function PlacesMap({
@@ -57,6 +61,7 @@ export function PlacesMap({
   showRoutes = true,
   height,
   fitPoints,
+  onPersonClick,
 }: {
   points: MapPlacePoint[];
   showRoutes?: boolean;
@@ -65,6 +70,8 @@ export function PlacesMap({
   /** Points used to frame the view; defaults to `points`. Pass the person-filtered
    *  (not year-filtered) set so the chronological slider doesn't re-zoom the map. */
   fitPoints?: MapPlacePoint[];
+  /** Opens the shared genealogy dossier from a marker portrait, label or popup row. */
+  onPersonClick?: (personId: string) => void;
 }) {
   const light = useIsLightTheme();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -73,6 +80,41 @@ export function PlacesMap({
   const lastFitRef = useRef<string>('');
   const [personsById, setPersonsById] = useState<Map<string, Person>>(new Map());
   const [portraitUrls, setPortraitUrls] = useState<Map<string, string>>(new Map());
+
+  // Leaflet creates markers and popups outside React's tree. Delegate their
+  // person actions from the stable map container so regenerated layers keep the
+  // same mouse and keyboard behaviour.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !onPersonClick) return;
+    const openFromTarget = (target: EventTarget | null) => {
+      const personTarget = target instanceof Element ? target.closest<HTMLElement>('[data-person-id]') : null;
+      const personId = personTarget?.dataset.personId;
+      if (!personId) return false;
+      onPersonClick(personId);
+      return true;
+    };
+    const handleClick = (event: MouseEvent) => {
+      if (openFromTarget(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.key === 'Enter' || event.key === ' ') && openFromTarget(event.target)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    // Capture before Leaflet's marker handler: a person click opens the dossier
+    // directly and must not also start popup auto-pan behind the modal.
+    container.addEventListener('click', handleClick, true);
+    container.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      container.removeEventListener('click', handleClick, true);
+      container.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [onPersonClick]);
 
   // Persons (portrait focus + sex) for the marker thumbnails.
   useEffect(() => {
@@ -185,9 +227,9 @@ export function PlacesMap({
       const chipBg = light ? 'background:#ffffff;border-color:#d4d4d8' : 'background:#18181b;border-color:#3f3f46';
       const nameColor = light ? '#18181b' : '#f4f4f5';
       const subColor = light ? '#71717a' : '#a1a1aa';
-      const cluster = persons.slice(0, 3).map((e) => portraitHtml(personsById.get(e.personId), portraitUrls.get(e.personId), 22)).join('');
+      const cluster = persons.slice(0, 3).map((e) => portraitHtml(personsById.get(e.personId), portraitUrls.get(e.personId), 22, e.personId)).join('');
       const textHtml = single
-        ? `<b style="color:${nameColor};font-size:11px;line-height:1.15;display:block;white-space:nowrap">${esc(single.personName)}</b><span style="color:${subColor};font-size:9px;line-height:1.1;display:block;white-space:nowrap">${esc(lifeDates(single) || g.placeName)}</span>`
+        ? `<span data-person-id="${esc(single.personId)}" role="button" tabindex="0" title="${esc(t('Abrir ficha'))}" style="display:block;cursor:pointer"><b style="color:${nameColor};font-size:11px;line-height:1.15;display:block;white-space:nowrap">${esc(single.personName)}</b><span style="color:${subColor};font-size:9px;line-height:1.1;display:block;white-space:nowrap">${esc(lifeDates(single) || g.placeName)}</span></span>`
         : `<b style="color:${nameColor};font-size:11px;line-height:1.15;display:block;white-space:nowrap">${esc(g.placeName)}</b><span style="color:${subColor};font-size:9px;line-height:1.1;display:block">${esc(tx('{n} personas', { n: persons.length }))}</span>`;
       const chip = `<div style="position:absolute;left:0;bottom:0;transform:translate(-50%,-14px);display:flex;align-items:center;gap:5px;border:1px solid;${chipBg};border-radius:9999px;padding:2px 8px 2px 2px;box-shadow:0 2px 6px rgba(0,0,0,.35);white-space:nowrap"><span style="display:flex;margin-right:2px">${cluster.replace(/margin-left/g, '')}</span>${textHtml}</div>`;
 
@@ -201,7 +243,7 @@ export function PlacesMap({
         .slice(0, 10)
         .map((e) => {
           const dates = [lifeDates(e), e.date && `· ${e.date}`].filter(Boolean).join(' ');
-          return `<div style="display:flex;align-items:center;gap:6px;padding:2px 0">${portraitHtml(personsById.get(e.personId), portraitUrls.get(e.personId), 24)}<span><span style="display:block;font-size:12px;color:${nameColor}">${esc(e.personName)}</span><span style="display:block;font-size:10px;color:${subColor}">${esc(dates)}</span></span></div>`;
+          return `<div data-person-id="${esc(e.personId)}" role="button" tabindex="0" title="${esc(t('Abrir ficha'))}" style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-radius:6px;cursor:pointer">${portraitHtml(personsById.get(e.personId), portraitUrls.get(e.personId), 24)}<span><span style="display:block;font-size:12px;color:${nameColor}">${esc(e.personName)}</span><span style="display:block;font-size:10px;color:${subColor}">${esc(dates)}</span></span></div>`;
         })
         .join('');
       const popup = `<div style="min-width:150px"><div style="font-weight:600;font-size:12px;color:${nameColor};margin-bottom:4px">${esc(g.placeName)}${g.admin1 ? `<span style="color:${subColor};font-weight:400"> · ${esc(g.admin1)}</span>` : ''}</div>${rows}${persons.length > 10 ? `<div style="font-size:10px;color:${subColor}">${esc(tx('+{n} más', { n: persons.length - 10 }))}</div>` : ''}</div>`;
@@ -220,9 +262,9 @@ export function PlacesMap({
     lastFitRef.current = sig;
     const latlngs = fitSet.map((p) => [p.latitude, p.longitude] as [number, number]);
     if (latlngs.length === 1) {
-      map.setView(latlngs[0], 11);
+      map.setView(latlngs[0], 11, { animate: false });
     } else if (latlngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 13 });
+      map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 13, animate: false });
     }
     setTimeout(() => map.invalidateSize(), 50);
   }, [fitPoints, points]);
@@ -230,7 +272,7 @@ export function PlacesMap({
   const hasPoints = points.length > 0;
 
   return (
-    <div className="relative w-full overflow-hidden rounded-lg border border-neutral-800" style={height ? { height } : { flex: 1, minHeight: 0 }}>
+    <div className="relative w-full overflow-hidden rounded-lg border border-neutral-800" style={height ? { height } : { flex: 1, minHeight: 0 }} data-testid="places-map">
       <div ref={containerRef} className={`h-full w-full ${light ? '' : 'pm-dark'}`} style={{ minHeight: height ?? 240 }} />
       {!hasPoints && (
         <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center bg-neutral-950/60 p-6 text-center">

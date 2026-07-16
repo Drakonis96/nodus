@@ -130,11 +130,12 @@ test('relationship editor keeps chronology review and repair actions', () => {
   assert.match(people, /createSocialRelation/);
 });
 
-test('dossier action buttons grow for translated labels without wrapping', () => {
+test('dossier action buttons grow for translated labels without overflowing', () => {
   assert.match(dossier, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
-  assert.match(dossierLayout, /min-w-36/);
-  assert.match(dossierLayout, /whitespace-nowrap/);
-  assert.doesNotMatch(dossierLayout, /[' ]w-36(?:[' ])/);
+  assert.match(dossierLayout, /h-auto min-h-9 min-w-44/);
+  assert.match(dossierLayout, /whitespace-normal/);
+  assert.match(dossierLayout, /px-4 py-2 text-center/);
+  assert.doesNotMatch(dossierLayout, /[' ]w-44(?:[' ])/);
 });
 
 test('people list leaves room above the first selectable person', () => {
