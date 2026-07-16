@@ -27,8 +27,10 @@ assert.match(modal, /if \(showSeenReleaseNotes\) return releaseNotesForMajor\(cu
 assert.doesNotMatch(modal, /releaseNotesSince/);
 assert.match(modal, /const scope = h\.scope;/);
 assert.match(modal, /data-testid=\{`whats-new-scope-\$\{scope\}`\}/);
-assert.match(modal, /genealogy: \{ icon: 'tree', color: '#ca8a04' \}/);
-assert.match(modal, /general: \{ icon: 'network', color: '#64748b' \}/);
+assert.match(modal, /genealogy: \{ icon: 'tree', color: '#ca8a04', label: 'Genealogía' \}/);
+assert.match(modal, /general: \{ icon: 'sparkles', color: '#64748b', label: 'General' \}/);
+assert.match(modal, /role="tooltip" className="whats-new-scope-tooltip"/);
+assert.match(modal, /aria-label=\{scopeLabel\}/);
 assert.match(releaseNotes, /version: '2\.3\.6'[\s\S]*scope: 'genealogy'/);
 assert.match(releaseNotes, /version: '2\.3\.6'[\s\S]*scope: 'general'/);
 assert.match(releaseNotes, /version: '2\.3\.6'[\s\S]*es: '[^']+'[\s\S]*en: '[^']+'/);
@@ -37,6 +39,7 @@ assert.match(releaseNotes, /noteMajor === currentMajor && compareVersions\(note\
 assert.match(styles, /\.whats-new-scope \{[\s\S]*border-radius: 7px/);
 assert.match(styles, /\.light \.whats-new-scope-general/);
 assert.match(styles, /\.whats-new-scope-general/);
+assert.match(styles, /\.whats-new-scope:hover \.whats-new-scope-tooltip/);
 assert.doesNotMatch(styles, /\.whats-new-check/);
 assert.doesNotMatch(styles, /\.whats-new-paypal-button \{ margin-left: 58px; \}/);
 assert.doesNotMatch(modal, /<motion\.li/);
@@ -46,6 +49,7 @@ assert.match(modal, /La donación es completamente opcional: no desbloquea funci
 assert.match(translations, /'Apoya el proyecto': 'Support the project'/);
 assert.match(translations, /Donations are entirely optional: they do not unlock features or change access to the application/);
 assert.match(icons, /paypal:/);
+assert.match(icons, /sparkles:/);
 assert.match(app, /onOpenWhatsNew=\{\(\) => setManualWhatsNewOpen\(true\)\}/);
 assert.match(app, /manualWhatsNewOpen[\s\S]*<WhatsNewModal[\s\S]*showSeenReleaseNotes[\s\S]*setManualWhatsNewOpen\(false\)/);
 

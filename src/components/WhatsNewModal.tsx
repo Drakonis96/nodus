@@ -12,16 +12,16 @@ import { Nodi } from './nodi/Nodi';
 
 const LAST_SEEN_KEY = 'nodus.lastSeenVersion';
 
-const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string }> = {
-  general: { icon: 'network', color: '#64748b' },
-  academic: { icon: 'network', color: '#6366f1' },
-  estudio: { icon: 'graduation', color: '#0f766e' },
-  primary_sources: { icon: 'archive', color: '#6366f1' },
-  genealogy: { icon: 'tree', color: '#ca8a04' },
-  databases: { icon: 'table', color: '#b30333' },
-  testimonios: { icon: 'microphone', color: '#0891b2' },
-  worldbuilding: { icon: 'globe', color: '#7c3aed' },
-  docencia: { icon: 'presentation', color: '#ea580c' },
+const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string; label: string }> = {
+  general: { icon: 'sparkles', color: '#64748b', label: 'General' },
+  academic: { icon: 'network', color: '#6366f1', label: 'Académico' },
+  estudio: { icon: 'graduation', color: '#0f766e', label: 'Estudio' },
+  primary_sources: { icon: 'archive', color: '#6366f1', label: 'Fuentes primarias' },
+  genealogy: { icon: 'tree', color: '#ca8a04', label: 'Genealogía' },
+  databases: { icon: 'table', color: '#b30333', label: 'Bases de datos' },
+  testimonios: { icon: 'microphone', color: '#0891b2', label: 'Testimonios' },
+  worldbuilding: { icon: 'globe', color: '#7c3aed', label: 'Worldbuilding' },
+  docencia: { icon: 'presentation', color: '#ea580c', label: 'Docencia' },
 };
 
 function readLastSeen(): string | null {
@@ -124,14 +124,20 @@ export function WhatsNewModal({
                 {note.highlights.map((h, i) => {
                   const scope = h.scope;
                   const scopeMeta = RELEASE_SCOPE_META[scope];
+                  const scopeLabel = t(scopeMeta.label);
+                  const tooltipId = `whats-new-scope-label-${note.version.replaceAll('.', '-')}-${i}`;
                   return (
                     <li key={i}>
                       <span
                         className={`whats-new-scope whats-new-scope-${scope}`}
                         data-testid={`whats-new-scope-${scope}`}
                         style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
+                        tabIndex={0}
+                        aria-label={scopeLabel}
+                        aria-describedby={tooltipId}
                       >
                         <Icon name={scopeMeta.icon} size={13} />
+                        <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
                       </span>
                       <span>{h[lang]}</span>
                     </li>

@@ -307,6 +307,15 @@ try {
   await page.getByTestId('open-latest-changes').click();
   await page.getByTestId('whats-new-cinematic-modal').waitFor();
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 1, 'Latest changes reopens the release modal even after the current version was seen');
+  const generalReleaseScope = page.getByTestId('whats-new-scope-general').first();
+  await page.waitForTimeout(550);
+  await generalReleaseScope.hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="whats-new-scope-general"] .whats-new-scope-tooltip')).opacity === '1');
+  const generalScopeTooltip = await generalReleaseScope.locator('.whats-new-scope-tooltip').evaluate((tooltip) => ({
+    label: tooltip.textContent?.trim(),
+    opacity: getComputedStyle(tooltip).opacity,
+  }));
+  assert.deepEqual(generalScopeTooltip, { label: 'General', opacity: '1' }, 'hovering a release icon visibly identifies its group');
   await page.getByTestId('whats-new-cinematic-modal').getByRole('button', { name: 'Cerrar', exact: true }).click();
   await page.getByTestId('whats-new-cinematic-modal').waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
