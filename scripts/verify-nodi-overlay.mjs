@@ -47,6 +47,14 @@ try {
   await overlay.waitForLoadState('domcontentloaded');
   const figure = overlay.locator('.nodi-figure');
   await figure.waitFor({ timeout: 30_000 });
+  const setMenuOpen = async (open) => {
+    const current = await overlay.locator('.nodi-node.open').count() > 0;
+    if (current === open) return;
+    await figure.click();
+    await overlay.waitForFunction((expected) => (
+      document.querySelector('.nodi-node')?.classList.contains('open') ?? false
+    ) === expected, open);
+  };
 
   /** How far the radial buttons stick out of the window, in px. */
   const overflow = () => overlay.evaluate(() => {
@@ -59,7 +67,7 @@ try {
     return { viewport: [window.innerWidth, window.innerHeight], clippedBy: Math.round(worst) };
   });
 
-  await figure.click();                       // open the radial menu
+  await setMenuOpen(true);
   await overlay.waitForTimeout(700);
   const open = await overflow();
   console.log('[verify] menu OPEN  ->', JSON.stringify(open));
@@ -67,7 +75,7 @@ try {
   assert.equal(open.clippedBy, 0);
   await overlay.screenshot({ path: `${shots}/overlay-1-open.png` });
 
-  await figure.click();                       // collapse it again
+  await setMenuOpen(false);
   let elapsed = 0;
   for (const ms of [60, 140, 260, 420, 700]) {
     await overlay.waitForTimeout(ms - elapsed);
@@ -75,11 +83,53 @@ try {
     const o = await overflow();
     console.log(`[verify] +${ms}ms after collapse ->`, JSON.stringify(o));
     assert.equal(o.clippedBy, 0, `a radial button was clipped at ${ms} ms`);
-    if (ms === 700) {
-      assert.deepEqual(o.viewport, [212, 232]);
-    }
     await overlay.screenshot({ path: `${shots}/overlay-2-collapse-${ms}.png` });
   }
+  // Electron may throttle background renderer timers, so allow the delayed compact
+  // resize more time than the CSS transition itself before testing another position.
+  await overlay.waitForFunction(
+    () => window.innerWidth === 212 && window.innerHeight === 232,
+    undefined,
+    { timeout: 3_000 },
+  );
+
+  const moveNodi = async (screenX, screenY) => {
+    await overlay.evaluate(async ([x, y]) => {
+      await window.nodus.nodiBeginWindowDrag(0, 0);
+      await window.nodus.nodiDragWindow(x, y);
+      await window.nodus.nodiEndWindowDrag();
+    }, [screenX, screenY]);
+    await overlay.waitForTimeout(100);
+  };
+  const bottomButtonHits = () => overlay.evaluate(() => Object.fromEntries(
+    ['Chat', 'Abrir Nodus'].map((title) => {
+      const button = document.querySelector(`.nodi-node[title="${title}"]`);
+      if (!(button instanceof HTMLElement)) return [title, null];
+      const rect = button.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return [title, {
+        rect: [Math.round(rect.left), Math.round(rect.top), Math.round(rect.right), Math.round(rect.bottom)],
+        target: hit?.closest('.nodi-node')?.getAttribute('title')
+          ?? (hit?.closest('.nodi-figure') ? 'nodi-figure' : hit?.getAttribute('class') ?? hit?.tagName ?? null),
+      }];
+    }),
+  ));
+  const verifyTopCorner = async (corner) => {
+    await setMenuOpen(true);
+    await overlay.waitForTimeout(700);
+    const hits = await bottomButtonHits();
+    console.log(`[verify] ${corner} button hits ->`, JSON.stringify(hits));
+    await overlay.screenshot({ path: `${shots}/overlay-3-${corner}.png` });
+    assert.equal(hits.Chat?.target, 'Chat', `Nodi's figure intercepts Chat in the ${corner} corner`);
+    assert.equal(hits['Abrir Nodus']?.target, 'Abrir Nodus', `Nodi's figure intercepts Abrir Nodus in the ${corner} corner`);
+    await setMenuOpen(false);
+    await overlay.waitForTimeout(700);
+  };
+
+  await moveNodi(-10_000, -10_000);
+  await verifyTopCorner('top-left');
+  await moveNodi(10_000, 0);
+  await verifyTopCorner('top-right');
   console.log('[verify] shots in', shots);
 } finally {
   await app.close().catch(() => {});

@@ -192,6 +192,8 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(companionCss, /\.nodi-context-menu/);
   assert.match(companionCss, /\.nodi-anchor\.open-right/);
   assert.match(companionCss, /\.nodi-anchor\.open-down/);
+  assert.match(companionCss, /\.nodi-figure\s*\{[^}]*z-index:\s*1/s);
+  assert.match(companionCss, /\.nodi-node\s*\{[^}]*z-index:\s*2/s, 'radial actions stay clickable when they overlap Nodi near a top edge');
   assert.match(english, /'Cerrar mascota': 'Close mascot'/);
 });
 

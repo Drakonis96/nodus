@@ -5,6 +5,7 @@
   position: absolute;
   right: 0;
   bottom: 0;
+  z-index: 1;
   cursor: grab;
   -webkit-user-select: none;
   user-select: none;
@@ -40,6 +41,7 @@
   width: 46px;
   height: 46px;
   margin: -23px -23px 0 0;
+  z-index: 2;
   border-radius: 50%;
   border: 1.5px solid #d4af37;
   background: radial-gradient(120% 120% at 35% 28%, #1c2b48 0%, #0d1424 100%);
