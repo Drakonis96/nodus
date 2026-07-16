@@ -1038,6 +1038,48 @@ body {
   @apply bg-white border-neutral-200;
 }
 
+/* Genealogy timeline surfaces. Gradient stops and Tailwind ring shadows do not
+ * inherit the generic light-mode background overrides, so keep both themes
+ * explicit here instead of allowing dark cards to leak into a light workspace. */
+.timeline-event-surface {
+  background: linear-gradient(135deg, rgba(23, 23, 23, 0.8), #0a0a0a);
+}
+.light .timeline-event-surface {
+  border-color: #e5e7eb;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.light .timeline-event-surface:hover {
+  border-color: rgba(202, 138, 4, 0.55);
+  box-shadow: 0 5px 16px rgba(146, 64, 14, 0.09);
+}
+.light .timeline-event-dot {
+  --tw-ring-color: #f8fafc;
+}
+.light .timeline-date-chip {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+.light .timeline-event-participants {
+  border-color: #e5e7eb;
+  background: rgba(248, 250, 252, 0.72);
+}
+.light .timeline-person-chip,
+.light .timeline-detail-person {
+  border-color: #e5e7eb;
+  background: #ffffff;
+}
+.light .timeline-person-chip:hover,
+.light .timeline-detail-person:hover {
+  border-color: #d4a017;
+  background: #fffbeb;
+}
+.light .timeline-evidence-card {
+  border-color: #e5e7eb;
+  background: #f8fafc;
+}
+
 /* ── Leaflet map (PlacesMap): real OpenStreetMap tiles ───────────────────────
  * Reset the default white div-icon box (our markers draw their own chip), theme the
  * popups to match the app, and darken the raster tiles with a CSS filter in dark

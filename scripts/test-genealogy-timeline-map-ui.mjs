@@ -5,8 +5,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [timeline, map, placesMap, modal, tree, relations] = await Promise.all([
+const [timeline, css, map, placesMap, modal, tree, relations] = await Promise.all([
   readFile(path.join(root, 'src/views/TimelineView.tsx'), 'utf8'),
+  readFile(path.join(root, 'src/index.css'), 'utf8'),
   readFile(path.join(root, 'src/views/MapView.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PlacesMap.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PersonDossierModal.tsx'), 'utf8'),
@@ -26,6 +27,14 @@ test('timeline cards show portraits and open the shared full record', () => {
   assert.match(timeline, /<PersonPortrait person=/);
   assert.match(timeline, /data-timeline-person-id=/);
   assert.match(timeline, /<PersonDossierModal personId=\{dossierId\}/);
+});
+
+test('timeline cards, chips and evidence expose explicit light-theme surfaces', () => {
+  for (const className of ['timeline-event-surface', 'timeline-event-dot', 'timeline-date-chip', 'timeline-event-participants', 'timeline-person-chip', 'timeline-detail-person', 'timeline-evidence-card']) {
+    assert.match(timeline, new RegExp(className));
+    assert.match(css, new RegExp(`\\.light \\.${className}`));
+  }
+  assert.doesNotMatch(timeline, /bg-gradient-to-br from-neutral-900\/80 to-neutral-950/);
 });
 
 test('map people are mouse and keyboard activatable and open the shared record', () => {

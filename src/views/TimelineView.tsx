@@ -130,10 +130,10 @@ function TimelineEventCard({
 }) {
   return (
     <li className="relative ml-6" data-testid="timeline-event-card">
-      <span className="absolute -left-[31px] top-6 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 ring-4 ring-neutral-950" />
-      <article className="overflow-hidden rounded-xl border border-neutral-800 bg-gradient-to-br from-neutral-900/80 to-neutral-950 shadow-sm transition hover:border-amber-800/60 hover:shadow-amber-950/20">
+      <span className="timeline-event-dot absolute -left-[31px] top-6 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-amber-500 ring-4 ring-neutral-950" />
+      <article className="timeline-event-surface overflow-hidden rounded-xl border border-neutral-800 shadow-sm transition hover:border-amber-800/60 hover:shadow-amber-950/20">
         <button className="group flex w-full items-start gap-4 p-4 text-left" onClick={onOpenEvent} aria-label={t('Ver detalles del evento')}>
-          <time className="min-w-[6.5rem] rounded-lg border border-amber-800/40 bg-amber-950/20 px-2.5 py-2 text-center text-xs font-semibold text-amber-300">
+          <time className="timeline-date-chip min-w-[6.5rem] rounded-lg border border-amber-800/40 bg-amber-950/20 px-2.5 py-2 text-center text-xs font-semibold text-amber-300">
             {event.date || t('sin fecha')}
           </time>
           <span className="min-w-0 flex-1">
@@ -146,13 +146,13 @@ function TimelineEventCard({
         </button>
 
         {event.participants.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t border-neutral-800/80 px-4 py-3">
+          <div className="timeline-event-participants flex flex-wrap gap-2 border-t border-neutral-800/80 px-4 py-3">
             {event.participants.map((participant) => {
               const person = personById.get(participant.personId);
               return (
                 <button
                   key={`${participant.personId}-${participant.role}`}
-                  className="flex max-w-full items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 px-2 py-1 text-left transition hover:border-amber-700 hover:bg-amber-950/20"
+                  className="timeline-person-chip flex max-w-full items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 px-2 py-1 text-left transition hover:border-amber-700 hover:bg-amber-950/20"
                   onClick={() => onOpenPerson(participant.personId)}
                   data-timeline-person-id={participant.personId}
                   aria-label={t('Abrir ficha de {name}').replace('{name}', participant.displayName ?? person?.displayName ?? '—')}
@@ -215,7 +215,7 @@ function EventDetail({
                   return (
                     <li key={`${participant.personId}-${participant.role}`}>
                       <button
-                        className="flex w-full items-center gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-left transition hover:border-amber-700 hover:bg-amber-950/20"
+                        className="timeline-detail-person flex w-full items-center gap-3 rounded-lg border border-neutral-800 px-3 py-2 text-left transition hover:border-amber-700 hover:bg-amber-950/20"
                         onClick={() => onOpenPerson(participant.personId)}
                       >
                         {person ? <PersonPortrait person={person} size={34} rounded="full" /> : <Icon name="user" size={18} className="text-neutral-500" />}
@@ -239,7 +239,7 @@ function EventDetail({
             ) : (
               <ul className="space-y-2">
                 {evidence.map((item) => (
-                  <li key={item.id} className="rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2">
+                  <li key={item.id} className="timeline-evidence-card rounded-md border border-neutral-800 bg-neutral-900/40 px-3 py-2">
                     {item.quote ? <p className="text-sm italic text-neutral-300">“{item.quote}”</p> : null}
                     <p className="mt-1 text-xs text-neutral-500">
                       {item.sourceKind === 'archive' ? t('Archivo') : t('Fuente')}{item.location ? ` · ${item.location}` : ''}
