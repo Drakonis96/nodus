@@ -16,6 +16,8 @@ test('E2E IPC waits are polled from Node instead of returning async promises to 
 test('generic CSS presence waits select one match instead of relying on Playwright strict mode', () => {
   assert.doesNotMatch(smoke, /page\.locator\((?:'[^']*'|"[^"]*"|`[^`]*`)\)\.waitFor\(/);
   assert.match(smoke, /page\.locator\('\.study-editor-shell \.md \.katex'\)\.first\(\)\.waitFor\(/);
+  assert.match(smoke, /getByTestId\('study-material-annotations-sidebar'\)\.getByText\('Comentario smoke'/);
+  assert.doesNotMatch(smoke, /page\.getByText\('Comentario smoke'/);
 });
 
 test('the smoke test suppresses release notes with the exact app version before reloading', () => {

@@ -876,7 +876,7 @@ try {
   await annotationCanvas.click({ position: { x: 220, y: 210 } });
   await page.getByTestId('study-pdf-inline-comment').locator('textarea').fill('Comentario smoke');
   await page.getByTestId('study-pdf-inline-comment').getByRole('button', { name: 'Guardar', exact: true }).click();
-  await page.getByText('Comentario smoke', { exact: true }).waitFor();
+  await page.getByTestId('study-material-annotations-sidebar').getByText('Comentario smoke', { exact: true }).waitFor();
   await page.getByText('Crear apunte', { exact: true }).last().click();
   await waitForCondition('apunte creado desde material', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.title.includes('fuente-smoke'))));
   assert.ok(await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.some((document) => document.contentMarkdown.includes('nodus://study/material/'))), 'highlight creates a note with a durable source link');
