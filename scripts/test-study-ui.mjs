@@ -154,6 +154,8 @@ test('study metadata uses one searchable icon and emoji catalogue', async () => 
   assert.match(picker, /data-testid="study-icon-search"/);
   assert.match(picker, /ICON_NAMES\.filter/);
   assert.match(picker, /EMOJI_SEARCH_GROUPS/);
+  assert.match(picker, /emoji \? t\('Emoji seleccionado'\)/);
+  assert.doesNotMatch(picker, /\{emoji \|\| icon \|\| t\('Seleccionar icono o emoji'\)\}/);
   assert.match(ui, /export const ICON_NAMES/);
   assert.match(view, /className="sr-only" type="file"/);
   assert.match(view, /t\(imageData \? 'Cambiar archivo' : 'Seleccionar archivo'\)/);
@@ -285,6 +287,10 @@ test('study timetable exposes editable weekdays, periods and subject styling', a
   assert.match(view, /study-schedule-kind-subject/);
   assert.match(view, /study-schedule-kind-activity/);
   assert.match(view, /study-schedule-activity-title/);
+  assert.match(view, /title=\{subject\?\.name \|\| cell\?\.activityTitle \|\| undefined\}/);
+  assert.match(view, /break-words text-xs font-semibold leading-4/);
+  assert.match(view, /flex-1 break-words text-sm leading-5/);
+  assert.doesNotMatch(view, /flex-1 truncate text-sm text-neutral-200/);
   assert.match(view, /<Icon name="trash" size=\{12\} \/>/);
   assert.match(sidebar, /view: 'studySchedule', icon: 'clock'/);
   assert.match(sidebar, /view: 'studyCalendar', icon: 'calendar'/);

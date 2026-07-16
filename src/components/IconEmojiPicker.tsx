@@ -54,7 +54,7 @@ export function IconEmojiPicker({ icon, emoji, onChange }: {
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-indigo-950/30 text-sm text-indigo-300">
         {emoji || <Icon name={icon} size={14} />}
       </span>
-      <span className="min-w-0 flex-1 truncate">{emoji || icon || t('Seleccionar icono o emoji')}</span>
+      <span className="min-w-0 flex-1 truncate">{emoji ? t('Emoji seleccionado') : icon || t('Seleccionar icono o emoji')}</span>
       <Icon name="chevronDown" size={13} className="text-neutral-500" />
     </button>
     {open && createPortal(
