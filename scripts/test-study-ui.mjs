@@ -95,6 +95,32 @@ test('study searches reserve icon space through the common input contract', asyn
   assert.doesNotMatch(view, /className="input w-full pl-/);
 });
 
+test('study materials expose downloadable hover actions and pedagogical Deep Research', async () => {
+  const [materials, preload, ipc, types, app, navigation, deep, markdown] = await Promise.all([
+    read('src/views/StudyMaterialsView.tsx'),
+    read('electron/preload.ts'),
+    read('electron/ipc.ts'),
+    read('shared/types.ts'),
+    read('src/App.tsx'),
+    read('src/navigation.ts'),
+    read('electron/ai/studyDeepResearch.ts'),
+    read('src/components/Markdown.tsx'),
+  ]);
+  assert.match(materials, /study-material-download/);
+  assert.match(materials, /group-hover:max-w-40/);
+  assert.match(preload, /downloadStudyMaterial/);
+  assert.match(types, /downloadStudyMaterial/);
+  assert.match(ipc, /study:materials:download/);
+  assert.match(navigation, /studyDeepResearch/);
+  assert.match(app, /view === 'studyDeepResearch'/);
+  assert.match(app, /isStudy/);
+  for (const language of ['es', 'en', 'fr', 'tr']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
+  assert.match(deep, /conceptos complejos paso a paso/);
+  assert.match(deep, /retrieveStudyAssistantEntries/);
+  assert.match(deep, /kinds: \['material', 'document', 'transcript'\]/);
+  assert.match(markdown, /const studyMaterial = href/);
+});
+
 test('study actions use renderer dialogs and the sidebar has no onboarding spacer', async () => {
   const [view, editor, sidebar, css] = await Promise.all([
     read('src/views/StudyOrganizationView.tsx'),
@@ -430,7 +456,7 @@ test('study material state reuses database select chips', async () => {
   assert.match(materials, /placements\.slice\(1\)/);
   assert.match(materials, /addStudyMaterialPlacement\(material\.id, placement\)/);
   assert.match(materials, /updateStudyMaterial\(material\.id/);
-  assert.match(materials, /data-testid="study-material-reindex"/);
+  assert.match(materials, /testId="study-material-reindex"/);
   assert.match(materials, /reindexStudyMaterial\(material\.id\)/);
   assert.match(materials, /onStudyMaterialIndexChanged/);
   assert.match(materials, /STUDY_WORKSPACE_CHANGED/);

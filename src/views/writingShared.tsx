@@ -67,6 +67,9 @@ export function DraftResultMain({
   onSaveToNotes,
   onExport,
   onCitation,
+  onStudyDocument,
+  onStudyMaterial,
+  onStudyRecording,
 }: {
   draft: WritingWorkshopDraft;
   exporting: boolean;
@@ -82,6 +85,9 @@ export function DraftResultMain({
   onSaveToNotes: () => void;
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (citation: MarkdownCitation) => void;
+  onStudyDocument?: (id: string) => void;
+  onStudyMaterial?: (id: string) => void;
+  onStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   return (
     <div className="max-w-4xl mx-auto space-y-5">
@@ -121,7 +127,7 @@ export function DraftResultMain({
         </div>
       </section>
       <section className={`card p-4 ${justify ? 'text-justify hyphens-auto' : ''}`}>
-        <Markdown content={draft.draftMarkdown} onCitation={onCitation} />
+        <Markdown content={draft.draftMarkdown} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
       </section>
     </div>
   );

@@ -552,6 +552,7 @@ const api: NodusApi = {
   listStudyMaterials: (options) => ipcRenderer.invoke('study:materials:list', options),
   getStudyMaterial: (id) => ipcRenderer.invoke('study:materials:get', id),
   getStudyMaterialContent: (id) => ipcRenderer.invoke('study:materials:content', id),
+  downloadStudyMaterial: (id) => ipcRenderer.invoke('study:materials:download', id),
   importStudyMaterials: (input) => ipcRenderer.invoke('study:materials:import', input),
   importStudyMaterialFolder: (input) => ipcRenderer.invoke('study:materials:importFolder', input),
   chooseStudyMaterialPaths: (folder) => ipcRenderer.invoke('study:materials:choosePaths', folder),

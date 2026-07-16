@@ -1189,6 +1189,14 @@ export function App() {
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
           {view === 'studyReview' && <StudyReviewView />}
+          {view === 'studyDeepResearch' && <DeepResearchView
+            settings={settings}
+            isStudy
+            onOpenGraph={(target) => navigate('graph', target)}
+            onOpenStudyDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            onOpenStudyMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenStudyRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }}
+          />}
           {view === 'immersion' && (
             <ImmersionView settings={settings} onOpenGraph={(target) => navigate('graph', target)} />
           )}

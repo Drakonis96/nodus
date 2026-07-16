@@ -225,6 +225,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   studyGraph: ['estudio'],
   studyQuestions: ['estudio'],
   studyReview: ['estudio'],
+  studyDeepResearch: ['estudio'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

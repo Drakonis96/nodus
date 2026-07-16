@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   StudyMaterialAnnotation,
@@ -67,6 +67,18 @@ function formatBytes(bytes: number): string {
 
 function materialIcon(kind: StudyMaterialPreviewKind): string {
   return kind === 'image' ? 'image' : kind === 'audio' ? 'play' : kind === 'presentation' ? 'columns' : kind === 'pdf' ? 'book' : 'notebook';
+}
+
+function MaterialAction({ icon, label, testId, disabled = false, tone = '', onClick, children }: {
+  icon?: string;
+  label: string;
+  testId?: string;
+  disabled?: boolean;
+  tone?: string;
+  onClick: () => void;
+  children?: ReactNode;
+}) {
+  return <span className="group inline-flex" title={label}><button data-testid={testId} className={`btn btn-ghost h-7 min-h-7 justify-center gap-0 px-2 ${tone}`} aria-label={label} disabled={disabled} onClick={onClick}>{children ?? <Icon name={icon ?? 'help'} size={12} className="shrink-0" />}<span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-40 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-40 group-focus-within:opacity-100">{label}</span></button></span>;
 }
 
 export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOpenDocument: (id: string) => void; initialMaterialId?: string | null }) {
@@ -386,7 +398,7 @@ function MaterialTable({
         <th className="w-[115px] px-3 py-2 font-medium">{t('Estado')}</th>
         <th className="w-[90px] px-3 py-2 font-medium">{t('Formato')}</th>
         <th className="w-[90px] px-3 py-2 font-medium">{t('Tamaño')}</th>
-        <th className="w-[190px] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
+        <th className="w-[260px] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
       </tr>
     </thead>
     <tbody>
@@ -397,13 +409,14 @@ function MaterialTable({
         <td className="px-3 py-2.5 text-neutral-500">{material.origin === 'zotero_link' ? 'ZOTERO' : material.extension.toUpperCase()}</td>
         <td className="px-3 py-2.5 text-neutral-500">{material.origin === 'zotero_link' ? '—' : formatBytes(material.sizeBytes)}</td>
         <td className="px-3 py-2.5"><div className="flex justify-end gap-0.5">
-          {material.origin === 'zotero_link' ? <button data-testid="study-material-open-zotero" className="btn btn-ghost h-7 px-2" title={t('Abrir en Zotero')} onClick={() => void window.nodus.openStudyMaterialInZotero(material.id)}><Icon name="external" size={12} /></button> : <button data-testid="study-material-reindex" className="btn btn-ghost h-7 px-2" disabled={reindexingId === material.id || material.indexStatus === 'indexing'} title={t('Reindexar material')} onClick={() => void onReindex(material)}>{reindexingId === material.id || material.indexStatus === 'indexing' ? <Spinner label="" /> : <Icon name="refresh" size={12} />}</button>}
-          {material.origin === 'zotero_import' && <button className="btn btn-ghost h-7 px-2" title={t('Abrir origen en Zotero')} onClick={() => void window.nodus.openStudyMaterialInZotero(material.id)}><Icon name="external" size={12} /></button>}
-          <button className="btn btn-ghost h-7 px-2" title={t(material.favorite ? 'Quitar de favoritos' : 'Marcar como favorito')} onClick={() => void onFavorite(material)}><Icon name="star" size={12} className={material.favorite ? 'text-amber-400' : 'text-neutral-600'} /></button>
-          <button className="btn btn-ghost h-7 px-2" title={t('Editar nombre y metadatos')} onClick={() => onEdit(material)}><Icon name="edit" size={12} /></button>
-          <button className="btn btn-ghost h-7 px-2" title={t('Cambiar ubicación')} onClick={() => onLocate(material, 'move')}><Icon name="folder" size={12} /></button>
-          <button className="btn btn-ghost h-7 px-2" title={t('Duplicar en otra ubicación')} onClick={() => onLocate(material, 'duplicate')}><Icon name="copy" size={12} /></button>
-          <button className="btn btn-ghost h-7 px-2 text-red-400" title={t('Mover a la papelera')} onClick={() => onDelete(material)}><Icon name="trash" size={12} /></button>
+          {material.origin === 'zotero_link' ? <MaterialAction testId="study-material-open-zotero" icon="external" label={t('Abrir en Zotero')} onClick={() => void window.nodus.openStudyMaterialInZotero(material.id)} /> : <MaterialAction testId="study-material-reindex" label={t('Reindexar material')} disabled={reindexingId === material.id || material.indexStatus === 'indexing'} onClick={() => void onReindex(material)}>{reindexingId === material.id || material.indexStatus === 'indexing' ? <Spinner label="" /> : <Icon name="refresh" size={12} />}</MaterialAction>}
+          {material.origin !== 'zotero_link' && <MaterialAction testId="study-material-download" icon="download" label={t('Descargar material')} onClick={() => void window.nodus.downloadStudyMaterial(material.id)} />}
+          {material.origin === 'zotero_import' && <MaterialAction icon="external" label={t('Abrir origen en Zotero')} onClick={() => void window.nodus.openStudyMaterialInZotero(material.id)} />}
+          <MaterialAction label={t(material.favorite ? 'Quitar de favoritos' : 'Marcar como favorito')} onClick={() => void onFavorite(material)}><Icon name="star" size={12} className={material.favorite ? 'text-amber-400' : 'text-neutral-600'} /></MaterialAction>
+          <MaterialAction icon="edit" label={t('Editar nombre y metadatos')} onClick={() => onEdit(material)} />
+          <MaterialAction icon="folder" label={t('Cambiar ubicación')} onClick={() => onLocate(material, 'move')} />
+          <MaterialAction icon="copy" label={t('Duplicar en otra ubicación')} onClick={() => onLocate(material, 'duplicate')} />
+          <MaterialAction icon="trash" label={t('Mover a la papelera')} tone="text-red-400" onClick={() => onDelete(material)} />
         </div></td>
       </tr>)}
     </tbody>

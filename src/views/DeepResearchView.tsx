@@ -72,11 +72,19 @@ function formatDate(iso: string): string {
 export function DeepResearchView({
   settings,
   isGenealogy = false,
+  isStudy = false,
   onOpenGraph,
+  onOpenStudyDocument,
+  onOpenStudyMaterial,
+  onOpenStudyRecording,
 }: {
   settings: AppSettings;
   isGenealogy?: boolean;
+  isStudy?: boolean;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  onOpenStudyDocument?: (id: string) => void;
+  onOpenStudyMaterial?: (id: string) => void;
+  onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const [mode, setMode] = useState<'gallery' | 'reader'>('gallery');
 
@@ -180,6 +188,7 @@ export function DeepResearchView({
       model: selectedModel,
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
+      ...(isStudy ? { studyMode: true } : {}),
     });
     setComposerOpen(false);
     setObjective('');
@@ -331,6 +340,9 @@ export function DeepResearchView({
           onExport={(format) => void exportDraft(format)}
           onCitation={setCitation}
           onImageChange={onImageChange}
+          onOpenStudyDocument={onOpenStudyDocument}
+          onOpenStudyMaterial={onOpenStudyMaterial}
+          onOpenStudyRecording={onOpenStudyRecording}
         />
         {citation && (
           <SourceCitationModal
@@ -366,7 +378,9 @@ export function DeepResearchView({
           <p className="mt-0.5 text-xs text-neutral-500">
             {isGenealogy
               ? t('Tu biblioteca de informes de historia familiar, generados en cola y citando tus documentos y fuentes.')
-              : t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
+              : isStudy
+                ? t('Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.')
+                : t('Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.')}
           </p>
         </div>
 
@@ -521,6 +535,7 @@ export function DeepResearchView({
         <ComposerModal
           settings={settings}
           isGenealogy={isGenealogy}
+          isStudy={isStudy}
           objective={objective}
           language={language}
           model={selectedModel}
@@ -796,6 +811,9 @@ function ReaderView({
   onExport,
   onCitation,
   onImageChange,
+  onOpenStudyDocument,
+  onOpenStudyMaterial,
+  onOpenStudyRecording,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
@@ -814,6 +832,9 @@ function ReaderView({
   onExport: (format: 'markdown' | 'pdf') => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
+  onOpenStudyDocument?: (id: string) => void;
+  onOpenStudyMaterial?: (id: string) => void;
+  onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
   return (
@@ -864,7 +885,7 @@ function ReaderView({
               onChange={onImageChange}
             />
             <AudioPanel entityKind="deep_research" entityId={saved.id} />
-            {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} /> : <DraftResultMain
+            {appliedTranslation ? <Markdown content={appliedTranslation.markdown} className="text-[15px] leading-7" onCitation={(citation) => onCitation(citation)} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
               draft={saved.draft}
               exporting={exporting}
               savingDraft={false}
@@ -876,6 +897,9 @@ function ReaderView({
               onSaveToNotes={onSaveToNotes}
               onExport={onExport}
               onCitation={onCitation}
+              onStudyDocument={onOpenStudyDocument}
+              onStudyMaterial={onOpenStudyMaterial}
+              onStudyRecording={onOpenStudyRecording}
             />}
             {showTranslations && <TranslationPanel entityKind="deep_research" entityId={saved.id} sourceTitle={saved.draft.title} sourceMarkdown={`# ${saved.draft.title}\n\n${saved.draft.abstract ? `${saved.draft.abstract}\n\n` : ''}${saved.draft.draftMarkdown}`} model={saved.model} activeTranslationId={appliedTranslation?.id ?? null} onApply={onApplyTranslation} />}
           </div>
@@ -898,6 +922,7 @@ function ReaderView({
 function ComposerModal({
   settings,
   isGenealogy = false,
+  isStudy = false,
   objective,
   language,
   model,
@@ -922,6 +947,7 @@ function ComposerModal({
 }: {
   settings: AppSettings;
   isGenealogy?: boolean;
+  isStudy?: boolean;
   objective: string;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
@@ -968,7 +994,9 @@ function ComposerModal({
             <p className="text-xs text-neutral-500">
               {isGenealogy
                 ? t('El informe reconstruye la historia familiar a partir de tus documentos y fuentes, citándolos.')
-                : t('El informe desarrolla tu idea por completo, citando todo el corpus.')}
+                : isStudy
+                  ? t('El informe enseña el tema paso a paso usando y citando tus materiales de estudio.')
+                  : t('El informe desarrolla tu idea por completo, citando todo el corpus.')}
             </p>
           </div>
           <button className="btn btn-ghost px-2" onClick={onClose} aria-label={t('Cerrar')}>
@@ -985,7 +1013,9 @@ function ComposerModal({
             placeholder={
               isGenealogy
                 ? t('Escribe el tema o la pregunta (p. ej. «Historia de la familia» o «La migración a la ciudad»). El informe la desarrollará citando tus documentos y fuentes.')
-                : t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
+                : isStudy
+                  ? t('Escribe el tema o pregunta que quieres comprender. El informe explicará los conceptos difíciles, ejemplos y conexiones usando tus materiales.')
+                  : t('Escribe la idea o pregunta de investigación. El informe la desarrollará por completo, citando todas las obras del corpus.')
             }
           />
           {isGenealogy && (

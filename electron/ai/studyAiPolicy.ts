@@ -6,6 +6,10 @@ import { getSettings } from '../db/settingsRepo';
 import { getStudyAiUsageSummary, recordStudyAiUsage } from '../db/studyAiUsageRepo';
 
 const primaryKey: Record<StudyAiTask, 'chatModel' | 'improveModel' | 'questionGenModel' | 'gradingModel' | 'flashcardModel'> = { chat: 'chatModel', improve: 'improveModel', questions: 'questionGenModel', grading: 'gradingModel', flashcards: 'flashcardModel' };
+// A background pipeline may split one source into several AI calls. The optional
+// request key lets those calls share one confirmation without suppressing consent
+// for a later, genuinely separate user action.
+const confirmedExternalRequests = new Set<string>();
 
 export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef | null, subjectId?: string | null): ModelRef {
   const settings = getSettings(); const scoped = subjectId ? settings.studyAiSubjectModels[subjectId]?.[task] : null;
@@ -19,7 +23,7 @@ export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef |
   return model;
 }
 
-export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
+export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalConsentKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
   const settings = getSettings(); if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${settings.studyAiMaxInputChars.toLocaleString('es-ES')} caracteres.`);
   const summary = getStudyAiUsageSummary(); if (summary.budgetUsd > 0 && summary.knownCostUsd >= summary.budgetUsd) throw new Error('Se ha alcanzado el presupuesto mensual de IA para estudio.');
   const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId);
@@ -39,15 +43,17 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
     if (settings.studyAiPrivacyMode === 'external' && isLocalStudyModel(candidate.model)) continue;
     if (input.subjectId && settings.studyAiExcludedSubjectIds.includes(input.subjectId) && !isLocalStudyModel(candidate.model)) continue;
     const externalKey = `${candidate.model.provider}:${candidate.model.model}`;
-    if (!isLocalStudyModel(candidate.model) && settings.studyAiConfirmExternal && !confirmedExternal.has(externalKey)) {
+    const requestConsentKey = input.externalConsentKey ? `${externalKey}:${input.externalConsentKey}` : null;
+    if (!isLocalStudyModel(candidate.model) && settings.studyAiConfirmExternal && !confirmedExternal.has(externalKey) && !(requestConsentKey && confirmedExternalRequests.has(requestConsentKey))) {
       const response = dialog.showMessageBoxSync({
         type: 'warning', title: 'Datos fuera del dispositivo',
         message: `Nodus enviará esta solicitud de estudio a ${candidate.model.provider} (${candidate.model.model}).`,
-        detail: `Tarea: ${input.task}. Se enviarán hasta ${input.inputChars.toLocaleString('es-ES')} caracteres según tus límites.`,
+        detail: `Finalidad: ${input.externalPurpose ?? input.task}. Se enviarán hasta ${input.inputChars.toLocaleString('es-ES')} caracteres según tus límites.`,
         buttons: ['Cancelar', 'Continuar'], defaultId: 0, cancelId: 0, noLink: true,
       });
       if (response !== 1) throw new Error('Envío externo cancelado por el usuario.');
       confirmedExternal.add(externalKey);
+      if (requestConsentKey) confirmedExternalRequests.add(requestConsentKey);
     }
     const attempts = Math.max(1, Math.min(3, settings.studyAiRetryCount + 1));
     for (let attempt = 0; attempt < attempts; attempt += 1) {

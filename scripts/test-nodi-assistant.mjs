@@ -49,6 +49,8 @@ test('Nodi context is explicit, bounded and rejects invented product claims', as
   assert.match(app, /data-nodi-view=\{view\}/);
   assert.match(app, /setNodiViewContext/);
   assert.match(app, /slice\(0, 12_000\)/);
+  assert.match(backend, /retrieveStudyAssistantEntries/);
+  assert.match(backend, /relevant_materials/);
 });
 
 test('Nodi and the genealogy assistant receive tags relative to the persisted tree focus', async () => {

@@ -64,6 +64,10 @@ try {
   const merged = ai.mergeStudyKnowledgeExtractions([extraction, { ideas: [{ ...extraction.ideas[0], key: 'duplicate', statement: 'Una formulación más extensa sobre la separación de poderes.' }], relations: [] }]);
   assert.equal(merged.ideas.length, 1, 'duplicate labels from separate chunks are merged');
   assert.match(ai.buildStudyKnowledgePrompt('Tema', 'Texto').system, /citas textuales exactas/i);
+  const policySource = await readFile(path.join(repoRoot, 'electron/ai/studyAiPolicy.ts'), 'utf8');
+  assert.match(policySource, /externalConsentKey/);
+  assert.match(policySource, /Finalidad:/);
+  assert.match(await readFile(path.join(repoRoot, 'electron/ai/studyKnowledge.ts'), 'utf8'), /mapa conceptual trazable/);
   assert.deepEqual(ai.chunkStudyKnowledgeText('A'.repeat(120) + '\n\n' + 'B'.repeat(120), 150, 4).map((part) => part.length), [120, 120]);
 
   const placementB = materials.getStudyMaterial(imported.material.id).placements.find((placement) => placement.subjectId === subjectB.id);

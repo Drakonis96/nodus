@@ -29,6 +29,7 @@ export function Markdown({
   className = '',
   onCitation,
   onStudyDocument,
+  onStudyMaterial,
   onStudyRecording,
   onStudyEvidence,
   verify = true,
@@ -37,6 +38,7 @@ export function Markdown({
   className?: string;
   onCitation?: (citation: MarkdownCitation) => void;
   onStudyDocument?: (documentId: string) => void;
+  onStudyMaterial?: (materialId: string) => void;
   onStudyRecording?: (recordingId: string, timestamp?: number | null) => void;
   onStudyEvidence?: (citationId: string) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
@@ -70,6 +72,10 @@ export function Markdown({
         urlTransform={nodusUrlTransform}
         components={{
           a: ({ href, children }) => {
+            const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?.*)?$/);
+            if (studyMaterial && onStudyMaterial) {
+              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyMaterial(decodeURIComponent(studyMaterial[1]))}>{children}</button>;
+            }
             const studyEvidence = href?.match(/^nodus:\/\/study\/evidence\/(.+)$/);
             if (studyEvidence && onStudyEvidence) {
               return <button className="mx-0.5 inline-flex rounded-full border border-teal-800 bg-teal-950/80 px-1.5 py-0.5 text-[10px] font-semibold text-teal-300 hover:border-teal-500" onClick={() => onStudyEvidence(decodeURIComponent(studyEvidence[1]))}>{children}</button>;

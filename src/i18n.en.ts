@@ -5228,5 +5228,10 @@ export const EN: Record<string, string> = {
   'Elegir cónyuges/parejas…': 'Choose spouses/partners…',
   '{count} de {max} seleccionados': '{count} of {max} selected',
   '{count} seleccionados': '{count} selected',
+  'Descargar material': 'Download material',
+  'Investigación de estudio': 'Study Research',
+  'Informes didácticos basados en tus materiales, apuntes y transcripciones indexados.': 'Learning-focused reports based on your indexed materials, notes, and transcripts.',
+  'El informe enseña el tema paso a paso usando y citando tus materiales de estudio.': 'The report teaches the topic step by step using and citing your study materials.',
+  'Escribe el tema o pregunta que quieres comprender. El informe explicará los conceptos difíciles, ejemplos y conexiones usando tus materiales.': 'Enter the topic or question you want to understand. The report will explain difficult concepts, examples, and connections using your materials.',
   // <<END_EN>>
 };

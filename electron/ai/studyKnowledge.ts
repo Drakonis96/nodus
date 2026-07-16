@@ -139,7 +139,13 @@ async function analyzeSource(source: SourceData, force: boolean): Promise<void> 
     const chunks = chunkStudyKnowledgeText(source.text); const parts: StudyKnowledgeExtraction[] = [];
     for (const chunk of chunks) {
       const prompt = buildStudyKnowledgePrompt(source.title, chunk);
-      const completed = await runStudyAiTask<StudyKnowledgeExtraction>({ task: 'questions', subjectId: pendingSubjects[0], inputChars: prompt.system.length + prompt.user.length },
+      const completed = await runStudyAiTask<StudyKnowledgeExtraction>({
+        task: 'questions',
+        subjectId: pendingSubjects[0],
+        inputChars: prompt.system.length + prompt.user.length,
+        externalPurpose: 'analizar el material y extraer un mapa conceptual trazable',
+        externalConsentKey: `knowledge:${source.kind}:${source.id}:${source.hash}`,
+      },
         (model) => completeJson({ system: prompt.system, user: prompt.user, temperature: 0.1, maxTokens: 7000 }, isStudyKnowledgeExtraction, model));
       parts.push(completed.value);
     }

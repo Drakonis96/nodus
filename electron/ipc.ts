@@ -1985,6 +1985,20 @@ export function registerIpc(
   h('study:materials:list', async (_e, options?: StudyMaterialListOptions) => studyMaterials.listStudyMaterials(options));
   h('study:materials:get', async (_e, id: string) => studyMaterials.getStudyMaterial(id));
   h('study:materials:content', async (_e, id: string) => studyMaterials.getStudyMaterialContent(id));
+  h('study:materials:download', async (_e, id: string) => {
+    const material = studyMaterials.getStudyMaterial(id);
+    if (material.origin === 'zotero_link') throw new Error('Este material es un enlace de Zotero y no contiene un fichero local que descargar.');
+    const content = studyMaterials.getStudyMaterialContent(id);
+    const safeName = path.basename(material.fileName).replace(/[\\/:*?"<>|]+/g, '-') || `material.${material.extension || 'bin'}`;
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar material',
+      defaultPath: safeName,
+      filters: material.extension ? [{ name: material.extension.toUpperCase(), extensions: [material.extension] }] : undefined,
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, Buffer.from(content.bytes));
+    return { path: picked.filePath };
+  });
   h('study:materials:import', async (_e, input?: StudyMaterialImportInput) => {
     const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
       title: 'Añadir materiales de estudio', properties: ['openFile', 'multiSelections'],

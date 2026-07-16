@@ -3885,6 +3885,8 @@ export interface DeepResearchRequest {
   sectionLimit?: DeepResearchSectionLimit;
   model?: ModelRef | null;
   decorativeImage?: DecorativeImageOption;
+  /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
+  studyMode?: boolean;
   /**
    * Genealogy vaults only: centre the family-history report on this person — their
    * documents are guaranteed into the source pool and every section is written to
@@ -5200,6 +5202,7 @@ export interface NodusApi {
   listStudyMaterials(options?: StudyMaterialListOptions): Promise<StudyMaterialSummary[]>;
   getStudyMaterial(id: string): Promise<StudyMaterialDetail>;
   getStudyMaterialContent(id: string): Promise<StudyMaterialContent>;
+  downloadStudyMaterial(id: string): Promise<{ path: string } | null>;
   importStudyMaterials(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   importStudyMaterialFolder(input?: StudyMaterialImportInput): Promise<StudyMaterialImportResult[]>;
   chooseStudyMaterialPaths(folder?: boolean): Promise<string[]>;
