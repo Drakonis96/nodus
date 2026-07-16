@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import type { AiProvider, ZoteroCollection, ModelInfo, VaultSummary } from '@shared/types';
+import type { AiProvider, AppSettings, ZoteroCollection, ModelInfo, VaultSummary } from '@shared/types';
 import { AI_PROVIDERS, PROVIDER_LABELS, Spinner, Icon } from '../components/ui';
 import { t, tx } from '../i18n';
 
@@ -8,12 +8,14 @@ type OnboardingExit = 'home' | 'library' | 'settings';
 
 export function Onboarding({
   activeVault,
+  settings,
   providerKeys,
   onDone,
   onCancel,
   discardsVault,
 }: {
   activeVault: VaultSummary | null;
+  settings: AppSettings;
   /** Which providers already have a (globally shared) key configured. */
   providerKeys?: Partial<Record<AiProvider, boolean>>;
   onDone: (view?: OnboardingExit) => void;
@@ -26,10 +28,10 @@ export function Onboarding({
   const [collections, setCollections] = useState<ZoteroCollection[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [readTag, setReadTag] = useState('leído');
-  const [provider, setProvider] = useState<AiProvider>('anthropic');
+  const [provider, setProvider] = useState<AiProvider>(settings.synthesisModel?.provider ?? 'anthropic');
   const [apiKey, setApiKey] = useState('');
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [models, setModels] = useState<ModelInfo[]>(settings.synthesisModel ? [{ id: settings.synthesisModel.model }] : []);
+  const [selectedModel, setSelectedModel] = useState(settings.synthesisModel?.model ?? '');
   const [modelError, setModelError] = useState<string | null>(null);
   const [loadingModels, setLoadingModels] = useState(false);
   const [storagePath, setStoragePath] = useState('');
@@ -104,6 +106,10 @@ export function Onboarding({
   };
 
   const finish = async () => {
+    if (!selectedModel.trim()) {
+      setModelError(t('Elige un modelo de IA para continuar.'));
+      return;
+    }
     setFinishing(true);
     setFinishError(null);
     setSyncSummary(null);
@@ -111,9 +117,12 @@ export function Onboarding({
     try {
       if (apiKey.trim()) await window.nodus.setApiKey(provider, apiKey.trim());
       const ref = selectedModel ? { provider, model: selectedModel } : null;
+      const favorites = ref && !settings.favorites.some((model) => model.provider === ref.provider && model.model === ref.model)
+        ? [...settings.favorites, ref]
+        : settings.favorites;
       await window.nodus.updateSettings({
         ...(simple ? {} : { monitoredCollections: Array.from(selected), readTag, zoteroStoragePath: storagePath }),
-        favorites: ref ? [ref] : [],
+        favorites,
         synthesisModel: ref,
         modelSettingsMode: 'basic',
         onboardingComplete: true,
@@ -212,7 +221,7 @@ export function Onboarding({
         {step === 0 && simple && (
           <div className="space-y-3">
             <p className="text-sm text-neutral-300">{intro.body}</p>
-            <p className="text-xs text-neutral-500">{t('Solo queda elegir un modelo de IA (opcional) para empezar.')}</p>
+            <p className="text-xs text-neutral-500">{t('Los modelos de IA y embeddings elegidos al crear el vault ya están preparados. Puedes revisar aquí el modelo de IA antes de empezar.')}</p>
           </div>
         )}
 
@@ -291,16 +300,18 @@ export function Onboarding({
                   setSelectedModel('');
                 }}
               >
-                {AI_PROVIDERS.map((p) => (
+                {(['nodus', ...AI_PROVIDERS] as AiProvider[]).map((p) => (
                   <option key={p} value={p}>
                     {PROVIDER_LABELS[p]}
                   </option>
                 ))}
               </select>
             </label>
-            {provider === 'ollama' || provider === 'lmstudio' ? (
+            {provider === 'nodus' || provider === 'ollama' || provider === 'lmstudio' ? (
               <p className="text-sm text-neutral-500">
-                {t('Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.')}
+                {provider === 'nodus'
+                  ? t('Modelo local integrado: ya está descargado en este equipo y no necesita clave.')
+                  : t('Proveedor local: no necesita clave. Usa la dirección por defecto; puedes cambiar IP y puerto en Ajustes → Proveedores.')}
               </p>
             ) : (
               <label className="block text-sm">
@@ -336,11 +347,7 @@ export function Onboarding({
             <p className="text-xs text-neutral-500">
               {t('Podrás añadir más proveedores y marcar favoritos en Ajustes.')}
             </p>
-            {!selectedModel && (
-              <p className="text-xs text-amber-400">
-                {t('⚠ Sin un modelo seleccionado podrás sincronizar metadatos, pero no analizar temas ni ideas hasta configurarlo.')}
-              </p>
-            )}
+            {!selectedModel && <p className="text-xs text-amber-400">{t('Elige un modelo para continuar.')}</p>}
           </div>
         )}
 
@@ -375,11 +382,6 @@ export function Onboarding({
                 {syncSummary}
               </div>
             )}
-            {!selectedModel && (
-              <p className="text-xs text-amber-400">
-                {t('Falta configurar un modelo para analizar temas e ideas. Puedes hacerlo desde Ajustes.')}
-              </p>
-            )}
           </div>
         )}
 
@@ -392,7 +394,7 @@ export function Onboarding({
               {t('Siguiente')}
             </button>
           ) : step === aiStep ? (
-            <button className="btn btn-primary" onClick={finish} disabled={finishing}>
+            <button className="btn btn-primary" onClick={finish} disabled={finishing || !selectedModel.trim()}>
               {finishing ? t('Preparando...') : t('Empezar')}
             </button>
           ) : (

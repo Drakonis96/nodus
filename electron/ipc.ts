@@ -348,6 +348,7 @@ import {
   setVaultType,
 } from './vaults/vaultRegistry';
 import { reuseVaultAnalysisForWorks } from './vaults/vaultAnalysisImport';
+import { initializeVaultModelSelection, validateVaultModelSelection } from './vaults/vaultCreationSettings';
 import {
   createPerson,
   updatePerson,
@@ -753,7 +754,14 @@ export function registerIpc(
   h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
   h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));
   h('vaults:create', async (_e, input: CreateVaultInput) => {
+    const modelSelection = validateVaultModelSelection(input);
     const vault = createVault(input.name, input.type);
+    try {
+      if (modelSelection) initializeVaultModelSelection(vault.path, modelSelection);
+    } catch (cause) {
+      deleteVault(vault.id, true);
+      throw cause;
+    }
     return { vault: withVaultKeyProviders(vault) };
   });
   h('vaults:rename', async (_e, id: string, name: string) => withVaultKeyProviders(renameVault(id, name)));

@@ -4,6 +4,30 @@
  * partial coverage never breaks the UI.
  */
 export const EN: Record<string, string> = {
+  // ── Vault creation model setup ───────────────────────────────────────────
+  'Modelos iniciales': 'Initial models',
+  'Elige por separado el modelo de IA y el modelo que creará los embeddings del vault. Ambos son obligatorios.': 'Choose the AI model and the model that will create this vault’s embeddings separately. Both are required.',
+  'Modelo de embeddings': 'Embedding model',
+  'Elige local o nube': 'Choose local or cloud',
+  'ID del modelo': 'Model ID',
+  'Consultar modelos': 'Browse models',
+  'Selecciona un modelo': 'Select a model',
+  'Puedes escribir un ID o elegir uno de tus modelos favoritos.': 'You can enter an ID or choose one of your favorite models.',
+  'Ya está descargado y listo para usar.': 'Already downloaded and ready to use.',
+  'Se descargará al crear la bóveda. La creación terminará cuando el modelo esté listo.': 'It will be downloaded when the vault is created. Creation will finish once the model is ready.',
+  'Selecciona primero dónde se ejecutará la IA.': 'First choose where AI will run.',
+  'Los proveedores en la nube usan las claves configuradas en Nodus. Ollama y LM Studio usan tu servidor local; Nodus local descarga el modelo en este equipo.': 'Cloud providers use the keys configured in Nodus. Ollama and LM Studio use your local server; Nodus local downloads the model to this computer.',
+  'Las claves de IA se comparten entre todas las bóvedas; la elección de embeddings se guarda en este vault.': 'AI keys are shared across all vaults; the embedding choice is stored in this vault.',
+  'Elige un modelo de IA antes de crear la bóveda.': 'Choose an AI model before creating the vault.',
+  'Elige un modelo de embeddings antes de crear la bóveda.': 'Choose an embedding model before creating the vault.',
+  'El modelo local seleccionado ya no está disponible.': 'The selected local model is no longer available.',
+  'Preparando el motor local…': 'Preparing the local runtime…',
+  'Descargando {model}…': 'Downloading {model}…',
+  'Creando y configurando la bóveda…': 'Creating and configuring the vault…',
+  'Los modelos de IA y embeddings elegidos al crear el vault ya están preparados. Puedes revisar aquí el modelo de IA antes de empezar.': 'The AI and embedding models chosen during vault creation are ready. You can review the AI model here before starting.',
+  'Modelo local integrado: ya está descargado en este equipo y no necesita clave.': 'Integrated local model: it is already downloaded to this computer and does not need a key.',
+  'Elige un modelo para continuar.': 'Choose a model to continue.',
+  'Elige un modelo de IA para continuar.': 'Choose an AI model to continue.',
   // ── Zotero libraries and study materials ─────────────────────────────────
   'Mi biblioteca': 'My Library',
   'Importar desde Zotero': 'Import from Zotero',

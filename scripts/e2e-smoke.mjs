@@ -176,6 +176,41 @@ try {
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
+  // ── Vault wizard: independent, required text + embedding models ───────────
+  const originalVaultId = (await page.evaluate(() => window.nodus.getActiveVault())).id;
+  await page.locator('[data-tour="vaults"]').click();
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
+  const vaultDialog = page.getByRole('dialog', { name: 'Añadir bóveda' });
+  await vaultDialog.waitFor();
+  for (const type of ['academic', 'genealogy', 'estudio', 'databases']) {
+    assert.equal(await vaultDialog.getByTestId(`new-vault-type-icon-${type}`).count(), 1, `${type} uses the shared model-enabled creation wizard`);
+  }
+  await vaultDialog.getByPlaceholder('Nombre de la bóveda').fill('Vault model setup smoke');
+  const createButton = vaultDialog.getByRole('button', { name: 'Crear', exact: true });
+  assert.equal(await createButton.isDisabled(), true, 'creation is blocked until an AI model is selected');
+  await vaultDialog.getByTestId('vault-ai-provider').selectOption('openai');
+  await vaultDialog.getByTestId('vault-ai-model-input').fill('gpt-vault-smoke');
+  await vaultDialog.getByTestId('vault-embedding-provider').selectOption('gemini');
+  assert.equal(await createButton.isEnabled(), true, 'independent AI and embedding choices unlock creation');
+  await createButton.click();
+  await waitForCondition('creación del vault con dos modelos', async () => {
+    const active = await page.evaluate(() => window.nodus.getActiveVault());
+    return active.id !== originalVaultId && active.name === 'Vault model setup smoke';
+  });
+  const configuredVault = await page.evaluate(() => window.nodus.getActiveVault());
+  const configuredSettings = await page.evaluate(() => window.nodus.getSettings());
+  assert.deepEqual(configuredSettings.synthesisModel, { provider: 'openai', model: 'gpt-vault-smoke' }, 'wizard persists the selected general AI model');
+  assert.equal(configuredSettings.embeddingProvider, 'gemini', 'wizard persists the independent embedding provider');
+  assert.equal(configuredSettings.embeddingModel, 'gemini-embedding-001', 'wizard persists the independent embedding model');
+  await page.evaluate(async ({ original, temporary }) => {
+    const switched = await window.nodus.switchVault(original);
+    if (!switched.ok) throw new Error(switched.message);
+    await window.nodus.deleteVault(temporary, true);
+  }, { original: originalVaultId, temporary: configuredVault.id });
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  console.log('[e2e] vault creation requires and persists independent AI + embedding models');
+
   // ── Main header: model selection belongs to Settings/features, never global ─
   const smokeModel = { provider: 'openai', model: 'smoke-model' };
   const chatModel = { provider: 'openrouter', model: 'smoke-chat-model' };

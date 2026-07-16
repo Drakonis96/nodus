@@ -777,6 +777,7 @@ export function App() {
     return (
       <Onboarding
         activeVault={activeVault}
+        settings={settings}
         providerKeys={settings.providerKeys}
         onDone={(nextView = 'home') => reloadSettings().then(() => setView(nextView))}
         onCancel={cancelOnboarding}
@@ -922,6 +923,7 @@ export function App() {
           anchorEl={vaultAnchor}
           onClose={() => setVaultAnchor(null)}
           vaults={vaults}
+          settings={settings}
           onVaultsChanged={reloadVaults}
           onActiveVaultChanged={handleActiveVaultChanged}
         />

@@ -75,3 +75,40 @@ test('the create-vault modal shows an inline accessible name error', async () =>
   assert.match(picker, /role="alert"/);
   assert.match(picker, /aria-invalid=\{Boolean\(addNameError\)\}/);
 });
+
+test('every available vault type requires independent AI and embedding models during creation', async () => {
+  const [picker, modelSetup, types] = await Promise.all([
+    read('src/components/VaultSwitcher.tsx'),
+    read('src/components/VaultCreationModels.tsx'),
+    read('shared/vaultTypes.ts'),
+  ]);
+  assert.match(picker, /data-testid="vault-creation-models"|<VaultCreationModels/);
+  assert.match(picker, /aiModel: \{ provider: addAiProvider, model: addAiModel\.trim\(\) \}/);
+  assert.match(picker, /embeddingProvider: addEmbeddingProvider/);
+  assert.match(picker, /embeddingModel: addEmbeddingModel\.trim\(\)/);
+  assert.match(picker, /installNodusLocalRuntime/);
+  assert.match(picker, /downloadNodusLocalModel/);
+  assert.match(modelSetup, /data-testid="vault-ai-provider"/);
+  assert.match(modelSetup, /data-testid="vault-embedding-provider"/);
+  assert.match(modelSetup, /NODUS_LOCAL_MODELS\.filter/);
+  for (const type of ['academic', 'genealogy', 'estudio', 'databases']) {
+    assert.match(types, new RegExp(`id: '${type}'[\\s\\S]{0,180}available: true`));
+  }
+});
+
+test('vault creation persists the complete model selection and keeps legacy callers compatible', async () => {
+  const [types, ipc, settings] = await Promise.all([
+    read('shared/types.ts'),
+    read('electron/ipc.ts'),
+    read('electron/vaults/vaultCreationSettings.ts'),
+  ]);
+  assert.match(types, /aiModel\?: ModelRef/);
+  assert.match(types, /embeddingProvider\?: EmbeddingProvider/);
+  assert.match(types, /embeddingModel\?: string/);
+  assert.match(ipc, /validateVaultModelSelection\(input\)/);
+  assert.match(ipc, /initializeVaultModelSelection\(vault\.path, modelSelection\)/);
+  assert.match(settings, /if \(!hasAnySelection\) return null/);
+  assert.match(settings, /modelSettingsMode: 'basic'/);
+  assert.match(settings, /embeddingProvider: selection\.embeddingProvider/);
+  assert.match(settings, /writeGlobalPrefs\(\{ favorites, synthesisModel: selection\.aiModel \}\)/);
+});

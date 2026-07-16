@@ -23,6 +23,7 @@ if (!process.argv.includes('--electron-vaults-test')) {
         `export * as database from ${JSON.stringify(path.join(repoRoot, 'electron/db/database.ts'))};`,
         `export * as secrets from ${JSON.stringify(path.join(repoRoot, 'electron/secrets/secretStore.ts'))};`,
         `export * as settingsRepo from ${JSON.stringify(path.join(repoRoot, 'electron/db/settingsRepo.ts'))};`,
+        `export * as vaultCreationSettings from ${JSON.stringify(path.join(repoRoot, 'electron/vaults/vaultCreationSettings.ts'))};`,
       ].join('\n'),
       'utf8'
     );
@@ -61,7 +62,7 @@ const [, , , bundle, userData] = process.argv;
 process.env.NODE_PATH = [path.join(repoRoot, 'node_modules'), process.env.NODE_PATH].filter(Boolean).join(path.delimiter);
 Module._initPaths();
 const require = createRequire(import.meta.url);
-const { registry, analysisReuse, database, secrets, settingsRepo } = require(bundle);
+const { registry, analysisReuse, database, secrets, settingsRepo, vaultCreationSettings } = require(bundle);
 
 assert.equal(registry.getActiveVault().id, 'default');
 assert.equal(registry.getActiveVault().type, 'academic', 'pre-existing/legacy vault defaults to academic type');
@@ -97,6 +98,39 @@ registry.setVaultType(researchVault.id, 'not-a-type');
 assert.equal(registry.getVault(researchVault.id).type, 'academic', 'unknown vault types normalise to academic');
 registry.deleteVault(studyVault.id, true);
 assert.equal(registry.listVaults().length, 2, 'temporary study vault removed');
+
+// The creation wizard persists two independent choices before the unopened vault
+// becomes active. The general text choice follows the existing shared-model policy;
+// embeddings stay local to the new database.
+const configuredVault = registry.createVault('Configurada desde el asistente', 'genealogy');
+const selection = vaultCreationSettings.validateVaultModelSelection({
+  name: configuredVault.name,
+  type: configuredVault.type,
+  aiModel: { provider: 'gemini', model: 'gemini-test-model' },
+  embeddingProvider: 'nodus',
+  embeddingModel: 'multilingual-e5-small-int8',
+});
+assert.ok(selection, 'the complete wizard payload is accepted');
+vaultCreationSettings.initializeVaultModelSelection(configuredVault.path, selection);
+registry.setActiveVault(configuredVault.id);
+db = database.getDb();
+assert.deepEqual(settingsRepo.getSettings().synthesisModel, { provider: 'gemini', model: 'gemini-test-model' });
+assert.equal(settingsRepo.getSettings().embeddingProvider, 'nodus');
+assert.equal(settingsRepo.getSettings().embeddingModel, 'multilingual-e5-small-int8');
+assert.equal(settingsRepo.getSettings().modelSettingsMode, 'basic');
+database.closeDb();
+registry.setActiveVault('default');
+registry.deleteVault(configuredVault.id, true);
+assert.equal(
+  vaultCreationSettings.validateVaultModelSelection({ name: 'Legacy caller' }),
+  null,
+  'older createVault clients remain supported'
+);
+assert.throws(
+  () => vaultCreationSettings.validateVaultModelSelection({ name: 'Incomplete', aiModel: { provider: 'openai', model: 'gpt-test' } }),
+  /embeddings/,
+  'partial wizard payloads are rejected instead of creating a half-configured vault'
+);
 assert.deepEqual(secrets.copyApiKeysBetweenVaults('default', researchVault.id), ['openai']);
 assert.deepEqual(secrets.listApiKeyProvidersForVault(researchVault.id), ['openai']);
 

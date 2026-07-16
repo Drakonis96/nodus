@@ -1332,6 +1332,12 @@ export interface CreateVaultInput {
   name: string;
   /** Optional vault type; defaults to 'academic' when omitted. */
   type?: VaultType;
+  /** Initial general text model chosen in the creation wizard. Optional only for
+   * backwards compatibility with older renderer builds and automation clients. */
+  aiModel?: ModelRef;
+  /** Initial semantic-index provider/model chosen independently from the text model. */
+  embeddingProvider?: EmbeddingProvider;
+  embeddingModel?: string;
 }
 
 export interface VaultSwitchOptions {
