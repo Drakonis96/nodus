@@ -169,15 +169,15 @@ export function globalSearch(query: string, limitPerKind = 8): GlobalSearchResul
   // ── Records / genealogy (empty and cheap in academic vaults) ────────────────
   const persons = db
     .prepare(
-      `SELECT p.person_id, p.display_name, p.birth_date, p.death_date FROM persons p
+      `SELECT p.person_id, p.display_name, p.national_id, p.birth_date, p.death_date FROM persons p
         LEFT JOIN person_names n ON n.person_id = p.person_id
-        WHERE p.display_name LIKE ? ESCAPE '\\' OR n.name LIKE ? ESCAPE '\\'
+        WHERE p.display_name LIKE ? ESCAPE '\\' OR p.national_id LIKE ? ESCAPE '\\' OR n.name LIKE ? ESCAPE '\\'
         GROUP BY p.person_id ORDER BY length(p.display_name) ASC LIMIT ?`
     )
-    .all(like, like, limitPerKind) as { person_id: string; display_name: string; birth_date: string | null; death_date: string | null }[];
+    .all(like, like, like, limitPerKind) as { person_id: string; display_name: string; national_id: string | null; birth_date: string | null; death_date: string | null }[];
   for (const r of persons) {
     const life = [r.birth_date, r.death_date].map((d) => d?.trim()).filter(Boolean).join(' – ');
-    results.push({ kind: 'person', id: r.person_id, title: r.display_name, subtitle: life || null });
+    results.push({ kind: 'person', id: r.person_id, title: r.display_name, subtitle: [r.national_id, life].filter(Boolean).join(' · ') || null });
   }
 
   const events = db

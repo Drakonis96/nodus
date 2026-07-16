@@ -1577,6 +1577,8 @@ export interface PortraitFocus {
 export interface Person {
   personId: string;
   displayName: string;
+  /** Country-issued identifier, e.g. a national identity or tax number. */
+  nationalId: string | null;
   sex: PersonSex;
   /** Human display form of the date, e.g. "c. 1850". */
   birthDate: string | null;
@@ -1597,6 +1599,7 @@ export interface Person {
 
 export interface PersonInput {
   displayName: string;
+  nationalId?: string | null;
   sex?: PersonSex;
   birthDate?: string | null;
   deathDate?: string | null;

@@ -111,6 +111,7 @@ export function mergePersons(targetId: string, sourceId: string): Person | null 
 
     // Fill empty target fields from the source (target values win when present).
     updatePerson(targetId, {
+      nationalId: target.nationalId ?? source.nationalId,
       sex: target.sex !== 'unknown' ? target.sex : source.sex,
       birthDate: target.birthDate ?? source.birthDate,
       deathDate: target.deathDate ?? source.deathDate,

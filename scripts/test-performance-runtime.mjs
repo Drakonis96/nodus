@@ -22,7 +22,7 @@ for (const pragma of [
   assert.ok(database.includes(pragma), `SQLite must set ${pragma}`);
 }
 assert.match(database, /setTimeout[\s\S]*?pragma\('optimize'\)/, 'SQLite optimize must run after startup, not on the critical path');
-assert.match(migrations, /SCHEMA_VERSION = 78/, 'performance indexes must have an append-only migration');
+assert.match(migrations, /version: 78,[\s\S]*idx_works_active_year_title/, 'performance indexes must keep their append-only migration');
 for (const index of [
   'idx_works_active_year_title',
   'idx_works_active_analysis_status',

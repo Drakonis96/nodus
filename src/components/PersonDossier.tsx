@@ -154,6 +154,9 @@ export function PersonDossier({
             {t(SEX_LABEL[person.sex] ?? 'Sin determinar')}
             {lifeSpan(person) ? ` · ${lifeSpan(person)}` : ''}
           </p>
+          {person.nationalId && (
+            <p className="mt-0.5 text-xs text-neutral-500">{t('Identificador nacional')}: {person.nationalId}</p>
+          )}
         </div>
         {extraActions}
         <button
@@ -469,6 +472,7 @@ function PersonBasicsEditor({
   onClose: () => void;
 }) {
   const [displayName, setDisplayName] = useState(person.displayName);
+  const [nationalId, setNationalId] = useState(person.nationalId ?? '');
   const [sex, setSex] = useState<PersonSex>(person.sex);
   const [birthDate, setBirthDate] = useState(person.birthDate ?? '');
   const [deathDate, setDeathDate] = useState(person.deathDate ?? '');
@@ -480,6 +484,7 @@ function PersonBasicsEditor({
     try {
       await window.nodus.updatePerson(person.personId, {
         displayName: displayName.trim(),
+        nationalId: nationalId.trim() || null,
         sex,
         birthDate: birthDate.trim() || null,
         deathDate: deathDate.trim() || null,
@@ -497,6 +502,13 @@ function PersonBasicsEditor({
         value={displayName}
         onChange={(e) => setDisplayName(e.target.value)}
         placeholder={t('Nombre completo')}
+      />
+      <input
+        className="input h-8 w-full text-sm"
+        value={nationalId}
+        onChange={(e) => setNationalId(e.target.value)}
+        placeholder={t('Identificador nacional (opcional)')}
+        aria-label={t('Identificador nacional (opcional)')}
       />
       <div className="grid grid-cols-3 gap-2">
         <select className="input h-8 text-sm" value={sex} onChange={(e) => setSex(e.target.value as PersonSex)}>

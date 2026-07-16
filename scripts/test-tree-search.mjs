@@ -27,6 +27,8 @@ test('tree search is accent-insensitive and covers visible kinship labels', () =
 test('tree UI keeps non-matches visible and highlights matches', async () => {
   const source = await readFile(path.join(root, 'src/views/TreeView.tsx'), 'utf8');
   assert.match(source, /data-testid="tree-search-input"/);
+  assert.match(source, /input input-with-leading-icon/);
+  assert.match(source, /person\.nationalId \?\? ''/);
   assert.match(source, /opacity=\{searchActive && !isSearchMatch \? 0\.22 : 1\}/);
   assert.match(source, /data-testid=\{`tree-search-match-\$\{n\.personId\}`\}/);
 });

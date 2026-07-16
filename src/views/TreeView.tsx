@@ -123,7 +123,7 @@ export function TreeView({
     const person = personById.get(node.personId);
     const relation = kinship.get(node.personId);
     const relationLabel = relation ? treeKinshipLabel(relation, getActiveLang()) : t('Sin parentesco registrado');
-    return person && matchesTreeSearch(searchQuery, [person.displayName, dates(person), relationLabel]) ? [node.personId] : [];
+    return person && matchesTreeSearch(searchQuery, [person.displayName, person.nationalId ?? '', dates(person), relationLabel]) ? [node.personId] : [];
   })), [kinship, layout.nodes, personById, searchQuery]);
   const familyPairSet = useMemo(() => {
     const pairs = new Set<string>();
@@ -225,7 +225,7 @@ export function TreeView({
           <input
             type="text"
             role="searchbox"
-            className="input h-9 w-full pl-8 pr-8 text-sm"
+            className="input input-with-leading-icon h-9 w-full pr-8 text-sm"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder={t('Buscar en el árbol…')}

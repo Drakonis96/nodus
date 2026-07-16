@@ -52,3 +52,10 @@ test('name variants, life events and places are created through accessible modal
   assert.match(translations, /'Nuevo lugar': 'New place'/);
   assert.match(translations, /'Registra el tipo, la fecha, el lugar y las notas del evento\.': 'Record the event type, date, place and notes\.'/);
 });
+
+test('full record exposes the optional national identification number', () => {
+  assert.match(dossier, /person\.nationalId/);
+  assert.match(dossier, /nationalId: nationalId\.trim\(\) \|\| null/);
+  assert.match(dossier, /Identificador nacional \(opcional\)/);
+  assert.match(translations, /'Identificador nacional \(opcional\)': 'National identification number \(optional\)'/);
+});

@@ -3438,6 +3438,8 @@ export const EN: Record<string, string> = {
   'Árbol genealógico': 'Family tree',
   'Centrar el árbol en…': 'Centre the tree on…',
   'Buscar en el árbol…': 'Search the tree…',
+  'Identificador nacional': 'National identification number',
+  'Identificador nacional (opcional)': 'National identification number (optional)',
   'Buscar personas en el árbol': 'Search people in the tree',
   'Limpiar búsqueda': 'Clear search',
   'Ver ficha completa': 'Open full record',

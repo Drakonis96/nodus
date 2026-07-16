@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 78;
+export const SCHEMA_VERSION = 79;
 
 export const migrations: Migration[] = [
   {
@@ -2693,6 +2693,14 @@ export const migrations: Migration[] = [
         ON edges(type, from_id, to_id);
       CREATE INDEX idx_gaps_kind_statement
         ON gaps(kind, statement);
+    `,
+  },
+  {
+    version: 79,
+    up: /* sql */ `
+      -- Optional country-issued identifier for archival disambiguation and search.
+      ALTER TABLE persons ADD COLUMN national_id TEXT;
+      CREATE INDEX idx_persons_national_id ON persons(national_id);
     `,
   },
 ];

@@ -35,6 +35,7 @@ try {
   // ── Persons with name variants + fuzzy dates ──────────────────────────────
   const juan = repo.createPerson({
     displayName: 'Juan Pérez',
+    nationalId: 'ES-12345678-Z',
     sex: 'male',
     birthDate: 'c. 1850',
     names: [{ name: 'Juan Pérez', kind: 'birth' }, { name: 'Joan Peres', kind: 'variant' }],
@@ -43,6 +44,7 @@ try {
 
   const fetched = repo.getPerson(juan.personId);
   assert.equal(fetched.displayName, 'Juan Pérez');
+  assert.equal(fetched.nationalId, 'ES-12345678-Z');
   assert.equal(fetched.birthDate, 'c. 1850');
   assert.equal(fetched.names.length, 2, 'name variants stored');
 
@@ -55,6 +57,11 @@ try {
     repo.listPersons({ search: 'peres' }).map((p) => p.personId),
     [juan.personId],
     'person is found by a name variant'
+  );
+  assert.deepEqual(
+    repo.listPersons({ search: '12345678' }).map((p) => p.personId),
+    [juan.personId],
+    'person is found by national identifier'
   );
 
   // ── Places de-duplicate case-insensitively ────────────────────────────────

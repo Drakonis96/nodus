@@ -40,6 +40,7 @@ function newId(prefix: string): string {
 interface PersonRow {
   person_id: string;
   display_name: string;
+  national_id: string | null;
   sex: PersonSex;
   birth_date: string | null;
   death_date: string | null;
@@ -71,6 +72,7 @@ function rowToPerson(row: PersonRow): Person {
   return {
     personId: row.person_id,
     displayName: row.display_name,
+    nationalId: row.national_id ?? null,
     sex: row.sex,
     birthDate: row.birth_date,
     deathDate: row.death_date,
@@ -108,11 +110,12 @@ export function createPerson(input: PersonInput): Person {
   const tx = db.transaction(() => {
     db.prepare(
       `INSERT INTO persons
-        (person_id, display_name, sex, birth_date, birth_date_sort, death_date, death_date_sort, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (person_id, display_name, national_id, sex, birth_date, birth_date_sort, death_date, death_date_sort, notes, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       id,
       input.displayName.trim(),
+      input.nationalId?.trim() || null,
       input.sex ?? 'unknown',
       input.birthDate ?? null,
       birth.sortKey,
@@ -132,17 +135,19 @@ export function updatePerson(personId: string, patch: Partial<PersonInput>): Per
   const existing = getPerson(personId);
   if (!existing) return null;
   const displayName = patch.displayName?.trim() ?? existing.displayName;
+  const nationalId = patch.nationalId !== undefined ? patch.nationalId?.trim() || null : existing.nationalId;
   const sex = patch.sex ?? existing.sex;
   const birthDate = patch.birthDate !== undefined ? patch.birthDate : existing.birthDate;
   const deathDate = patch.deathDate !== undefined ? patch.deathDate : existing.deathDate;
   const notes = patch.notes !== undefined ? patch.notes : existing.notes;
   getDb()
     .prepare(
-      `UPDATE persons SET display_name = ?, sex = ?, birth_date = ?, birth_date_sort = ?,
+      `UPDATE persons SET display_name = ?, national_id = ?, sex = ?, birth_date = ?, birth_date_sort = ?,
         death_date = ?, death_date_sort = ?, notes = ?, updated_at = ? WHERE person_id = ?`
     )
     .run(
       displayName,
+      nationalId,
       sex,
       birthDate,
       parseHistoricalDate(birthDate).sortKey,
@@ -168,11 +173,11 @@ export function listPersons(opts: { search?: string } = {}): Person[] {
         .prepare(
           `${PERSON_SELECT}
            LEFT JOIN person_names n ON n.person_id = p.person_id
-           WHERE p.display_name LIKE ? OR n.name LIKE ?
+           WHERE p.display_name LIKE ? OR p.national_id LIKE ? OR n.name LIKE ?
            GROUP BY p.person_id
            ORDER BY p.display_name`
         )
-        .all(`%${search}%`, `%${search}%`) as PersonRow[])
+        .all(`%${search}%`, `%${search}%`, `%${search}%`) as PersonRow[])
     : (getDb().prepare(`${PERSON_SELECT} ORDER BY p.display_name`).all() as PersonRow[]);
   return rows.map(rowToPerson);
 }
