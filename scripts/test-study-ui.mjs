@@ -419,7 +419,7 @@ test('study search follows the minimal global-search layout', async () => {
 });
 
 test('study material state reuses database select chips', async () => {
-  const [materials, pdf, epub, preload, ipc, types, css, materialIndex, studySearch] = await Promise.all([
+  const [materials, pdf, epub, preload, ipc, types, css, materialIndex, studySearch, organization, app] = await Promise.all([
     read('src/views/StudyMaterialsView.tsx'),
     read('src/components/materials/PdfViewer.tsx'),
     read('src/components/materials/EpubViewer.tsx'),
@@ -429,6 +429,8 @@ test('study material state reuses database select chips', async () => {
     read('src/index.css'),
     read('electron/ai/studyMaterialIndex.ts'),
     read('electron/ai/studySearch.ts'),
+    read('src/views/StudyOrganizationView.tsx'),
+    read('src/App.tsx'),
   ]);
   assert.match(materials, /import \{ ChipSelectCell \} from '\.\.\/components\/dbGrid'/);
   assert.match(materials, /<ChipSelectCell values=\{\[material\.readState\]\}/);
@@ -437,6 +439,7 @@ test('study material state reuses database select chips', async () => {
   assert.match(materials, /options=\{locationOptions\[dimension\]\}/);
   assert.match(materials, /options=\{locationOptions\[dimension\]\} multi onChange=\{\(ids\)/);
   assert.match(materials, /removeStudyMaterialPlacement\(material\.id, placement\.id\)/);
+  assert.match(materials, /announceStudyWorkspaceChanged\(\);\s+await load\(\)/);
   assert.doesNotMatch(materials, /<select[^>]*value=\{material\.readState\}/);
   assert.match(materials, /data-testid="study-material-dropzone"/);
   const materialResultsStart = materials.indexOf('<main className="relative min-h-0 flex-1 overflow-auto">');
@@ -490,6 +493,12 @@ test('study material state reuses database select chips', async () => {
   assert.match(types, /getPathForDroppedFile\(file: unknown\): string/);
   assert.match(types, /importStudyMaterialPaths\(paths: string\[\]/);
   assert.match(types, /removeStudyMaterialPlacement\(id: string, placementId: string\): Promise<void>/);
+  assert.match(organization, /window\.nodus\.listStudyMaterials\(\)/);
+  assert.match(organization, /material\.placements\.some/);
+  assert.match(organization, /data-testid=\{`study-organization-material-\$\{material\.id\}`\}/);
+  assert.match(organization, /documents\.length \+ scopedMaterials\.length/);
+  assert.match(organization, /onOpenMaterial\(material\.id\)/);
+  assert.match(app, /<StudyOrganizationView[^>]+onOpenMaterial=\{\(id\) => \{ setStudyMaterialTarget\(id\); setView\('studyLibrary'\); \}\}/);
   assert.match(materials, /className="absolute inset-0 z-40 flex flex-col/);
   assert.doesNotMatch(materials, /data-testid="study-material-viewer"[^\n]*fixed/);
   assert.match(materials, /material\.extension === 'md' \|\| material\.extension === 'markdown'/);

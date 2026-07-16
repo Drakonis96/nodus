@@ -827,6 +827,24 @@ try {
   const importedMaterial = await page.evaluate(async () => (await window.nodus.listStudyMaterials()).find((item) => item.title === 'fuente-smoke'));
   assert.equal(importedMaterial?.previewKind, 'pdf', 'PDF import stores an embedded material');
   assert.ok((importedMaterial?.extractedChars ?? 0) > 20, 'PDF text is extracted for search and citations');
+  const materialPlacement = await page.evaluate(async (materialId) => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    const course = workspace.courses.find((item) => item.name === 'Curso smoke');
+    const subject = workspace.subjects.find((item) => item.name === 'Asignatura smoke');
+    if (!course || !subject) throw new Error('Study organization fixture not found');
+    await window.nodus.setPrimaryStudyMaterialPlacement(materialId, { courseId: course.id, subjectId: subject.id });
+    const stored = (await window.nodus.listStudyMaterials()).find((item) => item.id === materialId);
+    return { courseId: course.id, subjectId: subject.id, placements: stored?.placements ?? [] };
+  }, importedMaterial.id);
+  assert.ok(materialPlacement.placements.some((placement) => placement.courseId === materialPlacement.courseId && placement.subjectId === materialPlacement.subjectId), 'material placement persists before navigating to its category');
+  await page.getByRole('button', { name: 'Cursos y asignaturas', exact: true }).click();
+  await page.getByTestId(`study-browser-course-${materialPlacement.courseId}`).locator('button').first().click();
+  await page.getByTestId(`study-organization-material-${importedMaterial.id}`).waitFor();
+  await page.getByTestId(`study-browser-subject-${materialPlacement.subjectId}`).locator('button').first().click();
+  await page.getByTestId(`study-organization-material-${importedMaterial.id}`).waitFor();
+  console.log('[e2e] imported material is visible in its assigned course and subject');
+  await page.getByRole('button', { name: 'Materiales', exact: true }).click();
+  await page.getByTestId('study-materials-view').waitFor({ timeout: 30_000 });
   await page.getByText('fuente-smoke', { exact: true }).click();
   await page.getByTestId('study-pdf-viewer').waitFor({ timeout: 30_000 });
   await page.waitForFunction(() => document.querySelector('[data-pdf-page] .select-text span')?.textContent?.length, { timeout: 30_000 });

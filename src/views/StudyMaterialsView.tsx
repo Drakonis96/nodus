@@ -213,6 +213,7 @@ export function StudyMaterialsView({ onOpenDocument, initialMaterialId }: { onOp
       await window.nodus.addStudyMaterialPlacement(material.id, placement);
     }
 
+    announceStudyWorkspaceChanged();
     await load();
   };
 

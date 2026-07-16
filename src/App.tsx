@@ -1165,7 +1165,7 @@ export function App() {
           )}
           {view === 'dbAnalysis' && <DatabasesAnalysisView initialDatabaseId={activeDatabaseId} />}
           {view === 'dbChat' && <DatabasesChatView initialDatabaseId={activeDatabaseId} />}
-          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }} />}
+          {view === 'studyCourses' && <StudyOrganizationView target={studyTarget} mode="organization" onTargetChange={setStudyTarget} onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }} onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp }); setView('studyRecordings'); }} />}
           {view === 'studySchedule' && <StudyScheduleView />}
           {view === 'studyCalendar' && <StudyCalendarView />}
           {view === 'studySearch' && <StudySearchView

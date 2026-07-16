@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { StudyDocument, StudyDocumentKind, StudyWorkspace } from '@shared/studyOrg';
-import type { StudyExportFormat, StudyExportScope } from '@shared/types';
+import type { StudyExportFormat, StudyExportScope, StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/types';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -317,6 +317,20 @@ function StudyDocumentCollection({ documents, layout, onOpen, onEdit }: { docume
   return <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="study-documents-grid">{documents.map((document) => <article key={document.id} className="group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 transition-colors hover:border-indigo-800"><button className="block w-full text-left" onClick={() => onOpen(document)}><span className="mb-3 block"><StudyDocumentVisual document={document} size="lg" /></span><span className="block truncate text-sm font-semibold text-neutral-200">{document.title}</span><span className="mt-1 block text-[10px] uppercase tracking-wider text-neutral-600">{t(KIND_LABEL[document.kind])}{document.year ? ` · ${document.year}` : ''}</span><span className="mt-3 line-clamp-3 block text-xs leading-5 text-neutral-500">{document.description || document.contentMarkdown || t('Material vacío')}</span></button><span className="mt-3 flex justify-end border-t border-neutral-800/70 pt-2"><button className="btn btn-ghost h-7 px-2" title={t('Editar información')} onClick={() => onEdit(document)}><Icon name="edit" size={12} /></button></span></article>)}</div>;
 }
 
+const MATERIAL_PREVIEW_LABEL: Record<StudyMaterialPreviewKind, string> = {
+  pdf: 'PDF', document: 'Documento', presentation: 'Presentación', image: 'Imagen', audio: 'Audio', unknown: 'Otro',
+};
+
+function studyMaterialIcon(kind: StudyMaterialPreviewKind): string {
+  return kind === 'image' ? 'image' : kind === 'audio' ? 'play' : kind === 'presentation' ? 'columns' : kind === 'pdf' ? 'book' : 'notebook';
+}
+
+function StudyMaterialCollection({ materials, layout, onOpen }: { materials: StudyMaterialSummary[]; layout: 'grid' | 'list'; onOpen: (material: StudyMaterialSummary) => void }) {
+  const visual = (material: StudyMaterialSummary, large = false) => <span className={`grid shrink-0 place-items-center rounded-lg bg-teal-600/15 text-teal-300 ${large ? 'h-12 w-12' : 'h-8 w-8'}`}><Icon name={material.origin === 'zotero_link' ? 'external' : studyMaterialIcon(material.previewKind)} size={large ? 20 : 15} /></span>;
+  if (layout === 'list') return <div className="mt-3 overflow-x-auto rounded-xl border border-neutral-800"><table className="w-full min-w-[720px] border-collapse text-xs" data-testid="study-organization-materials-list"><thead className="study-browser-table-head text-left"><tr><th className="px-4 py-2 font-medium">{t('Nombre')}</th><th className="w-40 px-3 py-2 font-medium">{t('Formato')}</th><th className="w-40 px-3 py-2 font-medium">{t('Estado')}</th><th className="w-24 px-3 py-2 text-right font-medium">{t('Acciones')}</th></tr></thead><tbody>{materials.map((material) => <tr key={material.id} data-testid={`study-organization-material-${material.id}`} className="border-t border-neutral-800/70 hover:bg-neutral-900/40"><td className="px-4 py-2.5"><button className="flex min-w-0 items-center gap-2 text-left" onClick={() => onOpen(material)}>{visual(material)}<span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{material.title}</span><span className="block truncate text-[10px] text-neutral-600">{material.description || material.fileName}</span></span></button></td><td className="px-3 py-2.5 text-neutral-500">{material.origin === 'zotero_link' ? 'ZOTERO' : material.extension.toUpperCase() || t(MATERIAL_PREVIEW_LABEL[material.previewKind])}</td><td className="px-3 py-2.5 text-neutral-500">{material.indexStatus === 'indexed' ? t('Indexado') : material.indexStatus === 'indexing' ? t('Indexando…') : t('Pendiente de indexar')}</td><td className="px-3 py-2.5 text-right"><button className="btn btn-ghost h-7 px-2" title={t('Abrir')} onClick={() => onOpen(material)}><Icon name="chevronRight" size={12} /></button></td></tr>)}</tbody></table></div>;
+  return <div className="mt-3 grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="study-organization-materials-grid">{materials.map((material) => <article key={material.id} data-testid={`study-organization-material-${material.id}`} className="group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 transition-colors hover:border-teal-800"><button className="block w-full text-left" onClick={() => onOpen(material)}><span className="mb-3 block">{visual(material, true)}</span><span className="block truncate text-sm font-semibold text-neutral-200">{material.title}</span><span className="mt-1 block text-[10px] uppercase tracking-wider text-neutral-600">{material.origin === 'zotero_link' ? 'ZOTERO' : material.extension.toUpperCase() || t(MATERIAL_PREVIEW_LABEL[material.previewKind])}</span><span className="mt-3 line-clamp-3 block text-xs leading-5 text-neutral-500">{material.description || material.fileName}</span></button><span className="mt-3 flex justify-end border-t border-neutral-800/70 pt-2"><button className="text-xs text-neutral-600 hover:text-teal-400" onClick={() => onOpen(material)}>{t('Abrir')} <Icon name="chevronRight" size={12} /></button></span></article>)}</div>;
+}
+
 function StudyEntityLocationDialog({ item, mode, workspace, onSave, onCancel }: { item: StudyBrowserItem; mode: 'move' | 'duplicate'; workspace: StudyWorkspace; onSave: (input: { courseId: string; subjectId: string; folderId: string | null; parentId: string | null }) => Promise<void>; onCancel: () => void }) {
   const subject = item.kind === 'subject' ? workspace.subjects.find((entry) => entry.id === item.id) : null;
   const folder = item.kind === 'folder' ? workspace.folders.find((entry) => entry.id === item.id) : null;
@@ -347,14 +361,17 @@ export function StudyOrganizationView({
   target,
   mode,
   onTargetChange,
+  onOpenMaterial,
   onOpenRecording,
 }: {
   target: StudyNavigationTarget | null;
   mode: 'organization' | 'library';
   onTargetChange: (target: StudyNavigationTarget | null) => void;
+  onOpenMaterial: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
+  const [materials, setMaterials] = useState<StudyMaterialSummary[]>([]);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<StudyDocumentKind | 'all'>('all');
   const [tagId, setTagId] = useState<string>('all');
@@ -380,8 +397,12 @@ export function StudyOrganizationView({
   const [zoteroMaterialImportOpen, setZoteroMaterialImportOpen] = useState(false);
 
   const reload = useCallback(async () => {
-    const next = await window.nodus.getStudyWorkspace();
+    const [next, nextMaterials] = await Promise.all([
+      window.nodus.getStudyWorkspace(),
+      window.nodus.listStudyMaterials(),
+    ]);
     setWorkspace(next);
+    setMaterials(nextMaterials);
     setEditing((current) => current ? next.documents.find((document) => document.id === current.id) ?? null : null);
   }, []);
 
@@ -525,6 +546,27 @@ export function StudyOrganizationView({
     ).sort((a, b) => compareStudyOrganization({ name: a.title, year: a.year, position: a.position, createdAt: a.createdAt, updatedAt: a.updatedAt }, { name: b.title, year: b.year, position: b.position, createdAt: b.createdAt, updatedAt: b.updatedAt }, organizationSort));
   }, [workspace, target, query, kind, tagId, courseFilterId, subjectFilterId, topicFilterId, organizationSort]);
 
+  const scopedMaterials = useMemo(() => {
+    if (!workspace || !target || target.kind === 'document' || kind !== 'all' || tagId !== 'all') return [];
+    const needle = query.trim().toLocaleLowerCase();
+    const placementMatchesTarget = (material: StudyMaterialSummary) => material.placements.some((placement) =>
+      (target.kind === 'course' && placement.courseId === target.id) ||
+      (target.kind === 'subject' && placement.subjectId === target.id) ||
+      (target.kind === 'folder' && placement.folderId === target.id) ||
+      (target.kind === 'topic' && placement.topicId === target.id));
+    const placementMatchesFilters = (material: StudyMaterialSummary) => material.placements.some((placement) =>
+      (courseFilterId === 'all' || placement.courseId === courseFilterId) &&
+      (subjectFilterId === 'all' || placement.subjectId === subjectFilterId) &&
+      (topicFilterId === 'all' || placement.topicId === topicFilterId));
+    return materials.filter((material) => placementMatchesTarget(material) && placementMatchesFilters(material) &&
+      (!needle || `${material.title} ${material.description} ${material.fileName} ${(material.metadata.tags ?? []).join(' ')}`.toLocaleLowerCase().includes(needle)))
+      .sort((a, b) => compareStudyOrganization(
+        { name: a.title, year: a.bibliography.year, position: a.position, createdAt: a.createdAt, updatedAt: a.updatedAt },
+        { name: b.title, year: b.bibliography.year, position: b.position, createdAt: b.createdAt, updatedAt: b.updatedAt },
+        organizationSort,
+      ));
+  }, [workspace, materials, target, query, kind, tagId, courseFilterId, subjectFilterId, topicFilterId, organizationSort]);
+
   const browserItems = useMemo<StudyBrowserItem[]>(() => {
     if (!workspace) return [];
     const needle = query.trim().toLocaleLowerCase();
@@ -636,7 +678,7 @@ export function StudyOrganizationView({
   const exportScope: StudyExportScope = target ? { kind: target.kind, id: target.id } : { kind: 'workspace' };
   const openDocuments = openDocumentIds.map((id) => workspace.documents.find((document) => document.id === id)).filter((document): document is StudyDocument => Boolean(document));
   const browserLabel = !target ? t('Cursos') : target.kind === 'course' ? t('Asignaturas') : target.kind === 'subject' ? t('Carpetas y temas') : t('Temas');
-  const showDocuments = Boolean(target && target.kind !== 'course');
+  const showDocuments = Boolean(target && target.kind !== 'document');
   const filterSubjects = workspace.subjects.filter((subject) => courseFilterId === 'all' || subject.courseId === courseFilterId);
   const filterTopics = workspace.topics.filter((topic) => subjectFilterId === 'all' || topic.subjectId === subjectFilterId);
   const testScope = (placementForTarget() ?? {}) as StudyTestScope;
@@ -789,10 +831,11 @@ export function StudyOrganizationView({
         </section>
 
         {showDocuments && <section className="flex min-w-0 flex-col px-5 pb-5" data-testid="study-documents-section">
-          <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-neutral-300">{t('Apuntes y materiales')}</h2><span className="text-xs text-neutral-600">{documents.length}</span></div>
+          <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-neutral-300">{t('Apuntes y materiales')}</h2><span className="text-xs text-neutral-600">{documents.length + scopedMaterials.length}</span></div>
           <div className="flex-1 content-start overflow-y-auto">
             {documents.length > 0 && <StudyDocumentCollection documents={documents} layout={browserLayout} onOpen={openDocument} onEdit={setEditingDocumentMetadata} />}
-            {documents.length === 0 && (
+            {scopedMaterials.length > 0 && <StudyMaterialCollection materials={scopedMaterials} layout={browserLayout} onOpen={(material) => onOpenMaterial(material.id)} />}
+            {documents.length === 0 && scopedMaterials.length === 0 && (
               <div className="col-span-full rounded-xl border border-dashed border-neutral-800 px-6 py-12 text-center text-sm text-neutral-500">
                 <Icon name="book" size={24} className="mb-3 text-neutral-700" /><p>{t('No hay materiales en esta selección.')}</p>
               </div>
