@@ -1379,6 +1379,15 @@ try {
 
   await page.locator('[data-tour="nav-map"]').click();
   await page.getByTestId('places-map').waitFor({ timeout: 30_000 });
+  await page.getByTestId('map-person-filter').getByRole('button').first().click();
+  await page.getByTestId('map-person-filter-dropdown').waitFor({ timeout: 30_000 });
+  const dropdownIsTopmost = await page.getByTestId('map-person-filter-dropdown').evaluate((dropdown) => {
+    const bounds = dropdown.getBoundingClientRect();
+    const topmost = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + Math.min(24, bounds.height / 2));
+    return topmost != null && dropdown.contains(topmost);
+  });
+  assert.equal(dropdownIsTopmost, true, 'map person dropdown stays above Leaflet layers');
+  await page.keyboard.press('Escape');
   await page.locator('.pm-marker [data-person-id]').first().click({ force: true });
   await page.getByTestId('person-dossier-modal').waitFor({ timeout: 30_000 });
   await page.getByTestId('person-dossier-modal').getByRole('button', { name: 'Cerrar' }).click();

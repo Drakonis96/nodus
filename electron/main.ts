@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { constants as fsConstants, promises as fs } from 'node:fs';
@@ -133,6 +133,39 @@ function emitUpdate(event: UpdateCheckResponse): UpdateCheckResponse {
   return event;
 }
 
+function isSafeExternalUrl(url: string): boolean {
+  return /^(https?:|mailto:)/i.test(url.trim());
+}
+
+function openExternalSafely(url: string): void {
+  if (!isSafeExternalUrl(url)) return;
+  void shell.openExternal(url.trim()).catch((error) => {
+    console.error(`[navigation] could not open external URL: ${error instanceof Error ? error.message : String(error)}`);
+  });
+}
+
+/** Never let a website replace Nodus inside its main BrowserWindow. */
+function protectMainWindowNavigation(window: BrowserWindow): void {
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    openExternalSafely(url);
+    return { action: 'deny' };
+  });
+  window.webContents.on('will-navigate', (event, url) => {
+    const currentUrl = window.webContents.getURL();
+    let sameOrigin = false;
+    try {
+      const target = new URL(url);
+      const current = new URL(currentUrl);
+      sameOrigin = /^https?:$/i.test(target.protocol) && target.origin === current.origin;
+    } catch {
+      sameOrigin = false;
+    }
+    if (sameOrigin) return;
+    event.preventDefault();
+    openExternalSafely(url);
+  });
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -148,6 +181,7 @@ function createWindow(): void {
       sandbox: false,
     },
   });
+  protectMainWindowNavigation(mainWindow);
 
   if (VITE_DEV_SERVER_URL) {
     void mainWindow.loadURL(VITE_DEV_SERVER_URL);

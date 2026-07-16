@@ -82,7 +82,7 @@ export function MapView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 p-4">
+      <div className="relative z-[1000] flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 bg-neutral-950 p-4">
         <Icon name="map" size={20} className="text-indigo-300" />
         <h1 className="text-lg font-semibold">{t('Mapa')}</h1>
 
@@ -121,7 +121,7 @@ export function MapView() {
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col p-4">
+      <div className="relative z-0 flex min-h-0 flex-1 flex-col p-4">
         {allPoints.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Icon name="map" size={30} className="text-neutral-600" />
@@ -163,13 +163,13 @@ function PersonFilter({
   const filtered = q.trim() ? options.filter((o) => o.personName.toLowerCase().includes(q.trim().toLowerCase())) : options;
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative" ref={ref} data-testid="map-person-filter">
       <button className="btn btn-ghost h-9 gap-1.5 border border-neutral-700 text-sm" onClick={() => setOpen((v) => !v)}>
         <Icon name="users" size={14} /> <span className="max-w-[12rem] truncate">{label}</span>
         <Icon name="chevronDown" size={13} />
       </button>
       {open && (
-        <div className="absolute z-30 mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl">
+        <div className="absolute z-[1100] mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl" data-testid="map-person-filter-dropdown">
           <input
             className="input mb-1.5 h-8 w-full text-sm"
             placeholder={t('Buscar persona…')}

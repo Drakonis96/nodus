@@ -81,6 +81,23 @@ export function PlacesMap({
   const [personsById, setPersonsById] = useState<Map<string, Person>>(new Map());
   const [portraitUrls, setPortraitUrls] = useState<Map<string, string>>(new Map());
 
+  // Leaflet renders its attribution as native anchors. Intercept them before
+  // the library can navigate the Electron webContents and delegate the URL to
+  // the same safe system-browser bridge used by the rest of Nodus.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const handleExternalLink = (event: MouseEvent) => {
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
+      if (!link) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void window.nodus.openExternal(link.href).catch(() => undefined);
+    };
+    container.addEventListener('click', handleExternalLink, true);
+    return () => container.removeEventListener('click', handleExternalLink, true);
+  }, []);
+
   // Leaflet creates markers and popups outside React's tree. Delegate their
   // person actions from the stable map container so regenerated layers keep the
   // same mouse and keyboard behaviour.
