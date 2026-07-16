@@ -3614,6 +3614,7 @@ export const EN: Record<string, string> = {
   '¿De dónde procede? Archivo, repositorio, cita, URL…': 'Where is it from? Archive, repository, citation, URL…',
   'Fuente (opcional): archivo, repositorio, cita, URL…': 'Source (optional): archive, repository, citation, URL…',
   'Clasificación': 'Classification',
+  'Clasificación conceptual dentro de la asignatura.': 'Conceptual classification within the subject.',
   'Guardar clasificación': 'Save classification',
   'Personas mencionadas en este documento': 'People mentioned in this document',
   'Coinciden con miembros del árbol. Vincúlalas si son la misma persona.':

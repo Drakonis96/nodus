@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { GraphEdge, IdeaConnection, IdeaDetail, IdeaListItem, IdeaType, EdgeDetail } from '@shared/types';
 import { Badge, EDGE_LABELS, NODE_LABELS, Icon, TypeDot } from '../components/ui';
 import {
@@ -19,6 +19,7 @@ import {
 } from '../navigation';
 import { t, tx } from '../i18n';
 import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import { academicKnowledgeViewSource, type KnowledgeViewSource } from './knowledgeViewSource';
 
 type SortKey = 'label' | 'type' | 'works' | 'connections' | 'confidence';
 const IDEA_ROW_HEIGHT = 116;
@@ -30,10 +31,16 @@ export function IdeasView({
   vaultId,
   onOpenGraph,
   onOpenAssistant,
+  dataSource = academicKnowledgeViewSource,
+  scopeControl,
+  testId,
 }: {
   vaultId: string | null;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
   onOpenAssistant: (target?: PendingAssistantNavigationTarget) => void;
+  dataSource?: KnowledgeViewSource;
+  scopeControl?: ReactNode;
+  testId?: string;
 }) {
   const [ideas, setIdeas] = useState<IdeaListItem[]>([]);
   const [totalIdeas, setTotalIdeas] = useState(0);
@@ -48,6 +55,7 @@ export function IdeasView({
   const [connections, setConnections] = useState<IdeaConnection[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingIdeaToNotes, setSavingIdeaToNotes] = useState(false);
+  const [savingIdea, setSavingIdea] = useState(false);
   const [detailWidth, setDetailWidth] = useState(() =>
     loadNumber(IDEAS_DETAIL_WIDTH_KEY, IDEAS_DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH)
   );
@@ -83,7 +91,7 @@ export function IdeasView({
       type: typeFilter,
       sort: sortKey,
     } as const;
-    const cacheKey = `ideas:${JSON.stringify(request)}`;
+    const cacheKey = `${dataSource.key}:ideas:${JSON.stringify(request)}`;
     if (!force) {
       const cached = getVaultQueryCache<{ items: IdeaListItem[]; total: number }>(vaultId, cacheKey);
       if (cached) {
@@ -94,7 +102,7 @@ export function IdeasView({
       }
     }
     setLoading(true);
-    void window.nodus
+    void dataSource
       .listIdeasPage(request)
       .then((page) => {
         if (page.total > 0 && page.items.length === 0 && pageOffset > 0) {
@@ -106,7 +114,7 @@ export function IdeasView({
         setVaultQueryCache(vaultId, cacheKey, { items: page.items, total: page.total });
       })
       .finally(() => setLoading(false));
-  }, [pageOffset, searchQuery, sortKey, typeFilter, vaultId]);
+  }, [dataSource, pageOffset, searchQuery, sortKey, typeFilter, vaultId]);
 
   useEffect(() => {
     const handle = setTimeout(() => setSearchQuery(search.trim()), 250);
@@ -131,7 +139,7 @@ export function IdeasView({
     }
     setDetailLoading(true);
     let on = true;
-    const cacheKey = `idea-detail:${selectedId}`;
+    const cacheKey = `${dataSource.key}:idea-detail:${selectedId}`;
     const cached = getVaultQueryCache<{ detail: IdeaDetail | null; connections: IdeaConnection[] }>(vaultId, cacheKey);
     if (cached) {
       setDetail(cached.detail);
@@ -139,7 +147,7 @@ export function IdeasView({
       setDetailLoading(false);
       return;
     }
-    void Promise.all([window.nodus.getIdeaDetail(selectedId), window.nodus.listIdeaConnections(selectedId)]).then(([d, linked]) => {
+    void Promise.all([dataSource.getIdeaDetail(selectedId), dataSource.listIdeaConnections(selectedId)]).then(([d, linked]) => {
       if (on) {
         setDetail(d);
         setConnections(linked);
@@ -150,12 +158,14 @@ export function IdeasView({
     return () => {
       on = false;
     };
-  }, [selectedId, vaultId]);
+  }, [dataSource, selectedId, vaultId]);
+
+  useEffect(() => dataSource.subscribe?.(() => reload(true)), [dataSource, reload]);
 
   const selectedNode = selectedId ? ideas.find((idea) => idea.id === selectedId) : null;
 
   return (
-    <div className="h-full flex min-h-0">
+    <div className="h-full flex min-h-0 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid={testId}>
       {/* List */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <div className="p-6 pb-4">
@@ -167,6 +177,7 @@ export function IdeasView({
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2">
+            {scopeControl}
             <input
               className="input text-sm w-60"
               placeholder={t('Buscar ideas…')}
@@ -216,6 +227,7 @@ export function IdeasView({
             return (
               <button
                 key={node.id}
+                data-testid={testId ? 'study-idea-card' : undefined}
                 className={`card p-3 w-full h-[104px] text-left transition-colors ${
                   isSelected ? 'ring-1 ring-indigo-500 bg-neutral-800/80' : 'hover:bg-neutral-800/50'
                 }`}
@@ -263,6 +275,7 @@ export function IdeasView({
       {/* Detail panel */}
       {selectedId && (
         <div
+          data-testid={testId ? 'study-idea-detail' : undefined}
           className="relative shrink-0 border-l border-neutral-800 bg-neutral-900/95 overflow-y-auto p-4"
           style={{ width: detailWidth }}
         >
@@ -325,9 +338,14 @@ export function IdeasView({
                   </button>
                   <button
                     className="btn btn-ghost border border-neutral-700 text-xs gap-1.5"
-                    onClick={() => setSavingIdeaToNotes(true)}
+                    disabled={savingIdea}
+                    onClick={() => {
+                      if (!dataSource.saveIdea) { setSavingIdeaToNotes(true); return; }
+                      setSavingIdea(true);
+                      void dataSource.saveIdea(detail).finally(() => setSavingIdea(false));
+                    }}
                   >
-                    <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+                    <Icon name="notebook" size={13} /> {t(savingIdea ? 'Guardando…' : 'Guardar en notas')}
                   </button>
                 </div>
               </div>
@@ -348,7 +366,7 @@ export function IdeasView({
                   <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
                   {detail.evidence.map((ev) => (
                     <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} />
+                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} onOpen={dataSource.openEvidence} />
                     </blockquote>
                   ))}
                 </div>
@@ -369,6 +387,7 @@ export function IdeasView({
                           node={node}
                           onSelectIdea={setSelectedId}
                           onOpenGraph={onOpenGraph}
+                          dataSource={dataSource}
                         />
                       )
                     )}
@@ -380,7 +399,7 @@ export function IdeasView({
         </div>
       )}
 
-      {savingIdeaToNotes && detail && (
+      {savingIdeaToNotes && detail && !dataSource.saveIdea && (
         <SaveToNotesModal
           content={buildIdeaNote(detail)}
           defaultTitle={detail.idea.label}
@@ -404,11 +423,13 @@ function ConnectedIdeaRow({
   node,
   onSelectIdea,
   onOpenGraph,
+  dataSource,
 }: {
   edge: GraphEdge;
   node: IdeaListItem;
   onSelectIdea: (id: string) => void;
   onOpenGraph: (target: PendingGraphNavigationTarget) => void;
+  dataSource: KnowledgeViewSource;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -422,7 +443,7 @@ function ConnectedIdeaRow({
       if (next && !loadedRef.current) {
         loadedRef.current = true;
         setLoading(true);
-        void Promise.all([window.nodus.getIdeaDetail(node.id), window.nodus.getEdgeDetail(edge.id)]).then(
+        void Promise.all([dataSource.getIdeaDetail(node.id), dataSource.getEdgeDetail(edge.id)]).then(
           ([ideaD, edgeD]) => {
             setIdeaDetail(ideaD);
             setEdgeDetail(edgeD);
@@ -432,7 +453,7 @@ function ConnectedIdeaRow({
       }
       return next;
     });
-  }, [edge.id, node.id]);
+  }, [dataSource, edge.id, node.id]);
 
   const edgeLabel = t(EDGE_LABELS[edge.type as keyof typeof EDGE_LABELS]) ?? edge.type;
 
@@ -482,7 +503,7 @@ function ConnectedIdeaRow({
                       key={ev.id}
                       className="border-l-2 border-indigo-700 pl-2 mt-1 text-xs italic text-neutral-400"
                     >
-                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} />
+                      "{ev.quote}" <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} onOpen={dataSource.openEvidence} />
                     </blockquote>
                   ))}
                 </div>

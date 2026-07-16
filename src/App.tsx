@@ -205,6 +205,10 @@ export function App() {
   const [studyTarget, setStudyTarget] = useState<StudyNavigationTarget | null>(null);
   const [studyMaterialTarget, setStudyMaterialTarget] = useState<string | null>(null);
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
+  const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
+  const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
+  useEffect(() => { if (view !== 'studyGraph') setStudyGraphTarget(null); }, [view]);
+  useEffect(() => { if (view !== 'studyChat') setStudyChatTarget(null); }, [view]);
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<SyncLogEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -664,6 +668,8 @@ export function App() {
     setCollectionsOpen(false);
     setResearchOpen(false);
     setGraphTarget(null);
+    setStudyGraphTarget(null);
+    setStudyChatTarget(null);
     setAssistantTarget(null);
     setNoteTarget(null);
     setLastSync(null);
@@ -1033,7 +1039,7 @@ export function App() {
                     {navButton(homeItem)}
                     <StudySidebar
                       activeView={view}
-                      onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setView(targetView); }}
+                      onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
                     />
                     {navGroups.filter((group) => group.id !== 'explore').map((group) => renderGroup(group))}
                     <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
@@ -1177,12 +1183,25 @@ export function App() {
           {view === 'studyRecordings' && <StudyRecordingsView initialRecordingId={studyRecordingTarget?.id} initialTimestamp={studyRecordingTarget?.timestamp} onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }} />}
           {view === 'studyChat' && <StudyChatView
             settings={settings}
+            initialPrompt={studyChatTarget?.prompt}
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
-          {view === 'studyIdeas' && <StudyIdeasView onOpenGraph={() => setView('studyGraph')} />}
-          {view === 'studyGraph' && <StudyGraphView onOpenIdeas={() => setView('studyIdeas')} />}
+          {view === 'studyIdeas' && <StudyIdeasView
+            vaultId={activeVault?.id ?? null}
+            onOpenGraph={(target) => { setStudyGraphTarget({ ...target, nonce: Date.now() }); setView('studyGraph'); }}
+            onOpenAssistant={(target) => { setStudyChatTarget({ prompt: target?.prompt ?? '', nonce: Date.now() }); setView('studyChat'); }}
+            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+          />}
+          {view === 'studyGraph' && <StudyGraphView
+            settings={settings}
+            onSettingsChange={reloadSettings}
+            target={studyGraphTarget}
+            onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
+            onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+          />}
           {view === 'studyQuestions' && <StudyBankView
             onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}

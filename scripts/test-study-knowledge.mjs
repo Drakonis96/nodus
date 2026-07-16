@@ -79,16 +79,27 @@ try {
   assert.equal(assessmentContext.ideas.length, 1, 'assessment retrieval respects explicit source selection');
   assert.match(assessmentContext.outline, /Separación de poderes/);
 
-  const [searchSource, questionSource, ideasView, graphView] = await Promise.all([
+  const [searchSource, questionSource, ideasView, graphView, ideasEngine, graphEngine, adapter] = await Promise.all([
     readFile(path.join(repoRoot, 'electron/ai/studySearch.ts'), 'utf8'), readFile(path.join(repoRoot, 'electron/ai/studyQuestions.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'src/views/StudyIdeasView.tsx'), 'utf8'), readFile(path.join(repoRoot, 'src/views/StudyGraphView.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/IdeasView.tsx'), 'utf8'), readFile(path.join(repoRoot, 'src/views/GraphView.tsx'), 'utf8'),
+    readFile(path.join(repoRoot, 'src/views/studyKnowledgeViewSource.ts'), 'utf8'),
   ]);
   assert.match(searchSource, /study-fragment-v2/); assert.match(searchSource, /embedding: null/);
   assert.match(questionSource, /MAPA CONCEPTUAL DE LA ASIGNATURA/); assert.match(questionSource, /no es evidencia/);
-  for (const view of [ideasView, graphView]) { assert.match(view, /dark:bg-neutral-950/); assert.match(view, /bg-white/); }
-  for (const marker of ['study-ideas-view', 'study-ideas-subject', 'study-idea-card', 'study-idea-detail']) assert.match(ideasView, new RegExp(marker));
-  for (const academicPattern of ['VirtualList', 'DETAIL_MIN_WIDTH', 'DETAIL_MAX_WIDTH', 'Ordenar: nombre', 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasView, new RegExp(academicPattern));
-  for (const marker of ['study-graph-view', 'study-graph-subject', 'study-graph-node']) assert.match(graphView, new RegExp(marker));
+  assert.match(ideasView, /<IdeasView/); assert.match(graphView, /<GraphView/);
+  for (const marker of ['study-ideas-view', 'study-ideas-subject']) assert.match(ideasView, new RegExp(marker));
+  for (const marker of ['study-graph-view', 'study-graph-subject']) assert.match(graphView, new RegExp(marker));
+  for (const academicPattern of ['VirtualList', 'DETAIL_MIN_WIDTH', 'DETAIL_MAX_WIDTH', 'Ordenar: nombre', 'Todos los tipos', 'Ideas conectadas']) assert.match(ideasEngine, new RegExp(academicPattern));
+  for (const graphCapability of ['SigmaGraph', 'GRAPH_PRESETS', 'layoutMode', 'highlightDepth', 'playGraphHistory', 'sigma-graph-engine']) assert.match(graphCapability === 'sigma-graph-engine' ? await readFile(path.join(repoRoot, 'src/views/graph/SigmaGraph.tsx'), 'utf8') : graphEngine, new RegExp(graphCapability));
+  assert.match(adapter, /key: `study:\$\{subjectId\}`/);
+  assert.match(adapter, /window\.nodus\.getStudyKnowledgeGraph\(subjectId\)/);
+  assert.match(adapter, /window\.nodus\.listStudyIdeas\(subjectId/);
+  assert.match(adapter, /theme:study:\$\{subjectId\}/);
+  assert.match(adapter, /window\.nodus\.createStudyDocument/);
+  assert.match(adapter, /placement: \{ courseId: subject\?\.courseId \?\? null, subjectId \}/);
+  assert.doesNotMatch(adapter, /window\.nodus\.getGraph\(/);
+  assert.match(graphEngine, /sourceStorageKey\(FILTER_KEY, dataSource\.key\)/, 'graph filters are isolated by knowledge source');
   closeDb(); console.log('Study knowledge graph tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }
 

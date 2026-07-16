@@ -1172,10 +1172,13 @@ try {
     return { light, dark };
   });
   assert.notEqual(knowledgeThemeColors.light, knowledgeThemeColors.dark, 'study ideas surface adapts between light and dark themes');
-  await page.getByRole('button', { name: 'Abrir grafo', exact: true }).click();
+  await page.locator('[data-tour="nav-studyGraph"]').click();
   await page.getByTestId('study-graph-view').waitFor();
   await page.getByTestId('study-graph-subject').waitFor();
-  console.log('[e2e] subject-scoped Ideas and Graph views render in light and dark themes');
+  await page.getByTestId('study-graph-view').getByTestId('sigma-graph-engine').waitFor();
+  await page.getByTestId('study-graph-view').getByPlaceholder('Buscar en el grafo...').waitFor();
+  for (const control of ['Panorama', 'Contradicciones', 'Huecos', 'Filtros']) await page.getByTestId('study-graph-view').getByRole('button', { name: new RegExp(control) }).first().waitFor();
+  console.log('[e2e] study Ideas reuse the original list and study Graph reuses the Sigma engine and controls');
 
   await page.locator('[data-tour="nav-settings"]').click();
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();

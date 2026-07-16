@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import cytoscape, { Core, ElementDefinition } from 'cytoscape';
 import type { AppSettings, GraphData, IdeaType, IdeaDetail, EdgeDetail, GraphNodeType, TutorStop } from '@shared/types';
 import { NODE_COLORS, NODE_LABELS, EDGE_LABELS, Icon } from '../components/ui';
@@ -13,6 +13,7 @@ import { buildThemeConstellation, buildThemeBackbone } from './graph/model';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import type { GraphNavigationTarget, GraphPresetId } from '../navigation';
 import { t, tx } from '../i18n';
+import { academicKnowledgeViewSource, type KnowledgeViewSource } from './knowledgeViewSource';
 
 // The Sigma (WebGL) + worker-layout + LOD renderer is the default engine.
 // Fall back to the legacy Cytoscape canvas renderer by setting:
@@ -1096,11 +1097,15 @@ function graphPreset(id: GraphPresetId, target?: GraphNavigationTarget): { lens:
   }
 }
 
-function loadFilters(): Filters {
+function sourceStorageKey(base: string, sourceKey: string): string {
+  return sourceKey === academicKnowledgeViewSource.key ? base : `${base}.${sourceKey}`;
+}
+
+function loadFilters(storageKey = FILTER_KEY, versionKey = FILTER_VERSION_KEY): Filters {
   try {
-    const parsed = JSON.parse(localStorage.getItem(FILTER_KEY) ?? '{}') as Partial<Filters>;
+    const parsed = JSON.parse(localStorage.getItem(storageKey) ?? '{}') as Partial<Filters>;
     const merged = { ...defaultFilters(), ...parsed };
-    const isLegacyFilters = localStorage.getItem(FILTER_VERSION_KEY) !== FILTER_VERSION;
+    const isLegacyFilters = localStorage.getItem(versionKey) !== FILTER_VERSION;
     const nodeTypes = new Set((merged.nodeTypes ?? []).filter((type) => GRAPH_NODE_TYPES.includes(type as any)));
     if (isLegacyFilters) nodeTypes.add('theme');
     merged.nodeTypes = GRAPH_NODE_TYPES.filter((type) => nodeTypes.has(type));
@@ -1114,12 +1119,12 @@ function loadFilters(): Filters {
   }
 }
 
-function loadLens(): GraphLens {
-  return localStorage.getItem(LENS_KEY) === 'authors' ? 'authors' : 'ideas';
+function loadLens(storageKey = LENS_KEY): GraphLens {
+  return localStorage.getItem(storageKey) === 'authors' ? 'authors' : 'ideas';
 }
 
-function loadHighlightDepth(): number | null {
-  const raw = localStorage.getItem(LOCAL_GRAPH_DEPTH_KEY);
+function loadHighlightDepth(storageKey = LOCAL_GRAPH_DEPTH_KEY): number | null {
+  const raw = localStorage.getItem(storageKey);
   if (!raw) return DEFAULT_LOCAL_GRAPH_DEPTH;
   if (raw === 'unlimited') return null;
   const parsed = Number(raw);
@@ -1365,11 +1370,23 @@ export function GraphView({
   settings,
   onSettingsChange,
   target,
+  dataSource = academicKnowledgeViewSource,
+  scopeControl,
+  testId,
 }: {
   settings: AppSettings;
   onSettingsChange: () => void;
   target?: GraphNavigationTarget | null;
+  dataSource?: KnowledgeViewSource;
+  scopeControl?: ReactNode;
+  testId?: string;
 }) {
+  const filterStorageKey = sourceStorageKey(FILTER_KEY, dataSource.key);
+  const filterVersionStorageKey = sourceStorageKey(FILTER_VERSION_KEY, dataSource.key);
+  const lensStorageKey = sourceStorageKey(LENS_KEY, dataSource.key);
+  const layoutStorageKey = sourceStorageKey(LAYOUT_KEY, dataSource.key);
+  const legendStorageKey = sourceStorageKey(LEGEND_COLLAPSED_KEY, dataSource.key);
+  const depthStorageKey = sourceStorageKey(LOCAL_GRAPH_DEPTH_KEY, dataSource.key);
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const activeLayoutRef = useRef<any | null>(null);
@@ -1428,7 +1445,7 @@ export function GraphView({
     window.clearTimeout(pendingInitialLayoutTimerRef.current);
     pendingInitialLayoutTimerRef.current = null;
   }, []);
-  const [lens, setLens] = useState<GraphLens>(loadLens);
+  const [lens, setLens] = useState<GraphLens>(() => dataSource.capabilities.authors ? loadLens(lensStorageKey) : 'ideas');
   const [themesModalOpen, setThemesModalOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [ideaDupesOpen, setIdeaDupesOpen] = useState(false);
@@ -1439,13 +1456,13 @@ export function GraphView({
   const [themes, setThemes] = useState<string[]>([]);
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [graphLoading, setGraphLoading] = useState(false);
-  const [filters, setFilters] = useState<Filters>(loadFilters);
-  const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (loadLens() === 'authors' ? 'authors' : 'overview'));
+  const [filters, setFilters] = useState<Filters>(() => loadFilters(filterStorageKey, filterVersionStorageKey));
+  const [activePreset, setActivePreset] = useState<GraphPresetId>(() => (dataSource.capabilities.authors && loadLens(lensStorageKey) === 'authors' ? 'authors' : 'overview'));
   const [graphLevel, setGraphLevel] = useState<GraphLevelState>({ level: 'corpus' });
   // How many of a theme's most-connected ideas the backbone (level 2) shows.
   const [backboneCap, setBackboneCap] = useState(90);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(LEGEND_COLLAPSED_KEY) === '1');
+  const [legendCollapsed, setLegendCollapsed] = useState(() => localStorage.getItem(legendStorageKey) === '1');
   const [contextNotice, setContextNotice] = useState<string | null>(null);
   const [contextZoteroKey, setContextZoteroKey] = useState<string | null>(null);
   const [ideaDetail, setIdeaDetail] = useState<IdeaDetail | null>(null);
@@ -1459,8 +1476,8 @@ export function GraphView({
   const detailSeqRef = useRef(0);
   const [detailWidth, setDetailWidth] = useState(() => loadNumber(DETAIL_WIDTH_KEY, DETAIL_DEFAULT_WIDTH, DETAIL_MIN_WIDTH, DETAIL_MAX_WIDTH));
   const [detailFontSize, setDetailFontSize] = useState(() => loadNumber(DETAIL_FONT_KEY, DETAIL_DEFAULT_FONT, DETAIL_MIN_FONT, DETAIL_MAX_FONT));
-  const [highlightDepth, setHighlightDepth] = useState<number | null>(loadHighlightDepth);
-  const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(LAYOUT_KEY) as 'force' | 'radial') || 'force');
+  const [highlightDepth, setHighlightDepth] = useState<number | null>(() => loadHighlightDepth(depthStorageKey));
+  const [layoutMode, setLayoutMode] = useState<'force' | 'radial'>(() => (localStorage.getItem(layoutStorageKey) as 'force' | 'radial') || 'force');
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const sigmaApiRef = useRef<SigmaGraphApi | null>(null);
   const layoutModeRef = useRef<'force' | 'radial'>(layoutMode);
@@ -1472,27 +1489,30 @@ export function GraphView({
   const graphSceneCacheRef = useRef(new Map<string, GraphData>());
   const graphSceneRequestRef = useRef<GraphSceneRequest>({ key: 'overview', kind: 'overview', lens: 'ideas' });
   const graphLoadStateRef = useRef({ running: false, queued: false, force: false });
+  const dataSourceRef = useRef(dataSource);
   const graphReloadTimerRef = useRef<number | null>(null);
   const pendingGraphTransitionRef = useRef<{ first: number | null; second: number | null }>({ first: null, second: null });
 
+  useEffect(() => { dataSourceRef.current = dataSource; }, [dataSource]);
+
   useEffect(() => {
-    localStorage.setItem(FILTER_KEY, JSON.stringify(filters));
-    localStorage.setItem(FILTER_VERSION_KEY, FILTER_VERSION);
-  }, [filters]);
+    localStorage.setItem(filterStorageKey, JSON.stringify(filters));
+    localStorage.setItem(filterVersionStorageKey, FILTER_VERSION);
+  }, [filterStorageKey, filterVersionStorageKey, filters]);
 
   useEffect(() => {
     lensRef.current = lens;
-    localStorage.setItem(LENS_KEY, lens);
-  }, [lens]);
+    localStorage.setItem(lensStorageKey, lens);
+  }, [lens, lensStorageKey]);
 
   useEffect(() => {
     layoutModeRef.current = layoutMode;
-    localStorage.setItem(LAYOUT_KEY, layoutMode);
-  }, [layoutMode]);
+    localStorage.setItem(layoutStorageKey, layoutMode);
+  }, [layoutMode, layoutStorageKey]);
 
   useEffect(() => {
-    localStorage.setItem(LEGEND_COLLAPSED_KEY, legendCollapsed ? '1' : '0');
-  }, [legendCollapsed]);
+    localStorage.setItem(legendStorageKey, legendCollapsed ? '1' : '0');
+  }, [legendCollapsed, legendStorageKey]);
 
   const cancelPendingGraphTransition = useCallback(() => {
     const pending = pendingGraphTransitionRef.current;
@@ -1528,9 +1548,9 @@ export function GraphView({
 
   useEffect(() => {
     highlightDepthRef.current = highlightDepth;
-    localStorage.setItem(LOCAL_GRAPH_DEPTH_KEY, highlightDepth == null ? 'unlimited' : String(highlightDepth));
+    localStorage.setItem(depthStorageKey, highlightDepth == null ? 'unlimited' : String(highlightDepth));
     if (lastUserFocusRef.current) focusNodeByIdRef.current(lastUserFocusRef.current);
-  }, [highlightDepth]);
+  }, [depthStorageKey, highlightDepth]);
 
   const progressiveOverview =
     USE_SIGMA && lens === 'ideas' && activePreset === 'overview' && !filters.search.trim() && filters.workIds.length === 0;
@@ -1541,19 +1561,19 @@ export function GraphView({
       : null;
   const graphSceneRequest = useMemo<GraphSceneRequest>(() => {
     if (!progressiveOverview || graphLevel.level === 'full') {
-      return { key: `full:${lens}`, kind: 'full' as const, lens };
+      return { key: `${dataSource.key}:full:${lens}`, kind: 'full' as const, lens };
     }
     if (requestedTheme) {
       return {
-        key: `theme:${requestedTheme.trim().toLowerCase()}:${Math.min(250, backboneCap)}`,
+        key: `${dataSource.key}:theme:${requestedTheme.trim().toLowerCase()}:${Math.min(250, backboneCap)}`,
         kind: 'theme' as const,
         lens,
         theme: requestedTheme,
         cap: backboneCap,
       };
     }
-    return { key: 'overview', kind: 'overview' as const, lens };
-  }, [backboneCap, graphLevel.level, lens, progressiveOverview, requestedTheme]);
+    return { key: `${dataSource.key}:overview`, kind: 'overview' as const, lens };
+  }, [backboneCap, dataSource.key, graphLevel.level, lens, progressiveOverview, requestedTheme]);
   graphSceneRequestRef.current = graphSceneRequest;
 
   const applyGraphScene = useCallback((request: GraphSceneRequest, nextData: GraphData) => {
@@ -1591,10 +1611,10 @@ export function GraphView({
             graphRequestPendingRef.current = true;
             setGraphLoading(true);
             nextData = request.kind === 'overview'
-              ? await window.nodus.getGraphOverview()
+              ? await dataSource.getGraphOverview()
               : request.kind === 'theme'
-                ? await window.nodus.getGraphTheme(request.theme ?? '', request.cap)
-                : await window.nodus.getGraph(request.lens);
+                ? await dataSource.getGraphTheme(request.theme ?? '', request.cap)
+                : await dataSource.getGraph(request.lens);
             if (seq !== graphLoadSeqRef.current && graphSceneRequestRef.current.key !== request.key) {
               state.queued = true;
               continue;
@@ -1613,7 +1633,7 @@ export function GraphView({
         if (state.queued) loadCurrentGraphScene(state.force);
       }
     })();
-  }, [applyGraphScene]);
+  }, [applyGraphScene, dataSource]);
 
   const reload = useCallback(() => {
     if (graphReloadTimerRef.current != null) window.clearTimeout(graphReloadTimerRef.current);
@@ -1635,6 +1655,7 @@ export function GraphView({
   // having to leave and re-open the view.
   useDataRefresh(reload);
   useScanComplete(reload);
+  useEffect(() => dataSource.subscribe?.(reload), [dataSource, reload]);
 
   const cancelPendingDragFrame = useCallback(() => {
     const state = dragStateRef.current;
@@ -2263,7 +2284,7 @@ export function GraphView({
         const seq = ++detailSeqRef.current;
         let detailPromise: Promise<IdeaDetail | null> | null = null;
         if (isIdea) {
-          detailPromise = window.nodus.getIdeaDetail(node.id());
+          detailPromise = dataSourceRef.current.getIdeaDetail(node.id());
           setIdeaDetail(null);
           setEdgeDetail(null);
           setDetailLoading({ kind: 'idea', id: node.id(), label: String(node.data('label') ?? ''), type: String(node.data('type') ?? '') });
@@ -2299,7 +2320,7 @@ export function GraphView({
         hoverActiveRef.current = false;
         lastUserFocusRef.current = edge.id();
         const seq = ++detailSeqRef.current;
-        const detailPromise = window.nodus.getEdgeDetail(edge.id());
+        const detailPromise = dataSourceRef.current.getEdgeDetail(edge.id());
         setIdeaDetail(null);
         setEdgeDetail(null);
         setDetailLoading({ kind: 'edge', id: edge.id(), label: String(edge.data('type') ?? '') });
@@ -2848,7 +2869,7 @@ export function GraphView({
     }
     setIdeaDetail(null);
     setDetailLoading({ kind: 'idea', id, label, type });
-    void window.nodus.getIdeaDetail(id).then(
+    void dataSourceRef.current.getIdeaDetail(id).then(
       (d) => {
         if (seq === detailSeqRef.current) {
           setIdeaDetail(d);
@@ -2865,7 +2886,7 @@ export function GraphView({
     setIdeaDetail(null);
     setEdgeDetail(null);
     setDetailLoading({ kind: 'edge', id, label: type });
-    void window.nodus.getEdgeDetail(id).then(
+    void dataSourceRef.current.getEdgeDetail(id).then(
       (d) => {
         if (seq === detailSeqRef.current) {
           setEdgeDetail(d);
@@ -3072,13 +3093,13 @@ export function GraphView({
     };
     if (stop.kind === 'connection' && stop.edgeId) {
       setIdeaDetail(null);
-      apply(null, await window.nodus.getEdgeDetail(stop.edgeId));
+      apply(null, await dataSourceRef.current.getEdgeDetail(stop.edgeId));
       return;
     }
     const ideaId = stop.nodeIds.find((id) => !id.startsWith('theme:'));
     if (ideaId) {
       setEdgeDetail(null);
-      apply(await window.nodus.getIdeaDetail(ideaId), null);
+      apply(await dataSourceRef.current.getIdeaDetail(ideaId), null);
       return;
     }
     apply(null, null); // theme stop — no dedicated detail panel
@@ -3208,12 +3229,13 @@ export function GraphView({
   }, [ideaDetail, edgeDetail, detailLoading]);
 
   return (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="h-full flex flex-col min-h-0" data-testid={testId}>
       {/* Filter bar */}
       <div className="border-b border-neutral-800 p-2 text-xs">
         <div className="flex flex-wrap gap-2 items-center">
+          {scopeControl}
           <div className="flex flex-wrap gap-1">
-            {GRAPH_PRESETS.map((preset) => (
+            {GRAPH_PRESETS.filter((preset) => dataSource.capabilities.authors || preset.id !== 'authors').filter((preset) => dataSource.capabilities.readingState || (preset.id !== 'reading' && preset.id !== 'unread')).map((preset) => (
               <button
                 key={preset.id}
                 className={`btn gap-1.5 py-1 ${activePreset === preset.id ? 'btn-primary' : 'btn-ghost border border-neutral-700'}`}
@@ -3259,7 +3281,7 @@ export function GraphView({
               )}
             </div>
           )}
-          {lens === 'ideas' && (
+          {lens === 'ideas' && dataSource.capabilities.tutor && (
             <button
               className={`btn border border-neutral-700 gap-1.5 ${tutorOpen ? 'bg-indigo-600 text-white' : 'btn-ghost'}`}
               title={t('Recorrido guiado por la IA a través de tus ideas y conexiones')}
@@ -3268,7 +3290,7 @@ export function GraphView({
               <Icon name="compass" /> {t('Modo Tutor')}
             </button>
           )}
-          {lens === 'ideas' && (
+          {lens === 'ideas' && dataSource.capabilities.manageThemes && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
               title={t('Gestionar los temas principales y reprocesar las conexiones de los nodos')}
@@ -3277,7 +3299,7 @@ export function GraphView({
               <Icon name="tag" /> {t('Temas')}
             </button>
           )}
-          {lens === 'ideas' && (
+          {lens === 'ideas' && dataSource.capabilities.audit && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
               title={t('Ver y deshacer tus veredictos sobre relaciones (confirmadas y rechazadas)')}
@@ -3286,7 +3308,7 @@ export function GraphView({
               <Icon name="check" /> {t('Auditoría')}
             </button>
           )}
-          {lens === 'ideas' && (
+          {lens === 'ideas' && dataSource.capabilities.duplicates && (
             <button
               className="btn btn-ghost border border-neutral-700 gap-1.5"
               title={t('Buscar y fusionar ideas duplicadas para limpiar el grafo y el listado')}
@@ -3305,9 +3327,9 @@ export function GraphView({
               <button className={`px-3 py-1 ${lens === 'ideas' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('ideas')}>
                 {t('Ideas')}
               </button>
-              <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('authors')}>
+              {dataSource.capabilities.authors && <button className={`px-3 py-1 ${lens === 'authors' ? 'bg-indigo-600 text-white' : ''}`} onClick={() => selectLens('authors')}>
                 {t('Autores')}
-              </button>
+              </button>}
             </div>
             {lens === 'ideas' && (
               <div className="flex flex-wrap gap-1">
@@ -3336,11 +3358,11 @@ export function GraphView({
                 ))}
               </select>
             )}
-            <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
+            {dataSource.capabilities.readingState && <select className="input" value={filters.readState} onChange={(e) => setF({ readState: e.target.value as any })}>
               <option value="all">{t('Leído + no leído')}</option>
               <option value="read">{t('Solo leído')}</option>
               <option value="unread">{t('Solo no leído')}</option>
-            </select>
+            </select>}
             {lens === 'ideas' && (
               <select className="input" value={filters.basis} onChange={(e) => setF({ basis: e.target.value as any })}>
                 <option value="all">{t('Explícito + inferido')}</option>
@@ -3372,18 +3394,18 @@ export function GraphView({
                 <option value="unlimited">{t('Sin límite')}</option>
               </select>
             </label>
-            <input
+            {dataSource.capabilities.readingState && <input
               className="input w-16"
               placeholder={t('año≥')}
               value={filters.yearMin ?? ''}
               onChange={(e) => setF({ yearMin: e.target.value ? +e.target.value : null })}
-            />
-            <input
+            />}
+            {dataSource.capabilities.readingState && <input
               className="input w-16"
               placeholder={t('año≤')}
               value={filters.yearMax ?? ''}
               onChange={(e) => setF({ yearMax: e.target.value ? +e.target.value : null })}
-            />
+            />}
             <button className="btn btn-ghost border border-neutral-700" onClick={() => applyPreset(lens === 'authors' ? 'authors' : 'overview')}>
               {t('Limpiar')}
             </button>
@@ -3392,7 +3414,7 @@ export function GraphView({
       </div>
 
       <div className="flex-1 flex min-h-0 relative">
-        {lens === 'ideas' && tutorOpen && (
+        {lens === 'ideas' && dataSource.capabilities.tutor && tutorOpen && (
           <TutorPanel
             settings={settings}
             onFocusStop={(stop) => void showTutorStop(stop)}
@@ -3599,6 +3621,10 @@ export function GraphView({
             onFontChange={changeDetailFont}
             relations={USE_SIGMA ? ideaRelations : undefined}
             onOpenIdea={openRelatedIdea}
+            onOpenEvidence={dataSource.openEvidence}
+            showEdgeAudit={dataSource.capabilities.audit}
+            onSaveIdea={dataSource.saveIdea}
+            onSaveEdge={dataSource.saveEdge}
             onEdgeFeedback={(verdict) => {
               // A rejected relation vanishes from the graph: refresh and close its detail.
               if (verdict === 'rejected') {
@@ -3620,7 +3646,7 @@ export function GraphView({
         )}
       </div>
 
-      {themesModalOpen && (
+      {dataSource.capabilities.manageThemes && themesModalOpen && (
         <ThemesModal
           settings={settings}
           onSettingsChange={onSettingsChange}
@@ -3631,7 +3657,7 @@ export function GraphView({
           }}
         />
       )}
-      {ideaDupesOpen && (
+      {dataSource.capabilities.duplicates && ideaDupesOpen && (
         <IdeaDuplicatesModal
           onClose={() => {
             setIdeaDupesOpen(false);
@@ -3639,7 +3665,7 @@ export function GraphView({
           }}
         />
       )}
-      {auditOpen && (
+      {dataSource.capabilities.audit && auditOpen && (
         <EdgeAuditModal
           onClose={() => setAuditOpen(false)}
           onChanged={() => {

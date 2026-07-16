@@ -1424,7 +1424,7 @@ export function SigmaGraph({
 
   return (
     <>
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" data-testid="sigma-graph-engine" />
       <canvas
         ref={minimapRef}
         width={156}

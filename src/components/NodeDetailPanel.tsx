@@ -58,6 +58,10 @@ export function NodeDetailPanel({
   relations,
   onOpenIdea,
   onEdgeFeedback,
+  onOpenEvidence,
+  showEdgeAudit = true,
+  onSaveIdea,
+  onSaveEdge,
 }: {
   ideaDetail: IdeaDetail | null;
   edgeDetail: EdgeDetail | null;
@@ -73,9 +77,14 @@ export function NodeDetailPanel({
   onOpenIdea?: (ideaId: string) => void;
   /** Called after the user sets/clears an audit verdict, so the host view can refresh its graph. */
   onEdgeFeedback?: (verdict: 'rejected' | 'confirmed' | null) => void;
+  onOpenEvidence?: (sourceRef: string, location: string | null) => void;
+  showEdgeAudit?: boolean;
+  onSaveIdea?: (detail: IdeaDetail) => Promise<void>;
+  onSaveEdge?: (detail: EdgeDetail) => Promise<void>;
 }) {
   // A note pending capture: built lazily from whichever detail is open.
   const [saving, setSaving] = useState<{ content: string; title: string; ref: string } | null>(null);
+  const [savingExternal, setSavingExternal] = useState(false);
 
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -106,14 +115,25 @@ export function NodeDetailPanel({
           <button
             className="card mr-auto inline-flex items-center gap-1.5 bg-neutral-900 px-2 py-1 text-xs hover:bg-neutral-800"
             title={t('Guardar en notas')}
+            disabled={savingExternal}
             onClick={() => {
               if (ideaDetail) {
+                if (onSaveIdea) {
+                  setSavingExternal(true);
+                  void onSaveIdea(ideaDetail).finally(() => setSavingExternal(false));
+                  return;
+                }
                 setSaving({
                   content: buildIdeaNote(ideaDetail),
                   title: ideaDetail.idea.label,
                   ref: ideaDetail.idea.global_id,
                 });
               } else if (edgeDetail) {
+                if (onSaveEdge) {
+                  setSavingExternal(true);
+                  void onSaveEdge(edgeDetail).finally(() => setSavingExternal(false));
+                  return;
+                }
                 setSaving({
                   content: buildEdgeNote(edgeDetail),
                   title: `${edgeDetail.fromLabel} → ${edgeDetail.toLabel}`,
@@ -122,7 +142,7 @@ export function NodeDetailPanel({
               }
             }}
           >
-            <Icon name="notebook" size={13} /> {t('Guardar en notas')}
+            <Icon name="notebook" size={13} /> {t(savingExternal ? 'Guardando…' : 'Guardar en notas')}
           </button>
         )}
         <button className="card bg-neutral-900 px-2 py-1 hover:bg-neutral-800 text-xs" title={t('Disminuir texto')} onClick={() => onFontChange(-1)}>
@@ -217,7 +237,7 @@ export function NodeDetailPanel({
               <div className="text-xs uppercase text-neutral-500 mb-1">{t('Evidencia anclada')}</div>
               {ideaDetail.evidence.map((ev) => (
                 <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} />
+                  “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} suffix={` · ${ev.kind}`} onOpen={onOpenEvidence} />
                 </blockquote>
               ))}
             </div>
@@ -252,10 +272,10 @@ export function NodeDetailPanel({
           )}
           {edgeDetail.evidence.map((ev) => (
             <blockquote key={ev.id} className="border-l-2 border-indigo-700 pl-3 py-2 my-2 text-xs text-neutral-300 italic bg-neutral-950/35 rounded-r-md">
-              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} />
+              “{ev.quote}” <EvidenceLocationLink nodusId={ev.nodus_id} location={ev.location} onOpen={onOpenEvidence} />
             </blockquote>
           ))}
-          <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />
+          {showEdgeAudit && <EdgeAuditControls edgeDetail={edgeDetail} onEdgeFeedback={onEdgeFeedback} />}
         </div>
       )}
       {saving && (
@@ -280,23 +300,25 @@ export function EvidenceLocationLink({
   nodusId,
   location,
   suffix = '',
+  onOpen,
 }: {
   nodusId: string;
   location: string | null;
   suffix?: string;
+  onOpen?: (sourceRef: string, location: string | null) => void;
 }) {
   const page = parsePageNumber(location);
-  if (page === null) {
+  if (page === null && !onOpen) {
     return <span className="text-neutral-500 not-italic">{(location ?? '') + suffix}</span>;
   }
   return (
     <span className="text-neutral-500 not-italic">
       <button
         className="inline-flex items-center gap-0.5 text-indigo-400 hover:text-indigo-300"
-        title={t('Abrir el PDF en Zotero por esta página')}
-        onClick={() => void window.nodus.openEvidenceAtPage(nodusId, location)}
+        title={onOpen ? t('Abrir fuente') : t('Abrir el PDF en Zotero por esta página')}
+        onClick={() => onOpen ? onOpen(nodusId, location) : void window.nodus.openEvidenceAtPage(nodusId, location)}
       >
-        <Icon name="external" size={11} /> {location}
+        <Icon name="external" size={11} /> {location || t('Abrir fuente')}
       </button>
       {suffix}
     </span>

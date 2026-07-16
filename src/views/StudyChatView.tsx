@@ -39,11 +39,12 @@ function relativeDate(value: string): string {
   return date.toLocaleDateString();
 }
 
-export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpenRecording }: {
+export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpenRecording, initialPrompt }: {
   settings: AppSettings;
   onOpenDocument: (id: string) => void;
   onOpenMaterial: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
+  initialPrompt?: string | null;
 }) {
   const [conversation, setConversation] = useState<StudyAssistantConversation | null>(null);
   const [history, setHistory] = useState<StudyAssistantConversationSummary[]>([]);
@@ -55,6 +56,7 @@ export function StudyChatView({ settings, onOpenDocument, onOpenMaterial, onOpen
   const [pendingDelete, setPendingDelete] = useState<StudyAssistantConversationSummary | null>(null);
   const [model, setModel] = useFeatureModel(settings, 'studyModel');
   const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (initialPrompt?.trim()) setInput(initialPrompt.trim()); }, [initialPrompt]);
 
   const refreshHistory = useCallback(async () => setHistory(await window.nodus.listStudyAssistantConversations()), []);
   useEffect(() => { void Promise.all([refreshHistory(), window.nodus.listStudyAssistantSources().then(setSources)]); }, [refreshHistory]);
