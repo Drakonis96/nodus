@@ -35,6 +35,8 @@ assert.match(releaseNotes, /version: '2\.3\.7'[\s\S]*scope: 'genealogy'/);
 assert.match(releaseNotes, /version: '2\.3\.7'[\s\S]*scope: 'estudio'/);
 assert.match(releaseNotes, /version: '2\.3\.7'[\s\S]*scope: 'general'/);
 assert.match(releaseNotes, /version: '2\.3\.7'[\s\S]*es: '[^']+'[\s\S]*en: '[^']+'/);
+assert.match(releaseNotes, /version: '2\.3\.8'[\s\S]*scope: 'general'/);
+assert.match(releaseNotes, /version: '2\.3\.8'[\s\S]*es: '[^']+'[\s\S]*en: '[^']+'[\s\S]*fr: '[^']+'[\s\S]*de: '[^']+'[\s\S]*pt: '[^']+'[\s\S]*'pt-BR': '[^']+'/);
 assert.match(releaseNotes, /export function releaseNotesForMajor\(current: string\)/);
 assert.match(releaseNotes, /noteMajor === currentMajor && compareVersions\(note\.version, current\) <= 0/);
 assert.match(styles, /\.whats-new-scope \{[\s\S]*border-radius: 7px/);

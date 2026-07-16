@@ -8,6 +8,8 @@
 // Fully dynamic: App re-invokes this whenever the theme or the active vault
 // changes, so no icon variants need to be pre-baked at build time.
 
+import markGeometry from '@shared/nodusMark.json';
+
 function clamp(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
 }
@@ -36,17 +38,18 @@ function shade(hex: string, amt: number): string {
 function markSvg(color: string): string {
   const light = shade(color, 0.55);
   const dark = shade(color, -0.4);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-    <defs><linearGradient id="g" x1="14" y1="10" x2="50" y2="54" gradientUnits="userSpaceOnUse">
+  const g = markGeometry;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.viewBoxSize} ${g.viewBoxSize}">
+    <defs><linearGradient id="g" x1="${g.gradient.x1}" y1="${g.gradient.y1}" x2="${g.gradient.x2}" y2="${g.gradient.y2}" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="${light}"/>
       <stop offset="0.45" stop-color="${color}"/>
       <stop offset="1" stop-color="${dark}"/>
     </linearGradient></defs>
-    <path d="M18 48V16L46 48V16" fill="none" stroke="url(#g)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="18" cy="16" r="6.5" fill="${light}"/>
-    <circle cx="18" cy="48" r="6.5" fill="${color}"/>
-    <circle cx="46" cy="48" r="6.5" fill="${shade(color, -0.15)}"/>
-    <circle cx="46" cy="16" r="6.5" fill="${dark}"/>
+    <path d="M${g.leftX} ${g.bottomY}V${g.topY}L${g.rightX} ${g.bottomY}V${g.topY}" fill="none" stroke="url(#g)" stroke-width="${g.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${g.leftX}" cy="${g.topY}" r="${g.nodeRadius}" fill="${light}"/>
+    <circle cx="${g.leftX}" cy="${g.bottomY}" r="${g.nodeRadius}" fill="${color}"/>
+    <circle cx="${g.rightX}" cy="${g.bottomY}" r="${g.nodeRadius}" fill="${shade(color, -0.15)}"/>
+    <circle cx="${g.rightX}" cy="${g.topY}" r="${g.nodeRadius}" fill="${dark}"/>
   </svg>`;
 }
 
@@ -64,12 +67,12 @@ export async function buildDockIconDataUrl(color: string, dark: boolean): Promis
   if (!ctx) return null;
 
   // Rounded-rect app-icon plate, with a transparent margin like other macOS icons.
-  const inset = SIZE * 0.06;
+  const inset = SIZE * markGeometry.plateInsetRatio;
   const x = inset;
   const y = inset;
   const w = SIZE - inset * 2;
   const h = SIZE - inset * 2;
-  const radius = w * 0.235;
+  const radius = w * markGeometry.plateRadiusRatio;
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
   ctx.arcTo(x + w, y, x + w, y + h, radius);
@@ -92,7 +95,7 @@ export async function buildDockIconDataUrl(color: string, dark: boolean): Promis
   } catch {
     return null;
   }
-  const markSize = w * 0.6;
+  const markSize = w * markGeometry.markScaleRatio;
   ctx.drawImage(img, x + (w - markSize) / 2, y + (h - markSize) / 2, markSize, markSize);
 
   return canvas.toDataURL('image/png');

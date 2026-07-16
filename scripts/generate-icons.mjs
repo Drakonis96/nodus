@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCanvas } from '@napi-rs/canvas';
@@ -7,6 +7,7 @@ import { createCanvas } from '@napi-rs/canvas';
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(scriptDir, '..');
 const buildDir = join(rootDir, 'build');
+const markGeometry = JSON.parse(readFileSync(join(rootDir, 'shared', 'nodusMark.json'), 'utf8'));
 
 mkdirSync(buildDir, { recursive: true });
 
@@ -24,49 +25,78 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 function drawIcon(size) {
   const canvas = createCanvas(size, size);
   const ctx = canvas.getContext('2d');
-  const s = size / 1024;
 
-  // Static fallback matches the current dynamic icon system. The renderer will
-  // replace it with the active vault/theme variant and macOS persists that last
-  // selection after Nodus exits.
-  drawRoundedRect(ctx, 61 * s, 61 * s, 902 * s, 902 * s, 212 * s);
+  // This static fallback and the renderer's live vault-coloured icon consume
+  // the same normalized geometry. macOS can therefore fall back to the bundled
+  // icon without changing the Nodus mark's silhouette or apparent size.
+  const inset = size * markGeometry.plateInsetRatio;
+  const plateSize = size - inset * 2;
+  drawRoundedRect(ctx, inset, inset, plateSize, plateSize, plateSize * markGeometry.plateRadiusRatio);
   ctx.fillStyle = '#ffffff';
   ctx.fill();
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.10)';
-  ctx.lineWidth = 6 * s;
+  ctx.lineWidth = size * 0.006;
   ctx.stroke();
 
-  const stroke = ctx.createLinearGradient(260 * s, 235 * s, 765 * s, 790 * s);
-  stroke.addColorStop(0, '#b1b3f5');
-  stroke.addColorStop(0.45, '#6366f1');
-  stroke.addColorStop(1, '#3b3d91');
+  const accent = '#6366f1';
+  const light = shade(accent, 0.55);
+  const dark = shade(accent, -0.4);
+  const markSize = plateSize * markGeometry.markScaleRatio;
+  const markOrigin = inset + (plateSize - markSize) / 2;
+  const markUnit = markSize / markGeometry.viewBoxSize;
+  const markX = (x) => markOrigin + x * markUnit;
+  const markY = (y) => markOrigin + y * markUnit;
+  const stroke = ctx.createLinearGradient(
+    markX(markGeometry.gradient.x1),
+    markY(markGeometry.gradient.y1),
+    markX(markGeometry.gradient.x2),
+    markY(markGeometry.gradient.y2),
+  );
+  stroke.addColorStop(0, light);
+  stroke.addColorStop(0.45, accent);
+  stroke.addColorStop(1, dark);
   ctx.strokeStyle = stroke;
-  ctx.lineWidth = 92 * s;
+  ctx.lineWidth = markGeometry.strokeWidth * markUnit;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   ctx.beginPath();
-  ctx.moveTo(286 * s, 737 * s);
-  ctx.lineTo(286 * s, 287 * s);
-  ctx.lineTo(738 * s, 737 * s);
-  ctx.lineTo(738 * s, 287 * s);
+  ctx.moveTo(markX(markGeometry.leftX), markY(markGeometry.bottomY));
+  ctx.lineTo(markX(markGeometry.leftX), markY(markGeometry.topY));
+  ctx.lineTo(markX(markGeometry.rightX), markY(markGeometry.bottomY));
+  ctx.lineTo(markX(markGeometry.rightX), markY(markGeometry.topY));
   ctx.stroke();
 
   const nodes = [
-    [286, 287, '#b1b3f5'],
-    [286, 737, '#6366f1'],
-    [738, 737, '#5557cd'],
-    [738, 287, '#3b3d91'],
+    [markGeometry.leftX, markGeometry.topY, light],
+    [markGeometry.leftX, markGeometry.bottomY, accent],
+    [markGeometry.rightX, markGeometry.bottomY, shade(accent, -0.15)],
+    [markGeometry.rightX, markGeometry.topY, dark],
   ];
 
   for (const [x, y, color] of nodes) {
     ctx.beginPath();
-    ctx.arc(x * s, y * s, 69 * s, 0, Math.PI * 2);
+    ctx.arc(markX(x), markY(y), markGeometry.nodeRadius * markUnit, 0, Math.PI * 2);
     ctx.fillStyle = color;
     ctx.fill();
   }
 
   return canvas.toBuffer('image/png');
+}
+
+function clamp(n) {
+  return Math.max(0, Math.min(255, Math.round(n)));
+}
+
+function parseHex(hex) {
+  const value = Number.parseInt(hex.replace('#', ''), 16);
+  return [(value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+}
+
+function shade(hex, amount) {
+  const target = amount >= 0 ? 255 : 0;
+  const ratio = Math.abs(amount);
+  return `#${parseHex(hex).map((channel) => clamp(channel + (target - channel) * ratio).toString(16).padStart(2, '0')).join('')}`;
 }
 
 function makeIco(images) {

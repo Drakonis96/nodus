@@ -23,13 +23,13 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor } = await import(pathToFileURL(bundlePath).href);
-  const currentMajorNotes = releaseNotesForMajor('2.3.7');
+  const currentMajorNotes = releaseNotesForMajor('2.3.8');
 
-  assert.equal(currentMajorNotes[0]?.version, '2.3.7');
+  assert.equal(currentMajorNotes[0]?.version, '2.3.8');
   assert.equal(currentMajorNotes.at(-1)?.version, '2.0.0');
   assert.ok(currentMajorNotes.every((note) => note.version.startsWith('2.')));
   assert.ok(!currentMajorNotes.some((note) => note.version === '1.8.0'));
-  assert.ok(!releaseNotesForMajor('2.3.6').some((note) => note.version === '2.3.7'));
+  assert.ok(!releaseNotesForMajor('2.3.7').some((note) => note.version === '2.3.8'));
 
   const validScopes = new Set([
     'general',

@@ -1,0 +1,18 @@
+{
+  "viewBoxSize": 64,
+  "plateInsetRatio": 0.06,
+  "plateRadiusRatio": 0.235,
+  "markScaleRatio": 0.6,
+  "strokeWidth": 6.5,
+  "nodeRadius": 6.5,
+  "leftX": 18,
+  "rightX": 46,
+  "topY": 16,
+  "bottomY": 48,
+  "gradient": {
+    "x1": 14,
+    "y1": 10,
+    "x2": 50,
+    "y2": 54
+  }
+}

@@ -1,7 +1,8 @@
 // Human-facing "what's new" notes shown once after the app updates to a new
-// version. Newest first. Each highlight is bilingual so the modal can follow the
-// UI language. Keep these short and user-facing — they are product notes, not a
-// changelog. Add a new entry at the top whenever the app version bumps.
+// version. Newest first. Each highlight covers every supported UI language so
+// the modal follows the interface. Keep these short and user-facing — they are
+// product notes, not a changelog. Add a new entry at the top whenever the app
+// version bumps.
 
 import type { VaultType } from './vaultTypes';
 
@@ -26,6 +27,48 @@ export interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: '2.3.8',
+    date: '2026-07-16',
+    highlights: [
+      {
+        scope: 'general',
+        es: 'Nodus ya está disponible por completo en francés, alemán, portugués de Portugal y portugués de Brasil. Cada interfaz conserva su vocabulario propio, cubre también taxonomías, parentescos y recuperación, y recurre al inglés de forma segura si falta alguna traducción.',
+        en: 'Nodus is now fully available in French, German, European Portuguese and Brazilian Portuguese. Each interface keeps its own vocabulary, also covers taxonomies, kinship and recovery, and safely falls back to English if a translation is ever missing.',
+        fr: 'Nodus est désormais entièrement disponible en français, allemand, portugais du Portugal et portugais du Brésil. Chaque interface conserve son propre vocabulaire, couvre également les taxonomies, les liens de parenté et la récupération, et revient à l’anglais en toute sécurité si une traduction manque.',
+        de: 'Nodus ist jetzt vollständig auf Französisch, Deutsch, europäischem Portugiesisch und brasilianischem Portugiesisch verfügbar. Jede Oberfläche bewahrt ihren eigenen Wortschatz, deckt auch Taxonomien, Verwandtschaft und Wiederherstellung ab und greift sicher auf Englisch zurück, falls eine Übersetzung fehlt.',
+        pt: 'O Nodus está agora totalmente disponível em francês, alemão, português de Portugal e português do Brasil. Cada interface preserva o seu próprio vocabulário, abrange também taxonomias, parentescos e recuperação e recorre em segurança ao inglês caso falte alguma tradução.',
+        'pt-BR': 'O Nodus agora está totalmente disponível em francês, alemão, português de Portugal e português do Brasil. Cada interface preserva seu próprio vocabulário, também abrange taxonomias, parentescos e recuperação e recorre com segurança ao inglês caso falte alguma tradução.',
+      },
+      {
+        scope: 'general',
+        es: 'El asistente de creación descubre automáticamente los modelos de IA y embeddings disponibles en proveedores locales y en la nube. Combina los resultados en dos buscadores claros, tolera proveedores desconectados y descarga el modelo integrado solo al terminar la configuración.',
+        en: 'The vault setup wizard now automatically discovers available AI and embedding models across local and cloud providers. It combines the results into two clear searchable pickers, tolerates offline providers and downloads a built-in model only when setup finishes.',
+        fr: 'L’assistant de création découvre automatiquement les modèles d’IA et d’embeddings disponibles auprès des fournisseurs locaux et dans le cloud. Il réunit les résultats dans deux sélecteurs de recherche clairs, tolère les fournisseurs hors ligne et ne télécharge le modèle intégré qu’à la fin de la configuration.',
+        de: 'Der Einrichtungsassistent erkennt jetzt automatisch verfügbare KI- und Embedding-Modelle bei lokalen und Cloud-Anbietern. Er führt die Ergebnisse in zwei übersichtlichen, durchsuchbaren Auswahlen zusammen, toleriert nicht erreichbare Anbieter und lädt ein integriertes Modell erst nach Abschluss der Einrichtung herunter.',
+        pt: 'O assistente de criação descobre automaticamente os modelos de IA e embeddings disponíveis em fornecedores locais e na nuvem. Combina os resultados em dois seletores pesquisáveis e claros, tolera fornecedores desligados e transfere o modelo integrado apenas ao concluir a configuração.',
+        'pt-BR': 'O assistente de criação descobre automaticamente os modelos de IA e embeddings disponíveis em provedores locais e na nuvem. Ele combina os resultados em dois seletores pesquisáveis e claros, tolera provedores desconectados e baixa o modelo integrado somente ao concluir a configuração.',
+      },
+      {
+        scope: 'general',
+        es: 'Los controles radiales de Nodi mantienen ahora una distribución equilibrada, siguen siendo pulsables en las esquinas superiores y permanecen visibles durante su despedida. El menú contextual conserva la acción de cerrar y las interacciones evitan aperturas o cierres accidentales.',
+        en: 'Nodi’s radial controls now stay evenly balanced, remain clickable in the top corners and stay visible during its farewell. The context menu reliably keeps the close action and interactions avoid accidental opening or dismissal.',
+        fr: 'Les commandes radiales de Nodi conservent désormais une disposition équilibrée, restent cliquables dans les coins supérieurs et demeurent visibles pendant ses adieux. Le menu contextuel garde fiablement l’action de fermeture et les interactions évitent les ouvertures ou fermetures accidentelles.',
+        de: 'Nodis radiale Bedienelemente bleiben jetzt gleichmäßig angeordnet, in den oberen Ecken anklickbar und während seines Abschieds sichtbar. Das Kontextmenü behält zuverlässig die Schließen-Aktion, und die Interaktionen vermeiden versehentliches Öffnen oder Ausblenden.',
+        pt: 'Os controlos radiais do Nodi mantêm agora uma distribuição equilibrada, continuam clicáveis nos cantos superiores e permanecem visíveis durante a despedida. O menu de contexto conserva de forma fiável a ação de fechar e as interações evitam aberturas ou fechos acidentais.',
+        'pt-BR': 'Os controles radiais do Nodi agora mantêm uma distribuição equilibrada, continuam clicáveis nos cantos superiores e permanecem visíveis durante a despedida. O menu de contexto preserva de forma confiável a ação de fechar e as interações evitam aberturas ou fechamentos acidentais.',
+      },
+      {
+        scope: 'general',
+        es: 'El icono de Nodus conserva la misma “N” compacta y estilizada tanto con la aplicación abierta como cerrada. El icono estático y las variantes dinámicas comparten ahora una única geometría, evitando que macOS muestre una marca sobredimensionada al salir.',
+        en: 'The Nodus icon now keeps the same compact, stylized “N” whether the application is open or closed. The bundled icon and dynamic variants share one geometry, preventing macOS from showing an oversized mark after quitting.',
+        fr: 'L’icône de Nodus conserve désormais le même « N » compact et stylisé, que l’application soit ouverte ou fermée. L’icône intégrée et les variantes dynamiques partagent une géométrie unique, empêchant macOS d’afficher une marque surdimensionnée après la fermeture.',
+        de: 'Das Nodus-Symbol behält jetzt dasselbe kompakte, stilisierte „N“, unabhängig davon, ob die Anwendung geöffnet oder geschlossen ist. Das gebündelte Symbol und die dynamischen Varianten verwenden eine gemeinsame Geometrie, sodass macOS nach dem Beenden keine übergroße Marke mehr anzeigt.',
+        pt: 'O ícone do Nodus mantém agora o mesmo “N” compacto e estilizado, quer a aplicação esteja aberta ou fechada. O ícone incluído e as variantes dinâmicas partilham uma única geometria, impedindo o macOS de mostrar uma marca sobredimensionada depois de sair.',
+        'pt-BR': 'O ícone do Nodus agora mantém o mesmo “N” compacto e estilizado, tanto com o aplicativo aberto quanto fechado. O ícone incluído e as variantes dinâmicas compartilham uma única geometria, impedindo que o macOS mostre uma marca superdimensionada depois de sair.',
+      },
+    ],
+  },
   {
     version: '2.3.7',
     date: '2026-07-16',

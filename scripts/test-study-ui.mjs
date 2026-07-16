@@ -21,13 +21,15 @@ test('study vault uses its teal header logo and the shared dock accent', async (
 });
 
 test('macOS keeps the last vault and theme dock icon after Nodus exits', async () => {
-  const [main, ipc, persistentIcon, dockPlugin, packageJson, generator] = await Promise.all([
+  const [main, ipc, persistentIcon, dockPlugin, packageJson, generator, rendererIcon, geometrySource] = await Promise.all([
     read('electron/main.ts'),
     read('electron/ipc.ts'),
     read('electron/dockIcon.ts'),
     read('build/docktile/NodusDockTilePlugin.m'),
     read('package.json'),
     read('scripts/generate-icons.mjs'),
+    read('src/dockIcon.ts'),
+    read('shared/nodusMark.json'),
   ]);
   assert.match(main, /restorePersistedDockIcon\(\)/);
   assert.match(ipc, /setPersistentDockIcon\(pngDataUrl\)/);
@@ -38,7 +40,10 @@ test('macOS keeps the last vault and theme dock icon after Nodus exits', async (
   assert.doesNotMatch(dockPlugin, /Library\/Application Support\/Nodus\/last-dock-icon\.png/);
   assert.match(dockPlugin, /dockTile\.contentView = self\.imageView/);
   assert.match(packageJson, /"NSDockTilePlugIn": "NodusDockTile\.docktileplugin"/);
-  assert.match(generator, /Static fallback matches the current dynamic icon system/);
+  assert.match(generator, /shared', 'nodusMark\.json/);
+  assert.match(generator, /markGeometry\.markScaleRatio/);
+  assert.match(rendererIcon, /import markGeometry from '@shared\/nodusMark\.json'/);
+  assert.equal(JSON.parse(geometrySource).markScaleRatio, 0.6);
   assert.doesNotMatch(generator, /#15131f|#1d1830|rgba\(8, 7, 14, 0\.42\)/);
 });
 
