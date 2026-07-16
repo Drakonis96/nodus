@@ -17,6 +17,7 @@ import { _electron as electron } from 'playwright-core';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
+const appVersion = require(path.join(repoRoot, 'package.json')).version;
 
 // Re-exec under Electron-as-Node so the final better-sqlite3 check matches the
 // app ABI (same pattern as every other script in this suite). Playwright then
@@ -112,7 +113,7 @@ try {
   // Suppress the "what's new" modal: a fresh profile has no last-seen version, so it
   // would otherwise overlay the app and intercept later clicks. localStorage persists
   // across the reloads below (same origin).
-  await page.evaluate(() => localStorage.setItem('nodus.lastSeenVersion', '9999.0.0'));
+  await page.evaluate((version) => localStorage.setItem('nodus.lastSeenVersion', version), appVersion);
 
   // ── Preload bridge ──────────────────────────────────────────────────────────
   const bridge = await page.evaluate(() => ({
@@ -172,6 +173,7 @@ try {
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
   assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');
+  assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
   // ── Main header: model selection belongs to Settings/features, never global ─

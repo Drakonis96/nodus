@@ -18,6 +18,13 @@ test('generic CSS presence waits select one match instead of relying on Playwrig
   assert.match(smoke, /page\.locator\('\.study-editor-shell \.md \.katex'\)\.first\(\)\.waitFor\(/);
 });
 
+test('the smoke test suppresses release notes with the exact app version before reloading', () => {
+  assert.match(smoke, /const appVersion = require\(path\.join\(repoRoot, 'package\.json'\)\)\.version/);
+  assert.match(smoke, /localStorage\.setItem\('nodus\.lastSeenVersion', version\), appVersion/);
+  assert.doesNotMatch(smoke, /nodus\.lastSeenVersion', '9999\.0\.0'/);
+  assert.match(smoke, /whats-new-cinematic-modal/);
+});
+
 test('accessibility controls expose stable selectors used by the E2E smoke', () => {
   for (const testId of ['accessibility-font', 'accessibility-contrast', 'accessibility-motion', 'accessibility-reading']) {
     assert.match(settings, new RegExp(`data-testid=["']${testId}["']`));
