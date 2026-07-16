@@ -134,7 +134,9 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   assert.match(mascot, /win\.on\('blur'/, 'clicking another application dismisses the overlay');
   assert.match(mascot, /webContents\.send\('nodi:dismiss'\)/);
   assert.match(ipc, /nodi:setExpanded/);
-  assert.match(ipc, /setIgnoreMouseEvents\(!expanded/);
+  assert.match(mascot, /setIgnoreMouseEvents\(false/, 'the compact host is immediately clickable');
+  assert.doesNotMatch(ipc, /setIgnoreMouseEvents\(!expanded/, 'resizing must not reintroduce the first-click race');
+  assert.doesNotMatch(component, /addEventListener\('mousemove'/, 'interactivity must not depend on a prior hover event');
   assert.match(preload, /onNodiDismiss/);
   assert.match(types, /onNodiDismiss\(cb: \(\) => void\)/);
 });
@@ -165,6 +167,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
   ]);
   assert.match(component, /e\.screenX - origin\.screenX/);
   assert.match(component, /e\.screenY - origin\.screenY/);
+  assert.match(component, /Math\.hypot\(dx, dy\) < DRAG_THRESHOLD_PX/, 'small pointer jitter remains a click');
+  assert.match(component, /onLostPointerCapture=\{onFigurePointerCaptureLost\}/, 'a lost capture cannot leave Nodi stuck dragging');
+  assert.match(component, /vertical === 'down' \? Math\.round\(figureH \* 0\.12\)/, 'the downward radial arc clears Nodi’s longer lower limbs');
   assert.doesNotMatch(component, /e\.movement[XY]/, 'native-window movement must not distort the drag delta');
   for (const contract of ['nodiBeginWindowDrag', 'nodiDragWindow', 'nodiEndWindowDrag']) {
     assert.match(component, new RegExp(contract));
@@ -194,6 +199,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(companionCss, /\.nodi-anchor\.open-down/);
   assert.match(companionCss, /\.nodi-figure\s*\{[^}]*z-index:\s*1/s);
   assert.match(companionCss, /\.nodi-node\s*\{[^}]*z-index:\s*2/s, 'radial actions stay clickable when they overlap Nodi near a top edge');
+  assert.match(companionCss, /margin:\s*0 -23px -23px 0/, 'radial controls are centred on both anchor axes');
+  assert.match(companionCss, /\.nodi-node\.open:hover[^}]*scale\(1\.06\)/s);
+  assert.match(companionCss, /\.nodi-node:focus-visible/);
   assert.match(english, /'Cerrar mascota': 'Close mascot'/);
 });
 

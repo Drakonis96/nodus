@@ -93,6 +93,21 @@ try {
     { timeout: 3_000 },
   );
 
+  // A little hand jitter must still produce a click instead of being mistaken for a
+  // drag. This also exercises clicking the compact native window with no prior hover.
+  const figureBox = await figure.boundingBox();
+  if (!figureBox) throw new Error('Nodi figure has no bounding box');
+  const clickX = figureBox.x + figureBox.width / 2;
+  const clickY = figureBox.y + figureBox.height / 2;
+  await overlay.mouse.move(clickX, clickY);
+  await overlay.mouse.down();
+  await overlay.mouse.move(clickX + 4, clickY + 2);
+  await overlay.mouse.up();
+  await overlay.waitForFunction(() => document.querySelector('.nodi-node')?.classList.contains('open') ?? false);
+  console.log('[verify] compact first click + pointer jitter -> menu open');
+  await setMenuOpen(false);
+  await overlay.waitForFunction(() => window.innerWidth === 212 && window.innerHeight === 232, undefined, { timeout: 3_000 });
+
   const moveNodi = async (screenX, screenY) => {
     await overlay.evaluate(async ([x, y]) => {
       await window.nodus.nodiBeginWindowDrag(0, 0);
@@ -118,10 +133,23 @@ try {
     await setMenuOpen(true);
     await overlay.waitForTimeout(700);
     const hits = await bottomButtonHits();
-    console.log(`[verify] ${corner} button hits ->`, JSON.stringify(hits));
+    const radii = await overlay.evaluate(() => {
+      const figureRect = document.querySelector('.nodi-figure')?.getBoundingClientRect();
+      if (!figureRect) return [];
+      const core = {
+        x: figureRect.left + figureRect.width * 130 / 270,
+        y: figureRect.top + figureRect.height * 140 / 300,
+      };
+      return [...document.querySelectorAll('.nodi-node')].map((node) => {
+        const rect = node.getBoundingClientRect();
+        return Math.round(Math.hypot(rect.left + rect.width / 2 - core.x, rect.top + rect.height / 2 - core.y));
+      });
+    });
+    console.log(`[verify] ${corner} button hits/radii ->`, JSON.stringify({ hits, radii }));
     await overlay.screenshot({ path: `${shots}/overlay-3-${corner}.png` });
     assert.equal(hits.Chat?.target, 'Chat', `Nodi's figure intercepts Chat in the ${corner} corner`);
     assert.equal(hits['Abrir Nodus']?.target, 'Abrir Nodus', `Nodi's figure intercepts Abrir Nodus in the ${corner} corner`);
+    assert.ok(radii.every((radius) => radius >= 126), `downward controls are too close to Nodi in the ${corner} corner: ${radii}`);
     await setMenuOpen(false);
     await overlay.waitForTimeout(700);
   };

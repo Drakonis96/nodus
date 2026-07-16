@@ -9,6 +9,7 @@
   cursor: grab;
   -webkit-user-select: none;
   user-select: none;
+  touch-action: none;
   filter: drop-shadow(0 6px 18px rgba(10, 14, 26, 0.28));
 }
 .nodi-figure.dragging { cursor: grabbing; }
@@ -40,7 +41,8 @@
   bottom: var(--anchor-b, 22px);
   width: 46px;
   height: 46px;
-  margin: -23px -23px 0 0;
+  /* Centre the 46px control on both right/bottom anchor coordinates. */
+  margin: 0 -23px -23px 0;
   z-index: 2;
   border-radius: 50%;
   border: 1.5px solid #d4af37;
@@ -61,6 +63,12 @@
   opacity: 1;
   transform: translate(var(--dx), var(--dy)) scale(1);
   pointer-events: auto;
+}
+.nodi-node.open:hover { transform: translate(var(--dx), var(--dy)) scale(1.06); }
+.nodi-node.open:active { transform: translate(var(--dx), var(--dy)) scale(.94); }
+.nodi-node:focus-visible {
+  outline: 3px solid rgba(255, 239, 178, .92);
+  outline-offset: 3px;
 }
 .nodi-node svg { width: 22px; height: 22px; }
 .nodi-node-badge {

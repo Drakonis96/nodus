@@ -11,8 +11,8 @@ import { getSettings } from './db/settingsRepo';
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
 // Roomy enough for Nodi plus its radial menu and a compact panel. The window is
-// transparent and click-through by default (the renderer re-enables the mouse only
-// over Nodi and open panels), so the extra size is not a dead zone over other apps.
+// transparent. Its compact bounds hug Nodi; the larger bounds are used only while a
+// menu or panel is open.
 const EXPANDED_WIDTH = 600;
 const EXPANDED_HEIGHT = 520;
 const FIGURE_WIDTH = 180;
@@ -102,9 +102,10 @@ function createMascotWindow(): BrowserWindow {
   // transform the process type and flicker the Dock icon each time).
   const applyLevels = () => win.setAlwaysOnTop(true, 'screen-saver');
   applyLevels();
-  // Transparent areas let clicks pass through to the apps behind; the renderer
-  // re-enables the mouse only over Nodi and its open panels.
-  win.setIgnoreMouseEvents(true, { forward: true });
+  // Keep the compact host interactive. Enabling it from a forwarded mousemove races
+  // a fast click, which makes Nodi appear unresponsive. The compact window is only a
+  // 16px margin larger than the figure, so it remains a tightly scoped hit target.
+  win.setIgnoreMouseEvents(false, { forward: true });
   positionBottomRight(win);
 
   win.on('show', applyLevels);

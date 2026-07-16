@@ -78,6 +78,9 @@ const DOT: Record<NodiNotification['kind'], string> = { info: '#5b9bd5', success
 // Four overlay actions collapse over 340 ms with up to 90 ms of stagger.
 // Keep the roomy native window until every button has returned to its anchor.
 const RADIAL_COLLAPSE_MS = 450;
+// Normal clicks commonly move a few pixels between press and release. Keeping a
+// comfortable dead zone prevents those tiny movements from swallowing the click.
+const DRAG_THRESHOLD_PX = 7;
 
 export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: boolean }) {
   const isOverlay = context === 'overlay';
@@ -213,42 +216,29 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     return () => window.removeEventListener('resize', place);
   }, [isOverlay, clamp, figureW, figureH]);
 
-  // ── Overlay: make the transparent window click-through except over Nodi/panels
-  const lastInteractive = useRef<boolean | null>(null);
-  const setInteractive = useCallback((v: boolean) => {
-    if (lastInteractive.current === v) return;
-    lastInteractive.current = v;
-    window.nodus.nodiSetMouseIgnore(!v);
-  }, []);
+  // ── Overlay: resize the native window around open surfaces ──────────────────
+  // The compact host is deliberately interactive. Toggling Electron's mouse-ignore
+  // mode from forwarded mousemove events creates a race in which a quick first click
+  // reaches the app behind Nodi before the IPC round-trip can enable this window.
   useEffect(() => {
     if (!isOverlay) return;
     let shrink: number | undefined;
     if (hasOpenSurface) {
       // Grow first, then let the surface animate open inside the new bounds.
-      lastInteractive.current = true;
       void window.nodus.nodiSetExpanded(true).then(setOverlayPlacement).catch(() => {});
     } else {
       // Shrinking is the opposite: the radial buttons are still flying home, and the
       // overlay body is overflow:hidden, so a window this small would slice them
       // mid-flight. Wait for them to land. Reopening clears the timer below, so a
       // quick open/close/open never shrinks behind the surface's back.
-      lastInteractive.current = false;
       shrink = window.setTimeout(() => {
         void window.nodus.nodiSetExpanded(false).then(setOverlayPlacement).catch(() => {});
       }, RADIAL_COLLAPSE_MS);
     }
-    const onMove = (e: MouseEvent) => {
-      if (draggingRef.current) return;
-      if (hasOpenSurface) { setInteractive(true); return; }
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      setInteractive(!!el?.closest('[data-nodi-interactive]'));
-    };
-    window.addEventListener('mousemove', onMove);
     return () => {
       window.clearTimeout(shrink);
-      window.removeEventListener('mousemove', onMove);
     };
-  }, [hasOpenSurface, isOverlay, setInteractive]);
+  }, [hasOpenSurface, isOverlay]);
 
   // ── Auto-scroll chat ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -301,7 +291,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     const dx = e.screenX - origin.screenX;
     const dy = e.screenY - origin.screenY;
     if (Math.abs(dx) + Math.abs(dy) > 0) {
-      if (!movedRef.current && Math.abs(dx) + Math.abs(dy) < 3) return;
+      if (!movedRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       movedRef.current = true;
       draggingRef.current = true;
       if (isOverlay) {
@@ -323,7 +313,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     // A right-click release must not reach the toggle below: it fires after
     // `contextmenu` and would swap the context menu for the radial one.
     if (!dragOriginRef.current) return;
-    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    const figure = e.currentTarget as HTMLElement;
+    if (figure.hasPointerCapture(e.pointerId)) figure.releasePointerCapture(e.pointerId);
     setDragging(false);
     draggingRef.current = false;
     dragOriginRef.current = null;
@@ -337,6 +328,15 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         wave();
       }
     }
+  };
+
+  const onFigurePointerCaptureLost = () => {
+    if (!dragOriginRef.current) return;
+    setDragging(false);
+    draggingRef.current = false;
+    dragOriginRef.current = null;
+    movedRef.current = false;
+    if (isOverlay) void window.nodus.nodiEndWindowDrag().catch(() => {});
   };
 
   const onFigureContextMenu = (e: React.MouseEvent) => {
@@ -484,12 +484,16 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     : pos && pos.y + figureH / 2 < window.innerHeight / 2 ? 'down' : 'up';
 
   const angleFor = (i: number, n: number) => {
+    // Nodi's body is centred in the figure, but its legs extend much farther below
+    // that centre than the hat/halo extend above it. A slightly wider downward arc
+    // keeps the controls visually as clear of the figure as the upward arc.
+    const radialRadius = R + (vertical === 'down' ? Math.round(figureH * 0.12) : 0);
     const start = 180;
     const end = 268;
     const deg = n <= 1 ? 224 : start + (i * (end - start)) / (n - 1);
     const rad = (deg * Math.PI) / 180;
-    const dx = Math.round(R * Math.cos(rad));
-    const dy = Math.round(R * Math.sin(rad));
+    const dx = Math.round(radialRadius * Math.cos(rad));
+    const dy = Math.round(radialRadius * Math.sin(rad));
     return { dx: horizontal === 'left' ? dx : -dx, dy: vertical === 'up' ? dy : -dy };
   };
 
@@ -669,6 +673,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
           onPointerMove={onFigurePointerMove}
           onPointerUp={(event) => finishFigurePointer(event)}
           onPointerCancel={(event) => finishFigurePointer(event, true)}
+          onLostPointerCapture={onFigurePointerCaptureLost}
           onContextMenu={onFigureContextMenu}
         >
           <Nodi state={nodiState} role={role} height={figureH} draggable={!closing} raiseArm={!closing && unread > 0} className={dragging ? 'dragging' : undefined} />

@@ -727,8 +727,8 @@ export function registerIpc(
   });
   h('nodi:viewContext:set', async (_e, context) => setNodiViewContext(context));
   h('nodi:viewContext:get', async () => getNodiViewContext());
-  // The transparent always-on-top overlay forwards mouse events except where Nodi
-  // (or an open panel) sits, so clicks pass through to the apps behind it.
+  // Retained for compatibility with older renderers; the current compact overlay is
+  // kept interactive so a first click cannot be lost during an IPC round-trip.
   h('nodi:setMouseIgnore', async (e, ignore: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
@@ -737,7 +737,10 @@ export function registerIpc(
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
     const nextPlacement = setMascotWindowExpanded(win, Boolean(expanded));
-    win.setIgnoreMouseEvents(!expanded, { forward: true });
+    // Reassert the single interaction policy after a native bounds change. On macOS
+    // this also keeps the transparent panel's hit-test state in sync with its new
+    // compact/expanded content bounds.
+    win.setIgnoreMouseEvents(false, { forward: true });
     if (expanded) win.focus();
     return nextPlacement;
   });
