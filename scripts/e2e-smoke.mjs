@@ -277,22 +277,42 @@ try {
     assert.equal(await vaultDialog.getByTestId(`new-vault-type-icon-${type}`).count(), 1, `${type} uses the shared model-enabled creation wizard`);
   }
   await vaultDialog.getByPlaceholder('Nombre de la bóveda').fill('Vault model setup smoke');
-  const createButton = vaultDialog.getByRole('button', { name: 'Crear', exact: true });
-  assert.equal(await createButton.isDisabled(), true, 'creation is blocked until an AI model is selected');
-  await vaultDialog.getByTestId('vault-ai-provider').selectOption('openai');
-  await vaultDialog.getByTestId('vault-ai-model-input').fill('gpt-vault-smoke');
-  await vaultDialog.getByTestId('vault-embedding-provider').selectOption('gemini');
-  assert.equal(await createButton.isEnabled(), true, 'independent AI and embedding choices unlock creation');
-  await createButton.click();
-  await waitForCondition('creación del vault con dos modelos', async () => {
+  // The dialog creates the vault bare and hands off to the setup wizard, which
+  // discovers the models instead of asking here — so the gate lives there now.
+  await vaultDialog.getByTestId('vault-models-next-step').waitFor();
+  await vaultDialog.getByRole('button', { name: 'Crear', exact: true }).click();
+  await waitForCondition('creación del vault y apertura del asistente', async () => {
     const active = await page.evaluate(() => window.nodus.getActiveVault());
     return active.id !== originalVaultId && active.name === 'Vault model setup smoke';
   });
   const configuredVault = await page.evaluate(() => window.nodus.getActiveVault());
-  const configuredSettings = await page.evaluate(() => window.nodus.getSettings());
-  assert.deepEqual(configuredSettings.synthesisModel, { provider: 'openai', model: 'gpt-vault-smoke' }, 'wizard persists the selected general AI model');
-  assert.equal(configuredSettings.embeddingProvider, 'gemini', 'wizard persists the independent embedding provider');
-  assert.equal(configuredSettings.embeddingModel, 'gemini-embedding-001', 'wizard persists the independent embedding model');
+
+  // A fresh vault opens on its wizard. Walk to the provider step rather than hard-
+  // coding its index, which differs by vault type (3 for academic, 1 for the simple
+  // types). That step must not let the user out until BOTH models are chosen — the
+  // requirement the create dialog used to enforce. Discovery reaches the built-in
+  // local models with no key and no network, so the picker always has choices.
+  const modelStep = page.getByTestId('onboarding-models');
+  for (let i = 0; i < 4 && await modelStep.count() === 0; i++) {
+    await page.getByRole('button', { name: 'Siguiente', exact: true }).click();
+  }
+  await modelStep.waitFor({ timeout: 30_000 });
+
+  // Finishing is still gated on having BOTH models, but the wizard fills them in
+  // itself: it discovers the built-in local models with no key and no network, and
+  // pre-selects one per role. So the point to assert is that a fresh vault reaches a
+  // finishable state with no typing — the create dialog no longer asks, and the
+  // wizard does not ask again for what it can find out.
+  const startButton = page.getByTestId('onboarding-start');
+  await waitForCondition('el asistente descubre ambos modelos por si mismo', () => startButton.isEnabled());
+  for (const role of ['onboarding-ai-model', 'onboarding-embedding-model']) {
+    await page.getByTestId(`${role}-trigger`).click();
+    const options = page.getByTestId(role).getByRole('option');
+    await options.first().waitFor({ timeout: 30_000 });
+    assert.ok(await options.count() > 0, `${role} offers discovered models to choose between`);
+    await page.keyboard.press('Escape');
+  }
+
   await page.evaluate(async ({ original, temporary }) => {
     const switched = await window.nodus.switchVault(original);
     if (!switched.ok) throw new Error(switched.message);
@@ -300,7 +320,7 @@ try {
   }, { original: originalVaultId, temporary: configuredVault.id });
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
-  console.log('[e2e] vault creation requires and persists independent AI + embedding models');
+  console.log('[e2e] a new vault hands off to the wizard, which discovers both models itself');
 
   // ── Main header: model selection belongs to Settings/features, never global ─
   const smokeModel = { provider: 'openai', model: 'smoke-model' };
