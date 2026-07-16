@@ -44,26 +44,45 @@ export function SearchableMultiSelect({
   }, [options, query]);
   const atLimit = maxSelected != null && selectedIds.length >= maxSelected;
 
-  const updatePopoverPosition = useCallback(() => {
-    if (!rootRef.current) return;
+  const calculatePopoverStyle = useCallback((): React.CSSProperties | null => {
+    if (!rootRef.current) return null;
     const rect = rootRef.current.getBoundingClientRect();
     const width = Math.max(240, rect.width);
     const estimatedHeight = 310;
     const openAbove = window.innerHeight - rect.bottom < estimatedHeight && rect.top > window.innerHeight - rect.bottom;
     const top = openAbove ? Math.max(8, rect.top - estimatedHeight - 4) : rect.bottom + 4;
     const availableHeight = openAbove ? rect.top - top - 4 : window.innerHeight - top - 8;
-    setPopoverStyle({
+    return {
       position: 'fixed',
       left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
       top,
       width,
       maxHeight: Math.max(96, availableHeight),
-    });
+    };
   }, []);
+
+  const updatePopoverPosition = useCallback(() => {
+    const nextStyle = calculatePopoverStyle();
+    if (nextStyle) setPopoverStyle(nextStyle);
+  }, [calculatePopoverStyle]);
+
+  const togglePopover = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+
+    // Seed the portaled panel with its final fixed geometry before mounting it.
+    // Mounting it unpositioned for one frame changes the document layout and makes
+    // the whole Electron renderer visibly flash, especially with autoFocus below.
+    const nextStyle = calculatePopoverStyle();
+    if (!nextStyle) return;
+    setPopoverStyle(nextStyle);
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
-    updatePopoverPosition();
     const dismiss = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!rootRef.current?.contains(target) && !popoverRef.current?.contains(target)) setOpen(false);
@@ -93,7 +112,7 @@ export function SearchableMultiSelect({
         className="input flex min-h-9 w-full items-center gap-1.5 px-2 py-1 text-left text-sm"
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
+        onClick={togglePopover}
       >
         <span className={`min-w-0 flex-1 truncate ${selected.length === 0 ? 'text-neutral-500' : 'text-neutral-200'}`}>
           {selected.length === 0 ? placeholder : selected.map((option) => option.label).join(', ')}
@@ -102,7 +121,7 @@ export function SearchableMultiSelect({
         <Icon name="chevronDown" size={13} className="shrink-0 text-neutral-500" />
       </button>
       {open && createPortal(
-        <div ref={popoverRef} style={popoverStyle} className="person-multi-select-popover z-[120] flex flex-col rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
+        <div ref={popoverRef} style={popoverStyle} className="person-multi-select-popover fixed z-[120] flex flex-col rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-2xl">
           <div className="relative mb-1.5">
             <Icon name="search" size={13} className="pointer-events-none absolute left-2 top-2 text-neutral-500" />
             <input

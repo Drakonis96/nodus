@@ -98,6 +98,8 @@ test('relationship selectors search and allow several relatives without closing'
   assert.match(picker, /aria-multiselectable="true"/);
   assert.match(picker, /type="checkbox"/);
   assert.match(picker, /createPortal/);
+  assert.match(picker, /const nextStyle = calculatePopoverStyle\(\);[\s\S]*setPopoverStyle\(nextStyle\);[\s\S]*setOpen\(true\);/);
+  assert.match(picker, /person-multi-select-popover fixed/);
   assert.match(picker, /style=\{\{ paddingLeft: '1\.9rem' \}\}/);
   assert.match(editor, /maxSelected=\{choice === 'child_of' \? 2 : undefined\}/);
   assert.match(editor, /kinshipRelationshipSpecsForPeople/);

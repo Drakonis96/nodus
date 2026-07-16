@@ -1407,6 +1407,19 @@ try {
   // timeline and map open the exact same full-record dossier.
   await page.locator('[data-tour="nav-timeline"]').click();
   await page.getByTestId('timeline-person-filter').waitFor({ timeout: 30_000 });
+  await page.evaluate(() => {
+    window.__timelinePopoverMountPositions = [];
+    window.__timelinePopoverObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (node instanceof HTMLElement && node.classList.contains('person-multi-select-popover')) {
+            window.__timelinePopoverMountPositions.push(getComputedStyle(node).position);
+          }
+        }
+      }
+    });
+    window.__timelinePopoverObserver.observe(document.body, { childList: true });
+  });
   await page.getByTestId('timeline-person-filter').getByRole('button').click();
   const peopleChecks = page.locator('.person-multi-select-popover input[type="checkbox"]');
   await peopleChecks.nth(0).check();
@@ -1419,6 +1432,11 @@ try {
   await typeChecks.nth(1).check();
   assert.equal(await page.locator('.person-multi-select-popover input[type="checkbox"]:checked').count(), 2, 'timeline type filter accepts multiple values');
   await page.keyboard.press('Escape');
+  const timelinePopoverMountPositions = await page.evaluate(() => {
+    window.__timelinePopoverObserver?.disconnect();
+    return window.__timelinePopoverMountPositions;
+  });
+  assert.deepEqual(timelinePopoverMountPositions, ['fixed', 'fixed'], 'timeline dropdowns mount already positioned and never flash through document layout');
   await page.locator('[data-timeline-person-id]').first().click();
   await page.getByTestId('person-dossier-modal').waitFor({ timeout: 30_000 });
   await page.getByTestId('person-dossier-modal').getByRole('button', { name: 'Cerrar' }).click();
