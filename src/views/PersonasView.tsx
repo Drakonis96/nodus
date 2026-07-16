@@ -392,15 +392,17 @@ function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [death, setDeath] = useState('');
   const [busy, setBusy] = useState(false);
   const [persons, setPersons] = useState<Person[]>([]);
+  const [initialRelationKind, setInitialRelationKind] = useState<'none' | 'family' | 'social'>('none');
   const [relation, setRelation] = useState<KinshipChoice | 'none'>('none');
   const [selectedRelationIds, setSelectedRelationIds] = useState<string[]>([]);
   const [adoptive, setAdoptive] = useState(false);
+  const [socialRole, setSocialRole] = useState('Amistad');
 
   useEffect(() => { void window.nodus.listPersons().then(setPersons); }, []);
 
   const save = async () => {
     if (!name.trim()) return;
-    if (relation !== 'none') {
+    if (initialRelationKind === 'family' && relation !== 'none') {
       const previewSpecs = kinshipRelationshipSpecsForPeople('__new__', relation, selectedRelationIds, adoptive);
       const dateOf = (id: string) => id === '__new__' ? birth : persons.find((candidate) => candidate.personId === id)?.birthDate;
       if (previewSpecs.some((spec) => spec.type === 'parent' && parentAgeWarning(dateOf(spec.fromPerson), dateOf(spec.toPerson)) != null)) {
@@ -421,10 +423,21 @@ function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         deathDate: death.trim() || null,
         names: [{ name: name.trim(), kind: null }],
       });
-      if (relation !== 'none') {
+      if (initialRelationKind === 'family' && relation !== 'none') {
         const specs = kinshipRelationshipSpecsForPeople(created.personId, relation, selectedRelationIds, adoptive);
         for (const spec of specs) {
           await window.nodus.addRelationship(spec.fromPerson, spec.toPerson, spec.type, 'user_asserted', spec.subtype);
+        }
+      }
+      if (initialRelationKind === 'social') {
+        for (const targetId of selectedRelationIds) {
+          await window.nodus.createSocialRelation({
+            personId: created.personId,
+            targetKind: 'person',
+            targetId,
+            role: socialRole,
+            notes: null,
+          });
         }
       }
       await onSaved();
@@ -467,35 +480,59 @@ function AddPersonModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         <p className="text-xs text-neutral-500">{t('Las fechas pueden ser inciertas: "c. 1850", "antes de 1880".')}</p>
         {persons.length > 0 && (
           <div className="space-y-2 rounded-md border border-neutral-800 bg-neutral-900/40 p-3">
-            <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Parentesco inicial (opcional)')}</label>
-            <select className="input h-9 w-full text-sm" value={relation} onChange={(event) => { setRelation(event.target.value as KinshipChoice | 'none'); setSelectedRelationIds([]); setAdoptive(false); }}>
-              <option value="none">{t('Sin parentesco por ahora')}</option>
-              <option value="child_of">{t('Es hijo/a de…')}</option>
-              <option value="parent_of">{t('Es padre/madre de…')}</option>
-              <option value="sibling_of">{t('Es hermano/a de…')}</option>
-              <option value="spouse_of">{t('Es cónyuge/pareja de…')}</option>
+            <label className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Relación inicial (opcional)')}</label>
+            <select
+              className="input h-9 w-full text-sm"
+              value={initialRelationKind}
+              data-testid="new-person-initial-relation-kind"
+              onChange={(event) => {
+                setInitialRelationKind(event.target.value as 'none' | 'family' | 'social');
+                setRelation('none');
+                setSelectedRelationIds([]);
+                setAdoptive(false);
+              }}
+            >
+              <option value="none">{t('Sin relación por ahora')}</option>
+              <option value="family">{t('Relación familiar inicial')}</option>
+              <option value="social">{t('Relación social inicial')}</option>
             </select>
-            {relation !== 'none' && (
+            {initialRelationKind === 'family' && (
+              <select className="input h-9 w-full text-sm" value={relation} onChange={(event) => { setRelation(event.target.value as KinshipChoice | 'none'); setSelectedRelationIds([]); setAdoptive(false); }}>
+                <option value="none">{t('Elegir parentesco…')}</option>
+                <option value="child_of">{t('Es hijo/a de…')}</option>
+                <option value="parent_of">{t('Es padre/madre de…')}</option>
+                <option value="sibling_of">{t('Es hermano/a de…')}</option>
+                <option value="spouse_of">{t('Es cónyuge/pareja de…')}</option>
+              </select>
+            )}
+            {initialRelationKind === 'social' && (
+              <select className="input h-9 w-full text-sm" value={socialRole} onChange={(event) => setSocialRole(event.target.value)}>
+                {['Amistad', 'Patronazgo', 'Empleo', 'Sociedad profesional', 'Rivalidad', 'Correspondencia', 'Vecindad', 'Colaboración', 'Clientela', 'Mentoría'].map((role) => (
+                  <option key={role} value={role}>{t(role)}</option>
+                ))}
+              </select>
+            )}
+            {((initialRelationKind === 'family' && relation !== 'none') || initialRelationKind === 'social') && (
               <PersonMultiSelect
                 persons={persons}
                 selectedIds={selectedRelationIds}
                 onChange={setSelectedRelationIds}
-                maxSelected={relation === 'child_of' ? 2 : undefined}
+                maxSelected={initialRelationKind === 'family' && relation === 'child_of' ? 2 : undefined}
                 testId="new-person-kinship-selector"
-                placeholder={t(relation === 'child_of' ? 'Elegir progenitores…' : relation === 'parent_of' ? 'Elegir hijos/as…' : relation === 'sibling_of' ? 'Elegir hermanos/as…' : 'Elegir cónyuges/parejas…')}
+                placeholder={t(initialRelationKind === 'social' ? 'Elegir personas relacionadas…' : relation === 'child_of' ? 'Elegir progenitores…' : relation === 'parent_of' ? 'Elegir hijos/as…' : relation === 'sibling_of' ? 'Elegir hermanos/as…' : 'Elegir cónyuges/parejas…')}
               />
             )}
-            {(relation === 'child_of' || relation === 'parent_of') && (
+            {initialRelationKind === 'family' && (relation === 'child_of' || relation === 'parent_of') && (
               <label className="flex items-center gap-2 text-xs text-neutral-400"><input type="checkbox" checked={adoptive} onChange={(event) => setAdoptive(event.target.checked)} />{t('Relación adoptiva')}</label>
             )}
-            {relation === 'child_of' && <p className="text-[11px] text-neutral-500">{t('Indica los dos progenitores cuando se conozcan; puedes guardar solo uno.')}</p>}
+            {initialRelationKind === 'family' && relation === 'child_of' && <p className="text-[11px] text-neutral-500">{t('Indica los dos progenitores cuando se conozcan; puedes guardar solo uno.')}</p>}
           </div>
         )}
         <div className="flex justify-end gap-2 pt-1">
           <button className="btn btn-ghost" onClick={onClose}>
             {t('Cancelar')}
           </button>
-          <button className="btn btn-primary" disabled={busy || !name.trim() || (relation !== 'none' && selectedRelationIds.length === 0)} onClick={() => void save()}>
+          <button className="btn btn-primary" disabled={busy || !name.trim() || (initialRelationKind === 'family' && (relation === 'none' || selectedRelationIds.length === 0)) || (initialRelationKind === 'social' && selectedRelationIds.length === 0)} onClick={() => void save()}>
             {t('Guardar')}
           </button>
         </div>

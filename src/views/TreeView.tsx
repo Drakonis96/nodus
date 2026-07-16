@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
 import { buildTreeFamilies, treeFamilyLaneY } from '@shared/treeFamilies';
@@ -49,6 +49,10 @@ export function TreeView({
   const [dossierId, setDossierId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isPanning, setIsPanning] = useState(false);
+  const treeViewportRef = useRef<HTMLDivElement>(null);
+  const panRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number; moved: boolean } | null>(null);
+  const suppressTreeClickRef = useRef(false);
   const light = useIsLightTheme();
   // SVG <text> fills can't inherit the .light utility remaps (they're not utility
   // classes), so pick readable ink colours for the active theme explicitly.
@@ -144,6 +148,44 @@ export function TreeView({
     setFocusId(nextFocusId);
     setSelected(null);
     void window.nodus.updateSettings({ treeFocusPersonId: nextFocusId }).then(() => onSettingsChange?.());
+  };
+
+  const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !treeViewportRef.current) return;
+    panRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      scrollLeft: treeViewportRef.current.scrollLeft,
+      scrollTop: treeViewportRef.current.scrollTop,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsPanning(true);
+  };
+
+  const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    const viewport = treeViewportRef.current;
+    if (!pan || !viewport || pan.pointerId !== event.pointerId) return;
+    const dx = event.clientX - pan.x;
+    const dy = event.clientY - pan.y;
+    if (!pan.moved && Math.hypot(dx, dy) < 4) return;
+    pan.moved = true;
+    suppressTreeClickRef.current = true;
+    viewport.scrollLeft = pan.scrollLeft - dx;
+    viewport.scrollTop = pan.scrollTop - dy;
+    event.preventDefault();
+  };
+
+  const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (panRef.current?.pointerId !== event.pointerId) return;
+    const moved = panRef.current.moved;
+    panRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setIsPanning(false);
+    if (!moved || event.type === 'pointercancel') suppressTreeClickRef.current = false;
+    else window.setTimeout(() => { suppressTreeClickRef.current = false; }, 0);
   };
 
   if (persons.length === 0) {
@@ -248,7 +290,22 @@ export function TreeView({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto bg-neutral-950/40 p-4">
+      <div
+        ref={treeViewportRef}
+        className={`min-h-0 flex-1 overflow-auto bg-neutral-950/40 p-4 ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        data-testid="tree-pan-viewport"
+        title={t('Arrastra para moverte por el árbol')}
+        onPointerDown={startPan}
+        onPointerMove={movePan}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onClickCapture={(event) => {
+          if (!suppressTreeClickRef.current) return;
+          event.preventDefault();
+          event.stopPropagation();
+          suppressTreeClickRef.current = false;
+        }}
+      >
         <svg
           width={svgW * zoom}
           height={svgH * zoom}

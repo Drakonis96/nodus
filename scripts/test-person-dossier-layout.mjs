@@ -31,7 +31,8 @@ test('every person dossier area uses the shared section block', () => {
 });
 
 test('all dossier add actions share exactly one size contract', () => {
-  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-7 w-36/);
+  assert.match(layout, /PERSON_DOSSIER_ADD_BUTTON_CLASS[\s\S]*h-7 min-w-36/);
+  assert.match(layout, /whitespace-nowrap/);
   assert.match(dossier, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(dossier, /Biografía'[\s\S]{0,240}PERSON_DOSSIER_ADD_BUTTON_CLASS/);
   assert.match(kinship, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);

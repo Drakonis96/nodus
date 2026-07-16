@@ -5,12 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [editor, picker, social, tree, dossier, people, settings, styles, kinshipModel] = await Promise.all([
+const [editor, picker, social, tree, dossier, dossierLayout, people, settings, styles, kinshipModel] = await Promise.all([
   readFile(path.join(root, 'src/components/KinshipEditor.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PersonMultiSelect.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/RelationsSection.tsx'), 'utf8'),
   readFile(path.join(root, 'src/views/TreeView.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PersonDossier.tsx'), 'utf8'),
+  readFile(path.join(root, 'src/components/personDossierLayout.ts'), 'utf8'),
   readFile(path.join(root, 'src/views/PersonasView.tsx'), 'utf8'),
   readFile(path.join(root, 'electron/db/settingsRepo.ts'), 'utf8'),
   readFile(path.join(root, 'src/index.css'), 'utf8'),
@@ -31,6 +32,15 @@ test('tree routes parentage by family units instead of overlapping independent e
   assert.match(tree, /treeFamilyLaneY/);
   assert.match(tree, /layout\.edges\.filter\(\(edge\) => edge\.kind !== 'parent'\)/);
   assert.doesNotMatch(tree, /const midY = \(a\.y \+ b\.y\) \/ 2/);
+});
+
+test('tree viewport supports drag panning without activating a person after movement', () => {
+  assert.match(tree, /data-testid="tree-pan-viewport"/);
+  assert.match(tree, /onPointerDown=\{startPan\}/);
+  assert.match(tree, /viewport\.scrollLeft = pan\.scrollLeft - dx/);
+  assert.match(tree, /viewport\.scrollTop = pan\.scrollTop - dy/);
+  assert.match(tree, /suppressTreeClickRef/);
+  assert.match(tree, /cursor-grabbing/);
 });
 
 test('paternal and maternal colours are the only user-selectable tree branch colours', () => {
@@ -103,7 +113,18 @@ test('relationship editor keeps chronology review and repair actions', () => {
   assert.match(editor, /parentAgeWarning/);
   assert.match(editor, /Invertir/);
   assert.match(editor, /Editar parentesco/);
-  assert.match(people, /Parentesco inicial \(opcional\)/);
+  assert.match(people, /Relación inicial \(opcional\)/);
+  assert.match(people, /data-testid="new-person-initial-relation-kind"/);
+  assert.match(people, /Relación familiar inicial/);
+  assert.match(people, /Relación social inicial/);
+  assert.match(people, /createSocialRelation/);
+});
+
+test('dossier action buttons grow for translated labels without wrapping', () => {
+  assert.match(dossier, /PERSON_DOSSIER_ADD_BUTTON_CLASS/);
+  assert.match(dossierLayout, /min-w-36/);
+  assert.match(dossierLayout, /whitespace-nowrap/);
+  assert.doesNotMatch(dossierLayout, /[' ]w-36(?:[' ])/);
 });
 
 test('people list leaves room above the first selectable person', () => {
