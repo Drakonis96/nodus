@@ -90,7 +90,10 @@ import type {
   SocialContactInput,
   SocialRelationInput,
   ArchiveItemInput,
+  ArchiveEntryCreateInput,
+  ArchiveIngestSummary,
   ArchiveListOptions,
+  ZoteroArchiveEntryImportInput,
   DecorativeImageActionRequest,
   DecorativeImageEntityKind,
   DecorativeImageStyle,
@@ -1021,6 +1024,66 @@ export function registerIpc(
   });
 
   // ── Evidence archive ───────────────────────────────────────────────────────
+  const createArchiveEntries = async (
+    input: ArchiveEntryCreateInput,
+    filePaths: string[] = input.paths ?? []
+  ): Promise<ArchiveIngestSummary> => {
+    const paths = [...new Set(filePaths.filter((filePath) => typeof filePath === 'string' && filePath.trim()))];
+    const settings = getSettings();
+    const ocr = { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages };
+    const visionModel = settings.visionModel ?? settings.extractionModel ?? settings.synthesisModel ?? null;
+    let added = 0;
+    let duplicates = 0;
+    const items = [];
+
+    if (paths.length === 0) {
+      const item = createItem({
+        title: input.title.trim() || 'Entrada sin título',
+        kind: 'text',
+        folderId: input.folderIds?.[0] ?? null,
+        description: input.description?.trim() || null,
+        source: input.source?.trim() || null,
+        extractedText: input.extractedText?.trim() || null,
+        docType: input.docType ?? null,
+        metadata: input.metadata ?? null,
+        tags: input.tags,
+      });
+      setItemFolders(item.itemId, input.folderIds ?? []);
+      for (const personId of input.personIds ?? []) linkItemPerson(item.itemId, personId);
+      items.push(getItem(item.itemId) ?? item);
+      added = 1;
+    } else {
+      for (const filePath of paths) {
+        const result = await ingestArchiveFile(filePath, {
+          folderId: input.folderIds?.[0] ?? null,
+          title: paths.length === 1 ? input.title.trim() || undefined : undefined,
+          tags: input.tags,
+          ocr,
+          visionModel,
+          docType: input.docType ?? null,
+        });
+        if (result.duplicate) {
+          duplicates += 1;
+          items.push(result.item);
+          continue;
+        }
+        added += 1;
+        const updated = updateItem(result.item.itemId, {
+          description: input.description?.trim() || result.item.description,
+          source: input.source?.trim() || null,
+          extractedText: input.extractedText?.trim() || result.item.extractedText,
+          docType: input.docType ?? null,
+          metadata: input.metadata ?? null,
+        }) ?? result.item;
+        setItemFolders(updated.itemId, input.folderIds ?? []);
+        for (const personId of input.personIds ?? []) linkItemPerson(updated.itemId, personId);
+        items.push(getItem(updated.itemId) ?? updated);
+      }
+    }
+    void embedArchiveBacklog().catch(() => undefined);
+    return { added, duplicates, items };
+  };
+
   h('archive:counts', async () => archiveCounts());
   h('archive:listFolders', async () => listFolders());
   h('archive:createFolder', async (_e, name: string, parentId?: string | null) => createFolder(name, parentId ?? null));
@@ -1092,6 +1155,32 @@ export function registerIpc(
     // Index the freshly ingested text for semantic discovery, in the background.
     void embedArchiveBacklog().catch(() => undefined);
     return { added, duplicates, items };
+  });
+  h('archive:chooseEntryFiles', async () => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Adjuntar archivos a la entrada genealógica',
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Todos los archivos', extensions: ['*'] }],
+    });
+    return picked.canceled ? [] : picked.filePaths;
+  });
+  h('archive:createEntry', async (_e, input: ArchiveEntryCreateInput) => createArchiveEntries(input));
+  h('archive:importZoteroEntry', async (_e, input: ZoteroArchiveEntryImportInput) => {
+    const { zoteroUserId } = getSettings();
+    const canonicalItemKey = input.library.type === 'group' ? `groups:${input.library.id}:${input.itemKey}` : input.itemKey;
+    const item = await zotero.getItem(zoteroUserId, canonicalItemKey, input.library);
+    if (!item) throw new Error('El elemento ya no está disponible en Zotero.');
+    const attachments = await zotero.itemAttachments(zoteroUserId, canonicalItemKey, input.library);
+    const attachment = attachments.find((candidate) => candidate.itemKey === input.attachmentKey || candidate.key === input.attachmentKey);
+    if (!attachment) throw new Error('Elige un adjunto para importarlo a Nodus.');
+    const filePath = await zotero.attachmentFilePath(zoteroUserId, attachment.key);
+    if (!filePath || !fs.existsSync(filePath)) throw new Error('El adjunto no está descargado en este equipo. Ábrelo o descárgalo primero desde Zotero.');
+    return createArchiveEntries({
+      ...input,
+      title: input.title.trim() || item.title,
+      source: input.source?.trim() || item.url || `Zotero · ${item.title}`,
+      tags: input.tags?.length ? input.tags : item.tags,
+    }, [filePath]);
   });
   // A typed text entry (diary page, note, memoir) with no file to upload.
   h('archive:createTextEntry', async (

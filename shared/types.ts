@@ -1892,6 +1892,26 @@ export interface ArchiveIngestSummary {
   items: ArchiveItem[];
 }
 
+/** Complete draft used by the genealogy Archive's single creation flow. */
+export interface ArchiveEntryCreateInput {
+  paths?: string[];
+  title: string;
+  description?: string | null;
+  source?: string | null;
+  docType?: string | null;
+  metadata?: Record<string, string> | null;
+  tags?: string[];
+  folderIds?: string[];
+  personIds?: string[];
+  extractedText?: string | null;
+}
+
+export interface ZoteroArchiveEntryImportInput extends Omit<ArchiveEntryCreateInput, 'paths'> {
+  library: ZoteroLibrary;
+  itemKey: string;
+  attachmentKey: string;
+}
+
 export interface RecordsScanSummary {
   persons: number;
   places: number;
@@ -4831,6 +4851,9 @@ export interface NodusApi {
   unlinkArchivePerson(itemId: string, personId: string): Promise<void>;
   listArchiveItemsForPerson(personId: string): Promise<ArchiveItem[]>;
   pickAndIngestArchive(folderId?: string | null, docType?: string | null): Promise<ArchiveIngestSummary>;
+  chooseArchiveEntryFiles(): Promise<string[]>;
+  createArchiveEntry(input: ArchiveEntryCreateInput): Promise<ArchiveIngestSummary>;
+  importZoteroArchiveEntry(input: ZoteroArchiveEntryImportInput): Promise<ArchiveIngestSummary>;
   createArchiveTextEntry(input: {
     title: string;
     content: string;

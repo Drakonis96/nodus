@@ -15,6 +15,7 @@ import { Icon } from '../components/ui';
 import { DocTypeForm, DocTypePicker, DocTypeSelect } from '../components/DocTypeForm';
 import { PersonLinkPicker } from '../components/PersonLinkPicker';
 import { ArchiveFilterBar } from '../components/ArchiveFilterBar';
+import { GenealogyArchiveEntryModal } from '../components/GenealogyArchiveEntryModal';
 import {
   ChipSelectCell,
   GUTTER_WIDTH,
@@ -44,14 +45,14 @@ interface ArchiveColumn {
 }
 const ARCHIVE_COLUMNS: ArchiveColumn[] = [
   { id: 'title', label: 'Título', width: 240 },
+  { id: 'description', label: 'Descripción', width: 260 },
   { id: 'file', label: 'Archivo', width: 84 },
   { id: 'docType', label: 'Tipo de documento', width: 190 },
+  { id: 'year', label: 'Año', width: 84 },
   { id: 'persons', label: 'Personas', width: 230 },
   { id: 'source', label: 'Fuente', width: 200 },
   { id: 'tags', label: 'Etiquetas', width: 200 },
   { id: 'folders', label: 'Carpeta', width: 180 },
-  { id: 'year', label: 'Año', width: 84 },
-  { id: 'description', label: 'Descripción', width: 260 },
   { id: 'text', label: 'Texto detectado', width: 220 },
 ];
 
@@ -64,6 +65,7 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [textEntry, setTextEntry] = useState(false);
+  const [genealogyEntry, setGenealogyEntry] = useState(false);
 
   // ── Filters (Notion-style) + sorting ────────────────────────────────────────
   const [availableTags, setAvailableTags] = useState<ArchiveTagCount[]>([]);
@@ -186,13 +188,17 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <ArchiveActionButton label={t('Añadir archivos')} icon="upload" primary disabled={busy} onClick={() => void addFiles()} />
-          <ArchiveActionButton
-            label={t('Nueva entrada')}
-            icon="edit"
-            onClick={() => setTextEntry(true)}
-            title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
-          />
+          {isGenealogy ? (
+            <ArchiveActionButton label={t('Añadir entrada')} icon="plus" primary disabled={busy} onClick={() => setGenealogyEntry(true)} />
+          ) : <>
+            <ArchiveActionButton label={t('Añadir archivos')} icon="upload" primary disabled={busy} onClick={() => void addFiles()} />
+            <ArchiveActionButton
+              label={t('Nueva entrada')}
+              icon="edit"
+              onClick={() => setTextEntry(true)}
+              title={t('Crear una entrada de texto (diario, nota, memorias) sin subir un archivo')}
+            />
+          </>}
           <ArchiveActionButton
             label={t('Indexar')}
             icon="wand"
@@ -339,6 +345,22 @@ export function ArchiveView({ onOpenLibrary, isGenealogy = false }: { onOpenLibr
           }}
         />
       )}
+      {genealogyEntry && (
+        <GenealogyArchiveEntryModal
+          folders={folders}
+          persons={treePersons}
+          initialFolderIds={fFolderIds.length === 1 ? fFolderIds : []}
+          onClose={() => setGenealogyEntry(false)}
+          onSaved={async (result) => {
+            setMessage(
+              t('Añadidos: {a} · duplicados omitidos: {d}')
+                .replace('{a}', String(result.added))
+                .replace('{d}', String(result.duplicates))
+            );
+            await reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -416,6 +438,10 @@ function ArchiveRow({
       <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('title') }}>
         <LongTextCell value={item.title} markdown={false} onChange={(v) => onPatch({ title: v ?? t('Sin título') })} />
       </div>
+      {/* Descripción */}
+      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('description') }}>
+        <LongTextCell value={item.description} markdown={false} onChange={(v) => onPatch({ description: v })} />
+      </div>
       {/* Archivo (kind) */}
       <div className="flex shrink-0 items-center gap-1.5 overflow-hidden border-r border-neutral-900 px-2" style={{ width: col('file') }}>
         <Icon name={KIND_ICON[item.kind]} size={15} className="shrink-0 text-neutral-400" />
@@ -424,6 +450,10 @@ function ArchiveRow({
       {/* Tipo de documento */}
       <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('docType') }}>
         <DocTypePicker value={item.docType} onChange={(id) => onPatch({ docType: id })} placeholder={t('Sin tipo')} fill genealogyFilter={isGenealogy} />
+      </div>
+      {/* Año (derived, read-only) */}
+      <div className="flex shrink-0 items-center overflow-hidden border-r border-neutral-900 px-2 text-neutral-400" style={{ width: col('year') }}>
+        {item.year ?? <span className="text-neutral-700">—</span>}
       </div>
       {/* Personas */}
       <div className="flex shrink-0 items-center overflow-x-auto border-r border-neutral-900 px-2 py-1" style={{ width: col('persons') }}>
@@ -440,14 +470,6 @@ function ArchiveRow({
       {/* Carpeta */}
       <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('folders') }}>
         <ChipSelectCell values={item.folderIds} options={folderOptions} multi onChange={onSetFolders} placeholder={t('Carpeta…')} />
-      </div>
-      {/* Año (derived, read-only) */}
-      <div className="flex shrink-0 items-center overflow-hidden border-r border-neutral-900 px-2 text-neutral-400" style={{ width: col('year') }}>
-        {item.year ?? <span className="text-neutral-700">—</span>}
-      </div>
-      {/* Descripción */}
-      <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('description') }}>
-        <LongTextCell value={item.description} markdown={false} onChange={(v) => onPatch({ description: v })} />
       </div>
       {/* Texto detectado (read-only preview → opens the record) */}
       <div className="shrink-0 overflow-hidden border-r border-neutral-900" style={{ width: col('text') }}>
