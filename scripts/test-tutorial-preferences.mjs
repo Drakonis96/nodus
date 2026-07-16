@@ -17,11 +17,17 @@ test.after(() => rm(outDir, { recursive: true, force: true }));
 test('tutorial choice selects the available UI and prompt translations', () => {
   assert.deepEqual(preferencesForTutorialLanguage('es'), { uiLanguage: 'es', promptLanguage: 'es' });
   assert.deepEqual(preferencesForTutorialLanguage('en'), { uiLanguage: 'en', promptLanguage: 'en' });
-  // French has a full UI translation, so it keeps the French interface. Turkish only
-  // has prompt translations, so it still borrows the English UI.
+  // The two axes are independent. French has both a UI table and prompt translations.
   assert.deepEqual(preferencesForTutorialLanguage('fr'), { uiLanguage: 'fr', promptLanguage: 'fr' });
+  // Turkish has prompt translations but no UI table, so it borrows the English UI.
   assert.deepEqual(preferencesForTutorialLanguage('tr'), { uiLanguage: 'en', promptLanguage: 'tr' });
-  for (const language of ['de', 'it', 'pt', 'pt-BR', 'zh', 'ja', 'ru', 'uk']) {
+  // German and both Portuguese variants have a UI table but no prompt translations,
+  // so the interface is theirs while generated content falls back to English.
+  for (const language of ['de', 'pt', 'pt-BR']) {
+    assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: language, promptLanguage: 'en' });
+  }
+  // Everything else is tutorial-only: English on both axes.
+  for (const language of ['it', 'zh', 'ja', 'ru', 'uk']) {
     assert.deepEqual(preferencesForTutorialLanguage(language), { uiLanguage: 'en', promptLanguage: 'en' });
   }
 });

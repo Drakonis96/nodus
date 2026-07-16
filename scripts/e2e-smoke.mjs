@@ -175,20 +175,30 @@ try {
   await page.getByTestId('basics-tutorial').waitFor({ state: 'detached' });
   assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 3, 'confirmed skip records the current tutorial version globally');
 
-  // Finish setup but stay in French, so the shell itself can be checked. These labels
-  // reach the DOM from navigation.ts through t(), proving the French table is wired
-  // all the way through a real render rather than merely present on disk.
-  await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, uiLanguage: 'fr', promptLanguage: 'fr' }));
-  await page.reload();
-  await page.getByTestId('app-shell').waitFor();
-  await waitForCondition('barra lateral traducida al francés', async () => {
-    // Group headers are uppercased by CSS ("EXPLORER"), so compare case-insensitively.
-    const sidebar = (await page.getByTestId('sidebar-scroll-region').innerText().catch(() => '')).toLowerCase();
-    return ['accueil', 'explorer', 'bibliothèque', 'idées', 'analyser', 'écrire', 'paramètres']
-      .every((label) => sidebar.includes(label));
-  });
-  assert.equal(await page.evaluate(() => document.documentElement.lang), 'fr', 'the document language follows the UI language');
-  console.log('[e2e] French UI renders on the real shell (sidebar + document lang)');
+  // Finish setup, then walk every translated language on the real shell. These labels
+  // reach the DOM from navigation.ts through t(), so they prove each table is wired
+  // all the way through a render rather than merely present on disk. Words are
+  // distinctive per language (and per Portuguese variant) so a table cannot pass by
+  // falling back to English or to its sibling variant.
+  await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true }));
+  const SIDEBAR_BY_LANGUAGE = {
+    fr: ['accueil', 'explorer', 'bibliothèque', 'idées', 'analyser', 'écrire', 'paramètres'],
+    de: ['start', 'erkunden', 'bibliothek', 'ideen', 'analysieren', 'schreiben', 'einstellungen'],
+    pt: ['início', 'explorar', 'biblioteca', 'ideias', 'analisar', 'escrever', 'definições'],
+    'pt-BR': ['início', 'explorar', 'biblioteca', 'ideias', 'analisar', 'escrever', 'configurações'],
+  };
+  for (const [language, labels] of Object.entries(SIDEBAR_BY_LANGUAGE)) {
+    await page.evaluate((lang) => window.nodus.updateSettings({ uiLanguage: lang }), language);
+    await page.reload();
+    await page.getByTestId('app-shell').waitFor();
+    await waitForCondition(`barra lateral traducida (${language})`, async () => {
+      // Group headers are uppercased by CSS ("EXPLORER"), so compare case-insensitively.
+      const sidebar = (await page.getByTestId('sidebar-scroll-region').innerText().catch(() => '')).toLowerCase();
+      return labels.every((label) => sidebar.includes(label));
+    });
+    assert.equal(await page.evaluate(() => document.documentElement.lang), language, `the document language follows the UI language (${language})`);
+  }
+  console.log(`[e2e] ${Object.keys(SIDEBAR_BY_LANGUAGE).length} translated UIs render on the real shell (sidebar + document lang)`);
 
   // Back to Spanish for the rest of the suite, which asserts on Spanish copy. The
   // reload above already consumed the once-per-session startup update check, so reset

@@ -9,11 +9,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Every user-facing string is authored in Spanish and translated via t()/tx() keyed
-// by that Spanish source (see src/i18n.ts). A missing key silently falls back to
-// Spanish — which is exactly the bug the genealogy vault shipped with. This test
-// enforces FULL English coverage: it collects the keys the renderer asks for and
-// asserts each has an EN entry. When you add a new UI string, add its EN
-// translation too, or this fails.
+// by that Spanish source (see src/i18n.ts). A missing key silently falls back —
+// which is exactly the bug the genealogy vault shipped with. This test enforces FULL
+// coverage for EVERY translated language: it collects the keys the renderer asks for
+// and asserts each has an entry in each table. When you add a new UI string, add its
+// translations too, or this fails.
 //
 // Keys reach t() two ways, and both must be collected or the gap stays invisible:
 //   - directly as a literal — including inside a ternary, `t(a ? 'X' : 'Y')`, which
@@ -38,12 +38,20 @@ function loadModule(file) {
   return require(bundle);
 }
 
-const { EN } = loadModule('src/i18n.en.ts');
-const { FR } = loadModule('src/i18n.fr.ts');
-const enKeys = new Set(Object.keys(EN));
+/**
+ * Every language the interface is translated into; Spanish is the source, so it has
+ * no table. Add a language here and it inherits every check below.
+ */
+const TRANSLATIONS = [
+  { name: 'English', file: 'src/i18n.en.ts', export: 'EN' },
+  { name: 'French', file: 'src/i18n.fr.ts', export: 'FR' },
+  { name: 'German', file: 'src/i18n.de.ts', export: 'DE' },
+  { name: 'European Portuguese', file: 'src/i18n.pt.ts', export: 'PT' },
+  { name: 'Brazilian Portuguese', file: 'src/i18n.pt-BR.ts', export: 'PT_BR' },
+].map((entry) => ({ ...entry, table: loadModule(entry.file)[entry.export] }));
 
-/** Every language the interface is translated into (Spanish is the source). */
-const TRANSLATIONS = [['English', EN], ['French', FR]];
+const EN = TRANSLATIONS[0].table;
+const enKeys = new Set(Object.keys(EN));
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
@@ -132,71 +140,124 @@ function collectTranslatableStrings() {
   return found;
 }
 
-for (const [language, table] of TRANSLATIONS) {
-  test(`every t()/tx() string and tour step has a ${language} translation`, () => {
+for (const { name, file, table } of TRANSLATIONS) {
+  test(`every t()/tx() string and tour step has a ${name} translation`, () => {
     const strings = collectTranslatableStrings();
     const missing = [...strings].filter(([s]) => !(s in table));
     const report = missing.map(([s, f]) => `  ${f}: ${JSON.stringify(s)}`).join('\n');
-    assert.equal(missing.length, 0, `Untranslated strings (add to src/i18n.${language.slice(0, 2).toLowerCase()}.ts):\n${report}`);
+    assert.equal(missing.length, 0, `Untranslated strings (add to ${file}):\n${report}`);
   });
 }
 
 test('every language table covers exactly the same keys', () => {
   // A key in one table but not another means one language silently falls back.
-  const [, base] = TRANSLATIONS[0];
-  for (const [language, table] of TRANSLATIONS.slice(1)) {
-    const missing = Object.keys(base).filter((key) => !(key in table));
-    const extra = Object.keys(table).filter((key) => !(key in base));
-    assert.deepEqual(missing, [], `${language} is missing keys English has`);
-    assert.deepEqual(extra, [], `${language} has keys English does not`);
+  for (const { name, table } of TRANSLATIONS.slice(1)) {
+    const missing = Object.keys(EN).filter((key) => !(key in table));
+    const extra = Object.keys(table).filter((key) => !(key in EN));
+    assert.deepEqual(missing, [], `${name} is missing keys English has`);
+    assert.deepEqual(extra, [], `${name} has keys English does not`);
   }
 });
 
 test('translations keep every {placeholder} intact', () => {
   // tx() substitutes by name, so a translated or dropped placeholder renders literally.
   const names = (value) => [...String(value).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
-  for (const [language, table] of TRANSLATIONS) {
+  for (const { name, table } of TRANSLATIONS) {
     const broken = Object.entries(table).filter(([key, value]) => names(key) !== names(value));
     assert.deepEqual(
       broken.map(([key, value]) => `${JSON.stringify(key)} → ${JSON.stringify(value)}`),
       [],
-      `${language} translations changed a {placeholder}`
+      `${name} translations changed a {placeholder}`
     );
   }
 });
 
 test('no translation is empty', () => {
-  for (const [language, table] of TRANSLATIONS) {
+  for (const { name, table } of TRANSLATIONS) {
     const blank = Object.entries(table).filter(([, value]) => !String(value).trim()).map(([key]) => key);
-    assert.deepEqual(blank, [], `${language} has blank translations`);
+    assert.deepEqual(blank, [], `${name} has blank translations`);
   }
 });
+
+test('the two Portuguese variants are really different', () => {
+  // Shipping pt and pt-BR separately only earns its keep if they actually diverge:
+  // the risk is one being a copy of the other, or drifting into its vocabulary.
+  const PT = TRANSLATIONS.find((t) => t.export === 'PT').table;
+  const PT_BR = TRANSLATIONS.find((t) => t.export === 'PT_BR').table;
+  const keys = Object.keys(PT);
+  const differing = keys.filter((key) => PT[key] !== PT_BR[key]);
+  // Many short labels legitimately coincide ("Nome", "Data"), so this is a floor,
+  // not a target — it only catches one variant being a copy of the other.
+  assert.ok(
+    differing.length > keys.length * 0.2,
+    `expected the Portuguese variants to diverge substantially, only ${differing.length}/${keys.length} differ`
+  );
+
+  // Vocabulary that belongs to exactly one variant. Deliberately excludes words that
+  // are legitimate in both: "arquivo" is Brazilian for a computer file but European
+  // for an archive/repository, and "transferir" means download in pt and transfer in
+  // pt-BR, so neither can be used as a marker.
+  const forbidden = {
+    PT: [/\bsalvar\b/i, /\busuários?\b/i, /\bconfigurações\b/i, /\bsenhas?\b/i, /\bgerenciar\b/i],
+    PT_BR: [/\bficheiros?\b/i, /\becrã\b/i, /\butilizadores?\b/i, /\bpalavra-passe\b/i],
+  };
+  for (const [variant, patterns] of Object.entries(forbidden)) {
+    const table = variant === 'PT' ? PT : PT_BR;
+    for (const pattern of patterns) {
+      const hits = Object.entries(table).filter(([, value]) => pattern.test(String(value)));
+      assert.deepEqual(
+        hits.map(([key, value]) => `${JSON.stringify(key)} → ${JSON.stringify(value)}`),
+        [],
+        `${variant} uses ${pattern} from the other variant`
+      );
+    }
+  }
+});
+
+// The languages that in-data labels must also carry. Spanish and English are the
+// source pair every table already had.
+const IN_DATA_LANGUAGES = ['fr', 'de', 'pt', 'pt-BR'];
 
 test('in-data labels are translated alongside the i18n table', () => {
   // These labels ship inside shared/ data rather than the i18n table, so the
   // coverage scan above cannot see them and they rot independently.
-  const { DOC_TYPE_LABEL_FR, RAW_DOC_TYPES, NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA } =
-    loadModule('shared/archiveDocTypes.ts');
+  const docTypes = loadModule('shared/archiveDocTypes.ts');
+  const { RAW_DOC_TYPES, NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA } = docTypes;
   assert.ok(RAW_DOC_TYPES.length > 150, `expected the full doc-type taxonomy, got ${RAW_DOC_TYPES.length}`);
-  // Assert against the source map, not the expanded `labelFr`: that one is
-  // `DOC_TYPE_LABEL_FR[id] ?? labelEn`, so a missing id would silently look fine.
-  // A French label equal to the English one is legitimate ("Illustration", "Notes").
-  const untranslated = RAW_DOC_TYPES.map((row) => row[0]).filter((id) => !DOC_TYPE_LABEL_FR[id]?.trim());
-  assert.deepEqual(untranslated, [], 'these document types have no French label and would fall back to English');
 
-  for (const [name, values] of Object.entries({ NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA })) {
-    const blank = (values ?? []).filter((value) => !value.fr?.trim()).map((value) => value.id);
-    assert.deepEqual(blank, [], `facet dimension ${name} has values with no French label`);
+  // Assert against the source maps, not the expanded `labels`: those are
+  // `DOC_TYPE_LABEL_XX[id] ?? labelEn`, so a missing id would silently look fine.
+  // A label equal to the English one is legitimate ("Illustration", "Notes").
+  const docTypeMaps = { fr: docTypes.DOC_TYPE_LABEL_FR, de: docTypes.DOC_TYPE_LABEL_DE, pt: docTypes.DOC_TYPE_LABEL_PT, 'pt-BR': docTypes.DOC_TYPE_LABEL_PT_BR };
+  for (const language of IN_DATA_LANGUAGES) {
+    const map = docTypeMaps[language];
+    assert.ok(map, `no doc-type label map for ${language}`);
+    const untranslated = RAW_DOC_TYPES.map((row) => row[0]).filter((id) => !map[id]?.trim());
+    assert.deepEqual(untranslated, [], `these document types have no ${language} label and would fall back to English`);
   }
 
-  const { TREE_KINSHIP_ROLE_LABEL_ES, TREE_KINSHIP_ROLE_LABEL_FR } = loadModule('shared/treeKinship.ts');
-  const rolesMissingFr = Object.keys(TREE_KINSHIP_ROLE_LABEL_ES).filter((role) => !TREE_KINSHIP_ROLE_LABEL_FR[role]?.trim());
-  assert.deepEqual(rolesMissingFr, [], 'these kinship roles have no French label');
+  for (const [dimension, values] of Object.entries({ NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA })) {
+    for (const language of IN_DATA_LANGUAGES) {
+      const blank = (values ?? []).filter((value) => !value[language]?.trim()).map((value) => value.id);
+      assert.deepEqual(blank, [], `facet dimension ${dimension} has values with no ${language} label`);
+    }
+  }
+
+  const kinship = loadModule('shared/treeKinship.ts');
+  const roles = Object.keys(kinship.TREE_KINSHIP_ROLE_LABEL_ES);
+  for (const language of IN_DATA_LANGUAGES) {
+    const table = kinship.TREE_KINSHIP_ROLE_LABELS[language];
+    assert.ok(table, `no kinship role table for ${language}`);
+    const missing = roles.filter((role) => !table[role]?.trim());
+    assert.deepEqual(missing, [], `these kinship roles have no ${language} label`);
+  }
 
   const { RELEASE_NOTES } = loadModule('shared/releaseNotes.ts');
   const highlights = RELEASE_NOTES.flatMap((note) => note.highlights.map((h) => [note.version, h]));
-  const missingFr = highlights.filter(([, h]) => !h.fr?.trim()).map(([version]) => version);
-  assert.deepEqual(missingFr, [], 'these release notes have no French highlight');
+  for (const language of IN_DATA_LANGUAGES) {
+    const missing = highlights.filter(([, h]) => !h[language]?.trim()).map(([version]) => version);
+    assert.deepEqual(missing, [], `these release notes have no ${language} highlight`);
+  }
 });
 
 test('keys reached indirectly and through ternaries are collected', () => {
