@@ -88,6 +88,7 @@ try {
     ...process.env,
     NODUS_USERDATA: userData,
     NODUS_DISABLE_AUTO_UPDATE: '1',
+    NODUS_E2E_UPDATE_STATUS: 'not-available',
     NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1',
     NODUS_E2E_FORCE_STUDY_AI_FAILURE: '1',
   };
@@ -174,6 +175,13 @@ try {
   await page.getByTestId('app-shell').waitFor();
   assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
+  const startupUpdateModal = page.getByTestId('startup-update-modal');
+  await startupUpdateModal.waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="startup-update-modal"]')?.getAttribute('data-update-status') === 'not-available');
+  assert.equal(await startupUpdateModal.getByText('Ya tienes la última versión', { exact: true }).count(), 1, 'startup update check reports that the installed version is current');
+  assert.equal(await startupUpdateModal.getByText(`v${appVersion}`, { exact: true }).count(), 1, 'startup update modal identifies the installed version');
+  await startupUpdateModal.getByRole('button', { name: 'Entendido', exact: false }).click();
+  await startupUpdateModal.waitFor({ state: 'detached' });
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
   // ── Nodi: absolute drag + right-click goodbye + persisted visibility ───────

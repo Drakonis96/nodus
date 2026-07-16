@@ -55,7 +55,6 @@ let lastUpdateEvent: UpdateProgressEvent | null = null;
 let installUpdateTimer: NodeJS.Timeout | null = null;
 let useUnsignedMacUpdaterFallback = false;
 
-const UPDATE_CHECK_DELAY_MS = 10_000;
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
 
 function macAppBundlePath(): string | null {
@@ -198,6 +197,16 @@ function createWindow(): void {
 }
 
 async function checkForUpdates(reason: string): Promise<UpdateCheckResponse> {
+  // Deterministic real-window coverage for the startup modal without contacting
+  // release infrastructure from the isolated E2E profile.
+  if (process.env.NODUS_E2E_UPDATE_STATUS === 'not-available') {
+    return emitUpdate({
+      status: 'not-available',
+      message: `Nodus ${app.getVersion()} ya está actualizado.`,
+      version: app.getVersion(),
+      progress: null,
+    });
+  }
   if (!app.isPackaged || process.env.NODUS_DISABLE_AUTO_UPDATE === '1') {
     return emitUpdate({
       status: 'disabled',
@@ -394,7 +403,8 @@ function setupAutoUpdates(): void {
     });
   });
 
-  setTimeout(() => void checkForUpdates('startup'), UPDATE_CHECK_DELAY_MS);
+  // The renderer's cinematic startup modal performs the immediate check and
+  // presents its result. Keep the long-running scheduled checks here.
   updateCheckTimer = setInterval(() => void checkForUpdates('scheduled'), UPDATE_CHECK_INTERVAL_MS);
 }
 

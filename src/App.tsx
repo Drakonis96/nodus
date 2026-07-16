@@ -21,6 +21,7 @@ import { StudyTour } from './views/StudyTour';
 import { BASICS_TUTORIAL_VERSION, BasicsTutorial } from './views/BasicsTutorial';
 import { preferencesForTutorialLanguage } from '@shared/tutorialPreferences';
 import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
+import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
 import { Icon } from './components/ui';
@@ -1391,7 +1392,7 @@ export function App() {
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
         (!isEstudio || settings.studyTourComplete) && (
-          <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} />
+          <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} onSettled={() => setWhatsNewSettled(true)} />
         )}
 
       {!isPreviewVault && recoveryStatus?.needsSetup && recoveryStatus.previousInstallation && !whatsNewSettled && (
@@ -1408,6 +1409,8 @@ export function App() {
           onSettled={() => setManualWhatsNewOpen(false)}
         />
       )}
+
+      {whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal />}
 
       <NodiMascot settings={settings} />
     </div>
