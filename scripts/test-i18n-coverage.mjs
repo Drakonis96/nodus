@@ -11,9 +11,16 @@ import { fileURLToPath } from 'node:url';
 // Every user-facing string is authored in Spanish and translated via t()/tx() keyed
 // by that Spanish source (see src/i18n.ts). A missing key silently falls back to
 // Spanish — which is exactly the bug the genealogy vault shipped with. This test
-// enforces FULL English coverage: it scans every renderer source for t('…')/tx('…')
-// literals and the GenealogyTour step strings, and asserts each has an EN entry.
-// When you add a new UI string, add its EN translation too, or this fails.
+// enforces FULL English coverage: it collects the keys the renderer asks for and
+// asserts each has an EN entry. When you add a new UI string, add its EN
+// translation too, or this fails.
+//
+// Keys reach t() two ways, and both must be collected or the gap stays invisible:
+//   - directly as a literal — including inside a ternary, `t(a ? 'X' : 'Y')`, which
+//     is why the argument is scanned rather than just the first token after `t(`;
+//   - indirectly from a data table translated at render time, e.g. navigation.ts
+//     labels rendered as `t(n.label)`. Those hide best (the Spanish sidebar labels
+//     shipped that way), so every such table is listed in INDIRECT_KEY_SOURCES.
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -40,29 +47,77 @@ function walk(dir) {
   return out;
 }
 
-/** All literal first-args of t()/tx() across the renderer (skips template interpolation). */
+// Data tables whose Spanish values are handed to t() from somewhere else.
+const INDIRECT_KEY_SOURCES = [
+  // Sidebar + command palette labels, rendered as t(n.label) / t(g.label) in App.tsx.
+  { file: 'src/navigation.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Settings tab labels, rendered as t(tab.label).
+  { file: 'src/views/Settings.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Tour steps are plain object literals fed through t() by the tour engine.
+  ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour'].map((name) => ({
+    file: `src/views/${name}.tsx`,
+    pattern: /(?:title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
+  })),
+];
+
+// Literals that sit inside a t() call but are not keys: they index a label map
+// whose *values* are the real keys, e.g. t(LABELS[state ?? 'empty']).
+const NOT_KEYS = new Set(['none', 'empty']);
+
+/** Yield the balanced argument text of every t()/tx() call in `src`. */
+function* translationCallArgs(src) {
+  const re = /\bt[x]?\(/g;
+  let m;
+  while ((m = re.exec(src))) {
+    let depth = 1;
+    let i = re.lastIndex;
+    const start = i;
+    while (i < src.length && depth > 0) {
+      const c = src[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      else if (c === "'" || c === '"' || c === '`') {
+        const quote = c;
+        i++;
+        while (i < src.length && src[i] !== quote) i += src[i] === '\\' ? 2 : 1;
+      }
+      i++;
+    }
+    yield src.slice(start, i - 1);
+  }
+}
+
+/** Remove literals that are compared or used as a lookup index, not translated. */
+function stripNonKeyLiterals(arg) {
+  return arg
+    .replace(/(?:===|!==|==|!=)\s*(["'])(?:\\.|(?!\1).)*?\1/g, '')
+    .replace(/(["'])(?:\\.|(?!\1).)*?\1\s*(?:===|!==|==|!=)/g, '')
+    .replace(/\.(?:includes|startsWith|endsWith|split|join|has|get)\(\s*(["'])(?:\\.|(?!\1).)*?\1\s*\)/g, '')
+    .replace(/\[[^\]]*(["'])(?:\\.|(?!\1).)*?\1\s*\]/g, '');
+}
+
+/** Every key the renderer asks t()/tx() for, mapped to the file that asks. */
 function collectTranslatableStrings() {
-  const files = walk(path.join(repoRoot, 'src'));
-  const re = /\bt[x]?\(\s*(["'`])((?:\\.|(?!\1).)*?)\1/g;
   const found = new Map(); // string -> file
-  for (const f of files) {
+  const record = (val, file) => {
+    if (!val || NOT_KEYS.has(val) || !/[a-zA-Z]/.test(val)) return;
+    if (!found.has(val)) found.set(val, path.relative(repoRoot, file));
+  };
+  const unescape = (s) => s.replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\`/g, '`');
+
+  for (const f of walk(path.join(repoRoot, 'src'))) {
     const src = fs.readFileSync(f, 'utf8');
-    let m;
-    while ((m = re.exec(src))) {
-      if (m[1] === '`' && m[2].includes('${')) continue;
-      const val = m[2].replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\`/g, '`');
-      if (val && /[a-zA-Z]/.test(val) && !found.has(val)) found.set(val, path.relative(repoRoot, f));
+    for (const arg of translationCallArgs(src)) {
+      if (arg.length > 600) continue; // a long expression, not a literal key
+      for (const m of stripNonKeyLiterals(arg).matchAll(/(["'])((?:\\.|(?!\1).)*?)\1/g)) {
+        record(unescape(m[2]), f);
+      }
     }
   }
-  // Tour steps are plain object literals fed through t() by the tour engine.
-  for (const tourFile of ['src/views/GenealogyTour.tsx', 'src/views/DatabasesTour.tsx']) {
-    const tour = fs.readFileSync(path.join(repoRoot, tourFile), 'utf8');
-    const tre = /(?:title|body):\s*(["'`])((?:\\.|(?!\1).)*?)\1/g;
-    let tm;
-    while ((tm = tre.exec(tour))) {
-      const val = tm[2];
-      if (!found.has(val)) found.set(val, tourFile);
-    }
+  for (const { file, pattern } of INDIRECT_KEY_SOURCES) {
+    const full = path.join(repoRoot, file);
+    const src = fs.readFileSync(full, 'utf8');
+    for (const m of src.matchAll(pattern)) record(unescape(m[2]), full);
   }
   return found;
 }
@@ -72,6 +127,17 @@ test('every t()/tx() string and tour step has an English translation', () => {
   const missing = [...strings].filter(([s]) => !enKeys.has(s));
   const report = missing.map(([s, f]) => `  ${f}: ${JSON.stringify(s)}`).join('\n');
   assert.equal(missing.length, 0, `Untranslated strings (add to src/i18n.en.ts):\n${report}`);
+});
+
+test('keys reached indirectly and through ternaries are collected', () => {
+  // Without these the scan silently stops seeing whole surfaces and the coverage
+  // test above passes while the UI renders Spanish.
+  const strings = collectTranslatableStrings();
+  for (const key of ['Grafo de estudio', 'Ideas de estudio', 'Explorar']) {
+    assert.ok(strings.has(key), `sidebar label "${key}" (navigation.ts) must be collected`);
+  }
+  assert.ok(strings.has('Proveedores'), 'Settings tab labels must be collected');
+  assert.ok(strings.has('Ocultar contraseña'), 'keys inside a t(cond ? … : …) ternary must be collected');
 });
 
 test('genealogy vault-type + section labels are translated', () => {

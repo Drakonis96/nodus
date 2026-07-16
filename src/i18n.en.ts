@@ -5316,5 +5316,75 @@ export const EN: Record<string, string> = {
   'Opcional. Añade una transcripción o texto que deba ser buscable e indexado…': 'Optional. Add a transcript or text that should be searchable and indexed…',
   'Si el archivo permite extraer texto automáticamente, Nodus lo hará al guardarlo. Este campo permite añadirlo o sustituirlo manualmente.': 'If text can be extracted from the file automatically, Nodus will do so when saving. This field lets you add or replace it manually.',
   'Guardar entrada': 'Save entry',
+
+  // ── v2.3.8: sidebar (study vault) ──
+  'Ideas de estudio': 'Study ideas',
+  'Grafo de estudio': 'Study graph',
+
+  // ── v2.3.8: updates. The main process cannot translate, so these are rebuilt
+  //    in the renderer from the structured status (see ../updateStatus). ──
+  'Buscando actualizaciones…': 'Checking for updates…',
+  'Actualización {version} encontrada. La descarga empezará automáticamente.': 'Update {version} found. The download will start automatically.',
+  'Descargando actualización… {percent}%': 'Downloading update… {percent}%',
+  'Actualización {version} descargada. Reiniciando para instalarla…': 'Update {version} downloaded. Restarting to install it…',
+  'Instalando Nodus {version} y reiniciando…': 'Installing Nodus {version} and restarting…',
+  'Nodus {version} ya está actualizado.': 'Nodus {version} is already up to date.',
+  'Las actualizaciones solo están disponibles en la app empaquetada.': 'Updates are only available in the packaged app.',
+  'No se pudo comprobar si hay actualizaciones.': 'Could not check for updates.',
+
+  // ── v2.3.8: study search index state ──
+  'vacío': 'empty',
+  'listo': 'ready',
+  'indexando': 'indexing',
+  'en pausa': 'paused',
+  // 'error' is already mapped above.
+
+  // ── v2.3.8: study bank, test generator and review ──
+  'Transcripción': 'Transcript',
+  'Crear examen con IA': 'Create exam with AI',
+  'Crear flashcards con IA': 'Create flashcards with AI',
+  'Número de flashcards': 'Number of flashcards',
+  'Idea o tema para las flashcards (opcional)': 'Idea or topic for the flashcards (optional)',
+  'Generar examen': 'Generate exam',
+  'Generar flashcards': 'Generate flashcards',
+  'Editar pregunta': 'Edit question',
+  'Dominada': 'Mastered',
+  'Demasiado fácil': 'Too easy',
+  'Demasiado difícil': 'Too hard',
+  'Aprobar y bloquear': 'Approve and lock',
+  'Crea primero un curso.': 'Create a course first.',
+  'Crea primero un curso y una asignatura.': 'Create a course and a subject first.',
+  'Escribe un nombre': 'Enter a name',
+  'Híbrida': 'Hybrid',
+
+  // ── v2.3.8: editors and model settings ──
+  'Verificar': 'Verify',
+  'Verificar de nuevo': 'Verify again',
+  'Cambios sin guardar': 'Unsaved changes',
+  'Error al guardar': 'Error saving',
+  'Chat con el corpus': 'Chat with the corpus',
+  'Mejora de texto': 'Text improvement',
+  'Detalles y fuente': 'Details and source',
+
+  // ── v2.3.8: guided tour steps ──
+  'Verificar ideas extraídas': 'Verify extracted ideas',
+  'Cada idea aparece con su tipo (afirmación, hallazgo, constructo, método o marco), la obra de la que procede y la cita textual que la sostiene. Abre el detalle para comprobar si la lectura automática coincide con la tuya.':
+    'Every idea appears with its type (claim, finding, construct, method or framework), the work it comes from and the verbatim quote backing it. Open the detail view to check whether the automatic reading matches your own.',
+  'Busca por palabras clave a través de ideas, obras, huecos, temas, autores y notas. Los resultados te llevan directamente al detalle correspondiente en cada vista.':
+    'Search by keyword across ideas, works, gaps, themes, authors and notes. Results take you straight to the matching detail in each view.',
+  'Tu espacio de notas': 'Your notes space',
+  'Crea carpetas y notas en Markdown. Captura respuestas del asistente, borradores del taller de escritura, síntesis de debates e ideas individuales. Las citas internas (nodus://) permanecen clicables.':
+    'Create folders and Markdown notes. Capture assistant answers, writing workshop drafts, debate syntheses and individual ideas. Internal citations (nodus://) stay clickable.',
+  'Debates: la estructura de una contradicción': 'Debates: the structure of a contradiction',
+  'Cada relación de contradicción o refutación se despliega como un debate de dos bandos con sus autores, evidencias y cronología. Pides una síntesis al modelo para entender la tensión y decides cómo tu trabajo puede resolverla o aprovecharla.':
+    'Every contradiction or refutation relation unfolds as a two-sided debate with its authors, evidence and timeline. You ask the model for a synthesis to understand the tension, then decide how your work can resolve it or build on it.',
+  'Mapa de cobertura: tu pregunta descompuesta': 'Coverage map: your question broken down',
+  'Escribe tu pregunta de investigación y Nodus la desglosa en subpreguntas. Después mapea cuáles cubre tu corpus, cuáles parcialmente y cuáles quedan sin literatura. Es la herramienta para convertir una intuición vaga en un plan de búsqueda estructurado.':
+    'Write your research question and Nodus breaks it down into subquestions. It then maps which ones your corpus covers, which only partially, and which are left without literature. This is the tool for turning a vague intuition into a structured search plan.',
+  'Notas: tu cuaderno de investigación': 'Notes: your research notebook',
+  'A lo largo del proceso habrás generado hallazgos en el asistente, borradores en el taller y síntesis de debates. Las Notas te permiten organizar todo ello en carpetas jerárquicas — piensa en capítulos y secciones — con un editor Markdown que conserva las citas clicables. Las ideas manuales que crees aquí se integran directamente en el grafo.':
+    'Along the way you will have generated findings in the assistant, drafts in the workshop and debate syntheses. Notes let you organize all of it into hierarchical folders — think chapters and sections — with a Markdown editor that keeps citations clickable. Manual ideas you create here feed straight into the graph.',
+  'Inicio resume el estado de tu corpus, los análisis pendientes y el siguiente paso recomendado. La investigación es iterativa: escaneas más obras, vuelven a aparecer ideas y huecos, refinas la ruta y el borrador. Vuelve aquí entre vueltas. Puedes relanzar este recorrido desde Ajustes → Ayuda.':
+    'Home summarizes the state of your corpus, the pending analyses and the recommended next step. Research is iterative: you scan more works, ideas and gaps resurface, you refine the route and the draft. Come back here between rounds. You can relaunch this tour from Settings → Help.',
   // <<END_EN>>
 };

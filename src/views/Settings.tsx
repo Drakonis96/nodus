@@ -20,6 +20,7 @@ import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t, tx } from '../i18n';
+import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
@@ -107,7 +108,7 @@ export function Settings({
   useEffect(() => {
     return window.nodus.onUpdateProgress((event) => {
       setUpdateProgress(event);
-      setUpdateMessage(event.message);
+      setUpdateMessage(updateStatusMessage(event));
       setCheckingUpdate(event.status === 'checking');
     });
   }, []);
@@ -215,7 +216,7 @@ export function Settings({
     try {
       const result = await window.nodus.checkForUpdates();
       setUpdateProgress({ ...result, at: new Date().toISOString() });
-      setUpdateMessage(result.message);
+      setUpdateMessage(updateStatusMessage(result));
     } finally {
       setCheckingUpdate(false);
     }
@@ -224,7 +225,7 @@ export function Settings({
   const installUpdate = async () => {
     const result = await window.nodus.installUpdate();
     setUpdateProgress({ ...result, at: new Date().toISOString() });
-    setUpdateMessage(result.message);
+    setUpdateMessage(updateStatusMessage(result));
   };
 
   const exportBackup = async () => {
