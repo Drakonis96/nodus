@@ -8,12 +8,13 @@ const [mapView, placesMap, main] = await Promise.all([
   readFile(new URL('../electron/main.ts', import.meta.url), 'utf8'),
 ]);
 
-test('map filter toolbar and dropdown stay above Leaflet layers', () => {
-  assert.match(mapView, /relative z-\[1000\][^"\n]*border-b/);
+test('map filter toolbar and dropdown stay locally above Leaflet layers', () => {
+  assert.match(mapView, /relative z-20[^"\n]*border-b/);
   assert.match(mapView, /data-testid="map-person-filter-dropdown"/);
   assert.match(mapView, /data-testid="map-person-filter"/);
-  assert.match(mapView, /absolute z-\[1100\]/);
+  assert.match(mapView, /absolute z-30/);
   assert.match(mapView, /relative z-0 flex min-h-0 flex-1/);
+  assert.doesNotMatch(mapView, /z-\[1000\]|z-\[1100\]/);
 });
 
 test('Leaflet attribution links use the safe system-browser bridge', () => {

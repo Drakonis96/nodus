@@ -1436,6 +1436,15 @@ try {
   await page.keyboard.press('Escape');
   await page.locator('.pm-marker [data-person-id]').first().click({ force: true });
   await page.getByTestId('person-dossier-modal').waitFor({ timeout: 30_000 });
+  const dossierCoversMapToolbar = await page.evaluate(() => {
+    const toolbar = document.querySelector('[data-testid="map-toolbar"]');
+    const modal = document.querySelector('[data-testid="person-dossier-modal"]');
+    if (!(toolbar instanceof HTMLElement) || !(modal instanceof HTMLElement)) return false;
+    const bounds = toolbar.getBoundingClientRect();
+    const topmost = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+    return topmost != null && modal.contains(topmost);
+  });
+  assert.equal(dossierCoversMapToolbar, true, 'person dossier fully covers the map toolbar');
   await page.getByTestId('person-dossier-modal').getByRole('button', { name: 'Cerrar' }).click();
   console.log('[e2e] genealogy timeline multiselects + shared dossier from timeline and map work');
 

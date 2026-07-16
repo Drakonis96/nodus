@@ -82,7 +82,10 @@ export function MapView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="relative z-[1000] flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 bg-neutral-950 p-4">
+      <div
+        className="relative z-20 flex shrink-0 flex-wrap items-center gap-3 border-b border-neutral-800 bg-neutral-950 p-4"
+        data-testid="map-toolbar"
+      >
         <Icon name="map" size={20} className="text-indigo-300" />
         <h1 className="text-lg font-semibold">{t('Mapa')}</h1>
 
@@ -169,7 +172,7 @@ function PersonFilter({
         <Icon name="chevronDown" size={13} />
       </button>
       {open && (
-        <div className="absolute z-[1100] mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl" data-testid="map-person-filter-dropdown">
+        <div className="absolute z-30 mt-1 w-64 rounded-md border border-neutral-800 bg-neutral-950 p-2 shadow-xl" data-testid="map-person-filter-dropdown">
           <input
             className="input mb-1.5 h-8 w-full text-sm"
             placeholder={t('Buscar persona…')}

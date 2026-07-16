@@ -179,15 +179,21 @@ export function PlacesMap({
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    const ro = new ResizeObserver(() => map.invalidateSize());
+    const ro = new ResizeObserver(() => {
+      if (mapRef.current === map) map.invalidateSize();
+    });
     ro.observe(containerRef.current);
     // A tick after mount the flex container has its real size.
-    setTimeout(() => map.invalidateSize(), 60);
+    const initialInvalidateTimer = window.setTimeout(() => {
+      if (mapRef.current === map) map.invalidateSize();
+    }, 60);
     return () => {
+      window.clearTimeout(initialInvalidateTimer);
       ro.disconnect();
-      map.remove();
       mapRef.current = null;
       layersRef.current = null;
+      map.stop();
+      map.remove();
     };
   }, []);
 
@@ -283,7 +289,10 @@ export function PlacesMap({
     } else if (latlngs.length > 1) {
       map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 13, animate: false });
     }
-    setTimeout(() => map.invalidateSize(), 50);
+    const fitInvalidateTimer = window.setTimeout(() => {
+      if (mapRef.current === map) map.invalidateSize();
+    }, 50);
+    return () => window.clearTimeout(fitInvalidateTimer);
   }, [fitPoints, points]);
 
   const hasPoints = points.length > 0;

@@ -45,6 +45,21 @@ test('map people are mouse and keyboard activatable and open the shared record',
   assert.match(placesMap, /event\.key === 'Enter' \|\| event\.key === ' '/);
 });
 
+test('map controls stay above Leaflet but below the shared dossier modal', () => {
+  assert.match(map, /data-testid="map-toolbar"/);
+  assert.match(map, /className="relative z-20/);
+  assert.match(map, /className="absolute z-30[^\"]*" data-testid="map-person-filter-dropdown"/);
+  assert.doesNotMatch(map, /z-\[1000\]|z-\[1100\]/);
+  assert.match(modal, /fixed inset-0 z-\[80\]/);
+});
+
+test('Leaflet resize work is cancelled and guarded when the map unmounts', () => {
+  assert.match(placesMap, /if \(mapRef\.current === map\) map\.invalidateSize\(\)/);
+  assert.match(placesMap, /window\.clearTimeout\(initialInvalidateTimer\)/);
+  assert.match(placesMap, /window\.clearTimeout\(fitInvalidateTimer\)/);
+  assert.match(placesMap, /map\.stop\(\);/);
+});
+
 test('all genealogy graph surfaces reuse one dossier modal', () => {
   assert.match(modal, /data-testid="person-dossier-modal"/);
   assert.match(modal, /<PersonDossier/);
