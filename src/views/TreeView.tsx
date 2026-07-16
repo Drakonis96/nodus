@@ -52,6 +52,8 @@ export function TreeView({
   const [searchQuery, setSearchQuery] = useState('');
   const [isPanning, setIsPanning] = useState(false);
   const treeViewportRef = useRef<HTMLDivElement>(null);
+  const treeNodeRefs = useRef(new Map<string, SVGGElement>());
+  const pendingCenterIdRef = useRef<string | null>(null);
   const panRef = useRef<{ pointerId: number; x: number; y: number; scrollLeft: number; scrollTop: number; moved: boolean } | null>(null);
   const suppressTreeClickRef = useRef(false);
   const light = useIsLightTheme();
@@ -151,10 +153,30 @@ export function TreeView({
     y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H / 2,
   });
   const changeFocus = (nextFocusId: string) => {
+    pendingCenterIdRef.current = nextFocusId;
     setFocusId(nextFocusId);
     setSelected(null);
     void window.nodus.updateSettings({ treeFocusPersonId: nextFocusId }).then(() => onSettingsChange?.());
   };
+
+  useEffect(() => {
+    const personId = pendingCenterIdRef.current;
+    if (!personId || personId !== focusId) return;
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = treeViewportRef.current;
+      const node = treeNodeRefs.current.get(personId);
+      if (!viewport || !node) return;
+      const viewportRect = viewport.getBoundingClientRect();
+      const nodeRect = node.getBoundingClientRect();
+      viewport.scrollBy({
+        left: nodeRect.left + nodeRect.width / 2 - (viewportRect.left + viewportRect.width / 2),
+        top: nodeRect.top + nodeRect.height / 2 - (viewportRect.top + viewportRect.height / 2),
+        behavior: 'smooth',
+      });
+      pendingCenterIdRef.current = null;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusId, layout, zoom]);
 
   const startPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !treeViewportRef.current) return;
@@ -431,8 +453,14 @@ export function TreeView({
             return (
               <g
                 key={n.personId}
+                ref={(node) => {
+                  if (node) treeNodeRefs.current.set(n.personId, node);
+                  else treeNodeRefs.current.delete(n.personId);
+                }}
+                data-tree-person-id={n.personId}
                 opacity={searchActive && !isSearchMatch ? 0.22 : 1}
                 style={{ cursor: 'pointer', transition: 'opacity 180ms ease, filter 180ms ease' }}
+                onPointerDown={(event) => event.stopPropagation()}
                 onClick={() => setSelected(n.personId)}
                 onDoubleClick={() => changeFocus(n.personId)}
               >
@@ -583,13 +611,17 @@ function NodePanel({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-80 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-5 shadow-2xl">
+    <div
+      className="fixed inset-y-0 right-0 z-40 w-80 overflow-y-auto border-l border-neutral-800 bg-neutral-950 p-5 shadow-2xl"
+      data-testid="tree-person-sidebar"
+      data-person-id={person.personId}
+    >
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h2 className="font-semibold">{person.displayName}</h2>
           <p className="text-xs text-neutral-500">{dates(person)}</p>
         </div>
-        <button className="btn btn-ghost px-2 py-1" onClick={onClose}>
+        <button className="btn btn-ghost px-2 py-1" onClick={onClose} aria-label={t('Cerrar')}>
           <Icon name="x" />
         </button>
       </div>

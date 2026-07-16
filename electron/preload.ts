@@ -75,7 +75,9 @@ const api: NodusApi = {
     ipcRenderer.on('nodi:navigate', listener);
     return () => ipcRenderer.removeListener('nodi:navigate', listener);
   },
-  nodiMoveWindow: (dx, dy) => ipcRenderer.invoke('nodi:moveWindow', dx, dy),
+  nodiBeginWindowDrag: (screenX, screenY) => ipcRenderer.invoke('nodi:windowDrag:begin', screenX, screenY),
+  nodiDragWindow: (screenX, screenY) => ipcRenderer.invoke('nodi:windowDrag:move', screenX, screenY),
+  nodiEndWindowDrag: () => ipcRenderer.invoke('nodi:windowDrag:end').then(() => undefined),
   onVaultChanged: (cb) => {
     const listener = (_e: unknown, vault: Parameters<typeof cb>[0]) => cb(vault);
     ipcRenderer.on('vaults:changed', listener);

@@ -13,6 +13,7 @@
 .nodi-svg .hoverwrap { transform-box: view-box; transform-origin: 130px 142px; transition: transform .3s ease; }
 .nodi-svg .deco,
 .nodi-svg .role,
+.nodi-svg .closing-smoke,
 .nodi-svg .eyes-happy,
 .nodi-svg .eyes-sleep,
 .nodi-svg .eyes-surprised,
@@ -153,6 +154,45 @@
 .nodi-svg[data-state="sleeping"] .leg-l,
 .nodi-svg[data-state="sleeping"] .leg-r { animation: none; }
 
+/* Right-click goodbye: retract each limb, puff away the active accessory,
+ * remove the face, then dissolve the whole node in a larger cloud. */
+.nodi-svg[data-state="closing"] { cursor: default; pointer-events: none; }
+.nodi-svg[data-state="closing"] .nodi-core {
+  animation: nodi-close-core 2.15s cubic-bezier(.2,.75,.25,1) both;
+}
+.nodi-svg[data-state="closing"] .halo { animation: nodi-close-halo 2.05s ease both; }
+.nodi-svg[data-state="closing"] .limb { animation: nodi-close-limb .34s cubic-bezier(.55,0,.35,1) forwards; }
+.nodi-svg[data-state="closing"] .arm-l { animation-delay: .04s; }
+.nodi-svg[data-state="closing"] .arm-r { animation-delay: .22s; }
+.nodi-svg[data-state="closing"] .leg-l { animation-delay: .40s; }
+.nodi-svg[data-state="closing"] .leg-r { animation-delay: .58s; }
+.nodi-svg[data-state="closing"] .role {
+  animation: nodi-close-accessory .34s cubic-bezier(.5,0,.6,1) .88s forwards;
+  transform-box: view-box;
+  transform-origin: 130px 140px;
+}
+.nodi-svg[data-state="closing"] .face {
+  animation: nodi-close-face .28s ease 1.27s forwards;
+  transform-box: view-box;
+  transform-origin: 130px 148px;
+}
+.nodi-svg[data-state="closing"] .closing-smoke { display: inline; fill: #fbf4e2; stroke: #d4af37; stroke-width: .8; }
+.nodi-svg[data-state="closing"] .closing-smoke circle {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.nodi-svg[data-state="closing"] .closing-accessory-smoke circle { animation: nodi-close-smoke .58s ease-out .80s both; }
+.nodi-svg[data-state="closing"] .closing-accessory-smoke circle:nth-child(2) { animation-delay: .86s; }
+.nodi-svg[data-state="closing"] .closing-accessory-smoke circle:nth-child(3) { animation-delay: .91s; }
+.nodi-svg[data-state="closing"] .closing-accessory-smoke circle:nth-child(4) { animation-delay: .84s; }
+.nodi-svg[data-state="closing"] .closing-accessory-smoke circle:nth-child(5) { animation-delay: .92s; }
+.nodi-svg[data-state="closing"] .closing-body-smoke circle { animation: nodi-close-smoke .68s ease-out 1.53s both; }
+.nodi-svg[data-state="closing"] .closing-body-smoke circle:nth-child(2) { animation-delay: 1.58s; }
+.nodi-svg[data-state="closing"] .closing-body-smoke circle:nth-child(3) { animation-delay: 1.62s; }
+.nodi-svg[data-state="closing"] .closing-body-smoke circle:nth-child(4) { animation-delay: 1.67s; }
+.nodi-svg[data-state="closing"] .closing-body-smoke circle:nth-child(5) { animation-delay: 1.71s; }
+
 .nodi-svg[data-role="academic"] .role-academic { display: inline; }
 .nodi-svg[data-role="genealogy"] .role-genealogy { display: inline; }
 .nodi-svg[data-role="study"] .role-study { display: inline; }
@@ -160,6 +200,7 @@
 .nodi-svg[data-role="study"] .arm-l .thread { d: path("M94 156 C 96 172 96 184 100 194"); }
 .nodi-svg[data-role="study"] .arm-l .hand { transform: translate(100px, 198px); }
 .nodi-svg[data-role="study"] .mouth-smile { transform: translateY(2px); }
+.nodi-svg[data-state="closing"][data-role="study"] .arm-l { animation: nodi-close-limb .34s cubic-bezier(.55,0,.35,1) .04s forwards; }
 
 @keyframes nodi-floaty { 0%,100%{transform:translateY(0) rotate(0deg)} 25%{transform:translateY(-6px) rotate(-1.2deg)} 50%{transform:translateY(-11px) rotate(0deg)} 75%{transform:translateY(-6px) rotate(1.2deg)} }
 @keyframes nodi-leanfloat { 0%,100%{transform:translateY(0) rotate(3deg)} 50%{transform:translateY(-8px) rotate(5deg)} }
@@ -188,6 +229,12 @@
 @keyframes nodi-waveline { 0%,100%{opacity:0} 50%{opacity:.75} }
 @keyframes nodi-zrise { 0%{opacity:0;transform:translateY(0) scale(.6)} 25%{opacity:.9} 100%{opacity:0;transform:translateY(-16px) scale(1.05)} }
 @keyframes nodi-sweat { 0%{opacity:0;transform:translateY(-2px) scale(.5)} 25%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(11px) scale(.9)} }
+@keyframes nodi-close-limb { 0%{opacity:1;transform:scale(1)} 70%{opacity:.9} 100%{opacity:0;transform:scale(.04)} }
+@keyframes nodi-close-accessory { 0%{opacity:1;filter:blur(0);transform:scale(1)} 100%{opacity:0;filter:blur(5px);transform:scale(.22)} }
+@keyframes nodi-close-face { from{opacity:1;transform:scale(1)} to{opacity:0;transform:scale(.35)} }
+@keyframes nodi-close-core { 0%,68%{opacity:1;transform:scale(1)} 78%{opacity:1;transform:scale(1.06)} 100%{opacity:0;transform:scale(.08)} }
+@keyframes nodi-close-halo { 0%,68%{opacity:.7;transform:scale(1)} 84%{opacity:1;transform:scale(1.28)} 100%{opacity:0;transform:scale(1.65)} }
+@keyframes nodi-close-smoke { 0%{opacity:0;transform:translateY(4px) scale(.2)} 32%{opacity:.92} 100%{opacity:0;transform:translateY(-18px) scale(1.8)} }
 
 @media (prefers-reduced-motion: reduce) {
   .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }

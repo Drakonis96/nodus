@@ -176,6 +176,38 @@ try {
   assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 0, 'the release modal stays dismissed for the exact running version');
   console.log('[e2e] essential tutorial language preferences + persistent seen-once gate ok');
 
+  // ── Nodi: absolute drag + right-click goodbye + persisted visibility ───────
+  const originalMascotSettings = await page.evaluate(() => window.nodus.getSettings());
+  await page.evaluate(() => window.nodus.updateSettings({ mascotEnabled: true, mascotAlwaysOnTop: false, reduceMotion: true }));
+  const nodiFigure = page.locator('.nodi-figure');
+  await nodiFigure.waitFor({ timeout: 30_000 });
+  const nodiStart = await nodiFigure.boundingBox();
+  assert.ok(nodiStart, 'Nodi is visible before the drag');
+  await page.mouse.move(nodiStart.x + nodiStart.width / 2, nodiStart.y + nodiStart.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(20, 20, { steps: 8 });
+  await page.mouse.up();
+  const nodiAtTop = await nodiFigure.boundingBox();
+  assert.ok(nodiAtTop && nodiAtTop.x <= 12 && nodiAtTop.y <= 12, `Nodi reaches the whole viewport (${nodiAtTop?.x}, ${nodiAtTop?.y})`);
+  await nodiFigure.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: /Cerrar mascota/ }).click();
+  await waitForCondition('Nodi desactivado tras el cierre animado', () => page.evaluate(async () => !(await window.nodus.getSettings()).mascotEnabled));
+  await nodiFigure.waitFor({ state: 'detached' });
+  await page.evaluate((previous) => window.nodus.updateSettings({
+    mascotEnabled: true,
+    mascotAlwaysOnTop: false,
+    reduceMotion: previous.reduceMotion,
+  }), originalMascotSettings);
+  await nodiFigure.waitFor({ timeout: 30_000 });
+  console.log('[e2e] Nodi reaches every screen edge and its right-click goodbye persists visibility');
+  if (process.env.NODUS_E2E_NODI_ONLY === '1') {
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await closeElectronApp(app); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused Nodi drag + close smoke passed');
+    process.exit(0);
+  }
+
   // ── Vault wizard: independent, required text + embedding models ───────────
   const originalVaultId = (await page.evaluate(() => window.nodus.getActiveVault())).id;
   await page.locator('[data-tour="vaults"]').click();
@@ -1352,10 +1384,24 @@ try {
   assert.equal(await page.locator('[data-tree-line-role="parental_merge"]').first().getAttribute('stroke'), expectedMergedTreeColor, 'the joined parental trunk mixes the configured paternal and maternal colours');
   assert.equal(await page.locator('[data-tree-line-role="focus_descendants"]').count(), 2, 'genealogy gold continues from the focused person through every recorded descendant generation');
   assert.deepEqual(await page.locator('[data-tree-line-role="focus_descendants"]').evaluateAll((lines) => lines.map((line) => line.getAttribute('stroke'))), ['#ca8a04', '#ca8a04'], 'every focused descendant trunk uses genealogy gold');
+  await page.locator('[data-tree-person-id="demo-p5"]').click();
+  await page.getByTestId('tree-person-sidebar').waitFor({ timeout: 30_000 });
+  assert.equal(await page.getByTestId('tree-person-sidebar').getAttribute('data-person-id'), 'demo-p5', 'a single person click opens its right sidebar');
+  await page.getByTestId('tree-person-sidebar').getByRole('button', { name: 'Cerrar' }).click();
+  await page.locator('[data-tree-person-id="demo-p7"]').dblclick();
+  await waitForCondition('doble clic centra el árbol en la persona', () => page.evaluate(async () => (await window.nodus.getSettings()).treeFocusPersonId === 'demo-p7'));
+  assert.equal(await page.getByTestId('tree-focus-person').inputValue(), 'demo-p7', 'double click updates the visible tree focus');
   await page.getByTestId('tree-focus-person').selectOption('demo-p7');
   await page.waitForFunction(() => document.querySelector('[data-tree-line-role="focus_descendants"]')?.getAttribute('stroke') === '#ca8a04');
   assert.equal(await page.locator('[data-tree-line-role="focus_descendants"]').count(), 2, 'the complete gold descendant line follows the newly focused co-parent');
-  console.log('[e2e] genealogy parental colour blend + focus descendant gold rendered and recalculated');
+  console.log('[e2e] genealogy person click sidebar + double-click focus + branch colours rendered and recalculated');
+  if (process.env.NODUS_E2E_TREE_ONLY === '1') {
+    assert.deepEqual(pageErrors, [], `renderer errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
+    await closeElectronApp(app); app = null;
+    await rm(userData, { recursive: true, force: true });
+    console.log('[e2e] focused genealogy tree interactions passed');
+    process.exit(0);
+  }
 
   // Timeline filters are true multiselects, and person mentions across both the
   // timeline and map open the exact same full-record dossier.

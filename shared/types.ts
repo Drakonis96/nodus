@@ -4701,6 +4701,13 @@ export interface NodiConversationInput {
   model?: ModelRef | null;
 }
 
+export interface NodiOverlayPlacement {
+  x: number;
+  y: number;
+  horizontal: 'left' | 'right';
+  vertical: 'up' | 'down';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC API surface exposed on window.nodus via the preload bridge.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -4728,10 +4735,12 @@ export interface NodusApi {
   nodiOpenSettings(): Promise<void>;
   onNodiNavigate(cb: (view: 'settings') => void): () => void;
   nodiSetMouseIgnore(ignore: boolean): Promise<void>;
-  nodiSetExpanded(expanded: boolean): Promise<void>;
+  nodiSetExpanded(expanded: boolean): Promise<NodiOverlayPlacement>;
   onNodiDismiss(cb: () => void): () => void;
   nodiOpenMainWindow(): Promise<void>;
-  nodiMoveWindow(dx: number, dy: number): Promise<void>;
+  nodiBeginWindowDrag(screenX: number, screenY: number): Promise<NodiOverlayPlacement>;
+  nodiDragWindow(screenX: number, screenY: number): Promise<NodiOverlayPlacement>;
+  nodiEndWindowDrag(): Promise<void>;
   onVaultChanged(cb: (vault: VaultSummary | null) => void): () => void;
   onSettingsChanged(cb: (settings: AppSettings) => void): () => void;
   getActiveVault(): Promise<VaultSummary>;

@@ -11,6 +11,7 @@
   filter: drop-shadow(0 6px 18px rgba(10, 14, 26, 0.28));
 }
 .nodi-figure.dragging { cursor: grabbing; }
+.nodi-figure.closing { cursor: default; }
 
 /* Unread badge on Nodi */
 .nodi-figure-badge {
@@ -93,6 +94,7 @@
   transition: opacity 0.15s;
 }
 .nodi-node:hover .nodi-node-label { opacity: 1; }
+.nodi-anchor.open-right .nodi-node-label { left: calc(100% + 8px); right: auto; }
 
 /* Comic help bubble */
 .nodi-bubble {
@@ -157,6 +159,24 @@
   border-right: 0;
   z-index: 1;
 }
+.nodi-anchor.open-right .nodi-bubble {
+  left: calc(100% - 6px);
+  right: auto;
+  transform-origin: bottom left;
+}
+.nodi-anchor.open-down .nodi-bubble { top: 46px; bottom: auto; }
+.nodi-anchor.open-right .nodi-bubble::after {
+  left: -12px;
+  right: auto;
+  border-right-color: #21324f;
+  border-left: 0;
+}
+.nodi-anchor.open-right .nodi-bubble::before {
+  left: -8px;
+  right: auto;
+  border-right-color: #fbf4e2;
+  border-left: 0;
+}
 
 /* Floating panels (notifications / chat) */
 .nodi-panel {
@@ -178,6 +198,63 @@
   z-index: 3;
   pointer-events: auto;
 }
+.nodi-anchor.open-right .nodi-panel {
+  left: calc(100% - 10px);
+  right: auto;
+  transform-origin: bottom left;
+}
+.nodi-anchor.open-down .nodi-panel {
+  top: 40px;
+  bottom: auto;
+}
+
+/* Native-style right-click action, kept inside the same adaptive quadrant as
+ * the radial menu so it remains reachable at every screen edge. */
+.nodi-context-menu {
+  position: absolute;
+  right: calc(100% - 18px);
+  bottom: 52px;
+  width: 232px;
+  padding: 6px;
+  border: 1px solid rgba(212, 175, 55, .35);
+  border-radius: 12px;
+  background: rgba(16, 21, 31, .97);
+  color: #e7ebf2;
+  box-shadow: 0 14px 36px rgba(6, 9, 16, .5);
+  animation: nodi-panel-pop .2s cubic-bezier(.2, 1.25, .4, 1);
+  pointer-events: auto;
+  z-index: 5;
+}
+.nodi-anchor.open-right .nodi-context-menu { left: calc(100% - 18px); right: auto; }
+.nodi-anchor.open-down .nodi-context-menu { top: 52px; bottom: auto; }
+.nodi-context-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nodi-context-menu button:hover { background: rgba(226, 73, 74, .13); color: #ffd8d8; }
+.nodi-context-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(226, 73, 74, .14);
+  color: #ff9a9b;
+}
+.nodi-context-menu b,
+.nodi-context-menu small { display: block; }
+.nodi-context-menu b { font-size: 12px; line-height: 1.3; }
+.nodi-context-menu small { margin-top: 2px; color: #9aa6b8; font-size: 10px; line-height: 1.35; }
 .nodi-panel-head {
   display: flex;
   align-items: center;

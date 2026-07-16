@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron';
 import path from 'node:path';
+import type { NodiOverlayPlacement } from '@shared/types';
 import { getSettings } from './db/settingsRepo';
 
 // Standalone always-on-top desktop window that hosts the Nodi mascot (mascot.html).
@@ -12,25 +13,63 @@ const RENDERER_DIST = path.join(__dirname, '../dist');
 // Roomy enough for Nodi plus its radial menu and a compact panel. The window is
 // transparent and click-through by default (the renderer re-enables the mouse only
 // over Nodi and open panels), so the extra size is not a dead zone over other apps.
-const WIDTH = 600;
-const HEIGHT = 520;
+const EXPANDED_WIDTH = 600;
+const EXPANDED_HEIGHT = 520;
+const FIGURE_WIDTH = 180;
+const FIGURE_HEIGHT = 200;
 const MARGIN = 16;
+const COMPACT_WIDTH = FIGURE_WIDTH + MARGIN * 2;
+const COMPACT_HEIGHT = FIGURE_HEIGHT + MARGIN * 2;
 
 let mascotWindow: BrowserWindow | null = null;
 let tutorialVisible = false;
+let placement: NodiOverlayPlacement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
+let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number } | null = null;
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
+
+function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: number, expanded: boolean): NodiOverlayPlacement {
+  const display = screen.getDisplayNearestPoint({
+    x: Math.round(desiredX + FIGURE_WIDTH / 2),
+    y: Math.round(desiredY + FIGURE_HEIGHT / 2),
+  });
+  const { workArea } = display;
+  const nodiX = clamp(desiredX, workArea.x, workArea.x + workArea.width - FIGURE_WIDTH);
+  const nodiY = clamp(desiredY, workArea.y, workArea.y + workArea.height - FIGURE_HEIGHT);
+  const horizontal: NodiOverlayPlacement['horizontal'] = nodiX + FIGURE_WIDTH / 2 >= workArea.x + workArea.width / 2 ? 'left' : 'right';
+  const vertical: NodiOverlayPlacement['vertical'] = nodiY + FIGURE_HEIGHT / 2 >= workArea.y + workArea.height / 2 ? 'up' : 'down';
+  const width = expanded ? Math.min(EXPANDED_WIDTH, workArea.width) : COMPACT_WIDTH;
+  const height = expanded ? Math.min(EXPANDED_HEIGHT, workArea.height) : COMPACT_HEIGHT;
+  const idealX = expanded && horizontal === 'left' ? nodiX - (width - FIGURE_WIDTH - MARGIN) : nodiX - MARGIN;
+  const idealY = expanded && vertical === 'up' ? nodiY - (height - FIGURE_HEIGHT - MARGIN) : nodiY - MARGIN;
+  const x = clamp(idealX, workArea.x, workArea.x + workArea.width - width);
+  const y = clamp(idealY, workArea.y, workArea.y + workArea.height - height);
+
+  placement = { x: Math.round(nodiX - x), y: Math.round(nodiY - y), horizontal, vertical };
+  win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+  return placement;
+}
+
+function currentNodiPosition(win: BrowserWindow): { x: number; y: number } {
+  const bounds = win.getBounds();
+  return { x: bounds.x + placement.x, y: bounds.y + placement.y };
+}
 
 function positionBottomRight(win: BrowserWindow): void {
   const { workArea } = screen.getPrimaryDisplay();
-  const x = Math.round(workArea.x + workArea.width - WIDTH - MARGIN);
-  const y = Math.round(workArea.y + workArea.height - HEIGHT - MARGIN);
-  win.setBounds({ x, y, width: WIDTH, height: HEIGHT });
+  placeWindowAroundNodi(
+    win,
+    workArea.x + workArea.width - FIGURE_WIDTH - MARGIN,
+    workArea.y + workArea.height - FIGURE_HEIGHT - MARGIN,
+    false
+  );
 }
 
 function createMascotWindow(): BrowserWindow {
   const isMac = process.platform === 'darwin';
   const win = new BrowserWindow({
-    width: WIDTH,
-    height: HEIGHT,
+    width: COMPACT_WIDTH,
+    height: COMPACT_HEIGHT,
     show: false,
     useContentSize: true,
     frame: false,
@@ -84,9 +123,43 @@ function createMascotWindow(): BrowserWindow {
   }
 
   win.on('closed', () => {
-    if (mascotWindow === win) mascotWindow = null;
+    if (mascotWindow === win) {
+      mascotWindow = null;
+      windowDrag = null;
+      placement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
+    }
   });
   return win;
+}
+
+/** Resize the transparent host around the mascot without moving Nodi itself. */
+export function setMascotWindowExpanded(win: BrowserWindow, expanded: boolean): NodiOverlayPlacement {
+  const nodi = currentNodiPosition(win);
+  windowDrag = null;
+  return placeWindowAroundNodi(win, nodi.x, nodi.y, expanded);
+}
+
+/** Start an absolute screen-space drag. This is stable while the native window moves. */
+export function beginMascotWindowDrag(win: BrowserWindow, screenX: number, screenY: number): NodiOverlayPlacement {
+  const nodi = currentNodiPosition(win);
+  placement = placeWindowAroundNodi(win, nodi.x, nodi.y, false);
+  const compactNodi = currentNodiPosition(win);
+  windowDrag = { cursorX: screenX, cursorY: screenY, nodiX: compactNodi.x, nodiY: compactNodi.y };
+  return placement;
+}
+
+export function dragMascotWindow(win: BrowserWindow, screenX: number, screenY: number): NodiOverlayPlacement {
+  if (!windowDrag) return placement;
+  return placeWindowAroundNodi(
+    win,
+    windowDrag.nodiX + screenX - windowDrag.cursorX,
+    windowDrag.nodiY + screenY - windowDrag.cursorY,
+    false
+  );
+}
+
+export function endMascotWindowDrag(): void {
+  windowDrag = null;
 }
 
 /** Create, show or tear down the mascot window to match the current settings. */

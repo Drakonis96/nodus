@@ -128,7 +128,7 @@ test('floating Nodi dismisses every open surface on an outside click or window b
     read('electron/preload.ts'),
     read('shared/types.ts'),
   ]);
-  assert.match(component, /const hasOpenSurface = menuOpen \|\| helpOpen \|\| panel !== 'none'/);
+  assert.match(component, /const hasOpenSurface = menuOpen \|\| helpOpen \|\| panel !== 'none' \|\| contextMenuOpen \|\| closing/);
   assert.match(component, /nodiSetExpanded\(true\)/, 'the transparent overlay captures outside clicks while expanded');
   assert.match(component, /onNodiDismiss\(closeAll\)/, 'a native window dismissal closes menu, chat and help together');
   assert.match(mascot, /win\.on\('blur'/, 'clicking another application dismisses the overlay');
@@ -137,6 +137,49 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   assert.match(ipc, /setIgnoreMouseEvents\(!expanded/);
   assert.match(preload, /onNodiDismiss/);
   assert.match(types, /onNodiDismiss\(cb: \(\) => void\)/);
+});
+
+test('Nodi drags in absolute screen space and closes through an animated context action', async () => {
+  const [component, figure, figureCss, companionCss, mascot, ipc, preload, types, english, app] = await Promise.all([
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('src/components/nodi/Nodi.tsx'),
+    read('src/components/nodi/nodi.css'),
+    read('src/components/nodi/companion.css'),
+    read('electron/mascotWindow.ts'),
+    read('electron/ipc.ts'),
+    read('electron/preload.ts'),
+    read('shared/types.ts'),
+    read('src/i18n.en.ts'),
+    read('src/App.tsx'),
+  ]);
+  assert.match(component, /e\.screenX - origin\.screenX/);
+  assert.match(component, /e\.screenY - origin\.screenY/);
+  assert.doesNotMatch(component, /e\.movement[XY]/, 'native-window movement must not distort the drag delta');
+  for (const contract of ['nodiBeginWindowDrag', 'nodiDragWindow', 'nodiEndWindowDrag']) {
+    assert.match(component, new RegExp(contract));
+    assert.match(preload, new RegExp(contract));
+    assert.match(types, new RegExp(contract));
+  }
+  assert.match(ipc, /nodi:windowDrag:begin/);
+  assert.match(ipc, /nodi:windowDrag:move/);
+  assert.match(mascot, /COMPACT_WIDTH = FIGURE_WIDTH \+ MARGIN \* 2/);
+  assert.match(mascot, /placeWindowAroundNodi/);
+  assert.match(mascot, /screen\.getDisplayNearestPoint/);
+  assert.match(types, /horizontal: 'left' \| 'right'/);
+  assert.match(component, /onContextMenu=\{onFigureContextMenu\}/);
+  assert.match(component, /t\('Cerrar mascota'\)/);
+  assert.match(component, /updateSettings\(\{ mascotEnabled: false \}\)/);
+  assert.match(app, /onSettingsChanged\(\(\) => \{ void reloadSettings\(\); \}\)/, 'the main window unmounts Nodi after an overlay-originated settings change');
+  assert.match(component, /closing \? 'closing'/);
+  assert.match(figure, /closing-accessory-smoke/);
+  assert.match(figure, /closing-body-smoke/);
+  for (const animation of ['nodi-close-limb', 'nodi-close-accessory', 'nodi-close-face', 'nodi-close-core', 'nodi-close-smoke']) {
+    assert.match(figureCss, new RegExp(animation));
+  }
+  assert.match(companionCss, /\.nodi-context-menu/);
+  assert.match(companionCss, /\.nodi-anchor\.open-right/);
+  assert.match(companionCss, /\.nodi-anchor\.open-down/);
+  assert.match(english, /'Cerrar mascota': 'Close mascot'/);
 });
 
 test('Nodi receives aggregated, rate-limited lifecycle notifications', async () => {

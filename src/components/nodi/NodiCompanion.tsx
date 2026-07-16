@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNotification, VaultType } from '@shared/types';
+import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
 import { Nodi, type NodiRole, type NodiState } from './Nodi';
 import { Markdown } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
@@ -100,14 +100,19 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [nodiModel, setNodiModel] = useState<ModelRef | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{ kind: 'conversation'; conversation: NodiConversation } | { kind: 'all' } | null>(null);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const msgsRef = useRef<HTMLDivElement | null>(null);
-  const hasOpenSurface = menuOpen || helpOpen || panel !== 'none';
+  const hasOpenSurface = menuOpen || helpOpen || panel !== 'none' || contextMenuOpen || closing;
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [overlayPlacement, setOverlayPlacement] = useState<NodiOverlayPlacement>({ x: 16, y: 16, horizontal: 'left', vertical: 'up' });
   const [dragging, setDragging] = useState(false);
   const [greet, setGreet] = useState(false);
   const draggingRef = useRef(false);
   const movedRef = useRef(false);
+  const dragOriginRef = useRef<{ screenX: number; screenY: number; x: number; y: number } | null>(null);
+  const closeTimerRef = useRef<number | null>(null);
   const greetTimer = useRef<number | null>(null);
   const wave = () => {
     setGreet(true);
@@ -123,6 +128,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [fetchedCostumes, setFetchedCostumes] = useState(true);
   const costumesEnabled = costumes ?? fetchedCostumes;
   const role = costumesEnabled ? roleForVault(vaultType) : 'none';
+
+  useEffect(() => () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const apply = (next: AppSettings) => {
@@ -212,10 +221,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (!isOverlay) return;
     if (hasOpenSurface) {
       lastInteractive.current = true;
-      void window.nodus.nodiSetExpanded(true);
+      void window.nodus.nodiSetExpanded(true).then(setOverlayPlacement).catch(() => {});
     } else {
       lastInteractive.current = false;
-      void window.nodus.nodiSetExpanded(false);
+      void window.nodus.nodiSetExpanded(false).then(setOverlayPlacement).catch(() => {});
     }
     const onMove = (e: MouseEvent) => {
       if (draggingRef.current) return;
@@ -236,6 +245,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     setMenuOpen(false);
     setPanel('none');
     setHelpOpen(false);
+    setContextMenuOpen(false);
   }, []);
 
   useEffect(() => {
@@ -245,36 +255,47 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   // Click anywhere outside Nodi or its controls closes the menu/panels/bubble.
   useEffect(() => {
-    if (!menuOpen && !helpOpen && panel === 'none') return;
+    if (!menuOpen && !helpOpen && panel === 'none' && !contextMenuOpen) return;
     const onDown = (e: MouseEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && t.closest('[data-nodi-interactive]')) return;
       setMenuOpen(false);
       setPanel('none');
       setHelpOpen(false);
+      setContextMenuOpen(false);
     };
     document.addEventListener('mousedown', onDown, true);
     return () => document.removeEventListener('mousedown', onDown, true);
-  }, [menuOpen, helpOpen, panel]);
+  }, [menuOpen, helpOpen, panel, contextMenuOpen]);
 
   const onFigurePointerDown = (e: React.PointerEvent) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || closing) return;
     movedRef.current = false;
     draggingRef.current = false;
+    dragOriginRef.current = { screenX: e.screenX, screenY: e.screenY, x: pos?.x ?? 0, y: pos?.y ?? 0 };
     setDragging(true);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    if (isOverlay) {
+      void window.nodus.nodiBeginWindowDrag(e.screenX, e.screenY).then(setOverlayPlacement).catch(() => {});
+    }
   };
   const onFigurePointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    if (Math.abs(e.movementX) + Math.abs(e.movementY) > 0) {
-      if (!movedRef.current && Math.abs(e.movementX) + Math.abs(e.movementY) < 3) return;
+    const origin = dragOriginRef.current;
+    // The ref is set synchronously on pointer-down; React state may not have
+    // committed yet when a fast pointer emits its first movement events.
+    if (!origin || closing) return;
+    const dx = e.screenX - origin.screenX;
+    const dy = e.screenY - origin.screenY;
+    if (Math.abs(dx) + Math.abs(dy) > 0) {
+      if (!movedRef.current && Math.abs(dx) + Math.abs(dy) < 3) return;
       movedRef.current = true;
       draggingRef.current = true;
-      if (isOverlay) void window.nodus.nodiMoveWindow(e.movementX, e.movementY);
+      if (isOverlay) {
+        void window.nodus.nodiDragWindow(e.screenX, e.screenY).then(setOverlayPlacement).catch(() => {});
+      }
       else
-        setPos((p) => {
-          if (!p) return p;
-          const np = clamp(p.x + e.movementX, p.y + e.movementY);
+        setPos(() => {
+          const np = clamp(origin.x + dx, origin.y + dy);
           offsetRef.current = {
             right: Math.max(0, window.innerWidth - (np.x + figureW)),
             bottom: Math.max(0, window.innerHeight - (np.y + figureH)),
@@ -283,18 +304,45 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         });
     }
   };
-  const onFigurePointerUp = (e: React.PointerEvent) => {
+  const finishFigurePointer = (e: React.PointerEvent, cancelled = false) => {
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     setDragging(false);
     draggingRef.current = false;
-    if (!movedRef.current) {
+    dragOriginRef.current = null;
+    if (isOverlay) void window.nodus.nodiEndWindowDrag().catch(() => {});
+    if (!cancelled && !movedRef.current && !closing) {
       // A click (not a drag): toggle the menu (closing also dismisses panels/bubble).
       if (menuOpen) closeAll();
       else {
+        setContextMenuOpen(false);
         setMenuOpen(true);
         wave();
       }
     }
+  };
+
+  const onFigureContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (closing) return;
+    setMenuOpen(false);
+    setPanel('none');
+    setHelpOpen(false);
+    setContextMenuOpen(true);
+  };
+
+  const closeMascot = () => {
+    if (closing) return;
+    if (streaming) void window.nodus.cancelNodiChat().catch(() => {});
+    closeAll();
+    setClosing(true);
+    setDragging(false);
+    dragOriginRef.current = null;
+    if (isOverlay) void window.nodus.nodiEndWindowDrag().catch(() => {});
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      void window.nodus.updateSettings({ mascotEnabled: false }).catch(() => setClosing(false));
+    }, settings?.reduceMotion ? 350 : 2200);
   };
 
   const openNotifications = () => {
@@ -303,7 +351,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (panel !== 'notifications' && unread > 0) window.nodus.markNotificationsRead().then(setNtfs).catch(() => {});
   };
 
-  const nodiState: NodiState = streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
+  const nodiState: NodiState = closing ? 'closing' : streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
 
   type Item = { id: string; label: string; icon: React.ReactNode; onClick: () => void; badge?: number };
@@ -407,20 +455,29 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       : { display: 'none' };
 
   const anchorStyle: CSSProperties = isOverlay
-    ? { right: 16, bottom: 16, width: figureW, height: figureH }
+    ? { left: overlayPlacement.x, top: overlayPlacement.y, width: figureW, height: figureH }
     : { inset: 0 };
+
+  const horizontal = isOverlay
+    ? overlayPlacement.horizontal
+    : pos && pos.x + figureW / 2 < window.innerWidth / 2 ? 'right' : 'left';
+  const vertical = isOverlay
+    ? overlayPlacement.vertical
+    : pos && pos.y + figureH / 2 < window.innerHeight / 2 ? 'down' : 'up';
 
   const angleFor = (i: number, n: number) => {
     const start = 180;
     const end = 268;
     const deg = n <= 1 ? 224 : start + (i * (end - start)) / (n - 1);
     const rad = (deg * Math.PI) / 180;
-    return { dx: Math.round(R * Math.cos(rad)), dy: Math.round(R * Math.sin(rad)) };
+    const dx = Math.round(R * Math.cos(rad));
+    const dy = Math.round(R * Math.sin(rad));
+    return { dx: horizontal === 'left' ? dx : -dx, dy: vertical === 'up' ? dy : -dy };
   };
 
   return (
     <div className="nodi-companion" style={rootStyle}>
-      <div className="nodi-anchor" style={anchorStyle}>
+      <div className={`nodi-anchor open-${horizontal} open-${vertical}`} style={anchorStyle}>
         {helpOpen && (
           <div className="nodi-bubble" data-nodi-interactive>
             <button className="nodi-bubble-x" onClick={() => setHelpOpen(false)} aria-label={t('Cerrar')}>✕</button>
@@ -550,6 +607,15 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
           </div>
         )}
 
+        {contextMenuOpen && !closing && (
+          <div className="nodi-context-menu" data-nodi-interactive role="menu" aria-label={t('Opciones de la mascota')}>
+            <button type="button" role="menuitem" onClick={closeMascot}>
+              <span className="nodi-context-icon"><Icon name="x" size={14} /></span>
+              <span><b>{t('Cerrar mascota')}</b><small>{t('Puedes volver a activarla desde Ajustes.')}</small></span>
+            </button>
+          </div>
+        )}
+
         {items.map((it, i) => {
           const { dx, dy } = angleFor(i, items.length);
           return (
@@ -578,16 +644,17 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         })}
 
         <div
-          className={`nodi-figure${dragging ? ' dragging' : ''}`}
+          className={`nodi-figure${dragging ? ' dragging' : ''}${closing ? ' closing' : ''}`}
           data-nodi-interactive
           style={{ width: figureW, height: figureH, pointerEvents: 'auto' }}
           onPointerDown={onFigurePointerDown}
           onPointerMove={onFigurePointerMove}
-          onPointerUp={onFigurePointerUp}
-          onPointerCancel={onFigurePointerUp}
+          onPointerUp={(event) => finishFigurePointer(event)}
+          onPointerCancel={(event) => finishFigurePointer(event, true)}
+          onContextMenu={onFigureContextMenu}
         >
-          <Nodi state={nodiState} role={role} height={figureH} draggable raiseArm={unread > 0} className={dragging ? 'dragging' : undefined} />
-          {!menuOpen && unread > 0 && <span className="nodi-figure-badge">{unread > 9 ? '9+' : unread}</span>}
+          <Nodi state={nodiState} role={role} height={figureH} draggable={!closing} raiseArm={!closing && unread > 0} className={dragging ? 'dragging' : undefined} />
+          {!closing && !menuOpen && unread > 0 && <span className="nodi-figure-badge">{unread > 9 ? '9+' : unread}</span>}
         </div>
       </div>
     </div>

@@ -154,7 +154,14 @@ const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
-import { applyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
+import {
+  applyMascotWindow,
+  beginMascotWindowDrag,
+  dragMascotWindow,
+  endMascotWindowDrag,
+  setMascotTutorialVisible,
+  setMascotWindowExpanded,
+} from './mascotWindow';
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -727,9 +734,11 @@ export function registerIpc(
   });
   h('nodi:setExpanded', async (e, expanded: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win) return;
+    if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
+    const nextPlacement = setMascotWindowExpanded(win, Boolean(expanded));
     win.setIgnoreMouseEvents(!expanded, { forward: true });
     if (expanded) win.focus();
+    return nextPlacement;
   });
   h('nodi:openMainWindow', async () => {
     const win = getWindow();
@@ -748,11 +757,18 @@ export function registerIpc(
       win.webContents.send('nodi:navigate', 'settings');
     }
   });
-  h('nodi:moveWindow', async (e, dx: number, dy: number) => {
+  h('nodi:windowDrag:begin', async (e, screenX: number, screenY: number) => {
     const win = BrowserWindow.fromWebContents(e.sender);
-    if (!win) return;
-    const [x, y] = win.getPosition();
-    win.setPosition(Math.round(x + dx), Math.round(y + dy));
+    if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
+    return beginMascotWindowDrag(win, screenX, screenY);
+  });
+  h('nodi:windowDrag:move', async (e, screenX: number, screenY: number) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
+    return dragMascotWindow(win, screenX, screenY);
+  });
+  h('nodi:windowDrag:end', async () => {
+    endMascotWindowDrag();
   });
   h('vaults:list', async () => listVaults().map(withVaultKeyProviders));
   h('vaults:getActive', async () => withVaultKeyProviders(getActiveVault()));

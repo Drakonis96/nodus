@@ -9,7 +9,8 @@ export type NodiState =
   | 'waving'
   | 'celebrating'
   | 'loading'
-  | 'sleeping';
+  | 'sleeping'
+  | 'closing';
 export type NodiRole = 'none' | 'academic' | 'genealogy' | 'study';
 
 type MeshNode = { x: number; y: number; z: number };
@@ -292,6 +293,25 @@ export function Nodi({
             <g transform="translate(150,98)"><path className="zzz" d="M0 0 h6 l-6 7 h6" style={{ animationDelay: '0s' }} /></g>
             <g transform="translate(159,90)"><path className="zzz" d="M0 0 h7 l-7 8 h7" style={{ animationDelay: '1s' }} /></g>
             <g transform="translate(169,82)"><path className="zzz" d="M0 0 h8 l-8 9 h8" style={{ animationDelay: '2s' }} /></g>
+          </g>
+
+          {/* The goodbye sequence uses two soft smoke bursts: the first removes
+              whichever vault accessory is active, the second dissolves Nodi. */}
+          {role !== 'none' && (
+            <g className="closing-smoke closing-accessory-smoke" aria-hidden="true">
+              <circle cx="112" cy="91" r="8" />
+              <circle cx="130" cy="82" r="10" />
+              <circle cx="149" cy="92" r="7" />
+              <circle cx="109" cy="194" r="7" />
+              <circle cx="128" cy="202" r="10" />
+            </g>
+          )}
+          <g className="closing-smoke closing-body-smoke" aria-hidden="true">
+            <circle cx="101" cy="132" r="13" />
+            <circle cx="127" cy="117" r="18" />
+            <circle cx="155" cy="132" r="14" />
+            <circle cx="111" cy="158" r="15" />
+            <circle cx="144" cy="161" r="18" />
           </g>
 
           <g className="role role-academic">

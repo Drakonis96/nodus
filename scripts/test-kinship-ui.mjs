@@ -43,6 +43,18 @@ test('tree viewport supports drag panning without activating a person after move
   assert.match(tree, /cursor-grabbing/);
 });
 
+test('tree people keep click gestures outside viewport pointer capture and focus in the visible centre', () => {
+  assert.match(tree, /data-tree-person-id=\{n\.personId\}/);
+  assert.match(tree, /onPointerDown=\{\(event\) => event\.stopPropagation\(\)\}/);
+  assert.match(tree, /onClick=\{\(\) => setSelected\(n\.personId\)\}/);
+  assert.match(tree, /onDoubleClick=\{\(\) => changeFocus\(n\.personId\)\}/);
+  assert.match(tree, /pendingCenterIdRef\.current = nextFocusId/);
+  assert.match(tree, /viewport\.scrollBy\(\{/);
+  assert.match(tree, /nodeRect\.left \+ nodeRect\.width \/ 2/);
+  assert.match(tree, /nodeRect\.top \+ nodeRect\.height \/ 2/);
+  assert.match(tree, /data-testid="tree-person-sidebar"/);
+});
+
 test('paternal and maternal colours are the only user-selectable tree branch colours', () => {
   assert.match(tree, /data-testid="tree-paternal-color"/);
   assert.match(tree, /data-testid="tree-maternal-color"/);

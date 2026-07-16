@@ -427,6 +427,9 @@ export function App() {
   }, [reloadSettings]);
 
   useEffect(() => window.nodus?.onApiKeysRecovered(() => { void reloadSettings(); }), [reloadSettings]);
+  // Settings may also change outside this React tree (notably from the floating
+  // Nodi window). Keep visibility, theme and every settings-backed control in sync.
+  useEffect(() => window.nodus?.onSettingsChanged(() => { void reloadSettings(); }), [reloadSettings]);
 
   // In "system" theme mode, follow the OS light/dark preference as it changes.
   useEffect(() => {

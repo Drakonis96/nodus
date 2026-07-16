@@ -96,6 +96,9 @@ export const EN: Record<string, string> = {
   Notificaciones: 'Notifications',
   Chat: 'Chat',
   'Abrir Nodus': 'Open Nodus',
+  'Opciones de la mascota': 'Mascot options',
+  'Cerrar mascota': 'Close mascot',
+  'Puedes volver a activarla desde Ajustes.': 'You can enable it again from Settings.',
   'No se pudo responder.': 'Could not answer.',
   '¡Hola! Soy Nodi': 'Hi! I am Nodi',
   'Soy el asistente integrado de Nodus. Puedo orientarte por la app y trabajar con los contextos que selecciones.':
