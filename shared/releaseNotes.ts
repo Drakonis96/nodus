@@ -23,6 +23,57 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.3.7',
+    date: '2026-07-16',
+    highlights: [
+      {
+        scope: 'genealogy',
+        es: 'El árbol genealógico es más directo y expresivo: puedes desplazarte arrastrando, abrir la ficha lateral con un clic y centrar una persona con doble clic. Las ramas combinan los colores elegidos para ambos progenitores y resaltan en dorado la descendencia de la persona protagonista; también se distinguen las relaciones familiares y sociales iniciales.',
+        en: 'The family tree is now more direct and expressive: drag to move around, open the side dossier with one click and centre a person with a double click. Branches blend the colours selected for both parents and highlight the focus person’s descendants in gold; initial family and social relationships are now distinguished too.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'El timeline y el mapa de Genealogía estrenan filtros múltiples, tarjetas más claras, miniaturas y acceso a la ficha completa al pulsar una persona. Se han eliminado parpadeos y solapamientos, el mapa encuadra los puntos visibles y sus créditos se abren de forma segura en el navegador.',
+        en: 'The Genealogy timeline and map now feature multi-select filters, clearer cards, thumbnails and full dossier access when a person is clicked. Flicker and layering issues are gone, the map fits the visible points and credit links open safely in the browser.',
+      },
+      {
+        scope: 'genealogy',
+        es: 'El archivo genealógico reúne la creación de entradas en un único modal ordenado, admite cualquier tipo de adjunto e incorpora importación desde Zotero. Las fichas incluyen además un identificador nacional opcional que también participa en las búsquedas.',
+        en: 'The genealogy archive now brings entry creation into one well-organised modal, accepts any attachment type and supports Zotero imports. Person dossiers also include an optional national identifier that is searchable throughout the vault.',
+      },
+      {
+        scope: 'estudio',
+        es: 'Los materiales de Estudio se pueden descargar, muestran el nombre de cada acción al pasar el ratón y aparecen correctamente dentro de sus cursos y asignaturas. Nodi, el chat y las herramientas de IA pueden utilizar el contenido ya indexado de imágenes, PDF y otros archivos.',
+        en: 'Study materials can now be downloaded, reveal each action name on hover and appear correctly inside their assigned courses and subjects. Nodi, chat and AI tools can use the indexed content of images, PDFs and other files.',
+      },
+      {
+        scope: 'estudio',
+        es: 'Estudio incorpora Deep Research adaptado al aprendizaje y reutiliza el mismo motor, diseño y capacidades de grafo e ideas que las bóvedas académicas, manteniendo siempre separado el contenido de cada vault. El horario muestra nombres completos y el selector evita emojis duplicados.',
+        en: 'Study now includes learning-focused Deep Research and reuses the same graph and ideas engine, design and capabilities as academic vaults, while keeping every vault’s content isolated. Timetable names remain readable and the picker no longer duplicates emoji.',
+      },
+      {
+        scope: 'general',
+        es: 'Los asistentes de creación de vaults Académico, Genealogía, Estudio y Bases de datos permiten elegir por separado el modelo de IA y el modelo de embeddings, tanto local como en la nube, y descargan el modelo local cuando es necesario.',
+        en: 'The Academic, Genealogy, Study and Databases vault creation wizards now let you choose separate AI and embedding models, either local or cloud-based, and download a local model when needed.',
+      },
+      {
+        scope: 'general',
+        es: 'Nodi contrae y hace girar sus extremidades mientras piensa, cierra los ojos y recupera su postura con una animación fluida. También se puede arrastrar por toda la pantalla y cerrar desde su menú contextual con una despedida animada que respeta sus cosméticos.',
+        en: 'Nodi contracts and spins its limbs while thinking, closes its eyes and smoothly returns to its normal pose. It can also be dragged across the full screen and dismissed from its context menu with an animated farewell that accounts for its cosmetics.',
+      },
+      {
+        scope: 'general',
+        es: 'La interfaz conserva ahora el color de la bóveda activa al redimensionar el sidebar, iguala el tamaño de las tarjetas de creación y corrige superficies claras, botones, buscadores y desplegables. Los iconos de Novedades indican además su grupo al pasar el ratón.',
+        en: 'The interface now keeps the active vault colour while resizing the sidebar, gives creation cards a consistent size and fixes light surfaces, buttons, search fields and dropdowns. What’s New icons also identify their group on hover.',
+      },
+      {
+        scope: 'general',
+        es: 'Al iniciar Nodus aparece una comprobación cinematográfica de actualizaciones que informa si ya tienes la última versión, si existe una nueva o si se produce un error. Muestra el progreso de descarga y permite instalar y reiniciar sin solaparse con el modal de novedades.',
+        en: 'Nodus now performs a cinematic update check at startup, reporting whether you are up to date, a new version is available or an error occurred. It shows download progress and supports install-and-restart without overlapping the What’s New modal.',
+      },
+    ],
+  },
+  {
     version: '2.3.6',
     date: '2026-07-16',
     highlights: [
