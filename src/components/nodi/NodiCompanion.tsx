@@ -75,6 +75,9 @@ function relTime(ts: number): string {
 }
 
 const DOT: Record<NodiNotification['kind'], string> = { info: '#5b9bd5', success: '#3bb273', warning: '#e0a53b' };
+// Four overlay actions collapse over 340 ms with up to 90 ms of stagger.
+// Keep the roomy native window until every button has returned to its anchor.
+const RADIAL_COLLAPSE_MS = 450;
 
 export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: boolean }) {
   const isOverlay = context === 'overlay';
@@ -219,12 +222,20 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   }, []);
   useEffect(() => {
     if (!isOverlay) return;
+    let shrink: number | undefined;
     if (hasOpenSurface) {
+      // Grow first, then let the surface animate open inside the new bounds.
       lastInteractive.current = true;
       void window.nodus.nodiSetExpanded(true).then(setOverlayPlacement).catch(() => {});
     } else {
+      // Shrinking is the opposite: the radial buttons are still flying home, and the
+      // overlay body is overflow:hidden, so a window this small would slice them
+      // mid-flight. Wait for them to land. Reopening clears the timer below, so a
+      // quick open/close/open never shrinks behind the surface's back.
       lastInteractive.current = false;
-      void window.nodus.nodiSetExpanded(false).then(setOverlayPlacement).catch(() => {});
+      shrink = window.setTimeout(() => {
+        void window.nodus.nodiSetExpanded(false).then(setOverlayPlacement).catch(() => {});
+      }, RADIAL_COLLAPSE_MS);
     }
     const onMove = (e: MouseEvent) => {
       if (draggingRef.current) return;
@@ -233,7 +244,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       setInteractive(!!el?.closest('[data-nodi-interactive]'));
     };
     window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    return () => {
+      window.clearTimeout(shrink);
+      window.removeEventListener('mousemove', onMove);
+    };
   }, [hasOpenSurface, isOverlay, setInteractive]);
 
   // ── Auto-scroll chat ──────────────────────────────────────────────────────

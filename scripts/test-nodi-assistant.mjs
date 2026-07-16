@@ -139,6 +139,17 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   assert.match(types, /onNodiDismiss\(cb: \(\) => void\)/);
 });
 
+test('floating Nodi stays expanded until its radial buttons finish collapsing', async () => {
+  const component = await read('src/components/nodi/NodiCompanion.tsx');
+  assert.match(component, /const RADIAL_COLLAPSE_MS = 450/);
+  assert.match(
+    component,
+    /setTimeout\(\(\) => \{\s*void window\.nodus\.nodiSetExpanded\(false\)[\s\S]*?\}, RADIAL_COLLAPSE_MS\)/,
+    'the native overlay must not shrink while the radial transition is still visible',
+  );
+  assert.match(component, /window\.clearTimeout\(shrink\)/, 'reopening Nodi cancels a pending shrink');
+});
+
 test('Nodi drags in absolute screen space and closes through an animated context action', async () => {
   const [component, figure, figureCss, companionCss, mascot, ipc, preload, types, english, app] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),
@@ -164,6 +175,8 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(ipc, /nodi:windowDrag:move/);
   assert.match(mascot, /COMPACT_WIDTH = FIGURE_WIDTH \+ MARGIN \* 2/);
   assert.match(mascot, /placeWindowAroundNodi/);
+  assert.match(mascot, /const expanded = bounds\.width > COMPACT_WIDTH \|\| bounds\.height > COMPACT_HEIGHT/);
+  assert.match(mascot, /windowDrag\.expanded/, 'pressing Nodi must not compact an open radial menu before it closes');
   assert.match(mascot, /screen\.getDisplayNearestPoint/);
   assert.match(types, /horizontal: 'left' \| 'right'/);
   assert.match(component, /onContextMenu=\{onFigureContextMenu\}/);

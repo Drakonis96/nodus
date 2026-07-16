@@ -24,7 +24,7 @@ const COMPACT_HEIGHT = FIGURE_HEIGHT + MARGIN * 2;
 let mascotWindow: BrowserWindow | null = null;
 let tutorialVisible = false;
 let placement: NodiOverlayPlacement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
-let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number } | null = null;
+let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number; expanded: boolean } | null = null;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
 
@@ -142,9 +142,11 @@ export function setMascotWindowExpanded(win: BrowserWindow, expanded: boolean): 
 /** Start an absolute screen-space drag. This is stable while the native window moves. */
 export function beginMascotWindowDrag(win: BrowserWindow, screenX: number, screenY: number): NodiOverlayPlacement {
   const nodi = currentNodiPosition(win);
-  placement = placeWindowAroundNodi(win, nodi.x, nodi.y, false);
-  const compactNodi = currentNodiPosition(win);
-  windowDrag = { cursorX: screenX, cursorY: screenY, nodiX: compactNodi.x, nodiY: compactNodi.y };
+  const bounds = win.getBounds();
+  const expanded = bounds.width > COMPACT_WIDTH || bounds.height > COMPACT_HEIGHT;
+  placement = placeWindowAroundNodi(win, nodi.x, nodi.y, expanded);
+  const placedNodi = currentNodiPosition(win);
+  windowDrag = { cursorX: screenX, cursorY: screenY, nodiX: placedNodi.x, nodiY: placedNodi.y, expanded };
   return placement;
 }
 
@@ -154,7 +156,7 @@ export function dragMascotWindow(win: BrowserWindow, screenX: number, screenY: n
     win,
     windowDrag.nodiX + screenX - windowDrag.cursorX,
     windowDrag.nodiY + screenY - windowDrag.cursorY,
-    false
+    windowDrag.expanded
   );
 }
 
