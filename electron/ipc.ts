@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import AdmZip from 'adm-zip';
 import { ipcMain, shell, BrowserWindow, dialog, app } from 'electron';
 import type {
+  AppLanguage,
   AppSettings,
   AudioEntityKind,
   AudioProvider,
@@ -2864,11 +2865,14 @@ export function registerIpc(
     return { ok: true, message: filePath };
   });
   h('recovery:status', async () => getRecoveryStatus());
-  h('recovery:chooseFolder', async (_e, mode: 'create' | 'restore', language: 'es' | 'en' = 'es') => {
+  h('recovery:chooseFolder', async (_e, mode: 'create' | 'restore', language: AppLanguage = 'es') => {
+    const titles: Record<AppLanguage, string> = {
+      en: mode === 'restore' ? 'Select a Nodus recovery folder' : 'Select an empty folder to protect Nodus',
+      es: mode === 'restore' ? 'Seleccionar una carpeta de recuperación de Nodus' : 'Seleccionar una carpeta vacía para proteger Nodus',
+      fr: mode === 'restore' ? 'Sélectionner un dossier de récupération Nodus' : 'Sélectionner un dossier vide pour protéger Nodus',
+    };
     const { canceled, filePaths } = await dialog.showOpenDialog(getWindow() ?? undefined!, {
-      title: language === 'en'
-        ? (mode === 'restore' ? 'Select a Nodus recovery folder' : 'Select an empty folder to protect Nodus')
-        : (mode === 'restore' ? 'Seleccionar una carpeta de recuperación de Nodus' : 'Seleccionar una carpeta vacía para proteger Nodus'),
+      title: titles[language],
       properties: mode === 'restore' ? ['openDirectory'] : ['openDirectory', 'createDirectory'],
     });
     return canceled || filePaths.length === 0 ? null : inspectRecoveryFolder(filePaths[0], language);

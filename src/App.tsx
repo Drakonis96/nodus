@@ -769,7 +769,7 @@ export function App() {
     return (
       <RecoverySetupWizard
         status={recoveryStatus}
-        language={settings.uiLanguage === 'en' ? 'en' : 'es'}
+        language={settings.uiLanguage}
         onComplete={async () => {
           await Promise.all([reloadSettings(), reloadVaults(), reloadRecoveryStatus()]);
         }}
@@ -1392,19 +1392,19 @@ export function App() {
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&
         (!isEstudio || settings.studyTourComplete) && (
-          <WhatsNewModal uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'} onSettled={() => setWhatsNewSettled(true)} />
+          <WhatsNewModal uiLanguage={settings.uiLanguage} onSettled={() => setWhatsNewSettled(true)} />
         )}
 
       {!isPreviewVault && recoveryStatus?.needsSetup && recoveryStatus.previousInstallation && !whatsNewSettled && (
         <WhatsNewModal
-          uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'}
+          uiLanguage={settings.uiLanguage}
           onSettled={() => setWhatsNewSettled(true)}
         />
       )}
 
       {manualWhatsNewOpen && (
         <WhatsNewModal
-          uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'}
+          uiLanguage={settings.uiLanguage}
           showSeenReleaseNotes
           onSettled={() => setManualWhatsNewOpen(false)}
         />

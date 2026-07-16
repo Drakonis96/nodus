@@ -9,17 +9,17 @@ import {
 import { searchDocTypes } from '@shared/docTypeSearch';
 import { Icon } from './ui';
 import { useAnchoredCoords } from './dbGrid';
-import { t, getActiveLang } from '../i18n';
+import { t, pick } from '../i18n';
 
-/** Bilingual label for a document type (labels live in-data, not in the i18n table). */
+/** Localized label for a document type (labels live in-data, not in the i18n table). */
 export function docTypeLabel(id: string | null | undefined): string {
   const def = getArchiveDocType(id);
   if (!def) return '';
-  return getActiveLang() === 'en' ? def.labelEn : def.label;
+  return defLabel(def);
 }
 
 function defLabel(def: ArchiveDocTypeDef): string {
-  return getActiveLang() === 'en' ? def.labelEn : def.label;
+  return pick(def.label, def.labelEn, def.labelFr);
 }
 
 /**

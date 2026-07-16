@@ -178,7 +178,9 @@ export function ImmersionView({
   const [includeQuiz, setIncludeQuiz] = useState(true);
   const [includeImage, setIncludeImage] = useState(false);
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
-  const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'en' ? 'en' : 'es');
+  // The immersion *content* is generated in Spanish or English only; a UI language
+  // without a matching content language (French) defaults to English.
+  const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'es' ? 'es' : 'en');
   const [model, setModel] = useFeatureModel(settings, 'immersionModel');
 
   const [scope, setScope] = useState<ImmersionScope | null>(null);

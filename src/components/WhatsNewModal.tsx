@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, type ReleaseNoteScope } from '@shared/releaseNotes';
+import type { AppLanguage } from '@shared/types';
 import { Icon } from './ui';
 import { t } from '../i18n';
 import { Nodi } from './nodi/Nodi';
@@ -51,7 +52,7 @@ export function WhatsNewModal({
   onSettled,
   showSeenReleaseNotes = false,
 }: {
-  uiLanguage: 'es' | 'en';
+  uiLanguage: AppLanguage;
   onSettled?: () => void;
   showSeenReleaseNotes?: boolean;
 }) {
@@ -77,7 +78,8 @@ export function WhatsNewModal({
     onSettled?.();
   };
 
-  const lang = uiLanguage === 'en' ? 'en' : 'es';
+  // Every highlight carries all three languages, so the UI language indexes directly.
+  const lang = uiLanguage;
   const confetti = Array.from({ length: 14 }, (_, index) => ({
     left: `${8 + ((index * 17) % 86)}%`,
     delay: `${(index % 7) * 0.18}s`,

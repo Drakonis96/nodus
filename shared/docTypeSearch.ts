@@ -44,9 +44,9 @@ export function diceCoefficient(a: string, b: string): number {
   return (2 * hits) / (A.length + B.length);
 }
 
-/** All normalized haystacks for a type: both labels + keywords, plus their tokens. */
+/** All normalized haystacks for a type: every label + keywords, plus their tokens. */
 function haystacks(def: ArchiveDocTypeDef): { phrases: string[]; tokens: Set<string> } {
-  const phrases = [def.label, def.labelEn, ...def.keywords].map(normalizeText).filter(Boolean);
+  const phrases = [def.label, def.labelEn, def.labelFr, ...def.keywords].map(normalizeText).filter(Boolean);
   const tokens = new Set<string>();
   for (const p of phrases) for (const tok of p.split(' ')) if (tok.length >= 2) tokens.add(tok);
   return { phrases, tokens };

@@ -4,9 +4,9 @@ import { ARCHIVE_DOC_TYPES, DOC_FACET_DIMENSIONS, type FacetValue } from '@share
 import { ARCHIVE_SORT_OPTIONS } from '@shared/archiveFilters';
 import { Icon } from './ui';
 import { useDismissableLayer } from '../hooks';
-import { t, getActiveLang } from '../i18n';
+import { t, pick } from '../i18n';
 
-const facetLabel = (v: FacetValue): string => (getActiveLang() === 'en' ? v.en : v.es);
+const facetLabel = (v: FacetValue): string => pick(v.es, v.en, v.fr);
 
 const KIND_OPTIONS: { id: ArchiveItemKind; label: string }[] = [
   { id: 'image', label: 'Imagen' },
@@ -151,7 +151,7 @@ function CompactArchiveFilters(props: ArchiveFilterBarProps & { setFacet: (dim: 
   const menuRef = useDismissableLayer<HTMLDivElement>({ open: menuOpen, onDismiss: () => setMenuOpen(false) });
   const docTypeOptions = ARCHIVE_DOC_TYPES
     .filter((docType) => !props.genealogyOnly || docType.facets.genealogia)
-    .map((docType) => ({ value: docType.id, label: getActiveLang() === 'en' ? docType.labelEn : docType.label }));
+    .map((docType) => ({ value: docType.id, label: pick(docType.label, docType.labelEn, docType.labelFr) }));
   const filters: { id: CompactFilterId; label: string; icon: string; clear: () => void }[] = [
     { id: 'docType', label: t('Tipo de documento'), icon: 'book', clear: () => props.onDocTypesChange?.([]) },
     { id: 'folder', label: t('Carpeta'), icon: 'folder', clear: () => props.onFolderIdsChange?.([]) },

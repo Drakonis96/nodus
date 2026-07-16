@@ -825,7 +825,7 @@ export type DeepContextMode = 'standard' | 'long';
 /** Languages Nodus can speak. `uiLanguage` localizes the interface; `promptLanguage`
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
-export type AppLanguage = 'es' | 'en';
+export type AppLanguage = 'es' | 'en' | 'fr';
 export type PromptLanguage = 'es' | 'en' | 'fr' | 'tr';
 
 /** A concrete model selection: which provider + which model id. */

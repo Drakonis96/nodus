@@ -5,6 +5,7 @@ import type { TutorialLanguage } from '@shared/tutorialPreferences';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Nodi, type NodiState } from '../components/nodi/Nodi';
 import { Icon } from '../components/ui';
+import { t } from '../i18n';
 
 export const BASICS_TUTORIAL_VERSION = 3;
 
@@ -364,6 +365,6 @@ export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { lan
       </AnimatePresence>
     </main>
     <footer className="tutorial-footer"><button className="btn btn-ghost" disabled={index === 0} onClick={() => setIndex((value) => Math.max(0, value - 1))}><Icon name="arrowLeft" />{ui.back}</button><span>{ui.pace}</span>{last ? <button data-testid="basics-tutorial-complete" className="btn btn-primary" onClick={() => void onComplete()}>{ui.finish}<Icon name="check" /></button> : <button className="btn btn-primary" onClick={() => setIndex((value) => value + 1)}>{ui.next}<Icon name="chevronRight" /></button>}</footer>
-    {confirmSkip && <ConfirmModal zIndex={220} title={language === 'en' ? 'Skip the essential guide?' : '¿Saltar la guía esencial?'} message={language === 'en' ? 'This guide explains workspaces, local and online models, personal access keys and meaningful search.' : 'Esta guía explica los espacios de trabajo, los modelos que funcionan en tu equipo, los servicios externos y las búsquedas por significado.'} cancelLabel={language === 'en' ? 'Continue tutorial' : 'Continuar tutorial'} confirmLabel={language === 'en' ? 'Skip anyway' : 'Saltar de todos modos'} danger onCancel={() => setConfirmSkip(false)} onConfirm={() => void onComplete()} />}
+    {confirmSkip && <ConfirmModal zIndex={220} title={t('¿Saltar la guía esencial?')} message={t('Esta guía explica los espacios de trabajo, los modelos que funcionan en tu equipo, los servicios externos y las búsquedas por significado.')} cancelLabel={t('Continuar tutorial')} confirmLabel={t('Saltar de todos modos')} danger onCancel={() => setConfirmSkip(false)} onConfirm={() => void onComplete()} />}
   </div>;
 }
