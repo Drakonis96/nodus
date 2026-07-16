@@ -1425,6 +1425,9 @@ try {
 
   await page.locator('[data-tour="nav-map"]').click();
   await page.getByTestId('places-map').waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() => document.querySelector('[data-testid="places-map"] > div')?.getAttribute('data-map-fit') === 'ready');
+  const fittedMapZoom = Number(await page.locator('[data-testid="places-map"] > div').getAttribute('data-map-zoom'));
+  assert.ok(fittedMapZoom > 2, `genealogy map fits its regional points instead of staying at world zoom (${fittedMapZoom})`);
   await page.getByTestId('map-person-filter').getByRole('button').first().click();
   await page.getByTestId('map-person-filter-dropdown').waitFor({ timeout: 30_000 });
   const dropdownIsTopmost = await page.getByTestId('map-person-filter-dropdown').evaluate((dropdown) => {

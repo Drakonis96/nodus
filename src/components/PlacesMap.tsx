@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { MapPlacePoint, Person } from '@shared/types';
@@ -78,8 +78,25 @@ export function PlacesMap({
   const mapRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
   const lastFitRef = useRef<string>('');
+  const fitPointsRef = useRef<MapPlacePoint[]>(fitPoints ?? points);
   const [personsById, setPersonsById] = useState<Map<string, Person>>(new Map());
   const [portraitUrls, setPortraitUrls] = useState<Map<string, string>>(new Map());
+  fitPointsRef.current = fitPoints ?? points;
+
+  const fitMapToCurrentPoints = useCallback((map: L.Map) => {
+    const fitSet = fitPointsRef.current;
+    const sig = [...new Set(fitSet.map((point) => `${point.latitude.toFixed(3)},${point.longitude.toFixed(3)}`))].sort().join('|');
+    if (!sig || sig === lastFitRef.current) return;
+    map.invalidateSize({ pan: false });
+    const size = map.getSize();
+    if (size.x <= 0 || size.y <= 0) return;
+    const latlngs = fitSet.map((point) => [point.latitude, point.longitude] as [number, number]);
+    if (latlngs.length === 1) map.setView(latlngs[0], 11, { animate: false });
+    else map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 13, animate: false });
+    lastFitRef.current = sig;
+    map.getContainer().dataset.mapFit = 'ready';
+    map.getContainer().dataset.mapZoom = String(map.getZoom());
+  }, []);
 
   // Leaflet renders its attribution as native anchors. Intercept them before
   // the library can navigate the Electron webContents and delegate the URL to
@@ -90,9 +107,19 @@ export function PlacesMap({
     const handleExternalLink = (event: MouseEvent) => {
       const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
       if (!link) return;
+      const href = link.getAttribute('href')?.trim() ?? '';
+      if (!href || href.startsWith('#')) return;
+      let url: URL;
+      try {
+        url = new URL(href, window.location.href);
+      } catch {
+        return;
+      }
+      if (!/^(https?:|mailto:)$/.test(url.protocol)) return;
+      if (/^https?:$/.test(url.protocol) && url.origin === window.location.origin) return;
       event.preventDefault();
       event.stopPropagation();
-      void window.nodus.openExternal(link.href).catch(() => undefined);
+      void window.nodus.openExternal(url.href).catch(() => undefined);
     };
     container.addEventListener('click', handleExternalLink, true);
     return () => container.removeEventListener('click', handleExternalLink, true);
@@ -180,12 +207,16 @@ export function PlacesMap({
     mapRef.current = map;
 
     const ro = new ResizeObserver(() => {
-      if (mapRef.current === map) map.invalidateSize();
+      if (mapRef.current !== map) return;
+      map.invalidateSize({ pan: false });
+      fitMapToCurrentPoints(map);
     });
     ro.observe(containerRef.current);
     // A tick after mount the flex container has its real size.
     const initialInvalidateTimer = window.setTimeout(() => {
-      if (mapRef.current === map) map.invalidateSize();
+      if (mapRef.current !== map) return;
+      map.invalidateSize({ pan: false });
+      fitMapToCurrentPoints(map);
     }, 60);
     return () => {
       window.clearTimeout(initialInvalidateTimer);
@@ -195,7 +226,7 @@ export function PlacesMap({
       map.stop();
       map.remove();
     };
-  }, []);
+  }, [fitMapToCurrentPoints]);
 
   const groups = useMemo(() => {
     const byPlace = new Map<string, PlaceGroup>();
@@ -274,26 +305,23 @@ export function PlacesMap({
     }
   }, [groups, points, personsById, portraitUrls, showRoutes, light]);
 
-  // Frame the view to the (person-filtered) points — but only when that set changes,
-  // so the chronological slider never re-zooms mid-play.
+  // Frame only after the flex container has a measurable size. A data update can
+  // arrive in the same render that changes the year slider; retrying after layout
+  // prevents the initial world view from becoming the remembered fitted state.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const fitSet = fitPoints ?? points;
-    const sig = [...new Set(fitSet.map((p) => `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}`))].sort().join('|');
-    if (!sig || sig === lastFitRef.current) return;
-    lastFitRef.current = sig;
-    const latlngs = fitSet.map((p) => [p.latitude, p.longitude] as [number, number]);
-    if (latlngs.length === 1) {
-      map.setView(latlngs[0], 11, { animate: false });
-    } else if (latlngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latlngs), { padding: [50, 50], maxZoom: 13, animate: false });
-    }
+    const fitFrame = window.requestAnimationFrame(() => {
+      if (mapRef.current === map) fitMapToCurrentPoints(map);
+    });
     const fitInvalidateTimer = window.setTimeout(() => {
-      if (mapRef.current === map) map.invalidateSize();
-    }, 50);
-    return () => window.clearTimeout(fitInvalidateTimer);
-  }, [fitPoints, points]);
+      if (mapRef.current === map) fitMapToCurrentPoints(map);
+    }, 80);
+    return () => {
+      window.cancelAnimationFrame(fitFrame);
+      window.clearTimeout(fitInvalidateTimer);
+    };
+  }, [fitPoints, points, fitMapToCurrentPoints]);
 
   const hasPoints = points.length > 0;
 

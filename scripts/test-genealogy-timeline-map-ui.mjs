@@ -54,9 +54,10 @@ test('map controls stay above Leaflet but below the shared dossier modal', () =>
 });
 
 test('Leaflet resize work is cancelled and guarded when the map unmounts', () => {
-  assert.match(placesMap, /if \(mapRef\.current === map\) map\.invalidateSize\(\)/);
+  assert.match(placesMap, /mapRef\.current !== map/);
   assert.match(placesMap, /window\.clearTimeout\(initialInvalidateTimer\)/);
   assert.match(placesMap, /window\.clearTimeout\(fitInvalidateTimer\)/);
+  assert.match(placesMap, /window\.cancelAnimationFrame\(fitFrame\)/);
   assert.match(placesMap, /map\.stop\(\);/);
 });
 

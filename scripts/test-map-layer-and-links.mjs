@@ -19,8 +19,19 @@ test('map filter toolbar and dropdown stay locally above Leaflet layers', () => 
 
 test('Leaflet attribution links use the safe system-browser bridge', () => {
   assert.match(placesMap, /closest<HTMLAnchorElement>\('a\[href\]'\)/);
-  assert.match(placesMap, /window\.nodus\.openExternal\(link\.href\)/);
+  assert.match(placesMap, /href\.startsWith\('#'\)/);
+  assert.match(placesMap, /url\.origin === window\.location\.origin/);
+  assert.match(placesMap, /window\.nodus\.openExternal\(url\.href\)/);
   assert.match(placesMap, /event\.preventDefault\(\)/);
+});
+
+test('map fitting waits for a measurable container and records the resulting zoom', () => {
+  assert.match(placesMap, /map\.getSize\(\)/);
+  assert.match(placesMap, /size\.x <= 0 \|\| size\.y <= 0/);
+  assert.match(placesMap, /requestAnimationFrame/);
+  assert.match(placesMap, /fitMapToCurrentPoints\(map\)/);
+  assert.match(placesMap, /dataset\.mapFit = 'ready'/);
+  assert.match(placesMap, /dataset\.mapZoom = String\(map\.getZoom\(\)\)/);
 });
 
 test('the main window rejects external in-app navigation as a safety net', () => {
