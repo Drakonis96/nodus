@@ -852,7 +852,7 @@ body {
 .sidebar-resize-handle:hover::after,
 .sidebar-resize-handle:focus-visible::after,
 .is-resizing-sidebar .sidebar-resize-handle::after {
-  background: #0f766e;
+  background: var(--vault-accent, #6366f1);
 }
 
 .is-resizing-sidebar,

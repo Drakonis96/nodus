@@ -789,6 +789,7 @@ export function App() {
   return (
     <div
       className="h-full flex flex-col"
+      style={{ '--vault-accent': dockColorForVaultType(activeVault?.type) } as React.CSSProperties}
       data-testid="app-shell"
       data-interface-scale={settings.interfaceScale}
       data-high-contrast={settings.highContrast ? 'true' : 'false'}

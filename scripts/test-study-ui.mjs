@@ -56,6 +56,9 @@ test('left sidebar is resizable and remembers the selected width', async () => {
   assert.match(app, /onDoubleClick/);
   assert.match(css, /\.sidebar-resize-handle/);
   assert.match(css, /cursor: col-resize/);
+  assert.match(app, /--vault-accent.*dockColorForVaultType\(activeVault\?\.type\)/);
+  assert.match(css, /\.is-resizing-sidebar \.sidebar-resize-handle::after\s*\{[^}]*var\(--vault-accent, #6366f1\)/s);
+  assert.doesNotMatch(css, /\.is-resizing-sidebar \.sidebar-resize-handle::after\s*\{[^}]*#0f766e/s);
 });
 
 test('sidebar header keeps the Nodus brand centered, stable when hidden and fully clickable', async () => {

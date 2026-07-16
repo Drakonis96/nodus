@@ -103,6 +103,7 @@ export function dockColorForVaultType(type: string | undefined): string {
   if (type === 'genealogy') return '#ca8a04';
   if (type === 'databases') return '#b30333';
   if (type === 'estudio') return '#0f766e';
+  if (type === 'testimonios') return '#0891b2';
   if (type === 'worldbuilding') return '#7c3aed';
   if (type === 'docencia') return '#ea580c';
   return '#6366f1';
