@@ -105,14 +105,14 @@ function vaultTypePhase(type: VaultType): VaultPhase | null {
 
 function vaultTypeDescription(type: VaultType): string {
   switch (type) {
-    case 'academic': return t('Investigación y escritura académica.');
-    case 'genealogy': return t('Historia familiar y archivo.');
+    case 'academic': return t('Investigación, análisis y escritura.');
+    case 'genealogy': return t('Historia familiar y archivos.');
     case 'estudio': return t('Aprendizaje y materiales de estudio.');
-    case 'databases': return t('Tablas y datos estructurados.');
-    case 'primary_sources': return t('Archivo y fuentes históricas.');
-    case 'testimonios': return t('Historia oral y periodismo.');
-    case 'worldbuilding': return t('Preview de un espacio para construir mundos, personajes, lugares, reglas y narrativas. Las secciones todavía no están disponibles.');
-    case 'docencia': return t('Preview de un espacio para organizar la docencia, evaluar y crear materiales. Las secciones todavía no están disponibles.');
+    case 'databases': return t('Tablas, datos y análisis.');
+    case 'primary_sources': return t('Archivos y fuentes históricas.');
+    case 'testimonios': return t('Entrevistas, historia oral y periodismo.');
+    case 'worldbuilding': return t('Mundos, personajes y narrativas.');
+    case 'docencia': return t('Cursos, evaluación y materiales.');
   }
 }
 
@@ -573,7 +573,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                       type="button"
                       disabled={soon}
                       title={soon ? `${t('Próximamente')}: ${vaultTypeDescription(tp)}` : undefined}
-                      className={`relative min-h-28 flex flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-center transition-colors ${
+                      className={`relative flex h-28 flex-col items-center justify-center gap-1.5 rounded-lg border p-3 text-center transition-colors ${
                         soon
                           ? 'cursor-not-allowed border-neutral-800/70 opacity-50'
                           : addType === tp
@@ -596,7 +596,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
                         <Icon name={vaultTypeIcon(tp)} size={18} />
                       </span>
                       <span className="text-xs font-medium text-neutral-200">{vaultTypeLabel(tp)}</span>
-                      <span className="max-w-40 text-[10px] leading-tight text-neutral-500">{vaultTypeDescription(tp)}</span>
+                      <span className="line-clamp-2 min-h-[2.5em] max-w-44 text-[10px] leading-tight text-neutral-500">{vaultTypeDescription(tp)}</span>
                     </button>
                   );
                 })}

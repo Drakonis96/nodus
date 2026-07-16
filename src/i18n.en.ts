@@ -706,19 +706,17 @@ export const EN: Record<string, string> = {
   Testimonios: 'Testimonies',
   Worldbuilding: 'Worldbuilding',
   Docencia: 'Teaching',
-  'Investigación y escritura académica.': 'Academic research and writing.',
-  'Historia familiar y archivo.': 'Family history and archives.',
+  'Investigación, análisis y escritura.': 'Research, analysis, and writing.',
+  'Historia familiar y archivos.': 'Family history and archives.',
   'Aprendizaje y materiales de estudio.': 'Learning and study materials.',
-  'Tablas y datos estructurados.': 'Tables and structured data.',
-  'Archivo y fuentes históricas.': 'Archives and historical sources.',
-  'Historia oral y periodismo.': 'Oral history and journalism.',
+  'Tablas, datos y análisis.': 'Tables, data, and analysis.',
+  'Archivos y fuentes históricas.': 'Archives and historical sources.',
+  'Entrevistas, historia oral y periodismo.': 'Interviews, oral history, and journalism.',
+  'Mundos, personajes y narrativas.': 'Worlds, characters, and narratives.',
+  'Cursos, evaluación y materiales.': 'Courses, assessment, and materials.',
   'Creación de mundos para escritores.': 'Worldbuilding for writers.',
   'Clases, cursos y materiales; la IA solo verá placeholders del alumnado.':
     'Classes, courses and materials; AI will only see student placeholders.',
-  'Preview de un espacio para construir mundos, personajes, lugares, reglas y narrativas. Las secciones todavía no están disponibles.':
-    'Preview of a workspace for building worlds, characters, places, rules and narratives. Its sections are not available yet.',
-  'Preview de un espacio para organizar la docencia, evaluar y crear materiales. Las secciones todavía no están disponibles.':
-    'Preview of a workspace for organising teaching, assessment and content creation. Its sections are not available yet.',
   'Vista previa navegable. Puedes crear el vault y consultar sus secciones, pero todavía no contienen funciones.':
     'Navigable preview. You can create the vault and browse its sections, but they do not contain features yet.',
   'Este vault es una preview navegable: se creará normalmente, pero por ahora sus secciones son solo una muestra y no permiten realizar acciones.':

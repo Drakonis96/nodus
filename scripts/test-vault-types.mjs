@@ -77,6 +77,9 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /data-testid="vault-phase-notice"/);
   assert.match(picker, /data-testid="vault-preview-notice"/);
   assert.match(picker, />PREVIEW<\/span>/);
+  assert.match(picker, /className=\{`relative flex h-28 flex-col/);
+  assert.match(picker, /line-clamp-2 min-h-\[2\.5em\]/);
+  assert.doesNotMatch(picker, /case '(?:worldbuilding|docencia)': return t\('Preview de un espacio/);
   assert.match(picker, /Icon name="bug"/);
   assert.match(picker, /data-testid="vault-phase-tooltip"/);
   assert.match(picker, /tooltipOpen && createPortal/);
