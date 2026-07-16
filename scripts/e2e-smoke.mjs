@@ -160,17 +160,43 @@ try {
   assert.equal(new Set(languageButtonSizes).size, 1, `every cinematic tutorial language button has the same dimensions: ${languageButtonSizes.join(', ')}`);
   await page.getByTestId('tutorial-language-fr').click();
   await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
+  // French now has a full UI translation, so choosing it keeps the French interface
+  // instead of borrowing the English one.
   await waitForCondition('preferencias de idioma del tutorial', () => page.evaluate(async () => {
     const settings = await window.nodus.getSettings();
-    return settings.uiLanguage === 'en' && settings.promptLanguage === 'fr';
+    return settings.uiLanguage === 'fr' && settings.promptLanguage === 'fr';
   }));
   assert.equal(await page.locator('.tutorial-progress button').count(), 13, 'essential guide exposes thirteen novice-friendly chapters');
   await page.locator('.tutorial-topbar button').click();
-  await page.getByText('Skip the essential guide?', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Skip anyway', exact: true }).click();
+  // The skip dialog follows the (now French) UI language, proving the French table
+  // is actually wired into a real render.
+  await page.getByText('Passer le guide essentiel ?', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Passer quand même', exact: true }).click();
   await page.getByTestId('basics-tutorial').waitFor({ state: 'detached' });
   assert.equal((await page.evaluate(() => window.nodus.getSettings())).basicsTutorialVersion, 3, 'confirmed skip records the current tutorial version globally');
-  await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, uiLanguage: 'es', promptLanguage: 'es' }));
+
+  // Finish setup but stay in French, so the shell itself can be checked. These labels
+  // reach the DOM from navigation.ts through t(), proving the French table is wired
+  // all the way through a real render rather than merely present on disk.
+  await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true, uiLanguage: 'fr', promptLanguage: 'fr' }));
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  await waitForCondition('barra lateral traducida al francés', async () => {
+    // Group headers are uppercased by CSS ("EXPLORER"), so compare case-insensitively.
+    const sidebar = (await page.getByTestId('sidebar-scroll-region').innerText().catch(() => '')).toLowerCase();
+    return ['accueil', 'explorer', 'bibliothèque', 'idées', 'analyser', 'écrire', 'paramètres']
+      .every((label) => sidebar.includes(label));
+  });
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'fr', 'the document language follows the UI language');
+  console.log('[e2e] French UI renders on the real shell (sidebar + document lang)');
+
+  // Back to Spanish for the rest of the suite, which asserts on Spanish copy. The
+  // reload above already consumed the once-per-session startup update check, so reset
+  // its gate to leave the next reload looking like a fresh session again.
+  await page.evaluate(() => {
+    sessionStorage.removeItem('nodus.startupUpdateChecked');
+    return window.nodus.updateSettings({ uiLanguage: 'es', promptLanguage: 'es' });
+  });
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
   assert.equal(await page.getByTestId('basics-tutorial-language').count(), 0, 'a seen cinematic tutorial does not return after restart/update');

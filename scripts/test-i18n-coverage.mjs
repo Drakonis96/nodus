@@ -26,14 +26,24 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 
 const outDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-i18n-'));
-const bundle = path.join(outDir, 'en.cjs');
-execFileSync(
-  path.join(repoRoot, 'node_modules/.bin/esbuild'),
-  [path.join(repoRoot, 'src/i18n.en.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
-  { cwd: repoRoot, stdio: 'inherit' }
-);
-const { EN } = require(bundle);
+
+/** Bundle a TS module so its real exported values can be asserted on. */
+function loadModule(file) {
+  const bundle = path.join(outDir, `${path.basename(file, '.ts')}.cjs`);
+  execFileSync(
+    path.join(repoRoot, 'node_modules/.bin/esbuild'),
+    [path.join(repoRoot, file), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`],
+    { cwd: repoRoot, stdio: 'inherit' }
+  );
+  return require(bundle);
+}
+
+const { EN } = loadModule('src/i18n.en.ts');
+const { FR } = loadModule('src/i18n.fr.ts');
 const enKeys = new Set(Object.keys(EN));
+
+/** Every language the interface is translated into (Spanish is the source). */
+const TRANSLATIONS = [['English', EN], ['French', FR]];
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
@@ -122,11 +132,71 @@ function collectTranslatableStrings() {
   return found;
 }
 
-test('every t()/tx() string and tour step has an English translation', () => {
-  const strings = collectTranslatableStrings();
-  const missing = [...strings].filter(([s]) => !enKeys.has(s));
-  const report = missing.map(([s, f]) => `  ${f}: ${JSON.stringify(s)}`).join('\n');
-  assert.equal(missing.length, 0, `Untranslated strings (add to src/i18n.en.ts):\n${report}`);
+for (const [language, table] of TRANSLATIONS) {
+  test(`every t()/tx() string and tour step has a ${language} translation`, () => {
+    const strings = collectTranslatableStrings();
+    const missing = [...strings].filter(([s]) => !(s in table));
+    const report = missing.map(([s, f]) => `  ${f}: ${JSON.stringify(s)}`).join('\n');
+    assert.equal(missing.length, 0, `Untranslated strings (add to src/i18n.${language.slice(0, 2).toLowerCase()}.ts):\n${report}`);
+  });
+}
+
+test('every language table covers exactly the same keys', () => {
+  // A key in one table but not another means one language silently falls back.
+  const [, base] = TRANSLATIONS[0];
+  for (const [language, table] of TRANSLATIONS.slice(1)) {
+    const missing = Object.keys(base).filter((key) => !(key in table));
+    const extra = Object.keys(table).filter((key) => !(key in base));
+    assert.deepEqual(missing, [], `${language} is missing keys English has`);
+    assert.deepEqual(extra, [], `${language} has keys English does not`);
+  }
+});
+
+test('translations keep every {placeholder} intact', () => {
+  // tx() substitutes by name, so a translated or dropped placeholder renders literally.
+  const names = (value) => [...String(value).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+  for (const [language, table] of TRANSLATIONS) {
+    const broken = Object.entries(table).filter(([key, value]) => names(key) !== names(value));
+    assert.deepEqual(
+      broken.map(([key, value]) => `${JSON.stringify(key)} → ${JSON.stringify(value)}`),
+      [],
+      `${language} translations changed a {placeholder}`
+    );
+  }
+});
+
+test('no translation is empty', () => {
+  for (const [language, table] of TRANSLATIONS) {
+    const blank = Object.entries(table).filter(([, value]) => !String(value).trim()).map(([key]) => key);
+    assert.deepEqual(blank, [], `${language} has blank translations`);
+  }
+});
+
+test('in-data labels are translated alongside the i18n table', () => {
+  // These labels ship inside shared/ data rather than the i18n table, so the
+  // coverage scan above cannot see them and they rot independently.
+  const { DOC_TYPE_LABEL_FR, RAW_DOC_TYPES, NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA } =
+    loadModule('shared/archiveDocTypes.ts');
+  assert.ok(RAW_DOC_TYPES.length > 150, `expected the full doc-type taxonomy, got ${RAW_DOC_TYPES.length}`);
+  // Assert against the source map, not the expanded `labelFr`: that one is
+  // `DOC_TYPE_LABEL_FR[id] ?? labelEn`, so a missing id would silently look fine.
+  // A French label equal to the English one is legitimate ("Illustration", "Notes").
+  const untranslated = RAW_DOC_TYPES.map((row) => row[0]).filter((id) => !DOC_TYPE_LABEL_FR[id]?.trim());
+  assert.deepEqual(untranslated, [], 'these document types have no French label and would fall back to English');
+
+  for (const [name, values] of Object.entries({ NATURALEZA, EPOCA, AMBITO, FUNCION, SOPORTE_MONUMENTAL, ESTATUS, SOPORTE_FISICO, GENEALOGIA })) {
+    const blank = (values ?? []).filter((value) => !value.fr?.trim()).map((value) => value.id);
+    assert.deepEqual(blank, [], `facet dimension ${name} has values with no French label`);
+  }
+
+  const { TREE_KINSHIP_ROLE_LABEL_ES, TREE_KINSHIP_ROLE_LABEL_FR } = loadModule('shared/treeKinship.ts');
+  const rolesMissingFr = Object.keys(TREE_KINSHIP_ROLE_LABEL_ES).filter((role) => !TREE_KINSHIP_ROLE_LABEL_FR[role]?.trim());
+  assert.deepEqual(rolesMissingFr, [], 'these kinship roles have no French label');
+
+  const { RELEASE_NOTES } = loadModule('shared/releaseNotes.ts');
+  const highlights = RELEASE_NOTES.flatMap((note) => note.highlights.map((h) => [note.version, h]));
+  const missingFr = highlights.filter(([, h]) => !h.fr?.trim()).map(([version]) => version);
+  assert.deepEqual(missingFr, [], 'these release notes have no French highlight');
 });
 
 test('keys reached indirectly and through ternaries are collected', () => {
