@@ -2870,6 +2870,9 @@ export function registerIpc(
       en: mode === 'restore' ? 'Select a Nodus recovery folder' : 'Select an empty folder to protect Nodus',
       es: mode === 'restore' ? 'Seleccionar una carpeta de recuperación de Nodus' : 'Seleccionar una carpeta vacía para proteger Nodus',
       fr: mode === 'restore' ? 'Sélectionner un dossier de récupération Nodus' : 'Sélectionner un dossier vide pour protéger Nodus',
+      de: mode === 'restore' ? 'Nodus-Wiederherstellungsordner auswählen' : 'Leeren Ordner zum Schutz von Nodus auswählen',
+      pt: mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
+      'pt-BR': mode === 'restore' ? 'Selecionar uma pasta de recuperação do Nodus' : 'Selecionar uma pasta vazia para proteger o Nodus',
     };
     const { canceled, filePaths } = await dialog.showOpenDialog(getWindow() ?? undefined!, {
       title: titles[language],

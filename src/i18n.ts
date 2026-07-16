@@ -1,6 +1,9 @@
 import type { AppLanguage } from '@shared/types';
 import { EN } from './i18n.en';
 import { FR } from './i18n.fr';
+import { DE } from './i18n.de';
+import { PT } from './i18n.pt';
+import { PT_BR } from './i18n.pt-BR';
 
 /**
  * Lightweight, dependency-free i18n. The source language is Spanish and the
@@ -8,7 +11,7 @@ import { FR } from './i18n.fr';
  *   - In Spanish, `t()` returns the key unchanged (zero risk, byte-identical UI).
  *   - Otherwise `t()` looks the key up in that language's table.
  *
- * Lookups fall back FR → EN → ES: a gap in a translated language shows English
+ * Lookups fall back <lang> → EN → ES: a gap in a translated language shows English
  * rather than Spanish, because an untranslated string is far more likely to be
  * readable to that user in English. Spanish remains the last resort since the key
  * *is* the Spanish text, so the app can never show a blank or a raw key.
@@ -21,7 +24,13 @@ import { FR } from './i18n.fr';
  * without prop-drilling or a context/hook. Because no component is memoized, a
  * language change re-renders the whole tree and every `t()` re-evaluates.
  */
-const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = { en: EN, fr: FR };
+const TABLES: Record<Exclude<AppLanguage, 'es'>, Record<string, string>> = {
+  en: EN,
+  fr: FR,
+  de: DE,
+  pt: PT,
+  'pt-BR': PT_BR,
+};
 
 let activeLang: AppLanguage = 'es';
 
@@ -52,11 +61,13 @@ export function tx(es: string, vars: Record<string, string | number>): string {
 }
 
 /**
- * Pick between already-built strings by language (for non-keyed, computed text).
- * `fr` is optional and falls back to `en`, matching {@link t}'s FR → EN → ES chain.
+ * Pick an already-built value by language, for text that is not keyed by a Spanish
+ * source string — in practice the labels that live inside `shared/` data tables
+ * (document types, heritage facets) rather than in the tables above.
+ *
+ * Spanish and English are required; the rest are optional and fall back to English,
+ * mirroring {@link t}'s <lang> → EN → ES chain.
  */
-export function pick<T>(es: T, en: T, fr?: T): T {
-  if (activeLang === 'es') return es;
-  if (activeLang === 'fr') return fr ?? en;
-  return en;
+export function pick<T>(values: Partial<Record<AppLanguage, T>> & { es: T; en: T }): T {
+  return values[activeLang] ?? values.en;
 }

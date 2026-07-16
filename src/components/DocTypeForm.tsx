@@ -19,7 +19,7 @@ export function docTypeLabel(id: string | null | undefined): string {
 }
 
 function defLabel(def: ArchiveDocTypeDef): string {
-  return pick(def.label, def.labelEn, def.labelFr);
+  return pick(def.labels);
 }
 
 /**
