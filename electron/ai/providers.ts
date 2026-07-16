@@ -429,13 +429,19 @@ interface ContextCacheEntry {
   expires: number;
 }
 const contextCache = new Map<string, ContextCacheEntry>();
-const CONTEXT_TTL_MS = 60_000;
+/**
+ * Short on purpose: this caches the window a model is *currently loaded with*, which changes
+ * when the server evicts and reloads it, not a fixed property of the model. A stale entry
+ * lets an over-long prompt past the guard, so the probe is cheap enough to repeat often.
+ */
+const CONTEXT_TTL_MS = 30_000;
 
 /**
- * The effective context window (in tokens) a local model is loaded with, or null
- * when it can't be determined. LM Studio reports the real loaded window; Ollama's
- * API only exposes the model's trained maximum — a ceiling, since the runtime
- * `num_ctx` can be smaller — so treat Ollama's value as best-effort. Never throws.
+ * The effective context window (in tokens) a local model is loaded with, or null when it
+ * can't be determined (cloud models manage their own context and never reach here). Both
+ * providers report the window their runtime actually uses rather than what the model was
+ * trained for — the two differ by 8x on a stock Ollama, and believing the trained figure is
+ * what let a 5,377-token prompt into a 4,096-token window to be silently cut down. Never throws.
  */
 export async function localContextWindow(
   provider: LocalProvider,
@@ -470,10 +476,28 @@ async function lmStudioContextWindow(base: string, modelId: string, key: string 
   return model.loaded_context_length ?? model.max_context_length ?? null;
 }
 
-/** Ollama's /api/show exposes only the trained context length (e.g. "llama.context_length");
- *  the arch prefix varies, so match any *.context_length key. This is a ceiling, not the
- *  runtime num_ctx (which Ollama silently truncates to), hence best-effort. */
-async function ollamaContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+/**
+ * Ollama's own default window when nothing overrides it. Deliberately used as the fallback
+ * instead of the model's trained length: Ollama loads at this size no matter how big the
+ * architecture is, and guessing high is what makes it truncate.
+ */
+const OLLAMA_DEFAULT_NUM_CTX = 4096;
+
+/** The window Ollama is actually running a loaded model with (/api/ps), or null if unloaded. */
+async function ollamaRunningContext(base: string, modelId: string, key: string | null): Promise<number | null> {
+  try {
+    const res = await localFetch(`${base}/api/ps`, key, 4000);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { models?: { model?: string; name?: string; context_length?: number }[] };
+    const m = (data.models ?? []).find((x) => x.model === modelId || x.name === modelId);
+    return typeof m?.context_length === 'number' ? m.context_length : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The model's trained ceiling and any num_ctx its Modelfile pins, from /api/show. */
+async function ollamaShowContext(base: string, modelId: string, key: string | null): Promise<{ trained: number | null; pinned: number | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
   try {
@@ -483,15 +507,46 @@ async function ollamaContextWindow(base: string, modelId: string, key: string | 
       body: JSON.stringify({ name: modelId }),
       signal: controller.signal,
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { model_info?: Record<string, unknown> };
+    if (!res.ok) return { trained: null, pinned: null };
+    const data = (await res.json()) as { model_info?: Record<string, unknown>; parameters?: string };
     const info = data.model_info ?? {};
+    // The arch prefix varies (llama./qwen2./…), so match any *.context_length key.
     const ctxKey = Object.keys(info).find((k) => k.endsWith('.context_length'));
-    const val = ctxKey ? info[ctxKey] : undefined;
-    return typeof val === 'number' ? val : null;
+    const trained = ctxKey && typeof info[ctxKey] === 'number' ? (info[ctxKey] as number) : null;
+    const pinned = Number(/^\s*num_ctx\s+(\d+)/m.exec(data.parameters ?? '')?.[1]) || null;
+    return { trained, pinned };
+  } catch {
+    return { trained: null, pinned: null };
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * The context window Ollama will really use — which is NOT the model's trained length.
+ * /api/show reports the architecture ceiling (qwen2.5:3b says 32768) while Ollama loads the
+ * model at its own default (4096) unless a Modelfile or OLLAMA_CONTEXT_LENGTH says otherwise,
+ * and then silently drops the *oldest* tokens of anything longer. Reporting the ceiling made
+ * the caller believe a 6.7k-token prompt fitted, so the head of the prompt was dropped and the
+ * model answered confidently from whatever tail survived. Prefer the running window, then a
+ * pinned num_ctx, and otherwise assume Ollama's default: refusing with an actionable message
+ * beats silently answering from a third of the prompt.
+ */
+async function ollamaContextWindow(base: string, modelId: string, key: string | null): Promise<number | null> {
+  // The running window is the truth, with one caveat: Ollama keys loaded instances by their
+  // options and /v1 always loads with the server default, so a model someone else loaded with
+  // a custom num_ctx is reported here but is not the instance our call gets. That only happens
+  // when another client pins a window; left as-is because the alternative — ignoring the real
+  // window — is wrong in the ordinary case, where the app is the only thing loading models.
+  const running = await ollamaRunningContext(base, modelId, key);
+  if (running) return running;
+  const { trained, pinned } = await ollamaShowContext(base, modelId, key);
+  if (pinned) return trained ? Math.min(pinned, trained) : pinned;
+  // Never give up and return null here the way an undetectable window would: for every other
+  // provider "unknown" is safe because an over-long prompt comes back as an error we can
+  // reword, whereas Ollama answers anyway from a prompt it quietly cut down. Assuming its
+  // documented default keeps the guard armed.
+  return Math.min(trained ?? OLLAMA_DEFAULT_NUM_CTX, OLLAMA_DEFAULT_NUM_CTX);
 }
 
 /** Ping a local provider so Settings can confirm the base URL before loading models. */

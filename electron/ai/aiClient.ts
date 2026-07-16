@@ -49,9 +49,31 @@ function resolveProviderKey(provider: AiProvider): string | null {
 /** Smallest generation budget worth attempting; below this the window has no room. */
 const MIN_LOCAL_GENERATION_TOKENS = 512;
 
-/** Rough token estimate (~4 chars/token) for sizing local-model requests. */
+/**
+ * Pessimistic token estimate, used only by the local-model guards below.
+ *
+ * "~4 chars per token" describes English prose and nothing else, and these guards mostly see
+ * the opposite: a database profile is `Fecha (number) · min 1945, max 2024`, ids like
+ * `LV001-FG001`, URL-encoded paths like `BD%20Fotograf%C3%ADas`. Measured against qwen2.5,
+ * that content runs at **2.4 chars/token** and URL-encoded runs at **1.7** — so the old
+ * estimate was 41% low, the guard waved a 5,377-token prompt into a 4,096 window, and Ollama
+ * silently dropped the middle. The model then answered a question about 7,172 rows from the
+ * handful of sample rows that survived, confidently and wrongly.
+ *
+ * So this counts BPE-ish units instead of characters — a word run merges into roughly one
+ * token per four characters, while punctuation and symbols usually cost one each — and then
+ * pads by half. It overshoots plain prose by about 2x, which only ever costs an over-cautious
+ * refusal carrying an actionable message; undershooting costs a wrong answer the user cannot
+ * detect, which is the trade this exists to make.
+ */
 function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  let units = 0;
+  for (const m of text.matchAll(/[A-Za-z0-9]+|[^A-Za-z0-9\s]|\s+/g)) {
+    const chunk = m[0];
+    if (/\s/.test(chunk[0])) continue; // whitespace mostly merges into the next token
+    units += /[A-Za-z0-9]/.test(chunk[0]) ? Math.max(1, Math.ceil(chunk.length / 4)) : 1;
+  }
+  return Math.ceil(units * 1.5);
 }
 
 /** Match llama.cpp's "prompt doesn't fit the context window" runtime error (LM Studio
@@ -351,9 +373,18 @@ function wrapProviderError(e: any): AiError {
   if (status === 401 || status === 403) return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
   if (status === 400) {
     const detail = e?.error?.message ?? e?.message;
-    const suffix = detail && !/no body/i.test(detail) ? ` Detalle: ${detail}` : '';
+    const readable = detail && !/no body/i.test(detail) ? detail : null;
+    // Not every provider answers a bad key with 401: Gemini returns 400 "Invalid Auth key.".
+    if (readable && /invalid auth|api[ _-]?key|API_KEY_INVALID|unauthenticated|invalid credential/i.test(readable)) {
+      return new AiError('Clave de IA inválida. Revísala en Ajustes.', false, true);
+    }
+    // With a readable reason, say it. Without one, say only what we know: Gemini returns its
+    // error as a JSON array that the OpenAI SDK cannot parse, so its 400s arrive as "no body"
+    // — and blaming the context size there sends someone with a mistyped key off to trim their
+    // data. A 400 we cannot explain should name the likely causes, not pick one.
+    if (readable) return new AiError(`El proveedor rechazó la solicitud (400). Detalle: ${readable}`, false);
     return new AiError(
-      `El proveedor rechazó la solicitud (400). Si ocurre al abrir el asistente con mucho contexto, la petición supera el límite del modelo.${suffix}`,
+      'El proveedor rechazó la solicitud (400) sin explicar el motivo. Suele ser la clave de IA (revísala en Ajustes) o, con mucho contexto, una petición que supera el límite del modelo.',
       false
     );
   }

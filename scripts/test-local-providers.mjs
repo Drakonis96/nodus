@@ -34,6 +34,12 @@ function startServer(routes) {
 
 const ollamaRoutes = {
   '/api/version': { version: '0.5.7' },
+  // The loaded instance's REAL window — unrelated to what the architecture allows.
+  '/api/ps': {
+    models: [{ name: 'llama3.1:8b', model: 'llama3.1:8b', context_length: 16384 }],
+  },
+  // The architecture ceiling. Ollama does NOT load the model at this size.
+  '/api/show': { model_info: { 'llama.context_length': 131072 }, parameters: null },
   '/api/tags': {
     models: [
       { name: 'zephyr:latest', model: 'zephyr:latest', size: 4_100_000_000, details: { parameter_size: '7B', quantization_level: 'Q4_0' } },
@@ -94,9 +100,8 @@ try {
       },
     ],
   });
-  const { AI_PROVIDERS, listModels, listEmbeddingModels, testLocalProvider, isLocalProvider, openAiCompatBase, supportsJsonMode } = await import(
-    pathToFileURL(outfile).href
-  );
+  const { AI_PROVIDERS, listModels, listEmbeddingModels, testLocalProvider, isLocalProvider, openAiCompatBase, supportsJsonMode, localContextWindow } =
+    await import(pathToFileURL(outfile).href);
 
   // ── Provider identity + base URL derivation ─────────────────────────────────
   assert.equal(isLocalProvider('ollama'), true, 'ollama is local');
@@ -145,6 +150,28 @@ try {
   } finally {
     globalThis.fetch = nativeFetch;
   }
+
+  // ── Ollama context window: the RUNTIME window, never the trained ceiling ────
+  // Ollama loads a model at its own default (4096) however large the architecture is, and
+  // silently drops the oldest tokens of anything longer instead of erroring. Reporting the
+  // trained ceiling here is what let a 5,377-token prompt into a 4,096-token window: the head
+  // of it was cut, and the model answered "15 rows" about a 7,172-row table, confidently.
+  // The mock server advertises llama.context_length=131072 while /api/ps reports the real one.
+  assert.equal(
+    await localContextWindow('ollama', 'llama3.1:8b', null),
+    16384,
+    'a loaded model reports the window it is actually running with (/api/ps), not the 131072 ceiling'
+  );
+  assert.equal(
+    await localContextWindow('ollama', 'zephyr:latest', null),
+    4096,
+    'an unloaded model assumes Ollama\'s default rather than trusting the trained ceiling'
+  );
+  assert.equal(
+    await localContextWindow('lmstudio', 'qwen2.5-7b-instruct', null),
+    32768,
+    'LM Studio still reports its own loaded window'
+  );
 
   // ── Ollama: /api/tags → ModelInfo with metadata, alphabetical ───────────────
   const ollamaModels = await listModels('ollama', null);

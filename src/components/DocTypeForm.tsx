@@ -8,7 +8,7 @@ import {
 } from '@shared/archiveDocTypes';
 import { searchDocTypes } from '@shared/docTypeSearch';
 import { Icon } from './ui';
-import { useAnchoredCoords } from './dbGrid';
+import { anchorStyle, useAnchoredCoords } from './dbGrid';
 import { t, pick } from '../i18n';
 
 /** Localized label for a document type (labels live in-data, not in the i18n table). */
@@ -97,7 +97,7 @@ export function DocTypePicker({
             <div className="fixed inset-0 z-[80]" onClick={close} />
             <div
               className="fixed z-[81] card-modal p-2 text-sm shadow-2xl"
-              style={{ top: coords.top, left: coords.left, width: Math.max(coords.width, 300) }}
+              style={{ ...anchorStyle(coords), width: Math.max(coords.width, 300) }}
             >
               <div className="relative mb-1.5">
                 <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />

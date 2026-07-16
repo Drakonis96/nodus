@@ -1362,7 +1362,11 @@ export function App() {
       {csvPlan && (
         <CsvImportModal
           plan={csvPlan}
-          onClose={() => setCsvPlan(null)}
+          onClose={() => {
+            // Let the main process drop the parsed rows it is holding for this import.
+            void window.nodus.releaseCsvImport(csvPlan.token);
+            setCsvPlan(null);
+          }}
           onImported={(id) => {
             setCsvPlan(null);
             void reloadDatabases();

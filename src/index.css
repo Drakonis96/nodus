@@ -1373,6 +1373,12 @@ body {
 .databases .hover\:border-indigo-700\/60:hover { border-color: rgba(138, 2, 39, 0.6); }
 .databases .ring-indigo-500 { --tw-ring-color: #cc0a3a; }
 .databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.4); }
+/* Hover states the grid uses: the column resize handle and the database card's border. Without
+   these two the databases vault flashes indigo on hover in an otherwise crimson surface. */
+.databases .hover\:bg-indigo-500\/40:hover { background-color: rgba(204, 10, 58, 0.4); }
+.databases .hover\:border-indigo-600\/70:hover { border-color: rgba(179, 3, 51, 0.7); }
+/* Hovering an attachment thumbnail to open its preview. */
+.databases .hover\:border-indigo-500:hover { border-color: #cc0a3a; }
 
 /* Databases mode in the LIGHT theme. The plain `.databases` rules above remap the
    indigo hue to crimson but keep the DARK shades (950/900), so a light-theme window

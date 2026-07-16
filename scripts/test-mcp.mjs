@@ -144,6 +144,42 @@ try {
   const gotRow = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
   assert.equal(gotRow.fields.Nombre, 'Gato', 'nodus_get_database_row decodes the row');
 
+  // Derived columns have to reach a client as data it can reason about. A rollup keeps its
+  // value beside the cells, so reading cells alone hands the client null; a formula lives in
+  // cells but is typed by what it computes, so a numeric one must arrive as a number and the
+  // schema must say so — "type: formula" tells a client nothing it can query on.
+  const mNum = dbmode.createColumn(mdb.id, 'Peso', 'number');
+  dbmode.setCell(mRow.id, mNum.id, '4');
+  const mDoble = dbmode.createColumn(mdb.id, 'Doble', 'formula', {
+    formula: { kind: 'arithmetic', op: 'multiply', operands: [{ kind: 'column', columnId: mNum.id }, { kind: 'number', value: 2 }] },
+  });
+  const mVerdict = dbmode.createColumn(mdb.id, 'Veredicto', 'formula', {
+    formula: { kind: 'ifThen', rules: [{ id: 'r', conjunction: 'and', conditions: [{ id: 'c', columnId: mNum.id, op: 'gt', value: '3' }], output: { kind: 'text', value: 'Pesado' } }], otherwise: { kind: 'text', value: 'Ligero' } },
+  });
+  // A rollup over a relation from another database back to this row.
+  const mOther = dbmode.createDatabase('MCP Rel');
+  const mOtherName = dbmode.createColumn(mOther.id, 'N', 'title');
+  const mOtherRow = dbmode.createRow(mOther.id);
+  dbmode.setCell(mOtherRow.id, mOtherName.id, 'Enlazado');
+  const mRel = dbmode.createColumn(mdb.id, 'Vínculo', 'relation', { relationTargetKind: 'db_row', relationTargetDatabaseId: mOther.id });
+  dbmode.addRelation(mRow.id, mRel.id, 'db_row', mOtherRow.id);
+  const mRollup = dbmode.createColumn(mdb.id, 'Enlaces', 'rollup', { rollupRelationColumnId: mRel.id, rollupTargetColumnId: '__title__', rollupFunction: 'count' });
+
+  const schema2 = await callTool(server, 'nodus_get_database_schema', { databaseId: mdb.id });
+  const doble = schema2.columns.find((c) => c.name === 'Doble');
+  assert.equal(doble.type, 'formula', 'the schema still reports the declared type');
+  assert.equal(doble.computes, 'number', 'and what the formula computes');
+  assert.match(doble.formula, /Peso/, 'and describes the recipe in words');
+  assert.equal(schema2.columns.find((c) => c.name === 'Veredicto').computes, 'text', 'a text formula computes text');
+
+  const q2 = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, limit: 10, offset: 0 });
+  const f = q2.rows[0].fields;
+  assert.strictEqual(f.Doble, 8, 'a numeric formula arrives as a number, not a string');
+  assert.strictEqual(f.Veredicto, 'Pesado', 'a text formula arrives as its text');
+  assert.strictEqual(f.Enlaces, '1', 'a rollup arrives with its computed value, not null');
+  const qFormula = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, query: 'pesado', limit: 10, offset: 0 });
+  assert.equal(qFormula.total, 1, 'a formula value is searchable over MCP');
+
   // Read-only study-vault tools expose organisation, grounded search, questions
   // and progress without allowing an MCP client to mutate learning state.
   const studyOrg = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));

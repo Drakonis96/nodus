@@ -7,6 +7,7 @@
  */
 
 import type { ColumnProfile, DatabaseProfile } from './dataProfile';
+import type { DatabaseColumnType } from './databases';
 import { ANALYSIS_KINDS } from './analysisSpec';
 import type { AnalysisKind, AnalysisRequest } from './analysisSpec';
 
@@ -27,23 +28,36 @@ export interface RoleColumn {
 // ── column role classification ───────────────────────────────────────────────
 
 export function isNumeric(col: ColumnProfile): boolean {
-  if (col.type === 'number') return !!col.number && col.number.count >= 2;
+  if (valueTypeOf(col) === 'number') return !!col.number && col.number.count >= 2;
   if (col.type === 'relation') return (col.relationLinks ?? 0) > 0;
   return false;
 }
 
+/**
+ * What a column's values behave as. Everything is its own type except a formula, which
+ * behaves as whatever it computes — so every role below sees a derived column for what it
+ * holds rather than for the word "formula". Falls back to `type` because a profile can reach
+ * here from outside TypeScript (a test fixture, a persisted or hand-built object), and for
+ * every non-formula column the two are the same anyway.
+ */
+function valueTypeOf(col: ColumnProfile): DatabaseColumnType {
+  return col.valueType ?? col.type;
+}
+
 /** Distinct count for a categorical-ish column (select uses its distribution length). */
 function categoryDistinct(col: ColumnProfile): number | null {
-  if (col.type === 'select' || col.type === 'multi_select') return col.distribution?.length ?? 0;
-  if (col.type === 'checkbox') return 2;
+  const t = valueTypeOf(col);
+  if (t === 'select' || t === 'multi_select') return col.distribution?.length ?? 0;
+  if (t === 'checkbox') return 2;
   if (col.distinct != null) return col.distinct;
   return null;
 }
 
 /** Any categorical column (incl. free text and multi-select) — for top-N frequency. */
 export function isCategory(col: ColumnProfile): boolean {
-  if (col.type === 'select' || col.type === 'multi_select' || col.type === 'checkbox') return (categoryDistinct(col) ?? 0) >= 1;
-  if (col.type === 'title' || col.type === 'text') {
+  const t = valueTypeOf(col);
+  if (t === 'select' || t === 'multi_select' || t === 'checkbox') return (categoryDistinct(col) ?? 0) >= 1;
+  if (t === 'title' || t === 'text') {
     const d = col.distinct ?? 0;
     return d >= 2 && d <= 200;
   }
@@ -52,11 +66,12 @@ export function isCategory(col: ColumnProfile): boolean {
 
 /** A bounded-cardinality category usable for grouping / chi-square. */
 export function isLowCard(col: ColumnProfile): boolean {
-  if (col.type === 'select' || col.type === 'checkbox') {
+  const t = valueTypeOf(col);
+  if (t === 'select' || t === 'checkbox') {
     const d = categoryDistinct(col) ?? 0;
     return d >= 2 && d <= LOW_CARD_LIMIT;
   }
-  if (col.type === 'title' || col.type === 'text') {
+  if (t === 'title' || t === 'text') {
     const d = col.distinct ?? 0;
     return d >= 2 && d <= TEXT_CARD_LIMIT;
   }
@@ -64,10 +79,13 @@ export function isLowCard(col: ColumnProfile): boolean {
 }
 
 export function isDate(col: ColumnProfile): boolean {
-  return (col.type === 'date' || col.type === 'time') && !!col.dateRange;
+  const t = valueTypeOf(col);
+  return (t === 'date' || t === 'time') && !!col.dateRange;
 }
 
-const toRoleCol = (col: ColumnProfile): RoleColumn => ({ id: col.columnId, name: col.name, type: col.type, distinct: categoryDistinct(col) ?? col.distinct });
+// The AI plans from these, so a formula is announced as the number or text it computes —
+// telling it a column's type is "formula" says nothing it can reason about.
+const toRoleCol = (col: ColumnProfile): RoleColumn => ({ id: col.columnId, name: col.name, type: valueTypeOf(col), distinct: categoryDistinct(col) ?? col.distinct });
 
 export interface ColumnRoles {
   numeric: RoleColumn[];

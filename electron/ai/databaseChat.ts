@@ -12,8 +12,25 @@ import type { DatabaseChatRequest, DatabaseColumn, DatabaseRow } from '@shared/t
 
 export type { DatabaseChatRequest };
 
-const SAMPLE_ROWS = 15;
+/**
+ * The sample only has to show what a row looks like — the profile is what answers questions —
+ * so it stays small enough to leave the profile the bulk of the context. Ollama runs models at
+ * a 4096-token window by default and silently drops the overflow, so a context that fits it is
+ * the difference between the chat working out of the box on a local model and refusing.
+ */
+const SAMPLE_ROWS = 10;
 const SAMPLE_COLS = 8;
+/**
+ * Longest a single value may be in the sample. Rows and columns were already bounded, but a
+ * cell was not: one `Descripcion visual` in a real catalogue runs to 3k characters, so 15
+ * rows became ~24k of a 27k context. That buried the profile the answers are supposed to come
+ * from, pushed the whole prompt past a local model's window, and left the model answering
+ * "15 rows" for a 7k-row table from the only thing it could still see. The sample exists to
+ * show the shape of a row, and a clipped value shows that just as well.
+ */
+const SAMPLE_VALUE_CHARS = 120;
+
+const clip = (v: string) => (v.length > SAMPLE_VALUE_CHARS ? `${v.slice(0, SAMPLE_VALUE_CHARS).trimEnd()}…` : v);
 
 /** One compact line per row: "col: value; …" resolving option labels. */
 function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
@@ -35,7 +52,7 @@ function sampleText(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
           else if (col.type === 'attachment') v = String((row.attachments?.[col.id] ?? []).length);
           else if (col.type === 'relation') v = String(row.relationCounts?.[col.id] ?? 0);
           else v = raw ?? '';
-          return v && v.trim() ? `${col.name}: ${v.trim()}` : '';
+          return v && v.trim() ? `${col.name}: ${clip(v.trim())}` : '';
         })
         .filter(Boolean);
       return `${i + 1}. ${parts.join('; ')}`;
@@ -53,7 +70,13 @@ export function buildDatabaseChatContext(databaseIds: string[]): { context: stri
     const columns = getColumns(id);
     const rows = listRows(id);
     const profile = computeProfile(columns, rows);
-    parts.push({ name: database.name, profileText: profileToText(database.name, profile), sample: sampleText(columns, rows) });
+    parts.push({
+      name: database.name,
+      profileText: profileToText(database.name, profile),
+      sample: sampleText(columns, rows),
+      rowCount: rows.length,
+      sampleSize: Math.min(rows.length, SAMPLE_ROWS),
+    });
     names.push(database.name);
   }
   return { context: buildDbChatContext(parts), names };

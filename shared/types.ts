@@ -3,6 +3,8 @@
 
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type { CsvImportPlanData } from './databaseCsv';
+import type { BulkAttachOptions } from './databaseBulk';
 import type {
   StudyAnnotation,
   StudyAnnotationInput,
@@ -4923,6 +4925,12 @@ export interface NodusApi {
   setDatabaseCell(rowId: string, columnId: string, raw: string | null): Promise<DatabaseRow | null>;
   listDatabaseAttachments(rowId: string, columnId: string): Promise<DatabaseAttachment[]>;
   getDatabaseAttachmentBlob(id: string): Promise<Uint8Array | null>;
+  /**
+   * The attachment's downscaled preview, falling back to the original when there is none.
+   * `mimeType` describes the returned bytes, which is not the attachment's own type when a
+   * thumb was generated.
+   */
+  getDatabaseAttachmentThumb(id: string): Promise<{ bytes: Uint8Array; mimeType: string | null } | null>;
   deleteDatabaseAttachment(id: string): Promise<void>;
   downloadDatabaseAttachment(id: string): Promise<{ canceled: boolean; path: string | null }>;
   pickAndAttachDatabaseFiles(
@@ -4948,15 +4956,22 @@ export interface NodusApi {
     query: string,
     databaseId?: string
   ): Promise<RelationTarget[]>;
-  parseCsvForImport(): Promise<
-    { fileName: string; headers: string[]; rows: string[][]; suggestedTypes: DatabaseColumnType[] } | null
-  >;
+  parseCsvForImport(): Promise<CsvImportPlanData | null>;
   createDatabaseFromCsv(
     name: string,
     headers: string[],
     rows: string[][],
-    types: DatabaseColumnType[]
+    types: (DatabaseColumnType | null)[]
   ): Promise<DatabaseSummary>;
+  /** Import the CSV held in the main process behind `token`. A null type discards the column. */
+  createDatabaseFromCsvToken(
+    token: string,
+    name: string,
+    types: (DatabaseColumnType | null)[]
+  ): Promise<DatabaseSummary>;
+  /** Drop a parsed CSV the user decided not to import, so its rows stop occupying memory. */
+  releaseCsvImport(token: string): Promise<void>;
+  onCsvImportProgress(cb: (p: { done: number; total: number; finished: boolean }) => void): () => void;
   exportDatabase(databaseId: string, format: 'csv' | 'json' | 'xlsx'): Promise<{ canceled: boolean; path?: string }>;
   getDatabaseProfile(databaseId: string): Promise<{ databaseName: string; profile: DatabaseProfile } | null>;
   analyzeDatabaseReport(databaseId: string): Promise<{ databaseName: string; profileText: string; report: string }>;
@@ -4974,12 +4989,13 @@ export interface NodusApi {
   createDatabaseView(databaseId: string, input: SavedViewInput): Promise<DatabaseSavedView>;
   updateDatabaseView(id: string, patch: Partial<SavedViewInput>): Promise<DatabaseSavedView | null>;
   deleteDatabaseView(id: string): Promise<void>;
-  pickBulkDatabaseFiles(): Promise<{ name: string; path: string }[]>;
+  pickBulkDatabaseFiles(mode?: 'files' | 'folder'): Promise<{ name: string; path: string }[]>;
   bulkAttachDatabaseFiles(
     databaseId: string,
     refColumnId: string,
     attachmentColumnId: string,
-    files: { name: string; path: string }[]
+    files: { name: string; path: string }[],
+    options?: BulkAttachOptions
   ): Promise<{ attached: number; matched: number; unmatched: number }>;
   onDatabaseBulkProgress(
     cb: (payload: { databaseId: string; done: number; total: number; attached: number; matched: number; finished: boolean }) => void

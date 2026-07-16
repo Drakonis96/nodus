@@ -16,7 +16,9 @@ import {
   aggregateRollup,
   type RollupFunction,
 } from '@shared/databases';
-import { splitMultiValue, normalizeCsvValue } from '@shared/databaseCsv';
+import { splitMultiValue, normalizeCsvValue, typeStoresImportedText } from '@shared/databaseCsv';
+import { computeFormulas } from '@shared/databaseFormulaEval';
+import type { FormulaSpec } from '@shared/databaseFormula';
 import type { DatabaseFilterState, DatabaseSavedView, SavedViewInput, SortRule } from '@shared/databaseFilters';
 import type {
   DatabaseAttachment,
@@ -546,7 +548,16 @@ export function listRows(
     const row = rowIndex.get(rowId);
     if (row) row.relationCounts = byCol;
   }
-  computeRollups(out, getColumns(databaseId));
+  const columns = getColumns(databaseId);
+  computeRollups(out, columns);
+  // Formulas run last: one may read a rollup, and they resolve their own inter-dependencies.
+  if (columns.some((c) => c.type === 'formula')) {
+    // Column statistics are defined over the whole table, so a caller asking for one page must
+    // not get a "% of total" measured against that page. Reload the full set for them — the
+    // recursive call is unpaginated, so it takes the cheap branch and cannot recurse again.
+    const paginated = opts.limit != null || opts.offset != null;
+    computeFormulas(out, columns, paginated ? listRows(databaseId) : out);
+  }
   return out;
 }
 
@@ -639,7 +650,16 @@ export function getRow(rowId: string): DatabaseRow | null {
     createdAt: meta.created_at,
     updatedAt: meta.updated_at,
   };
-  computeRollups([row], getColumns(meta.database_id));
+  const columns = getColumns(meta.database_id);
+  computeRollups([row], columns);
+  if (columns.some((c) => c.type === 'formula')) {
+    // getRow runs after every cell edit, so only reload the table when a formula genuinely
+    // needs it: a column statistic is the only recipe that looks beyond its own row.
+    const needsTable = columns.some(
+      (c) => c.type === 'formula' && (c.config.formula as FormulaSpec | undefined)?.kind === 'columnStat'
+    );
+    computeFormulas([row], columns, needsTable ? listRows(meta.database_id) : [row]);
+  }
   return row;
 }
 
@@ -727,6 +747,8 @@ export interface AddAttachmentInput {
   description?: string | null;
   aiGenerated?: boolean;
   aiPrompt?: string | null;
+  /** Downscaled preview for the grid/gallery; null for non-images. */
+  thumb?: Uint8Array | null;
 }
 
 export function addAttachment(input: AddAttachmentInput): DatabaseAttachment {
@@ -739,8 +761,8 @@ export function addAttachment(input: AddAttachmentInput): DatabaseAttachment {
     ) as { n: number }
   ).n;
   db.prepare(
-    `INSERT INTO db_attachments (id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash, extracted_text, description, ai_generated, ai_prompt, position, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO db_attachments (id, row_id, column_id, file_name, mime_type, bytes, blob, content_hash, extracted_text, description, ai_generated, ai_prompt, thumb, position, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     input.rowId,
@@ -754,6 +776,7 @@ export function addAttachment(input: AddAttachmentInput): DatabaseAttachment {
     input.description ?? null,
     input.aiGenerated ? 1 : 0,
     input.aiPrompt ?? null,
+    input.thumb ? Buffer.from(input.thumb) : null,
     position,
     now()
   );
@@ -775,6 +798,29 @@ export function getAttachmentBlob(id: string): Buffer | null {
     | { blob: Buffer | null }
     | undefined;
   return row?.blob ?? null;
+}
+
+/**
+ * The mime type of a stored thumb. attachmentThumb.ts encodes every preview as JPEG; it is
+ * named here rather than imported from there because that module pulls in Electron's
+ * nativeImage, and this repo has to stay importable from the pure-DB paths (and their
+ * esbuild bundles, e.g. the .nodussync package) that run outside the Electron runtime.
+ */
+const THUMB_MIME = 'image/jpeg';
+
+/**
+ * The attachment's preview image, falling back to the original when there is no thumb
+ * (non-image files, or attachments stored before thumbs existed). Reports the returned
+ * bytes' own mime type — a generated thumb is always JPEG whatever the original was, so
+ * the caller cannot infer it from the attachment's mime_type.
+ */
+export function getAttachmentThumb(id: string): { bytes: Buffer; mimeType: string | null } | null {
+  const row = getDb().prepare('SELECT thumb, blob, mime_type FROM db_attachments WHERE id = ?').get(id) as
+    | { thumb: Buffer | null; blob: Buffer | null; mime_type: string | null }
+    | undefined;
+  if (!row) return null;
+  if (row.thumb) return { bytes: row.thumb, mimeType: THUMB_MIME };
+  return row.blob ? { bytes: row.blob, mimeType: row.mime_type } : null;
 }
 
 export function listAttachments(rowId: string, columnId: string): DatabaseAttachment[] {
@@ -1181,46 +1227,81 @@ const IMPORT_OPTION_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#10b981', '#3b82
 /**
  * Create a database from parsed CSV rows with a per-column type mapping. Select /
  * multi-select columns build their options from the distinct values encountered.
+ *
+ * Columns whose type is null are skipped (the user discarded them in the import modal).
+ *
+ * This is a bulk path, so it deliberately bypasses createRow/addOption/setCell: those
+ * are tuned for single edits and each re-compiles its SQL, re-reads the column, bumps
+ * both timestamps and re-reads the whole row. At ~180k cells that overhead dominated
+ * (a 7k-row import took ~40s of blocked event loop). Here every statement is prepared
+ * once, positions come from a counter instead of SELECT MAX(position), and timestamps
+ * are stamped once for the batch.
  */
 export function createDatabaseFromCsv(
   name: string,
   headers: string[],
   rows: string[][],
-  types: DatabaseColumnType[]
+  types: (DatabaseColumnType | null)[],
+  onProgress?: (done: number, total: number) => void
 ): DatabaseSummary {
   const db = getDb();
   const database = createDatabase(name);
-  const cols = headers.map((h, i) => createColumn(database.id, h, columnTypeDef(types[i]).id));
+  // Keep the source column index alongside the created column so skipped columns don't
+  // shift the mapping between a row's cells and the columns we created.
+  const cols = headers
+    .map((h, i) => ({ sourceIndex: i, type: types[i] }))
+    .filter((c): c is { sourceIndex: number; type: DatabaseColumnType } => c.type != null)
+    .map((c) => ({ sourceIndex: c.sourceIndex, column: createColumn(database.id, headers[c.sourceIndex], c.type) }));
+
+  const insRow = db.prepare(
+    'INSERT INTO db_rows (id, database_id, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+  );
+  const insCell = db.prepare('INSERT INTO db_cells (row_id, column_id, value_text) VALUES (?, ?, ?)');
+  const insOption = db.prepare(
+    'INSERT INTO db_select_options (id, column_id, label, color, position) VALUES (?, ?, ?, ?, ?)'
+  );
+
   // For option columns, remember label→optionId as we go.
-  const optionMaps = cols.map((c) => (c.type === 'select' || c.type === 'multi_select' ? new Map<string, string>() : null));
+  const optionMaps = cols.map((c) =>
+    c.column.type === 'select' || c.column.type === 'multi_select' ? new Map<string, string>() : null
+  );
   const optionId = (colIdx: number, label: string): string => {
     const map = optionMaps[colIdx]!;
     const key = label.toLowerCase();
     let id = map.get(key);
     if (!id) {
       const color = IMPORT_OPTION_COLORS[map.size % IMPORT_OPTION_COLORS.length];
-      id = addOption(cols[colIdx].id, label, color).id;
+      id = newId('dopt');
+      insOption.run(id, cols[colIdx].column.id, label.trim() || 'Opción', color, map.size);
       map.set(key, id);
     }
     return id;
   };
 
+  const ts = now();
   const tx = db.transaction(() => {
-    for (const rawRow of rows) {
-      const row = createRow(database.id);
-      cols.forEach((col, i) => {
-        const raw = (rawRow[i] ?? '').trim();
-        if (!raw) return;
-        if (col.type === 'select') {
-          setCell(row.id, col.id, optionId(i, raw));
-        } else if (col.type === 'multi_select') {
-          const ids = splitMultiValue(raw).map((label) => optionId(i, label));
-          setCell(row.id, col.id, encodeMultiSelect(ids));
+    for (let r = 0; r < rows.length; r++) {
+      const rawRow = rows[r];
+      const rowId = newId('drow');
+      insRow.run(rowId, database.id, r, ts, ts);
+      for (let i = 0; i < cols.length; i++) {
+        const { sourceIndex, column } = cols[i];
+        // attachment/ai_image/relation/rollup keep their value outside db_cells, so an
+        // imported string has nowhere to land: create the column, leave the cells empty.
+        if (!typeStoresImportedText(column.type)) continue;
+        const raw = (rawRow[sourceIndex] ?? '').trim();
+        if (!raw) continue;
+        let value: string | null;
+        if (column.type === 'select') {
+          value = optionId(i, raw);
+        } else if (column.type === 'multi_select') {
+          value = encodeMultiSelect(splitMultiValue(raw).map((label) => optionId(i, label)));
         } else {
-          const v = normalizeCsvValue(col.type, raw);
-          if (v != null) setCell(row.id, col.id, v);
+          value = normalizeCellValue(column.type, normalizeCsvValue(column.type, raw));
         }
-      });
+        if (value != null) insCell.run(rowId, column.id, value);
+      }
+      if (onProgress && (r % 500 === 0 || r === rows.length - 1)) onProgress(r + 1, rows.length);
     }
   });
   tx();

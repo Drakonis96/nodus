@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AiBadge, Icon } from '../components/ui';
 import { VirtualList } from '../components/VirtualList';
@@ -14,9 +15,10 @@ import {
   OPTION_COLORS,
   ROW_HEIGHT,
   TextCell,
+  anchorStyle,
   useAnchoredCoords,
 } from '../components/dbGrid';
-import { confirm, toast } from '../components/feedback';
+import { confirm, promptText, toast } from '../components/feedback';
 import { notifyDataChanged } from '../hooks';
 import { t, tx } from '../i18n';
 import {
@@ -30,13 +32,13 @@ import {
   type RollupFunction,
 } from '@shared/databases';
 import { AI_COLUMN_PRESETS } from '@shared/databaseAi';
-import { matchFilesToRows } from '@shared/databaseBulk';
+import { matchFilesToRows, summarizeMatches, codeTemplateToRegex } from '@shared/databaseBulk';
+import type { CsvImportPlanData } from '@shared/databaseCsv';
 import {
   applyDatabaseFilter,
   sortDatabaseRows,
   isFilterActive,
-  operatorsForType,
-  isColumnFilterable,
+  operatorsForColumn,
   opNeedsValue,
   opLabel,
   type DatabaseFilterState,
@@ -45,6 +47,24 @@ import {
   type FilterGroup,
   type SortRule,
 } from '@shared/databaseFilters';
+import {
+  ARITHMETIC_OPS,
+  COLUMN_STAT_FNS,
+  FORMULA_RECIPES,
+  comparableType,
+  emptyFormula,
+  formulaResultKind,
+  isNumericSource,
+  validateFormula,
+  type ConcatPart,
+  type FormulaColorRule,
+  type FormulaKind,
+  type FormulaOperand,
+  type FormulaOutput,
+  type FormulaRule,
+  type FormulaSpec,
+} from '@shared/databaseFormula';
+import { computeFormulas, describeFormula } from '@shared/databaseFormulaEval';
 import type {
   DatabaseAttachment,
   DatabaseColumn,
@@ -154,8 +174,14 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
   }, []);
   const saveAsView = useCallback(async () => {
     if (!databaseId) return;
-    const name = window.prompt(t('Nombre de la vista'), t('Nueva vista'));
-    if (!name || !name.trim()) return;
+    // Electron has no window.prompt (it returns null without showing anything), so this
+    // button did nothing at all until it asked through the app's own dialog.
+    const name = await promptText({
+      title: t('Guardar vista'),
+      message: t('La vista recuerda el diseño, los filtros y el orden que tienes ahora.'),
+      initial: t('Nueva vista'),
+    });
+    if (!name) return;
     const v = await window.nodus.createDatabaseView(databaseId, { name: name.trim(), layout: viewMode, filter, sorts });
     await reloadViews();
     setActiveViewId(v.id);
@@ -340,6 +366,24 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
     },
     [rows, persistWidth]
   );
+  /**
+   * Forget a column's stored width so it falls back to the default for its type. Fitting to
+   * content writes a width computed from the data, and until this existed there was no way
+   * back from it — dragging could approximate the old size but never restore it.
+   */
+  const resetColumnWidth = useCallback(
+    async (col: DatabaseColumn) => {
+      setWidthOverrides((prev) => {
+        const next = { ...prev };
+        delete next[col.id];
+        return next;
+      });
+      const { width: _width, ...rest } = col.config;
+      await window.nodus.updateDatabaseColumn(col.id, { config: rest });
+      await reloadColumns();
+    },
+    [reloadColumns]
+  );
   const reorderColumn = useCallback(
     async (fromId: string, toId: string) => {
       if (fromId === toId || !databaseId) return;
@@ -474,19 +518,25 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
                 <ColumnHeader
                   key={col.id}
                   column={col}
+                  columns={columns}
+                  rows={rows}
                   width={widthOf(col)}
                   onChanged={reloadColumnsAndRows}
                   onResizeStart={(x) => startResize(col, x)}
                   onFit={() => fitColumn(col)}
+                  onResetWidth={() => void resetColumnWidth(col)}
                   onReorder={reorderColumn}
                 />
               ))}
               <AddColumnButton onAdd={addColumn} />
             </div>
 
-            {/* Body */}
+            {/* Body. overflow-x-hidden matters: VirtualList sets overflow-y, which CSS promotes
+                the other axis to `auto`, so once the vertical scrollbar appears it eats ~15px of
+                width, the rows no longer fit, and a SECOND horizontal scrollbar shows up under
+                the one this container already provides. Only the outer div scrolls sideways. */}
             <VirtualList
-              className="flex-1 min-h-0"
+              className="flex-1 min-h-0 overflow-x-hidden"
               items={visibleRows}
               itemHeight={ROW_HEIGHT}
               getKey={(r) => r.id}
@@ -524,6 +574,8 @@ export function DatabasesView({ databaseId, onDatabasesChanged, onCreateDatabase
                       width={widthOf(col)}
                       value={row.cells[col.id] ?? null}
                       rollup={row.rollups?.[col.id] ?? ''}
+                      formulaColor={row.formulaColors?.[col.id]}
+                      formulaError={row.formulaErrors?.[col.id]}
                       rowId={row.id}
                       attachments={row.attachments?.[col.id] ?? []}
                       onChange={(raw) => void setCell(row.id, col.id, raw)}
@@ -605,13 +657,17 @@ function ExportButton({ databaseId }: { databaseId: string }) {
 
 // ── Filter + sort ─────────────────────────────────────────────────────────────
 
-function newFilterCondition(filterable: DatabaseColumn[]): FilterCondition {
+export function newFilterCondition(filterable: DatabaseColumn[]): FilterCondition {
   const col = filterable[0];
-  return { id: `fc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, columnId: col.id, op: operatorsForType(col.type)[0], value: null };
+  return { id: `fc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, columnId: col.id, op: operatorsForColumn(col)[0], value: null };
 }
 
-/** One condition row (column · operator · value), reused at the top level and in groups. */
-function ConditionRow({
+/**
+ * One condition row (column · operator · value), reused at the top level, in filter groups
+ * and by the formula editor's "Si… entonces…" rules — so a condition is written the same way
+ * everywhere in the app and is only learned once.
+ */
+export function ConditionRow({
   cond,
   first,
   conjunction,
@@ -620,6 +676,8 @@ function ConditionRow({
   onUpdate,
   onRemove,
   onToggleConjunction,
+  firstLabel,
+  labelClass,
 }: {
   cond: FilterCondition;
   first: boolean;
@@ -629,14 +687,18 @@ function ConditionRow({
   onUpdate: (patch: Partial<FilterCondition>) => void;
   onRemove: () => void;
   onToggleConjunction: () => void;
+  /** Leading word for the first row ("Donde" in a filter, "Si" in a formula rule), translated. */
+  firstLabel?: string;
+  /** Gutter for that leading word; widen it so a row lines up with its neighbours. */
+  labelClass?: string;
 }) {
   const col = byId.get(cond.columnId);
-  const ops = col ? operatorsForType(col.type) : [];
+  const ops = col ? operatorsForColumn(col) : [];
   return (
-    <div className="flex items-center gap-1">
-      <span className="w-10 text-[11px] text-neutral-500 text-right shrink-0">
+    <div className="flex items-center gap-1.5">
+      <span className={labelClass ?? 'w-10 text-[11px] text-neutral-500 text-right shrink-0'}>
         {first ? (
-          t('Donde')
+          (firstLabel ?? t('Donde'))
         ) : (
           <button className="text-indigo-400 hover:underline" onClick={onToggleConjunction}>
             {conjunction === 'and' ? t('Y') : t('O')}
@@ -648,7 +710,7 @@ function ConditionRow({
         value={cond.columnId}
         onChange={(e) => {
           const nc = byId.get(e.target.value);
-          onUpdate({ columnId: e.target.value, op: nc ? operatorsForType(nc.type)[0] : cond.op, value: null });
+          onUpdate({ columnId: e.target.value, op: nc ? operatorsForColumn(nc)[0] : cond.op, value: null });
         }}
       >
         {filterable.map((c) => (
@@ -665,7 +727,11 @@ function ConditionRow({
         ))}
       </select>
       {col && opNeedsValue(cond.op) && <FilterValueInput column={col} cond={cond} onChange={(value) => onUpdate({ value })} />}
-      <button className="text-neutral-600 hover:text-red-400 shrink-0" onClick={onRemove}>
+      <button
+        className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-neutral-600 hover:text-red-400 hover:bg-neutral-800"
+        title={t('Quitar')}
+        onClick={onRemove}
+      >
         <Icon name="x" size={13} />
       </button>
     </div>
@@ -682,7 +748,7 @@ function FilterButton({
   onChange: (f: DatabaseFilterState) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const filterable = columns.filter((c) => isColumnFilterable(c.type));
+  const filterable = columns.filter((c) => operatorsForColumn(c).length > 0);
   const byId = new Map(columns.map((c) => [c.id, c]));
   const groups = filter.groups ?? [];
   const activeCount = filter.conditions.length + groups.reduce((n, g) => n + g.conditions.length, 0);
@@ -813,7 +879,9 @@ function FilterValueInput({ column, cond, onChange }: { column: DatabaseColumn; 
       </select>
     );
   }
-  const inputType = column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : column.type === 'time' ? 'time' : 'text';
+  // A formula column takes the input its result deserves — a number box for a numeric one.
+  const ct = comparableType(column);
+  const inputType = ct === 'number' ? 'number' : ct === 'date' ? 'date' : ct === 'time' ? 'time' : 'text';
   return (
     <input
       className="input text-xs w-32"
@@ -899,31 +967,45 @@ function BulkUploadModal({
   const [files, setFiles] = useState<{ name: string; path: string }[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [running, setRunning] = useState(false);
+  const [fuzzy, setFuzzy] = useState(false);
+  const [codeTemplate, setCodeTemplate] = useState('');
+  const [ocr, setOcr] = useState(false);
+  const [describe, setDescribe] = useState(false);
 
   useEffect(() => window.nodus.onDatabaseBulkProgress((p) => {
     if (p.databaseId === databaseId) setProgress({ done: p.done, total: p.total });
   }), [databaseId]);
 
   const matches = useMemo(
-    () => (refId ? matchFilesToRows(files.map((f) => f.name), rows.map((r) => ({ rowId: r.id, refValue: r.cells[refId] ?? null }))) : []),
-    [files, refId, rows]
+    () =>
+      refId
+        ? matchFilesToRows(
+            files.map((f) => f.name),
+            rows.map((r) => ({ rowId: r.id, refValue: r.cells[refId] ?? null })),
+            { fuzzy, codePattern: codeTemplate.trim() ? codeTemplateToRegex(codeTemplate) : null }
+          )
+        : [],
+    [files, refId, rows, fuzzy, codeTemplate]
   );
-  const matched = matches.filter((m) => m.rowId).length;
+  const summary = useMemo(() => summarizeMatches(matches), [matches]);
+  const matched = matches.length - summary.unmatched;
+  const badTemplate = codeTemplate.trim().length > 0 && codeTemplateToRegex(codeTemplate) == null;
 
-  const pick = async () => {
-    const picked = await window.nodus.pickBulkDatabaseFiles();
+  const pick = async (mode: 'files' | 'folder') => {
+    const picked = await window.nodus.pickBulkDatabaseFiles(mode);
     if (picked.length) setFiles(picked);
   };
   const run = async (background: boolean) => {
     if (!refId || !attId || files.length === 0) return;
+    const opts = { ocr, describe, fuzzy, codeTemplate: codeTemplate.trim() || null };
     setRunning(true);
     if (background) {
-      void window.nodus.bulkAttachDatabaseFiles(databaseId, refId, attId, files);
+      void window.nodus.bulkAttachDatabaseFiles(databaseId, refId, attId, files, opts);
       toast(t('Subida en segundo plano…'));
       onClose();
       return;
     }
-    await window.nodus.bulkAttachDatabaseFiles(databaseId, refId, attId, files);
+    await window.nodus.bulkAttachDatabaseFiles(databaseId, refId, attId, files, opts);
     setRunning(false);
     onDone();
     onClose();
@@ -942,11 +1024,17 @@ function BulkUploadModal({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
           <p className="text-xs text-neutral-500">
-            {t('Sube muchos archivos y se emparejarán con las filas comparando el nombre del archivo con una columna de referencia.')}
+            {t('Elige archivos o una carpeta completa. Nodus empareja cada archivo con su fila por el nombre exacto y, si no, por el código del catálogo que compartan (LV001-FG001).')}
           </p>
-          <button className="btn btn-ghost border border-neutral-700 gap-1.5 self-start" onClick={() => void pick()}>
-            <Icon name="folderPlus" /> {files.length ? tx('{n} archivos elegidos', { n: files.length }) : t('Elegir archivos')}
-          </button>
+          <div className="flex gap-2">
+            <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => void pick('files')}>
+              <Icon name="folderPlus" /> {t('Elegir archivos')}
+            </button>
+            <button className="btn btn-ghost border border-neutral-700 gap-1.5" onClick={() => void pick('folder')}>
+              <Icon name="folderPlus" /> {t('Elegir carpeta')}
+            </button>
+            {files.length > 0 && <span className="text-xs text-neutral-500 self-center">{tx('{n} archivos', { n: files.length.toLocaleString() })}</span>}
+          </div>
           <div>
             <label className="text-xs text-neutral-500">{t('Columna de referencia (nombre del archivo)')}</label>
             <select className="input w-full mt-1" value={refId} onChange={(e) => setRefId(e.target.value)}>
@@ -967,8 +1055,62 @@ function BulkUploadModal({
               ))}
             </select>
           </div>
+          <div>
+            <label className="text-xs text-neutral-500">{t('Código en el nombre (opcional)')}</label>
+            <input
+              className={`input w-full mt-1 ${badTemplate ? 'border-red-500' : ''}`}
+              placeholder={t('Ej.: @@###-@@### · # dígito, @ letra, * cualquier cosa')}
+              value={codeTemplate}
+              onChange={(e) => setCodeTemplate(e.target.value)}
+            />
+            <p className="text-[11px] text-neutral-600 mt-1">
+              {badTemplate ? t('Ese patrón no es válido.') : t('Déjalo vacío para detectar el código automáticamente.')}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-neutral-400">
+            <input type="checkbox" checked={fuzzy} onChange={(e) => setFuzzy(e.target.checked)} />
+            {t('Emparejar también por parecido del nombre (menos preciso)')}
+          </label>
+          {summary.fuzzyDeclined && (
+            <p className="text-[11px] text-amber-400 -mt-1.5">
+              {t('Hay demasiados archivos sin pareja para compararlos por parecido. Revisa la columna de referencia o el código.')}
+            </p>
+          )}
+          <div className="border-t border-neutral-800 pt-3">
+            <p className="text-xs text-neutral-500 mb-2">{t('Al adjuntar, además de guardar el archivo:')}</p>
+            <label className="flex items-center gap-2 text-xs text-neutral-400 mb-1.5">
+              <input type="checkbox" checked={ocr} onChange={(e) => setOcr(e.target.checked)} />
+              {t('Extraer el texto (OCR)')}
+            </label>
+            <label className="flex items-center gap-2 text-xs text-neutral-400">
+              <input type="checkbox" checked={describe} onChange={(e) => setDescribe(e.target.checked)} />
+              {t('Describir cada imagen con IA')}
+            </label>
+            {(ocr || describe) && files.length > 200 && (
+              <p className="text-[11px] text-amber-400 mt-1.5">
+                {tx('Con {n} archivos esto puede tardar horas. Puedes adjuntarlos ahora y hacerlo después por columnas.', {
+                  n: files.length.toLocaleString(),
+                })}
+              </p>
+            )}
+          </div>
           {files.length > 0 && (
-            <p className="text-xs text-neutral-400">{tx('{m} de {n} archivos coinciden con una fila.', { m: matched, n: files.length })}</p>
+            <div className="text-xs text-neutral-400">
+              <p>{tx('{m} de {n} archivos coinciden con una fila.', { m: matched.toLocaleString(), n: files.length.toLocaleString() })}</p>
+              <p className="text-[11px] text-neutral-600 mt-0.5">
+                {tx('Por nombre exacto: {e} · por código: {c} · por parecido: {f} · sin pareja: {u}', {
+                  e: summary.exact.toLocaleString(),
+                  c: summary.code.toLocaleString(),
+                  f: summary.fuzzy.toLocaleString(),
+                  u: summary.unmatched.toLocaleString(),
+                })}
+              </p>
+              {summary.unmatched > 0 && (
+                <p className="text-[11px] text-neutral-600 mt-0.5 truncate" title={matches.filter((m) => !m.rowId).map((m) => m.fileName).join(', ')}>
+                  {tx('Sin pareja: {list}', { list: matches.filter((m) => !m.rowId).slice(0, 3).map((m) => m.fileName).join(', ') })}
+                </p>
+              )}
+            </div>
           )}
           {progress && (
             <div className="h-2 rounded bg-neutral-800 overflow-hidden">
@@ -1078,7 +1220,7 @@ function GalleryView({
               </button>
             </div>
           </div>
-          <div className="grid gap-3 items-start" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
             {rows.map((row) => (
               <GalleryCard key={row.id} row={row} columns={columns} chipCols={chipCols} fit={fit} onOpen={() => onOpen(row.id)} />
             ))}
@@ -1117,10 +1259,13 @@ function GalleryCard({
           <Icon name="table" size={26} className="text-neutral-700" />
         )}
       </div>
-      <div className="p-2.5 min-w-0">
-        <div className="font-medium text-sm truncate">{rowTitle(row, columns)}</div>
+      {/* Fixed height, not just a fixed square above it: a card with two rows of chips used to
+          be taller than one with none, so the grid came out ragged. Every card is now the same
+          box and the content is clipped inside it. */}
+      <div className="p-2.5 min-w-0 h-[4.25rem] flex flex-col gap-1.5 overflow-hidden">
+        <div className="font-medium text-sm truncate shrink-0">{rowTitle(row, columns)}</div>
         {chipCols.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5 max-h-[3.5rem] overflow-hidden">
+          <div className="flex flex-wrap gap-1 min-h-0 overflow-hidden">
             {chipCols.flatMap((col) => {
               const ids = col.type === 'multi_select' ? decodeMultiSelect(row.cells[col.id] ?? null) : row.cells[col.id] ? [row.cells[col.id]!] : [];
               return ids
@@ -1269,6 +1414,8 @@ function RecordField({
   if (col.type === 'ai') return <AiCell column={col} rowId={row.id} value={value} onRan={onAttachmentsChanged} />;
   if (col.type === 'relation') return <RelationCell column={col} rowId={row.id} />;
   if (col.type === 'rollup') return <RollupCell value={row.rollups?.[col.id] ?? ''} />;
+  if (col.type === 'formula')
+    return <FormulaCell column={col} value={value} color={row.formulaColors?.[col.id]} error={row.formulaErrors?.[col.id]} large />;
   if (col.type === 'number' || col.type === 'date' || col.type === 'time')
     return <TextCell value={value} onChange={onChange} inputType={col.type} />;
   return <LongTextCell value={value} onChange={onChange} markdown={col.type === 'text'} />;
@@ -1312,35 +1459,48 @@ function DatabaseTitle({ name, onRename }: { name: string; onRename: (name: stri
 
 function ColumnHeader({
   column,
+  columns,
+  rows,
   width,
   onChanged,
   onResizeStart,
   onFit,
+  onResetWidth,
   onReorder,
 }: {
   column: DatabaseColumn;
+  /** Siblings + rows: a formula is built out of the other columns and previewed on real rows. */
+  columns: DatabaseColumn[];
+  rows: DatabaseRow[];
   width: number;
   onChanged: () => void;
   onResizeStart: (clientX: number) => void;
   onFit: () => void;
+  onResetWidth: () => void;
   onReorder: (fromId: string, toId: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  // Lifted out of FormulaColumnConfig so switching the type can open the editor too.
+  const [formulaOpen, setFormulaOpen] = useState(false);
   const def = columnTypeDef(column.type);
 
   const rename = async () => {
-    const name = window.prompt(t('Nombre de la columna'), column.name);
-    if (name && name.trim()) {
-      await window.nodus.updateDatabaseColumn(column.id, { name: name.trim() });
-      onChanged();
-    }
     setMenuOpen(false);
+    // Same as the saved-view name: window.prompt is a no-op in Electron.
+    const name = await promptText({ title: t('Renombrar columna'), initial: column.name });
+    if (!name) return;
+    await window.nodus.updateDatabaseColumn(column.id, { name: name.trim() });
+    onChanged();
   };
   const changeType = async (type: DatabaseColumnType) => {
     await window.nodus.updateDatabaseColumn(column.id, { type });
     onChanged();
     setMenuOpen(false);
+    // A formula does nothing until it has a recipe, so picking the type is really the first
+    // step of building one: open the editor rather than leaving an inert column behind and
+    // making the user find the button that configures it.
+    if (type === 'formula' && !column.config.formula) setFormulaOpen(true);
   };
   const remove = async () => {
     setMenuOpen(false);
@@ -1378,9 +1538,11 @@ function ColumnHeader({
         <span className="truncate flex-1">{column.name}</span>
         <Icon name="chevronDown" size={12} className="opacity-40 shrink-0" />
       </button>
-      {/* Resize handle: drag to set width, double-click to fit to content. */}
+      {/* Resize handle: drag to set width, double-click to fit to content. Straddles the
+          column's own border (translate-x-1/2) instead of sitting inside it, so the line you
+          grab is the line you see rather than one a few pixels to its left. */}
       <div
-        className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-indigo-500/40"
+        className="absolute top-0 right-0 z-10 h-full w-1.5 translate-x-1/2 cursor-col-resize hover:bg-indigo-500/40"
         onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -1408,10 +1570,33 @@ function ColumnHeader({
             >
               <Icon name="fit" size={13} /> {t('Ajustar al contenido')}
             </button>
+            {/* Only offered once a width has actually been stored, so it appears exactly when
+                there is something to undo — fitting to content had no way back otherwise. */}
+            {typeof column.config.width === 'number' && (
+              <button
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-neutral-800 flex items-center gap-2"
+                onClick={() => {
+                  onResetWidth();
+                  setMenuOpen(false);
+                }}
+              >
+                <Icon name="undo" size={13} /> {t('Restablecer ancho')}
+              </button>
+            )}
             {column.type === 'ai' && <AiColumnConfig column={column} onChanged={onChanged} />}
             {column.type === 'ai_image' && <AiImageColumnConfig column={column} onChanged={onChanged} />}
             {column.type === 'relation' && <RelationColumnConfig column={column} onChanged={onChanged} />}
             {column.type === 'rollup' && <RollupColumnConfig column={column} onChanged={onChanged} />}
+            {column.type === 'formula' && (
+              <FormulaColumnConfig
+                column={column}
+                columns={columns}
+                onEdit={() => {
+                  setMenuOpen(false);
+                  setFormulaOpen(true);
+                }}
+              />
+            )}
             {def.hasOptions && (
               <OptionsManager column={column} onChanged={onChanged} />
             )}
@@ -1436,6 +1621,18 @@ function ColumnHeader({
             </div>
           </div>
         </>
+      )}
+      {formulaOpen && (
+        <FormulaEditorModal
+          column={column}
+          columns={columns}
+          rows={rows}
+          onClose={() => setFormulaOpen(false)}
+          onSaved={() => {
+            setFormulaOpen(false);
+            onChanged();
+          }}
+        />
       )}
     </div>
   );
@@ -1573,6 +1770,8 @@ function Cell({
   width,
   value,
   rollup,
+  formulaColor,
+  formulaError,
   rowId,
   attachments,
   onChange,
@@ -1583,6 +1782,8 @@ function Cell({
   width: number;
   value: string | null;
   rollup?: string;
+  formulaColor?: string;
+  formulaError?: string;
   rowId: string;
   attachments: DatabaseAttachment[];
   onChange: (raw: string | null) => void;
@@ -1591,7 +1792,9 @@ function Cell({
 }) {
   return (
     <div style={{ width }} className="shrink-0 border-r border-neutral-900 overflow-hidden">
-      {column.type === 'checkbox' ? (
+      {column.type === 'formula' ? (
+        <FormulaCell column={column} value={value} color={formulaColor} error={formulaError} />
+      ) : column.type === 'checkbox' ? (
         <CheckboxCell value={value} onChange={onChange} />
       ) : column.type === 'select' ? (
         <SelectCell column={column} value={value} onChange={onChange} onOptionsChanged={onOptionsChanged} multi={false} />
@@ -1677,7 +1880,7 @@ function SelectOptionRow({
         createPortal(
           <>
             <div className="fixed inset-0 z-[60]" onClick={() => void rename().then(() => setMenuOpen(false))} />
-            <div className="fixed z-[61] card-modal p-2 text-sm" style={{ top: coords.top, left: coords.left, width: coords.width }}>
+            <div className="fixed z-[61] card-modal p-2 text-sm" style={anchorStyle(coords)}>
               <input
                 className="input w-full py-1 text-xs mb-2"
                 value={name}
@@ -1806,7 +2009,7 @@ function SelectCell({
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div
               className="fixed z-50 card-modal p-2 text-sm"
-              style={{ top: coords.top, left: coords.left, width: coords.width }}
+              style={anchorStyle(coords)}
             >
             {/* Selected values as removable chips (Notion-style). */}
             {selected.length > 0 && (
@@ -2192,7 +2395,7 @@ function RelationCell({ column, rowId }: { column: DatabaseColumn; rowId: string
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div
               className="fixed z-50 card-modal p-2 text-sm"
-              style={{ top: coords.top, left: coords.left, width: coords.width }}
+              style={anchorStyle(coords)}
             >
             {missingTargetDb ? (
               <p className="text-xs text-neutral-500 px-1 py-1">{t('Configura la base de datos destino en la cabecera de la columna.')}</p>
@@ -2258,6 +2461,697 @@ function RollupCell({ value }: { value: string }) {
         {value}
       </span>
     </div>
+  );
+}
+
+/**
+ * A formula's result. Read-only by nature — it is computed, so there is nothing to type into.
+ * A colour from an "Si… entonces…" rule (or a colour rule) becomes a tinted pill, which is the
+ * whole point of the traffic-light use case; an unrunnable formula says so instead of a blank.
+ */
+function FormulaCell({
+  column,
+  value,
+  color,
+  error,
+  large = false,
+}: {
+  column: DatabaseColumn;
+  value: string | null;
+  color?: string;
+  error?: string;
+  large?: boolean;
+}) {
+  const numeric = comparableType(column) === 'number';
+  const text = value == null || value === '' ? '' : numeric ? formatFormulaNumber(value, column) : value;
+  if (error) {
+    return (
+      <div className={`w-full ${large ? '' : 'h-full'} px-2 flex items-center gap-1 overflow-hidden text-xs text-amber-400`} title={error}>
+        <Icon name="alert" size={12} className="shrink-0" />
+        <span className="truncate">{t(error)}</span>
+      </div>
+    );
+  }
+  return (
+    // Numbers stay right-aligned whether or not a rule painted them: a column where the
+    // coloured values drift left and the rest stay right reads as two different columns.
+    <div className={`w-full ${large ? '' : 'h-full'} px-2 flex items-center overflow-hidden text-sm ${numeric ? 'justify-end' : ''}`}>
+      {color ? (
+        <span
+          className="truncate rounded px-1.5 py-0.5 text-xs font-medium"
+          style={{ backgroundColor: `${color}26`, color }}
+          title={text}
+        >
+          {text || '—'}
+        </span>
+      ) : (
+        <span className="truncate text-neutral-300" title={text}>
+          {text || <span className="text-neutral-600">—</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Show a computed number at the column's chosen precision. The cell stores the true value —
+ * rounding lives here so that a "% of total" still adds up to 100 no matter how few decimals
+ * the user wants to look at.
+ */
+function formatFormulaNumber(raw: string, column: DatabaseColumn): string {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return raw;
+  const decimals = typeof column.config.formulaDecimals === 'number' ? column.config.formulaDecimals : 2;
+  return n.toLocaleString(undefined, { maximumFractionDigits: decimals });
+}
+
+// ── Formula editor ────────────────────────────────────────────────────────────
+
+const newId = (p: string) => `${p}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * Layout grammar for the formula editor. Every block in the modal is built from these, so the
+ * fields line up in a single column, the leading words of stacked rows share one gutter, and
+ * the spacing is decided once instead of per-component. Written down because the editor grew
+ * one ad-hoc `w-24`/`w-36`/`mt-1.5` at a time and stopped looking like one screen.
+ */
+/** Leading word of a control row ("Si", "mostrar", "si no"), sized so rows align vertically. */
+const FROW_LABEL = 'w-16 shrink-0 text-right text-[11px] text-neutral-500';
+/** The trailing remove button of a repeatable row, so every row ends the same way. */
+const FROW_REMOVE = 'shrink-0 w-6 h-6 flex items-center justify-center rounded text-neutral-600 hover:text-red-400 hover:bg-neutral-800';
+/** A narrow leading select (kind pickers) — one width for all of them. */
+const FSELECT_LEAD = 'input text-xs w-32 shrink-0';
+
+/** One labelled control with an optional hint: the only way this modal presents a field. */
+function FormulaField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium text-neutral-400">{label}</label>
+      {children}
+      {hint && <p className="text-[11px] leading-snug text-neutral-500">{hint}</p>}
+    </div>
+  );
+}
+
+/** A boxed group of rows (rules, operands, colours) — one border, one padding, everywhere. */
+function FormulaBox({ children }: { children: ReactNode }) {
+  return <div className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-2.5 flex flex-col gap-2">{children}</div>;
+}
+
+/** The single "add another one of these" button style. */
+function FormulaAdd({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <button className="btn btn-ghost border border-neutral-700 self-start gap-1 text-xs h-7 px-2" onClick={onClick}>
+      <Icon name="plus" size={12} /> {children}
+    </button>
+  );
+}
+
+/** Why a recipe cannot be built yet — same shape wherever it appears. */
+function FormulaNotice({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-lg border border-amber-900/50 bg-amber-950/20 p-2.5 text-xs text-amber-400">
+      <Icon name="alert" size={13} className="mt-px shrink-0" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+/** Column-header entry point: the builder itself needs room, so it opens a modal. */
+function FormulaColumnConfig({ column, columns, onEdit }: { column: DatabaseColumn; columns: DatabaseColumn[]; onEdit: () => void }) {
+  const spec = column.config.formula as FormulaSpec | undefined;
+  const summary = spec ? describeFormula(spec, columns, t) : t('Sin fórmula todavía');
+  return (
+    <div className="px-2 py-1.5 border-t border-neutral-800">
+      <button className="btn btn-ghost border border-neutral-700 w-full gap-1.5 text-xs" onClick={onEdit}>
+        <Icon name="sigma" size={13} className="text-indigo-400" /> {spec ? t('Editar fórmula') : t('Crear fórmula')}
+      </button>
+      <p className="mt-1 text-[10px] text-neutral-500 line-clamp-2" title={summary}>
+        {summary}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The visual formula builder. Everything here exists to keep the user out of a syntax:
+ * they pick a recipe, then point at columns by name, and see the answer on their own rows
+ * as they go. Nothing is typed that could be mistyped.
+ */
+function FormulaEditorModal({
+  column,
+  columns,
+  rows,
+  onClose,
+  onSaved,
+}: {
+  column: DatabaseColumn;
+  columns: DatabaseColumn[];
+  rows: DatabaseRow[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [spec, setSpec] = useState<FormulaSpec | null>((column.config.formula as FormulaSpec | undefined) ?? null);
+  const [colors, setColors] = useState<FormulaColorRule[]>((column.config.formulaColors as FormulaColorRule[] | undefined) ?? []);
+  const [decimals, setDecimals] = useState<number>(
+    typeof column.config.formulaDecimals === 'number' ? column.config.formulaDecimals : 2
+  );
+  const [busy, setBusy] = useState(false);
+
+  // Never let a formula read itself: it is the one column that cannot be an operand.
+  const others = useMemo(() => columns.filter((c) => c.id !== column.id), [columns, column.id]);
+  const problem = spec ? validateFormula(spec, columns) : t('Elige qué quieres calcular.');
+  const resultIsNumber = spec ? formulaResultKind(spec) === 'number' : false;
+
+  /**
+   * A column statistic is the only recipe that looks past its own row, so it is the only one
+   * that needs a copy of the whole table to preview. Keeping this out of the preview memo
+   * matters: it is keyed on `spec`, and copying 7k rows on every keystroke in a rule's text
+   * box is exactly the kind of lag this editor exists to avoid.
+   */
+  const statRows = useMemo(() => {
+    const needsTable =
+      spec?.kind === 'columnStat' ||
+      others.some((c) => c.type === 'formula' && (c.config.formula as FormulaSpec | undefined)?.kind === 'columnStat');
+    return needsTable ? rows.map((r) => ({ ...r, cells: { ...r.cells } })) : null;
+  }, [spec?.kind, others, rows]);
+
+  const preview = useMemo(() => {
+    if (!spec || validateFormula(spec, columns)) return [];
+    // Evaluate against copies so the real grid is untouched while the user is still deciding.
+    const sample = rows.slice(0, 5).map((r) => ({ ...r, cells: { ...r.cells }, formulaColors: undefined, formulaErrors: undefined }));
+    const draft: DatabaseColumn = {
+      ...column,
+      type: 'formula',
+      config: { ...column.config, formula: spec, formulaColors: colors, formulaDecimals: decimals },
+    };
+    try {
+      computeFormulas(sample, [...others, draft], statRows ?? sample);
+    } catch {
+      return [];
+    }
+    // Format exactly as the grid will, so the preview is a promise and not an approximation.
+    return sample.map((r) => {
+      const raw = r.cells[column.id] ?? null;
+      return {
+        title: rowTitle(r, columns),
+        value: raw != null && raw !== '' && formulaResultKind(spec) === 'number' ? formatFormulaNumber(raw, draft) : raw,
+        color: r.formulaColors?.[column.id],
+      };
+    });
+  }, [spec, colors, decimals, rows, columns, others, column, statRows]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await window.nodus.updateDatabaseColumn(column.id, {
+        config: { ...column.config, formula: spec ?? undefined, formulaColors: colors, formulaDecimals: decimals },
+      });
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="card-modal w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 px-5 py-3 border-b border-neutral-800">
+          <Icon name="sigma" size={16} className="text-indigo-400" />
+          <h2 className="font-semibold truncate">{tx('Fórmula: {name}', { name: column.name })}</h2>
+          <div className="flex-1" />
+          <button className="text-neutral-500 hover:text-neutral-300" onClick={onClose}>
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        {/* One column of FormulaFields, one gap between them: the whole body reads as a single
+            form rather than a stack of differently-spaced widgets. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+          <FormulaField label={t('¿Qué quieres calcular?')}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {FORMULA_RECIPES.map((r) => {
+                const active = spec?.kind === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    className={`flex h-full flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+                      active ? 'border-indigo-500 bg-indigo-600/15' : 'border-neutral-800 hover:border-neutral-700 bg-neutral-900/40'
+                    }`}
+                    onClick={() => setSpec(active ? spec : emptyFormula(r.id as FormulaKind))}
+                  >
+                    <Icon name={r.icon} size={15} className={active ? 'text-indigo-400' : 'text-neutral-500'} />
+                    <span className="text-xs font-medium">{t(r.label)}</span>
+                    <span className="text-[10px] leading-tight text-neutral-500">{t(r.hint)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </FormulaField>
+
+          {spec?.kind === 'arithmetic' && <ArithmeticEditor spec={spec} columns={others} onChange={setSpec} />}
+          {spec?.kind === 'columnStat' && <ColumnStatEditor spec={spec} columns={others} onChange={setSpec} />}
+          {spec?.kind === 'ifThen' && <IfThenEditor spec={spec} columns={others} onChange={setSpec} />}
+          {spec?.kind === 'concat' && <ConcatEditor spec={spec} columns={others} onChange={setSpec} />}
+
+          {spec && resultIsNumber && (
+            <FormulaField label={t('Decimales a mostrar')} hint={t('Solo cambia cómo se ve: el valor guardado mantiene toda su precisión.')}>
+              <select className="input w-32 text-xs" value={decimals} onChange={(e) => setDecimals(Number(e.target.value))}>
+                {[0, 1, 2, 3, 4, 6].map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </FormulaField>
+          )}
+
+          {spec && spec.kind !== 'ifThen' && <ColorRulesEditor rules={colors} numeric={resultIsNumber} onChange={setColors} />}
+
+          {spec && (
+            <FormulaField label={t('Vista previa')}>
+              <FormulaBox>
+                {problem ? (
+                  <p className="text-xs text-amber-400">{t(problem)}</p>
+                ) : preview.length === 0 ? (
+                  <p className="text-xs text-neutral-600">{t('Añade filas para ver el resultado.')}</p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {preview.map((p, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs">
+                        <span className="flex-1 truncate text-neutral-500" title={p.title}>
+                          {p.title || t('(sin título)')}
+                        </span>
+                        {p.value == null || p.value === '' ? (
+                          <span className="text-neutral-600">—</span>
+                        ) : p.color ? (
+                          <span className="rounded px-1.5 py-0.5 font-medium" style={{ backgroundColor: `${p.color}26`, color: p.color }}>
+                            {p.value}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-200">{p.value}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!problem && (
+                  <p className="pt-2 border-t border-neutral-800 text-[10px] leading-snug text-neutral-500">{describeFormula(spec, columns, t)}</p>
+                )}
+              </FormulaBox>
+            </FormulaField>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-neutral-800">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t('Cancelar')}
+          </button>
+          <button className="btn btn-primary gap-1.5" onClick={() => void save()} disabled={busy || Boolean(problem)}>
+            <Icon name={busy ? 'sync' : 'check'} size={14} className={busy ? 'animate-spin' : ''} /> {t('Guardar')}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/** Pick a column, or type a fixed number — the two things an operand can be. */
+function OperandPicker({
+  operand,
+  columns,
+  onChange,
+  onRemove,
+}: {
+  operand: FormulaOperand;
+  columns: DatabaseColumn[];
+  onChange: (o: FormulaOperand) => void;
+  onRemove: () => void;
+}) {
+  const numeric = columns.filter(isNumericSource);
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <select
+        className="input text-xs flex-1 min-w-0"
+        value={operand.kind === 'column' ? operand.columnId : '__number__'}
+        onChange={(e) =>
+          onChange(e.target.value === '__number__' ? { kind: 'number', value: 0 } : { kind: 'column', columnId: e.target.value })
+        }
+      >
+        {numeric.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+        <option value="__number__">{t('Un número fijo…')}</option>
+      </select>
+      {operand.kind === 'number' && (
+        <input
+          type="number"
+          className="input text-xs w-24 shrink-0"
+          value={operand.value}
+          onChange={(e) => onChange({ kind: 'number', value: Number(e.target.value) || 0 })}
+        />
+      )}
+      <button className={FROW_REMOVE} onClick={onRemove} title={t('Quitar')}>
+        <Icon name="x" size={13} />
+      </button>
+    </div>
+  );
+}
+
+function ArithmeticEditor({
+  spec,
+  columns,
+  onChange,
+}: {
+  spec: Extract<FormulaSpec, { kind: 'arithmetic' }>;
+  columns: DatabaseColumn[];
+  onChange: (s: FormulaSpec) => void;
+}) {
+  const numeric = columns.filter(isNumericSource);
+  const def = ARITHMETIC_OPS.find((o) => o.id === spec.op)!;
+  const add = () => {
+    const first = numeric[0];
+    onChange({ ...spec, operands: [...spec.operands, first ? { kind: 'column', columnId: first.id } : { kind: 'number', value: 0 }] });
+  };
+  if (numeric.length === 0) {
+    return <FormulaNotice>{t('No hay ninguna columna de número, casilla o fórmula con la que operar.')}</FormulaNotice>;
+  }
+  return (
+    <>
+      <FormulaField label={t('Operación')} hint={def.ordered && spec.operands.length > 2 ? t('Se aplica en orden, de arriba abajo.') : undefined}>
+        <select className="input w-full text-xs" value={spec.op} onChange={(e) => onChange({ ...spec, op: e.target.value as typeof spec.op })}>
+          {ARITHMETIC_OPS.map((o) => (
+            <option key={o.id} value={o.id}>
+              {t(o.label)}
+            </option>
+          ))}
+        </select>
+      </FormulaField>
+      <FormulaField label={t('Con estas columnas o números')}>
+        <FormulaBox>
+          {spec.operands.length === 0 && <p className="text-[11px] text-neutral-600">{t('Todavía no has añadido nada.')}</p>}
+          {spec.operands.map((o, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              {/* The operator sits in the same gutter as every other row's leading word. */}
+              <span className={`${FROW_LABEL} font-medium`}>{i === 0 ? '' : def.symbol || '·'}</span>
+              <div className="flex-1 min-w-0">
+                <OperandPicker
+                  operand={o}
+                  columns={columns}
+                  onChange={(next) => onChange({ ...spec, operands: spec.operands.map((x, j) => (j === i ? next : x)) })}
+                  onRemove={() => onChange({ ...spec, operands: spec.operands.filter((_, j) => j !== i) })}
+                />
+              </div>
+            </div>
+          ))}
+          <FormulaAdd onClick={add}>{t('Añadir columna o número')}</FormulaAdd>
+        </FormulaBox>
+      </FormulaField>
+    </>
+  );
+}
+
+function ColumnStatEditor({
+  spec,
+  columns,
+  onChange,
+}: {
+  spec: Extract<FormulaSpec, { kind: 'columnStat' }>;
+  columns: DatabaseColumn[];
+  onChange: (s: FormulaSpec) => void;
+}) {
+  const numeric = columns.filter(isNumericSource);
+  const fn = COLUMN_STAT_FNS.find((f) => f.id === spec.fn)!;
+  if (numeric.length === 0) {
+    return <FormulaNotice>{t('No hay ninguna columna de número, casilla o fórmula que medir.')}</FormulaNotice>;
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <FormulaField label={t('Medida')} hint={t(fn.hint)}>
+        <select className="input w-full text-xs" value={spec.fn} onChange={(e) => onChange({ ...spec, fn: e.target.value as typeof spec.fn })}>
+          {COLUMN_STAT_FNS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {t(f.label)}
+            </option>
+          ))}
+        </select>
+      </FormulaField>
+      <FormulaField label={t('De la columna')} hint={t('Siempre se calcula sobre toda la tabla, aunque haya filtros puestos.')}>
+        <select className="input w-full text-xs" value={spec.columnId} onChange={(e) => onChange({ ...spec, columnId: e.target.value })}>
+          <option value="">{t('Elige una columna…')}</option>
+          {numeric.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </FormulaField>
+    </div>
+  );
+}
+
+/** Pick what a rule shows when it wins: fixed text, a fixed number, another column, or nothing. */
+function OutputPicker({ output, columns, onChange }: { output: FormulaOutput; columns: DatabaseColumn[]; onChange: (o: FormulaOutput) => void }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+      <select
+        className={FSELECT_LEAD}
+        value={output.kind}
+        onChange={(e) => {
+          const k = e.target.value as FormulaOutput['kind'];
+          if (k === 'text') onChange({ kind: 'text', value: '' });
+          else if (k === 'number') onChange({ kind: 'number', value: 0 });
+          else if (k === 'column') onChange({ kind: 'column', columnId: columns[0]?.id ?? '' });
+          else onChange({ kind: 'empty' });
+        }}
+      >
+        <option value="text">{t('este texto')}</option>
+        <option value="number">{t('este número')}</option>
+        <option value="column">{t('otra columna')}</option>
+        <option value="empty">{t('nada')}</option>
+      </select>
+      {output.kind === 'text' && (
+        <input
+          className="input text-xs flex-1 min-w-0"
+          placeholder={t('Ej.: Reciente')}
+          value={output.value}
+          onChange={(e) => onChange({ kind: 'text', value: e.target.value })}
+        />
+      )}
+      {output.kind === 'number' && (
+        <input
+          type="number"
+          className="input text-xs w-24"
+          value={output.value}
+          onChange={(e) => onChange({ kind: 'number', value: Number(e.target.value) || 0 })}
+        />
+      )}
+      {output.kind === 'column' && (
+        <select className="input text-xs flex-1 min-w-0" value={output.columnId} onChange={(e) => onChange({ kind: 'column', columnId: e.target.value })}>
+          {columns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+/** A colour swatch that cycles the shared option palette, plus "no colour". */
+function ColorDot({ color, onChange }: { color: string | null | undefined; onChange: (c: string | null) => void }) {
+  const next = () => {
+    if (!color) return onChange(OPTION_COLORS[0]);
+    const i = OPTION_COLORS.indexOf(color);
+    return onChange(i < 0 || i === OPTION_COLORS.length - 1 ? null : OPTION_COLORS[i + 1]);
+  };
+  return (
+    <button
+      className="shrink-0 w-5 h-5 rounded-full border border-neutral-700 flex items-center justify-center"
+      style={color ? { backgroundColor: color } : undefined}
+      title={color ? t('Cambiar color') : t('Sin color')}
+      onClick={next}
+    >
+      {!color && <Icon name="palette" size={11} className="text-neutral-600" />}
+    </button>
+  );
+}
+
+function IfThenEditor({
+  spec,
+  columns,
+  onChange,
+}: {
+  spec: Extract<FormulaSpec, { kind: 'ifThen' }>;
+  columns: DatabaseColumn[];
+  onChange: (s: FormulaSpec) => void;
+}) {
+  const filterable = columns.filter((c) => operatorsForColumn(c).length > 0);
+  const byId = useMemo(() => new Map(columns.map((c) => [c.id, c])), [columns]);
+  if (filterable.length === 0) return <FormulaNotice>{t('No hay columnas sobre las que poner condiciones.')}</FormulaNotice>;
+
+  const setRule = (id: string, patch: Partial<FormulaRule>) =>
+    onChange({ ...spec, rules: spec.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)) });
+  const addRule = () =>
+    onChange({
+      ...spec,
+      rules: [
+        ...spec.rules,
+        { id: newId('fr'), conjunction: 'and', conditions: [newFilterCondition(filterable)], output: { kind: 'text', value: '' }, color: null },
+      ],
+    });
+
+  return (
+    <FormulaField label={t('Reglas')} hint={t('Se comprueban en orden: gana la primera regla que se cumpla.')}>
+      <div className="flex flex-col gap-2">
+        {spec.rules.map((rule, i) => (
+          <FormulaBox key={rule.id}>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wide text-indigo-400">{tx('Regla {n}', { n: i + 1 })}</span>
+              <div className="flex-1" />
+              <button
+                className={FROW_REMOVE}
+                title={t('Eliminar regla')}
+                onClick={() => onChange({ ...spec, rules: spec.rules.filter((r) => r.id !== rule.id) })}
+              >
+                <Icon name="trash" size={12} />
+              </button>
+            </div>
+            {rule.conditions.map((c, ci) => (
+              <ConditionRow
+                key={c.id}
+                cond={c}
+                first={ci === 0}
+                firstLabel={t('Si')}
+                labelClass={FROW_LABEL}
+                conjunction={rule.conjunction}
+                filterable={filterable}
+                byId={byId}
+                onUpdate={(patch) => setRule(rule.id, { conditions: rule.conditions.map((x) => (x.id === c.id ? { ...x, ...patch } : x)) })}
+                onRemove={() => setRule(rule.id, { conditions: rule.conditions.filter((x) => x.id !== c.id) })}
+                onToggleConjunction={() => setRule(rule.id, { conjunction: rule.conjunction === 'and' ? 'or' : 'and' })}
+              />
+            ))}
+            <FormulaAdd onClick={() => setRule(rule.id, { conditions: [...rule.conditions, newFilterCondition(filterable)] })}>
+              {t('Añadir condición')}
+            </FormulaAdd>
+            {/* The outcome shares the conditions' gutter, so "Si" and "mostrar" line up. */}
+            <div className="flex items-center gap-1.5 pt-2 border-t border-neutral-800/70">
+              <span className={FROW_LABEL}>{t('mostrar')}</span>
+              <OutputPicker output={rule.output} columns={columns} onChange={(output) => setRule(rule.id, { output })} />
+              <ColorDot color={rule.color} onChange={(color) => setRule(rule.id, { color })} />
+            </div>
+          </FormulaBox>
+        ))}
+        <FormulaAdd onClick={addRule}>{t('Añadir regla')}</FormulaAdd>
+        <FormulaBox>
+          <div className="flex items-center gap-1.5">
+            <span className={FROW_LABEL}>{t('si no')}</span>
+            <OutputPicker output={spec.otherwise} columns={columns} onChange={(otherwise) => onChange({ ...spec, otherwise })} />
+            <ColorDot color={spec.otherwiseColor} onChange={(otherwiseColor) => onChange({ ...spec, otherwiseColor })} />
+          </div>
+        </FormulaBox>
+      </div>
+    </FormulaField>
+  );
+}
+
+function ConcatEditor({
+  spec,
+  columns,
+  onChange,
+}: {
+  spec: Extract<FormulaSpec, { kind: 'concat' }>;
+  columns: DatabaseColumn[];
+  onChange: (s: FormulaSpec) => void;
+}) {
+  const set = (i: number, part: ConcatPart) => onChange({ ...spec, parts: spec.parts.map((p, j) => (j === i ? part : p)) });
+  return (
+    <FormulaField label={t('Partes')} hint={t('Se unen en orden, tal cual. Añade un texto con un espacio o un guion para separarlos.')}>
+      <FormulaBox>
+        {spec.parts.length === 0 && <p className="text-[11px] text-neutral-600">{t('Todavía no has añadido nada.')}</p>}
+        {spec.parts.map((p, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <select
+              className={FSELECT_LEAD}
+              value={p.kind}
+              onChange={(e) => set(i, e.target.value === 'text' ? { kind: 'text', value: ' ' } : { kind: 'column', columnId: columns[0]?.id ?? '' })}
+            >
+              <option value="column">{t('columna')}</option>
+              <option value="text">{t('texto fijo')}</option>
+            </select>
+            {p.kind === 'column' ? (
+              <select className="input text-xs flex-1 min-w-0" value={p.columnId} onChange={(e) => set(i, { kind: 'column', columnId: e.target.value })}>
+                {columns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="input text-xs flex-1 min-w-0" value={p.value} onChange={(e) => set(i, { kind: 'text', value: e.target.value })} />
+            )}
+            <button className={FROW_REMOVE} title={t('Quitar')} onClick={() => onChange({ ...spec, parts: spec.parts.filter((_, j) => j !== i) })}>
+              <Icon name="x" size={13} />
+            </button>
+          </div>
+        ))}
+        <div className="flex gap-2">
+          <FormulaAdd onClick={() => onChange({ ...spec, parts: [...spec.parts, { kind: 'column', columnId: columns[0]?.id ?? '' }] })}>
+            {t('Añadir columna')}
+          </FormulaAdd>
+          <FormulaAdd onClick={() => onChange({ ...spec, parts: [...spec.parts, { kind: 'text', value: ' ' }] })}>{t('Añadir texto')}</FormulaAdd>
+        </div>
+      </FormulaBox>
+    </FormulaField>
+  );
+}
+
+/** Conditional formatting on the result — the colours an "Si… entonces…" gets from its rules. */
+function ColorRulesEditor({ rules, numeric, onChange }: { rules: FormulaColorRule[]; numeric: boolean; onChange: (r: FormulaColorRule[]) => void }) {
+  const ops: FilterCondition['op'][] = numeric
+    ? ['gt', 'gte', 'lt', 'lte', 'equals', 'notEquals', 'isEmpty', 'notEmpty']
+    : ['equals', 'notEquals', 'contains', 'notContains', 'isEmpty', 'notEmpty'];
+  const set = (id: string, patch: Partial<FormulaColorRule>) => onChange(rules.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  return (
+    <FormulaField label={t('Colores (opcional)')}>
+      <FormulaBox>
+        {rules.length === 0 && <p className="text-[11px] text-neutral-600">{t('El resultado se muestra sin color.')}</p>}
+        {rules.map((r) => (
+          <div key={r.id} className="flex items-center gap-1.5">
+            {/* Not FROW_LABEL: this phrase is far longer than "Si"/"mostrar", and every row in
+                this box carries the same one, so they line up on their own width. */}
+            <span className="shrink-0 text-[11px] text-neutral-500">{t('Si el resultado')}</span>
+            <select className="input text-xs w-32 shrink-0" value={r.op} onChange={(e) => set(r.id, { op: e.target.value as FormulaColorRule['op'] })}>
+              {ops.map((op) => (
+                <option key={op} value={op}>
+                  {t(opLabel(op))}
+                </option>
+              ))}
+            </select>
+            {opNeedsValue(r.op) && (
+              <input
+                className="input text-xs flex-1 min-w-0"
+                type={numeric ? 'number' : 'text'}
+                value={r.value ?? ''}
+                onChange={(e) => set(r.id, { value: e.target.value })}
+              />
+            )}
+            <ColorDot color={r.color} onChange={(c) => set(r.id, { color: c ?? OPTION_COLORS[0] })} />
+            <button className={FROW_REMOVE} title={t('Quitar')} onClick={() => onChange(rules.filter((x) => x.id !== r.id))}>
+              <Icon name="x" size={13} />
+            </button>
+          </div>
+        ))}
+        <FormulaAdd onClick={() => onChange([...rules, { id: newId('cr'), op: numeric ? 'gt' : 'equals', value: '', color: OPTION_COLORS[0] }])}>
+          {t('Añadir color')}
+        </FormulaAdd>
+      </FormulaBox>
+    </FormulaField>
   );
 }
 
@@ -2332,8 +3226,13 @@ function RollupColumnConfig({ column, onChanged }: { column: DatabaseColumn; onC
 
 // ── Attachments ───────────────────────────────────────────────────────────────
 
-/** Object URL for an image attachment's blob (fetched on demand, revoked on unmount). */
-function useAttachmentImageUrl(att: DatabaseAttachment): string | null {
+/**
+ * Object URL for an image attachment's preview (fetched on demand, revoked on unmount). Reads
+ * the downscaled thumb rather than the original: the grid and the gallery draw one of these
+ * per visible row, and pulling full-size photos across IPC to fill a 28px box is what makes a
+ * large catalogue crawl. The main process falls back to the original when there is no thumb.
+ */
+function useAttachmentImageUrl(att: DatabaseAttachment, full = false): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (attachmentKind(att.mimeType) !== 'image' || !att.hasBlob) {
@@ -2342,16 +3241,20 @@ function useAttachmentImageUrl(att: DatabaseAttachment): string | null {
     }
     let revoked = false;
     let objUrl: string | null = null;
-    void window.nodus.getDatabaseAttachmentBlob(att.id).then((bytes) => {
-      if (!bytes || revoked) return;
-      objUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: att.mimeType ?? 'image/png' }));
+    // The preview wants the real photo; a grid of 400px thumbs does not.
+    const bytes = full
+      ? window.nodus.getDatabaseAttachmentBlob(att.id).then((b) => (b ? { bytes: b, mimeType: att.mimeType } : null))
+      : window.nodus.getDatabaseAttachmentThumb(att.id);
+    void bytes.then((res) => {
+      if (!res || revoked) return;
+      objUrl = URL.createObjectURL(new Blob([new Uint8Array(res.bytes)], { type: res.mimeType ?? 'image/png' }));
       setUrl(objUrl);
     });
     return () => {
       revoked = true;
       if (objUrl) URL.revokeObjectURL(objUrl);
     };
-  }, [att.id, att.mimeType, att.hasBlob]);
+  }, [att.id, att.mimeType, att.hasBlob, full]);
   return url;
 }
 
@@ -2434,45 +3337,109 @@ function AttachmentInfoModal({ att, onClose }: { att: DatabaseAttachment; onClos
   );
 }
 
+/**
+ * One attachment in a cell or a record. Clicking it opens the preview, which is also where the
+ * actions live: the hover buttons used to be 14px targets pinned OUTSIDE the thumb, so in a
+ * 28px grid row the cell's own `overflow-hidden` clipped them and they could not be hit at all.
+ * A file you can open is also the thing people try first.
+ */
 function AttachmentThumb({ att, onRemove, large = false }: { att: DatabaseAttachment; onRemove: () => void; large?: boolean }) {
   const url = useAttachmentImageUrl(att);
   const kind = attachmentKind(att.mimeType);
-  const [info, setInfo] = useState(false);
+  const [preview, setPreview] = useState(false);
   const box = large ? 'w-24 h-24' : 'w-7 h-7';
+  return (
+    <>
+      <button
+        className="relative shrink-0 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        title={att.fileName ?? t('Abrir archivo')}
+        onClick={(e) => {
+          e.stopPropagation();
+          setPreview(true);
+        }}
+      >
+        {kind === 'image' && url ? (
+          <img src={url} alt={att.fileName ?? ''} className={`${box} rounded object-cover border border-neutral-700 hover:border-indigo-500 transition-colors`} />
+        ) : (
+          <span
+            className={`inline-flex items-center gap-1 ${large ? 'w-24 h-24 flex-col justify-center text-center px-2' : 'max-w-[9rem] px-1.5 py-0.5'} rounded border border-neutral-700 hover:border-indigo-500 bg-neutral-800/60 text-[11px] text-neutral-300 transition-colors`}
+          >
+            <Icon name={kind === 'pdf' ? 'book' : 'archive'} size={large ? 20 : 11} className="opacity-60 shrink-0" />
+            <span className="truncate max-w-full">{att.fileName ?? t('archivo')}</span>
+          </span>
+        )}
+        {att.aiGenerated && kind === 'image' && url && <AiBadge size="sm" corner="bottom-left" />}
+      </button>
+      {preview && (
+        <AttachmentPreview
+          att={att}
+          onClose={() => setPreview(false)}
+          onRemove={() => {
+            setPreview(false);
+            onRemove();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * Full-size preview of an attachment, and the only place its actions live. Everything is a
+ * normal-sized button here, which is what the 14px hover chips could never be.
+ */
+function AttachmentPreview({ att, onClose, onRemove }: { att: DatabaseAttachment; onClose: () => void; onRemove: () => void }) {
+  const url = useAttachmentImageUrl(att, true);
+  const kind = attachmentKind(att.mimeType);
+  const [info, setInfo] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   const download = async () => {
     const r = await window.nodus.downloadDatabaseAttachment(att.id);
     if (!r.canceled && r.path) toast(tx('Descargado en {p}', { p: r.path }));
   };
-  const iconBtn =
-    'flex w-3.5 h-3.5 rounded-full bg-neutral-900 border border-neutral-600 items-center justify-center text-neutral-300';
-  return (
-    <div className="group/att relative shrink-0">
-      {kind === 'image' && url ? (
-        <img src={url} alt={att.fileName ?? ''} title={att.fileName ?? ''} className={`${box} rounded object-cover border border-neutral-700`} />
-      ) : (
-        <span
-          className={`inline-flex items-center gap-1 ${large ? 'w-24 h-24 flex-col justify-center text-center px-2' : 'max-w-[9rem] px-1.5 py-0.5'} rounded border border-neutral-700 bg-neutral-800/60 text-[11px] text-neutral-300`}
-          title={att.fileName ?? ''}
-        >
-          <Icon name={kind === 'pdf' ? 'book' : 'archive'} size={large ? 20 : 11} className="opacity-60 shrink-0" />
-          <span className="truncate max-w-full">{att.fileName ?? t('archivo')}</span>
-        </span>
-      )}
-      {att.aiGenerated && kind === 'image' && url && <AiBadge size="sm" corner="bottom-left" />}
-      {/* Hover actions: info · download · remove. */}
-      <div className="absolute -top-1 -right-1 hidden group-hover/att:flex items-center gap-0.5">
-        <button className={`${iconBtn} hover:text-indigo-300`} onClick={() => setInfo(true)} title={t('Información')}>
-          <Icon name="info" size={9} />
+  const remove = async () => {
+    if (!(await confirm({ title: t('Quitar archivo'), message: tx('¿Quitar «{name}»?', { name: att.fileName ?? '' }), danger: true }))) return;
+    await window.nodus.deleteDatabaseAttachment(att.id);
+    onRemove();
+  };
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 p-6" onClick={onClose}>
+      <div className="flex items-center gap-3 text-sm text-neutral-300 shrink-0" onClick={(e) => e.stopPropagation()}>
+        <span className="truncate font-medium">{att.fileName ?? t('archivo')}</span>
+        <span className="text-xs text-neutral-500 shrink-0">{formatBytes(att.bytes)}</span>
+        <div className="flex-1" />
+        <button className="btn btn-ghost gap-1.5 text-xs" onClick={() => setInfo(true)}>
+          <Icon name="info" size={13} /> {t('Información')}
         </button>
-        <button className={`${iconBtn} hover:text-emerald-300`} onClick={() => void download()} title={t('Descargar')}>
-          <Icon name="download" size={9} />
+        <button className="btn btn-ghost gap-1.5 text-xs" onClick={() => void download()}>
+          <Icon name="download" size={13} /> {t('Descargar')}
         </button>
-        <button className={`${iconBtn} hover:text-red-400`} onClick={onRemove} title={t('Quitar')}>
-          <Icon name="x" size={9} />
+        <button className="btn btn-ghost gap-1.5 text-xs text-red-400 hover:text-red-300" onClick={() => void remove()}>
+          <Icon name="trash" size={13} /> {t('Quitar')}
+        </button>
+        <button className="text-neutral-400 hover:text-neutral-200 ml-1" onClick={onClose} title={t('Cerrar')}>
+          <Icon name="x" size={18} />
         </button>
       </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center pt-4" onClick={onClose}>
+        {kind === 'image' && url ? (
+          <img src={url} alt={att.fileName ?? ''} className="max-w-full max-h-full object-contain rounded" onClick={(e) => e.stopPropagation()} />
+        ) : (
+          <div className="card flex flex-col items-center gap-3 p-8 text-neutral-400" onClick={(e) => e.stopPropagation()}>
+            <Icon name={kind === 'pdf' ? 'book' : 'archive'} size={40} className="opacity-50" />
+            <span className="text-sm">{t('Este archivo no se puede previsualizar. Descárgalo para abrirlo.')}</span>
+          </div>
+        )}
+      </div>
       {info && <AttachmentInfoModal att={att} onClose={() => setInfo(false)} />}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -2529,14 +3496,26 @@ function AttachmentCell({
 
 // ── CSV import ────────────────────────────────────────────────────────────────
 
-export interface CsvImportPlanData {
-  fileName: string;
-  headers: string[];
-  rows: string[][];
-  suggestedTypes: DatabaseColumnType[];
-}
+export type { CsvImportPlanData };
 
-const IMPORTABLE_TYPES: DatabaseColumnType[] = ['title', 'text', 'number', 'date', 'time', 'select', 'multi_select', 'checkbox'];
+/** Every type a column can be imported as. relation/rollup need a target, so they are
+ *  configured after the import from the grid's own type picker. */
+const IMPORTABLE_TYPES: DatabaseColumnType[] = [
+  'title',
+  'text',
+  'number',
+  'date',
+  'time',
+  'select',
+  'multi_select',
+  'checkbox',
+  'attachment',
+  'ai',
+  'ai_image',
+];
+
+/** Sentinel for the type <select> when the user discards a column. */
+const SKIP = '__skip__';
 
 export function CsvImportModal({
   plan,
@@ -2548,14 +3527,24 @@ export function CsvImportModal({
   onImported: (databaseId: string) => void;
 }) {
   const [name, setName] = useState(plan.fileName.replace(/\.[^.]+$/, '') || t('Base de datos importada'));
-  const [types, setTypes] = useState<DatabaseColumnType[]>(plan.suggestedTypes);
+  const [types, setTypes] = useState<(DatabaseColumnType | null)[]>(plan.suggestedTypes);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => window.nodus.onCsvImportProgress((p) => setProgress({ done: p.done, total: p.total })), []);
+
+  const kept = types.filter((ty) => ty != null).length;
+  const titleCount = types.filter((ty) => ty === 'title').length;
 
   const importNow = async () => {
     setBusy(true);
+    setError(null);
     try {
-      const db = await window.nodus.createDatabaseFromCsv(name.trim() || t('Base de datos importada'), plan.headers, plan.rows, types);
+      const db = await window.nodus.createDatabaseFromCsvToken(plan.token, name.trim() || t('Base de datos importada'), types);
       onImported(db.id);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -2563,7 +3552,7 @@ export function CsvImportModal({
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="card-modal w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="card-modal w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-5 py-3 border-b border-neutral-800">
           <Icon name="upload" size={16} className="text-indigo-400" />
           <h2 className="font-semibold">{t('Importar CSV')}</h2>
@@ -2575,35 +3564,87 @@ export function CsvImportModal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <label className="text-xs text-neutral-500">{t('Nombre de la base de datos')}</label>
           <input className="input w-full mt-1 mb-4" value={name} onChange={(e) => setName(e.target.value)} />
-          <p className="text-xs text-neutral-500 mb-2">
-            {tx('{n} columnas · {r} filas. Asigna un tipo a cada columna:', { n: plan.headers.length, r: plan.rows.length })}
+          <p className="text-xs text-neutral-500 mb-1">
+            {tx('{n} columnas · {r} filas. Nodus ha sugerido un tipo para cada una; cámbialo o descarta las que no necesites.', {
+              n: plan.headers.length,
+              r: plan.rowCount.toLocaleString(),
+            })}
           </p>
-          <div className="flex flex-col gap-2">
-            {plan.headers.map((h, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <span className="flex-1 truncate text-sm" title={h}>
-                  {h}
-                </span>
-                <select
-                  className="input text-xs w-44"
-                  value={types[i]}
-                  onChange={(e) => setTypes((prev) => prev.map((t2, j) => (j === i ? (e.target.value as DatabaseColumnType) : t2)))}
+          <p className="text-xs text-neutral-600 mb-3">{tx('Se importarán {k} de {n} columnas.', { k: kept, n: plan.headers.length })}</p>
+          {titleCount !== 1 && (
+            <p className="text-xs text-amber-400 mb-3">
+              {titleCount === 0
+                ? t('Ninguna columna es el título: la cuadrícula no tendrá con qué identificar cada fila.')
+                : t('Hay más de una columna de título. Solo la primera identificará la fila.')}
+            </p>
+          )}
+          <div className="flex flex-col gap-1.5">
+            {plan.headers.map((h, i) => {
+              const s = plan.suggestions[i];
+              const skipped = types[i] == null;
+              const changed = types[i] !== plan.suggestedTypes[i];
+              const sample = plan.sampleRows.find((r) => (r[i] ?? '').trim())?.[i].trim() ?? '';
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-2 rounded px-2 py-1.5 ${skipped ? 'opacity-40' : 'bg-neutral-900/40'}`}
                 >
-                  {IMPORTABLE_TYPES.map((ty) => (
-                    <option key={ty} value={ty}>
-                      {t(columnTypeDef(ty).label)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`truncate text-sm ${skipped ? 'line-through' : ''}`} title={h}>
+                        {h}
+                      </span>
+                      {s.filled === 0 && <span className="text-[10px] text-neutral-500 shrink-0">{t('vacía')}</span>}
+                    </div>
+                    <div className="truncate text-[11px] text-neutral-500" title={sample}>
+                      {skipped
+                        ? t('Se descartará')
+                        : changed
+                          ? tx('Ej.: {v}', { v: sample })
+                          : `${t(s.reason)}${sample ? ` · ${tx('Ej.: {v}', { v: sample })}` : ''}`}
+                    </div>
+                  </div>
+                  {!skipped && s.dropped > 0 && (
+                    <span className="text-[10px] text-amber-400 shrink-0" title={t('Valores que este tipo no puede representar')}>
+                      {tx('{n} vacíos', { n: s.dropped })}
+                    </span>
+                  )}
+                  <select
+                    className="input text-xs w-40 shrink-0"
+                    value={types[i] ?? SKIP}
+                    onChange={(e) =>
+                      setTypes((prev) =>
+                        prev.map((t2, j) =>
+                          j === i ? (e.target.value === SKIP ? null : (e.target.value as DatabaseColumnType)) : t2
+                        )
+                      )
+                    }
+                  >
+                    {IMPORTABLE_TYPES.map((ty) => (
+                      <option key={ty} value={ty}>
+                        {t(columnTypeDef(ty).label)}
+                        {ty === plan.suggestedTypes[i] ? ` · ${t('sugerido')}` : ''}
+                      </option>
+                    ))}
+                    <option value={SKIP}>{t('No importar')}</option>
+                  </select>
+                </div>
+              );
+            })}
           </div>
         </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-neutral-800">
-          <button className="btn btn-ghost" onClick={onClose}>
+        <div className="flex items-center gap-2 px-5 py-3 border-t border-neutral-800">
+          {error && <span className="text-xs text-red-400 flex-1 truncate">{error}</span>}
+          {!error && busy && progress && (
+            <span className="text-xs text-neutral-500 flex-1">
+              {tx('Importando {d} de {n} filas…', { d: progress.done.toLocaleString(), n: progress.total.toLocaleString() })}
+            </span>
+          )}
+          <div className="flex-1" />
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
             {t('Cancelar')}
           </button>
-          <button className="btn btn-primary gap-1.5" onClick={() => void importNow()} disabled={busy}>
+          <button className="btn btn-primary gap-1.5" onClick={() => void importNow()} disabled={busy || kept === 0}>
             <Icon name={busy ? 'sync' : 'upload'} size={14} className={busy ? 'animate-spin' : ''} /> {t('Importar')}
           </button>
         </div>

@@ -10,6 +10,10 @@
  * a column needs no schema change (an entity-attribute-value model).
  */
 
+// Type-only (erased at compile time), so this module stays runtime-dependency-free even
+// though databaseFormula.ts imports its column types back.
+import type { FormulaColorRule, FormulaSpec } from './databaseFormula';
+
 // ── Column types ───────────────────────────────────────────────────────────────
 
 export type DatabaseColumnType =
@@ -25,7 +29,8 @@ export type DatabaseColumnType =
   | 'ai' // Phase 3
   | 'ai_image' // AI-generated image, stored as an attachment
   | 'relation' // Phase 3
-  | 'rollup'; // Rollup: aggregate a property across related rows
+  | 'rollup' // Rollup: aggregate a property across related rows
+  | 'formula'; // Computed from other columns by a visual recipe (see databaseFormula.ts)
 
 export interface ColumnTypeDef {
   id: DatabaseColumnType;
@@ -54,6 +59,7 @@ export const COLUMN_TYPES: ColumnTypeDef[] = [
   { id: 'ai_image', label: 'Imagen IA', icon: 'image', hasOptions: false, available: true },
   { id: 'relation', label: 'Relación', icon: 'link', hasOptions: false, available: true },
   { id: 'rollup', label: 'Rollup', icon: 'layers', hasOptions: false, available: true },
+  { id: 'formula', label: 'Fórmula', icon: 'sigma', hasOptions: false, available: true },
 ];
 
 const COLUMN_TYPE_BY_ID = new Map<DatabaseColumnType, ColumnTypeDef>(COLUMN_TYPES.map((d) => [d.id, d]));
@@ -103,6 +109,10 @@ export interface DatabaseColumnConfig {
   rollupRelationColumnId?: string; // a 'relation' (db_row) column on THIS database
   rollupTargetColumnId?: string; // a column id on the related database ('__title__' for its title)
   rollupFunction?: RollupFunction;
+  /** formula columns: the visual recipe, its conditional colours and the result's precision. */
+  formula?: FormulaSpec;
+  formulaColors?: FormulaColorRule[];
+  formulaDecimals?: number;
   [key: string]: unknown;
 }
 
@@ -300,6 +310,13 @@ export interface DatabaseRow {
   relationCounts?: Record<string, number>;
   /** columnId → computed rollup display value, for rollup columns (derived, read-only). */
   rollups?: Record<string, string>;
+  /**
+   * Formula columns are derived, but their value is written straight into `cells` so that
+   * filters, sorts, search and export treat them exactly like a stored column. These two
+   * carry what a raw cell cannot: the colour a rule painted, and why a formula could not run.
+   */
+  formulaColors?: Record<string, string>;
+  formulaErrors?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 }

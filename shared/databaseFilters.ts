@@ -7,6 +7,7 @@
 
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseColumnType, DatabaseRow } from './databases';
+import { comparableType } from './databaseFormula';
 
 export type FilterOp =
   | 'contains'
@@ -98,6 +99,14 @@ export function opLabel(op: FilterOp): string {
   return OP_LABELS[op];
 }
 
+/**
+ * Operators offered for a column, honouring what a formula actually computes. Prefer this
+ * over operatorsForType when you have the column: a numeric formula deserves "mayor que".
+ */
+export function operatorsForColumn(column: DatabaseColumn): FilterOp[] {
+  return operatorsForType(comparableType(column));
+}
+
 /** Operators offered for a column type (empty for non-filterable types like relation). */
 export function operatorsForType(type: DatabaseColumnType): FilterOp[] {
   switch (type) {
@@ -136,10 +145,16 @@ function asArray(v: FilterCondition['value']): string[] {
   return Array.isArray(v) ? v : v == null ? [] : [v];
 }
 
-function matchesCondition(column: DatabaseColumn, row: DatabaseRow, cond: FilterCondition): boolean {
+/**
+ * Whether a row satisfies one condition. Exported because the formula engine's "Si… entonces…"
+ * rules are the same comparison over the same cells — reusing this is what lets the formula
+ * editor speak the filter bar's vocabulary instead of inventing a second one.
+ */
+export function matchesCondition(column: DatabaseColumn, row: DatabaseRow, cond: FilterCondition): boolean {
   const raw = row.cells[column.id] ?? null;
   const empty = raw == null || raw === '';
-  switch (column.type) {
+  // A formula column stores its result in cells; compare it as whatever it computes.
+  switch (comparableType(column)) {
     case 'title':
     case 'text':
     case 'ai': {
@@ -286,7 +301,7 @@ export function applyDatabaseFilter(rows: DatabaseRow[], columns: DatabaseColumn
 function sortKey(column: DatabaseColumn, row: DatabaseRow): { empty: boolean; num?: number; str?: string } {
   const raw = row.cells[column.id] ?? null;
   if (raw == null || raw === '') return { empty: true };
-  switch (column.type) {
+  switch (comparableType(column)) {
     case 'number': {
       const n = decodeNumber(raw);
       return n == null ? { empty: true } : { empty: false, num: n };

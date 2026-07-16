@@ -34,12 +34,15 @@ try {
   const aiShared = require(path.join(repoRoot, 'shared/databaseAi.ts'));
   const bulk = require(path.join(repoRoot, 'shared/databaseBulk.ts'));
   const filters = require(path.join(repoRoot, 'shared/databaseFilters.ts'));
+  const formulaShared = require(path.join(repoRoot, 'shared/databaseFormula.ts'));
+  const formulaEval = require(path.join(repoRoot, 'shared/databaseFormulaEval.ts'));
   const profile = require(path.join(repoRoot, 'shared/dataProfile.ts'));
   const chart = require(path.join(repoRoot, 'shared/chartSpec.ts'));
   const exportShared = require(path.join(repoRoot, 'shared/databaseExport.ts'));
   const { exportDatabase, buildXlsx } = require(path.join(repoRoot, 'electron/export/databaseExport.ts'));
   const { generateAnalysisReport } = require(path.join(repoRoot, 'electron/ai/databaseAnalysis.ts'));
   const { buildDatabaseChatContext } = require(path.join(repoRoot, 'electron/ai/databaseChat.ts'));
+  const chatShared = require(path.join(repoRoot, 'shared/databaseChat.ts'));
   const { runAiCell, runAiColumn } = require(path.join(repoRoot, 'electron/ai/databaseAiColumn.ts'));
   const { runAiImageCell, runAiImageColumn } = require(path.join(repoRoot, 'electron/ai/databaseAiImageColumn.ts'));
   const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
@@ -253,6 +256,38 @@ try {
   assert.deepEqual(csv.splitMultiValue('a, b; c'), ['a', 'b', 'c']);
   assert.equal(csv.normalizeCsvValue('number', '3,5'), '3.5');
   assert.equal(csv.normalizeCsvValue('checkbox', 'sí'), '1');
+  assert.equal(csv.normalizeCsvValue('date', '13/05/2020'), null, 'a non-ISO date has nowhere to go');
+  assert.equal(csv.normalizeCsvValue('date', '2020-05-13'), '2020-05-13');
+
+  // ── Column suggestions: null markers, headers, tag lists ───────────────────
+  // A "no data" placeholder must not drag a numeric column down to text: real sheets
+  // write s.d. / - for unknown, and one of them among 7k years is not evidence of prose.
+  assert.ok(csv.isNullMarker('s.d.') && csv.isNullMarker('-') && !csv.isNullMarker('1958'));
+  assert.equal(csv.suggestColumn('Fecha', ['1958', '1960', 's.d.', '1962'], 1).type, 'number');
+  assert.equal(csv.suggestColumn('Lugar', ['Ronda', '-', 'Sevilla', 'Ronda'], 1).type, 'select');
+  // A short vocabulary repeated across many rows is a select even past the 12-option mark.
+  const regions = Array.from({ length: 300 }, (_, i) => `Region ${i % 18}`);
+  assert.equal(csv.suggestColumn('Comunidad', regions, 1).type, 'select');
+  // ...but hundreds of distinct values are not a controlled vocabulary.
+  assert.equal(csv.suggestColumn('Lugar', Array.from({ length: 300 }, (_, i) => `Pueblo ${i}`), 1).type, 'text');
+  // Tag lists reuse a small vocabulary; comma-laden prose does not.
+  const tagRows = Array.from({ length: 30 }, () => 'arquitectura civil, paisaje urbano, fiestas');
+  assert.equal(csv.suggestColumn('Etiquetas', tagRows, 1).type, 'multi_select');
+  const prose = Array.from({ length: 30 }, (_, i) => `La imagen muestra una escena ${i}, con detalles variados, y un fondo distinto ${i}`);
+  assert.equal(csv.suggestColumn('Descripcion visual', prose, 1).type, 'text');
+  // Header hints: a numeric-looking id is not a quantity; an empty file column is a target.
+  assert.equal(csv.suggestColumn('Codigo', ['001', '002', '003'], 1).type, 'text');
+  assert.equal(csv.suggestColumn('Peso', ['001', '002', '003'], 1).type, 'number');
+  assert.equal(csv.suggestColumn('Documento', ['', '', ''], 1).type, 'attachment');
+  assert.equal(csv.suggestColumn('Nada', ['', '', ''], 1).type, 'text');
+  assert.equal(csv.suggestColumn('Lo que sea', ['x'], 0).type, 'title', 'first column identifies the row');
+  const dropped = csv.suggestColumn('Peso', ['1', '2', 'tres'], 1);
+  assert.equal(dropped.type, 'text', 'one non-numeric value is not a null marker');
+  assert.equal(csv.suggestColumn('Fecha', ['1958', 's.d.'], 1).filled, 1, 'null markers are not counted as values');
+  // Blob/table-backed types cannot receive an imported string.
+  assert.ok(csv.typeStoresImportedText('text') && csv.typeStoresImportedText('ai'));
+  assert.ok(!csv.typeStoresImportedText('attachment') && !csv.typeStoresImportedText('relation'));
+  assert.ok(!csv.typeStoresImportedText('ai_image') && !csv.typeStoresImportedText('rollup'));
 
   // ── createDatabaseFromCsv (repo): options built from distinct values ────────
   const imported = dbmode.createDatabaseFromCsv(
@@ -275,6 +310,29 @@ try {
   assert.equal(impRows[0].cells[impDetail.columns[1].id], '3.5');
   const vivoOpt = impDetail.columns[2].options.find((o) => o.label === 'vivo');
   assert.equal(impRows[0].cells[impDetail.columns[2].id], vivoOpt.id, 'select cell maps to the option id');
+
+  // Discarding columns (type = null) must not shift the remaining cells' mapping, and a
+  // blob-backed type gets its column but no imported text.
+  const partial = dbmode.createDatabaseFromCsv(
+    'Parcial',
+    ['Nombre', 'Basura', 'Peso', 'Foto'],
+    [
+      ['Gato', 'xxx', '3.5', 'gato.jpg'],
+      ['Perro', 'yyy', '8', 'perro.jpg'],
+    ],
+    ['title', null, 'number', 'attachment']
+  );
+  const partialDetail = dbmode.getDatabaseDetail(partial.id);
+  assert.deepEqual(partialDetail.columns.map((c) => c.name), ['Nombre', 'Peso', 'Foto'], 'discarded column is not created');
+  const partialRows = dbmode.listRows(partial.id, { sort: 'position' });
+  assert.equal(partialRows[0].cells[partialDetail.columns[1].id], '3.5', 'cells still line up after a discard');
+  assert.equal(partialRows[0].cells[partialDetail.columns[2].id], undefined, 'attachment column holds no imported text');
+  assert.equal(partialRows[1].cells[partialDetail.columns[0].id], 'Perro', 'row order follows the CSV');
+
+  // Progress is reported so a long import can show a bar instead of freezing silently.
+  const ticks = [];
+  dbmode.createDatabaseFromCsv('Progreso', ['N'], [['a'], ['b']], ['title'], (done, total) => ticks.push([done, total]));
+  assert.ok(ticks.length > 0 && ticks[ticks.length - 1][0] === 2, 'progress reaches the final row');
 
   // ── AI columns: pure context + injected completion persistence ─────────────
   const aiDb = dbmode.createDatabase('IA');
@@ -428,6 +486,155 @@ try {
   const ruGapHits = dbmode.searchRelationTargets('gap', 'evidencia');
   assert.ok(ruGapHits.some((h) => h.id === 'g1'), 'gap relation search finds the gap by its statement');
 
+  // ── Formula columns (shared/databaseFormula + databaseFormulaEval, pure) ───
+  const fCol = (id, name, type, config = {}) => ({ id, name, type, config, options: [], position: 0, databaseId: 'db', createdAt: '' });
+  const fRow = (id, cells) => ({ id, databaseId: 'db', position: 0, cells, createdAt: '', updatedAt: '' });
+  const fTitle = fCol('t', 'Nombre', 'title');
+  const fA = fCol('a', 'Peso', 'number');
+  const fB = fCol('b', 'Cantidad', 'number');
+  const fBase = [fTitle, fA, fB];
+  /** Run one spec over rows and return the computed column's values. */
+  const runFormula = (spec, rows, extra = {}) => {
+    formulaEval.computeFormulas(rows, [...fBase, fCol('f', 'F', 'formula', { formula: spec, ...extra })]);
+    return rows.map((r) => r.cells.f);
+  };
+  const abRows = () => [fRow('r1', { t: 'x', a: '10', b: '4' }), fRow('r2', { t: 'y', a: '3', b: '0' }), fRow('r3', { t: 'z', a: '', b: '5' })];
+  const ab = (op) => runFormula({ kind: 'arithmetic', op, operands: [{ kind: 'column', columnId: 'a' }, { kind: 'column', columnId: 'b' }] }, abRows());
+
+  // Blanks: a missing value is "no value", so the set operations skip it, but a positional
+  // one (a − b) has no answer without it. Dividing by zero has no answer either.
+  assert.deepEqual(ab('add'), ['14', '3', '5']);
+  assert.deepEqual(ab('subtract'), ['6', '3', null], 'subtract needs every operand');
+  assert.deepEqual(ab('multiply'), ['40', '0', '5']);
+  assert.deepEqual(ab('divide'), ['2.5', null, null], 'divide by zero yields no value');
+  assert.deepEqual(ab('average'), ['7', '1.5', '5'], 'average ignores blanks rather than counting them as 0');
+  assert.deepEqual(ab('min'), ['4', '0', '5']);
+  assert.deepEqual(ab('max'), ['10', '3', '5']);
+  assert.deepEqual(ab('median'), ['7', '1.5', '5']);
+  assert.deepEqual(ab('countFilled'), ['2', '2', '1']);
+  assert.deepEqual(
+    runFormula({ kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'a' }, { kind: 'number', value: 100 }] }, abRows()),
+    ['110', '103', '100'],
+    'a fixed number is a valid operand, and the blank row is still just 100'
+  );
+
+  const statRows = () => [fRow('r1', { a: '50' }), fRow('r2', { a: '30' }), fRow('r3', { a: '20' })];
+  const stat = (fn) => runFormula({ kind: 'columnStat', fn, columnId: 'a' }, statRows());
+  assert.deepEqual(stat('percentOfTotal'), ['50', '30', '20']);
+  assert.deepEqual(stat('rank'), ['1', '2', '3'], 'rank 1 is the highest value');
+  assert.deepEqual(stat('columnTotal'), ['100', '100', '100'], 'a column total is the same on every row');
+  // Stored at full precision, not at display precision — see the 1000-row check below.
+  assert.deepEqual(stat('percentile'), ['66.6666666667', '33.3333333333', '0']);
+  // Precision is a display concern: storing a rounded % would stop the column adding to 100.
+  const thousandRows = Array.from({ length: 1000 }, (_, i) => fRow(`r${i}`, { a: '1' }));
+  const pcts = runFormula({ kind: 'columnStat', fn: 'percentOfTotal', columnId: 'a' }, thousandRows);
+  const pctSum = pcts.reduce((n, v) => n + Number(v), 0);
+  assert.ok(Math.abs(pctSum - 100) < 1e-6, `1000 rows of "% of total" must still add to 100, got ${pctSum}`);
+  assert.equal(formulaEval.evaluateFormula(
+    { kind: 'arithmetic', op: 'add', operands: [{ kind: 'number', value: 0.1 }, { kind: 'number', value: 0.2 }] },
+    fRow('r', {}),
+    { columns: new Map(), stats: new Map() }
+  ).value, '0.3', 'floating-point noise is cleaned up');
+
+  const ifSpec = {
+    kind: 'ifThen',
+    rules: [
+      { id: '1', conjunction: 'and', conditions: [{ id: 'c', columnId: 'a', op: 'gt', value: '5' }], output: { kind: 'text', value: 'Alto' }, color: '#10b981' },
+      { id: '2', conjunction: 'and', conditions: [{ id: 'c', columnId: 't', op: 'equals', value: 'z' }], output: { kind: 'text', value: 'Es Z' }, color: '#ef4444' },
+    ],
+    otherwise: { kind: 'text', value: 'Normal' },
+  };
+  const ifRows = abRows();
+  assert.deepEqual(runFormula(ifSpec, ifRows), ['Alto', 'Normal', 'Es Z'], 'the first matching rule wins');
+  assert.equal(ifRows[0].formulaColors.f, '#10b981', 'the winning rule paints the cell');
+  assert.equal(ifRows[1].formulaColors, undefined, 'a colourless fallback paints nothing');
+  // Two conditions on one rule, combined by the rule's own conjunction.
+  const andRule = {
+    kind: 'ifThen',
+    rules: [{
+      id: '1', conjunction: 'and',
+      conditions: [{ id: 'c1', columnId: 'a', op: 'gt', value: '5' }, { id: 'c2', columnId: 'b', op: 'gt', value: '3' }],
+      output: { kind: 'text', value: 'Ambas' },
+    }],
+    otherwise: { kind: 'empty' },
+  };
+  assert.deepEqual(runFormula(andRule, abRows()), ['Ambas', null, null], 'Y requires both conditions');
+  assert.deepEqual(
+    runFormula({ ...andRule, rules: [{ ...andRule.rules[0], conjunction: 'or' }] }, abRows()),
+    ['Ambas', null, 'Ambas'],
+    'O requires either condition'
+  );
+  assert.deepEqual(
+    runFormula({ kind: 'ifThen', rules: [{ id: '1', conjunction: 'and', conditions: [{ id: 'c', columnId: 'a', op: 'gt', value: '5' }], output: { kind: 'column', columnId: 'b' } }], otherwise: { kind: 'empty' } }, abRows()),
+    ['4', null, null],
+    'a rule can output another column value'
+  );
+
+  assert.deepEqual(
+    runFormula({ kind: 'concat', parts: [{ kind: 'column', columnId: 't' }, { kind: 'text', value: ' (' }, { kind: 'column', columnId: 'a' }, { kind: 'text', value: ')' }] }, abRows()),
+    ['x (10)', 'y (3)', 'z ()'],
+    'concat joins in order'
+  );
+
+  // Result kind drives how the column filters and sorts.
+  assert.equal(formulaShared.formulaResultKind({ kind: 'arithmetic', op: 'add', operands: [] }), 'number');
+  assert.equal(formulaShared.formulaResultKind({ kind: 'concat', parts: [] }), 'text');
+  assert.equal(formulaShared.formulaResultKind(ifSpec), 'text');
+  assert.equal(
+    formulaShared.formulaResultKind({ kind: 'ifThen', rules: [{ id: '1', conjunction: 'and', conditions: [], output: { kind: 'number', value: 1 } }], otherwise: { kind: 'number', value: 0 } }),
+    'number',
+    'an if whose branches are all numbers is a number column'
+  );
+  assert.equal(formulaShared.comparableType(fCol('f', 'F', 'formula', { formula: { kind: 'arithmetic', op: 'add', operands: [] } })), 'number');
+  assert.equal(formulaShared.comparableType(fA), 'number', 'a non-formula column is itself');
+  assert.ok(filters.operatorsForColumn(fCol('f', 'F', 'formula', { formula: { kind: 'concat', parts: [] } })).includes('contains'));
+  assert.ok(filters.operatorsForColumn(fCol('f', 'F', 'formula', { formula: { kind: 'arithmetic', op: 'add', operands: [] } })).includes('gt'));
+
+  // A formula may build on another; evaluation order follows the dependencies, not the columns.
+  const totalCol = fCol('tot', 'Total', 'formula', { formula: { kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'a' }, { kind: 'column', columnId: 'b' }] } });
+  const pctCol = fCol('pct', 'Pct', 'formula', { formula: { kind: 'columnStat', fn: 'percentOfTotal', columnId: 'tot' } });
+  const chained = abRows();
+  formulaEval.computeFormulas(chained, [...fBase, pctCol, totalCol]); // dependent column declared first
+  assert.deepEqual(chained.map((r) => r.cells.tot), ['14', '3', '5'], 'the dependency is computed first');
+  assert.equal(chained[0].cells.pct, '63.6363636364');
+
+  // A circular reference is reported, never hung on.
+  const c1 = fCol('c1', 'C1', 'formula', { formula: { kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'c2' }] } });
+  const c2 = fCol('c2', 'C2', 'formula', { formula: { kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'c1' }] } });
+  const cyc = [fRow('r1', {})];
+  formulaEval.computeFormulas(cyc, [fA, c1, c2]);
+  assert.match(cyc[0].formulaErrors.c1, /circular/i);
+  assert.match(cyc[0].formulaErrors.c2, /circular/i);
+
+  // A half-built formula explains itself instead of rendering a blank.
+  assert.equal(formulaShared.validateFormula(null, []), 'Esta columna todavía no tiene fórmula.');
+  assert.match(formulaShared.validateFormula({ kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'a' }] }, fBase), /al menos dos/);
+  assert.match(formulaShared.validateFormula({ kind: 'columnStat', fn: 'rank', columnId: '' }, fBase), /Elige la columna/);
+  assert.match(formulaShared.validateFormula({ kind: 'ifThen', rules: [], otherwise: { kind: 'empty' } }, fBase), /al menos una regla/);
+  assert.match(
+    formulaShared.validateFormula({ kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'gone' }, { kind: 'column', columnId: 'a' }] }, fBase),
+    /ya no existe/,
+    'a deleted source column is reported'
+  );
+  assert.deepEqual(formulaShared.formulaDependencies(ifSpec).sort(), ['a', 't']);
+
+  // Colour rules paint any recipe's result, not just an if's branches.
+  const colored = abRows();
+  formulaEval.computeFormulas(colored, [
+    ...fBase,
+    fCol('f', 'F', 'formula', {
+      formula: { kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'a' }, { kind: 'column', columnId: 'b' }] },
+      formulaColors: [{ id: 'x', op: 'gt', value: '10', color: '#ef4444' }],
+    }),
+  ]);
+  assert.equal(colored[0].formulaColors.f, '#ef4444', '14 > 10 is painted');
+  assert.equal(colored[1].formulaColors, undefined, '3 is not');
+
+  // The description is the column's own explanation, in words.
+  assert.equal(formulaEval.describeFormula({ kind: 'arithmetic', op: 'add', operands: [{ kind: 'column', columnId: 'a' }, { kind: 'column', columnId: 'b' }] }, fBase), 'Peso + Cantidad');
+  assert.equal(formulaEval.describeFormula({ kind: 'columnStat', fn: 'percentOfTotal', columnId: 'a' }, fBase), '% del total de Peso');
+  assert.match(formulaEval.describeFormula(ifSpec, fBase), /si Peso mayor que 5 → «Alto»/);
+
   // ── Bulk file matching (shared/databaseBulk, pure) ─────────────────────────
   assert.equal(bulk.fileMatchKey('Foto_01.PNG'), 'foto_01');
   const bm = bulk.matchFilesToRows(
@@ -440,6 +647,67 @@ try {
   assert.equal(bm.find((m) => m.fileName === 'gato.png').rowId, 'r1', 'file matches a row by name without extension');
   assert.equal(bm.find((m) => m.fileName === 'nope.png').rowId, null, 'unmatched file has no row');
   assert.deepEqual(bulk.countMatches(bm), { matched: 2, unmatched: 1 });
+
+  // ── Catalogue-code matching ────────────────────────────────────────────────
+  // Real exports carry debris around the code on both sides: variant suffixes on files
+  // ("LV005-FG069__2"), junk prefixes, and stray characters on the reference value.
+  assert.equal(bulk.extractCode('LV001-FG001.jpg'), 'lv001-fg001');
+  assert.equal(bulk.extractCode('lv005-fg069__2'), 'lv005-fg069', 'a variant suffix is not part of the code');
+  assert.equal(bulk.extractCode('_ _ lv130-fg006'), 'lv130-fg006', 'a junk prefix is skipped');
+  assert.equal(bulk.extractCode('LV037-FG189.158 Quilla'), 'lv037-fg189', 'trailing text is not part of the code');
+  assert.equal(bulk.extractCode('sin codigo aqui'), null);
+  const coded = bulk.matchFilesToRows(
+    ['LV005-FG069__1.png', 'LV005-FG069__2.png', '_ _ LV130-FG006.jpg', 'suelto.jpg'],
+    [
+      { rowId: 'a', refValue: 'LV005-FG069' },
+      { rowId: 'b', refValue: 'LV130-FG006·' },
+    ]
+  );
+  assert.equal(coded[0].rowId, 'a');
+  assert.equal(coded[1].rowId, 'a', 'both variants land on the same row');
+  assert.equal(coded[0].strategy, 'code');
+  assert.equal(coded[2].rowId, 'b', 'a stray character on the reference value still matches');
+  assert.equal(coded[3].rowId, null, 'a file with no code stays unmatched');
+  assert.deepEqual(bulk.summarizeMatches(coded), { exact: 0, code: 3, fuzzy: 0, unmatched: 1, fuzzyDeclined: false });
+  // An exact name always wins over a code, so a confident match is never displaced.
+  const exactWins = bulk.matchFilesToRows(
+    ['LV001-FG001.jpg'],
+    [{ rowId: 'other', refValue: 'LV001-FG001 bis' }, { rowId: 'exact', refValue: 'LV001-FG001' }]
+  );
+  assert.equal(exactWins[0].rowId, 'exact');
+  assert.equal(exactWins[0].strategy, 'exact');
+  // useCode: false restores the old exact-only behaviour.
+  assert.equal(bulk.matchFilesToRows(['LV005-FG069__1.png'], [{ rowId: 'a', refValue: 'LV005-FG069' }], { useCode: false })[0].rowId, null);
+
+  // ── User-supplied code templates ──────────────────────────────────────────
+  assert.equal(bulk.extractCode('foto AB123 final', bulk.codeTemplateToRegex('@@###')), 'ab123');
+  assert.equal(bulk.extractCode('x LV001-FG001 y', bulk.codeTemplateToRegex('@@###-@@###')), 'lv001-fg001');
+  assert.equal(bulk.extractCode('ref 42 aqui', bulk.codeTemplateToRegex('/\\d+/')), '42', 'a raw regex body is honoured');
+  assert.equal(bulk.codeTemplateToRegex('   '), null, 'an empty template is not a pattern');
+  assert.equal(bulk.codeTemplateToRegex('/[/'), null, 'an invalid regex is rejected, not thrown');
+
+  // ── Fuzzy fallback ────────────────────────────────────────────────────────
+  const fuzzyRows = [{ rowId: 'f1', refValue: 'Informe Anual Definitivo' }];
+  const fz = bulk.matchFilesToRows(['informe_anual_definitivo (copia).pdf'], fuzzyRows, { fuzzy: true });
+  assert.equal(fz[0].rowId, 'f1', 'a near-identical name pairs when fuzzy is on');
+  assert.equal(fz[0].strategy, 'fuzzy');
+  assert.ok(fz[0].score >= 0.6);
+  // Off by default: a wrong attachment is worse than none.
+  assert.equal(bulk.matchFilesToRows(['informe_anual_definitivo (copia).pdf'], fuzzyRows)[0].rowId, null);
+  // A name with nothing in common is refused even with fuzzy on.
+  assert.equal(bulk.matchFilesToRows(['zzzz.pdf'], fuzzyRows, { fuzzy: true })[0].rowId, null);
+  // Two rows that score alike are indistinguishable, so neither is guessed.
+  const tie = bulk.matchFilesToRows(
+    ['documento uno.pdf'],
+    [{ rowId: 't1', refValue: 'Documento Uno A' }, { rowId: 't2', refValue: 'Documento Uno B' }],
+    { fuzzy: true }
+  );
+  assert.equal(tie[0].rowId, null, 'an ambiguous fuzzy winner is refused');
+  // The fuzzy pass is O(leftovers x rows): past its budget it declines instead of hanging.
+  const many = Array.from({ length: 1200 }, (_, i) => `archivo-${i}.jpg`);
+  const manyRows = Array.from({ length: 1200 }, (_, i) => ({ rowId: `m${i}`, refValue: `Fila ${i}` }));
+  const declined = bulk.matchFilesToRows(many, manyRows, { fuzzy: true });
+  assert.ok(bulk.summarizeMatches(declined).fuzzyDeclined, 'an unaffordable fuzzy pass is declined, not run');
 
   // ── Filters + sorts (shared/databaseFilters) over a real database ──────────
   const fDb = dbmode.createDatabase('Filtros');
@@ -604,8 +872,29 @@ try {
   const chatCtx = buildDatabaseChatContext([pDb.id]);
   assert.match(chatCtx.context, /BASE DE DATOS: Perfil/, 'chat context names the database');
   assert.match(chatCtx.context, /media 20/, 'chat context includes the profile');
-  assert.match(chatCtx.context, /Muestra de filas/, 'chat context includes a row sample');
+  assert.match(chatCtx.context, /MUESTRA/, 'chat context includes a row sample');
   assert.ok(chatCtx.names.includes('Perfil'));
+  // The profile is computed over every row while the sample is a handful of examples, so both
+  // have to say which they are: a model shown 15 numbered rows answers "15" when asked how
+  // many rows the table has, and reports that with total confidence.
+  assert.match(chatCtx.context, /PERFIL \(calculado sobre las 3 filas\)/, 'the profile states its scope');
+  assert.match(chatCtx.context, /MUESTRA: 3 filas de ejemplo de 3/, 'the sample states it is a sample of the whole');
+  assert.match(chatCtx.context, /no cuentes sobre ella/, 'and that it must not be counted');
+  assert.match(chatShared.DB_CHAT_SYSTEM, /única fuente válida para totales/, 'the system prompt names the profile as the only source of figures');
+
+  // A single long cell must not be allowed to crowd out the profile: real catalogues carry
+  // 3k-character description fields, and 15 of those bury the figures the answers come from
+  // (and push the prompt past a local model's window, which truncates it silently).
+  const longDb = dbmode.createDatabase('Largo');
+  const lTitle = dbmode.createColumn(longDb.id, 'Nombre', 'title');
+  const lText = dbmode.createColumn(longDb.id, 'Descripcion', 'text');
+  const lRow = dbmode.createRow(longDb.id);
+  dbmode.setCell(lRow.id, lTitle.id, 'Ficha');
+  dbmode.setCell(lRow.id, lText.id, 'palabra '.repeat(500));
+  const longCtx = buildDatabaseChatContext([longDb.id]).context;
+  const sampleBlock = longCtx.slice(longCtx.indexOf('MUESTRA'));
+  assert.ok(sampleBlock.length < 1000, `a 4000-char cell must be clipped in the sample, block was ${sampleBlock.length}`);
+  assert.match(sampleBlock, /…/, 'the clipped value is marked as clipped');
 
   // ── Export CSV / JSON / XLSX (Phase 8) ─────────────────────────────────────
   const expCols = dbmode.getColumns(imported.id);

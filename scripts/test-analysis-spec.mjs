@@ -74,6 +74,35 @@ test('columnRoles classifies by type/cardinality', () => {
   assert.deepEqual(roles.date.map((c) => c.id), ['when']);
 });
 
+// A formula column is only "formula" on the header; the analysis engine has to see the number
+// or text it computes, or every derived column silently drops out of every analysis.
+test('columnRoles classifies a formula by what it computes, not by its declared type', () => {
+  const withFormula = {
+    ...profile,
+    columns: [
+      ...profile.columns,
+      { columnId: 'total', name: 'Total', type: 'formula', valueType: 'number', filled: 20, fillRate: 1,
+        number: { count: 20, min: 2, max: 18, mean: 10, median: 10, sum: 200, stdev: 4, histogram: [] } },
+      { columnId: 'verdict', name: 'Veredicto', type: 'formula', valueType: 'select', filled: 20, fillRate: 1, distinct: 2,
+        distribution: [{ id: 'x', label: 'Alto', color: null, count: 12 }, { id: 'y', label: 'Bajo', color: null, count: 8 }] },
+    ],
+  };
+  const roles = cat.columnRoles(withFormula);
+  assert.ok(roles.numeric.some((c) => c.id === 'total'), 'a numeric formula is a numeric column');
+  assert.equal(roles.numeric.find((c) => c.id === 'total').type, 'number', 'and is announced to the AI as a number');
+  assert.ok(roles.lowCard.some((c) => c.id === 'verdict'), 'a select-like formula can group');
+  // It must therefore be usable as a real operand, not just listed.
+  assert.ok(cat.validateRequest({ kind: 'correlation', columns: ['price', 'total'] }, withFormula).ok, 'correlating a formula is allowed');
+  assert.ok(cat.validateRequest({ kind: 'group_compare', columns: ['verdict', 'total'] }, withFormula).ok, 'grouping by a formula is allowed');
+});
+
+// A profile built outside TypeScript (fixtures, persisted JSON) has no valueType; every
+// non-formula column must still classify from its own type.
+test('columnRoles falls back to type when a profile carries no valueType', () => {
+  const roles = cat.columnRoles({ rowCount: 2, columns: [{ columnId: 'n', name: 'N', type: 'number', filled: 2, fillRate: 1, number: { count: 2, min: 1, max: 2, mean: 1.5, median: 1.5, sum: 3, stdev: 0.5, histogram: [] } }] });
+  assert.deepEqual(roles.numeric.map((c) => c.id), ['n']);
+});
+
 test('applicableKinds reflects available columns', () => {
   const kinds = cat.applicableKinds(profile);
   assert.ok(kinds.includes('correlation'));

@@ -76,6 +76,19 @@ const INDIRECT_KEY_SOURCES = [
     file: `src/views/${name}.tsx`,
     pattern: /(?:title|body):\s*(["'])((?:\\.|(?!\1).)*?)\1/g,
   })),
+  // Why the CSV import suggested a column type, rendered as t(s.reason) in the import modal.
+  { file: 'shared/databaseCsv.ts', pattern: /\bpick\([^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Column type + rollup function names, rendered as t(columnTypeDef(x).label) / t(f.label).
+  { file: 'shared/databases.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Formula recipe / operation / statistic names and hints, rendered as t(r.label) / t(r.hint).
+  { file: 'shared/databaseFormula.ts', pattern: /\b(?:label|hint):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // validateFormula's problems, surfaced through t(problem) in the editor and t(error) in the
+  // cell. Only sentences: a returned single word here is a discriminant ('number'), not a key.
+  { file: 'shared/databaseFormula.ts', pattern: /\breturn (["'])((?:\\.|(?!\1).)*?\s(?:\\.|(?!\1).)*?)\1;/g },
+  // Formula errors written onto a row, surfaced through t(error) in the cell.
+  { file: 'shared/databaseFormulaEval.ts', pattern: /\bsetError\([^,]+,[^,]+,\s*(?:problem \?\? )?(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // describeFormula stitches its sentence from words, each passed through the injected t().
+  { file: 'shared/databaseFormulaEval.ts', pattern: /\bt\((["'])((?:\\.|(?!\1).)*?)\1\)/g },
 ];
 
 // Literals that sit inside a t() call but are not keys: they index a label map

@@ -8,6 +8,7 @@
 
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from './databases';
 import type { DatabaseColumn, DatabaseColumnType, DatabaseRow } from './databases';
+import { comparableType } from './databaseFormula';
 
 export interface HistogramBucket {
   label: string;
@@ -35,7 +36,16 @@ export interface DistributionSlice {
 export interface ColumnProfile {
   columnId: string;
   name: string;
+  /** The column's declared type — what the header shows. */
   type: DatabaseColumnType;
+  /**
+   * The type the column's values actually behave as, which is what statistics care about.
+   * Identical to `type` except for a formula, whose declared type says nothing about whether
+   * it holds numbers or text. Without this the analysis engine cannot see a formula at all:
+   * "% of total" would be profiled as if it were prose and never offered to a correlation.
+   * Optional so a hand-built or persisted profile still classifies (readers fall back to `type`).
+   */
+  valueType?: DatabaseColumnType;
   filled: number;
   fillRate: number;
   distinct?: number;
@@ -106,9 +116,13 @@ function distributionFor(column: DatabaseColumn, rows: DatabaseRow[], multi: boo
 
 export function computeColumnProfile(column: DatabaseColumn, rows: DatabaseRow[]): ColumnProfile {
   const total = rows.length;
-  const base = { columnId: column.id, name: column.name, type: column.type };
+  // A formula writes its result into cells like any other column, so profile it by what it
+  // computes rather than by the word "formula" — otherwise every derived column is invisible
+  // to the analysis engine, which is exactly where a computed column is most wanted.
+  const valueType = comparableType(column);
+  const base = { columnId: column.id, name: column.name, type: column.type, valueType };
 
-  switch (column.type) {
+  switch (valueType) {
     case 'number': {
       const values = rows.map((r) => decodeNumber(r.cells[column.id] ?? null)).filter((n): n is number => n != null);
       return { ...base, filled: values.length, fillRate: total ? values.length / total : 0, number: values.length ? numberStats(values) : undefined };
@@ -182,7 +196,9 @@ export function profileToText(databaseName: string, profile: DatabaseProfile): s
     } else if (c.distinct != null) {
       detail = `${c.distinct} valores distintos`;
     }
-    lines.push(`- ${c.name} (${c.type}) · relleno ${pct}%${detail ? ` · ${detail}` : ''}`);
+    // Announce what the column holds: "(formula)" tells a model nothing it can reason with,
+    // while "(number)" lets it use the min/max/mean that follow.
+    lines.push(`- ${c.name} (${c.valueType}) · relleno ${pct}%${detail ? ` · ${detail}` : ''}`);
   }
   return lines.join('\n');
 }

@@ -232,6 +232,7 @@ const api: NodusApi = {
   setDatabaseCell: (rowId, columnId, raw) => ipcRenderer.invoke('db:setCell', rowId, columnId, raw),
   listDatabaseAttachments: (rowId, columnId) => ipcRenderer.invoke('db:listAttachments', rowId, columnId),
   getDatabaseAttachmentBlob: (id) => ipcRenderer.invoke('db:getAttachmentBlob', id),
+  getDatabaseAttachmentThumb: (id) => ipcRenderer.invoke('db:getAttachmentThumb', id),
   deleteDatabaseAttachment: (id) => ipcRenderer.invoke('db:deleteAttachment', id).then(() => undefined),
   downloadDatabaseAttachment: (id) => ipcRenderer.invoke('db:downloadAttachment', id),
   pickAndAttachDatabaseFiles: (rowId, columnId) => ipcRenderer.invoke('db:pickAndAttach', rowId, columnId),
@@ -251,6 +252,13 @@ const api: NodusApi = {
   searchDatabaseRelationTargets: (kind, query, databaseId) => ipcRenderer.invoke('db:searchRelationTargets', kind, query, databaseId),
   parseCsvForImport: () => ipcRenderer.invoke('db:parseCsvForImport'),
   createDatabaseFromCsv: (name, headers, rows, types) => ipcRenderer.invoke('db:createFromCsv', name, headers, rows, types),
+  createDatabaseFromCsvToken: (token, name, types) => ipcRenderer.invoke('db:createFromCsvToken', token, name, types),
+  releaseCsvImport: (token) => ipcRenderer.invoke('db:releaseCsvImport', token).then(() => undefined),
+  onCsvImportProgress: (cb) => {
+    const listener = (_e: unknown, payload: { done: number; total: number; finished: boolean }) => cb(payload);
+    ipcRenderer.on('db:csvImportProgress', listener);
+    return () => ipcRenderer.removeListener('db:csvImportProgress', listener);
+  },
   exportDatabase: (databaseId, format) => ipcRenderer.invoke('db:export', databaseId, format),
   getDatabaseProfile: (databaseId) => ipcRenderer.invoke('db:profile', databaseId),
   analyzeDatabaseReport: (databaseId) => ipcRenderer.invoke('db:analyzeReport', databaseId),
@@ -283,9 +291,9 @@ const api: NodusApi = {
   createDatabaseView: (databaseId, input) => ipcRenderer.invoke('db:createView', databaseId, input),
   updateDatabaseView: (id, patch) => ipcRenderer.invoke('db:updateView', id, patch),
   deleteDatabaseView: (id) => ipcRenderer.invoke('db:deleteView', id).then(() => undefined),
-  pickBulkDatabaseFiles: () => ipcRenderer.invoke('db:pickBulkFiles'),
-  bulkAttachDatabaseFiles: (databaseId, refColumnId, attachmentColumnId, files) =>
-    ipcRenderer.invoke('db:bulkAttach', databaseId, refColumnId, attachmentColumnId, files),
+  pickBulkDatabaseFiles: (mode) => ipcRenderer.invoke('db:pickBulkFiles', mode ?? 'files'),
+  bulkAttachDatabaseFiles: (databaseId, refColumnId, attachmentColumnId, files, options) =>
+    ipcRenderer.invoke('db:bulkAttach', databaseId, refColumnId, attachmentColumnId, files, options ?? {}),
   onDatabaseBulkProgress: (cb) => {
     const listener = (
       _e: unknown,

@@ -28,6 +28,22 @@ export const MAX_COL_WIDTH = 640;
 /** Palette offered when creating/recoloring a select option or a chip. */
 export const OPTION_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6'];
 
+export interface AnchorCoords {
+  /** Set when the popover hangs below the trigger. */
+  top?: number;
+  /** Set instead of `top` when it had to open upwards; distance from the viewport bottom. */
+  bottom?: number;
+  left: number;
+  width: number;
+  /** Room actually available on the chosen side; the popover scrolls inside it. */
+  maxHeight: number;
+}
+
+const ANCHOR_MARGIN = 8;
+const ANCHOR_GAP = 4;
+/** Below this much room, a popover is better off flipped above its trigger. */
+const ANCHOR_MIN_ROOM = 180;
+
 /**
  * Anchor a portaled popover to a trigger element. Body cells are `overflow-hidden`
  * (to truncate their content), so cell editors render in a `document.body` portal
@@ -35,6 +51,10 @@ export const OPTION_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#10b981', '#3b82
  * (rather than closing) so it stays glued to its cell and never vanishes mid-edit.
  * `fixedWidth` pins a width; otherwise it matches the cell width (>= `minWidth`).
  * `place` puts it just below the cell ('below') or over its top-left ('over').
+ *
+ * Both axes are kept on screen. Only `left` used to be, so editing a cell near the bottom of
+ * a long table opened its editor past the fold, where it could not be seen or reached — the
+ * popover flips above the trigger when the room below runs out, and caps its height either way.
  */
 export function useAnchoredCoords(
   open: boolean,
@@ -42,8 +62,8 @@ export function useAnchoredCoords(
   fixedWidth: number | null,
   minWidth: number,
   place: 'below' | 'over'
-): { top: number; left: number; width: number } | null {
-  const [coords, setCoords] = useState<{ top: number; left: number; width: number } | null>(null);
+): AnchorCoords | null {
+  const [coords, setCoords] = useState<AnchorCoords | null>(null);
   useEffect(() => {
     if (!open) {
       setCoords(null);
@@ -53,9 +73,23 @@ export function useAnchoredCoords(
       const r = ref.current?.getBoundingClientRect();
       if (!r) return;
       const width = fixedWidth ?? Math.max(minWidth, r.width);
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 8));
-      const top = Math.max(8, place === 'over' ? r.top : r.bottom + 4);
-      setCoords({ top, left, width });
+      const left = Math.max(ANCHOR_MARGIN, Math.min(r.left, window.innerWidth - width - ANCHOR_MARGIN));
+
+      // 'over' sits on the trigger itself, so it only needs clamping into view.
+      if (place === 'over') {
+        const top = Math.max(ANCHOR_MARGIN, Math.min(r.top, window.innerHeight - ANCHOR_MIN_ROOM));
+        setCoords({ top, left, width, maxHeight: window.innerHeight - top - ANCHOR_MARGIN });
+        return;
+      }
+      const roomBelow = window.innerHeight - r.bottom - ANCHOR_GAP - ANCHOR_MARGIN;
+      const roomAbove = r.top - ANCHOR_GAP - ANCHOR_MARGIN;
+      if (roomBelow >= ANCHOR_MIN_ROOM || roomBelow >= roomAbove) {
+        setCoords({ top: r.bottom + ANCHOR_GAP, left, width, maxHeight: Math.max(ANCHOR_MIN_ROOM, roomBelow) });
+      } else {
+        // Anchored by its bottom edge so it grows upward from the trigger and stays glued to
+        // it, whatever height the content turns out to be.
+        setCoords({ bottom: window.innerHeight - r.top + ANCHOR_GAP, left, width, maxHeight: Math.max(ANCHOR_MIN_ROOM, roomAbove) });
+      }
     };
     compute();
     window.addEventListener('resize', compute);
@@ -66,6 +100,11 @@ export function useAnchoredCoords(
     };
   }, [open, ref, fixedWidth, minWidth, place]);
   return coords;
+}
+
+/** The fixed-position style an anchored popover needs, including its scroll cap. */
+export function anchorStyle(c: AnchorCoords): React.CSSProperties {
+  return { top: c.top, bottom: c.bottom, left: c.left, width: c.width, maxHeight: c.maxHeight, overflowY: 'auto' };
 }
 
 export function defaultColumnWidth(type: DatabaseColumnType): number {
@@ -189,7 +228,7 @@ export function LongTextCell({ value, onChange, markdown }: { value: string | nu
             <div className="fixed inset-0 z-40" onClick={commit} />
             <div
               className="fixed z-50 card-modal p-2 text-sm shadow-xl"
-              style={{ top: coords.top, left: coords.left, width: coords.width }}
+              style={anchorStyle(coords)}
             >
               {markdown && (
                 <div className="flex items-center justify-end gap-1 mb-1">
@@ -324,7 +363,7 @@ export function ChipSelectCell({
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <div
               className="fixed z-50 card-modal p-1.5 text-sm shadow-xl"
-              style={{ top: coords.top, left: coords.left, width: coords.width }}
+              style={anchorStyle(coords)}
             >
               <input
                 className="input h-7 w-full text-xs"

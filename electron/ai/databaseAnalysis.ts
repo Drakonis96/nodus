@@ -149,6 +149,21 @@ export async function suggestDatabaseAnalyses(databaseId: string, deps: Analysis
 
 const MAX_SCATTER_POINTS = 600;
 
+/**
+ * Thin a scatter down to a drawable number of dots by walking the whole set at an even
+ * stride, rather than taking the first N. The statistics always run on every pair — this only
+ * decides which dots get drawn — but taking a prefix samples whatever the rows happen to be
+ * ordered by (in a photo catalogue, the earliest folders), so the cloud would misrepresent a
+ * range the caption still reports in full. An even stride keeps the picture honest.
+ */
+function scatterSample(pairs: [number, number][]): [number, number][] {
+  if (pairs.length <= MAX_SCATTER_POINTS) return pairs;
+  const stride = pairs.length / MAX_SCATTER_POINTS;
+  const out: [number, number][] = [];
+  for (let i = 0; i < MAX_SCATTER_POINTS; i++) out.push(pairs[Math.floor(i * stride)]);
+  return out;
+}
+
 function histogram(values: number[], buckets = 10): { label: string; count: number }[] {
   if (!values.length) return [];
   const min = Math.min(...values);
@@ -205,7 +220,7 @@ export function computeAnalysis(columns: DatabaseColumn[], rows: DatabaseRow[], 
       const cx = col(request.columns[0]);
       const cy = col(request.columns[1]);
       const pairs = finitePairs(numericValues(cx, rows), numericValues(cy, rows));
-      const points: ScatterPoint[] = pairs.slice(0, MAX_SCATTER_POINTS).map(([x, y]) => ({ x: round(x, 4), y: round(y, 4) }));
+      const points: ScatterPoint[] = scatterSample(pairs).map(([x, y]) => ({ x: round(x, 4), y: round(y, 4) }));
       return { kind: 'correlation', xColumn: cx.id, yColumn: cy.id, xName: cx.name, yName: cy.name, pearson: pearson(pairs), spearman: spearman(pairs), regression: linearRegression(pairs), points };
     }
     case 'correlation_matrix':

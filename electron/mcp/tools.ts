@@ -36,6 +36,8 @@ import * as workSummaries from '../db/workSummariesRepo';
 import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
 import * as dbMode from '../db/databasesRepo';
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from '@shared/databases';
+import { comparableType, type FormulaSpec } from '@shared/databaseFormula';
+import { describeFormula } from '@shared/databaseFormulaEval';
 import type { DatabaseColumn, DatabaseRow } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
@@ -330,7 +332,11 @@ function vaultContext() {
 /** Decode a cell to a human-readable value for MCP (resolves option labels, counts). */
 function dbCellValue(col: DatabaseColumn, row: DatabaseRow): unknown {
   const raw = row.cells[col.id] ?? null;
-  switch (col.type) {
+  // A rollup is derived and kept beside the cells, so it has to be read from there or it
+  // reaches the client as null. A formula lives in cells but is typed by what it computes,
+  // so a numeric one is handed over as a number rather than as a string.
+  if (col.type === 'rollup') return row.rollups?.[col.id] ?? null;
+  switch (comparableType(col)) {
     case 'select':
       return col.options.find((o) => o.id === raw)?.label ?? null;
     case 'multi_select':
@@ -1662,7 +1668,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get database schema',
       description:
-        'Gets a database\'s columns: each column\'s id, name and type (title|text|number|date|time|select|multi_select|checkbox|attachment|ai|relation) plus the option labels for select/multi-select columns. Read-only.',
+        'Gets a database\'s columns: each column\'s id, name and type (title|text|number|date|time|select|multi_select|checkbox|attachment|ai|ai_image|relation|rollup|formula) plus the option labels for select/multi-select columns. A formula column also reports `computes` (number|text — what its values behave as, since "formula" says nothing on its own) and `formula`, a plain-language description of the recipe. Read-only.',
       inputSchema: { databaseId: z.string().trim().min(1) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -1676,6 +1682,13 @@ export function registerTools(server: McpServer): void {
             id: c.id,
             name: c.name,
             type: c.type,
+            // "formula" tells a client nothing it can query on, so say what it yields and how.
+            ...(c.type === 'formula'
+              ? {
+                  computes: comparableType(c),
+                  formula: describeFormula(c.config.formula as FormulaSpec | undefined, detail.columns) || undefined,
+                }
+              : {}),
             options: c.options.length ? c.options.map((o) => o.label) : undefined,
           })),
         };

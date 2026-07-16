@@ -33,8 +33,18 @@ interface ConfirmRequest {
   resolve: (ok: boolean) => void;
 }
 
+interface PromptRequest {
+  title: string;
+  message?: ReactNode;
+  initial: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  resolve: (value: string | null) => void;
+}
+
 let toasts: ToastItem[] = [];
 let confirmReq: ConfirmRequest | null = null;
+let promptReq: PromptRequest | null = null;
 const listeners = new Set<() => void>();
 let seq = 0;
 
@@ -91,6 +101,32 @@ function resolveConfirm(ok: boolean): void {
   confirmReq = null;
   emit();
   req?.resolve(ok);
+}
+
+/**
+ * Styled replacement for `window.prompt`, which Electron does not implement at all — calling
+ * it returns null without showing anything, so any button relying on it silently does nothing.
+ * Resolves the typed text, or null on cancel/Escape/backdrop.
+ */
+export function promptText(opts: {
+  title: string;
+  message?: ReactNode;
+  initial?: string;
+  placeholder?: string;
+  confirmLabel?: string;
+}): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (promptReq) promptReq.resolve(null);
+    promptReq = { ...opts, initial: opts.initial ?? '', resolve };
+    emit();
+  });
+}
+
+function resolvePrompt(value: string | null): void {
+  const req = promptReq;
+  promptReq = null;
+  emit();
+  req?.resolve(value);
 }
 
 const TONE: Record<ToastTone, { icon: string; accent: string; iconClass: string }> = {
@@ -155,6 +191,87 @@ export function FeedbackHost() {
           onCancel={() => resolveConfirm(false)}
         />
       )}
+      {promptReq && (
+        <PromptModal
+          key={promptReq.title}
+          title={promptReq.title}
+          message={promptReq.message}
+          initial={promptReq.initial}
+          placeholder={promptReq.placeholder}
+          confirmLabel={promptReq.confirmLabel}
+          onConfirm={(v) => resolvePrompt(v)}
+          onCancel={() => resolvePrompt(null)}
+        />
+      )}
     </>
+  );
+}
+
+/** The prompt counterpart of ConfirmModal: one text field, Enter to accept. */
+function PromptModal({
+  title,
+  message,
+  initial,
+  placeholder,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  message?: ReactNode;
+  initial: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  onConfirm: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+  const accept = () => {
+    const v = value.trim();
+    if (v) onConfirm(v);
+  };
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-6 z-[120]" onClick={onCancel}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="card w-full max-w-sm p-5"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="font-semibold mb-2">{title}</h2>
+        {message && <div className="text-sm text-neutral-400 mb-3">{message}</div>}
+        <input
+          className="input w-full"
+          autoFocus
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              accept();
+            }
+          }}
+        />
+        <div className="flex justify-end gap-2 mt-5">
+          <button className="btn btn-ghost" onClick={onCancel}>
+            {t('Cancelar')}
+          </button>
+          <button className="btn btn-primary" onClick={accept} disabled={!value.trim()}>
+            {confirmLabel ?? t('Guardar')}
+          </button>
+        </div>
+      </motion.div>
+    </div>,
+    document.body
   );
 }

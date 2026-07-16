@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from './ui';
 import { BarList } from './DatabaseChart';
-import { useAnchoredCoords } from './dbGrid';
+import { anchorStyle, useAnchoredCoords } from './dbGrid';
 import { Markdown } from './Markdown';
 import { t, tx } from '../i18n';
 import type {
@@ -651,7 +651,7 @@ export function ColumnSelect({
             <div className="fixed inset-0 z-[55]" onClick={() => setOpen(false)} />
             <div
               className="fixed z-[56] card p-1 max-h-[50vh] overflow-y-auto shadow-xl"
-              style={{ top: coords.top, left: coords.left, width: coords.width }}
+              style={anchorStyle(coords)}
             >
               {options.length === 0 && <div className="px-2 py-1.5 text-xs text-neutral-500">{t('Sin columnas')}</div>}
               {options.map((o) => {

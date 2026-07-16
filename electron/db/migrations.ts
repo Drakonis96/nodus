@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 79;
+export const SCHEMA_VERSION = 80;
 
 export const migrations: Migration[] = [
   {
@@ -2701,6 +2701,16 @@ export const migrations: Migration[] = [
       -- Optional country-issued identifier for archival disambiguation and search.
       ALTER TABLE persons ADD COLUMN national_id TEXT;
       CREATE INDEX idx_persons_national_id ON persons(national_id);
+    `,
+  },
+  {
+    version: 80,
+    up: /* sql */ `
+      -- A downscaled preview of an image attachment. The grid and the gallery render one
+      -- thumb per visible row, and reading the original blob for that (a 5 GB photo
+      -- catalogue is ~800 KB per file) moved hundreds of MB over IPC just to draw a 40px
+      -- box. NULL for non-images and for attachments added before this column existed.
+      ALTER TABLE db_attachments ADD COLUMN thumb BLOB;
     `,
   },
 ];
