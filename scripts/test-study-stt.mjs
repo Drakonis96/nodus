@@ -67,6 +67,8 @@ try {
   assert.match(cppBackend, /onPartial/, 'whisper.cpp streams completed segments');
   assert.match(ipc, /study:stt:transcribe/, 'STT is registered in main IPC');
   assert.match(preload, /study:stt:transcribe/, 'STT crosses the preload bridge');
+  assert.match(ipc, /study:stt:complete/, 'main marks the streaming event queue complete before replying');
+  assert.match(preload, /await Promise\.race\(\[streamComplete/, 'preload keeps streaming listeners alive until queued events arrive');
   assert.match(settingsUi, /Transformers\.js \+ ONNX/, 'Settings exposes the ONNX engine');
   assert.match(settingsUi, /whisper\.cpp/, 'Settings exposes the whisper.cpp engine and model manager');
   assert.match(cppBackend, /installWhisperCpp/, 'whisper.cpp can be installed with one click');

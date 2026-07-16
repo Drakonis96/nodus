@@ -491,15 +491,25 @@ const api: NodusApi = {
     const requestId = `study-stt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const onProgress = (_event: unknown, id: string, fraction: number) => { if (id === requestId) handlers.onProgress?.(fraction); };
     const onPartial = (_event: unknown, id: string, text: string) => { if (id === requestId) handlers.onPartial?.(text); };
+    let markStreamComplete: () => void = () => {};
+    const streamComplete = new Promise<void>((resolve) => { markStreamComplete = resolve; });
+    const onComplete = (_event: unknown, id: string) => { if (id === requestId) markStreamComplete(); };
     ipcRenderer.on('study:stt:progress', onProgress);
     ipcRenderer.on('study:stt:partial', onPartial);
+    ipcRenderer.on('study:stt:complete', onComplete);
     activeStudySttRequestId = requestId;
     try {
-      return await ipcRenderer.invoke('study:stt:transcribe', { ...request, requestId });
+      const result = await ipcRenderer.invoke('study:stt:transcribe', { ...request, requestId });
+      // The invoke reply and webContents.send events travel through separate IPC
+      // queues. On a busy runner the reply can win, so keep the listeners alive
+      // until main confirms every partial/progress event has been enqueued.
+      await Promise.race([streamComplete, new Promise<void>((resolve) => setTimeout(resolve, 1_000))]);
+      return result;
     } finally {
       if (activeStudySttRequestId === requestId) activeStudySttRequestId = null;
       ipcRenderer.removeListener('study:stt:progress', onProgress);
       ipcRenderer.removeListener('study:stt:partial', onPartial);
+      ipcRenderer.removeListener('study:stt:complete', onComplete);
     }
   },
   cancelStudyTranscription: async () => {

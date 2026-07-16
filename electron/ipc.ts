@@ -1913,14 +1913,19 @@ export function registerIpc(
   h('study:annotation:delete', async (_e, id: string) => studyEditor.deleteStudyAnnotation(id));
   h('study:stt:transcribe', async (event, request: StudySttRequest) => {
     const provider = request.provider ?? getSettings().sttProvider;
+    let result;
     if (provider === 'whisper_cpp') {
-      return transcribeWhisperCpp(request, {
+      result = await transcribeWhisperCpp(request, {
         onProgress: (fraction) => event.sender.send('study:stt:progress', request.requestId, fraction),
         onPartial: (text) => event.sender.send('study:stt:partial', request.requestId, text),
       });
+    } else if (provider === 'openai') {
+      result = await transcribeOpenAiStudyAudio(request);
+    } else {
+      throw new Error('Transformers.js se ejecuta en el worker local del renderer.');
     }
-    if (provider === 'openai') return transcribeOpenAiStudyAudio(request);
-    throw new Error('Transformers.js se ejecuta en el worker local del renderer.');
+    event.sender.send('study:stt:complete', request.requestId);
+    return result;
   });
   h('study:stt:cancel', async (_event, requestId: string) => cancelWhisperCpp(requestId));
   h('study:stt:whisperCpp:status', async () => getWhisperCppStatus());
