@@ -189,6 +189,21 @@ try {
   await page.evaluate(() => window.nodus.updateSettings({ mascotEnabled: true, mascotAlwaysOnTop: false, reduceMotion: true }));
   const nodiFigure = page.locator('.nodi-figure');
   await nodiFigure.waitFor({ timeout: 30_000 });
+
+  // Right-click on a Nodi that has NOT been dragged yet: the context menu must
+  // survive its own pointer-up, which is otherwise read as a click and swaps the
+  // menu for the radial one. Order matters — a preceding drag leaves the "moved"
+  // flag set (a right press never resets it) and hides the bug.
+  const nodiCloseItem = page.getByRole('menuitem', { name: /Cerrar mascota/ });
+  await nodiFigure.click({ button: 'right' });
+  await nodiCloseItem.waitFor({ timeout: 5_000 });
+  await page.waitForTimeout(150);
+  assert.ok(await nodiCloseItem.isVisible(), 'right-click keeps the Nodi context menu open');
+  // Dismiss via a synthetic outside mousedown rather than a real click at some
+  // corner, which would land on the sidebar and collapse it.
+  await page.evaluate(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  await nodiCloseItem.waitFor({ state: 'hidden', timeout: 5_000 });
+
   const nodiStart = await nodiFigure.boundingBox();
   assert.ok(nodiStart, 'Nodi is visible before the drag');
   await page.mouse.move(nodiStart.x + nodiStart.width / 2, nodiStart.y + nodiStart.height / 2);

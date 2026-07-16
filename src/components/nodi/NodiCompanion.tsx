@@ -305,6 +305,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     }
   };
   const finishFigurePointer = (e: React.PointerEvent, cancelled = false) => {
+    // Only a primary press starts a gesture, so only its release can be a click.
+    // A right-click release must not reach the toggle below: it fires after
+    // `contextmenu` and would swap the context menu for the radial one.
+    if (!dragOriginRef.current) return;
     (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     setDragging(false);
     draggingRef.current = false;
