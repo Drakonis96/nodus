@@ -23,11 +23,11 @@
 .nodi-svg .nodi-core { animation: nodi-floaty 5s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 152px; }
 .nodi-svg .halo { animation: nodi-halo 5s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 140px; }
 .nodi-svg .eyes-open { animation: nodi-blink 5.4s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 139px; }
+.nodi-svg .limbs { opacity: 1; transform-box: view-box; transform-origin: 130px 140px; transition: opacity .3s ease, transform .48s cubic-bezier(.2,.8,.3,1); }
 .nodi-svg .arm-l .hand { transform: translate(64px, 214px); }
 .nodi-svg .arm-r .hand { transform: translate(196px, 214px); }
 .nodi-svg .leg-l .hand { transform: translate(96px, 266px); }
 .nodi-svg .leg-r .hand { transform: translate(170px, 276px); }
-.nodi-svg .chinarm .hand { transform: translate(117px, 163px); }
 .nodi-svg .arm-r { animation: nodi-swayR 4.4s ease-in-out infinite; transform-box: view-box; transform-origin: 168px 150px; }
 /* Right arm raised (e.g. an unread notification): held up with a gentle attention wave. */
 .nodi-svg.arm-up .arm-r { animation: nodi-raisewave 1.6s ease-in-out infinite; transform-origin: 168px 150px; }
@@ -37,9 +37,37 @@
 .nodi-svg .leg-l { animation: nodi-legA 4.6s ease-in-out infinite; transform-box: view-box; transform-origin: 114px 190px; }
 .nodi-svg .leg-r { animation: nodi-legB 4.9s ease-in-out infinite; transform-box: view-box; transform-origin: 150px 192px; }
 .nodi-svg .mspark { animation: nodi-twinkle 2.4s ease-in-out infinite; }
-.nodi-svg .orbitring { animation: nodi-orbit 12s linear infinite; transform-box: view-box; transform-origin: 130px 140px; }
 .nodi-svg .thinkdot { animation: nodi-thinkdot 1.6s ease-in-out infinite; }
-.nodi-svg .chinarm { animation: nodi-tap 2.6s ease-in-out infinite; transform-box: view-box; transform-origin: 100px 184px; }
+.nodi-svg .thinking-rotor {
+  opacity: 0;
+  visibility: hidden;
+  filter: blur(.8px);
+  animation: nodi-centrifuge 1.28s linear infinite;
+  animation-play-state: paused;
+  transform-box: view-box;
+  transform-origin: 130px 140px;
+  transition: opacity .3s ease, filter .42s ease, visibility 0s linear .42s;
+}
+.nodi-svg .thinking-ring {
+  fill: none;
+  stroke: #d4af37;
+  stroke-width: 1.2;
+  stroke-dasharray: 2 10;
+  opacity: .32;
+}
+.nodi-svg .thinking-trail {
+  fill: none;
+  stroke: #e4c368;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: .5;
+  animation: nodi-thinking-trail 1.1s ease-in-out infinite;
+}
+.nodi-svg .thinking-limb .thread { stroke-width: 4; }
+.nodi-svg .thinking-arm-l .hand { transform: translate(72px, 86px); }
+.nodi-svg .thinking-arm-r .hand { transform: translate(190px, 86px); }
+.nodi-svg .thinking-leg-r .hand { transform: translate(190px, 194px); }
+.nodi-svg .thinking-leg-l .hand { transform: translate(70px, 194px); }
 .nodi-svg .lline { stroke: #c9a24a; stroke-width: 1.4; fill: none; stroke-dasharray: 4 4; opacity: .6; animation: nodi-dash 1s linear infinite; }
 .nodi-svg .lnode { animation: nodi-nodein 1.8s ease-in-out infinite; }
 .nodi-svg .cline { fill: none; stroke: #16294a; stroke-width: 1.6; opacity: .6; stroke-dasharray: 5 5; animation: nodi-dash 1.1s linear infinite; }
@@ -74,8 +102,18 @@
 .nodi-svg[data-state="discovering"] .arm-r .hand { transform: translate(228px, 152px); }
 
 .nodi-svg[data-state="thinking"] .deco-think { display: inline; }
-.nodi-svg[data-state="thinking"] .arm-l { display: none; }
-.nodi-svg[data-state="thinking"] .headwrap { animation: nodi-tilt 3.6s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 158px; }
+.nodi-svg[data-state="thinking"] .eyes-open { display: none; }
+.nodi-svg[data-state="thinking"] .eyes-sleep { display: inline; animation: nodi-thinking-eyes 1.28s ease-in-out infinite; transform-box: view-box; transform-origin: 130px 140px; }
+.nodi-svg[data-state="thinking"] .limbs { opacity: 0; transform: scale(.7) rotate(-10deg); }
+.nodi-svg[data-state="thinking"] .thinking-rotor {
+  opacity: 1;
+  visibility: visible;
+  filter: blur(0);
+  animation-play-state: running;
+  transition-delay: 0s;
+}
+.nodi-svg[data-state="thinking"] .halo { animation: nodi-haloBright 1.28s ease-in-out infinite; }
+.nodi-svg[data-state="thinking"] .mesh { animation: nodi-thinking-core 2.56s linear infinite; transform-box: view-box; transform-origin: 130px 140px; }
 
 .nodi-svg[data-state="connecting"] .deco-connect { display: inline; }
 
@@ -137,9 +175,10 @@
 @keyframes nodi-dangle { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(8deg)} }
 @keyframes nodi-wave { 0%,100%{transform:rotate(-12deg)} 50%{transform:rotate(30deg)} }
 @keyframes nodi-raisewave { 0%,100%{transform:rotate(-6deg)} 50%{transform:rotate(10deg)} }
-@keyframes nodi-tap { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-4deg)} }
-@keyframes nodi-tilt { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-6deg)} }
-@keyframes nodi-orbit { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes nodi-centrifuge { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes nodi-thinking-core { from{transform:rotate(0deg)} to{transform:rotate(-360deg)} }
+@keyframes nodi-thinking-eyes { 0%,100%{transform:scaleX(.96)} 50%{transform:scaleX(1.06) translateY(1px)} }
+@keyframes nodi-thinking-trail { 0%,100%{opacity:.18;stroke-dasharray:2 12} 50%{opacity:.72;stroke-dasharray:15 5} }
 @keyframes nodi-spin { to{transform:rotate(360deg)} }
 @keyframes nodi-dash { from{stroke-dashoffset:20} to{stroke-dashoffset:0} }
 @keyframes nodi-thinkdot { 0%,100%{opacity:.2;transform:translateY(0)} 50%{opacity:1;transform:translateY(-3px)} }
@@ -151,5 +190,5 @@
 @keyframes nodi-sweat { 0%{opacity:0;transform:translateY(-2px) scale(.5)} 25%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(11px) scale(.9)} }
 
 @media (prefers-reduced-motion: reduce) {
-  .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; }
+  .nodi-svg * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

@@ -105,6 +105,21 @@ test('Nodi chat keeps model selection inside settings and exposes deletable hist
   assert.match(globalCss, /background-repeat: no-repeat/);
 });
 
+test('Nodi closes its eyes and centrifuges contracted limbs while thinking', async () => {
+  const [component, figure, css] = await Promise.all([
+    read('src/components/nodi/NodiCompanion.tsx'),
+    read('src/components/nodi/Nodi.tsx'),
+    read('src/components/nodi/nodi.css'),
+  ]);
+  assert.match(component, /streaming \? 'thinking'/, 'the live chat activates the thinking state');
+  for (const limb of ['thinking-arm-l', 'thinking-arm-r', 'thinking-leg-l', 'thinking-leg-r']) assert.match(figure, new RegExp(limb));
+  assert.match(css, /data-state="thinking"[^}]*\.eyes-open[^}]*display:\s*none/s);
+  assert.match(css, /data-state="thinking"[^}]*\.eyes-sleep[^}]*display:\s*inline/s);
+  assert.match(css, /animation:\s*nodi-centrifuge/);
+  assert.match(css, /animation-play-state:\s*paused/, 'the rotor freezes at its current angle while fading back to rest');
+  assert.match(css, /data-state="thinking"[^}]*\.limbs[^}]*scale\(\.7\)/s, 'normal limbs contract during the crossfade');
+});
+
 test('floating Nodi dismisses every open surface on an outside click or window blur', async () => {
   const [component, mascot, ipc, preload, types] = await Promise.all([
     read('src/components/nodi/NodiCompanion.tsx'),

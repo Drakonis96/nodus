@@ -169,6 +169,31 @@ export function Nodi({
             </g>
           </g>
 
+          {/* Thinking uses a compact second set of limbs. Keeping it separate
+              lets the spinning pose fade out at its current angle while the
+              normal limbs unfold again, instead of snapping back to rest. */}
+          <g className="thinking-rotor" aria-hidden="true">
+            <circle className="thinking-ring" cx="130" cy="140" r="76" />
+            <path className="thinking-trail" d="M78 84 A76 76 0 0 1 111 66" />
+            <path className="thinking-trail" d="M182 196 A76 76 0 0 1 149 214" style={{ animationDelay: '.18s' }} />
+            <g className="thinking-limb thinking-arm-l">
+              <path className="thread" d="M92 108 C 84 103 78 95 72 86" />
+              <g className="hand"><Pearl big glow={ref('fSm')} pearl={ref('pearlG')} /></g>
+            </g>
+            <g className="thinking-limb thinking-arm-r">
+              <path className="thread" d="M168 108 C 176 103 183 95 190 86" />
+              <g className="hand"><Pearl big glow={ref('fSm')} pearl={ref('pearlG')} /></g>
+            </g>
+            <g className="thinking-limb thinking-leg-r">
+              <path className="thread" d="M168 172 C 177 178 184 186 190 194" />
+              <g className="hand"><Pearl big glow={ref('fSm')} pearl={ref('pearlG')} /></g>
+            </g>
+            <g className="thinking-limb thinking-leg-l">
+              <path className="thread" d="M92 172 C 83 178 77 186 70 194" />
+              <g className="hand"><Pearl big glow={ref('fSm')} pearl={ref('pearlG')} /></g>
+            </g>
+          </g>
+
           <circle cx="130" cy="140" r="56" fill={ref('bodyG')} />
           <g clipPath={ref('bodyClip')}>
             <g className="mesh">
@@ -230,17 +255,9 @@ export function Nodi({
           </g>
 
           <g className="deco deco-think">
-            <g className="orbitring">
-              <ellipse cx="130" cy="140" rx="74" ry="92" fill="none" stroke="#c9a24a" strokeWidth="1" strokeDasharray="3 7" opacity=".3" transform="rotate(-12 130 140)" />
-              <circle cx="130" cy="48" r="4" fill={ref('goldG')} />
-            </g>
             <circle className="thinkdot" cx="182" cy="86" r="3" fill="#12203a" style={{ animationDelay: '0s' }} />
             <circle className="thinkdot" cx="194" cy="74" r="4" fill="#12203a" style={{ animationDelay: '.2s' }} />
             <circle className="thinkdot" cx="208" cy="60" r="5" fill={ref('goldG')} style={{ animationDelay: '.4s' }} />
-            <g className="chinarm">
-              <path className="thread" d="M100 184 C 104 176 110 169 116 164" />
-              <g className="hand"><Pearl glow={ref('fSm')} pearl={ref('pearlG')} /></g>
-            </g>
           </g>
 
           <g className="deco deco-connect">

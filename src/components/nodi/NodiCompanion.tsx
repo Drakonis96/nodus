@@ -303,7 +303,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (panel !== 'notifications' && unread > 0) window.nodus.markNotificationsRead().then(setNtfs).catch(() => {});
   };
 
-  const nodiState: NodiState = streaming ? 'loading' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
+  const nodiState: NodiState = streaming ? 'thinking' : greet ? 'waving' : celebrate ? 'discovering' : 'idle';
   const activeConversation = conversations.find((conversation) => conversation.id === activeConversationId) ?? null;
 
   type Item = { id: string; label: string; icon: React.ReactNode; onClick: () => void; badge?: number };
