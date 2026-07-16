@@ -433,6 +433,7 @@ export function Settings({
               >
                 <option value="es">Español</option>
                 <option value="en">English</option>
+                <option value="fr">Français</option>
               </select>
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>

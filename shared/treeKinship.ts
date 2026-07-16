@@ -1,4 +1,5 @@
 import type { TreePersonAttr } from './treeLayout';
+import type { AppLanguage } from './types';
 
 export type TreeBranch = 'paternal' | 'maternal' | 'neutral';
 export type TreeKinshipRole =
@@ -86,6 +87,38 @@ export const TREE_KINSHIP_ROLE_LABEL_EN: Record<TreeKinshipRole, string> = {
   descendant: 'Descendant', relative_by_marriage: 'Relative by marriage', connected_relative: 'Family connection', unrelated: 'No recorded kinship',
 };
 
+export const TREE_KINSHIP_ROLE_LABEL_FR: Record<TreeKinshipRole, string> = {
+  focus: 'Personne de référence', father: 'Père', mother: 'Mère',
+  parent: 'Parent', grandfather: 'Grand-père', grandmother: 'Grand-mère',
+  grandparent: 'Grand-parent', paternal_grandfather: 'Grand-père paternel', paternal_grandmother: 'Grand-mère paternelle',
+  paternal_grandparent: 'Grand-parent paternel', maternal_grandfather: 'Grand-père maternel', maternal_grandmother: 'Grand-mère maternelle',
+  maternal_grandparent: 'Grand-parent maternel', great_grandfather: 'Arrière-grand-père', great_grandmother: 'Arrière-grand-mère',
+  great_grandparent: 'Arrière-grand-parent', great_great_grandfather: 'Arrière-arrière-grand-père', great_great_grandmother: 'Arrière-arrière-grand-mère',
+  great_great_grandparent: 'Arrière-arrière-grand-parent', paternal_ancestor: 'Ancêtre paternel', maternal_ancestor: 'Ancêtre maternel',
+  ancestor: 'Ancêtre', brother: 'Frère', sister: 'Sœur',
+  sibling: 'Frère/sœur', husband: 'Époux', wife: 'Épouse',
+  spouse: 'Conjoint(e)/partenaire', son: 'Fils', daughter: 'Fille',
+  child: 'Enfant', grandson: 'Petit-fils', granddaughter: 'Petite-fille',
+  grandchild: 'Petit-enfant', great_grandson: 'Arrière-petit-fils', great_granddaughter: 'Arrière-petite-fille',
+  great_grandchild: 'Arrière-petit-enfant', great_great_grandson: 'Arrière-arrière-petit-fils', great_great_granddaughter: 'Arrière-arrière-petite-fille',
+  great_great_grandchild: 'Arrière-arrière-petit-enfant', paternal_uncle: 'Oncle paternel', paternal_aunt: 'Tante paternelle',
+  maternal_uncle: 'Oncle maternel', maternal_aunt: 'Tante maternelle', uncle_aunt: 'Oncle/tante',
+  paternal_granduncle: 'Grand-oncle paternel', paternal_grandaunt: 'Grand-tante paternelle', maternal_granduncle: 'Grand-oncle maternel',
+  maternal_grandaunt: 'Grand-tante maternelle', granduncle_aunt: 'Grand-oncle/grand-tante', great_granduncle: 'Arrière-grand-oncle',
+  great_grandaunt: 'Arrière-grand-tante', great_granduncle_aunt: 'Arrière-grand-oncle/arrière-grand-tante', nephew: 'Neveu',
+  niece: 'Nièce', nibling: 'Neveu/nièce', grandnephew: 'Petit-neveu',
+  grandniece: 'Petite-nièce', grandnibling: 'Petit-neveu/petite-nièce', great_grandnephew: 'Arrière-petit-neveu',
+  great_grandniece: 'Arrière-petite-nièce', great_grandnibling: 'Arrière-petit-neveu/arrière-petite-nièce', male_cousin: 'Cousin',
+  female_cousin: 'Cousine', cousin: 'Cousin/cousine', father_in_law: 'Beau-père',
+  mother_in_law: 'Belle-mère', parent_in_law: 'Beau-père/belle-mère', son_in_law: 'Gendre',
+  daughter_in_law: 'Bru', child_in_law: 'Gendre/bru', brother_in_law: 'Beau-frère',
+  sister_in_law: 'Belle-sœur', sibling_in_law: 'Beau-frère/belle-sœur', stepfather: 'Beau-père',
+  stepmother: 'Belle-mère', stepparent: 'Beau-père/belle-mère', stepson: 'Beau-fils',
+  stepdaughter: 'Belle-fille', stepchild: 'Beau-fils/belle-fille', co_parent: 'Co-parent',
+  descendant: 'Descendant', relative_by_marriage: 'Parent par alliance', connected_relative: 'Lien familial',
+  unrelated: 'Aucune parenté enregistrée',
+};
+
 export interface TreeKinshipContext {
   role: TreeKinshipRole;
   branch: TreeBranch;
@@ -95,6 +128,7 @@ export interface TreeKinshipContext {
   /** Exact generated labels for unbounded generations, cousin removals and rare affinity paths. */
   labelEs?: string;
   labelEn?: string;
+  labelFr?: string;
   cousinDegree?: number;
   cousinRemoval?: number;
 }
@@ -107,7 +141,8 @@ export interface TreeKinshipInput {
   persons?: TreePersonAttr[];
 }
 
-export function treeKinshipLabel(context: TreeKinshipContext, language: 'es' | 'en' = 'es'): string {
+export function treeKinshipLabel(context: TreeKinshipContext, language: AppLanguage = 'es'): string {
+  if (language === 'fr') return context.labelFr ?? TREE_KINSHIP_ROLE_LABEL_FR[context.role];
   if (language === 'en') return context.labelEn ?? TREE_KINSHIP_ROLE_LABEL_EN[context.role];
   return context.labelEs ?? TREE_KINSHIP_ROLE_LABEL_ES[context.role];
 }
@@ -122,6 +157,12 @@ function ordinalEn(value: number): string {
   return `${value}${suffix}`;
 }
 
+/** French ordinals only inflect at 1 ("1er degré" vs "1re génération"); the rest take "e". */
+function ordinalFr(value: number, feminine = false): string {
+  if (value === 1) return feminine ? '1re' : '1er';
+  return `${value}e`;
+}
+
 function descendantContext(sex: string | undefined, depth: number): TreeKinshipContext {
   let role: TreeKinshipRole;
   if (depth === 1) role = sexRole(sex, 'son', 'daughter', 'child');
@@ -131,7 +172,13 @@ function descendantContext(sex: string | undefined, depth: number): TreeKinshipC
   else role = 'descendant';
   return {
     role, branch: 'neutral', tone: 0, depth,
-    ...(depth > 4 ? { labelEs: `Descendiente de ${depth}.ª generación`, labelEn: `${ordinalEn(depth)}-generation descendant` } : {}),
+    ...(depth > 4
+      ? {
+        labelEs: `Descendiente de ${depth}.ª generación`,
+        labelEn: `${ordinalEn(depth)}-generation descendant`,
+        labelFr: `Descendant à la ${ordinalFr(depth, true)} génération`,
+      }
+      : {}),
   };
 }
 
@@ -142,7 +189,13 @@ function niblingContext(sex: string | undefined, depth: number, branch: TreeBran
   else role = sexRole(sex, 'great_grandnephew', 'great_grandniece', 'great_grandnibling');
   return {
     role, branch, tone, depth,
-    ...(depth > 3 ? { labelEs: `Sobrino/a de ${depth}.ª generación`, labelEn: `${ordinalEn(depth)}-generation niece/nephew` } : {}),
+    ...(depth > 3
+      ? {
+        labelEs: `Sobrino/a de ${depth}.ª generación`,
+        labelEn: `${ordinalEn(depth)}-generation niece/nephew`,
+        labelFr: `Neveu/nièce à la ${ordinalFr(depth, true)} génération`,
+      }
+      : {}),
   };
 }
 
@@ -163,9 +216,16 @@ function uncleContext(sex: string | undefined, level: number, branch: TreeBranch
   } else role = sexRole(sex, 'great_granduncle', 'great_grandaunt', 'great_granduncle_aunt');
   const branchEs = branch === 'paternal' ? ' paterno/a' : branch === 'maternal' ? ' materno/a' : '';
   const branchEn = branch === 'paternal' ? ' paternal' : branch === 'maternal' ? ' maternal' : '';
+  const branchFr = branch === 'paternal' ? ' paternel(le)' : branch === 'maternal' ? ' maternel(le)' : '';
   return {
     role, branch, tone, depth: level,
-    ...(level > 3 ? { labelEs: `Tío/a${branchEs} de ${level}.ª generación`, labelEn: `${ordinalEn(level)}-generation${branchEn} uncle/aunt` } : {}),
+    ...(level > 3
+      ? {
+        labelEs: `Tío/a${branchEs} de ${level}.ª generación`,
+        labelEn: `${ordinalEn(level)}-generation${branchEn} uncle/aunt`,
+        labelFr: `Oncle/tante${branchFr} à la ${ordinalFr(level, true)} génération`,
+      }
+      : {}),
   };
 }
 
@@ -174,12 +234,15 @@ function cousinContext(sex: string | undefined, degree: number, removal: number,
   if (degree === 1 && removal === 0) return { role, branch, tone, depth: 0, cousinDegree: degree, cousinRemoval: removal };
   const genderEs = sex === 'male' ? 'Primo' : sex === 'female' ? 'Prima' : 'Primo/a';
   const genderEn = sex === 'male' ? 'male cousin' : sex === 'female' ? 'female cousin' : 'cousin';
+  const genderFr = sex === 'male' ? 'Cousin' : sex === 'female' ? 'Cousine' : 'Cousin/e';
   const removalEs = removal === 1 ? ', 1 generación de diferencia' : removal > 1 ? `, ${removal} generaciones de diferencia` : '';
   const removalEn = removal === 1 ? ', once removed' : removal === 2 ? ', twice removed' : removal > 2 ? `, ${removal} times removed` : '';
+  const removalFr = removal === 1 ? ", à 1 génération d'écart" : removal > 1 ? `, à ${removal} générations d'écart` : '';
   return {
     role, branch, tone, depth: 0, cousinDegree: degree, cousinRemoval: removal,
     labelEs: `${genderEs} de ${degree}.º grado${removalEs}`,
     labelEn: `${ordinalEn(degree)} ${genderEn}${removalEn}`,
+    labelFr: `${genderFr} au ${ordinalFr(degree)} degré${removalFr}`,
   };
 }
 

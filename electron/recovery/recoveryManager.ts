@@ -67,33 +67,40 @@ function snapshotSummary(filePath: string): RecoverySnapshotSummary | null {
   }
 }
 
-const tr = (language: AppLanguage, es: string, en: string) => language === 'en' ? en : es;
+/**
+ * The main process cannot reach the renderer's i18n table, so the handful of
+ * user-facing recovery strings are localized inline. Anything without a French
+ * translation falls back to English, matching `src/i18n.ts`.
+ */
+const tr = (language: AppLanguage, es: string, en: string, fr?: string) =>
+  language === 'fr' ? fr ?? en : language === 'en' ? en : es;
 
 function localizeRestoreMessage(message: string, language: AppLanguage): string {
-  if (language !== 'en') return message;
-  if (message.includes('No se pudo descifrar la copia')) return 'The snapshot could not be decrypted. Check the password or recovery key.';
-  if (message.includes('falta la contraseña')) return 'Restore cancelled: enter the password or recovery key.';
-  if (message.includes('Formato de copia de seguridad no soportado')) return 'This backup format is not supported.';
-  if (message.includes('los hashes internos no coinciden')) return 'Invalid snapshot: its integrity hashes do not match.';
-  if (message.includes('falta la clave de recuperación cifrada')) return 'Invalid snapshot: the encrypted recovery key is missing.';
-  if (message.includes('falta el manifiesto interno')) return 'Invalid snapshot: its internal manifest is missing.';
-  if (message.includes('faltan manifest o datos cifrados')) return 'Invalid .nodus file: its manifest or encrypted data is missing.';
-  if (message.includes('esquema más reciente')) return 'This snapshot was created by a newer Nodus version. Update the app before restoring it.';
-  if (message.includes('reversión automática')) return `Restore failed, but Nodus attempted to preserve the previous state. ${message}`;
-  if (message.includes('restauración se canceló antes de modificar')) return `Restore was cancelled before changing your data. ${message}`;
+  if (language === 'es') return message;
+  const pick = (en: string, fr: string) => (language === 'fr' ? fr : en);
+  if (message.includes('No se pudo descifrar la copia')) return pick('The snapshot could not be decrypted. Check the password or recovery key.', 'La sauvegarde n\'a pas pu être déchiffrée. Vérifiez le mot de passe ou la clé de récupération.');
+  if (message.includes('falta la contraseña')) return pick('Restore cancelled: enter the password or recovery key.', 'Restauration annulée : saisissez le mot de passe ou la clé de récupération.');
+  if (message.includes('Formato de copia de seguridad no soportado')) return pick('This backup format is not supported.', 'Ce format de sauvegarde n\'est pas pris en charge.');
+  if (message.includes('los hashes internos no coinciden')) return pick('Invalid snapshot: its integrity hashes do not match.', 'Sauvegarde invalide : ses hachages d\'intégrité ne correspondent pas.');
+  if (message.includes('falta la clave de recuperación cifrada')) return pick('Invalid snapshot: the encrypted recovery key is missing.', 'Sauvegarde invalide : la clé de récupération chiffrée est manquante.');
+  if (message.includes('falta el manifiesto interno')) return pick('Invalid snapshot: its internal manifest is missing.', 'Sauvegarde invalide : son manifeste interne est manquant.');
+  if (message.includes('faltan manifest o datos cifrados')) return pick('Invalid .nodus file: its manifest or encrypted data is missing.', 'Fichier .nodus invalide : son manifeste ou ses données chiffrées sont manquants.');
+  if (message.includes('esquema más reciente')) return pick('This snapshot was created by a newer Nodus version. Update the app before restoring it.', 'Cette sauvegarde a été créée par une version plus récente de Nodus. Mettez à jour l\'application avant de la restaurer.');
+  if (message.includes('reversión automática')) return pick(`Restore failed, but Nodus attempted to preserve the previous state. ${message}`, `La restauration a échoué, mais Nodus a tenté de préserver l'état précédent. ${message}`);
+  if (message.includes('restauración se canceló antes de modificar')) return pick(`Restore was cancelled before changing your data. ${message}`, `La restauration a été annulée avant toute modification de vos données. ${message}`);
   return message;
 }
 
 export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'es'): RecoveryFolderInspection {
   const clean = path.resolve(folder);
-  if (!fs.existsSync(clean)) return { path: clean, kind: 'missing', message: tr(language, 'La carpeta no existe.', 'The folder does not exist.'), snapshots: [] };
+  if (!fs.existsSync(clean)) return { path: clean, kind: 'missing', message: tr(language, 'La carpeta no existe.', 'The folder does not exist.', "Le dossier n'existe pas."), snapshots: [] };
   let stat: fs.Stats;
   try {
     stat = fs.statSync(clean);
   } catch {
-    return { path: clean, kind: 'missing', message: tr(language, 'No se puede acceder a la carpeta.', 'The folder cannot be accessed.'), snapshots: [] };
+    return { path: clean, kind: 'missing', message: tr(language, 'No se puede acceder a la carpeta.', 'The folder cannot be accessed.', "Impossible d'accéder au dossier."), snapshots: [] };
   }
-  if (!stat.isDirectory()) return { path: clean, kind: 'invalid', message: tr(language, 'La ruta seleccionada no es una carpeta.', 'The selected path is not a folder.'), snapshots: [] };
+  if (!stat.isDirectory()) return { path: clean, kind: 'invalid', message: tr(language, 'La ruta seleccionada no es una carpeta.', 'The selected path is not a folder.', "Le chemin sélectionné n'est pas un dossier."), snapshots: [] };
 
   const manifest = readRecoveryManifest(clean);
   if (manifest) {
@@ -109,21 +116,22 @@ export function inspectRecoveryFolder(folder: string, language: AppLanguage = 'e
       path: clean,
       kind: 'recovery',
       message: snapshots.length
-        ? tr(language, `${snapshots.length} copia(s) válida(s) encontrada(s).`, `${snapshots.length} valid snapshot(s) found.`)
-        : tr(language, 'Carpeta de recuperación válida, todavía sin copias.', 'Valid recovery folder, with no snapshots yet.'),
+        ? tr(language, `${snapshots.length} copia(s) válida(s) encontrada(s).`, `${snapshots.length} valid snapshot(s) found.`, `${snapshots.length} sauvegarde(s) valide(s) trouvée(s).`)
+        : tr(language, 'Carpeta de recuperación válida, todavía sin copias.', 'Valid recovery folder, with no snapshots yet.', 'Dossier de récupération valide, encore sans sauvegarde.'),
       snapshots,
     };
   }
 
   const entries = visibleDirectoryEntries(clean);
-  if (entries.length === 0) return { path: clean, kind: 'empty', message: tr(language, 'Carpeta vacía y disponible.', 'Empty folder, ready to use.'), snapshots: [] };
+  if (entries.length === 0) return { path: clean, kind: 'empty', message: tr(language, 'Carpeta vacía y disponible.', 'Empty folder, ready to use.', 'Dossier vide et disponible.'), snapshots: [] };
   return {
     path: clean,
     kind: 'invalid',
     message: tr(
       language,
       `La carpeta debe estar vacía o contener una recuperación de Nodus válida. Contiene ${entries.length} elemento(s).`,
-      `The folder must be empty or contain a valid Nodus recovery. It contains ${entries.length} item(s).`
+      `The folder must be empty or contain a valid Nodus recovery. It contains ${entries.length} item(s).`,
+      `Le dossier doit être vide ou contenir une récupération Nodus valide. Il contient ${entries.length} élément(s).`
     ),
     snapshots: [],
   };
@@ -169,7 +177,7 @@ export async function initializeRecoveryFolder(
   language: AppLanguage = 'es'
 ): Promise<RecoverySetupResult> {
   const cleanPassword = password.trim();
-  if (cleanPassword.length < 8) return { ok: false, message: tr(language, 'La contraseña debe tener al menos 8 caracteres.', 'The password must be at least 8 characters long.') };
+  if (cleanPassword.length < 8) return { ok: false, message: tr(language, 'La contraseña debe tener al menos 8 caracteres.', 'The password must be at least 8 characters long.', 'Le mot de passe doit contenir au moins 8 caractères.') };
   const inspection = inspectRecoveryFolder(folder, language);
   if (inspection.kind !== 'empty') return { ok: false, message: inspection.message };
 
@@ -189,10 +197,10 @@ export async function initializeRecoveryFolder(
     const result = await runAutoBackupNow(appVersion);
     if (!result.ok || !result.path) throw new Error(result.message);
     const snapshot = snapshotSummary(result.path);
-    if (!snapshot) throw new Error(tr(language, 'La copia inicial se escribió, pero no superó la verificación del manifiesto.', 'The initial snapshot was written but failed manifest verification.'));
+    if (!snapshot) throw new Error(tr(language, 'La copia inicial se escribió, pero no superó la verificación del manifiesto.', 'The initial snapshot was written but failed manifest verification.', "La sauvegarde initiale a été écrite, mais elle n'a pas passé la vérification du manifeste."));
     return {
       ok: true,
-      message: tr(language, 'Carpeta de recuperación creada y primera copia verificada.', 'Recovery folder created and first snapshot verified.'),
+      message: tr(language, 'Carpeta de recuperación creada y primera copia verificada.', 'Recovery folder created and first snapshot verified.', 'Dossier de récupération créé et première sauvegarde vérifiée.'),
       snapshot,
       recoveryKey,
     };
@@ -227,7 +235,7 @@ export async function restoreRecoverySnapshot(
   const inspection = inspectRecoveryFolder(root, language);
   if (inspection.kind !== 'recovery') return { ok: false, message: inspection.message };
   const snapshot = inspection.snapshots.find((candidate) => candidate.fileName === path.basename(fileName));
-  if (!snapshot) return { ok: false, message: tr(language, 'La copia seleccionada no pertenece a esta carpeta de recuperación.', 'The selected snapshot does not belong to this recovery folder.') };
+  if (!snapshot) return { ok: false, message: tr(language, 'La copia seleccionada no pertenece a esta carpeta de recuperación.', 'The selected snapshot does not belong to this recovery folder.', "La sauvegarde sélectionnée n'appartient pas à ce dossier de récupération.") };
   let archive: Buffer;
   try {
     archive = fs.readFileSync(snapshot.path);
