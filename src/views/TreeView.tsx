@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, Person, Relationship } from '@shared/types';
 import { computeTreeLayout, type TreeLayoutResult } from '@shared/treeLayout';
-import { buildTreeFamilies, treeFamilyLaneY } from '@shared/treeFamilies';
-import { branchColorForTheme, deriveTreeKinship, treeKinshipLabel } from '@shared/treeKinship';
+import { buildTreeFamilies, treeDescendantLineIds, treeFamilyConnectorRole, treeFamilyLaneY } from '@shared/treeFamilies';
+import { branchColorForTheme, deriveTreeKinship, mixBranchColors, treeKinshipLabel } from '@shared/treeKinship';
 import { matchesTreeSearch } from '@shared/treeSearch';
 import { parseHistoricalDate } from '@shared/genealogyDates';
 import { parentAgeWarning } from '@shared/kinshipRelations';
@@ -21,6 +21,7 @@ const NODE_H = 176;
 const FRAME_W = 100;
 const FRAME_H = 116;
 const PAD = 40;
+const GENEALOGY_GOLD = '#ca8a04';
 
 function pairKey(a: string, b: string): string {
   return a < b ? `${a}|${b}` : `${b}|${a}`;
@@ -118,6 +119,7 @@ export function TreeView({
 
   const pos = useMemo(() => new Map(layout.nodes.map((n) => [n.personId, n])), [layout]);
   const families = useMemo(() => buildTreeFamilies(parentEdges, layout.nodes), [layout.nodes, parentEdges]);
+  const focusDescendantLineIds = useMemo(() => treeDescendantLineIds(focusId, parentEdges), [focusId, parentEdges]);
   const searchActive = searchQuery.trim().length > 0;
   const searchMatches = useMemo(() => new Set(layout.nodes.flatMap((node) => {
     const person = personById.get(node.personId);
@@ -138,6 +140,10 @@ export function TreeView({
     if (!context || context.branch === 'neutral') return light ? '#64748b' : '#94a3b8';
     return branchColorForTheme(context.branch === 'paternal' ? paternalColor : maternalColor, context.tone, light);
   };
+  const mergedParentColor = mixBranchColors(
+    branchColorForTheme(paternalColor, 0, light),
+    branchColorForTheme(maternalColor, 0, light)
+  );
   const frameTop = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD });
   const frameBottom = (id: string) => ({ x: (pos.get(id)?.x ?? 0) + PAD + NODE_W / 2, y: (pos.get(id)?.y ?? 0) + PAD + FRAME_H });
   const frameSide = (id: string, side: 'left' | 'right') => ({
@@ -337,6 +343,14 @@ export function TreeView({
             const gradientId = `tree-family-${familyIndex}`;
             const parentColors = orderedParents.map(branchColorFor);
             const fallbackColor = branchColorFor(family.childIds[0]);
+            const connectorRole = treeFamilyConnectorRole(family, focusDescendantLineIds, branchByPerson);
+            const connectorColor = connectorRole === 'focus_descendants'
+              ? GENEALOGY_GOLD
+              : connectorRole === 'parental_merge'
+                ? mergedParentColor
+                : null;
+            const connectorStroke = connectorColor ?? (parentColors.length > 1 ? `url(#${gradientId})` : parentColors[0] ?? fallbackColor);
+            const junctionColor = connectorColor ?? parentColors[0] ?? fallbackColor;
             const hasAdoptive = family.parentIds.some((parentId) => family.childIds.some((childId) => adoptiveSet.has(`${parentId}->${childId}`)));
             const hasInconsistent = family.parentIds.some((parentId) => family.childIds.some((childId) => inconsistentParentSet.has(`${parentId}->${childId}`)));
             const unionIsSpouse = orderedParents.length > 1 && orderedParents.some((parentId, index) => orderedParents.slice(index + 1).some((otherId) => spousePairSet.has(pairKey(parentId, otherId))));
@@ -368,14 +382,15 @@ export function TreeView({
                 })}
                 <path d={connectorPath} fill="none" stroke={light ? '#ffffffcc' : '#09090bdd'} strokeWidth={5} strokeLinejoin="round" />
                 <path
+                  data-tree-line-role={connectorRole}
                   d={connectorPath}
                   fill="none"
-                  stroke={parentColors.length > 1 ? `url(#${gradientId})` : parentColors[0] ?? fallbackColor}
+                  stroke={connectorStroke}
                   strokeWidth={2.2}
                   strokeDasharray={hasInconsistent ? '3 3' : hasAdoptive ? '6 4' : undefined}
                   strokeLinejoin="round"
                 />
-                <circle cx={anchorX} cy={parentMidY} r={hasInconsistent ? 4 : 3} fill={hasInconsistent ? '#f59e0b' : parentColors[0] ?? fallbackColor} stroke={light ? '#fff' : '#09090b'} strokeWidth={1.5} />
+                <circle cx={anchorX} cy={parentMidY} r={hasInconsistent ? 4 : 3} fill={hasInconsistent ? '#f59e0b' : junctionColor} stroke={light ? '#fff' : '#09090b'} strokeWidth={1.5} />
               </g>
             );
           })}

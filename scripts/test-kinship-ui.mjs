@@ -52,6 +52,16 @@ test('paternal and maternal colours are the only user-selectable tree branch col
   assert.match(styles, /\.light \.tree-branch-color-control/);
 });
 
+test('the parental junction mixes configured colours and focus descendants use genealogy gold', () => {
+  assert.match(tree, /mixBranchColors/);
+  assert.match(tree, /treeDescendantLineIds/);
+  assert.match(tree, /treeFamilyConnectorRole/);
+  assert.match(tree, /connectorRole === 'focus_descendants'[\s\S]*GENEALOGY_GOLD/);
+  assert.match(tree, /connectorRole === 'parental_merge'[\s\S]*mergedParentColor/);
+  assert.match(tree, /data-tree-line-role=\{connectorRole\}/);
+  assert.match(tree, /const GENEALOGY_GOLD = '#ca8a04'/);
+});
+
 test('each person displays an explicit relationship label relative to the focus', () => {
   assert.match(tree, /deriveTreeKinship/);
   assert.match(tree, /treeKinshipLabel/);

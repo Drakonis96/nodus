@@ -34,8 +34,10 @@ const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords:
   { id: 'integrations', label: 'Integraciones', icon: 'link', keywords: 'mcp servidor token puerto word copilot certificado addin' },
   { id: 'system', label: 'Tutoriales', icon: 'graduation', keywords: 'sistema ayuda tutorial' },
   { id: 'data', label: 'Backup / copia de seguridad', icon: 'download', keywords: 'datos backup exportar importar demo copia cifrada peligro reinicializar grafo borrar' },
-  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia actualizaciones update version' },
+  { id: 'about', label: 'Acerca de Nodus', icon: 'info', keywords: 'acerca proyecto codigo abierto open source gratuito apoyar donacion paypal desarrollador licencia actualizaciones update version novedades ultimos cambios latest changes' },
 ];
+
+const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-56 shrink-0 justify-center border border-neutral-300 dark:border-neutral-700';
 
 function normalizeSettingsText(value: string): string {
   return value
@@ -51,12 +53,14 @@ export function Settings({
   activeVault,
   onChange,
   onVaultsChanged: _onVaultsChanged,
+  onOpenWhatsNew,
 }: {
   settings: AppSettings;
   vaults: VaultSummary[];
   activeVault: VaultSummary | null;
   onChange: () => Promise<unknown>;
   onVaultsChanged: () => Promise<unknown>;
+  onOpenWhatsNew: () => void;
 }) {
   const [saved, setSaved] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<SettingsTabId>('providers');
@@ -656,7 +660,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version') && (
+      {visibleSettingsSection('about', 'Acerca de Nodus', 'proyecto independiente codigo abierto open source gratuito apoyar donacion paypal desarrollador actualizaciones update version novedades ultimos cambios latest changes') && (
         <Section title={t('Acerca de Nodus')}>
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
             <div className="flex items-start gap-3">
@@ -690,6 +694,19 @@ export function Settings({
               {t('El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.')}
             </p>
           </div>
+          <div data-testid="about-latest-changes" className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
+            <div>
+              <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Últimos cambios')}</label>
+              <p className="mt-0.5 text-xs text-neutral-500">{t('Consulta las novedades de la versión actual cuando quieras.')}</p>
+            </div>
+            <button
+              data-testid="open-latest-changes"
+              className={ABOUT_ACTION_BUTTON_CLASS}
+              onClick={onOpenWhatsNew}
+            >
+              <Icon name="star" /> {t('Ver últimos cambios')}
+            </button>
+          </div>
           <div data-testid="about-updates" className="flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-neutral-50 p-5 dark:border-neutral-800 dark:bg-neutral-900/50">
             <div>
               <label className="text-sm text-neutral-700 dark:text-neutral-300">{t('Actualizaciones')}</label>
@@ -716,7 +733,7 @@ export function Settings({
                   <Icon name="refresh" /> {t('Reiniciar')}
                 </button>
               )}
-              <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
+              <button className={ABOUT_ACTION_BUTTON_CLASS} onClick={checkForUpdates} disabled={checkingUpdate || updateBusy}>
                 <Icon name="sync" className={checkingUpdate || updateBusy ? 'animate-spin' : ''} />
                 {checkingUpdate ? t('Buscando…') : updateBusy ? t('Actualizando…') : t('Buscar actualización')}
               </button>

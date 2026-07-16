@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modal = await readFile(path.join(root, 'src/components/WhatsNewModal.tsx'), 'utf8');
+const app = await readFile(path.join(root, 'src/App.tsx'), 'utf8');
 const releaseNotes = await readFile(path.join(root, 'shared/releaseNotes.ts'), 'utf8');
 const styles = await readFile(path.join(root, 'src/index.css'), 'utf8');
 const translations = await readFile(path.join(root, 'src/i18n.en.ts'), 'utf8');
@@ -22,6 +23,7 @@ assert.match(modal, /<footer className="whats-new-footer">[\s\S]*whats-new-foote
 assert.match(modal, /<div className="whats-new-release-version">v\{note\.version\}<\/div>/);
 assert.match(modal, /note\.highlights\.map[\s\S]*<li key=\{i\}>/);
 assert.match(modal, /releaseNotesForMajor\(current\)/);
+assert.match(modal, /if \(showSeenReleaseNotes\) return releaseNotesForMajor\(current\);/);
 assert.doesNotMatch(modal, /releaseNotesSince/);
 assert.match(modal, /const scope = h\.scope;/);
 assert.match(modal, /data-testid=\{`whats-new-scope-\$\{scope\}`\}/);
@@ -44,5 +46,7 @@ assert.match(modal, /La donación es completamente opcional: no desbloquea funci
 assert.match(translations, /'Apoya el proyecto': 'Support the project'/);
 assert.match(translations, /Donations are entirely optional: they do not unlock features or change access to the application/);
 assert.match(icons, /paypal:/);
+assert.match(app, /onOpenWhatsNew=\{\(\) => setManualWhatsNewOpen\(true\)\}/);
+assert.match(app, /manualWhatsNewOpen[\s\S]*<WhatsNewModal[\s\S]*showSeenReleaseNotes[\s\S]*setManualWhatsNewOpen\(false\)/);
 
 console.log('What\'s new PayPal support tests passed!');

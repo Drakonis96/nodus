@@ -20,10 +20,16 @@ assert.match(
 
 const tutorialsSection = settings.indexOf("visibleSettingsSection('system', 'Ayuda'");
 const aboutSection = settings.indexOf("visibleSettingsSection('about', 'Acerca de Nodus'", tutorialsSection);
+const latestChangesControl = settings.indexOf('data-testid="about-latest-changes"', tutorialsSection);
 const updatesControl = settings.indexOf('data-testid="about-updates"', tutorialsSection);
 assert.ok(tutorialsSection >= 0 && aboutSection > tutorialsSection, 'settings sections must be present in their expected order');
+assert.ok(latestChangesControl > aboutSection, 'the latest changes control must be rendered inside About Nodus');
+assert.ok(updatesControl > latestChangesControl, 'latest changes must be presented before the update checker');
 assert.ok(updatesControl > aboutSection, 'the updates control must be rendered inside About Nodus, after Tutorials');
 assert.equal(settings.slice(tutorialsSection, aboutSection).includes("t('Actualizaciones')"), false, 'Tutorials must not render the updates control');
+assert.match(settings, /const ABOUT_ACTION_BUTTON_CLASS = 'btn btn-ghost w-56[^']+'/);
+assert.equal((settings.match(/className=\{ABOUT_ACTION_BUTTON_CLASS\}/g) ?? []).length, 2, 'latest changes and check updates must use the same fixed-size button class');
+assert.match(settings, /data-testid="open-latest-changes"[\s\S]*onClick=\{onOpenWhatsNew\}/);
 
 const nodiOverride = settings.match(/<Row label=\{t\('Asistente Nodi'\)\}>(.*?)<\/Row>/s)?.[1] ?? '';
 assert.match(nodiOverride, /<ModelPicker/);

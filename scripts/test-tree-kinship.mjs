@@ -14,7 +14,7 @@ const bundle = path.join(outDir, 'treeKinship.cjs');
 execFileSync(path.join(root, 'node_modules/.bin/esbuild'), [
   path.join(root, 'shared/treeKinship.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
 ], { cwd: root, stdio: 'inherit' });
-const { adjustBranchColor, branchColorForTheme, deriveTreeKinship, treeKinshipLabel, TREE_KINSHIP_ROLE_LABEL_ES } = require(bundle);
+const { adjustBranchColor, branchColorForTheme, deriveTreeKinship, mixBranchColors, treeKinshipLabel, TREE_KINSHIP_ROLE_LABEL_ES } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 const persons = [
@@ -203,4 +203,11 @@ test('dark theme brightens tonal branch colours without changing the configured 
   assert.equal(branchColorForTheme('#2563eb', -0.2, true), adjustBranchColor('#2563eb', -0.2));
   assert.notEqual(branchColorForTheme('#2563eb', -0.2, false), branchColorForTheme('#2563eb', -0.2, true));
   assert.equal(branchColorForTheme('#dc2626', 0, false), '#e66363');
+});
+
+test('paternal and maternal colours mix equally when their lines meet', () => {
+  assert.equal(mixBranchColors('#2563eb', '#dc2626'), '#814589');
+  assert.equal(mixBranchColors('#000000', '#ffffff'), '#808080');
+  assert.equal(mixBranchColors(branchColorForTheme('#204060', 0, false), branchColorForTheme('#c080a0', 0, false)), '#988da4');
+  assert.equal(mixBranchColors('invalid', '#ca8a04'), '#ca8a04');
 });

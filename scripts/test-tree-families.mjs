@@ -14,7 +14,7 @@ const bundle = path.join(outDir, 'treeFamilies.cjs');
 execFileSync(path.join(root, 'node_modules/.bin/esbuild'), [
   path.join(root, 'shared/treeFamilies.ts'), '--bundle', '--platform=node', '--format=cjs', '--target=es2022', `--outfile=${bundle}`,
 ], { cwd: root, stdio: 'inherit' });
-const { buildTreeFamilies, treeFamilyLaneY } = require(bundle);
+const { buildTreeFamilies, treeDescendantLineIds, treeFamilyConnectorRole, treeFamilyLaneY } = require(bundle);
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 const nodes = [
@@ -51,6 +51,43 @@ test('siblings with the same parents share one trunk and one sibling group', () 
   const family = buildTreeFamilies(parentEdges, nodes).find((candidate) => candidate.childIds.includes('focus'));
   assert.deepEqual(family.parentIds, ['father', 'mother']);
   assert.deepEqual(family.childIds, ['focus', 'sister']);
+});
+
+test('shared trunks distinguish a parental merge from the focus descendant line', () => {
+  const families = buildTreeFamilies(parentEdges, nodes);
+  const focusFamily = families.find((candidate) => candidate.childIds.includes('focus'));
+  const branchByPerson = { father: 'paternal', mother: 'maternal', focus: 'neutral', sister: 'neutral' };
+  assert.equal(treeFamilyConnectorRole(focusFamily, treeDescendantLineIds('focus', parentEdges), branchByPerson), 'parental_merge');
+
+  const descendants = {
+    parentIds: ['focus', 'partner'], parentGeneration: 0, childGeneration: 1,
+  };
+  const descendantEdges = [
+    { parent: 'focus', child: 'child' },
+    { parent: 'partner', child: 'child' },
+    { parent: 'child', child: 'grandchild' },
+  ];
+  const focusLine = treeDescendantLineIds('focus', descendantEdges);
+  assert.deepEqual([...focusLine], ['focus', 'child', 'grandchild']);
+  assert.equal(
+    treeFamilyConnectorRole(descendants, focusLine, { focus: 'neutral', partner: 'neutral' }),
+    'focus_descendants',
+    'the focus descendant line takes the genealogy gold role even with a co-parent'
+  );
+  assert.equal(
+    treeFamilyConnectorRole(
+      { parentIds: ['child', 'child_partner'], parentGeneration: 1, childGeneration: 2 },
+      focusLine,
+      { child: 'neutral', child_partner: 'neutral' }
+    ),
+    'focus_descendants',
+    'the gold line continues through grandchildren and later generations'
+  );
+  assert.equal(
+    treeFamilyConnectorRole(descendants, treeDescendantLineIds('partner', descendantEdges), { focus: 'neutral', partner: 'neutral' }),
+    'focus_descendants',
+    're-focusing the co-parent recalculates the same descendant family as gold'
+  );
 });
 
 test('family lanes stay below labels and above the next generation in both orientations', () => {

@@ -468,6 +468,20 @@ export function adjustBranchColor(hex: string, tone: number): string {
   return `#${adjusted.join('')}`;
 }
 
+/** Equal RGB blend used once the user-selected paternal and maternal lines meet. */
+export function mixBranchColors(firstHex: string, secondHex: string): string {
+  const parse = (hex: string): number[] | null => {
+    const match = /^#([0-9a-f]{6})$/i.exec(hex);
+    if (!match) return null;
+    return [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16));
+  };
+  const first = parse(firstHex);
+  const second = parse(secondHex);
+  if (!first) return secondHex;
+  if (!second) return firstHex;
+  return `#${first.map((channel, index) => Math.round((channel + second[index]) / 2).toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** Keep user-selected branch colours legible over the dark tree canvas. */
 export function branchColorForTheme(hex: string, tone: number, light: boolean): string {
   const tonalColor = adjustBranchColor(hex, tone);

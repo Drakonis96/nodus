@@ -10,6 +10,47 @@ export interface TreeFamily {
   laneCount: number;
 }
 
+export type TreeFamilyConnectorRole = 'family' | 'parental_merge' | 'focus_descendants';
+
+/** Focus plus every person reachable below it through recorded parent edges. */
+export function treeDescendantLineIds(
+  focusId: string,
+  parentEdges: { parent: string; child: string }[]
+): Set<string> {
+  const childrenByParent = new Map<string, string[]>();
+  for (const { parent, child } of parentEdges) {
+    (childrenByParent.get(parent) ?? childrenByParent.set(parent, []).get(parent)!).push(child);
+  }
+  const lineage = new Set<string>(focusId ? [focusId] : []);
+  const queue = focusId ? [focusId] : [];
+  while (queue.length) {
+    const current = queue.shift()!;
+    for (const child of childrenByParent.get(current) ?? []) {
+      if (lineage.has(child)) continue;
+      lineage.add(child);
+      queue.push(child);
+    }
+  }
+  return lineage;
+}
+
+/**
+ * Gives the shared family trunk its visual meaning relative to the current focus.
+ * The focus's downward line takes precedence; otherwise the point where its
+ * paternal and maternal roots meet is explicitly identified as a merged branch.
+ */
+export function treeFamilyConnectorRole(
+  family: Pick<TreeFamily, 'parentIds' | 'parentGeneration' | 'childGeneration'>,
+  focusDescendantLineIds: ReadonlySet<string>,
+  branchByPerson: Readonly<Record<string, 'paternal' | 'maternal' | 'neutral'>>
+): TreeFamilyConnectorRole {
+  if (family.parentGeneration < family.childGeneration && family.parentIds.some((personId) => focusDescendantLineIds.has(personId))) {
+    return 'focus_descendants';
+  }
+  const branches = new Set(family.parentIds.map((personId) => branchByPerson[personId] ?? 'neutral'));
+  return branches.has('paternal') && branches.has('maternal') ? 'parental_merge' : 'family';
+}
+
 function familyKey(parentIds: string[], childGeneration: number): string {
   return `${parentIds.slice().sort().join('|')}->${childGeneration}`;
 }

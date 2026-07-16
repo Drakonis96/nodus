@@ -163,6 +163,7 @@ export function App() {
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
+  const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
   useEffect(() => setActiveVaultQueryScope(activeVault?.id ?? null), [activeVault?.id]);
   // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
   const [isDark, setIsDark] = useState<boolean>(() =>
@@ -1274,6 +1275,7 @@ export function App() {
               activeVault={activeVault}
               onChange={reloadSettings}
               onVaultsChanged={reloadVaults}
+              onOpenWhatsNew={() => setManualWhatsNewOpen(true)}
             />
           )}
           </AppErrorBoundary>
@@ -1390,6 +1392,14 @@ export function App() {
         <WhatsNewModal
           uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'}
           onSettled={() => setWhatsNewSettled(true)}
+        />
+      )}
+
+      {manualWhatsNewOpen && (
+        <WhatsNewModal
+          uiLanguage={settings.uiLanguage === 'en' ? 'en' : 'es'}
+          showSeenReleaseNotes
+          onSettled={() => setManualWhatsNewOpen(false)}
         />
       )}
 

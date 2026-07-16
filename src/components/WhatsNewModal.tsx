@@ -46,10 +46,19 @@ export function hasPendingWhatsNew(): boolean {
   return lastSeen !== current && releaseNotesForMajor(current).length > 0;
 }
 
-export function WhatsNewModal({ uiLanguage, onSettled }: { uiLanguage: 'es' | 'en'; onSettled?: () => void }) {
+export function WhatsNewModal({
+  uiLanguage,
+  onSettled,
+  showSeenReleaseNotes = false,
+}: {
+  uiLanguage: 'es' | 'en';
+  onSettled?: () => void;
+  showSeenReleaseNotes?: boolean;
+}) {
   const current = __APP_VERSION__;
   // Compute once on mount: each update shows the complete current-major history.
   const [notes] = useState(() => {
+    if (showSeenReleaseNotes) return releaseNotesForMajor(current);
     const lastSeen = readLastSeen();
     if (lastSeen === current) return [];
     return releaseNotesForMajor(current);

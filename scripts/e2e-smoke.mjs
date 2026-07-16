@@ -229,6 +229,19 @@ try {
   await page.getByRole('button', { name: 'Acerca de Nodus', exact: true }).click();
   await page.getByTestId('about-updates').waitFor();
   assert.equal(await page.getByText('Guía esencial de Nodus e IA', { exact: true }).count(), 0, 'Updates is rendered under About Nodus, not Tutorials');
+  await page.getByTestId('about-latest-changes').waitFor();
+  const [latestChangesButtonBox, checkUpdatesButtonBox] = await Promise.all([
+    page.getByTestId('open-latest-changes').boundingBox(),
+    page.getByTestId('about-updates').getByRole('button', { name: 'Buscar actualización', exact: true }).boundingBox(),
+  ]);
+  assert.ok(latestChangesButtonBox && checkUpdatesButtonBox, 'About Nodus renders both release-related actions');
+  assert.equal(latestChangesButtonBox.width, checkUpdatesButtonBox.width, 'Latest changes and Check for updates have the same width');
+  assert.equal(latestChangesButtonBox.height, checkUpdatesButtonBox.height, 'Latest changes and Check for updates have the same height');
+  await page.getByTestId('open-latest-changes').click();
+  await page.getByTestId('whats-new-cinematic-modal').waitFor();
+  assert.equal(await page.getByTestId('whats-new-cinematic-modal').count(), 1, 'Latest changes reopens the release modal even after the current version was seen');
+  await page.getByTestId('whats-new-cinematic-modal').getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByTestId('whats-new-cinematic-modal').waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'Modelos IA', exact: true }).click();
   await page.getByTestId('nodus-local-ai-models').waitFor({ timeout: 30_000 });
   const localAiStatus = await page.evaluate(() => window.nodus.getNodusLocalAiStatus());
@@ -1284,6 +1297,30 @@ try {
   await waitForCondition('datos de ejemplo de estudio eliminados', () => page.evaluate(async () => (await window.nodus.getStudyWorkspace()).courses.length === 0));
   await page.getByTestId('study-demo-offer').waitFor({ timeout: 30_000 });
   console.log('[e2e] reversible study sample workspace works through the real UI and IPC bridge');
+
+  // The empty study-demo vault can now host the genealogy fixture without
+  // disturbing earlier checks. Verify the real SVG renderer, including custom
+  // user colours and recalculation when the focus changes to the co-parent.
+  await page.evaluate(async () => {
+    await window.nodus.seedGenealogyDemoData();
+    await window.nodus.updateSettings({
+      genealogyTourComplete: true,
+      treeFocusPersonId: 'demo-p5',
+      treePaternalColor: '#204060',
+      treeMaternalColor: '#c080a0',
+    });
+  });
+  await page.reload();
+  await page.locator('[data-tour="nav-tree"]').click();
+  await page.getByTestId('tree-pan-viewport').waitFor({ timeout: 30_000 });
+  const expectedMergedTreeColor = await page.evaluate(() => document.documentElement.classList.contains('light') ? '#706080' : '#988da4');
+  assert.equal(await page.locator('[data-tree-line-role="parental_merge"]').first().getAttribute('stroke'), expectedMergedTreeColor, 'the joined parental trunk mixes the configured paternal and maternal colours');
+  assert.equal(await page.locator('[data-tree-line-role="focus_descendants"]').count(), 2, 'genealogy gold continues from the focused person through every recorded descendant generation');
+  assert.deepEqual(await page.locator('[data-tree-line-role="focus_descendants"]').evaluateAll((lines) => lines.map((line) => line.getAttribute('stroke'))), ['#ca8a04', '#ca8a04'], 'every focused descendant trunk uses genealogy gold');
+  await page.getByTestId('tree-focus-person').selectOption('demo-p7');
+  await page.waitForFunction(() => document.querySelector('[data-tree-line-role="focus_descendants"]')?.getAttribute('stroke') === '#ca8a04');
+  assert.equal(await page.locator('[data-tree-line-role="focus_descendants"]').count(), 2, 'the complete gold descendant line follows the newly focused co-parent');
+  console.log('[e2e] genealogy parental colour blend + focus descendant gold rendered and recalculated');
 
   // ── No uncaught renderer errors during startup ──────────────────────────────
   assert.deepEqual(
