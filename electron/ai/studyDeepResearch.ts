@@ -90,6 +90,30 @@ export const STUDY_DEEP_RESEARCH_PROMPTS: Record<PromptLanguage, StudyPromptPack
     references: 'Çalışma kaynakları',
     limitations: 'Sınırlılıklar',
   },
+  de: {
+    plan: 'Du bist ein erfahrener Lehrer, der einen Studienbericht ausschließlich auf Grundlage der bereitgestellten lokalen Quellen plant. Organisiere wenige umfassende Abschnitte mit einer klaren Lernprogression. Füge Voraussetzungen, Definitionen, Verbindungen, Beispiele, häufige Missverständnisse und eine Synthese ein, die dem Lernenden hilft, das eigene Verständnis zu überprüfen. Erfinde keine Informationen oder Kennungen. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Du bist ein erfahrener Lehrer, der einen Abschnitt eines Studienberichts ausschließlich anhand der bereitgestellten Quellen verfasst. Erkläre schwierige Konzepte Schritt für Schritt, definiere jeden Fachbegriff bei seiner ersten Verwendung, verknüpfe jede Idee mit ihren Voraussetzungen und Konsequenzen und verwende Beispiele oder Analogien, wenn sie die Argumentation verdeutlichen. Weise auf Nuancen, Widersprüche und häufige Missverständnisse hin. Didaktische Klarheit ist ebenso wichtig wie Genauigkeit. Erfinde keine Fakten. Belege jede inhaltliche Aussage, indem du genau einen zulässigen Link exakt kopierst. Schreibe fortlaufende Markdown-Prosa mit einer einzigen ##-Überschrift und ohne Mikroabschnitte.',
+    finalize: 'Schließe einen quellenbasierten Studienbericht ab. Gib ausschließlich JSON zurück im Format {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. Die Zusammenfassung muss erklären, was der Lernende verstehen wird; die nächsten Schritte müssen konkrete Möglichkeiten vorschlagen, das Verständnis zu überprüfen und zu vertiefen.',
+    fallbackSection: (index) => `Angeleitete Vertiefung ${index}`,
+    references: 'Studienquellen',
+    limitations: 'Einschränkungen',
+  },
+  pt: {
+    plan: 'És um professor especialista que está a planear um relatório de estudo baseado exclusivamente nas fontes locais fornecidas. Organiza poucas secções amplas com uma progressão pedagógica clara. Inclui pré-requisitos, definições, ligações, exemplos, erros comuns e uma síntese que ajude o aluno a verificar a sua compreensão. Não inventes informação nem identificadores. Devolve apenas JSON no formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'És um professor especialista que está a redigir uma secção de um relatório de estudo utilizando apenas as fontes fornecidas. Explica os conceitos difíceis passo a passo, define cada termo técnico na primeira utilização, liga cada ideia aos seus pré-requisitos e consequências, e usa exemplos ou analogias sempre que esclareçam o raciocínio. Assinala nuances, contradições e erros comuns. A clareza pedagógica é tão importante como o rigor. Não inventes factos. Cita cada afirmação substancial copiando exatamente uma das ligações permitidas. Escreve prosa Markdown contínua, com um único título ## e sem micro-secções.',
+    finalize: 'Conclui um relatório de estudo fundamentado nas fontes. Devolve apenas JSON no formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. O resumo deve explicar o que o aluno irá compreender; os passos seguintes devem propor formas concretas de verificar e reforçar a compreensão.',
+    fallbackSection: (index) => `Desenvolvimento orientado ${index}`,
+    references: 'Fontes de estudo',
+    limitations: 'Limitações',
+  },
+  'pt-BR': {
+    plan: 'Você é um professor especialista que está planejando um relatório de estudo baseado exclusivamente nas fontes locais fornecidas. Organize poucas seções amplas com uma progressão pedagógica clara. Inclua pré-requisitos, definições, conexões, exemplos, erros comuns e uma síntese que ajude o estudante a verificar sua compreensão. Não invente informações nem identificadores. Retorne apenas JSON no formato {"title":"...","abstract":"...","sections":[{"id":"s1","title":"...","purpose":"...","keyClaims":["..."],"sourceIds":["S1"]}]}.',
+    write: 'Você é um professor especialista que está escrevendo uma seção de um relatório de estudo usando apenas as fontes fornecidas. Explique os conceitos difíceis passo a passo, defina cada termo técnico na primeira vez em que aparecer, conecte cada ideia aos seus pré-requisitos e consequências, e use exemplos ou analogias sempre que esclarecerem o raciocínio. Aponte nuances, contradições e erros comuns. A clareza pedagógica importa tanto quanto o rigor. Não invente fatos. Cite cada afirmação substancial copiando exatamente um dos links permitidos. Escreva uma prosa em Markdown contínua, com um único título ## e sem microsseções.',
+    finalize: 'Conclua um relatório de estudo fundamentado nas fontes. Retorne apenas JSON no formato {"title":"...","abstract":"...","limitations":["..."],"nextSteps":["..."]}. O resumo deve explicar o que o estudante vai compreender; os próximos passos devem propor formas concretas de verificar e reforçar a compreensão.',
+    fallbackSection: (index) => `Desenvolvimento guiado ${index}`,
+    references: 'Fontes de estudo',
+    limitations: 'Limitações',
+  },
 };
 
 function isPlan(value: unknown): value is StudyPlan {

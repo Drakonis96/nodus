@@ -1057,6 +1057,9 @@ function ComposerModal({
               <option value="es">Español</option>
               <option value="en">English</option>
               <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+              <option value="pt">Português (Portugal)</option>
+              <option value="pt-BR">Português (Brasil)</option>
               <option value="tr">Türkçe</option>
             </select>
             <ModelPicker settings={settings} value={model} onChange={onModel} compact />

@@ -122,7 +122,8 @@ test('study materials expose downloadable hover actions and pedagogical Deep Res
   assert.match(navigation, /studyDeepResearch/);
   assert.match(app, /view === 'studyDeepResearch'/);
   assert.match(app, /isStudy/);
-  for (const language of ['es', 'en', 'fr', 'tr']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
+  for (const language of ['es', 'en', 'fr', 'tr', 'de', 'pt']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
+  assert.match(deep, /\n {2}'pt-BR': \{/);
   assert.match(deep, /conceptos complejos paso a paso/);
   assert.match(deep, /retrieveStudyAssistantEntries/);
   assert.match(deep, /kinds: \['material', 'document', 'transcript'\]/);
