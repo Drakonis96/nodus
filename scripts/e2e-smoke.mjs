@@ -620,14 +620,45 @@ try {
   }
   await page.getByTestId('toolkit-card-presenter').click({ force: true });
   assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
-  // Nodus Convert opens and hands back a way home.
+  // Nodus Convert opens: the workspace chrome (category rail + dropzone) is present.
   await page.getByTestId('toolkit-card-convert').click();
   await page.getByTestId('toolkit-convert-page').waitFor({ timeout: 10_000 });
-  await page.getByText('El conversor está en construcción.', { exact: true }).waitFor();
+  await page.getByTestId('toolkit-cat-documents').waitFor();
+  await page.getByTestId('toolkit-dropzone').waitFor();
+
+  // Real conversion through the whole stack: Markdown → PDF uses printToPDF in the
+  // main process (A5), which no unit test can reach. Drive it via the IPC API with a
+  // fixture on disk, then read the produced PDF back with pdfjs and match its text.
+  const toolkitDir = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-toolkit-'));
+  const mdPath = path.join(toolkitDir, 'sample.md');
+  await writeFile(mdPath, '# Titulo Principal\n\nUn parrafo con **negrita** para la prueba.\n', 'utf8');
+  const convertResult = await page.evaluate(
+    async ({ input, outDir }) => {
+      const result = await window.nodus.runToolkitJob(
+        { opId: 'text-to-pdf', inputPaths: [input], outputFormat: 'pdf', options: {}, outputDir: outDir, mergedName: null, openFolderOnDone: false },
+        { onProgress: () => {} },
+      );
+      return { status: result.files[0]?.status, error: result.files[0]?.error, outputs: result.files[0]?.outputPaths ?? [] };
+    },
+    { input: mdPath, outDir: toolkitDir },
+  );
+  assert.equal(convertResult.status, 'done', `MD→PDF conversion succeeded (${convertResult.error ?? ''})`);
+  assert.equal(convertResult.outputs.length, 1, 'one PDF was produced');
+  const producedPdf = convertResult.outputs[0];
+  assert.ok(existsSync(producedPdf), 'the produced PDF exists on disk');
+  const toolkitPdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const producedPdfBytes = await readFile(producedPdf);
+  const producedPdfDoc = await toolkitPdfjs.getDocument({ data: new Uint8Array(producedPdfBytes), isEvalSupported: false }).promise;
+  assert.ok(producedPdfDoc.numPages > 0, 'the produced PDF has pages');
+  const producedPdfText = (await (await producedPdfDoc.getPage(1)).getTextContent()).items.map((it) => it.str ?? '').join(' ');
+  assert.match(producedPdfText, /Titulo Principal/, 'the PDF carries the document text');
+  await rm(toolkitDir, { recursive: true, force: true });
+
+  // …and hands back a way home.
   await page.getByTestId('toolkit-back').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
   assert.equal(await page.getByTestId('toolkit-convert-page').count(), 0, 'back returns to the hub');
-  console.log('[e2e] toolkit hub: equal cards, centred icons, inert coming-soon tools and a way back');
+  console.log('[e2e] toolkit: hub geometry, a real Markdown→PDF conversion, and a way back');
 
   // ── Search result: an idea reuses the Ideas section's detail modal ─────────
   assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');

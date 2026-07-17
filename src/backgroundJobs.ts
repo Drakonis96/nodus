@@ -7,6 +7,9 @@ import type {
   ImmersionScope,
   ImmersionSession,
   WritingWorkshopSavedDraft,
+  ToolkitJobRequest,
+  ToolkitJobProgress,
+  ToolkitJobResult,
 } from '@shared/types';
 
 export type BackgroundJobStatus = 'running' | 'completed' | 'failed';
@@ -154,6 +157,19 @@ export type ImmersionGenerationJob = BackgroundJob<ImmersionGenerationInput, Imm
 export function startImmersionGeneration(input: ImmersionGenerationInput): ImmersionGenerationJob {
   return startBackgroundJob(IMMERSION_GENERATION_JOB_KEY, input, ({ request }, onProgress) =>
     window.nodus.generateImmersionSession(request, { onProgress })
+  );
+}
+
+// ── Nodus Toolkit (Convert) ──────────────────────────────────────────────────
+// A single active conversion job at a time, under a shared key, so its progress
+// survives navigation and the Convert view re-subscribes on return.
+export const TOOLKIT_JOB_KEY = 'toolkit:convert';
+
+export type ToolkitConvertJob = BackgroundJob<ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult>;
+
+export function startToolkitJob(request: ToolkitJobRequest): ToolkitConvertJob {
+  return startBackgroundJob(TOOLKIT_JOB_KEY, request, (currentRequest, onProgress) =>
+    window.nodus.runToolkitJob(currentRequest, { onProgress }),
   );
 }
 

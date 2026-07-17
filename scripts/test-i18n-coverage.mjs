@@ -114,6 +114,10 @@ const INDIRECT_KEY_SOURCES = [
   { file: 'src/navigation.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Settings tab labels, rendered as t(tab.label).
   { file: 'src/views/Settings.tsx', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Nodus Toolkit catalogue: category / operation / output / option / choice labels,
+  // operation descriptions and option placeholders, all rendered through t() in the
+  // Convert view.
+  { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
   ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour'].map((name) => ({
     file: `src/views/${name}.tsx`,

@@ -32,6 +32,21 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2.4.0',
+    date: '2026-07-17',
+    highlights: [
+      {
+        scope: 'toolkit',
+        es: 'Estrena Nodus Toolkit y su primer conversor, Nodus Convert: convierte y procesa archivos en tu equipo, de uno en uno o en lote. Documentos (PDF, DOCX, EPUB, Markdown, HTML y texto), utilidades de PDF (unir, dividir, rotar, reordenar, extraer imágenes y editar metadatos), OCR ligero con PDF buscable, imágenes (incluido HEIC, redimensionar y comprimir) y utilidades de texto. Todo local y determinista; nunca modifica el archivo original.',
+        en: 'Nodus Toolkit arrives with its first converter, Nodus Convert: convert and process files on your own computer, one at a time or in batches. Documents (PDF, DOCX, EPUB, Markdown, HTML and text), PDF utilities (merge, split, rotate, reorder, extract images and edit metadata), light OCR with a searchable PDF, images (including HEIC, resize and compress) and text utilities. Everything is local and deterministic; the original file is never modified.',
+        fr: 'Nodus Toolkit arrive avec son premier convertisseur, Nodus Convert : convertissez et traitez vos fichiers sur votre propre ordinateur, un par un ou par lots. Documents (PDF, DOCX, EPUB, Markdown, HTML et texte), utilitaires PDF (fusionner, diviser, faire pivoter, réordonner, extraire des images et modifier les métadonnées), OCR léger avec PDF interrogeable, images (y compris HEIC, redimensionner et compresser) et utilitaires de texte. Tout est local et déterministe ; le fichier d’origine n’est jamais modifié.',
+        de: 'Nodus Toolkit erscheint mit seinem ersten Konverter, Nodus Convert: Konvertiere und verarbeite Dateien auf deinem eigenen Gerät, einzeln oder im Stapel. Dokumente (PDF, DOCX, EPUB, Markdown, HTML und Text), PDF-Werkzeuge (zusammenführen, teilen, drehen, neu anordnen, Bilder extrahieren und Metadaten bearbeiten), leichtes OCR mit durchsuchbarem PDF, Bilder (inklusive HEIC, skalieren und komprimieren) und Textwerkzeuge. Alles ist lokal und deterministisch; die Originaldatei wird nie verändert.',
+        pt: 'Chega o Nodus Toolkit com o seu primeiro conversor, o Nodus Convert: converta e processe ficheiros no seu próprio equipamento, um a um ou em lote. Documentos (PDF, DOCX, EPUB, Markdown, HTML e texto), utilitários de PDF (unir, dividir, rodar, reordenar, extrair imagens e editar metadados), OCR ligeiro com PDF pesquisável, imagens (incluindo HEIC, redimensionar e comprimir) e utilitários de texto. Tudo local e determinista; o ficheiro original nunca é modificado.',
+        'pt-BR': 'Chega o Nodus Toolkit com seu primeiro conversor, o Nodus Convert: converta e processe arquivos no seu próprio computador, um a um ou em lote. Documentos (PDF, DOCX, EPUB, Markdown, HTML e texto), utilitários de PDF (unir, dividir, girar, reordenar, extrair imagens e editar metadados), OCR leve com PDF pesquisável, imagens (incluindo HEIC, redimensionar e comprimir) e utilitários de texto. Tudo local e determinístico; o arquivo original nunca é modificado.',
+      },
+    ],
+  },
+  {
     version: '2.3.8',
     date: '2026-07-16',
     highlights: [
