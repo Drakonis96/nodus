@@ -3113,7 +3113,7 @@ export function registerIpc(
         onProgress: (progress) => e.sender.send('toolkit:job:event', jobId, progress),
       });
       if (request.openFolderOnDone && !result.cancelled) {
-        const firstOutput = result.files.flatMap((f) => f.outputPaths)[0];
+        const firstOutput = result.zipPath ?? result.files.flatMap((f) => f.outputPaths)[0];
         if (firstOutput) shell.showItemInFolder(firstOutput);
       }
       return result;

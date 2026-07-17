@@ -15,6 +15,48 @@ function readBytes(filePath: string): Uint8Array {
   return new Uint8Array(fs.readFileSync(filePath));
 }
 
+function clampQuality(value: unknown, fallback: number): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(100, Math.max(1, n)) : fallback;
+}
+
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+}
+
+/** Render a pdfjs page to an image buffer, optionally grayscale. `scale` maps
+ *  PDF points (72 dpi) to output pixels, so scale = dpi / 72. */
+async function renderPageToImage(
+  page: any,
+  scale: number,
+  format: 'png' | 'jpeg',
+  quality: number,
+  grayscale = false,
+): Promise<Buffer> {
+  const { createCanvas } = await import('@napi-rs/canvas');
+  const viewport = page.getViewport({ scale });
+  const canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx as any, viewport }).promise;
+  if (grayscale) {
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = image.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const v = Math.round(0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]);
+      px[i] = px[i + 1] = px[i + 2] = v;
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+  return format === 'png' ? canvas.toBuffer('image/png') : canvas.toBuffer('image/jpeg', quality);
+}
+
+/** Points-per-inch pages for A4 / US Letter. */
+const PAGE_SIZES: Record<string, [number, number]> = {
+  a4: [595.28, 841.89],
+  letter: [612, 792],
+};
+
 /** B1 — merge every input PDF, in the order given, into one document. */
 async function mergePdfs(inputs: string[]): Promise<ToolkitProduced[]> {
   const { PDFDocument } = await loadPdfLib();
@@ -163,18 +205,142 @@ async function extractImages(input: string, ctx: ToolkitRunContext): Promise<Too
   return produced;
 }
 
-/** B6 — one image per page, page sized to the image. */
-async function imagesToPdf(inputs: string[]): Promise<ToolkitProduced[]> {
+/** B6 — images → PDF. Page size can fit each image, or be A4/Letter with the image
+ *  scaled to fit inside a margin; orientation auto/portrait/landscape. */
+async function imagesToPdf(inputs: string[], ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
   const { PDFDocument } = await loadPdfLib();
   const doc = await PDFDocument.create();
+  const pageSize = String(ctx.options.pageSize ?? 'fit');
+  const orientation = String(ctx.options.orientation ?? 'auto');
+  const margin = Math.max(0, Number(ctx.options.margin ?? 0));
   for (const input of inputs) {
+    if (ctx.signal.cancelled) break;
     const bytes = readBytes(input);
     const isJpg = /\.jpe?g$/i.test(input);
     const image = isJpg ? await doc.embedJpg(bytes) : await doc.embedPng(bytes);
-    const page = doc.addPage([image.width, image.height]);
-    page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+    if (pageSize === 'fit' || !PAGE_SIZES[pageSize]) {
+      const page = doc.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+      continue;
+    }
+    let [pw, ph] = PAGE_SIZES[pageSize];
+    const landscape = orientation === 'landscape' || (orientation === 'auto' && image.width > image.height);
+    if (landscape) [pw, ph] = [ph, pw];
+    const page = doc.addPage([pw, ph]);
+    const scale = Math.min((pw - 2 * margin) / image.width, (ph - 2 * margin) / image.height);
+    const dw = image.width * scale;
+    const dh = image.height * scale;
+    page.drawImage(image, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh });
   }
   return [{ data: await doc.save(), ext: 'pdf' }];
+}
+
+/** PDF → one image per page (JPEG or PNG), for "PDF to JPG"-style export. */
+async function pdfToImages(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const format = ctx.outputFormat === 'png' ? 'png' : 'jpeg';
+  const quality = clampQuality(ctx.options.quality, 90);
+  const scale = Math.max(0.5, clampInt(ctx.options.dpi, 150, 36, 600) / 72);
+  const pdf = await openPdf(input);
+  const produced: ToolkitProduced[] = [];
+  try {
+    for (let p = 1; p <= pdf.numPages; p++) {
+      if (ctx.signal.cancelled) break;
+      const page = await pdf.getPage(p);
+      const data = await renderPageToImage(page, scale, format, quality);
+      page.cleanup?.();
+      produced.push({ data, ext: format === 'png' ? 'png' : 'jpg', suffix: `-p${String(p).padStart(2, '0')}` });
+      ctx.onPageProgress(p / pdf.numPages);
+    }
+  } finally {
+    await pdf.destroy?.();
+  }
+  if (produced.length === 0) throw new Error('El PDF no tiene páginas que exportar.');
+  return produced;
+}
+
+/** Rebuild a PDF by rasterising each page (lossy). Grayscale variant reuses the
+ *  same path. Best for scanned PDFs; a note tells the user it is lossy. */
+async function rebuildRasterPdf(input: string, ctx: ToolkitRunContext, grayscale: boolean): Promise<ToolkitProduced[]> {
+  const { PDFDocument } = await loadPdfLib();
+  const quality = clampQuality(ctx.options.quality, grayscale ? 80 : 70);
+  const scale = Math.max(0.5, clampInt(ctx.options.dpi, 150, 36, 400) / 72);
+  const pdf = await openPdf(input);
+  const out = await PDFDocument.create();
+  try {
+    for (let p = 1; p <= pdf.numPages; p++) {
+      if (ctx.signal.cancelled) break;
+      const page = await pdf.getPage(p);
+      const pointsViewport = page.getViewport({ scale: 1 });
+      const jpg = await renderPageToImage(page, scale, 'jpeg', quality, grayscale);
+      page.cleanup?.();
+      const image = await out.embedJpg(jpg);
+      const target = out.addPage([pointsViewport.width, pointsViewport.height]);
+      target.drawImage(image, { x: 0, y: 0, width: pointsViewport.width, height: pointsViewport.height });
+      ctx.onPageProgress(p / pdf.numPages);
+    }
+  } finally {
+    await pdf.destroy?.();
+  }
+  return [{ data: await out.save(), ext: 'pdf', suffix: grayscale ? ' (grises)' : ' (comprimido)' }];
+}
+
+/** Add page numbers to every page. */
+async function pdfPageNumbers(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { PDFDocument, StandardFonts, rgb } = await loadPdfLib();
+  const doc = await PDFDocument.load(readBytes(input));
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const start = clampInt(ctx.options.start, 1, 0, 100000);
+  const size = clampInt(ctx.options.fontSize, 11, 6, 48);
+  const position = String(ctx.options.position ?? 'bottom-center');
+  const margin = 24;
+  doc.getPages().forEach((page, i) => {
+    const label = String(start + i);
+    const w = page.getWidth();
+    const h = page.getHeight();
+    const textWidth = font.widthOfTextAtSize(label, size);
+    let x = (w - textWidth) / 2;
+    if (position.endsWith('right')) x = w - margin - textWidth;
+    else if (position.endsWith('left')) x = margin;
+    const y = position.startsWith('top') ? h - margin - size : margin;
+    page.drawText(label, { x, y, size, font, color: rgb(0, 0, 0) });
+  });
+  return [{ data: await doc.save(), ext: 'pdf', suffix: ' (numerado)' }];
+}
+
+/** Stamp a diagonal text watermark on every page. */
+async function pdfWatermark(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { PDFDocument, StandardFonts, rgb, degrees } = await loadPdfLib();
+  const text = String(ctx.options.text ?? '').trim() || 'BORRADOR';
+  const opacity = Math.min(0.9, Math.max(0.05, Number(ctx.options.opacity ?? 0.2)));
+  const angle = clampInt(ctx.options.angle, 45, -90, 90);
+  const doc = await PDFDocument.load(readBytes(input));
+  const font = await doc.embedFont(StandardFonts.HelveticaBold);
+  doc.getPages().forEach((page) => {
+    const w = page.getWidth();
+    const h = page.getHeight();
+    const size = Math.max(24, Math.min(w, h) / 8);
+    const textWidth = font.widthOfTextAtSize(text, size);
+    const rad = (angle * Math.PI) / 180;
+    // Anchor so the rotated text runs through the page centre.
+    const x = w / 2 - (textWidth / 2) * Math.cos(rad);
+    const y = h / 2 - (textWidth / 2) * Math.sin(rad);
+    page.drawText(text, { x, y, size, font, color: rgb(0.4, 0.4, 0.4), opacity, rotate: degrees(angle) });
+  });
+  return [{ data: await doc.save(), ext: 'pdf', suffix: ' (marca de agua)' }];
+}
+
+/** Crop every page by a uniform margin (points) via the crop box. */
+async function pdfCrop(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { PDFDocument } = await loadPdfLib();
+  const doc = await PDFDocument.load(readBytes(input));
+  const margin = Math.max(0, Number(ctx.options.margin ?? 20));
+  doc.getPages().forEach((page) => {
+    const { width, height } = page.getSize();
+    const cw = Math.max(1, width - 2 * margin);
+    const ch = Math.max(1, height - 2 * margin);
+    page.setCropBox(margin, margin, cw, ch);
+  });
+  return [{ data: await doc.save(), ext: 'pdf', suffix: ' (recortado)' }];
 }
 
 /** B7 — write document metadata; empty fields are left unchanged. */
@@ -198,6 +364,12 @@ export const pdfOps: ToolkitOpRegistry = {
   'pdf-rotate': { arity: 'each', run: ([input], ctx) => rotatePdf(input, ctx) },
   'pdf-reorder': { arity: 'each', run: ([input], ctx) => reorderPdf(input, ctx) },
   'pdf-extract-images': { arity: 'each', run: ([input], ctx) => extractImages(input, ctx) },
-  'images-to-pdf': { arity: 'merge', run: (inputs) => imagesToPdf(inputs) },
+  'images-to-pdf': { arity: 'merge', run: (inputs, ctx) => imagesToPdf(inputs, ctx) },
   'pdf-metadata': { arity: 'each', run: ([input], ctx) => editMetadata(input, ctx) },
+  'pdf-to-images': { arity: 'each', run: ([input], ctx) => pdfToImages(input, ctx) },
+  'pdf-compress': { arity: 'each', run: ([input], ctx) => rebuildRasterPdf(input, ctx, false) },
+  'pdf-grayscale': { arity: 'each', run: ([input], ctx) => rebuildRasterPdf(input, ctx, true) },
+  'pdf-page-numbers': { arity: 'each', run: ([input], ctx) => pdfPageNumbers(input, ctx) },
+  'pdf-watermark': { arity: 'each', run: ([input], ctx) => pdfWatermark(input, ctx) },
+  'pdf-crop': { arity: 'each', run: ([input], ctx) => pdfCrop(input, ctx) },
 };

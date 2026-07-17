@@ -27,6 +27,7 @@ import type {
   ToolkitProduced,
 } from '@shared/toolkitTypes';
 import { toolkitOp } from '@shared/toolkitTypes';
+import { buildZip, type ZipEntry } from './zip';
 
 /** Cooperative cancellation flag; ops read `cancelled` between units of work. */
 export interface ToolkitSignal {
@@ -100,6 +101,17 @@ function resolveOutputPath(
   return out;
 }
 
+/** Non-colliding entry name within a zip (in-memory namespace, no disk check). */
+function resolveEntryName(baseName: string, suffix: string, ext: string, taken: Set<string>): string {
+  const safeBase = sanitizeBaseName(baseName) + suffix;
+  const candidate = (n: number): string => `${n <= 1 ? safeBase : `${safeBase} (${n})`}.${ext}`;
+  let n = 1;
+  let name = candidate(n);
+  while (taken.has(name)) name = candidate(++n);
+  taken.add(name);
+  return name;
+}
+
 /** Write bytes to a sibling temp file, then rename into place (atomic on same fs). */
 function writeAtomic(targetPath: string, data: Uint8Array): void {
   const tmp = `${targetPath}.tmp-${crypto.randomBytes(6).toString('hex')}`;
@@ -140,7 +152,6 @@ export async function runToolkitJob(
   }
 
   const outputExt = (spec.outputs.find((o) => o.format === request.outputFormat) ?? spec.outputs[0]).ext;
-  const takenPaths = new Set<string>();
 
   const files: ToolkitFileProgress[] = request.inputPaths.map((inputPath) => ({
     inputPath,
@@ -179,20 +190,22 @@ export async function runToolkitJob(
     },
   });
 
-  const persist = (produced: ToolkitProduced[], dir: string, fallbackBase: string): string[] => {
-    const written: string[] = [];
+  // Operations produce in-memory outputs; the engine materialises them at the end,
+  // either as loose files or packaged into a single zip. Collect them alongside the
+  // identity (destination dir + fallback base name) the naming will need.
+  interface Pending {
+    fileIndex: number;
+    dir: string;
+    base: string;
+    out: ToolkitProduced;
+  }
+  const pending: Pending[] = [];
+  const contributed = new Set<number>();
+  const collect = (produced: ToolkitProduced[], fileIndex: number, dir: string, base: string): void => {
     for (const out of produced) {
-      const target = resolveOutputPath(
-        dir,
-        out.suggestedBaseName ?? fallbackBase,
-        out.suffix ?? '',
-        out.ext || outputExt,
-        takenPaths,
-      );
-      writeAtomic(target, out.data);
-      written.push(target);
+      pending.push({ fileIndex, dir, base, out });
+      contributed.add(fileIndex);
     }
-    return written;
   };
 
   if (impl.arity === 'merge') {
@@ -205,9 +218,7 @@ export async function runToolkitJob(
       if (signal.cancelled) throw new CancelledError();
       const produced = await impl.run(request.inputPaths, makeCtx(0));
       if (signal.cancelled) throw new CancelledError();
-      const dir = outputDirFor(request.inputPaths[0]);
-      const base = request.mergedName?.trim() || baseNameNoExt(request.inputPaths[0]);
-      files[0].outputPaths = persist(produced, dir, base);
+      collect(produced, 0, outputDirFor(request.inputPaths[0]), request.mergedName?.trim() || baseNameNoExt(request.inputPaths[0]));
       for (const f of files) {
         f.status = 'done';
         f.pct = 1;
@@ -220,47 +231,66 @@ export async function runToolkitJob(
         f.error = cancelled ? null : errorMessage(error);
       }
     }
-    activeIndex = -1;
-    emit(true);
-    return { jobId, files, cancelled: signal.cancelled };
-  }
-
-  // arity === 'each': one run per input, error-isolated.
-  for (let i = 0; i < files.length; i++) {
-    if (signal.cancelled) {
-      files[i].status = 'cancelled';
-      continue;
-    }
-    activeIndex = i;
-    files[i].status = 'processing';
-    files[i].pct = null;
-    emit();
-    try {
-      const produced = await impl.run([files[i].inputPath], makeCtx(i));
+  } else {
+    // arity === 'each': one run per input, error-isolated.
+    for (let i = 0; i < files.length; i++) {
       if (signal.cancelled) {
         files[i].status = 'cancelled';
-        files[i].pct = null;
         continue;
       }
-      const dir = outputDirFor(files[i].inputPath);
-      files[i].outputPaths = persist(produced, dir, baseNameNoExt(files[i].inputPath));
-      files[i].status = 'done';
-      files[i].pct = 1;
-      done += 1;
-    } catch (error) {
-      if (signal.cancelled || error instanceof CancelledError) {
-        files[i].status = 'cancelled';
-        files[i].pct = null;
-      } else {
-        files[i].status = 'error';
-        files[i].error = errorMessage(error);
+      activeIndex = i;
+      files[i].status = 'processing';
+      files[i].pct = null;
+      emit();
+      try {
+        const produced = await impl.run([files[i].inputPath], makeCtx(i));
+        if (signal.cancelled) {
+          files[i].status = 'cancelled';
+          files[i].pct = null;
+          continue;
+        }
+        collect(produced, i, outputDirFor(files[i].inputPath), baseNameNoExt(files[i].inputPath));
+        files[i].status = 'done';
+        files[i].pct = 1;
+        done += 1;
+      } catch (error) {
+        if (signal.cancelled || error instanceof CancelledError) {
+          files[i].status = 'cancelled';
+          files[i].pct = null;
+        } else {
+          files[i].status = 'error';
+          files[i].error = errorMessage(error);
+        }
       }
+      emit();
     }
-    emit();
   }
   activeIndex = -1;
+
+  // Materialise the collected outputs: one zip, or loose files.
+  let zipPath: string | null = null;
+  if (request.zipOutput && pending.length > 0) {
+    const takenNames = new Set<string>();
+    const entries: ZipEntry[] = pending.map((p) => ({
+      name: resolveEntryName(p.out.suggestedBaseName ?? p.base, p.out.suffix ?? '', p.out.ext || outputExt, takenNames),
+      data: p.out.data,
+    }));
+    const zipDir = request.outputDir || path.dirname(request.inputPaths[0]);
+    const zipBase = request.zipName?.trim() || (request.inputPaths.length === 1 ? baseNameNoExt(request.inputPaths[0]) : 'nodus-convert');
+    zipPath = resolveOutputPath(zipDir, zipBase, '', 'zip', new Set());
+    writeAtomic(zipPath, buildZip(entries));
+    for (const idx of contributed) files[idx].outputPaths = [zipPath];
+  } else {
+    const takenPaths = new Set<string>();
+    for (const p of pending) {
+      const target = resolveOutputPath(p.dir, p.out.suggestedBaseName ?? p.base, p.out.suffix ?? '', p.out.ext || outputExt, takenPaths);
+      writeAtomic(target, p.out.data);
+      files[p.fileIndex].outputPaths.push(target);
+    }
+  }
+
   emit(true);
-  return { jobId, files, cancelled: signal.cancelled };
+  return { jobId, files, cancelled: signal.cancelled, zipPath };
 }
 
 /** Convenience for tests and one-off callers that just want a temp directory. */

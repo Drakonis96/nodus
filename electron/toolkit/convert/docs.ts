@@ -4,10 +4,10 @@
 // and the shared markdownToHtml for Markdown → EPUB. Heavy deps load lazily.
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import { markdownToHtml, escapeHtml } from '@shared/toolkitMarkdown';
 import type { ToolkitOpRegistry, ToolkitRunContext } from '../toolkitJobs';
 import type { ToolkitProduced } from '@shared/toolkitTypes';
+import { buildZip, crc32, type ZipEntry } from '../zip';
 import { openPdf, pageText } from '../../extraction/pdfjsLoader';
 
 const enc = new TextEncoder();
@@ -279,73 +279,6 @@ async function epubConvert(input: string, ctx: ToolkitRunContext): Promise<Toolk
 }
 
 // ── A7 — Markdown → EPUB ────────────────────────────────────────────────────
-
-// A minimal, order-preserving ZIP writer. adm-zip sorts entries alphabetically on
-// write, which breaks EPUB's rule that `mimetype` be the first entry and STORED —
-// so the EPUB is assembled by hand (as the plan requires).
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(buf: Buffer): number {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-interface ZipEntry {
-  name: string;
-  data: Buffer;
-  store: boolean;
-}
-
-function buildZip(entries: ZipEntry[]): Buffer {
-  const locals: Buffer[] = [];
-  const centrals: Buffer[] = [];
-  let offset = 0;
-  for (const entry of entries) {
-    const nameBuf = Buffer.from(entry.name, 'utf8');
-    const method = entry.store ? 0 : 8;
-    const comp = entry.store ? entry.data : zlib.deflateRawSync(entry.data);
-    const crc = crc32(entry.data);
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(0, 6);
-    local.writeUInt16LE(method, 8);
-    local.writeUInt32LE(crc, 14);
-    local.writeUInt32LE(comp.length, 18);
-    local.writeUInt32LE(entry.data.length, 22);
-    local.writeUInt16LE(nameBuf.length, 26);
-    locals.push(local, nameBuf, comp);
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(method, 10);
-    central.writeUInt32LE(crc, 16);
-    central.writeUInt32LE(comp.length, 20);
-    central.writeUInt32LE(entry.data.length, 24);
-    central.writeUInt16LE(nameBuf.length, 28);
-    central.writeUInt32LE(offset, 42);
-    centrals.push(central, nameBuf);
-    offset += 30 + nameBuf.length + comp.length;
-  }
-  const centralBuf = Buffer.concat(centrals);
-  const eocd = Buffer.alloc(22);
-  eocd.writeUInt32LE(0x06054b50, 0);
-  eocd.writeUInt16LE(entries.length, 8);
-  eocd.writeUInt16LE(entries.length, 10);
-  eocd.writeUInt32LE(centralBuf.length, 12);
-  eocd.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, centralBuf, eocd]);
-}
 
 function xhtmlChapter(title: string, bodyHtml: string): string {
   return (

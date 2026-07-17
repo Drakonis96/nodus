@@ -100,3 +100,31 @@ test('D4 — compress makes a smaller, still-decodable file', async () => {
   assert.equal(d.width, 800);
   assert.equal(d.height, 600);
 });
+
+test('crop to an aspect ratio produces the expected centered dimensions', async () => {
+  const src = buildPng(fxDir, 'crop-src.png', { width: 640, height: 480 });
+  const [square] = await imageOps['image-crop'].run([src], ctx(null, { aspect: '1:1' }));
+  assert.deepEqual(await dims(square.data), { width: 480, height: 480 });
+  assert.equal(square.ext, 'png');
+
+  const [wide] = await imageOps['image-crop'].run([src], ctx(null, { aspect: '16:9' }));
+  const d = await dims(wide.data);
+  assert.equal(d.width, 640);
+  assert.equal(d.height, 360);
+});
+
+test('rotate 90° swaps width and height; 180° keeps them', async () => {
+  const src = buildPng(fxDir, 'rot-src.png', { width: 300, height: 200 });
+  const [r90] = await imageOps['image-rotate'].run([src], ctx(null, { transform: 'rotate90' }));
+  assert.deepEqual(await dims(r90.data), { width: 200, height: 300 });
+  const [r180] = await imageOps['image-rotate'].run([src], ctx(null, { transform: 'rotate180' }));
+  assert.deepEqual(await dims(r180.data), { width: 300, height: 200 });
+});
+
+test('watermark keeps dimensions and stays decodable', async () => {
+  const src = buildPhoto(fxDir, 'wm-src.jpg', { width: 500, height: 400 });
+  const [out] = await imageOps['image-watermark'].run([src], ctx('jpeg', { text: 'PRUEBA', opacity: 0.4, position: 'bottom-right' }));
+  const d = await dims(out.data);
+  assert.equal(d.width, 500);
+  assert.equal(d.height, 400);
+});
