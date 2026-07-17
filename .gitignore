@@ -36,3 +36,6 @@ build/NodusDockTile.docktileplugin/
 # Local tooling / caches
 .claude/
 __pycache__/
+
+# Locally generated analysis reports
+reports/
