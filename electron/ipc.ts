@@ -166,6 +166,7 @@ import {
   beginMascotWindowDrag,
   dragMascotWindow,
   endMascotWindowDrag,
+  getMascotWindowPlacement,
   setMascotTutorialVisible,
   setMascotWindowExpanded,
 } from './mascotWindow';
@@ -761,8 +762,17 @@ export function registerIpc(
   });
   h('nodi:viewContext:set', async (_e, context) => setNodiViewContext(context));
   h('nodi:viewContext:get', async () => getNodiViewContext());
-  // Retained for compatibility with older renderers; the current compact overlay is
-  // kept interactive so a first click cannot be lost during an IPC round-trip.
+  ipcMain.on('nodi:setMouseIgnoreSync', (e, ignore: boolean) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
+    // sendSync is intentional here: a forwarded mousemove must make Nodi interactive
+    // before a following physical mouse-down can pass through to the app underneath.
+    e.returnValue = true;
+  });
+  ipcMain.on('nodi:getOverlayPlacementSync', (e) => {
+    e.returnValue = getMascotWindowPlacement();
+  });
+  // Retained for compatibility with older preload bundles.
   h('nodi:setMouseIgnore', async (e, ignore: boolean) => {
     const win = BrowserWindow.fromWebContents(e.sender);
     win?.setIgnoreMouseEvents(Boolean(ignore), { forward: true });
@@ -771,7 +781,6 @@ export function registerIpc(
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
     const nextPlacement = setMascotWindowExpanded(win, Boolean(expanded));
-    if (expanded) win.focus();
     return nextPlacement;
   });
   h('nodi:openMainWindow', async () => {

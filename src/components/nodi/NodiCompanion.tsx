@@ -186,7 +186,11 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const notesLight = settings ? settings.theme === 'light' || (settings.theme === 'system' && !systemDark) : false;
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const [overlayPlacement, setOverlayPlacement] = useState<NodiOverlayPlacement>({ x: 16, y: 16, horizontal: 'left', vertical: 'up' });
+  const [overlayPlacement, setOverlayPlacement] = useState<NodiOverlayPlacement>(() => (
+    isOverlay
+      ? window.nodus.nodiGetOverlayPlacement()
+      : { x: 16, y: 16, horizontal: 'left', vertical: 'up' }
+  ));
   const [dragging, setDragging] = useState(false);
   const [greet, setGreet] = useState(false);
   const draggingRef = useRef(false);
@@ -432,27 +436,22 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     return () => window.removeEventListener('resize', place);
   }, [isOverlay, clamp, figureW, figureH]);
 
-  // ── Overlay: resize the native window around open surfaces ──────────────────
-  // The compact host is deliberately interactive. Toggling Electron's mouse-ignore
-  // mode from forwarded mousemove events creates a race in which a quick first click
-  // reaches the app behind Nodi before the IPC round-trip can enable this window.
+  // ── Overlay: switch full-host interactivity around open surfaces ────────────
   useEffect(() => {
     if (!isOverlay) return;
-    let shrink: number | undefined;
+    let releasePassthrough: number | undefined;
     if (hasOpenSurface) {
-      // Grow first, then let the surface animate open inside the new bounds.
+      // The host already has its full, stable bounds; make all controls interactive.
       void window.nodus.nodiSetExpanded(true).then(setOverlayPlacement).catch(() => {});
     } else {
-      // Shrinking is the opposite: the radial buttons are still flying home, and the
-      // overlay body is overflow:hidden, so a window this small would slice them
-      // mid-flight. Wait for them to land. Reopening clears the timer below, so a
-      // quick open/close/open never shrinks behind the surface's back.
-      shrink = window.setTimeout(() => {
+      // Keep the host interactive while the radial buttons fly home, then restore
+      // transparent-area passthrough. Reopening clears this pending hand-off.
+      releasePassthrough = window.setTimeout(() => {
         void window.nodus.nodiSetExpanded(false).then(setOverlayPlacement).catch(() => {});
       }, RADIAL_COLLAPSE_MS);
     }
     return () => {
-      window.clearTimeout(shrink);
+      window.clearTimeout(releasePassthrough);
     };
   }, [hasOpenSurface, isOverlay]);
 
@@ -472,6 +471,38 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     if (!isOverlay) return;
     return window.nodus.onNodiDismiss(closeAll);
   }, [closeAll, isOverlay]);
+
+  // The native overlay keeps its full bounds so macOS never stretches a compact
+  // backing surface while the radial menu opens. When no surface is open, make the
+  // transparent area click-through and reactivate only the figure itself. The
+  // preload uses synchronous IPC for this one mouse hit-test transition, preventing
+  // a fast first click from racing ahead of BrowserWindow.setIgnoreMouseEvents().
+  useEffect(() => {
+    if (!isOverlay) return;
+    let lastIgnore: boolean | null = null;
+    const setIgnore = (ignore: boolean) => {
+      if (lastIgnore === ignore) return;
+      lastIgnore = ignore;
+      void window.nodus.nodiSetMouseIgnore(ignore).catch(() => {});
+    };
+    const onMove = (event: MouseEvent) => {
+      if (hasOpenSurface || dragging) {
+        setIgnore(false);
+        return;
+      }
+      const figure = document.querySelector<HTMLElement>('.nodi-figure');
+      if (!figure) return;
+      const rect = figure.getBoundingClientRect();
+      const overFigure = event.clientX >= rect.left
+        && event.clientX < rect.right
+        && event.clientY >= rect.top
+        && event.clientY < rect.bottom;
+      setIgnore(!overFigure);
+    };
+    if (hasOpenSurface || dragging) setIgnore(false);
+    document.addEventListener('mousemove', onMove, true);
+    return () => document.removeEventListener('mousemove', onMove, true);
+  }, [dragging, hasOpenSurface, isOverlay]);
 
   // Click anywhere outside Nodi or its controls closes the menu/panels/bubble.
   useEffect(() => {
@@ -698,11 +729,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
 
   const anchorStyle: CSSProperties = isOverlay
     ? {
-        // Anchor to the window edges that stay next to Nodi while the transparent
-        // host grows and shrinks. Numeric left/top coordinates require a second
-        // React update after Electron changes the native bounds; for one compositor
-        // frame that left Nodi at (404,304) inside a 212x232 window, clipping the orb
-        // completely on close and making it jump diagonally on open.
+        // Preserve Nodi's screen-edge relationship while the stable native host is
+        // dragged between quadrants. The host itself never resizes when controls open.
         ...(overlayPlacement.horizontal === 'left'
           ? { right: Math.max(0, window.innerWidth - overlayPlacement.x - figureW) }
           : { left: overlayPlacement.x }),

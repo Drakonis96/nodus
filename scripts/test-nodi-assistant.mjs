@@ -134,22 +134,27 @@ test('floating Nodi dismisses every open surface on an outside click or window b
   assert.match(mascot, /win\.on\('blur'/, 'clicking another application dismisses the overlay');
   assert.match(mascot, /webContents\.send\('nodi:dismiss'\)/);
   assert.match(ipc, /nodi:setExpanded/);
-  assert.match(mascot, /setIgnoreMouseEvents\(false/, 'the compact host is immediately clickable');
-  assert.doesNotMatch(ipc, /setIgnoreMouseEvents\(!expanded/, 'resizing must not reintroduce the first-click race');
-  assert.doesNotMatch(component, /addEventListener\('mousemove'/, 'interactivity must not depend on a prior hover event');
+  assert.match(mascot, /width: EXPANDED_WIDTH/, 'opening controls must not resize a visible transparent NSPanel');
+  assert.match(mascot, /applyClosedMousePassthrough/, 'closed transparent regions pass clicks to the app underneath');
+  assert.match(component, /addEventListener\('mousemove'/, 'forwarded movement performs transparent-region hit testing');
+  assert.match(ipc, /nodi:setMouseIgnoreSync/);
+  assert.match(ipc, /e\.returnValue = true/, 'the native hit target changes before a following physical mouse-down');
+  assert.match(preload, /sendSync\('nodi:setMouseIgnoreSync'/);
+  assert.match(component, /nodiGetOverlayPlacement\(\)/, 'the first renderer frame uses the native placement rather than a provisional anchor');
+  assert.match(preload, /sendSync\('nodi:getOverlayPlacementSync'/);
   assert.match(preload, /onNodiDismiss/);
   assert.match(types, /onNodiDismiss\(cb: \(\) => void\)/);
 });
 
-test('floating Nodi stays expanded until its radial buttons finish collapsing', async () => {
+test('floating Nodi restores mouse passthrough after its radial buttons finish collapsing', async () => {
   const component = await read('src/components/nodi/NodiCompanion.tsx');
   assert.match(component, /const RADIAL_COLLAPSE_MS = 450/);
   assert.match(
     component,
     /setTimeout\(\(\) => \{\s*void window\.nodus\.nodiSetExpanded\(false\)[\s\S]*?\}, RADIAL_COLLAPSE_MS\)/,
-    'the native overlay must not shrink while the radial transition is still visible',
+    'transparent-area passthrough waits until the radial transition finishes',
   );
-  assert.match(component, /window\.clearTimeout\(shrink\)/, 'reopening Nodi cancels a pending shrink');
+  assert.match(component, /window\.clearTimeout\(releasePassthrough\)/, 'reopening Nodi cancels a pending passthrough hand-off');
 });
 
 test('Nodi drags in absolute screen space and closes through an animated context action', async () => {
@@ -188,13 +193,15 @@ test('Nodi drags in absolute screen space and closes through an animated context
   }
   assert.match(ipc, /nodi:windowDrag:begin/);
   assert.match(ipc, /nodi:windowDrag:move/);
-  assert.match(mascot, /COMPACT_WIDTH = FIGURE_WIDTH \+ MARGIN \* 2/);
+  assert.doesNotMatch(mascot, /COMPACT_WIDTH/, 'the native host has no compact size to flash during menu opening');
+  assert.match(mascot, /width: EXPANDED_WIDTH/);
   assert.match(mascot, /movable:\s*false/, 'AppKit must not apply a second, conflicting drag constraint at screen edges');
+  assert.match(mascot, /backgroundThrottling:\s*false/, 'the desktop overlay compositor must keep drawing while another macOS app is active');
   assert.match(mascot, /placeWindowAroundNodi/);
   assert.match(mascot, /const isRepeatedRequest = requestedBounds/, 'clamped pointer movement must not repeatedly invalidate a native edge constraint');
   assert.match(mascot, /const appliedBounds = win\.getBounds\(\)/, 'renderer placement follows the bounds actually applied by the window manager');
-  assert.match(mascot, /const expanded = bounds\.width > COMPACT_WIDTH \|\| bounds\.height > COMPACT_HEIGHT/);
-  assert.match(mascot, /windowDrag\.expanded/, 'pressing Nodi must not compact an open radial menu before it closes');
+  assert.match(mascot, /return placeWindowAroundNodi\(win, nodi\.x, nodi\.y\)/, 'menu state changes never resize the native host');
+  assert.doesNotMatch(mascot, /windowDrag\.expanded/, 'dragging never switches the native host to a compact size');
   assert.match(mascot, /screen\.getDisplayNearestPoint/);
   assert.match(types, /horizontal: 'left' \| 'right'/);
   assert.match(component, /onContextMenu=\{onFigureContextMenu\}/);
@@ -205,6 +212,7 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(component, /settings\?\.mascotStyle !== 'orb'\) wave\(\)/, 'opening the orb menu cannot replace its continuous float with a snapping rock animation');
   assert.match(component, /window\.innerWidth - overlayPlacement\.x - figureW/, 'the overlay anchor follows the stable native-window edge during horizontal resize');
   assert.match(component, /window\.innerHeight - overlayPlacement\.y - figureH/, 'the overlay anchor follows the stable native-window edge during vertical resize');
+  assert.doesNotMatch(ipc, /if \(expanded\) win\.focus\(\)/, 'opening radial controls must not explicitly focus Electron over the active desktop app');
   assert.match(figure, /closing-accessory-smoke/);
   assert.match(figure, /closing-body-smoke/);
   for (const animation of ['nodi-close-limb', 'nodi-close-accessory', 'nodi-close-face', 'nodi-close-core', 'nodi-close-smoke']) {
