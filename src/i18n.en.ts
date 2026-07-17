@@ -4,6 +4,17 @@
  * partial coverage never breaks the UI.
  */
 export const EN: Record<string, string> = {
+  // ── Nodi: quick notes ────────────────────────────────────────────────────
+  'Notas rápidas': 'Quick notes',
+  'Nueva nota': 'New note',
+  'Tachado': 'Strikethrough',
+  'Borrar nota': 'Delete note',
+  'Escribe tu nota en Markdown…': 'Write your note in Markdown…',
+  'Nada que previsualizar.': 'Nothing to preview.',
+  'Buscar en tus notas…': 'Search your notes…',
+  'Aún no tienes notas. Crea la primera con el botón +.': 'No notes yet. Create your first one with the + button.',
+  'Sin guardar': 'Unsaved',
+  'apuntes rápidos en Markdown, siempre a mano.': 'quick Markdown jottings, always within reach.',
   // ── Setup wizard: model discovery ────────────────────────────────────────
   'Modelo de embeddings': 'Embedding model',
   'El modelo local seleccionado ya no está disponible.': 'The selected local model is no longer available.',

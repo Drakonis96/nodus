@@ -5,6 +5,17 @@
  * `scripts/test-i18n-coverage.mjs` requires every key the UI asks for to be here.
  */
 export const DE: Record<string, string> = {
+  // ── Nodi: Schnellnotizen ─────────────────────────────────────────────────
+  'Notas rápidas': 'Schnellnotizen',
+  'Nueva nota': 'Neue Notiz',
+  'Tachado': 'Durchgestrichen',
+  'Borrar nota': 'Notiz löschen',
+  'Escribe tu nota en Markdown…': 'Schreib deine Notiz in Markdown…',
+  'Nada que previsualizar.': 'Nichts zum Vorschauen.',
+  'Buscar en tus notas…': 'Notizen durchsuchen…',
+  'Aún no tienes notas. Crea la primera con el botón +.': 'Noch keine Notizen. Erstelle die erste mit der Schaltfläche +.',
+  'Sin guardar': 'Nicht gespeichert',
+  'apuntes rápidos en Markdown, siempre a mano.': 'schnelle Markdown-Notizen, immer griffbereit.',
   'Modelo de embeddings': 'Embeddings-Modell',
   'El modelo local seleccionado ya no está disponible.': 'Das ausgewählte lokale Modell ist nicht mehr verfügbar.',
   'Preparando el motor local…': 'Lokale Engine wird vorbereitet…',

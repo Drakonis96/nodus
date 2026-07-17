@@ -4739,6 +4739,21 @@ export interface NodiConversationInput {
   model?: ModelRef | null;
 }
 
+/** A quick Markdown note kept by the Nodi companion (local, per install). The
+ *  title is derived from the first non-empty line when the note is saved. */
+export interface NodiNote {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NodiNoteInput {
+  id?: string | null;
+  content: string;
+}
+
 export interface NodiOverlayPlacement {
   x: number;
   y: number;
@@ -4765,6 +4780,9 @@ export interface NodusApi {
   saveNodiConversation(input: NodiConversationInput): Promise<NodiConversation>;
   deleteNodiConversation(id: string): Promise<void>;
   clearNodiConversations(): Promise<void>;
+  listNodiNotes(): Promise<NodiNote[]>;
+  saveNodiNote(input: NodiNoteInput): Promise<NodiNote>;
+  deleteNodiNote(id: string): Promise<void>;
   nodiChatStream(request: NodiChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<string>;
   cancelNodiChat(): Promise<void>;
   setNodiViewContext(context: NodiViewContext): Promise<void>;

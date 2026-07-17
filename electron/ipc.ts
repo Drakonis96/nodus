@@ -174,6 +174,7 @@ import {
 import { getNodiViewContext, setNodiViewContext, streamNodiChat } from './ai/nodiChat';
 import type { NodiChatRequest } from '@shared/types';
 import { clearNodiConversations, deleteNodiConversation, getNodiConversation, listNodiConversations, saveNodiConversation } from './nodiConversations';
+import { deleteNodiNote, listNodiNotes, saveNodiNote } from './nodiNotes';
 import { ensureCopilotCert } from './copilot/certs';
 import { installCopilotAddin, installLibreOfficeCopilot } from './copilot/install';
 import { setApiKey, clearApiKey, getApiKey, copyApiKeysBetweenVaults, listApiKeyProvidersForVault, setBackupPassword, clearBackupPassword, hasBackupPassword, getBackupPassword, getBackupRecoveryKey } from './secrets/secretStore';
@@ -729,6 +730,9 @@ export function registerIpc(
   h('nodi:conversations:save', async (_e, input) => saveNodiConversation(input));
   h('nodi:conversations:delete', async (_e, id: string) => deleteNodiConversation(id));
   h('nodi:conversations:clear', async () => clearNodiConversations());
+  h('nodi:notes:list', async () => listNodiNotes());
+  h('nodi:notes:save', async (_e, input) => saveNodiNote(input));
+  h('nodi:notes:delete', async (_e, id: string) => deleteNodiNote(id));
   h('nodi:chatStream', async (e, requestId: string, request: NodiChatRequest) => {
     const controller = new AbortController();
     nodiChatAborters.set(requestId, controller);
