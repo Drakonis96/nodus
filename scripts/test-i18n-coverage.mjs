@@ -89,6 +89,10 @@ const INDIRECT_KEY_SOURCES = [
   { file: 'shared/databaseFormulaEval.ts', pattern: /\bsetError\([^,]+,[^,]+,\s*(?:problem \?\? )?(["'])((?:\\.|(?!\1).)*?)\1/g },
   // describeFormula stitches its sentence from words, each passed through the injected t().
   { file: 'shared/databaseFormulaEval.ts', pattern: /\bt\((["'])((?:\\.|(?!\1).)*?)\1\)/g },
+  // Where a conflicting birth/death year came from ('ficha', 'bautismo'…), rendered as
+  // t(v.label) in the ficha's "Hechos en conflicto" section.
+  { file: 'shared/conflictDetection.ts', pattern: /\bcollect\([^,]+,[^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'shared/conflictDetection.ts', pattern: /^\s{2}\w+:\s*(["'])((?:\\.|(?!\1).)*?)\1,$/gm },
 ];
 
 // Literals that sit inside a t() call but are not keys: they index a label map
