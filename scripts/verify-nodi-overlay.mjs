@@ -47,8 +47,25 @@ try {
   if (!overlay) throw new Error('overlay window never appeared');
   await overlay.waitForLoadState('domcontentloaded');
   const nativeOverlay = await app.browserWindow(overlay);
+  assert.equal(
+    await nativeOverlay.evaluate((win) => win.webContents.getBackgroundThrottling()),
+    false,
+    'Nodi overlay must keep compositing while another macOS app is active',
+  );
+  // Playwright's synthetic click does not perform AppKit's real mouse-window
+  // activation. A physical click does, so reproduce that native precondition before
+  // exercising the menu; otherwise the overlay's blur dismissal immediately wins.
+  await nativeOverlay.evaluate((win) => win.focus());
   const figure = overlay.locator('.nodi-figure');
   await figure.waitFor({ timeout: 30_000 });
+  const figureScreenPosition = async () => {
+    const [bounds, box] = await Promise.all([
+      nativeOverlay.evaluate((win) => win.getBounds()),
+      figure.boundingBox(),
+    ]);
+    if (!box) throw new Error('Nodi figure has no bounding box');
+    return { x: Math.round(bounds.x + box.x), y: Math.round(bounds.y + box.y) };
+  };
   const setMenuOpen = async (open) => {
     const current = await overlay.locator('.nodi-node.open').count() > 0;
     if (current === open) return;
@@ -60,9 +77,7 @@ try {
 
   /** How far the radial buttons stick out of the window, in px. */
   const overflow = () => overlay.evaluate(() => {
-    // Include Nodi itself: the old numeric anchor briefly remained at (404,304)
-    // after the host had already shrunk to 212x232, making the mascot disappear for
-    // exactly one compositor frame even though the returning buttons were in bounds.
+    // Include Nodi itself as well as every radial action.
     const nodes = [...document.querySelectorAll('.nodi-node, .nodi-figure')];
     let worst = 0;
     for (const n of nodes) {
@@ -72,7 +87,10 @@ try {
     return { viewport: [window.innerWidth, window.innerHeight], clippedBy: Math.round(worst) };
   });
 
+  const beforeOpenPosition = await figureScreenPosition();
   await setMenuOpen(true);
+  const afterOpenPosition = await figureScreenPosition();
+  assert.deepEqual(afterOpenPosition, beforeOpenPosition, 'opening the radial menu moved Nodi on screen');
   await overlay.waitForTimeout(700);
   assert.equal(await overlay.locator('.nodi-orb').getAttribute('data-state'), 'idle', 'opening the orb menu must not replace its continuous float animation');
   const open = await overflow();
@@ -89,18 +107,13 @@ try {
     const o = await overflow();
     console.log(`[verify] +${ms}ms after collapse ->`, JSON.stringify(o));
     assert.equal(o.clippedBy, 0, `a radial button was clipped at ${ms} ms`);
+    assert.deepEqual(await figureScreenPosition(), beforeOpenPosition, `closing the radial menu moved Nodi at ${ms} ms`);
     await overlay.screenshot({ path: `${shots}/overlay-2-collapse-${ms}.png` });
   }
-  // Electron may throttle background renderer timers, so allow the delayed compact
-  // resize more time than the CSS transition itself before testing another position.
-  await overlay.waitForFunction(
-    () => window.innerWidth === 212 && window.innerHeight === 232,
-    undefined,
-    { timeout: 3_000 },
-  );
+  assert.deepEqual((await overflow()).viewport, [600, 520], 'the native host resized after collapse');
 
   // A little hand jitter must still produce a click instead of being mistaken for a
-  // drag. This also exercises clicking the compact native window with no prior hover.
+  // drag. This also exercises reactivating Nodi from transparent-area passthrough.
   const figureBox = await figure.boundingBox();
   if (!figureBox) throw new Error('Nodi figure has no bounding box');
   const clickX = figureBox.x + figureBox.width / 2;
@@ -110,9 +123,9 @@ try {
   await overlay.mouse.move(clickX + 4, clickY + 2);
   await overlay.mouse.up();
   await overlay.waitForFunction(() => document.querySelector('.nodi-node')?.classList.contains('open') ?? false);
-  console.log('[verify] compact first click + pointer jitter -> menu open');
+  console.log('[verify] passthrough first click + pointer jitter -> menu open');
   await setMenuOpen(false);
-  await overlay.waitForFunction(() => window.innerWidth === 212 && window.innerHeight === 232, undefined, { timeout: 3_000 });
+  await overlay.waitForTimeout(700);
 
   const moveNodi = async (screenX, screenY) => {
     await overlay.evaluate(async ([x, y]) => {
@@ -173,7 +186,7 @@ try {
   }
   await overlay.evaluate(async () => window.nodus.nodiEndWindowDrag());
   console.log('[verify] lower-left native bounds ->', JSON.stringify(lowerLeftSamples));
-  assert.equal(new Set(lowerLeftSamples.map(({ x }) => x)).size, 1, 'the compact panel rebounds horizontally at the left edge');
+  assert.equal(new Set(lowerLeftSamples.map(({ x }) => x)).size, 1, 'the stable panel rebounds horizontally at the left edge');
   console.log('[verify] shots in', shots);
 } finally {
   await app.close().catch(() => {});

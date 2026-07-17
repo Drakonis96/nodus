@@ -10,26 +10,25 @@ import { getSettings } from './db/settingsRepo';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
-// Roomy enough for Nodi plus its radial menu and a compact panel. The window is
-// transparent. Its compact bounds hug Nodi; the larger bounds are used only while a
-// menu or panel is open.
+// Roomy enough for Nodi plus its radial menu and panels. Keep these native bounds
+// stable: on macOS, resizing a visible transparent NSPanel briefly stretches its old
+// backing surface from the new origin before Chromium submits the next frame. That
+// exact transient is the diagonal jump seen when Nodi opens outside the main app.
 const EXPANDED_WIDTH = 600;
 const EXPANDED_HEIGHT = 520;
 const FIGURE_WIDTH = 180;
 const FIGURE_HEIGHT = 200;
 const MARGIN = 16;
-const COMPACT_WIDTH = FIGURE_WIDTH + MARGIN * 2;
-const COMPACT_HEIGHT = FIGURE_HEIGHT + MARGIN * 2;
 
 let mascotWindow: BrowserWindow | null = null;
 let tutorialVisible = false;
 let placement: NodiOverlayPlacement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
-let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number; expanded: boolean } | null = null;
+let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number } | null = null;
 let requestedBounds: { x: number; y: number; width: number; height: number } | null = null;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
 
-function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: number, expanded: boolean): NodiOverlayPlacement {
+function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: number): NodiOverlayPlacement {
   const display = screen.getDisplayNearestPoint({
     x: Math.round(desiredX + FIGURE_WIDTH / 2),
     y: Math.round(desiredY + FIGURE_HEIGHT / 2),
@@ -39,10 +38,10 @@ function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: n
   const nodiY = clamp(desiredY, workArea.y, workArea.y + workArea.height - FIGURE_HEIGHT);
   const horizontal: NodiOverlayPlacement['horizontal'] = nodiX + FIGURE_WIDTH / 2 >= workArea.x + workArea.width / 2 ? 'left' : 'right';
   const vertical: NodiOverlayPlacement['vertical'] = nodiY + FIGURE_HEIGHT / 2 >= workArea.y + workArea.height / 2 ? 'up' : 'down';
-  const width = expanded ? Math.min(EXPANDED_WIDTH, workArea.width) : COMPACT_WIDTH;
-  const height = expanded ? Math.min(EXPANDED_HEIGHT, workArea.height) : COMPACT_HEIGHT;
-  const idealX = expanded && horizontal === 'left' ? nodiX - (width - FIGURE_WIDTH - MARGIN) : nodiX - MARGIN;
-  const idealY = expanded && vertical === 'up' ? nodiY - (height - FIGURE_HEIGHT - MARGIN) : nodiY - MARGIN;
+  const width = Math.min(EXPANDED_WIDTH, workArea.width);
+  const height = Math.min(EXPANDED_HEIGHT, workArea.height);
+  const idealX = horizontal === 'left' ? nodiX - (width - FIGURE_WIDTH - MARGIN) : nodiX - MARGIN;
+  const idealY = vertical === 'up' ? nodiY - (height - FIGURE_HEIGHT - MARGIN) : nodiY - MARGIN;
   const x = clamp(idealX, workArea.x, workArea.x + workArea.width - width);
   const y = clamp(idealY, workArea.y, workArea.y + workArea.height - height);
 
@@ -63,7 +62,7 @@ function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: n
       win.setBounds(nextBounds, false);
     }
     // Keep the requested rectangle as well as the applied one. AppKit may inset a
-    // compact NSPanel at a screen edge; comparing only against getBounds() would
+    // transparent NSPanel at a screen edge; comparing only against getBounds() would
     // resend the rejected x=0 request on every pointermove and make the panel rock.
     requestedBounds = nextBounds;
   }
@@ -85,21 +84,36 @@ function currentNodiPosition(win: BrowserWindow): { x: number; y: number } {
   return { x: bounds.x + placement.x, y: bounds.y + placement.y };
 }
 
+function cursorIsOverNodi(win: BrowserWindow): boolean {
+  const cursor = screen.getCursorScreenPoint();
+  const nodi = currentNodiPosition(win);
+  return cursor.x >= nodi.x
+    && cursor.x < nodi.x + FIGURE_WIDTH
+    && cursor.y >= nodi.y
+    && cursor.y < nodi.y + FIGURE_HEIGHT;
+}
+
+function applyClosedMousePassthrough(win: BrowserWindow): void {
+  // The host stays large to avoid a native resize flash. Its transparent area must
+  // therefore pass through to the app below, while a stationary pointer already on
+  // Nodi must remain clickable without requiring a preparatory mouse movement.
+  win.setIgnoreMouseEvents(!cursorIsOverNodi(win), { forward: true });
+}
+
 function positionBottomRight(win: BrowserWindow): void {
   const { workArea } = screen.getPrimaryDisplay();
   placeWindowAroundNodi(
     win,
     workArea.x + workArea.width - FIGURE_WIDTH - MARGIN,
-    workArea.y + workArea.height - FIGURE_HEIGHT - MARGIN,
-    false
+    workArea.y + workArea.height - FIGURE_HEIGHT - MARGIN
   );
 }
 
 function createMascotWindow(): BrowserWindow {
   const isMac = process.platform === 'darwin';
   const win = new BrowserWindow({
-    width: COMPACT_WIDTH,
-    height: COMPACT_HEIGHT,
+    width: EXPANDED_WIDTH,
+    height: EXPANDED_HEIGHT,
     show: false,
     useContentSize: true,
     frame: false,
@@ -107,9 +121,8 @@ function createMascotWindow(): BrowserWindow {
     backgroundColor: '#00000000',
     resizable: false,
     // Movement is implemented below in absolute screen space. Letting AppKit also
-    // treat this panel as user-movable makes macOS constrain a compact window 43px
-    // away from the left edge while the expanded one can reach x=0, so changing
-    // size or dragging at that edge visibly bounces Nodi between both positions.
+    // treat this panel as user-movable makes macOS apply a second edge constraint,
+    // so pointer movement at the left wall visibly rebounds between two positions.
     movable: false,
     minimizable: false,
     maximizable: false,
@@ -127,6 +140,11 @@ function createMascotWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Nodi is an animated desktop overlay and remains visible while another app
+      // owns the active window. Chromium's default background throttling suspends
+      // its compositor in that exact state; the first click would otherwise resume
+      // with a stale frame. Keep this one tiny renderer compositing continuously.
+      backgroundThrottling: false,
     },
   });
 
@@ -141,18 +159,19 @@ function createMascotWindow(): BrowserWindow {
     win.setMovable(false);
   };
   applyLevels();
-  // Keep the compact host interactive. Enabling it from a forwarded mousemove races
-  // a fast click, which makes Nodi appear unresponsive. The compact window is only a
-  // 16px margin larger than the figure, so it remains a tightly scoped hit target.
-  win.setIgnoreMouseEvents(false, { forward: true });
   positionBottomRight(win);
+  applyClosedMousePassthrough(win);
 
   win.on('show', applyLevels);
   win.on('blur', () => {
-    if (!win.isDestroyed()) win.webContents.send('nodi:dismiss');
+    if (!win.isDestroyed()) {
+      win.webContents.send('nodi:dismiss');
+      applyClosedMousePassthrough(win);
+    }
   });
   win.once('ready-to-show', () => {
     applyLevels();
+    applyClosedMousePassthrough(win);
     if (!tutorialVisible) win.showInactive();
   });
 
@@ -173,21 +192,29 @@ function createMascotWindow(): BrowserWindow {
   return win;
 }
 
-/** Resize the transparent host around the mascot without moving Nodi itself. */
+/** Toggle full-host interactivity without moving or resizing Nodi. */
 export function setMascotWindowExpanded(win: BrowserWindow, expanded: boolean): NodiOverlayPlacement {
   const nodi = currentNodiPosition(win);
   windowDrag = null;
-  return placeWindowAroundNodi(win, nodi.x, nodi.y, expanded);
+  if (expanded) win.setIgnoreMouseEvents(false, { forward: true });
+  else applyClosedMousePassthrough(win);
+  // Deliberately keep the native window expanded. Only its mouse passthrough state
+  // changes; stable bounds mean AppKit never has an old compact surface to flash.
+  return placeWindowAroundNodi(win, nodi.x, nodi.y);
+}
+
+/** Placement already computed before mascot.html loads, for its very first frame. */
+export function getMascotWindowPlacement(): NodiOverlayPlacement {
+  return { ...placement };
 }
 
 /** Start an absolute screen-space drag. This is stable while the native window moves. */
 export function beginMascotWindowDrag(win: BrowserWindow, screenX: number, screenY: number): NodiOverlayPlacement {
   const nodi = currentNodiPosition(win);
-  const bounds = win.getBounds();
-  const expanded = bounds.width > COMPACT_WIDTH || bounds.height > COMPACT_HEIGHT;
-  placement = placeWindowAroundNodi(win, nodi.x, nodi.y, expanded);
+  win.setIgnoreMouseEvents(false, { forward: true });
+  placement = placeWindowAroundNodi(win, nodi.x, nodi.y);
   const placedNodi = currentNodiPosition(win);
-  windowDrag = { cursorX: screenX, cursorY: screenY, nodiX: placedNodi.x, nodiY: placedNodi.y, expanded };
+  windowDrag = { cursorX: screenX, cursorY: screenY, nodiX: placedNodi.x, nodiY: placedNodi.y };
   return placement;
 }
 
@@ -196,8 +223,7 @@ export function dragMascotWindow(win: BrowserWindow, screenX: number, screenY: n
   return placeWindowAroundNodi(
     win,
     windowDrag.nodiX + screenX - windowDrag.cursorX,
-    windowDrag.nodiY + screenY - windowDrag.cursorY,
-    windowDrag.expanded
+    windowDrag.nodiY + screenY - windowDrag.cursorY
   );
 }
 

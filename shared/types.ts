@@ -4820,6 +4820,7 @@ export interface NodusApi {
   nodiOpenSettings(): Promise<void>;
   onNodiNavigate(cb: (view: 'settings') => void): () => void;
   nodiSetMouseIgnore(ignore: boolean): Promise<void>;
+  nodiGetOverlayPlacement(): NodiOverlayPlacement;
   nodiSetExpanded(expanded: boolean): Promise<NodiOverlayPlacement>;
   onNodiDismiss(cb: () => void): () => void;
   nodiOpenMainWindow(): Promise<void>;

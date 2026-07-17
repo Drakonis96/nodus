@@ -64,7 +64,10 @@ const api: NodusApi = {
   setNodiViewContext: (context) => ipcRenderer.invoke('nodi:viewContext:set', context).then(() => undefined),
   getNodiViewContext: () => ipcRenderer.invoke('nodi:viewContext:get'),
   setNodiTutorialVisible: (visible) => ipcRenderer.invoke('nodi:tutorialVisible', visible).then(() => undefined),
-  nodiSetMouseIgnore: (ignore) => ipcRenderer.invoke('nodi:setMouseIgnore', ignore),
+  nodiSetMouseIgnore: async (ignore) => {
+    ipcRenderer.sendSync('nodi:setMouseIgnoreSync', ignore);
+  },
+  nodiGetOverlayPlacement: () => ipcRenderer.sendSync('nodi:getOverlayPlacementSync'),
   nodiSetExpanded: (expanded) => ipcRenderer.invoke('nodi:setExpanded', expanded),
   onNodiDismiss: (cb) => {
     const listener = () => cb();
