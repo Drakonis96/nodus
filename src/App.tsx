@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, RecoveryStatus, SyncLogEntry, VaultSummary } from '@shared/types';
 import { Onboarding } from './views/Onboarding';
 import { HomeView, GenealogyHome, DatabasesHome } from './views/HomeView';
@@ -36,6 +36,7 @@ import type {
   View,
 } from './navigation';
 import { groupedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { placeHeaderBadge, type HeaderBadgePlacement } from './headerLayout';
 import { effectiveSidebarHidden, isPreviewVaultType, isViewAllowedForVaultType, viewsDisallowedForType } from '@shared/vaultTypes';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import nodusLogo from './assets/nodus-logo.svg';
@@ -193,6 +194,22 @@ export function App() {
   // The trigger element that opened the vault panel (the centre badge or the
   // right-rail vaults icon), or null when closed. The panel anchors under it.
   const [vaultAnchor, setVaultAnchor] = useState<HTMLElement | null>(null);
+  // Live placement of the centred vault badge. Both rails around it change width
+  // (the logo tracks the sidebar; the action rail grows when a button pins or
+  // reveals its label), so the badge is measured rather than pinned at 50% — see
+  // headerLayout.ts.
+  //
+  // These are callback refs held in state, not useRef: the header renders only past
+  // the loading/tutorial/onboarding returns below, and the measurement has to start
+  // the moment those four boxes attach. A plain ref cannot say when that happened,
+  // so the effect would have to guess from unrelated deps — and a wrong guess leaves
+  // the badge unmeasured and invisible until some later state change happens to
+  // re-run it. Storing the nodes makes attachment itself the trigger.
+  const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
+  const [headerLogoEl, setHeaderLogoEl] = useState<HTMLElement | null>(null);
+  const [headerActionsEl, setHeaderActionsEl] = useState<HTMLElement | null>(null);
+  const [vaultBadgeEl, setVaultBadgeEl] = useState<HTMLElement | null>(null);
+  const [vaultBadgePlacement, setVaultBadgePlacement] = useState<HeaderBadgePlacement | null>(null);
   const toggleVaults = useCallback(
     (el: HTMLElement) => setVaultAnchor((cur) => (cur === el ? null : el)),
     []
@@ -601,6 +618,37 @@ export function App() {
     });
   };
 
+  // Keep the vault badge centred without letting either rail reach it. Both rails
+  // resize for reasons React never re-renders for — the action rail animates open
+  // on hover, the logo follows a pointer-driven sidebar drag — so the measurement
+  // is driven by a ResizeObserver over the boxes themselves rather than by the
+  // render cycle. The badge is absolutely positioned, so moving it cannot resize
+  // the rails back: no feedback loop.
+  useLayoutEffect(() => {
+    if (!headerEl || !headerLogoEl || !headerActionsEl || !vaultBadgeEl) {
+      setVaultBadgePlacement(null);
+      return undefined;
+    }
+    const measure = () => {
+      setVaultBadgePlacement((previous) => {
+        const next = placeHeaderBadge({
+          headerWidth: headerEl.clientWidth,
+          logoWidth: headerLogoEl.offsetWidth,
+          actionsWidth: headerActionsEl.offsetWidth,
+          badgeWidth: vaultBadgeEl.offsetWidth,
+        });
+        // Bail out when nothing moved: the observer fires on every frame of the
+        // rail's open/close animation and each state write would re-render the app.
+        if (previous && previous.fits === next.fits && Math.abs(previous.left - next.left) < 0.5) return previous;
+        return next;
+      });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    for (const box of [headerEl, headerLogoEl, headerActionsEl, vaultBadgeEl]) observer.observe(box);
+    return () => observer.disconnect();
+  }, [headerEl, headerLogoEl, headerActionsEl, vaultBadgeEl]);
+
   // Global command palette: ⌘K / Ctrl+K toggles it from anywhere.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -804,8 +852,9 @@ export function App() {
       {/* Top bar. `app-titlebar` makes the empty header area a drag region so the
           window can be moved (its interactive children are auto-marked no-drag in
           index.css). On macOS the traffic lights sit at the very top-left. */}
-      <header className="app-titlebar relative flex h-11 items-center border-b border-neutral-800">
+      <header ref={setHeaderEl} className="app-titlebar relative flex h-11 items-center border-b border-neutral-800">
         <button
+          ref={setHeaderLogoEl}
           data-testid="sidebar-header-toggle"
           className="flex h-full shrink-0 items-center justify-center gap-2 px-2 font-semibold text-lg tracking-tight transition-colors hover:bg-neutral-900/70 focus-visible:bg-neutral-900/70"
           style={{ width: sidebarWidth }}
@@ -824,13 +873,24 @@ export function App() {
           <Icon name={navCollapsed ? 'chevronRight' : 'chevronLeft'} size={14} className="text-neutral-600" />
         </button>
 
-        {/* Vault mode, centered, in the vault's accent colour (gold in genealogy /
+        {/* Vault mode, centred, in the vault's accent colour (gold in genealogy /
             crimson in databases via the accent-utility remaps). Clicking it opens
-            the vault panel right under the badge (see VaultSwitcher). */}
+            the vault panel right under the badge (see VaultSwitcher).
+            Its `left` is measured, not pinned at 50%: the rails on either side
+            change width and must never reach it (see headerLayout.ts). Until the
+            first measurement lands it stays invisible rather than flashing at a
+            position it is about to leave. */}
         {activeVault && (
           <button
+            ref={setVaultBadgeEl}
             data-vault-trigger
-            className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
+            data-testid="header-vault-badge"
+            data-badge-fits={vaultBadgePlacement ? String(vaultBadgePlacement.fits) : undefined}
+            style={{
+              left: vaultBadgePlacement ? `${vaultBadgePlacement.left}px` : '50%',
+              visibility: vaultBadgePlacement?.fits ? 'visible' : 'hidden',
+            }}
+            className="absolute top-1/2 hidden -translate-y-1/2 items-center gap-1.5 rounded-full border border-indigo-700/60 bg-indigo-950/30 px-3 py-0.5 text-xs font-semibold uppercase tracking-wide text-indigo-200 transition-colors hover:border-indigo-500 hover:bg-indigo-900/40 xl:inline-flex"
             title={t('Bóveda activa')}
             onClick={(e) => toggleVaults(e.currentTarget)}
           >
@@ -842,8 +902,10 @@ export function App() {
 
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, each button reveals its
-            label on hover/focus so the header reads as a clean row of icons. */}
-        <div className="flex items-center gap-0.5 pr-4">
+            label on hover/focus so the header reads as a clean row of icons. It
+            grows leftwards as labels open, which is why the centre badge measures
+            it instead of assuming a fixed clearance. */}
+        <div ref={setHeaderActionsEl} data-testid="header-actions" className="flex items-center gap-0.5 pr-4">
           <HeaderAction
             dataTour="vaults"
             vaultTrigger

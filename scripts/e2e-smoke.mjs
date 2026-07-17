@@ -449,6 +449,117 @@ try {
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
 
+  // ── Header: the centre badge yields to the rails instead of overlapping ────
+  // A hard left:50% badge sat under the action rail as soon as it grew (the AI
+  // alert, a hovered label, a dragged-wide sidebar). Measure the real boxes and
+  // assert the geometry survives every state that widens a rail.
+  const HEADER_GAP = 12;
+  // The badge only exists from the xl breakpoint up; the app asks for a 1440px
+  // window, so anything narrower means the host shrank it and these assertions
+  // would be measuring a badge that is deliberately display:none.
+  const headerViewportWidth = await page.evaluate(() => window.innerWidth);
+  assert.ok(
+    headerViewportWidth >= 1280,
+    `the header badge steps need an xl window; got ${headerViewportWidth}px (the app asks for 1440)`
+  );
+  const readHeaderGeometry = () => page.evaluate(() => {
+    const badge = document.querySelector('[data-testid="header-vault-badge"]');
+    const logo = document.querySelector('[data-testid="sidebar-header-toggle"]');
+    const actions = document.querySelector('[data-testid="header-actions"]');
+    const header = actions?.closest('header');
+    if (!badge || !logo || !actions || !header) return null;
+    const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width }; };
+    return {
+      badge: box(badge),
+      logo: box(logo),
+      actions: box(actions),
+      header: box(header),
+      fits: badge.getAttribute('data-badge-fits'),
+      visible: getComputedStyle(badge).visibility === 'visible',
+    };
+  });
+  // A rail that grows is a layout change; the badge answers it through a
+  // ResizeObserver, so it lands a frame later. Poll for the settled position rather
+  // than sampling once — a real overlap never settles and still fails, loudly, with
+  // the measurements that prove it.
+  const headerBadgeSafety = (g) => {
+    if (!g) return { safe: false, why: 'header geometry unreadable' };
+    if (!g.visible) {
+      return g.fits === 'false'
+        ? { safe: true, why: 'badge hidden because it reported it cannot fit' }
+        : { safe: false, why: `badge is invisible but reported fits=${g.fits}` };
+    }
+    if (g.badge.left < g.logo.right + HEADER_GAP - 0.5) {
+      return { safe: false, why: `badge.left ${g.badge.left.toFixed(1)} crosses logo.right ${g.logo.right.toFixed(1)} + ${HEADER_GAP}` };
+    }
+    if (g.badge.right > g.actions.left - HEADER_GAP + 0.5) {
+      return { safe: false, why: `badge.right ${g.badge.right.toFixed(1)} crosses actions.left ${g.actions.left.toFixed(1)} - ${HEADER_GAP}` };
+    }
+    return { safe: true, why: 'clear of both rails' };
+  };
+  const assertHeaderBadgeSafe = async (label) => {
+    let geometry = null;
+    let safety = { safe: false, why: 'never measured' };
+    const deadline = Date.now() + 5_000;
+    do {
+      geometry = await readHeaderGeometry();
+      safety = headerBadgeSafety(geometry);
+      if (safety.safe) return geometry;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
+    assert.fail(`the header badge never settled clear of the rails (${label}): ${safety.why}`);
+  };
+
+  // The model warning is pinned open in this profile (no synthesis model yet at
+  // first launch) — the exact state that used to overlap. Force both cases.
+  const originalSynthesis = (await page.evaluate(() => window.nodus.getSettings())).synthesisModel;
+  await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
+  await waitForCondition('aviso de modelo de IA visible', async () =>
+    (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
+  const withAlert = await assertHeaderBadgeSafe('con el aviso de IA abierto');
+
+  await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
+  await waitForCondition('aviso de modelo de IA retirado', async () =>
+    (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
+  // With the alert gone there is room again, so the badge must return to the true
+  // centre — the resting position the design calls for. Waited for rather than
+  // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
+  // single read could catch it mid-return.
+  const badgeCentreOffset = async () => {
+    const g = await readHeaderGeometry();
+    if (!g?.visible) return null;
+    return Math.abs((g.badge.left + g.badge.width / 2) - (g.header.left + g.header.width / 2));
+  };
+  await waitForCondition('el badge vuelve al centro exacto', async () => {
+    const offset = await badgeCentreOffset();
+    return offset !== null && offset <= 1;
+  });
+  const roomy = await assertHeaderBadgeSafe('sin el aviso');
+  assert.ok(roomy.visible, 'the badge shows on a roomy header');
+  assert.ok(
+    withAlert.badge.left < roomy.badge.left,
+    `the alert pushed the badge off centre (${withAlert.badge.left}) and it came back (${roomy.badge.left})`
+  );
+
+  // Hovering a rail button opens its label and widens the rail mid-flight.
+  await page.locator('[data-tour="toolkit"]').hover();
+  await page.waitForTimeout(400);
+  await assertHeaderBadgeSafe('con una etiqueta desplegada al pasar el ratón');
+  await page.mouse.move(0, 300);
+  await page.waitForTimeout(400);
+
+  // A sidebar dragged to its maximum walks the logo towards the badge.
+  await page.evaluate(() => localStorage.setItem('nodus.sidebarWidth', '360'));
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  await page.waitForTimeout(600);
+  await assertHeaderBadgeSafe('con la barra lateral al máximo');
+  await page.evaluate(() => localStorage.setItem('nodus.sidebarWidth', '176'));
+  await page.reload();
+  await page.getByTestId('app-shell').waitFor();
+  await page.waitForTimeout(400);
+  console.log('[e2e] header centre badge stays centred, yields to both rails and never overlaps');
+
   // ── Nodus Toolkit: hub geometry, tool navigation and the way back ──────────
   // The hub's promise is three cards that read as one set, so the sizes are
   // measured on the real rendered shell rather than trusted from the classes.
