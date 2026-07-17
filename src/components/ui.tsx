@@ -148,6 +148,10 @@ const ICON_PATHS: Record<string, string> = {
   swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   scanText: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/>',
   bug: '<path d="M8 2l1.5 1.5"/><path d="M16 2l-1.5 1.5"/><path d="M9 7a3 3 0 0 1 6 0v1H9V7Z"/><rect x="7" y="8" width="10" height="10" rx="5"/><path d="M12 12v6"/><path d="M7 12H3"/><path d="M21 12h-4"/><path d="M6.5 7 4 5"/><path d="M17.5 7 20 5"/><path d="M6.5 17 4 19"/><path d="M17.5 17 20 19"/>',
+  plug: '<path d="M9 2v6"/><path d="M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0V8Z"/><path d="M12 17v5"/>',
+  // The mascot's face fills the circle: at the 13px the release chip renders, rays
+  // or satellite nodes turn it into a smudge.
+  nodi: '<circle cx="12" cy="12" r="8.5"/><path d="M9 10.5h.01"/><path d="M15 10.5h.01"/><path d="M9 14.5a4 4 0 0 0 6 0"/>',
 };
 
 /** Complete renderer-owned icon catalogue. Pickers should consume this list so

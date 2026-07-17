@@ -41,6 +41,10 @@ try {
     'testimonios',
     'worldbuilding',
     'docencia',
+    'mcp',
+    'nodi',
+    'toolkit',
+    'languages',
   ]);
   for (const note of RELEASE_NOTES) {
     for (const highlight of note.highlights) {

@@ -6,7 +6,11 @@
 
 import type { VaultType } from './vaultTypes';
 
-export type ReleaseNoteScope = 'general' | VaultType;
+// Beyond the vault types, a highlight can belong to a cross-vault surface with an
+// identity of its own: the MCP server, the Nodi mascot, the tools hub or a new
+// interface language. They get their own icon and colour instead of dissolving
+// into 'general'.
+export type ReleaseNoteScope = 'general' | VaultType | 'mcp' | 'nodi' | 'toolkit' | 'languages';
 
 export interface ReleaseHighlight {
   es: string;
@@ -32,7 +36,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     date: '2026-07-16',
     highlights: [
       {
-        scope: 'general',
+        scope: 'languages',
         es: 'Nodus ya está disponible por completo en francés, alemán, portugués de Portugal y portugués de Brasil. Cada interfaz conserva su vocabulario propio, cubre también taxonomías, parentescos y recuperación, y recurre al inglés de forma segura si falta alguna traducción.',
         en: 'Nodus is now fully available in French, German, European Portuguese and Brazilian Portuguese. Each interface keeps its own vocabulary, also covers taxonomies, kinship and recovery, and safely falls back to English if a translation is ever missing.',
         fr: 'Nodus est désormais entièrement disponible en français, allemand, portugais du Portugal et portugais du Brésil. Chaque interface conserve son propre vocabulaire, couvre également les taxonomies, les liens de parenté et la récupération, et revient à l’anglais en toute sécurité si une traduction manque.',
@@ -50,7 +54,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'O assistente de criação descobre automaticamente os modelos de IA e embeddings disponíveis em provedores locais e na nuvem. Ele combina os resultados em dois seletores pesquisáveis e claros, tolera provedores desconectados e baixa o modelo integrado somente ao concluir a configuração.',
       },
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Los controles radiales de Nodi mantienen ahora una distribución equilibrada, siguen siendo pulsables en las esquinas superiores y permanecen visibles durante su despedida. El menú contextual conserva la acción de cerrar y las interacciones evitan aperturas o cierres accidentales.',
         en: 'Nodi’s radial controls now stay evenly balanced, remain clickable in the top corners and stay visible during its farewell. The context menu reliably keeps the close action and interactions avoid accidental opening or dismissal.',
         fr: 'Les commandes radiales de Nodi conservent désormais une disposition équilibrée, restent cliquables dans les coins supérieurs et demeurent visibles pendant ses adieux. Le menu contextuel garde fiablement l’action de fermeture et les interactions évitent les ouvertures ou fermetures accidentelles.',
@@ -128,7 +132,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'Os assistentes de criação de espaços Acadêmico, Genealogia, Estudo e Bases de dados permitem escolher separadamente o modelo de IA e o modelo de embeddings, tanto local quanto na nuvem, e baixam o modelo local quando necessário.',
       },
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Nodi contrae y hace girar sus extremidades mientras piensa, cierra los ojos y recupera su postura con una animación fluida. También se puede arrastrar por toda la pantalla y cerrar desde su menú contextual con una despedida animada que respeta sus cosméticos.',
         en: 'Nodi contracts and spins its limbs while thinking, closes its eyes and smoothly returns to its normal pose. It can also be dragged across the full screen and dismissed from its context menu with an animated farewell that accounts for its cosmetics.',
         fr: 'Nodi contracte et fait tourner ses membres pendant qu\'il réfléchit, ferme les yeux et retrouve sa posture grâce à une animation fluide. Il peut également être déplacé sur tout l\'écran et fermé depuis son menu contextuel avec un adieu animé qui respecte ses cosmétiques.',
@@ -440,7 +444,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'As demos dos modos Acadêmico, Genealogia, Bases de dados e Estudo foram ampliadas para que nenhuma seção comece vazia: incluem pastas, notas, materiais, conversas, relatórios e exemplos conectados que você pode explorar e excluir depois.',
       },
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Nodi cierra correctamente su menú, chat y paneles al hacer clic fuera. También mejoran la experiencia flotante, las animaciones del tutorial y el comportamiento del icono de la app, que conserva el aspecto de la bóveda y el tema activos al cerrar.',
         en: 'Nodi now closes its menu, chat and panels correctly when you click elsewhere. The floating experience and tutorial animations are improved too, and the app icon now keeps the active vault and theme appearance after quitting.',
         fr: 'Nodi ferme désormais correctement son menu, son chat et ses panneaux lors d\'un clic à l\'extérieur. L\'expérience flottante, les animations du tutoriel et le comportement de l\'icône de l\'application s\'améliorent également : elle conserve l\'apparence de l\'espace et du thème actifs à la fermeture.',
@@ -473,7 +477,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     date: '2026-07-13',
     highlights: [
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Te presentamos a Nodi, la nueva mascota de Nodus: un nodo de luz que te acompaña flotando abajo a la derecha. Puedes arrastrarlo por la ventana y activarlo o desactivarlo desde Ajustes → Interfaz.',
         en: 'Meet Nodi, Nodus’s new mascot: a little node of light that keeps you company, floating at the bottom right. Drag it around the window, and switch it on or off in Settings → Interface.',
         fr: 'Nous vous présentons Nodi, la nouvelle mascotte de Nodus : un nœud de lumière qui vous accompagne en flottant en bas à droite. Vous pouvez le faire glisser dans la fenêtre et l\'activer ou le désactiver depuis Paramètres → Interface.',
@@ -482,7 +486,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'Apresentamos o Nodi, a nova mascote do Nodus: um nó de luz que acompanha você flutuando no canto inferior direito. Você pode arrastá-lo pela janela e ativá-lo ou desativá-lo em Configurações → Interface.',
       },
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Haz clic en Nodi para abrir su menú: un chat con la IA que conoce Nodus y tu configuración, un centro de notificaciones (te avisa con un punto rojo y levantando la mano) y una ayuda rápida. Además, Nodi cambia de traje según el modo de la bóveda (académico, genealogía, bases de datos), algo que puedes desactivar si prefieres el Nodi de siempre.',
         en: 'Click Nodi to open its menu: a chat with an AI that knows Nodus and your setup, a notification center (it flags unread items with a red dot and a raised hand) and quick help. Nodi even changes outfit to match the vault mode (academic, genealogy, databases) — which you can turn off if you prefer the plain Nodi.',
         fr: 'Cliquez sur Nodi pour ouvrir son menu : un chat avec l\'IA qui connaît Nodus et votre configuration, un centre de notifications (il vous prévient avec un point rouge et en levant la main) et une aide rapide. De plus, Nodi change de tenue selon le mode de l\'espace (académique, généalogie, bases de données), ce que vous pouvez désactiver si vous préférez le Nodi habituel.',
@@ -491,7 +495,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'Clique em Nodi para abrir seu menu: um chat com a IA que conhece o Nodus e sua configuração, uma central de notificações (ele avisa com um ponto vermelho e levantando a mão) e uma ajuda rápida. Além disso, Nodi troca de traje conforme o modo do espaço (acadêmico, genealogia, bases de dados), algo que você pode desativar se preferir o Nodi de sempre.',
       },
       {
-        scope: 'general',
+        scope: 'nodi',
         es: 'Si quieres, Nodi puede vivir en una pequeña ventana flotante del escritorio, siempre por encima del resto de aplicaciones —incluso a pantalla completa—, para tenerlo a mano sin cambiar de app.',
         en: 'If you like, Nodi can live in a small floating desktop window, always on top of your other apps — even in fullscreen — so it’s always within reach without switching apps.',
         fr: 'Si vous le souhaitez, Nodi peut vivre dans une petite fenêtre flottante du bureau, toujours au-dessus des autres applications — même en plein écran — pour l\'avoir à portée de main sans changer d\'application.',
@@ -689,7 +693,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
         'pt-BR': 'O Nodus chega ao Linux: cada release agora publica instaladores .deb e AppImage, e o app herda o tema do cursor do sistema no Wayland.',
       },
       {
-        scope: 'general',
+        scope: 'languages',
         es: 'Los idiomas de los prompts suman francés y turco: las ideas, los informes de Deep Research y los borradores del taller pueden generarse también en esos idiomas. Las citas literales siempre conservan el idioma original.',
         en: 'Prompt languages now include French and Turkish: ideas, Deep Research reports and workshop drafts can also be generated in those languages. Verbatim quotes always keep the source language.',
         fr: 'Les langues des prompts s\'enrichissent du français et du turc : les idées, les rapports de Deep Research et les brouillons de l\'atelier peuvent désormais être générés dans ces langues également. Les citations littérales conservent toujours la langue d\'origine.',

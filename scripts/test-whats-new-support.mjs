@@ -29,6 +29,23 @@ assert.match(modal, /const scope = h\.scope;/);
 assert.match(modal, /data-testid=\{`whats-new-scope-\$\{scope\}`\}/);
 assert.match(modal, /genealogy: \{ icon: 'tree', color: '#ca8a04', label: 'Genealogía' \}/);
 assert.match(modal, /general: \{ icon: 'sparkles', color: '#64748b', label: 'General' \}/);
+// Cross-vault surfaces with an identity of their own get their own chip instead of
+// the anonymous 'general' sparkles.
+assert.match(modal, /mcp: \{ icon: 'plug', color: '#2563eb', label: 'Servidor MCP' \}/);
+assert.match(modal, /nodi: \{ icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' \}/);
+assert.match(modal, /toolkit: \{ icon: 'tools', color: '#059669', label: 'Herramientas' \}/);
+assert.match(modal, /languages: \{ icon: 'languages', color: '#db2777', label: 'Idiomas' \}/);
+assert.match(releaseNotes, /export type ReleaseNoteScope = 'general' \| VaultType \| 'mcp' \| 'nodi' \| 'toolkit' \| 'languages';/);
+assert.match(releaseNotes, /version: '2\.2\.0'[\s\S]*scope: 'nodi'/);
+assert.match(releaseNotes, /version: '2\.3\.8'[\s\S]*scope: 'languages'/);
+
+// Icon() renders nothing for an unknown name, so a typo here would ship an empty
+// coloured chip rather than fail. Every scope icon must exist in the catalogue.
+const scopeIcons = [...modal.matchAll(/icon: '([^']+)'/g)].map((m) => m[1]);
+assert.ok(scopeIcons.length >= 13, `expected every scope to declare an icon, got ${scopeIcons.length}`);
+for (const icon of scopeIcons) {
+  assert.match(icons, new RegExp(`^  ${icon}: '<`, 'm'), `scope icon "${icon}" is missing from ICON_PATHS`);
+}
 assert.match(modal, /role="tooltip" className="whats-new-scope-tooltip"/);
 assert.match(modal, /aria-label=\{scopeLabel\}/);
 assert.match(releaseNotes, /version: '2\.3\.7'[\s\S]*scope: 'genealogy'/);
