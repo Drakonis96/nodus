@@ -4,6 +4,7 @@ import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sd
 import { app } from 'electron';
 import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
+import { PROMPT_LANGUAGES } from '@shared/types';
 import type {
   AiProvider,
   Debate,
@@ -21,7 +22,8 @@ import type {
   WorkFilter,
   AuthorSummary,
 } from '@shared/types';
-import { getDb } from '../db/database';
+import path from 'node:path';
+import { getDb, openDbPath } from '../db/database';
 import { getActiveVault, listVaults } from '../vaults/vaultRegistry';
 import * as ideas from '../db/ideasRepo';
 import { getWork, getWorkByZoteroKey, getWorkByAliasKey, listWorks } from '../db/worksRepo';
@@ -148,12 +150,16 @@ const modelSchema = z
   })
   .describe('Nodus model override. If omitted, the model configured in Nodus Settings is used.');
 
+/** Derived from the shared list so the MCP surface can never accept a narrower set of
+ *  languages than the app itself offers. */
+const promptLanguageSchema = z.enum(PROMPT_LANGUAGES);
+
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
   objective: z.string().trim().min(1).max(8_000),
   audience: z.string().trim().max(1_000).optional(),
   tone: z.enum(['academic', 'synthetic', 'critical', 'exploratory']).optional(),
-  language: z.enum(['es', 'en', 'fr']).optional(),
+  language: promptLanguageSchema.optional(),
 });
 
 const writingSelectionSchema = z.object({
@@ -325,6 +331,28 @@ function page<T, K extends string>(key: K, rows: T[], limit: number, offset: num
   } as Record<K, T[]> & { total: number; limit: number; offset: number; hasMore: boolean };
 }
 
+/**
+ * Semantic search can only find what has been embedded, and an unindexed corpus returns
+ * exactly what an irrelevant query returns: nothing. A bare empty list therefore reads as
+ * "the corpus does not discuss this" — a confident false negative — when the truth is
+ * "this was never indexed" (never scanned, or the embedding model changed in Settings and
+ * the stored vectors no longer match). Every semantic tool reports its index coverage, and
+ * says so outright when there is none, so a client can tell the two apart.
+ */
+function searchCoverage(indexed: number, indexable: number, what: string) {
+  return {
+    indexed,
+    indexable,
+    ...(indexed === 0
+      ? {
+          warning:
+            `No ${what} in this vault are indexed for semantic search with the embedding model currently configured in Nodus, so this search cannot match anything. ` +
+            'An empty result here does NOT mean the corpus lacks the topic — do not tell the user it does. Ask them to index the vault in Nodus (or restore the embedding model it was indexed with).',
+        }
+      : {}),
+  };
+}
+
 /** Case-insensitive substring match over an entity's human-readable text fields only,
  *  so a query never matches JSON keys, enum values or internal ids. */
 function matchesText(query: string | undefined, fields: (string | null | undefined)[]): boolean {
@@ -365,13 +393,33 @@ function count(table: 'ideas' | 'works' | 'gaps' | 'authors' | 'notes' | 'themes
   return (getDb().prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
 }
 
-/** Describes which vault the MCP is currently bound to, plus the vaults available to switch to.
- *  The active vault is chosen from the Nodus app UI; MCP tools always read the active one. */
+/**
+ * Describes the vault these tools are actually serving, plus the vaults available to
+ * switch to. `active` is resolved from the database file this process has OPEN, not from
+ * the registry's activeVaultId: the connection is cached until an explicit vault switch,
+ * while the registry is a file any second Nodus instance can rewrite underneath us.
+ * Trusting the registry there would label another vault's data with this vault's name —
+ * a silent misattribution. When the two disagree we serve (and say) the open one, and
+ * hand the client a `warning` it can relay instead of guessing.
+ */
 function vaultContext() {
-  const active = getActiveVault();
+  const vaults = listVaults();
+  const registryActive = getActiveVault();
+  const openPath = openDbPath();
+  const serving = (openPath ? vaults.find((vault) => path.resolve(vault.path) === path.resolve(openPath)) : null) ?? registryActive;
+  const diverged = serving.id !== registryActive.id;
   return {
-    active: { id: active.id, name: active.name, type: active.type },
-    available: listVaults().map((vault) => ({ id: vault.id, name: vault.name, type: vault.type, active: vault.active })),
+    active: { id: serving.id, name: serving.name, type: serving.type },
+    available: vaults.map((vault) => ({ id: vault.id, name: vault.name, type: vault.type, active: vault.id === serving.id })),
+    ...(diverged
+      ? {
+          warning:
+            `Nodus has since made "${registryActive.name}" the active vault (another window or instance switched it), but this MCP server still serves "${serving.name}". ` +
+            'Every tool here returns data from "' +
+            serving.name +
+            '". Ask the user to restart Nodus (or reconnect this MCP client) before trusting these results for the other vault.',
+        }
+      : {}),
   };
 }
 
@@ -614,7 +662,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Nodus corpus capabilities',
       description:
-        'Returns the running Nodus version, the current size and vocabulary of this local corpus, and which vault it belongs to. Ideas, themes, edges, debates, gaps and authors are generated by analysing works and are read-only through MCP. All tools read the active vault (`vault.active`); if the user seems to mean a different one from `vault.available`, tell them to switch it in the Nodus app — MCP cannot change the active vault.',
+        'Returns the running Nodus version, the current size and vocabulary of this local corpus, and which vault it belongs to. Ideas, themes, edges, debates, gaps and authors are generated by analysing works and are read-only through MCP. All tools read the vault reported as `vault.active`; if the user seems to mean a different one from `vault.available`, tell them to switch it in the Nodus app — MCP cannot change the active vault. If `vault.warning` is present, the app has since switched vaults and this server is still serving the one named in `vault.active`: relay that warning instead of presenting the results as the other vault\'s.',
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -721,7 +769,8 @@ export function registerTools(server: McpServer): void {
     'nodus_search_ideas',
     {
       title: 'Search ideas semantically',
-      description: 'Finds ideas ranked by semantic similarity. Requires embeddings and an embedding provider already configured in Nodus.',
+      description:
+        'Finds ideas ranked by semantic similarity. Requires embeddings and an embedding provider already configured in Nodus. Reports index coverage (`indexed` of `indexable` ideas); when `indexed` is 0 the vault has no vectors for the configured embedding model, so an empty result means "not indexed", NOT "not in the corpus" — a `warning` says so.',
       inputSchema: {
         query: z.string().trim().min(1).max(8_000),
         limit: z.number().int().min(1).max(100).default(20),
@@ -737,7 +786,10 @@ export function registerTools(server: McpServer): void {
             'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
           );
         }
-        return { ideas: ideas.findSimilarIdeas(vector, -1, limit) };
+        return {
+          ideas: ideas.findSimilarIdeas(vector, -1, limit),
+          ...searchCoverage(ideas.embeddedIdeaCount(), count('ideas'), 'ideas'),
+        };
       })()
   );
 
@@ -1147,7 +1199,9 @@ export function registerTools(server: McpServer): void {
           .min(0)
           .max(1)
           .default(0.18)
-          .describe('Cosine similarity threshold; 0.18 is the same value the Nodus writing copilot uses.'),
+          .describe(
+            'Cosine similarity floor; 0.18 is the value the Nodus writing copilot uses. Scores are RELATIVE and their scale depends on the configured embedding model — with some models unrelated text still scores well above this floor, so clearing it is not evidence of relevance on its own. Rank by the returned order and judge each hit by its text.'
+          ),
         workId: z.string().trim().min(1).optional(),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -1165,6 +1219,7 @@ export function registerTools(server: McpServer): void {
         }
         const hits = passages.findSimilarPassages(vector, minSimilarity, limit, nodusId ? { nodusIds: [nodusId] } : {});
         return {
+          ...searchCoverage(passages.embeddedPassageCount(), count('passages'), 'full-text passages'),
           passages: hits.map((hit) => ({
             passage_id: hit.passage_id,
             nodus_id: hit.nodus_id,
@@ -1440,7 +1495,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Ask and map a coverage question',
       description:
-        'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens. Sends MCP progress notifications while mapping when the request carries a progressToken.',
+        'Creates a research question, uses Nodus AI to decompose it, maps coverage against the local corpus, and saves the result. This modifies Nodus data and may consume provider tokens. Sends MCP progress notifications while mapping when the request carries a progressToken. All-or-nothing: if decomposition or mapping fails, the question is not left behind in Nodus.',
       inputSchema: {
         question: z.string().trim().min(1).max(8_000),
         notes: z.string().trim().max(8_000).optional(),
@@ -1453,9 +1508,18 @@ export function registerTools(server: McpServer): void {
         const notify = progressNotifier(extra);
         const created = researchQuestions.createResearchQuestion(question, questionNotes);
         const request = { rqId: created.rq.id, model: asModel(model) };
-        notify('Decomposing the question into sub-questions…');
-        await decomposeQuestion(request);
-        return mapCoverage(request, (p) => notify(`Mapping coverage ${p.index}/${p.total}: ${p.subQuestion}`));
+        try {
+          notify('Decomposing the question into sub-questions…');
+          await decomposeQuestion(request);
+          return await mapCoverage(request, (p) => notify(`Mapping coverage ${p.index}/${p.total}: ${p.subQuestion}`));
+        } catch (error) {
+          // The row is written before the AI runs, so a failure here (no provider, a
+          // transient error) would report an error to the client and still leave an
+          // empty, unmapped question in the user's vault. Undo it: the client was told
+          // the call failed, so nothing may survive it.
+          researchQuestions.deleteResearchQuestion(created.rq.id);
+          throw error;
+        }
       })()
   );
 
@@ -1524,7 +1588,7 @@ export function registerTools(server: McpServer): void {
         '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
-        language: z.enum(['es', 'en', 'fr']).optional(),
+        language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         targetLength: deepResearchTargetLengthSchema,
         sectionLimit: deepResearchSectionLimitSchema,
@@ -1566,7 +1630,7 @@ export function registerTools(server: McpServer): void {
         'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (`## ` body sections only) and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language used for the brief so the same corpus snapshot is used to validate citations.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
-        language: z.enum(['es', 'en', 'fr']).optional(),
+        language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionsMarkdown: z.string().trim().min(1).max(200_000),
         title: z.string().trim().min(1).max(2_000).optional(),
@@ -1893,7 +1957,7 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Search archive documents semantically',
       description:
-        'Finds evidence-archive documents ranked by semantic similarity to the query — the direct way to locate which records discuss a person, place or fact when exact words differ (period spellings, synonyms). Searches the embedded extracted text/description of archive items; documents without indexed text are not found (index them from the Nodus archive view). Returns compact items with a similarity score; use nodus_get_archive_item for full text. Requires an embedding provider already configured in Nodus. Read-only.',
+        'Finds evidence-archive documents ranked by semantic similarity to the query — the direct way to locate which records discuss a person, place or fact when exact words differ (period spellings, synonyms). Searches the embedded extracted text/description of archive items. Reports index coverage (`indexed` of `indexable`); when `indexed` is 0 nothing can match and a `warning` says so, so an empty result means "not indexed", NOT "not in the archive". Returns compact items with a similarity score; use nodus_get_archive_item for full text. Requires an embedding provider already configured in Nodus. Read-only.',
       inputSchema: {
         query: z.string().trim().min(1).max(8_000),
         limit: z.number().int().min(1).max(50).default(10),
@@ -1902,7 +1966,9 @@ export function registerTools(server: McpServer): void {
           .min(0)
           .max(1)
           .default(0.35)
-          .describe('Cosine similarity threshold; 0.35 is the same value the Nodus archive discovery uses.'),
+          .describe(
+            'Cosine similarity floor; 0.35 is the value the Nodus archive discovery uses. Scores are RELATIVE and their scale depends on the configured embedding model — with some models unrelated text still scores ~0.5, so a hit clearing this floor is not evidence of relevance on its own. Rank by the returned order and judge each hit by its text.'
+          ),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -1920,8 +1986,7 @@ export function registerTools(server: McpServer): void {
         const embedding = archive.archiveEmbeddingCount();
         return {
           items: hits.map((hit) => ({ ...compactArchiveItem(hit, folderNames), similarity: hit.similarity })),
-          indexed: embedding.indexed,
-          indexable: embedding.total,
+          ...searchCoverage(embedding.indexed, embedding.total, 'archive documents'),
         };
       })()
   );

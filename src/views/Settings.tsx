@@ -430,7 +430,7 @@ export function Settings({
           <Section title={t('Idioma')}>
             <Row label={t('Idioma de la interfaz')}>
               <select
-                className="input"
+                className="input w-full md:w-64"
                 value={settings.uiLanguage}
                 onChange={(e) => patch({ uiLanguage: e.target.value as AppSettings['uiLanguage'] })}
               >
@@ -444,13 +444,16 @@ export function Settings({
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
               <select
-                className="input"
+                className="input w-full md:w-64"
                 value={settings.promptLanguage}
                 onChange={(e) => patch({ promptLanguage: e.target.value as AppSettings['promptLanguage'] })}
               >
                 <option value="es">Español</option>
                 <option value="en">English</option>
                 <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="pt">Português (Portugal)</option>
+                <option value="pt-BR">Português (Brasil)</option>
                 <option value="tr">Türkçe</option>
               </select>
             </Row>

@@ -728,5 +728,8 @@ function labels(language: string) {
   if (language === 'en') return { abstract: 'Abstract', limitations: 'Limitations', sources: 'Sources', noSources: 'No sources cited.' };
   if (language === 'fr') return { abstract: 'Résumé', limitations: 'Limites', sources: 'Sources', noSources: 'Aucune source citée.' };
   if (language === 'tr') return { abstract: 'Özet', limitations: 'Sınırlılıklar', sources: 'Kaynaklar', noSources: 'Kaynak belirtilmedi.' };
+  if (language === 'de') return { abstract: 'Zusammenfassung', limitations: 'Einschränkungen', sources: 'Quellen', noSources: 'Keine Quellen angegeben.' };
+  if (language === 'pt') return { abstract: 'Resumo', limitations: 'Limitações', sources: 'Fontes', noSources: 'Nenhuma fonte citada.' };
+  if (language === 'pt-BR') return { abstract: 'Resumo', limitations: 'Limitações', sources: 'Fontes', noSources: 'Nenhuma fonte citada.' };
   return { abstract: 'Resumen', limitations: 'Limitaciones', sources: 'Fuentes', noSources: 'Sin fuentes citadas.' };
 }

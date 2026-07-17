@@ -3621,6 +3621,9 @@ export const EN: Record<string, string> = {
   'oficiante': 'officiant',
   'otro': 'other',
   // Fact labels (FACT_LABEL values, rendered via t())
+  'ficha': 'record',
+  'bautismo': 'baptism',
+  'entierro': 'burial',
   'nacimiento': 'birth',
   'defunción': 'death',
 

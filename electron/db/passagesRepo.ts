@@ -87,6 +87,27 @@ export function findSimilarPassages(
     .all(encodeEmbedding(queryEmbedding), config.provider, config.model, queryEmbedding.length, ...nodusIds, threshold, limit) as SimilarPassage[];
 }
 
+/**
+ * How many passages carry an embedding for the current provider/model (0 ⇒ the full text
+ * is not indexed for semantic search, so findSimilarPassages can only return nothing).
+ * Mirrors embeddedIdeaCount; both let a caller tell "no matches" apart from "no index".
+ */
+export function embeddedPassageCount(): number {
+  const config = currentEmbeddingConfig();
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM passages p
+         JOIN works w ON w.nodus_id = p.nodus_id
+        WHERE p.embedding IS NOT NULL
+          AND w.archived = 0
+          AND p.embedding_provider = ?
+          AND p.embedding_model = ?`
+    )
+    .get(config.provider, config.model) as { count: number };
+  return row.count;
+}
+
 export function getPassageDetail(passageId: string): PassageDetail | null {
   const row = getDb()
     .prepare(

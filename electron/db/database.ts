@@ -59,6 +59,18 @@ export function getDb(): Database.Database {
   return db;
 }
 
+/**
+ * The database file the live connection actually has open, or null when none is. This is
+ * NOT always dbPath(): the connection is cached and only re-opened on an explicit
+ * closeDb(), while dbPath() re-reads the vault registry from disk on every call. A second
+ * Nodus instance switching vaults rewrites that registry underneath this process, so a
+ * caller that reports which vault it is serving must ask here rather than trust the
+ * registry.
+ */
+export function openDbPath(): string | null {
+  return db ? db.name : null;
+}
+
 export function closeDb(): void {
   if (db) {
     db.close();
