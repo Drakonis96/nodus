@@ -70,7 +70,7 @@ function snapshotSummary(filePath: string): RecoverySnapshotSummary | null {
 /**
  * The main process cannot reach the renderer's i18n table, so the handful of
  * user-facing recovery strings are localized inline. A language with no entry falls
- * back to English, matching `src/i18n.ts`'s <lang> → EN → ES chain.
+ * back to English, matching `src/i18n.ts`'s <lang> → EN chain.
  */
 type RecoveryStrings = Partial<Record<AppLanguage, string>> & { es: string; en: string };
 const tr = (language: AppLanguage, values: RecoveryStrings) => values[language] ?? values.en;

@@ -44,7 +44,7 @@ export function getNodiViewContext(): NodiViewContext | null {
 function buildSystemPrompt(request: NodiChatRequest, sources: string[]): string {
   const settings = getSettings();
   const active = getActiveVault();
-  const lang = settings.uiLanguage === 'en' ? 'English' : 'Spanish';
+  const lang = settings.uiLanguage === 'es' ? 'Spanish' : 'English';
   const model = resolveModelRef(request.model ?? settings.nodiModel ?? settings.chatModel);
   const selected = request.contexts.length ? request.contexts.join(', ') : 'ninguno';
   return [

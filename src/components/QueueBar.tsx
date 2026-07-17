@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { QueueProgress, QueueKind } from '@shared/types';
 import { Icon } from './ui';
 import { ConfirmModal } from './ConfirmModal';
-import { t, tx } from '../i18n';
+import { t, tr, tx } from '../i18n';
 
 const KIND_LABELS: Record<QueueKind, string> = {
   light: 'LIGERO',
@@ -11,6 +11,19 @@ const KIND_LABELS: Record<QueueKind, string> = {
   summary: 'RESUMEN',
   bridge: 'PUENTES',
 };
+
+const STATE_LABELS = {
+  queued: 'En cola',
+  running: 'En curso',
+  done: 'Completado',
+  failed: 'Fallido',
+  cancelled: 'Cancelado',
+  paused: 'Pausado',
+} as const;
+
+function queueTitle(item: { kind: QueueKind; title: string }): string {
+  return item.kind === 'bridge' ? tr(item.title) : item.title;
+}
 
 export function QueueBar() {
   const [progress, setProgress] = useState<QueueProgress | null>(null);
@@ -34,7 +47,7 @@ export function QueueBar() {
         <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-amber-700 text-xs dark:bg-amber-950/60 dark:border-amber-800/60 dark:text-amber-300">
           <span>⚠</span>
           <span className="flex-1">
-            {t('Escaneo en pausa:')} {pausedReason} {t('Corrígelo en Ajustes y pulsa')} <b>{t('Reanudar')}</b>.
+            {t('Escaneo en pausa:')} {tr(pausedReason)} {t('Corrígelo en Ajustes y pulsa')} <b>{t('Reanudar')}</b>.
           </span>
         </div>
       )}
@@ -47,11 +60,11 @@ export function QueueBar() {
             <span>
               {current ? (
                 <>
-                  {done + failed} / {total} — {t('Procesando:')} <span className="text-neutral-200">{current.title}</span>{' '}
+                  {done + failed} / {total} — {t('Procesando:')} <span className="text-neutral-200">{queueTitle(current)}</span>{' '}
                   <span className="uppercase text-[10px] tracking-wide">({t(KIND_LABELS[current.kind]) ?? current.kind})</span>
                   {running?.detail && (
                     <span className="text-indigo-300 ml-1">
-                      · {running.detail}
+                      · {tr(running.detail)}
                       {running.subPct != null ? ` (${Math.round(running.subPct * 100)}%)` : ''}
                     </span>
                   )}
@@ -135,7 +148,7 @@ export function QueueBar() {
             <div className="mt-2 max-h-48 overflow-y-auto divide-y divide-neutral-800">
               {items.map((it) => (
                 <div key={it.id} className="flex items-center justify-between py-1 text-xs">
-                  <span className="truncate flex-1">{it.title}</span>
+                  <span className="truncate flex-1">{queueTitle(it)}</span>
                   <span className="uppercase text-[10px] text-neutral-500 mx-2">{t(KIND_LABELS[it.kind]) ?? it.kind}</span>
                   <span
                     className={
@@ -148,7 +161,7 @@ export function QueueBar() {
                             : 'text-neutral-500'
                     }
                   >
-                    {it.state}
+                    {t(STATE_LABELS[it.state])}
                   </span>
                   {it.state === 'queued' && (
                     <button

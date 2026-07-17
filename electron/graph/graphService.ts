@@ -1334,6 +1334,7 @@ function toReadingEntry(
     relatedGaps,
     relatedIdeas: ideaLabels.slice(0, 4),
     connectedAuthors: authors.slice(0, 4),
+    citedBy,
     reason: readingReason({
       read,
       analysis,

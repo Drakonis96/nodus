@@ -1,7 +1,8 @@
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { NodiNotification } from '@shared/types';
+import type { AppLanguage, NodiNotification } from '@shared/types';
+import { uiText } from '@shared/uiLanguage';
 
 // Lightweight, app-wide notification centre for the Nodi companion. Stored as a
 // single JSON file in userData (no schema migration) and capped so it can't grow
@@ -88,7 +89,7 @@ export function clearNotifications(): void {
 
 /** Seed a one-time welcome notification so the centre isn't empty on first run.
  *  Idempotent: keyed on a marker file next to the store. */
-export function seedWelcomeNotification(): void {
+export function seedWelcomeNotification(language: AppLanguage): void {
   const marker = path.join(app.getPath('userData'), 'nodi-welcome.seed');
   try {
     if (fs.existsSync(marker)) return;
@@ -97,8 +98,18 @@ export function seedWelcomeNotification(): void {
     return;
   }
   addNotification({
-    title: '¡Hola! Soy Nodi',
-    body: 'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.',
+    title: uiText(language, {
+      es: '¡Hola! Soy Nodi', en: 'Hi! I’m Nodi', fr: 'Bonjour ! Je suis Nodi', de: 'Hallo! Ich bin Nodi',
+      pt: 'Olá! Sou o Nodi', 'pt-BR': 'Olá! Eu sou o Nodi',
+    }),
+    body: uiText(language, {
+      es: 'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.',
+      en: 'Your companion node. Click me to open chat, notifications and help.',
+      fr: 'Votre nœud compagnon. Cliquez sur moi pour ouvrir le chat, les notifications et l’aide.',
+      de: 'Dein Begleitknoten. Klicke auf mich, um Chat, Benachrichtigungen und Hilfe zu öffnen.',
+      pt: 'O teu nodo companheiro. Clica em mim para abrir o chat, as notificações e a ajuda.',
+      'pt-BR': 'Seu nodo companheiro. Clique em mim para abrir o chat, as notificações e a ajuda.',
+    }),
     kind: 'success',
   });
 }

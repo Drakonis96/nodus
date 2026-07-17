@@ -155,6 +155,7 @@ import type {
 // alias for a runtime value import.
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
+import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
 import {
@@ -602,7 +603,17 @@ export function registerIpc(
   checkForUpdates: () => Promise<UpdateCheckResponse>,
   installUpdate: () => Promise<UpdateCheckResponse>
 ): void {
-  const h = ipcMain.handle.bind(ipcMain);
+  const h: typeof ipcMain.handle = (channel, listener) => ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      const result = await listener(event, ...args);
+      return localizeIpcPayload(result, getSettings().uiLanguage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const localized = localizeRuntimeError(message, getSettings().uiLanguage);
+      if (localized === message) throw error;
+      throw new Error(localized);
+    }
+  });
 
   // In-flight research-chat streams, keyed by requestId, so the renderer's Stop
   // button (`research:chatStream:cancel`) can abort the provider mid-answer.
@@ -2947,7 +2958,7 @@ export function registerIpc(
     const password = getBackupPassword();
     const recoveryKey = getBackupRecoveryKey();
     const language = getSettings().uiLanguage;
-    const es = language !== 'en';
+    const es = language === 'es';
     if (!password) return { ok: false, message: es ? 'No hay contraseña maestra configurada.' : 'No master password is configured.' };
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: es ? 'Guardar kit de recuperación' : 'Save recovery kit',

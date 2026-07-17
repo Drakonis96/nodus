@@ -53,6 +53,49 @@ const TRANSLATIONS = [
 const EN = TRANSLATIONS[0].table;
 const enKeys = new Set(Object.keys(EN));
 
+const ISSUE_12_RUNTIME_KEYS = [
+  // Reading path payload assembled in Electron and rendered by ReadingPathView.
+  'Ruta optimizada por {strategy}: {shown} lecturas priorizadas de {total} obras, agrupadas en fases manejables.',
+  'Lecturas fundamentales',
+  'Base conceptual y dependencias intelectuales que conviene leer antes de avanzar.',
+  'Huecos de investigación',
+  'Textos más útiles para cubrir o delimitar huecos detectados en el corpus.',
+  'Ampliación de temas secundarios',
+  'Lecturas que amplían temas del proyecto sin saturar una sola línea temática.',
+  'Contrastar ideas o contradicciones',
+  'Documentos conectados con relaciones, refutaciones o contradicciones ya analizadas.',
+  'Lecturas pendientes de análisis',
+  'Ítems no leídos o poco procesados que conviene analizar para decidir si entran al mapa.',
+  'Leídas sin incorporar al mapa',
+  'Obras marcadas como leídas en Zotero pero todavía sin análisis profundo suficiente.',
+  'Siguientes mejores opciones',
+  'Lecturas restantes que todavía aportan señales relevantes para el criterio elegido.',
+  // Queue title, progress and states.
+  'Descubrir relaciones semánticas',
+  'Analizando con IA…',
+  'Resumiendo…',
+  'Escaneando pares semánticos…',
+  'En cola',
+  'En curso',
+  'Completado',
+  'Fallido',
+  'Cancelado',
+  'Pausado',
+  // Vault switching errors returned as successful IPC payloads rather than throws.
+  'No se puede cambiar de bóveda con la cola de análisis activa. Pausa o termina los trabajos pendientes antes de cargar otra bóveda.',
+  'No se puede cambiar de bóveda mientras se están indexando embeddings de ideas.',
+  'No se puede cambiar de bóveda mientras se están indexando pasajes.',
+  'No se puede cambiar de bóveda mientras se descubren relaciones semánticas.',
+  'Bóveda no encontrada.',
+  // Active filter chips.
+  'Análisis profundo hecho',
+  'Análisis profundo NO hecho',
+  'Ideas extraídas',
+  'Sin ideas extraídas',
+  'Pasajes completos',
+  'Pasajes incompletos',
+];
+
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
 function walk(dir) {
@@ -193,6 +236,84 @@ test('no translation is empty', () => {
   for (const { name, table } of TRANSLATIONS) {
     const blank = Object.entries(table).filter(([, value]) => !String(value).trim()).map(([key]) => key);
     assert.deepEqual(blank, [], `${name} has blank translations`);
+  }
+});
+
+test('issue #12 runtime UI payloads have a translation in every language', () => {
+  for (const { name, table } of TRANSLATIONS) {
+    const missing = ISSUE_12_RUNTIME_KEYS.filter((key) => !table[key]?.trim());
+    assert.deepEqual(missing, [], `${name} is missing issue #12 runtime UI translations`);
+  }
+});
+
+test('all non-Spanish translation fallbacks resolve to English, never Spanish', () => {
+  const { resolveTranslation, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
+  const sparse = { en: { Clave: 'English fallback' }, fr: {}, de: {} };
+  assert.equal(resolveTranslation('fr', 'Clave', sparse), 'English fallback');
+  assert.equal(resolveTranslation('de', 'Clave', sparse), 'English fallback');
+  assert.equal(resolveTranslation('unknown-locale', 'Clave', sparse), 'English fallback');
+  assert.equal(resolveTranslation('pt', 'Sin inglés', { en: {} }), 'Translation unavailable.');
+  setActiveLang('unknown-locale');
+  assert.equal(getActiveLang(), 'en', 'an unknown locale must normalize to English');
+
+  const { treeKinshipLabel } = loadModule('shared/treeKinship.ts');
+  const generatedOnlyInSpanish = { role: 'father', branch: 'paternal', tone: 0, depth: 1, labels: { es: 'Solo español' } };
+  assert.equal(treeKinshipLabel(generatedOnlyInSpanish, 'de'), 'Father');
+});
+
+test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', () => {
+  const { localizeIpcPayload, localizeRuntimeError, uiText } = loadModule('shared/uiLanguage.ts');
+  const spanish = 'No se puede cambiar de bóveda mientras hay un análisis activo.';
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'unknown']) {
+    const localized = localizeRuntimeError(spanish, language);
+    assert.notEqual(localized, spanish, `${language} leaked the Spanish runtime error`);
+  }
+  assert.equal(uiText('de', { en: 'English fallback' }), 'English fallback');
+  assert.equal(uiText('unknown', { en: 'English fallback', es: 'Español' }), 'English fallback');
+  const payload = localizeIpcPayload({ ok: false, message: 'Archivo no encontrado.', nested: { error: 'La operación falló.' } }, 'en');
+  assert.deepEqual(payload, { ok: false, message: 'The operation could not be completed.', nested: { error: 'The operation could not be completed.' } });
+  const rendererTranslated = 'No se puede cambiar de bóveda mientras se están indexando pasajes.';
+  assert.equal(localizeIpcPayload({ message: rendererTranslated }, 'en').message, rendererTranslated);
+});
+
+test('issue #12 queue payloads translate at runtime', () => {
+  const runtime = loadModule('src/i18n.ts');
+  for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR']) {
+    runtime.setActiveLang(language);
+    assert.notEqual(runtime.tr('Descubrir relaciones semánticas'), 'Descubrir relaciones semánticas');
+    assert.notEqual(runtime.tr('Analizando fragmento 2/5 con IA… (8s)'), 'Analizando fragmento 2/5 con IA… (8s)');
+  }
+});
+
+test('issue #12 examples pass through localization at their render boundaries', () => {
+  const readingPath = fs.readFileSync(path.join(repoRoot, 'src/views/ReadingPathView.tsx'), 'utf8');
+  assert.match(readingPath, /t\(phase\.title\)/);
+  assert.match(readingPath, /t\(phase\.objective\)/);
+  assert.match(readingPath, /localizedReadingReason\(entry\)/);
+  assert.doesNotMatch(readingPath, />\{plan\.summary\}</);
+
+  const queue = fs.readFileSync(path.join(repoRoot, 'src/components/QueueBar.tsx'), 'utf8');
+  assert.match(queue, /queueTitle\(current\)/);
+  assert.match(queue, /tr\(running\.detail\)/);
+  assert.match(queue, /t\(STATE_LABELS\[it\.state\]\)/);
+
+  const vaultSwitcher = fs.readFileSync(path.join(repoRoot, 'src/components/VaultSwitcher.tsx'), 'utf8');
+  assert.match(vaultSwitcher, /setMessage\(tr\(result\.message\)\)/);
+  assert.match(vaultSwitcher, /setAddError\(errorText\(error\)\)/);
+
+  const library = fs.readFileSync(path.join(repoRoot, 'src/views/Library.tsx'), 'utf8');
+  assert.match(library, /\{t\(labelFor\(flag\)\)\}/);
+});
+
+test('two-language compatibility paths choose English for every non-Spanish UI locale', () => {
+  const files = [
+    ['electron/copilot/server.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
+    ['electron/ai/nodiChat.ts', /uiLanguage === 'es' \? 'Spanish' : 'English'/],
+    ['electron/ai/argumentMap.ts', /uiLanguage === 'es' \? 'es' : 'en'/],
+    ['electron/ipc.ts', /const es = language === 'es'/],
+  ];
+  for (const [file, expected] of files) {
+    assert.match(fs.readFileSync(path.join(repoRoot, file), 'utf8'), expected, `${file} does not fall back to English`);
   }
 });
 

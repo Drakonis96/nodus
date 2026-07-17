@@ -18,6 +18,7 @@ import { startEmbedding, getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
+import { uiText } from '@shared/uiLanguage';
 
 type ProgressListener = (p: QueueProgress) => void;
 
@@ -290,10 +291,14 @@ class ScanQueue {
     for (const item of terminal) this.notifiedTerminalIds.add(item.id);
     const done = terminal.filter((item) => item.state === 'done').length;
     const failed = terminal.length - done;
-    const english = getSettings().uiLanguage === 'en';
+    const language = getSettings().uiLanguage;
     addNotification({
-      title: failed ? (english ? 'The analysis queue finished with issues' : 'La cola de análisis ha terminado con incidencias') : (english ? 'Analysis queue completed' : 'Cola de análisis completada'),
-      body: failed ? (english ? `${done} tasks completed and ${failed} failed.` : `${done} tareas completadas y ${failed} con errores.`) : (english ? `${done} tasks completed. The vault knowledge is up to date.` : `${done} tareas completadas. El conocimiento de la bóveda está actualizado.`),
+      title: failed
+        ? uiText(language, { es: 'La cola de análisis ha terminado con incidencias', en: 'The analysis queue finished with issues', fr: 'La file d’analyse s’est terminée avec des problèmes', de: 'Die Analysewarteschlange wurde mit Problemen beendet', pt: 'A fila de análise terminou com problemas', 'pt-BR': 'A fila de análise terminou com problemas' })
+        : uiText(language, { es: 'Cola de análisis completada', en: 'Analysis queue completed', fr: 'File d’analyse terminée', de: 'Analysewarteschlange abgeschlossen', pt: 'Fila de análise concluída', 'pt-BR': 'Fila de análise concluída' }),
+      body: failed
+        ? uiText(language, { es: `${done} tareas completadas y ${failed} con errores.`, en: `${done} tasks completed and ${failed} failed.`, fr: `${done} tâches terminées et ${failed} échouées.`, de: `${done} Aufgaben abgeschlossen und ${failed} fehlgeschlagen.`, pt: `${done} tarefas concluídas e ${failed} falharam.`, 'pt-BR': `${done} tarefas concluídas e ${failed} falharam.` })
+        : uiText(language, { es: `${done} tareas completadas. El conocimiento de la bóveda está actualizado.`, en: `${done} tasks completed. The vault knowledge is up to date.`, fr: `${done} tâches terminées. Les connaissances du vault sont à jour.`, de: `${done} Aufgaben abgeschlossen. Der Wissensstand des Vaults ist aktuell.`, pt: `${done} tarefas concluídas. O conhecimento do vault está atualizado.`, 'pt-BR': `${done} tarefas concluídas. O conhecimento do vault está atualizado.` }),
       kind: failed ? 'warning' : 'success',
       dedupeKey: `scan-queue:${failed ? 'warning' : 'success'}`,
     });
@@ -350,10 +355,10 @@ class ScanQueue {
     try {
       const result = await reprocessConnections({ relations: true, nodusIds });
       if (result.relationsAdded > 0 || result.newThemes > 0) {
-        const english = getSettings().uiLanguage === 'en';
+        const language = getSettings().uiLanguage;
         addNotification({
-          title: english ? 'New connections in your vault' : 'Nuevas conexiones en tu bóveda',
-          body: english ? `${result.relationsAdded} relations and ${result.newThemes} new themes detected.` : `${result.relationsAdded} relaciones y ${result.newThemes} temas nuevos detectados.`,
+          title: uiText(language, { es: 'Nuevas conexiones en tu bóveda', en: 'New connections in your vault', fr: 'Nouvelles connexions dans votre vault', de: 'Neue Verbindungen in deinem Vault', pt: 'Novas ligações no teu vault', 'pt-BR': 'Novas conexões no seu vault' }),
+          body: uiText(language, { es: `${result.relationsAdded} relaciones y ${result.newThemes} temas nuevos detectados.`, en: `${result.relationsAdded} relations and ${result.newThemes} new themes detected.`, fr: `${result.relationsAdded} relations et ${result.newThemes} nouveaux thèmes détectés.`, de: `${result.relationsAdded} Beziehungen und ${result.newThemes} neue Themen erkannt.`, pt: `${result.relationsAdded} relações e ${result.newThemes} novos temas detetados.`, 'pt-BR': `${result.relationsAdded} relações e ${result.newThemes} novos temas detectados.` }),
           kind: 'info',
           dedupeKey: 'knowledge-connections',
         });
@@ -592,10 +597,10 @@ class ScanQueue {
     item.subPct = 1;
     this.emit();
     if (result.added > 0) {
-      const english = getSettings().uiLanguage === 'en';
+      const language = getSettings().uiLanguage;
       addNotification({
-        title: english ? 'Nodi found semantic relations' : 'Nodi ha encontrado relaciones semánticas',
-        body: english ? `${result.added} new connections after reviewing ${result.candidatesScanned} candidates.` : `${result.added} conexiones nuevas tras revisar ${result.candidatesScanned} candidatos.`,
+        title: uiText(language, { es: 'Nodi ha encontrado relaciones semánticas', en: 'Nodi found semantic relations', fr: 'Nodi a trouvé des relations sémantiques', de: 'Nodi hat semantische Beziehungen gefunden', pt: 'O Nodi encontrou relações semânticas', 'pt-BR': 'O Nodi encontrou relações semânticas' }),
+        body: uiText(language, { es: `${result.added} conexiones nuevas tras revisar ${result.candidatesScanned} candidatos.`, en: `${result.added} new connections after reviewing ${result.candidatesScanned} candidates.`, fr: `${result.added} nouvelles connexions après l’examen de ${result.candidatesScanned} candidats.`, de: `${result.added} neue Verbindungen nach der Prüfung von ${result.candidatesScanned} Kandidaten.`, pt: `${result.added} novas ligações após rever ${result.candidatesScanned} candidatos.`, 'pt-BR': `${result.added} novas conexões após revisar ${result.candidatesScanned} candidatos.` }),
         kind: 'info',
         dedupeKey: 'semantic-bridges',
       });

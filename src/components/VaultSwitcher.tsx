@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
 import { isPreviewVaultType, VAULT_TYPE_COLORS, VAULT_TYPES } from '@shared/vaultTypes';
-import { t, tx } from '../i18n';
+import { errorText, t, tr, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
 
@@ -216,7 +216,7 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
   const loadVault = (vaultId: string) =>
     run(async () => {
       const result = await window.nodus.switchVault(vaultId);
-      setMessage(result.message);
+      setMessage(tr(result.message));
       if (result.ok) {
         await onActiveVaultChanged();
         onClose();
@@ -248,14 +248,14 @@ export function VaultSwitcher({ anchorEl, onClose, vaults, onVaultsChanged, onAc
       setAddOpen(false);
       setAddName('');
       setAddType('academic');
-      setMessage(result.message);
+      setMessage(tr(result.message));
       await onActiveVaultChanged();
       onClose();
     } catch (error) {
       if (createdVaultId) {
         await window.nodus.deleteVault(createdVaultId, true).catch(() => undefined);
       }
-      setAddError(error instanceof Error ? error.message : String(error));
+      setAddError(errorText(error));
       await onVaultsChanged();
     } finally {
       setBusy(false);

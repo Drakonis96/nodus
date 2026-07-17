@@ -453,7 +453,7 @@ export function buildStructuralArgumentMap(seedIdeaId: string): ArgumentMap {
     (adj.get(e.to_id) ?? adj.set(e.to_id, []).get(e.to_id)!).push({ other: e.from_id, edge: e });
   }
 
-  const lang: 'es' | 'en' = getSettings().uiLanguage === 'en' ? 'en' : 'es';
+  const lang: 'es' | 'en' = getSettings().uiLanguage === 'es' ? 'es' : 'en';
   const relLabelOf = (rel: string): string =>
     (lang === 'en' ? EDGE_TYPE_LABELS_EN[rel] : EDGE_TYPE_LABELS[rel]) ?? rel;
   const seedDegree = adj.get(seed.global_id)?.length ?? 0;
