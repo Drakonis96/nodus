@@ -10,6 +10,7 @@ export const NODUS_ROADMAP = [
   { title: 'Vault de worldbuilding', detail: 'Personajes, lugares, cronologías y reglas de mundos narrativos.' },
   { title: 'Servidor', detail: 'Infraestructura opcional para nuevas capacidades conectadas.' },
   { title: 'Compartir vaults y trabajo colaborativo', detail: 'Compartir espacios y colaborar con control sobre los datos.' },
+  { title: 'Nodus Toolkit', detail: 'Herramientas prácticas y local-first para convertir archivos y procesar documentos, integradas en Nodus.' },
   { title: 'Nodus PDF Presenter', detail: 'Presentar archivos PDF con vista del presentador, control remoto desde el móvil, notas del orador y herramientas de anotación en directo.' },
   { title: 'Nodus OCR Workspace', detail: 'OCR asistido por IA para PDF escaneados e imágenes, con revisión página a página, limpieza de texto, reprocesamiento e integración directa con las bóvedas de Nodus.' },
   { title: 'Otros vaults sugeridos por usuarios', detail: 'Nuevos ámbitos con especialistas, colaboración activa y testers.' },
