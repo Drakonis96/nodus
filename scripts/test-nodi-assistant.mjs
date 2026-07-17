@@ -170,6 +170,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(component, /Math\.hypot\(dx, dy\) < DRAG_THRESHOLD_PX/, 'small pointer jitter remains a click');
   assert.match(component, /onLostPointerCapture=\{onFigurePointerCaptureLost\}/, 'a lost capture cannot leave Nodi stuck dragging');
   assert.match(component, /vertical === 'down' \? Math\.round\(figureH \* 0\.12\)/, 'the downward radial arc clears Nodi’s longer lower limbs');
+  assert.match(component, /const RADIAL_NODE_GAP_PX = 58/, 'radial actions keep a deliberate 12px edge-to-edge gap');
+  assert.match(component, /RADIAL_NODE_GAP_PX \/ \(2 \* Math\.sin/, 'the radial radius grows when more actions are added');
+  assert.match(component, /Math\.asin\(Math\.min\(1, RADIAL_NODE_GAP_PX \/ \(2 \* radialRadius\)\)\)/, 'angular steps preserve the same centre spacing in every quadrant');
   assert.doesNotMatch(component, /e\.movement[XY]/, 'native-window movement must not distort the drag delta');
   for (const contract of ['nodiBeginWindowDrag', 'nodiDragWindow', 'nodiEndWindowDrag']) {
     assert.match(component, new RegExp(contract));

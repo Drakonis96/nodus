@@ -35,6 +35,9 @@ const api: NodusApi = {
   saveNodiConversation: (input) => ipcRenderer.invoke('nodi:conversations:save', input),
   deleteNodiConversation: (id) => ipcRenderer.invoke('nodi:conversations:delete', id).then(() => undefined),
   clearNodiConversations: () => ipcRenderer.invoke('nodi:conversations:clear').then(() => undefined),
+  listNodiNotes: () => ipcRenderer.invoke('nodi:notes:list'),
+  saveNodiNote: (input) => ipcRenderer.invoke('nodi:notes:save', input),
+  deleteNodiNote: (id) => ipcRenderer.invoke('nodi:notes:delete', id).then(() => undefined),
   onNotificationsChanged: (cb) => {
     const listener = (_e: unknown, list: Parameters<typeof cb>[0]) => cb(list);
     ipcRenderer.on('nodi:notifications:changed', listener);

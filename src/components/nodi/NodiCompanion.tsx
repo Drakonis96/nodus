@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
+import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
 import { Markdown } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
 import { Icon } from '../ui';
-import { setActiveLang, t } from '../../i18n';
+import { setActiveLang, t, tx } from '../../i18n';
 import './companion.css';
 
 /** Nodi wears a subtle accessory that reflects the active vault's mode. */
@@ -64,21 +64,65 @@ function IconSend() {
     </svg>
   );
 }
+function IconNotes() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6M9 16.5h4" />
+    </svg>
+  );
+}
+
+/** A quick note's title is its first meaningful line, stripped of Markdown markers.
+ *  Derived live from the draft so the header updates as you type. */
+function deriveNoteTitle(content: string): string {
+  for (const raw of content.split('\n')) {
+    const line = raw
+      .replace(/^\s{0,3}#{1,6}\s+/, '')
+      .replace(/^\s{0,3}[-*+>]\s+/, '')
+      .replace(/[*_`~]/g, '')
+      .trim();
+    if (line) return line.slice(0, 80);
+  }
+  return '';
+}
+
+/** A one-line preview of everything after the title line, for the notes list. */
+function noteSnippet(content: string): string {
+  const rest: string[] = [];
+  let started = false;
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (!started) {
+      if (line) started = true;
+      continue;
+    }
+    if (line) rest.push(line.replace(/^\s{0,3}[-*+>]\s+/, '').replace(/[*_`~#]/g, ''));
+  }
+  return rest.join(' ').trim().slice(0, 140);
+}
 
 function relTime(ts: number): string {
   const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
-  if (s < 60) return 'ahora';
+  if (s < 60) return t('ahora');
   const m = Math.round(s / 60);
-  if (m < 60) return `hace ${m} min`;
+  if (m < 60) return tx('hace {n} min', { n: m });
   const h = Math.round(m / 60);
-  if (h < 24) return `hace ${h} h`;
-  return `hace ${Math.round(h / 24)} d`;
+  if (h < 24) return tx('hace {n} h', { n: h });
+  return tx('hace {n} d', { n: Math.round(h / 24) });
 }
 
 const DOT: Record<NodiNotification['kind'], string> = { info: '#5b9bd5', success: '#3bb273', warning: '#e0a53b' };
 // Four overlay actions collapse over 340 ms with up to 90 ms of stagger.
 // Keep the roomy native window until every button has returned to its anchor.
 const RADIAL_COLLAPSE_MS = 450;
+// Each control is 46px wide. Keeping the centres 58px apart leaves a deliberate
+// 12px breathing space even after adding a fifth overlay action.
+const RADIAL_NODE_GAP_PX = 58;
+// Stay inside the original 180°–268° quadrant so every action opens away from the
+// nearest screen edges, including the first and last controls.
+const RADIAL_MAX_SPAN_DEG = 88;
 // Normal clicks commonly move a few pixels between press and release. Keeping a
 // comfortable dead zone prevents those tiny movements from swallowing the click.
 const DRAG_THRESHOLD_PX = 7;
@@ -92,7 +136,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const R = isOverlay ? 104 : 92;
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [panel, setPanel] = useState<'none' | 'notifications' | 'chat'>('none');
+  const [panel, setPanel] = useState<'none' | 'notifications' | 'chat' | 'notes'>('none');
   const [helpOpen, setHelpOpen] = useState(false);
   const [ntfs, setNtfs] = useState<NodiNotification[]>([]);
   const unread = ntfs.reduce((n, x) => n + (x.read ? 0 : 1), 0);
@@ -111,6 +155,35 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const [closing, setClosing] = useState(false);
   const msgsRef = useRef<HTMLDivElement | null>(null);
   const hasOpenSurface = menuOpen || helpOpen || panel !== 'none' || contextMenuOpen || closing;
+
+  // ── Quick notes ────────────────────────────────────────────────────────────
+  const [notes, setNotes] = useState<NodiNote[]>([]);
+  const [noteView, setNoteView] = useState<'list' | 'editor'>('list');
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [noteDirty, setNoteDirty] = useState(false);
+  const [noteSearch, setNoteSearch] = useState('');
+  const [notePreview, setNotePreview] = useState(false);
+  const [deleteNoteTarget, setDeleteNoteTarget] = useState<NodiNote | null>(null);
+  const noteEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  // Mirror the in-flight note so the leave-editor flush reads live values without a
+  // stale closure (a lesson from the study-vault useMemo bug: closures over editor
+  // state go stale between renders).
+  const noteRef = useRef({ id: activeNoteId, draft: noteDraft, dirty: noteDirty });
+  noteRef.current = { id: activeNoteId, draft: noteDraft, dirty: noteDirty };
+
+  // Light/dark for the notes panel is driven locally (self-contained modifier class)
+  // so it looks right in both the app and the theme-less always-on-top overlay.
+  const [systemDark, setSystemDark] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const on = () => setSystemDark(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const notesLight = settings ? settings.theme === 'light' || (settings.theme === 'system' && !systemDark) : false;
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [overlayPlacement, setOverlayPlacement] = useState<NodiOverlayPlacement>({ x: 16, y: 16, horizontal: 'left', vertical: 'up' });
@@ -155,6 +228,148 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     void window.nodus.listNodiConversations().then(setConversations).catch(() => {});
   }, []);
   useEffect(() => { refreshConversations(); }, [refreshConversations]);
+
+  // ── Notes: load when the panel opens, persist on save / on leaving the editor ─
+  const refreshNotes = useCallback(() => {
+    void window.nodus.listNodiNotes().then(setNotes).catch(() => {});
+  }, []);
+  useEffect(() => { if (panel === 'notes') refreshNotes(); }, [panel, refreshNotes]);
+
+  const persistNote = useCallback(async (id: string | null, draft: string) => {
+    try {
+      const saved = await window.nodus.saveNodiNote({ id, content: draft });
+      setNotes((cur) => [saved, ...cur.filter((n) => n.id !== saved.id)]);
+      // A save may finish after the user has opened another note or continued
+      // typing. Only mark the editor clean when it still shows this exact snapshot.
+      const current = noteRef.current;
+      if (current.id === id && current.draft === draft) {
+        noteRef.current = { id: saved.id, draft, dirty: false };
+        setActiveNoteId(saved.id);
+        setNoteDirty(false);
+      }
+      return saved;
+    } catch {
+      const current = noteRef.current;
+      if (current.id === id && current.draft === draft) {
+        noteRef.current = { ...current, dirty: true };
+        setNoteDirty(true);
+      }
+      return null;
+    }
+  }, []);
+
+  // Fire-and-forget save used when the editor is left by any route (panel closed,
+  // switched, vault change, overlay dismissed). Mark the snapshot clean before the
+  // IPC call so opening another note cannot enqueue the same save twice.
+  const flushNote = useCallback(() => {
+    const { id, draft, dirty } = noteRef.current;
+    if (!dirty || !draft.trim()) return;
+    noteRef.current = { id, draft, dirty: false };
+    setNoteDirty(false);
+    void persistNote(id, draft);
+  }, [persistNote]);
+  const leftEditor = panel !== 'notes' || noteView !== 'editor';
+  useEffect(() => { if (leftEditor) flushNote(); }, [leftEditor, flushNote]);
+
+  const saveNote = useCallback(async () => {
+    const { id, draft, dirty } = noteRef.current;
+    if (!dirty || !draft.trim()) return;
+    noteRef.current = { id, draft, dirty: false };
+    setNoteDirty(false);
+    await persistNote(id, draft);
+  }, [persistNote]);
+
+  const openNoteEditor = (note: NodiNote | null) => {
+    flushNote();
+    setActiveNoteId(note?.id ?? null);
+    setNoteDraft(note?.content ?? '');
+    setNoteDirty(false);
+    setNotePreview(false);
+    setNoteView('editor');
+  };
+  const backToNotes = () => { setNoteView('list'); setNotePreview(false); };
+  const openNotes = () => {
+    setPanel((p) => (p === 'notes' ? 'none' : 'notes'));
+    setHelpOpen(false);
+    setNoteView('list');
+    setNoteSearch('');
+    setNotePreview(false);
+  };
+
+  const confirmDeleteNote = async () => {
+    if (!deleteNoteTarget) return;
+    const id = deleteNoteTarget.id;
+    const deleted = await window.nodus.deleteNodiNote(id).then(() => true).catch(() => false);
+    if (!deleted) return;
+    setNotes((cur) => cur.filter((n) => n.id !== id));
+    if (activeNoteId === id) {
+      setActiveNoteId(null);
+      setNoteDraft('');
+      setNoteDirty(false);
+      setNoteView('list');
+    }
+    setDeleteNoteTarget(null);
+  };
+
+  const filteredNotes = useMemo(() => {
+    const q = noteSearch.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter((n) => n.title.toLowerCase().includes(q) || n.content.toLowerCase().includes(q));
+  }, [notes, noteSearch]);
+
+  // Markdown formatting acting on the textarea's current selection.
+  const wrapSelection = (marker: string) => {
+    const ta = noteEditorRef.current;
+    if (!ta) return;
+    const { selectionStart: s, selectionEnd: e, value } = ta;
+    const next = value.slice(0, s) + marker + value.slice(s, e) + marker + value.slice(e);
+    setNoteDraft(next);
+    setNoteDirty(true);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(s + marker.length, e + marker.length);
+    });
+  };
+  const prefixLines = (prefix: string) => {
+    const ta = noteEditorRef.current;
+    if (!ta) return;
+    const { selectionStart: s, selectionEnd: e, value } = ta;
+    const lineStart = value.lastIndexOf('\n', s - 1) + 1;
+    const head = value.slice(0, lineStart);
+    const block = value.slice(lineStart, e);
+    const prefixed = block.split('\n').map((ln) => (ln.startsWith(prefix) ? ln : prefix + ln)).join('\n');
+    const next = head + prefixed + value.slice(e);
+    setNoteDraft(next);
+    setNoteDirty(true);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(lineStart, head.length + prefixed.length);
+    });
+  };
+  const insertLink = () => {
+    const ta = noteEditorRef.current;
+    if (!ta) return;
+    const { selectionStart: s, selectionEnd: e, value } = ta;
+    const sel = value.slice(s, e);
+    const snippet = `[${sel}](url)`;
+    setNoteDraft(value.slice(0, s) + snippet + value.slice(e));
+    setNoteDirty(true);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const urlStart = s + sel.length + 3; // past "[sel]("
+      ta.setSelectionRange(urlStart, urlStart + 3);
+    });
+  };
+  const noteFormats: Array<{ id: string; icon: string; label: string; run: () => void }> = [
+    { id: 'bold', icon: 'bold', label: t('Negrita'), run: () => wrapSelection('**') },
+    { id: 'italic', icon: 'italic', label: t('Cursiva'), run: () => wrapSelection('*') },
+    { id: 'strike', icon: 'strikethrough', label: t('Tachado'), run: () => wrapSelection('~~') },
+    { id: 'head', icon: 'heading', label: t('Encabezado'), run: () => prefixLines('## ') },
+    { id: 'list', icon: 'list', label: t('Lista'), run: () => prefixLines('- ') },
+    { id: 'quote', icon: 'quote', label: t('Cita'), run: () => prefixLines('> ') },
+    { id: 'code', icon: 'code', label: t('Código'), run: () => wrapSelection('`') },
+    { id: 'link', icon: 'link', label: t('Enlace'), run: insertLink },
+  ];
 
   // ── Notifications: load + live updates ────────────────────────────────────
   useEffect(() => {
@@ -379,6 +594,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       { id: 'help', label: t('¿Quién soy?'), icon: <IconHelp />, onClick: () => { setHelpOpen((v) => !v); setPanel('none'); } },
       { id: 'ntf', label: t('Notificaciones'), icon: <IconBell />, onClick: openNotifications, badge: unread },
       { id: 'chat', label: t('Chat'), icon: <IconChat />, onClick: () => { setPanel((p) => (p === 'chat' ? 'none' : 'chat')); setHelpOpen(false); } },
+      { id: 'notes', label: t('Notas rápidas'), icon: <IconNotes />, onClick: openNotes },
     ];
     if (isOverlay) base.push({ id: 'open', label: t('Abrir Nodus'), icon: <IconOpen />, onClick: () => window.nodus.nodiOpenMainWindow() });
     return base;
@@ -485,13 +701,19 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     : pos && pos.y + figureH / 2 < window.innerHeight / 2 ? 'down' : 'up';
 
   const angleFor = (i: number, n: number) => {
-    // Nodi's body is centred in the figure, but its legs extend much farther below
-    // that centre than the hat/halo extend above it. A slightly wider downward arc
-    // keeps the controls visually as clear of the figure as the upward arc.
-    const radialRadius = R + (vertical === 'down' ? Math.round(figureH * 0.12) : 0);
-    const start = 180;
-    const end = 268;
-    const deg = n <= 1 ? 224 : start + (i * (end - start)) / (n - 1);
+    // Grow the radius only as much as needed to keep every pair of 46px controls
+    // exactly RADIAL_NODE_GAP_PX apart. The extra downward radius compensates for
+    // Nodi's longer lower silhouette, preserving the same visible mascot-to-button
+    // breathing room in every corner rather than merely mirroring centre points.
+    const halfSpan = (RADIAL_MAX_SPAN_DEG * Math.PI) / 360;
+    const crowdedRadius = n <= 1 ? R : RADIAL_NODE_GAP_PX / (2 * Math.sin(halfSpan / (n - 1)));
+    const spacingAdjustment = Math.max(0, crowdedRadius - R);
+    const silhouetteRadius = R + (vertical === 'down' ? Math.round(figureH * 0.12) : 0);
+    const radialRadius = silhouetteRadius + spacingAdjustment;
+    const step = n <= 1
+      ? 0
+      : (2 * Math.asin(Math.min(1, RADIAL_NODE_GAP_PX / (2 * radialRadius))) * 180) / Math.PI;
+    const deg = 224 + (i - (n - 1) / 2) * step;
     const rad = (deg * Math.PI) / 180;
     const dx = Math.round(radialRadius * Math.cos(rad));
     const dy = Math.round(radialRadius * Math.sin(rad));
@@ -508,6 +730,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
             {t('Soy el asistente integrado de Nodus. Puedo orientarte por la app y trabajar con los contextos que selecciones.')}
             <ul>
               <li><b>{t('Chat')}</b>: {t('respuestas fundamentadas en las fuentes activas.')}</li>
+              <li><b>{t('Notas')}</b>: {t('apuntes rápidos en Markdown, siempre a mano.')}</li>
               <li><b>{t('Contextos')}</b>: {t('documentación, vista actual y recuperación acotada del vault.')}</li>
               <li><b>{t('Notificaciones')}</b>: {t('avisos locales de la aplicación.')}</li>
             </ul>
@@ -630,6 +853,112 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
           </div>
         )}
 
+        {panel === 'notes' && (
+          <div className={`nodi-panel nodi-notes-panel${notesLight ? ' nodi-light' : ''}`} data-nodi-interactive style={{ height: 460 }}>
+            <div className="nodi-panel-head">
+              {noteView === 'editor' && (
+                <button className="nodi-head-icon" onClick={backToNotes} title={t('Volver')} aria-label={t('Volver')}><Icon name="arrowLeft" size={15} /></button>
+              )}
+              <span className="nodi-chat-title" title={noteView === 'editor' ? (deriveNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}>
+                {noteView === 'editor' ? (deriveNoteTitle(noteDraft) || t('Nueva nota')) : t('Notas rápidas')}
+              </span>
+              <span className="grow" />
+              {noteView === 'list' && (
+                <button className="nodi-head-icon" onClick={() => openNoteEditor(null)} title={t('Nueva nota')} aria-label={t('Nueva nota')}><Icon name="plus" size={16} /></button>
+              )}
+              {noteView === 'editor' && (
+                <button className={`nodi-head-icon${notePreview ? ' active' : ''}`} disabled={!noteDraft.trim()} onClick={() => setNotePreview((v) => !v)} title={notePreview ? t('Editar') : t('Vista previa')} aria-label={notePreview ? t('Editar') : t('Vista previa')}><Icon name={notePreview ? 'edit' : 'eye'} size={15} /></button>
+              )}
+              <button className="nodi-head-icon" onClick={() => setPanel('none')} title={t('Cerrar')} aria-label={t('Cerrar')}><Icon name="x" size={15} /></button>
+            </div>
+
+            {noteView === 'list' ? (
+              <>
+                <div className="nodi-notes-search">
+                  <Icon name="search" size={13} />
+                  <input value={noteSearch} placeholder={t('Buscar en tus notas…')} onChange={(e) => setNoteSearch(e.target.value)} />
+                  {noteSearch && <button onClick={() => setNoteSearch('')} title={t('Limpiar')} aria-label={t('Limpiar')}><Icon name="x" size={12} /></button>}
+                </div>
+                <div className="nodi-notes-list">
+                  {filteredNotes.length === 0 ? (
+                    <div className="nodi-empty">{noteSearch.trim() ? t('Sin resultados.') : t('Aún no tienes notas. Crea la primera con el botón +.')}</div>
+                  ) : (
+                    filteredNotes.map((note) => {
+                      const snippet = noteSnippet(note.content);
+                      return (
+                        <div key={note.id} className="nodi-note-row">
+                          <button className="nodi-note-open" onClick={() => openNoteEditor(note)}>
+                            <span className="nodi-note-title">{note.title || t('Nota sin título')}</span>
+                            {snippet && <span className="nodi-note-snippet">{snippet}</span>}
+                            <span className="nodi-note-time">{relTime(note.updatedAt)}</span>
+                          </button>
+                          <button className="nodi-note-delete" onClick={() => setDeleteNoteTarget(note)} title={t('Borrar nota')} aria-label={`${t('Borrar nota')}: ${note.title || t('Nota sin título')}`}><Icon name="trash" size={13} /></button>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {!notePreview && (
+                  <div className="nodi-note-toolbar">
+                    {noteFormats.map((f) => (
+                      <button key={f.id} type="button" className="nodi-note-tool" data-format={f.id} onMouseDown={(e) => e.preventDefault()} onClick={f.run} title={f.label} aria-label={f.label}><Icon name={f.icon} size={15} /></button>
+                    ))}
+                  </div>
+                )}
+                <div className="nodi-note-body">
+                  {notePreview ? (
+                    noteDraft.trim()
+                      ? <div className="nodi-note-preview"><Markdown content={noteDraft} verify={false} /></div>
+                      : <div className="nodi-empty">{t('Nada que previsualizar.')}</div>
+                  ) : (
+                    <textarea
+                      ref={noteEditorRef}
+                      className="nodi-note-textarea"
+                      value={noteDraft}
+                      placeholder={t('Escribe tu nota en Markdown…')}
+                      autoFocus
+                      onChange={(e) => { setNoteDraft(e.target.value); setNoteDirty(true); }}
+                      onKeyDown={(e) => {
+                        const mod = e.metaKey || e.ctrlKey;
+                        if (!mod) return;
+                        const key = e.key.toLowerCase();
+                        if (key === 'b') { e.preventDefault(); wrapSelection('**'); }
+                        else if (key === 'i') { e.preventDefault(); wrapSelection('*'); }
+                        else if (key === 's') { e.preventDefault(); void saveNote(); }
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="nodi-note-foot">
+                  {activeNoteId && (
+                    <button className="nodi-note-remove" onClick={() => { const note = notes.find((n) => n.id === activeNoteId); if (note) setDeleteNoteTarget(note); }} title={t('Borrar nota')} aria-label={t('Borrar nota')}><Icon name="trash" size={13} /></button>
+                  )}
+                  <span className="nodi-note-state">{noteDirty ? t('Sin guardar') : activeNoteId ? t('Guardado') : ''}</span>
+                  <span className="grow" />
+                  <button className="nodi-note-save" onClick={() => void saveNote()} disabled={!noteDraft.trim() || !noteDirty}><Icon name="save" size={14} /> {t('Guardar')}</button>
+                </div>
+              </>
+            )}
+
+            {deleteNoteTarget && (
+              <div className="nodi-confirm-overlay">
+                <div className="nodi-confirm-dialog" role="dialog" aria-modal="true" aria-label={t('Borrar nota')}>
+                  <Icon name="trash" size={18} />
+                  <h3>{t('Borrar nota')}</h3>
+                  <p>{t('Se eliminará «{title}». Esta acción no se puede deshacer.').replace('{title}', deleteNoteTarget.title || t('Nota sin título'))}</p>
+                  <div>
+                    <button onClick={() => setDeleteNoteTarget(null)}>{t('Cancelar')}</button>
+                    <button className="danger" onClick={() => void confirmDeleteNote()}>{t('Borrar')}</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {contextMenuOpen && !closing && (
           <div className="nodi-context-menu" data-nodi-interactive role="menu" aria-label={t('Opciones de la mascota')}>
             <button type="button" role="menuitem" onClick={closeMascot}>
@@ -646,6 +975,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
               key={it.id}
               className={`nodi-node${menuOpen ? ' open' : ''}`}
               data-nodi-interactive
+              data-nodi-action={it.id}
               style={{
                 ['--dx' as string]: `${dx}px`,
                 ['--dy' as string]: `${dy}px`,
