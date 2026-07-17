@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 // The prompt files are authored in Spanish; the output-language control must APPEND a
 // high-priority directive rather than find/replace over the base prompt (which would
 // corrupt JSON examples and cases where "español" denotes the source text). This test
-// pins that contract for es/en/fr/tr.
+// pins that contract for every prompt language.
 if (!process.argv.includes('--electron-prompt-language-test')) {
   execFileSync(
     path.join(repoRoot, 'node_modules/.bin/electron'),
@@ -50,6 +50,9 @@ try {
     { lang: 'en', name: 'INGLÉS' },
     { lang: 'fr', name: 'FRANCÉS' },
     { lang: 'tr', name: 'TURCO' },
+    { lang: 'de', name: 'ALEMÁN' },
+    { lang: 'pt', name: 'PORTUGUÉS DE PORTUGAL' },
+    { lang: 'pt-BR', name: 'PORTUGUÉS DE BRASIL' },
   ];
   for (const { lang, name } of cases) {
     updateSettings({ promptLanguage: lang });

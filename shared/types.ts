@@ -828,7 +828,12 @@ export type DeepContextMode = 'standard' | 'long';
  *  is injected into the AI prompts and so determines the language of generated content
  *  (ideas, themes, tutor narrative, drafts, assistant answers). */
 export type AppLanguage = 'es' | 'en' | 'fr' | 'de' | 'pt' | 'pt-BR';
-export type PromptLanguage = 'es' | 'en' | 'fr' | 'tr';
+/** Single source of truth for the prompt languages: the union below is derived from
+ *  it, and runtime validators (the MCP tool schemas) enumerate it instead of
+ *  re-spelling the list — which is how `tr` once ended up accepted everywhere except
+ *  over MCP. Adding a language here forces the exhaustive `Record`s to be filled in. */
+export const PROMPT_LANGUAGES = ['es', 'en', 'fr', 'tr', 'de', 'pt', 'pt-BR'] as const;
+export type PromptLanguage = (typeof PROMPT_LANGUAGES)[number];
 
 /** A concrete model selection: which provider + which model id. */
 export interface ModelRef {
@@ -3693,7 +3698,7 @@ export interface WritingWorkshopBrief {
   objective: string;
   audience?: string;
   tone?: 'academic' | 'synthetic' | 'critical' | 'exploratory';
-  language?: 'es' | 'en' | 'fr' | 'tr';
+  language?: PromptLanguage;
 }
 
 export interface WritingWorkshopSelection {
@@ -3902,7 +3907,7 @@ export type DeepResearchSectionLimit = 'auto' | number;
 export interface DeepResearchRequest {
   /** The research idea/question the whole report must develop. */
   objective: string;
-  language?: 'es' | 'en' | 'fr' | 'tr';
+  language?: PromptLanguage;
   audience?: string;
   targetLength?: DeepResearchTargetLength;
   /**

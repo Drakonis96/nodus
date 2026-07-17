@@ -4,6 +4,7 @@ import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sd
 import { app } from 'electron';
 import { z } from 'zod';
 import { AI_PROVIDERS as SHARED_AI_PROVIDERS } from '@shared/providers';
+import { PROMPT_LANGUAGES } from '@shared/types';
 import type {
   AiProvider,
   Debate,
@@ -149,12 +150,16 @@ const modelSchema = z
   })
   .describe('Nodus model override. If omitted, the model configured in Nodus Settings is used.');
 
+/** Derived from the shared list so the MCP surface can never accept a narrower set of
+ *  languages than the app itself offers. */
+const promptLanguageSchema = z.enum(PROMPT_LANGUAGES);
+
 const writingBriefSchema = z.object({
   kind: z.enum(WRITING_KINDS),
   objective: z.string().trim().min(1).max(8_000),
   audience: z.string().trim().max(1_000).optional(),
   tone: z.enum(['academic', 'synthetic', 'critical', 'exploratory']).optional(),
-  language: z.enum(['es', 'en', 'fr']).optional(),
+  language: promptLanguageSchema.optional(),
 });
 
 const writingSelectionSchema = z.object({
@@ -1583,7 +1588,7 @@ export function registerTools(server: McpServer): void {
         '"client" — returns a self-contained writing kit (corpus materials with verbatim citation tokens, target scope, method and citation policy) so the MODEL CALLING THIS MCP articulates and drafts the report itself; when done, that draft is passed to nodus_finalize_deep_research to validate citations and assemble references. Both keep Nodus as the grounding authority. writer="nodus" can consume provider tokens and may take several minutes; it sends MCP progress notifications (planning, per-section, assembly) when the request carries a progressToken.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
-        language: z.enum(['es', 'en', 'fr']).optional(),
+        language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         targetLength: deepResearchTargetLengthSchema,
         sectionLimit: deepResearchSectionLimitSchema,
@@ -1625,7 +1630,7 @@ export function registerTools(server: McpServer): void {
         'Second step of nodus_generate_deep_research(writer="client"). Takes the Markdown the calling model wrote (`## ` body sections only) and enforces Nodus\'s citation contract: hallucinated citations are stripped, labels canonicalised, and the References/bibliography are built from the works actually cited. Returns the assembled report in the standard draft shape; with save=true it also stores it as a Nodus writing draft. Pass the SAME objective/language used for the brief so the same corpus snapshot is used to validate citations.',
       inputSchema: {
         objective: z.string().trim().min(1).max(8_000),
-        language: z.enum(['es', 'en', 'fr']).optional(),
+        language: promptLanguageSchema.optional(),
         audience: z.string().trim().max(1_000).optional(),
         sectionsMarkdown: z.string().trim().min(1).max(200_000),
         title: z.string().trim().min(1).max(2_000).optional(),
