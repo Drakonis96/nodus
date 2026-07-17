@@ -32,7 +32,8 @@ try {
   await page.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 30_000 });
   await page.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
-    basicsTutorialVersion: 3, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: true, reduceMotion: false,
+    basicsTutorialVersion: 3, uiLanguage: 'es', mascotEnabled: true, mascotAlwaysOnTop: true,
+    mascotStyle: 'orb', reduceMotion: false,
   }));
   await page.reload();
   await page.getByTestId('app-shell').waitFor();
@@ -45,6 +46,7 @@ try {
   }
   if (!overlay) throw new Error('overlay window never appeared');
   await overlay.waitForLoadState('domcontentloaded');
+  const nativeOverlay = await app.browserWindow(overlay);
   const figure = overlay.locator('.nodi-figure');
   await figure.waitFor({ timeout: 30_000 });
   const setMenuOpen = async (open) => {
@@ -58,7 +60,10 @@ try {
 
   /** How far the radial buttons stick out of the window, in px. */
   const overflow = () => overlay.evaluate(() => {
-    const nodes = [...document.querySelectorAll('.nodi-node')];
+    // Include Nodi itself: the old numeric anchor briefly remained at (404,304)
+    // after the host had already shrunk to 212x232, making the mascot disappear for
+    // exactly one compositor frame even though the returning buttons were in bounds.
+    const nodes = [...document.querySelectorAll('.nodi-node, .nodi-figure')];
     let worst = 0;
     for (const n of nodes) {
       const r = n.getBoundingClientRect();
@@ -69,6 +74,7 @@ try {
 
   await setMenuOpen(true);
   await overlay.waitForTimeout(700);
+  assert.equal(await overlay.locator('.nodi-orb').getAttribute('data-state'), 'idle', 'opening the orb menu must not replace its continuous float animation');
   const open = await overflow();
   console.log('[verify] menu OPEN  ->', JSON.stringify(open));
   assert.deepEqual(open.viewport, [600, 520]);
@@ -158,6 +164,16 @@ try {
   await verifyTopCorner('top-left');
   await moveNodi(10_000, 0);
   await verifyTopCorner('top-right');
+  await moveNodi(-10_000, 10_000);
+  const lowerLeftSamples = [];
+  await overlay.evaluate(async () => window.nodus.nodiBeginWindowDrag(0, 0));
+  for (let index = 0; index < 8; index += 1) {
+    await overlay.evaluate(async () => window.nodus.nodiDragWindow(-10_000, 10_000));
+    lowerLeftSamples.push(await nativeOverlay.evaluate((win) => win.getBounds()));
+  }
+  await overlay.evaluate(async () => window.nodus.nodiEndWindowDrag());
+  console.log('[verify] lower-left native bounds ->', JSON.stringify(lowerLeftSamples));
+  assert.equal(new Set(lowerLeftSamples.map(({ x }) => x)).size, 1, 'the compact panel rebounds horizontally at the left edge');
   console.log('[verify] shots in', shots);
 } finally {
   await app.close().catch(() => {});

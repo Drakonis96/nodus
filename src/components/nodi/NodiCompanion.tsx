@@ -544,7 +544,11 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       else {
         setContextMenuOpen(false);
         setMenuOpen(true);
-        wave();
+        // The classic character has an actual arm gesture. The orb's "wave" replaces
+        // its continuous float with a side-to-side rocking animation; ending it snaps
+        // the whole sphere back to 0°, which looks like a flash on menu close and like
+        // a rebound when the orb is resting against a screen edge.
+        if (settings?.mascotStyle !== 'orb') wave();
       }
     }
   };
@@ -693,7 +697,21 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       : { display: 'none' };
 
   const anchorStyle: CSSProperties = isOverlay
-    ? { left: overlayPlacement.x, top: overlayPlacement.y, width: figureW, height: figureH }
+    ? {
+        // Anchor to the window edges that stay next to Nodi while the transparent
+        // host grows and shrinks. Numeric left/top coordinates require a second
+        // React update after Electron changes the native bounds; for one compositor
+        // frame that left Nodi at (404,304) inside a 212x232 window, clipping the orb
+        // completely on close and making it jump diagonally on open.
+        ...(overlayPlacement.horizontal === 'left'
+          ? { right: Math.max(0, window.innerWidth - overlayPlacement.x - figureW) }
+          : { left: overlayPlacement.x }),
+        ...(overlayPlacement.vertical === 'up'
+          ? { bottom: Math.max(0, window.innerHeight - overlayPlacement.y - figureH) }
+          : { top: overlayPlacement.y }),
+        width: figureW,
+        height: figureH,
+      }
     : { inset: 0 };
 
   const horizontal = isOverlay
