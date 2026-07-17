@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Nodus: Turn your library into a living graph of ideas</title>
-<meta name="description" content="Nodus is a free, open-source, local-first desktop app that turns your Zotero library into a navigable graph of ideas, debates, gaps and cited drafts. Private by design."/>
-<meta property="og:title" content="Nodus: Turn your library into a living graph of ideas"/>
-<meta property="og:description" content="Free &amp; open-source research workspace: graph of ideas, debates, gaps, deep research reports, audio narration and a citation-verified writing workshop."/>
+<title>Nodus: a local-first workspace for research, teaching and study</title>
+<meta name="description" content="Nodus is a free, open-source, local-first desktop app for academic work. Each vault picks a mode — research library, study workspace, family archive, structured data — over the same private engine. No accounts, no telemetry."/>
+<meta property="og:title" content="Nodus: a local-first workspace for research, teaching and study"/>
+<meta property="og:description" content="Free &amp; open-source, local-first. Four vault modes over one engine: an academic research library, a study workspace, a genealogy archive and structured databases."/>
 <link rel="icon" type="image/svg+xml" href="assets/nodus-logo.svg"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -97,17 +97,17 @@
   .free-badge svg { width: 14px; height: 14px; }
   .hero .n-mark { width: 140px; height: 140px; margin: 0 auto 4px; cursor: pointer; }
   .hero h1 {
-    font-family: var(--serif); font-size: clamp(38px, 6vw, 64px); line-height: 1.08;
+    font-family: var(--serif); font-size: clamp(40px, 6.5vw, 66px); line-height: 1.12;
     margin: 16px auto 0; font-weight: 700; letter-spacing: -0.01em;
-    /* Narrow the column on wide screens so the headline wraps into the same
-       four-line rhythm it naturally takes on mobile; text-wrap: balance keeps
-       each sentence broken at an even midpoint across every language. */
-    max-width: 640px; text-wrap: balance;
   }
   .hero h1 .grad {
     background: linear-gradient(100deg, var(--violet-3), var(--violet-2) 45%, var(--violet));
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
+  /* First word of each headline line, in a progressive purple. */
+  .hero h1 .hw1 { color: #c4b5fd; }
+  .hero h1 .hw2 { color: #a78bfa; }
+  .hero h1 .hw3 { color: #8b5cf6; }
   .hero p.sub { font-size: clamp(16px, 2vw, 19px); color: var(--text-2); max-width: 660px; margin: 22px auto 0; }
   .hero .ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 34px; }
   .hero .meta { margin-top: 24px; font-size: 13.5px; color: var(--text-2); }
@@ -190,10 +190,15 @@
   .shot .tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet-2); }
   .shot .try { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; font-size: 13px; font-weight: 600; }
 
+  /* Each spotlight carries its vault accent via --acc, so the coloured edge and
+     the tag tell the reader which mode they are looking at without a label. */
+  .shot { --acc: var(--violet-2); }
+  .shot .tag { color: var(--acc); }
   .vig {
     border-radius: 16px; border: 1px solid var(--border); overflow: hidden;
     background: linear-gradient(160deg, #131120, #0c0b14);
-    box-shadow: 0 24px 70px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,92,246,0.06);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, var(--acc) 20%, transparent);
+    border-color: color-mix(in srgb, var(--acc) 16%, var(--border));
   }
   .vig .vbar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
   .vig .vbar i { width: 10px; height: 10px; border-radius: 50%; background: #2b2838; }
@@ -305,6 +310,101 @@
     border: 1px solid rgba(251,191,36,0.35); background: rgba(251,191,36,0.06); opacity: 0;
   }
   .in .vig-gaps .gq { animation: rowIn 0.5s ease 1.2s forwards; }
+
+  /* genealogy vignette — a small tree with an AI kinship suggestion below it */
+  .vig-tree svg { width: 100%; height: 150px; display: block; }
+  .vig-tree line[stroke-dasharray] { stroke-dasharray: 60; stroke-dashoffset: 60; }
+  .in .vig-tree line[stroke-dasharray] { animation: edgeDraw 0.9s ease 0.8s forwards; }
+  .vig-tree g { opacity: 0; transform-origin: center; transform-box: fill-box; }
+  .in .vig-tree g { animation: pop 0.45s cubic-bezier(0.2,1.6,0.4,1) forwards; }
+  .in .vig-tree g:nth-of-type(2) { animation-delay: 0.15s; } .in .vig-tree g:nth-of-type(3) { animation-delay: 0.3s; }
+  .vig-tree .vsugg {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 12px; border-radius: 11px;
+    border: 1px solid rgba(202,138,4,0.32); background: rgba(202,138,4,0.07); opacity: 0;
+  }
+  .in .vig-tree .vsugg { animation: rowIn 0.5s ease 1.3s forwards; }
+  .vig-tree .vsugg-t { flex: 1; min-width: 0; }
+  .vig-tree .vsugg-t b { display: block; font-size: 12px; color: #fde68a; }
+  .vig-tree .vsugg-t span { font-size: 10.5px; color: var(--text-2); }
+  .vig-tree .vsugg-a { display: flex; gap: 6px; flex-shrink: 0; }
+  .vig-tree .vsugg-y { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; color: #052e16; background: #fbbf24; }
+  .vig-tree .vsugg-n { font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; color: var(--text-2); border: 1px solid var(--border); }
+
+  /* databases vignette — a typed table and a computed statistic with a scatter */
+  .vig-db .vbody { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 12px; align-items: start; }
+  .vig-db table.dbmini { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .vig-db .dbmini th { text-align: left; padding: 5px 7px; color: var(--text-3); font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .vig-db .dbmini th span { display: block; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7a5560; }
+  .vig-db .dbmini td { padding: 6px 7px; border-bottom: 1px solid #1d1d1d; color: var(--text-2); }
+  .vig-db .dbpill { font-size: 9.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: var(--p); border: 1px solid color-mix(in srgb, var(--p) 40%, transparent); background: color-mix(in srgb, var(--p) 12%, transparent); }
+  .vig-db .dbstat { border: 1px solid rgba(179,3,51,0.28); border-radius: 12px; padding: 11px 12px; background: rgba(179,3,51,0.05); }
+  .vig-db .dbstat-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .vig-db .dbstat-h b { font-size: 11.5px; }
+  .vig-db .dbstat-r { font-size: 12px; font-weight: 700; color: #ff8fa3; font-variant-numeric: tabular-nums; }
+  .vig-db .dbscatter { width: 100%; height: 66px; display: block; margin: 6px 0 4px; }
+  .vig-db .dbscatter line[stroke-dasharray] { stroke-dasharray: 180; stroke-dashoffset: 180; }
+  .in .vig-db .dbscatter line[stroke-dasharray] { animation: edgeDraw 1.1s ease 0.5s forwards; }
+  .vig-db .dbscatter circle { opacity: 0; }
+  .in .vig-db .dbscatter circle { animation: holeIn 0.4s ease forwards; }
+  .in .vig-db .dbscatter circle:nth-of-type(2) { animation-delay: 0.55s; } .in .vig-db .dbscatter circle:nth-of-type(3) { animation-delay: 0.7s; }
+  .in .vig-db .dbscatter circle:nth-of-type(4) { animation-delay: 0.85s; } .in .vig-db .dbscatter circle:nth-of-type(5) { animation-delay: 1s; } .in .vig-db .dbscatter circle:nth-of-type(6) { animation-delay: 1.15s; }
+  .vig-db .dbstat-c { margin: 0; font-size: 10.5px; line-height: 1.5; color: var(--text-2); }
+  @media (max-width: 560px) { .vig-db .vbody { grid-template-columns: 1fr; } }
+
+  /* study quiz vignette */
+  .vig-quiz .qprompt { font-size: 13px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
+  .vig-quiz .qopt { display: flex; align-items: center; gap: 8px; padding: 9px 12px; margin-bottom: 7px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.025); font-size: 12.5px; color: var(--text-2); opacity: 0; transform: translateX(-12px); }
+  .in .vig-quiz .qopt { animation: rowIn 0.45s cubic-bezier(0.2,0.8,0.3,1) forwards; }
+  .in .vig-quiz .qopt:nth-child(3) { animation-delay: 0.12s; } .in .vig-quiz .qopt:nth-child(4) { animation-delay: 0.24s; } .in .vig-quiz .qopt:nth-child(5) { animation-delay: 0.36s; }
+  .vig-quiz .qopt.right { border-color: rgba(45,212,191,0.5); background: rgba(45,212,191,0.1); color: #99f6e4; font-weight: 600; }
+  .vig-quiz .qopt.right svg { width: 13px; height: 13px; color: #2dd4bf; flex-shrink: 0; }
+  .vig-quiz .qsrc { margin-top: 10px; font-size: 10.5px; color: #5eead4; }
+
+  /* chat vignettes (study + databases) */
+  .cmsg { max-width: 88%; padding: 10px 13px; border-radius: 13px; font-size: 12.5px; line-height: 1.55; margin-bottom: 9px; opacity: 0; }
+  .in .cmsg { animation: rowIn 0.5s ease forwards; }
+  .cmsg.user { margin-left: auto; background: var(--card-2, #1c1c1e); border: 1px solid var(--border); border-bottom-right-radius: 4px; color: var(--text); }
+  .cmsg.ai { margin-right: auto; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-bottom-left-radius: 4px; color: #d4d4d4; }
+  .in .cmsg.ai { animation-delay: 0.35s; }
+  .cchip { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: var(--cc); border: 1px solid color-mix(in srgb, var(--cc) 40%, transparent); background: color-mix(in srgb, var(--cc) 12%, transparent); }
+  .cmini { font-size: 10.5px; color: var(--text-3); opacity: 0; }
+  .in .cmini { animation: rowIn 0.5s ease 0.7s forwards; }
+  .vig-dchat .dbbars { width: 100%; height: 74px; display: block; margin-top: 6px; }
+  .vig-dchat .dbbars rect { opacity: 0; transform-origin: bottom; transform-box: fill-box; }
+  .in .vig-dchat .dbbars rect { animation: barGrow 0.6s cubic-bezier(0.2,0.8,0.3,1) 0.7s forwards; }
+  .in .vig-dchat .dbbars g:nth-child(2) rect { animation-delay: 0.82s; } .in .vig-dchat .dbbars g:nth-child(3) rect { animation-delay: 0.94s; }
+  @keyframes barGrow { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
+
+  /* prosopography (social relations) vignette */
+  .vig-relations svg { width: 100%; height: 172px; display: block; }
+  .vig-relations line { stroke-dasharray: 160; stroke-dashoffset: 160; }
+  .in .vig-relations line { animation: edgeDraw 0.9s ease forwards; }
+  .in .vig-relations line:nth-of-type(2) { animation-delay: 0.15s; } .in .vig-relations line:nth-of-type(3) { animation-delay: 0.3s; } .in .vig-relations line:nth-of-type(4) { animation-delay: 0.45s; } .in .vig-relations line:nth-of-type(5) { animation-delay: 0.6s; }
+  .vig-relations g { opacity: 0; transform-origin: center; transform-box: fill-box; }
+  .in .vig-relations g { animation: pop 0.45s cubic-bezier(0.2,1.6,0.4,1) forwards; }
+  .in .vig-relations g:nth-of-type(2) { animation-delay: 0.15s; } .in .vig-relations g:nth-of-type(3) { animation-delay: 0.3s; } .in .vig-relations g:nth-of-type(4) { animation-delay: 0.45s; } .in .vig-relations g:nth-of-type(5) { animation-delay: 0.6s; }
+  .vig-relations .gnote { margin-top: 8px; font-size: 11px; color: #fcd34d; }
+
+  /* teaching gradebook vignette */
+  .vig-grade .gradebook td:first-child { padding-left: 7px; }
+  .vig-grade .code { font-family: ui-monospace, monospace; font-size: 11px; color: #fdba74; background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.3); border-radius: 6px; padding: 1px 7px; }
+  .vig-grade .dbmini b { color: var(--text); }
+  .vig-grade .tnote { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 9px 12px; border-radius: 10px; font-size: 11.5px; color: #fdba74; border: 1px solid rgba(251,146,60,0.32); background: rgba(251,146,60,0.07); }
+  .vig-grade .tnote svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  /* teaching guide vignette */
+  .vig-guide .gsec { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1d1d1d; }
+  .vig-guide .gsec:last-of-type { border-bottom: none; }
+  .vig-guide .gsec-k { flex-shrink: 0; width: 108px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #fdba74; }
+  .vig-guide .gsec-l { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.09); width: 0; }
+  .in .vig-guide .gsec-l { animation: fillUp 0.7s ease forwards; }
+  .in .vig-guide .gsec:nth-child(2) .gsec-l { animation-delay: 0.15s; } .in .vig-guide .gsec:nth-child(3) .gsec-l { animation-delay: 0.3s; } .in .vig-guide .gsec:nth-child(4) .gsec-l { animation-delay: 0.45s; }
+  .vig-guide .verify { margin-top: 12px; }
+  .in .vig-guide .verify { animation: rowIn 0.5s ease 0.9s forwards; }
+
+  /* audio player embedded in a vignette */
+  .vig-player { margin-top: 12px; }
+  .shot .try.soon { color: var(--text-3); font-weight: 600; cursor: default; }
 
   /* ideas vignette uses .vrow; library too */
 
@@ -477,30 +577,78 @@
     .faq-answer { padding-left: 16px; padding-right: 16px; }
   }
 
-  /* ---------- vault modes ---------- */
-  .modes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); grid-auto-rows: 1fr; gap: 18px; margin-top: 42px; }
-  .mode-card { display: flex; flex-direction: column; padding: 24px; border-radius: 18px; border: 1px solid var(--border); background: var(--card); transition: transform .2s, border-color .2s, background .2s; }
-  .mode-card .mode-try { margin-top: auto; }
-  .mode-card.live { cursor: pointer; }
-  .mode-card.live:hover { border-color: rgba(167,139,250,0.5); transform: translateY(-3px); background: rgba(255,255,255,0.05); }
-  .mode-card.gen.live:hover { border-color: rgba(202,138,4,0.55); }
-  .mode-card.db.live:hover { border-color: rgba(179,3,51,0.6); }
-  .mode-card.soon { opacity: 0.7; }
-  .mode-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-  .mode-ic { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; background: rgba(139,92,246,0.14); color: var(--violet-2); }
-  .mode-ic svg { width: 23px; height: 23px; }
-  .mode-ic.gen { background: rgba(202,138,4,0.16); color: #fbbf24; }
-  .mode-ic.primary { background: rgba(249,115,22,0.16); color: #fb923c; }   /* Primary Sources — orange */
-  .mode-ic.databases { background: rgba(179,3,51,0.20); color: #ff5f7e; }   /* Databases — #B30333 */
-  .mode-ic.study { background: rgba(56,189,248,0.16); color: #7dd3fc; }     /* Study — sky blue */
-  .mode-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
-  .mode-badge.live { color: #6ee7b7; background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.32); }
-  .mode-badge.soon { color: var(--text-2); background: rgba(255,255,255,0.05); border: 1px solid var(--border); }
-  .mode-card h3 { font-family: var(--serif); font-size: 21px; margin: 0 0 8px; font-weight: 700; }
-  .mode-card p { color: var(--text-2); font-size: 14px; margin: 0 0 14px; line-height: 1.6; }
-  .mode-try { font-size: 13.5px; font-weight: 600; color: var(--violet-2); }
-  .mode-card.gen .mode-try { color: #fbbf24; }
-  .mode-card.db .mode-try { color: #ff5f7e; }
+  /* ---------- vaults ---------- */
+  /* Each vault carries the accent colour the app itself gives it
+     (VAULT_TYPE_COLOR in src/components/VaultSwitcher.tsx), so the site and the
+     product never disagree about what "the study vault" looks like. */
+  .vaults-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 42px; }
+  .vault-card {
+    --vc: var(--violet); position: relative; display: flex; flex-direction: column; padding: 26px 26px 24px; border-radius: 18px;
+    border: 1px solid var(--border); background: var(--card);
+    transition: transform .2s, border-color .2s, background .2s;
+    opacity: 0; transform: translateY(20px);
+  }
+  .vault-card.in { opacity: 1; transform: none; }
+  .vault-card.live { cursor: pointer; }
+  .vault-card.live:hover { border-color: color-mix(in srgb, var(--vc) 55%, transparent); transform: translateY(-3px); background: color-mix(in srgb, var(--vc) 6%, transparent); }
+  .vault-top { display: flex; align-items: center; gap: 13px; margin-bottom: 15px; }
+  .vault-ic { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0;
+    background: color-mix(in srgb, var(--vc) 18%, transparent); color: var(--vc); }
+  .vault-ic svg { width: 23px; height: 23px; }
+  .vault-card h3 { font-family: var(--serif); font-size: 22px; margin: 0; font-weight: 700; color: var(--text); }
+  /* The maturity badge is pinned to the corner so it never reflows the title row. */
+  .vault-stage { position: absolute; top: 24px; right: 24px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 4px 11px; border-radius: 999px; white-space: nowrap; border: 1px solid; }
+  .vault-stage.stable { color: #6ee7b7; border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.1); }
+  .vault-stage.beta { color: #fcd34d; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.08); }
+  .vault-stage.alpha { color: #fdba74; border-color: rgba(249,115,22,0.35); background: rgba(249,115,22,0.08); }
+  .vault-stage.prealpha { color: #f0abfc; border-color: rgba(232,121,249,0.32); background: rgba(232,121,249,0.08); }
+  .vault-card > p { color: var(--text-2); font-size: 14px; margin: 0 0 16px; line-height: 1.62; }
+  .vault-feats { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 9px; }
+  .vault-feats li { position: relative; padding-left: 17px; font-size: 13.2px; color: var(--text-2); line-height: 1.55; }
+  .vault-feats li::before {
+    content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--vc);
+  }
+  .vault-feats b { color: var(--text); font-weight: 600; }
+  .vault-feats i { color: var(--text-2); font-style: italic; }
+  .vault-try { margin-top: auto; font-size: 13.5px; font-weight: 600; color: var(--vc); }
+  @media (max-width: 720px) { .vaults-grid { grid-template-columns: 1fr; } }
+
+  /* roadmap — a teaser for the next mode, then a compact row of the rest */
+  .road { margin-top: 26px; padding: 24px; border-radius: 18px; border: 1px dashed var(--border); background: rgba(255,255,255,0.015); }
+  .road h4 { margin: 0 0 4px; font-size: 15px; }
+  .road > p { margin: 0 0 20px; color: var(--text-2); font-size: 13.5px; max-width: 640px; }
+
+  /* teaching teaser — the prominent next vault */
+  .teach-teaser { --vc: var(--violet); border-radius: 16px; border: 1px solid color-mix(in srgb, var(--vc) 30%, var(--border)); background: color-mix(in srgb, var(--vc) 7%, transparent); padding: 20px 22px; }
+  .teach-head { display: flex; align-items: center; gap: 13px; margin-bottom: 14px; }
+  .teach-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0;
+    background: color-mix(in srgb, var(--vc) 20%, transparent); color: var(--vc); }
+  .teach-ic svg { width: 21px; height: 21px; }
+  .teach-head h5 { margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 700; }
+  .teach-head > div > span { font-size: 13px; color: var(--text-2); }
+  .teach-feats { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .teach-feats li { position: relative; padding-left: 18px; font-size: 13.2px; color: var(--text-2); line-height: 1.55; }
+  .teach-feats li::before { content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--vc); }
+  .teach-feats b { color: var(--text); font-weight: 600; }
+
+  .road-more { margin-top: 20px; }
+  .road-more-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; }
+  .road-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+  .road-item { --vc: var(--violet); display: flex; gap: 11px; align-items: flex-start; padding: 13px 15px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); }
+  .road-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0;
+    background: color-mix(in srgb, var(--vc) 16%, transparent); color: var(--vc); }
+  .road-ic svg { width: 15px; height: 15px; }
+  .road-item b { display: block; font-size: 13.5px; }
+  .road-item span { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+  /* audience strip */
+  .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 44px; }
+  .who-card { padding: 20px 22px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); }
+  .who-card h4 { margin: 0 0 6px; font-size: 15px; display: flex; align-items: center; gap: 9px; }
+  .who-card h4 svg { width: 16px; height: 16px; color: var(--violet-2); }
+  .who-card p { margin: 0; font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+  .who-card p b { color: var(--violet-3); font-weight: 600; }
 
   /* ---------- contributing ---------- */
   .contrib-wrap { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 52px; align-items: center; }
@@ -527,8 +675,8 @@
 <nav class="nav" id="nav">
   <a class="logo" href="#"><img src="assets/nodus-logo.svg" alt=""/> Nodus</a>
   <div class="links">
+    <a href="#vaults" class="hideS" data-i18n="nav.vaults">Vaults</a>
     <a href="#story" class="hideS" data-i18n="nav.how">How it works</a>
-    <a href="#modes" class="hideS" data-i18n="nav.modes">Modes</a>
     <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
     <a href="#contrib" class="hideS" data-i18n="nav.contrib">Contribute</a>
     <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
@@ -557,8 +705,8 @@
       <circle cx="46" cy="48" r="6.5" fill="#8b5cf6"/>
       <circle cx="46" cy="16" r="6.5" fill="#7c3aed"/>
     </svg>
-    <h1 data-i18n="hero.h1">A thousand ideas, scattered like stars.<br/><span class="grad">Nodus connects the constellations.</span></h1>
-    <p class="sub" data-i18n="hero.sub">A local-first desktop app that turns your Zotero library into a navigable graph of ideas, authors, debates and gaps, then helps you write with citations you can actually verify.</p>
+    <h1 data-i18n="hero.h1"><span class="hw hw1">Research</span> deeper<br/><span class="hw hw2">Teach</span> smarter<br/><span class="hw hw3">Study</span> better</h1>
+    <p class="sub" data-i18n="hero.sub">A local-first desktop app for academic work. Every vault picks a mode. A research library that becomes a graph of ideas, a workspace for your courses and classes, an archive built from primary sources, or a set of your own structured data. All of it over one engine that never leaves your machine.</p>
     <div class="ctas">
       <a class="btn primary" href="demo/index.html">
         <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg>
@@ -574,121 +722,169 @@
   </div>
 </header>
 
+<!-- ---------- vaults ---------- -->
+<section id="vaults" style="border-top:1px solid var(--border)">
+  <div class="wrap">
+    <span class="kicker" data-i18n="vaults.kicker">The vaults</span>
+    <h2 class="title" data-i18n="vaults.title">The same engine, shaped to your work.</h2>
+    <p class="lead" data-i18n="vaults.lead">A vault is a single file on your device, holding one project. Its mode decides which sections appear and how the AI assistant is briefed. The engine, the private storage and the settings underneath stay the same across every mode. Four modes are ready today, and each one opens in a live demo right here.</p>
+
+    <div class="vaults-grid">
+      <a class="vault-card live" href="demo/index.html" style="--vc:#818cf8">
+        <div class="vault-top">
+          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5 6 17M12 7.5 18 17M7.5 19h9"/></svg></span>
+          <h3 data-i18n="vaults.academic.t">Academic</h3>
+        </div>
+        <p data-i18n="vaults.academic.b">For research. Point it at your Zotero library and every work turns into the claims, findings and methods it actually makes, each one carrying the exact passage and page it came from.</p>
+        <ul class="vault-feats">
+          <li data-i18n="vaults.academic.f1"><b>A graph of ideas</b> rather than files, linked by supports, contradicts and refines.</li>
+          <li data-i18n="vaults.academic.f2"><b>Debates and open gaps</b> surfaced from what your sources leave unsettled.</li>
+          <li data-i18n="vaults.academic.f3"><b>Deep Research reports</b> whose every citation lands on a real item.</li>
+          <li data-i18n="vaults.academic.f4"><b>A writing copilot</b> that runs inside Word and LibreOffice Writer.</li>
+        </ul>
+        <span class="vault-try" data-i18n="vaults.academic.cta">Open the academic demo →</span>
+      </a>
+
+      <a class="vault-card live" href="demo/study.html" style="--vc:#2dd4bf">
+        <div class="vault-top">
+          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg></span>
+          <h3 data-i18n="vaults.study.t">Study</h3>
+        </div>
+        <p data-i18n="vaults.study.b">For learning. Everything you study, kept in order by course and subject, with your own notes and materials underneath. No Zotero, nothing uploaded.</p>
+        <ul class="vault-feats">
+          <li data-i18n="vaults.study.f1"><b>Organised by course, subject and topic</b>, so your whole term sits in one place.</li>
+          <li data-i18n="vaults.study.f2"><b>Tests and exams from your own material</b>, ready to practise and mark yourself.</li>
+          <li data-i18n="vaults.study.f3"><b>Ask the AI about your notes</b> and it answers only from what you actually have.</li>
+          <li data-i18n="vaults.study.f4"><b>Flashcards and spaced review</b> built from your content, each one yours to approve.</li>
+        </ul>
+        <span class="vault-try" data-i18n="vaults.study.cta">Open the study demo →</span>
+      </a>
+
+      <a class="vault-card live" href="demo/genealogy.html" style="--vc:#fbbf24">
+        <div class="vault-top">
+          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span>
+          <h3 data-i18n="vaults.genealogy.t">Genealogy</h3>
+        </div>
+        <p data-i18n="vaults.genealogy.b">For rebuilding people from primary sources. Family history is the obvious use, but the method fits any record work. Identity and kinship stay hypotheses until the documents prove them.</p>
+        <ul class="vault-feats">
+          <li data-i18n="vaults.genealogy.f1"><b>People, a family tree, a timeline and a map</b>, with GEDCOM in and out.</li>
+          <li data-i18n="vaults.genealogy.f2"><b>An evidence archive</b> of censuses, registers, letters and photos, each tied to the people inside it.</li>
+          <li data-i18n="vaults.genealogy.f3"><b>An AI genealogist</b> that proposes kinship from the records and never adds a link you have not confirmed.</li>
+          <li data-i18n="vaults.genealogy.f4"><b>Conflicts stay visible</b>, with period spellings and uncertain dates left as they are.</li>
+        </ul>
+        <span class="vault-try" data-i18n="vaults.genealogy.cta">Open the genealogy demo →</span>
+      </a>
+
+      <a class="vault-card live" href="demo/databases.html" style="--vc:#ff5f7e">
+        <div class="vault-top">
+          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
+          <h3 data-i18n="vaults.databases.t">Databases</h3>
+        </div>
+        <p data-i18n="vaults.databases.b">For your own data. Fieldwork, corpora, catalogues, coding sheets. Typed tables you can genuinely analyse, without a spreadsheet flattening your categories into plain text.</p>
+        <ul class="vault-feats">
+          <li data-i18n="vaults.databases.f1"><b>Real column types</b> for select, number, date, relation, rollup, formula and attachments.</li>
+          <li data-i18n="vaults.databases.f2"><b>The AI plans, the app computes.</b> Correlations, chi-square, ANOVA and regressions run in code, not in a prompt.</li>
+          <li data-i18n="vaults.databases.f3"><b>Charts drawn straight from your rows</b>, from heatmaps to scatter and box plots.</li>
+          <li data-i18n="vaults.databases.f4"><b>A data chat</b> that answers over the real table and refuses to invent a value.</li>
+        </ul>
+        <span class="vault-try" data-i18n="vaults.databases.cta">Open the databases demo →</span>
+      </a>
+    </div>
+
+    <div class="road">
+      <h4 data-i18n="road.t">Coming next</h4>
+      <p data-i18n="road.b">The vault picker already lists what is on the way. The one we are building next turns Nodus into a full workspace for teachers.</p>
+
+      <div class="teach-teaser" style="--vc:#fb923c">
+        <div class="teach-head">
+          <span class="teach-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg></span>
+          <div><h5 data-i18n="road.teaching.t">Teaching</h5><span data-i18n="road.teaching.sub">A workspace built around a teacher's real week.</span></div>
+        </div>
+        <ul class="teach-feats">
+          <li data-i18n="road.teaching.b1"><b>Classes and grades in one place</b>, where the AI only ever sees anonymous student codes, never a name.</li>
+          <li data-i18n="road.teaching.b2"><b>Notes, tests and exams from your own material</b>, with the AI held to what you gave it and nothing invented.</li>
+          <li data-i18n="road.teaching.b3"><b>Teaching guides, unit plans and learning situations</b>, drafted in the format your institution expects.</li>
+        </ul>
+      </div>
+
+      <div class="road-more">
+        <span class="road-more-label" data-i18n="road.also">Also on the roadmap</span>
+        <div class="road-grid">
+          <div class="road-item" style="--vc:#a78bfa">
+            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z"/></svg></span>
+            <div><b data-i18n="road.worldbuilding.t">Worldbuilding</b><span data-i18n="road.worldbuilding.b">The same shell, aimed at fiction and invented worlds rather than research.</span></div>
+          </div>
+          <div class="road-item" style="--vc:#818cf8">
+            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span>
+            <div><b data-i18n="road.primary.t">Primary Sources</b><span data-i18n="road.primary.b">Archival records beside secondary literature, with source-critical extraction.</span></div>
+          </div>
+          <div class="road-item" style="--vc:#22d3ee">
+            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>
+            <div><b data-i18n="road.testimony.t">Testimony</b><span data-i18n="road.testimony.b">Interviews and oral history, tracking who spoke and what each person said.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="who">
+      <div class="who-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg> <span data-i18n="who.research.t">If you research</span></h4>
+        <p data-i18n="who.research.b">Your reading turns into a corpus you can question. You see what is contested, what is missing and who backs what, then draft with citations that land on real items. <b>Academic</b>, <b>Genealogy</b> and <b>Databases</b>.</p>
+      </div>
+      <div class="who-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg> <span data-i18n="who.teach.t">If you teach</span></h4>
+        <p data-i18n="who.teach.b">Build your material once and get tests, exams and teaching guides out of it, each grounded in what you wrote and nothing invented. A dedicated Teaching mode is on the way, and the <b>Study</b> vault already covers a lot of it.</p>
+      </div>
+      <div class="who-card">
+        <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg> <span data-i18n="who.study.t">If you study</span></h4>
+        <p data-i18n="who.study.b">Upload your own PDFs, slides and notes and keep them in order by course and subject. Then turn them into tests and exams, review with flashcards, and ask the AI questions it answers only from your material. <b>Study</b>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ---------- story ---------- -->
-<section id="story" class="story">
+<section id="story" class="story" style="border-top:1px solid var(--border);background:var(--bg2)">
   <div class="wrap">
     <span class="kicker" data-i18n="story.kicker">How it works</span>
-    <h2 class="title" data-i18n="story.title">Everything hangs on one thread: the idea.</h2>
-    <p class="lead" data-i18n="story.lead">Not files, not PDFs, not folders. Nodus decomposes every work in your library into its actual claims, findings and constructs, then follows the thread wherever it leads.</p>
+    <h2 class="title" data-i18n="story.title">From your sources to ideas you can use.</h2>
+    <p class="lead" data-i18n="story.lead">Whatever you bring in, a research library, your own class notes, a recorded lecture, a box of old records or a table of data, Nodus reads it for the ideas and entities it actually holds. Then it connects them, and lets you ask questions that stay grounded in what is really there.</p>
 
     <div style="margin-top:50px">
       <div class="step">
         <div class="num">1</div>
-        <h3 data-i18n="step1.t">Sync your library</h3>
-        <p data-i18n="step1.b">Point Nodus at your Zotero collections. It reads the attached files directly, no plugins, no re-indexing, no uploads. Duplicates are detected and merged losslessly.</p>
-        <div class="views"><span class="vchip"><b>Library</b> · works &amp; collections</span><span class="vchip"><b>Search</b> · semantic + exact</span></div>
+        <h3 data-i18n="step1.t">Bring in your material</h3>
+        <p data-i18n="step1.b">Sync a Zotero library, drop in your own files, record a class or import a set of records. Nodus reads the content directly on your device, with nothing to upload and no plugin to install.</p>
+        <div class="views"><span class="vchip"><b>Zotero</b> or your own files</span><span class="vchip"><b>Audio</b> recorded and transcribed</span><span class="vchip"><b>Records</b> and tables</span></div>
       </div>
       <div class="step">
         <div class="num">2</div>
-        <h3 data-i18n="step2.t">Extract the ideas</h3>
-        <p data-i18n="step2.b">An AI pass (cloud with your own key, or fully offline with Ollama / LM Studio) pulls out each work's claims, findings, methods and frameworks, with verbatim evidence and page references for every single one.</p>
-        <div class="views"><span class="vchip"><b>Ideas</b> · typed &amp; evidenced</span><span class="vchip"><b>Authors</b> · who backs what</span></div>
+        <h3 data-i18n="step2.t">It reads for meaning</h3>
+        <p data-i18n="step2.b">An AI pass, in the cloud with your own key or fully offline, pulls out the claims, concepts, people or values each source holds and keeps the exact passage behind every one. Nothing is saved without the evidence for it.</p>
+        <div class="views"><span class="vchip"><b>Ideas &amp; entities</b> with page-level evidence</span><span class="vchip"><b>Your key</b>, or run it offline</span></div>
       </div>
       <div class="step">
         <div class="num">3</div>
-        <h3 data-i18n="step3.t">Watch them connect</h3>
-        <p data-i18n="step3.b">Ideas link up into a living graph: supports, contradicts, refines, extends. Force-directed, WebGL-fast, and filterable by theme, author or reading status. This is where your corpus starts to look like an argument instead of a pile.</p>
-        <div class="views"><span class="vchip"><b>Graph</b> · the whole corpus</span><span class="vchip"><b>Argument map</b> · thesis vs. objections</span></div>
-      </div>
-      <div class="step">
-        <div class="num">4</div>
-        <h3 data-i18n="step4.t">Interrogate the corpus</h3>
-        <p data-i18n="step4.b">Nodus mines what your library does not say: open contradictions become head-to-head debates with a chronology; missing links become research gaps; your questions get tracked against actual coverage.</p>
-        <div class="views"><span class="vchip"><b>Debates</b></span><span class="vchip"><b>Gaps</b></span><span class="vchip"><b>Coverage</b></span><span class="vchip"><b>Hypotheses</b></span><span class="vchip"><b>Reading path</b></span></div>
-      </div>
-      <div class="step">
-        <div class="num">5</div>
-        <h3 data-i18n="step5.t">Write with proof</h3>
-        <p data-i18n="step5.b">The writing workshop drafts sections grounded in the graph, and refuses to cite anything that doesn't resolve to a real Zotero item. Deep Research composes full multi-page cited reports. The same copilot runs live inside Microsoft Word and LibreOffice Writer.</p>
-        <div class="views"><span class="vchip"><b>Writing</b></span><span class="vchip"><b>Deep Research</b></span><span class="vchip"><b>Word &amp; Writer</b> · beta</span><span class="vchip"><b>Projects</b></span><span class="vchip"><b>Notes</b></span></div>
-      </div>
-      <div class="step">
-        <div class="num">6</div>
-        <h3 data-i18n="step6.t">Then listen to it</h3>
-        <p data-i18n="step6.b">Turn any report into narrated audio, or take an immersive guided walk through a corner of your corpus. Voices run locally (Piper, Kokoro), or bring a Hume key for cloud voices.</p>
-        <div class="views"><span class="vchip"><b>Immersion</b> · audio walks</span><span class="vchip"><b>Study</b> · guides &amp; flashcards</span></div>
+        <h3 data-i18n="step3.t">It connects, and answers</h3>
+        <p data-i18n="step3.b">Ideas link into a living map, records line up into people and timelines, rows turn into charts. The assistant answers over that and only over that, so you can always trace a claim back to where it came from.</p>
+        <div class="views"><span class="vchip"><b>A map</b> you can follow and question</span><span class="vchip"><b>Answers</b> you can trace to the source</span></div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ---------- animated views ---------- -->
-<!-- ---------- vault modes ---------- -->
-<section id="modes" style="border-top:1px solid var(--border)">
-  <div class="wrap">
-    <span class="kicker" data-i18n="modes.kicker">Vault modes · new in 2.0</span>
-    <h2 class="title" data-i18n="modes.title">One engine. A mode for every kind of corpus.</h2>
-    <p class="lead" data-i18n="modes.lead">Every vault has a mode that tailors its sidebar and the AI assistant’s persona — the same graph engine underneath. Three ship today; two more are on the way. Try each shipped mode right in the demo.</p>
-    <div class="modes-grid">
-      <a class="mode-card live" href="demo/index.html">
-        <div class="mode-top"><span class="mode-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg></span><span class="mode-badge live" data-i18n="modes.available">Available</span></div>
-        <h3 data-i18n="modes.academic.t">Academic</h3>
-        <p data-i18n="modes.academic.b">Turn a Zotero library into a graph of ideas, authors, debates and gaps — then write with citations you can actually verify.</p>
-        <span class="mode-try" data-i18n="modes.academic.cta">Open the academic demo →</span>
-      </a>
-      <a class="mode-card live gen" href="demo/genealogy.html">
-        <div class="mode-top"><span class="mode-ic gen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span><span class="mode-badge live" data-i18n="modes.available">Available</span></div>
-        <h3 data-i18n="modes.genealogy.t">Genealogy</h3>
-        <p data-i18n="modes.genealogy.b">Reconstruct a family from primary sources: persons, a family tree, a timeline, an evidence archive, a real map — and an AI genealogist that proposes kinship from the evidence.</p>
-        <span class="mode-try" data-i18n="modes.genealogy.cta">Open the genealogy demo →</span>
-      </a>
-      <a class="mode-card live db" href="demo/databases.html">
-        <div class="mode-top"><span class="mode-ic databases"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><span class="mode-badge live" data-i18n="modes.available">Available</span></div>
-        <h3 data-i18n="modes.databases.t">Databases</h3>
-        <p data-i18n="modes.databases.b">Structured data as typed tables — single/multi-select, numbers, dates, relations and an AI-summary column — with a computed Analysis section and a data chat over your rows.</p>
-        <span class="mode-try" data-i18n="modes.databases.cta">Open the databases demo →</span>
-      </a>
-      <div class="mode-card soon">
-        <div class="mode-top"><span class="mode-ic primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span><span class="mode-badge soon" data-i18n="modes.soon">Coming soon</span></div>
-        <h3 data-i18n="modes.primary.t">Primary Sources</h3>
-        <p data-i18n="modes.primary.b">Archival records alongside secondary literature, with source-critical extraction that stays faithful to the document.</p>
-      </div>
-      <div class="mode-card soon">
-        <div class="mode-top"><span class="mode-ic study"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg></span><span class="mode-badge soon" data-i18n="modes.soon">Coming soon</span></div>
-        <h3 data-i18n="modes.study.t">Study</h3>
-        <p data-i18n="modes.study.b">A learner’s workspace: the graph, flashcards, guided routes and self-testing, tuned for understanding over original research.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <section id="views" style="background:var(--bg2);border-top:1px solid var(--border)">
   <div class="wrap">
-    <span class="kicker" data-i18n="views.kicker">The views</span>
-    <h2 class="title" data-i18n="views.title">Watch each section come alive.</h2>
-    <p class="lead" data-i18n="views.lead">Every vignette below mirrors a real view of the app, and each one is fully explorable in the live demo.</p>
+    <span class="kicker" data-i18n="views.kicker">Every vault, in motion</span>
+    <h2 class="title" data-i18n="views.title">See what each mode can do.</h2>
+    <p class="lead" data-i18n="views.lead">Each panel below is a real view from the app, opened in the mode it belongs to. The further you go, the more the same engine turns out to do.</p>
     <div class="shots">
 
-      <!-- Library -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Library</div><h3>Zotero in, ideas out</h3>
-          <p>Sync your collections, keep the read tags, merge duplicates losslessly. Every work carries its analysis state, nothing gets scanned twice.</p>
-          <a class="try" href="demo/index.html#library">Open in the demo →</a></div>
-        <div class="vig"><div class="vbar"><i></i><i></i><i></i><span>LIBRARY · SYNCED FROM ZOTERO</span></div>
-          <div class="vbody">
-            <div class="vrow"><b class="grow">Roediger &amp; Karpicke (2006), Test-Enhanced Learning</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
-            <div class="vrow"><b class="grow">Karpicke &amp; Blunt (2011), Retrieval Practice…</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:100%"></i></span></div>
-            <div class="vrow"><b class="grow">Sweller (1988), Cognitive Load During Problem Solving</b><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">read</span><span class="vbar2"><i style="--w:88%"></i></span></div>
-            <div class="vrow"><b class="grow">Cepeda et al. (2006), Distributed Practice…</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:62%"></i></span></div>
-            <div class="vrow"><b class="grow">Van Gog &amp; Sweller (2015), Not New, but Nearly Forgotten</b><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">to read</span><span class="vbar2"><i style="--w:45%"></i></span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Graph -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Graph</div><h3>The corpus as a constellation</h3>
-          <p>Themes, claims, findings and methods with typed edges like supports, contradicts and refines. Presets jump straight to contradictions, gaps or your reading route.</p>
+      <!-- Academic 1 · Graph -->
+      <div class="shot" style="--acc:#818cf8">
+        <div class="shot-txt"><div class="tag">Academic</div><h3>Your reading becomes a map</h3>
+          <p>Every work breaks into the claims and findings it makes, and they link into one living map of supports, contradictions and refinements. A pile of papers starts to read like an argument.</p>
           <a class="try" href="demo/index.html#graph">Open in the demo →</a></div>
         <div class="vig vig-graph"><div class="vbar"><i></i><i></i><i></i><span>GRAPH · 12 NODES</span></div>
           <div class="vbody" style="padding:6px">
@@ -711,173 +907,203 @@
         </div>
       </div>
 
-      <!-- Ideas -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Ideas</div><h3>Claims with receipts</h3>
-          <p>Every idea carries verbatim evidence and a page reference. Click one and you get its relations, its author and the exact passage. No orphan assertions, ever.</p>
-          <a class="try" href="demo/index.html#ideas">Open in the demo →</a></div>
-        <div class="vig"><div class="vbar"><i></i><i></i><i></i><span>IDEAS · 12 EXTRACTED</span></div>
-          <div class="vbody">
-            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#34d399;border-color:rgba(52,211,153,0.4)">finding</span><b class="grow">The testing effect strengthens long-term retention</b><span style="font-size:10px;color:#a5b4fc">p. 251</span></div>
-            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#818cf8;border-color:rgba(129,140,248,0.4)">claim</span><b class="grow">Active retrieval outperforms re-reading</b><span style="font-size:10px;color:#a5b4fc">p. 254</span></div>
-            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#fbbf24;border-color:rgba(251,191,36,0.4)">construct</span><b class="grow">Element interactivity</b><span style="font-size:10px;color:#a5b4fc">p. 4</span></div>
-            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#22d3ee;border-color:rgba(34,211,238,0.4)">framework</span><b class="grow">Desirable difficulties</b><span style="font-size:10px;color:#a5b4fc">p. 58</span></div>
-            <div class="vrow" style="flex-wrap:wrap"><span class="mini-chip" style="color:#f87171;border-color:rgba(248,113,113,0.4)">method</span><b class="grow">Delayed cued-recall testing paradigm</b><span style="font-size:10px;color:#a5b4fc">p. 250</span></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Debates -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Debates</div><h3>Contradictions, head to head</h3>
-          <p>Two positions, the authors on each side, their evidence, and the chronology of the dispute, built automatically from contradiction edges in the graph.</p>
-          <a class="try" href="demo/index.html#debate">Open in the demo →</a></div>
-        <div class="vig vig-debate"><div class="vbar"><i></i><i></i><i></i><span>DEBATES · 1 OPEN DISPUTE</span></div>
-          <div class="vbody">
-            <div style="font-size:12px;font-weight:700;margin-bottom:10px">Does the testing effect survive complex materials?</div>
-            <div class="cols">
-              <div class="colA"><h5 style="color:#34d399">A · Robust across materials</h5>
-                <div class="ev">Roediger · Karpicke · Blunt</div>
-                <div class="ev">“d = 1.50 even on inference questions”</div></div>
-              <div class="colB"><h5 style="color:#f87171">B · Attenuates under load</h5>
-                <div class="ev">Van Gog · Sweller</div>
-                <div class="ev">“shrinks toward zero at high interactivity”</div></div>
-              <div class="vs">VS</div>
-            </div>
-            <div class="tl"><b>2006</b><i></i><b>2011</b><i></i><b>2015</b></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Gaps -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Gaps</div><h3>What nobody has said yet</h3>
-          <p>Missing links between themes become explicit research opportunities, each with a drafted coverage question and one-click source hunting.</p>
-          <a class="try" href="demo/index.html#gaps">Open in the demo →</a></div>
-        <div class="vig vig-gaps"><div class="vbar"><i></i><i></i><i></i><span>GAPS · 4 MINED</span></div>
-          <div class="vbody">
-            <svg viewBox="0 0 420 150">
-              <g opacity="0.9">
-                <circle cx="70" cy="50" r="7" fill="#f97316"/><text x="82" y="54" style="font-size:9px;fill:#b7b3cc;font-family:Inter,sans-serif">RETRIEVAL PRACTICE</text>
-                <circle cx="88" cy="105" r="5" fill="#34d399"/><circle cx="46" cy="96" r="5" fill="#818cf8"/>
-                <circle cx="352" cy="48" r="7" fill="#f97316"/><text x="248" y="36" style="font-size:9px;fill:#b7b3cc;font-family:Inter,sans-serif">COGNITIVE LOAD</text>
-                <circle cx="332" cy="102" r="5" fill="#fbbf24"/><circle cx="378" cy="96" r="5" fill="#22d3ee"/>
-                <line x1="70" y1="50" x2="88" y2="105" stroke="#34d399" stroke-width="1.2" opacity="0.5"/>
-                <line x1="70" y1="50" x2="46" y2="96" stroke="#a78bfa" stroke-width="1.2" opacity="0.5"/>
-                <line x1="352" y1="48" x2="332" y2="102" stroke="#8b5cf6" stroke-width="1.2" opacity="0.5"/>
-                <line x1="352" y1="48" x2="378" y2="96" stroke="#22d3ee" stroke-width="1.2" opacity="0.5"/>
-              </g>
-              <circle class="hole" cx="210" cy="76" r="34" fill="none" stroke="#fbbf24" stroke-width="1.6"/>
-              <text class="holetxt" x="210" y="80" text-anchor="middle" style="font-size:8px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:700;letter-spacing:0.04em">no edges yet</text>
-            </svg>
-            <div class="gq">Suggested question: does scaffolded retrieval preserve the testing effect for complex material in real classrooms?</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Deep Research -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Deep Research</div><h3>Reports that cite for real</h3>
-          <p>Multi-page academic reports generated in a queue, every claim resolves to a page in your corpus, with a support matrix and an audio edition.</p>
+      <!-- Academic 2 · Deep Research + audio -->
+      <div class="shot" style="--acc:#818cf8">
+        <div class="shot-txt"><div class="tag">Academic</div><h3>Reports that cite for real, read aloud</h3>
+          <p>Deep Research writes several pages and checks every citation against your sources. A reference that does not resolve to something real never makes the page. Then you can turn the finished report into a narrated walk, in a local voice or a studio-grade cloud one.</p>
           <a class="try" href="demo/index.html#deepResearch">Open in the demo →</a></div>
-        <div class="vig vig-research"><div class="vbar"><i></i><i></i><i></i><span>DEEP RESEARCH · GENERATING…</span></div>
+        <div class="vig vig-research"><div class="vbar"><i></i><i></i><i></i><span>DEEP RESEARCH · READ OR PLAY</span></div>
           <div class="vbody">
             <div class="ptabs"><span class="ptab on">Page 1</span><span class="ptab">Page 2</span><span class="ptab">Page 3</span></div>
             <div class="ln" style="--w:96%"></div>
             <div class="ln" style="--w:88%"></div>
-            <div class="ln" style="--w:92%"></div>
             <div class="ln" style="--w:70%"></div>
-            <div class="ln" style="--w:83%"></div>
             <div class="cites">
               <span class="cite">[1] Roediger &amp; Karpicke 2006, p. 251</span>
               <span class="cite">[2] Karpicke &amp; Blunt 2011, p. 774</span>
-              <span class="cite">[3] Sweller 1988, p. 262</span>
+            </div>
+            <div class="player vig-player" data-src="assets/audio/nodus-station.m4a?v=2">
+              <button class="play" aria-label="Play the narrated sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
+              <div style="flex:1;min-width:0"><div class="lbl">Narrated audio · sample</div><div class="bar"><div></div></div></div>
+              <span class="time">0:00</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Writing -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Writing</div><h3>Drafts with verifiable citations</h3>
-          <p>The workshop composes from the graph and refuses to cite anything that doesn't resolve to a Zotero item. The same copilot runs live inside Microsoft Word and LibreOffice Writer.</p>
-          <a class="try" href="demo/index.html#writing">Open in the demo →</a></div>
-        <div class="vig vig-writing"><div class="vbar"><i></i><i></i><i></i><span>WRITING · SECTION 2.1</span></div>
+      <!-- Study 1 · Tests from your notes -->
+      <div class="shot" style="--acc:#2dd4bf">
+        <div class="shot-txt"><div class="tag">Study</div><h3>Turn your notes into a test</h3>
+          <p>Point Nodus at a topic and it drafts questions, tests and exams from your own material. Practise them, mark yourself, and keep only the ones you approve.</p>
+          <a class="try" href="demo/study.html#questions">Open in the demo →</a></div>
+        <div class="vig vig-quiz"><div class="vbar"><i></i><i></i><i></i><span>QUESTION BANK · FROM YOUR NOTES</span></div>
           <div class="vbody">
-            <div class="doc"><span class="tw" id="typewriter"></span></div>
-            <span class="verify">
+            <div class="qprompt">Which mechanism moves solutes against their gradient?</div>
+            <div class="qopt">Simple diffusion</div>
+            <div class="qopt">Osmosis</div>
+            <div class="qopt right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> Active transport</div>
+            <div class="qopt">Filtration</div>
+            <div class="qsrc">Drawn from your note · “Plasma membrane · summary”, p. 2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Study 2 · Ask your notes -->
+      <div class="shot" style="--acc:#2dd4bf">
+        <div class="shot-txt"><div class="tag">Study</div><h3>Ask your notes anything</h3>
+          <p>The study chat answers from your notes, slides and materials, and every reply points back to the page it came from. No guessing, and nothing it cannot show you in your own material.</p>
+          <a class="try" href="demo/study.html#chat">Open in the demo →</a></div>
+        <div class="vig vig-chat"><div class="vbar"><i></i><i></i><i></i><span>STUDY CHAT · GROUNDED LOCALLY</span></div>
+          <div class="vbody">
+            <div class="cmsg user">Explain passive and active transport simply.</div>
+            <div class="cmsg ai">Passive transport goes downhill, so the cell spends nothing. Active transport goes uphill against the gradient, so it needs energy <span class="cchip" style="--cc:#2dd4bf">[1]</span>.</div>
+            <div class="cmini">[1] Plasma membrane · summary, p. 2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Genealogy 1 · Tree + AI suggestion -->
+      <div class="shot" style="--acc:#fbbf24">
+        <div class="shot-txt"><div class="tag">Genealogy</div><h3>A family, rebuilt from the records</h3>
+          <p>People, dates and places are pulled out of censuses, registers and letters. The assistant proposes how they connect and waits for you to confirm before anyone joins the tree.</p>
+          <a class="try" href="demo/genealogy.html#tree">Open in the demo →</a></div>
+        <div class="vig vig-tree"><div class="vbar"><i></i><i></i><i></i><span>FAMILY TREE · 1 SUGGESTION</span></div>
+          <div class="vbody">
+            <svg viewBox="0 0 420 150">
+              <line x1="120" y1="46" x2="210" y2="96" stroke="#6b6b73" stroke-width="1.3"/>
+              <line x1="300" y1="46" x2="210" y2="96" stroke="#6b6b73" stroke-width="1.3"/>
+              <line x1="120" y1="46" x2="300" y2="46" stroke="#ca8a04" stroke-width="1.3" stroke-dasharray="4 4"/>
+              <g><rect x="92" y="22" width="56" height="46" rx="8" fill="#1c1c1e" stroke="#3a3a3f"/><circle cx="120" cy="40" r="10" fill="#3a3436"/><text x="120" y="62" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Casimiro</text></g>
+              <g><rect x="272" y="22" width="56" height="46" rx="8" fill="#1c1c1e" stroke="#3a3a3f"/><circle cx="300" cy="40" r="10" fill="#3a2f2f"/><text x="300" y="62" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Dolores</text></g>
+              <g><rect x="182" y="96" width="56" height="46" rx="8" fill="#1c1c1e" stroke="#3a3a3f"/><circle cx="210" cy="114" r="10" fill="#33322f"/><text x="210" y="136" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Rafael</text></g>
+              <text x="210" y="40" text-anchor="middle" style="font-size:8px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:700">proposed marriage</text>
+            </svg>
+            <div class="vsugg">
+              <div class="vsugg-t"><b>Casimiro &amp; Dolores, married</b><span>from the 1890 marriage record and a 1901 letter</span></div>
+              <div class="vsugg-a"><span class="vsugg-y">Confirm</span><span class="vsugg-n">Dismiss</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Genealogy 2 · Prosopography -->
+      <div class="shot" style="--acc:#fbbf24">
+        <div class="shot-txt"><div class="tag">Genealogy</div><h3>Not only kin, but who knew whom</h3>
+          <p>Beyond the family tree, Nodus maps the social web around each person. Godparents, witnesses, neighbours and business partners become a prosopography you can read across a whole community.</p>
+          <a class="try" href="demo/genealogy.html#relations">Open in the demo →</a></div>
+        <div class="vig vig-relations"><div class="vbar"><i></i><i></i><i></i><span>SOCIAL RELATIONS · PROSOPOGRAPHY</span></div>
+          <div class="vbody">
+            <svg viewBox="0 0 420 172">
+              <line x1="120" y1="50" x2="250" y2="46" stroke="#6b6b73" stroke-width="1.2"/>
+              <line x1="120" y1="50" x2="90" y2="128" stroke="#6b6b73" stroke-width="1.2"/>
+              <line x1="250" y1="46" x2="330" y2="112" stroke="#6b6b73" stroke-width="1.2"/>
+              <line x1="90" y1="128" x2="210" y2="140" stroke="#6b6b73" stroke-width="1.2"/>
+              <line x1="250" y1="46" x2="210" y2="140" stroke="#6b6b73" stroke-width="1.2"/>
+              <text x="185" y="42" text-anchor="middle" style="font-size:8.5px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:600">godparent</text>
+              <text x="92" y="92" text-anchor="middle" style="font-size:8.5px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:600">witness</text>
+              <text x="303" y="82" text-anchor="middle" style="font-size:8.5px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:600">neighbour</text>
+              <text x="150" y="150" text-anchor="middle" style="font-size:8.5px;fill:#fcd34d;font-family:Inter,sans-serif;font-weight:600">partner</text>
+              <g><circle cx="120" cy="50" r="9" fill="#fbbf24"/><text x="120" y="30" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Rafael</text></g>
+              <g><circle cx="250" cy="46" r="8" fill="#f59e0b"/><text x="250" y="28" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Encarnación</text></g>
+              <g><circle cx="90" cy="128" r="7" fill="#f59e0b"/><text x="66" y="132" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Vicente</text></g>
+              <g><circle cx="330" cy="112" r="7" fill="#f59e0b"/><text x="356" y="116" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Amparo</text></g>
+              <g><circle cx="210" cy="140" r="7" fill="#f59e0b"/><text x="210" y="162" text-anchor="middle" style="font-size:9px;fill:#e5e5e5;font-family:Inter,sans-serif;font-weight:600">Dolores</text></g>
+            </svg>
+            <div class="gnote">Relations drawn straight from the records, not just bloodlines.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Databases 1 · computed analysis -->
+      <div class="shot" style="--acc:#ff5f7e">
+        <div class="shot-txt"><div class="tag">Databases</div><h3>You bring the data, it runs the numbers</h3>
+          <p>Turn your own records into typed tables, then ask for an analysis. The assistant picks the method and the app computes it for real, so a correlation or a regression is a calculation, never a guess.</p>
+          <a class="try" href="demo/databases.html#dbAnalysis">Open in the demo →</a></div>
+        <div class="vig vig-db"><div class="vbar"><i></i><i></i><i></i><span>ANALYSIS · FIELD NOTEBOOK</span></div>
+          <div class="vbody">
+            <table class="dbmini">
+              <thead><tr><th>Site</th><th>Depth <span>num</span></th><th>Finds <span>num</span></th><th>Layer <span>select</span></th></tr></thead>
+              <tbody>
+                <tr><td>Trench A</td><td>0.4</td><td>12</td><td><span class="dbpill" style="--p:#34d399">topsoil</span></td></tr>
+                <tr><td>Trench B</td><td>1.1</td><td>34</td><td><span class="dbpill" style="--p:#818cf8">fill</span></td></tr>
+                <tr><td>Trench C</td><td>1.9</td><td>58</td><td><span class="dbpill" style="--p:#f472b6">floor</span></td></tr>
+              </tbody>
+            </table>
+            <div class="dbstat">
+              <div class="dbstat-h"><b>Depth × finds</b><span class="dbstat-r">r = 0.71</span></div>
+              <svg viewBox="0 0 200 66" class="dbscatter">
+                <line x1="14" y1="54" x2="192" y2="54" stroke="#333" stroke-width="1"/>
+                <line x1="14" y1="6" x2="14" y2="54" stroke="#333" stroke-width="1"/>
+                <line x1="16" y1="50" x2="188" y2="14" stroke="#ff5f7e" stroke-width="1.4" stroke-dasharray="3 3" opacity="0.8"/>
+                <circle cx="34" cy="47" r="3" fill="#ff5f7e"/><circle cx="70" cy="40" r="3" fill="#ff5f7e"/><circle cx="104" cy="33" r="3" fill="#ff5f7e"/><circle cx="140" cy="24" r="3" fill="#ff5f7e"/><circle cx="176" cy="17" r="3" fill="#ff5f7e"/>
+              </svg>
+              <p class="dbstat-c">Deeper trenches yield more finds. Computed over your rows, not estimated.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Databases 2 · Data chat + chart -->
+      <div class="shot" style="--acc:#ff5f7e">
+        <div class="shot-txt"><div class="tag">Databases</div><h3>Ask your table, get a chart</h3>
+          <p>Ask a question in plain words and get a straight answer over the real rows, drawn as a chart when it helps. It never invents a value that is not in your data.</p>
+          <a class="try" href="demo/databases.html#dbChat">Open in the demo →</a></div>
+        <div class="vig vig-dchat"><div class="vbar"><i></i><i></i><i></i><span>DATA CHAT · OVER YOUR ROWS</span></div>
+          <div class="vbody">
+            <div class="cmsg user">Average finds per layer?</div>
+            <div class="cmsg ai">Floor layers average 58, fill 34 and topsoil 12 <span class="cchip" style="--cc:#ff5f7e">computed</span>.</div>
+            <svg viewBox="0 0 220 74" class="dbbars">
+              <g><rect x="24" y="52" width="34" height="14" rx="2" fill="#34d399"/><text x="41" y="72" text-anchor="middle" style="font-size:8px;fill:#a3a3a3;font-family:Inter,sans-serif">topsoil</text></g>
+              <g><rect x="92" y="30" width="34" height="36" rx="2" fill="#818cf8"/><text x="109" y="72" text-anchor="middle" style="font-size:8px;fill:#a3a3a3;font-family:Inter,sans-serif">fill</text></g>
+              <g><rect x="160" y="8" width="34" height="58" rx="2" fill="#f472b6"/><text x="177" y="72" text-anchor="middle" style="font-size:8px;fill:#a3a3a3;font-family:Inter,sans-serif">floor</text></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teaching 1 · Gradebook, anonymised -->
+      <div class="shot" style="--acc:#fb923c">
+        <div class="shot-txt"><div class="tag">Teaching · coming next</div><h3>Classes and grades, kept private</h3>
+          <p>Manage your classes and grades in one place. When the AI helps, it only ever sees anonymous student codes, never a name.</p>
+          <span class="try soon">Coming to the teaching vault</span></div>
+        <div class="vig vig-grade"><div class="vbar"><i></i><i></i><i></i><span>GRADEBOOK · ANONYMISED FOR AI</span></div>
+          <div class="vbody">
+            <table class="dbmini gradebook">
+              <thead><tr><th>Student</th><th>Test 1</th><th>Test 2</th><th>Avg</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code">S-4821</span></td><td>7.5</td><td>8.0</td><td><b>7.8</b></td></tr>
+                <tr><td><span class="code">S-4822</span></td><td>6.0</td><td>7.5</td><td><b>6.8</b></td></tr>
+                <tr><td><span class="code">S-4823</span></td><td>9.0</td><td>8.5</td><td><b>8.8</b></td></tr>
+              </tbody>
+            </table>
+            <div class="tnote">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+              The AI only ever sees these codes, never a student's name.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teaching 2 · Guides & exams -->
+      <div class="shot" style="--acc:#fb923c">
+        <div class="shot-txt"><div class="tag">Teaching · coming next</div><h3>Guides and exams, grounded in your material</h3>
+          <p>Draft teaching guides, unit plans and learning situations, plus tests and exams, all built from your own material. The AI stays inside what you gave it and invents nothing.</p>
+          <span class="try soon">Coming to the teaching vault</span></div>
+        <div class="vig vig-guide"><div class="vbar"><i></i><i></i><i></i><span>TEACHING GUIDE · FROM YOUR MATERIAL</span></div>
+          <div class="vbody">
+            <div class="gsec"><span class="gsec-k">Objectives</span><div class="gsec-l" style="--w:92%"></div><div class="gsec-l" style="--w:74%"></div></div>
+            <div class="gsec"><span class="gsec-k">Unit plan</span><div class="gsec-l" style="--w:88%"></div><div class="gsec-l" style="--w:66%"></div></div>
+            <div class="gsec"><span class="gsec-k">Learning situation</span><div class="gsec-l" style="--w:80%"></div></div>
+            <div class="gsec"><span class="gsec-k">Assessment</span><div class="gsec-l" style="--w:84%"></div></div>
+            <span class="verify" style="color:#fdba74;border-color:rgba(251,146,60,0.4);background:rgba(251,146,60,0.08)">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="m4 12.5 5 5L20 6.5"/></svg>
-              Verified · 2/2 citations resolve to Zotero items</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Immersion / audio -->
-      <div class="shot">
-        <div class="shot-txt"><div class="tag">Immersion</div><h3>Hear your corpus think</h3>
-          <p>Guided audio walks: panorama, stations with verbatim quotes, contrasts, frontiers and a final exam. Voices are generated locally with Piper and Kokoro.</p>
-          <a class="try" href="demo/index.html#immersion">Open in the demo →</a></div>
-        <div class="vig vig-audio"><div class="vbar"><i></i><i></i><i></i><span>IMMERSION · STATION 2 OF 5</span></div>
-          <div class="vbody">
-            <div class="wave">
-              <i style="--h:55%"></i><i style="--h:80%;animation-delay:0.1s"></i><i style="--h:35%;animation-delay:0.2s"></i><i style="--h:90%;animation-delay:0.05s"></i><i style="--h:60%;animation-delay:0.3s"></i><i style="--h:75%;animation-delay:0.15s"></i><i style="--h:40%;animation-delay:0.25s"></i><i style="--h:85%;animation-delay:0.12s"></i><i style="--h:50%;animation-delay:0.28s"></i><i style="--h:70%;animation-delay:0.08s"></i><i style="--h:45%;animation-delay:0.22s"></i><i style="--h:88%;animation-delay:0.18s"></i><i style="--h:58%;animation-delay:0.02s"></i><i style="--h:78%;animation-delay:0.26s"></i><i style="--h:36%;animation-delay:0.14s"></i><i style="--h:66%;animation-delay:0.06s"></i><i style="--h:82%;animation-delay:0.24s"></i><i style="--h:48%;animation-delay:0.1s"></i>
-            </div>
-            <div class="track"><span class="pbtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7-11-7Z"/></svg></span>
-              <span style="flex:1">Station 2 · Desirable difficulties, “conditions that slow learning…”</span><span>Kokoro · local</span></div>
+              Built only from your material. Nothing invented.</span>
           </div>
         </div>
       </div>
 
     </div>
     <div style="text-align:center;margin-top:56px">
-      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Explore all 19 views in the live demo →</a>
-    </div>
-  </div>
-</section>
-
-<!-- ---------- listen ---------- -->
-<section id="listen">
-  <div class="wrap">
-    <span class="kicker" data-i18n="listen.kicker">Hear your research</span>
-    <h2 class="title" data-i18n="listen.title">Reports you can read. Or press play.</h2>
-    <p class="lead" data-i18n="listen.lead">Deep Research writes multi-page cited reports from your corpus; Immersion narrates guided walks through it. These samples were generated with Kokoro, the same local voice model that ships inside the app.</p>
-    <div class="media-grid">
-      <div class="media-card">
-        <img src="assets/art/deep-research-cover.svg" alt="Deep research report cover"/>
-        <div class="pad">
-          <h3 data-i18n="listen.c1.t">Deep Research brief</h3>
-          <p data-i18n="listen.c1.b">"Retrieval practice: why testing yourself beats re-reading", 6 works, 12 cited ideas, narrated.</p>
-          <div class="player" data-src="assets/audio/deep-research-sample.m4a">
-            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
-            <div style="flex:1;min-width:0"><div class="lbl">Heart · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
-            <span class="time">0:27</span>
-          </div>
-        </div>
-      </div>
-      <div class="media-card">
-        <img src="assets/art/immersion-night-sky.svg" alt="Immersion artwork: night sky"/>
-        <div class="pad">
-          <h3 data-i18n="listen.c2.t">Immersion walk</h3>
-          <p data-i18n="listen.c2.b">"Your library as a night sky", a guided audio walk through one constellation of the sample corpus.</p>
-          <div class="player" data-src="assets/audio/immersion-sample.m4a">
-            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
-            <div style="flex:1;min-width:0"><div class="lbl">George · Kokoro (runs locally)</div><div class="bar"><div></div></div></div>
-            <span class="time">0:24</span>
-          </div>
-        </div>
-      </div>
-      <div class="media-card">
-        <img src="assets/art/immersion-threads.svg" alt="Immersion artwork: threads between shelves"/>
-        <div class="pad">
-          <h3 data-i18n="listen.c3.t">Every voice, local by default</h3>
-          <p data-i18n="listen.c3.b">Piper and Kokoro synthesize on your machine, nothing is uploaded. Prefer studio-grade cloud voices? Bring your own Hume key.</p>
-          <div class="player" data-src="assets/audio/deep-research-sample.m4a">
-            <button class="play" aria-label="Play sample"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7-11-7Z"/></svg></button>
-            <div style="flex:1;min-width:0"><div class="lbl">Sample narration</div><div class="bar"><div></div></div></div>
-            <span class="time">0:27</span>
-          </div>
-        </div>
-      </div>
+      <a class="btn primary" href="demo/index.html" data-i18n="views.cta">Open the four live demos →</a>
     </div>
   </div>
 </section>
@@ -887,7 +1113,7 @@
   <div class="wrap">
     <span class="kicker" data-i18n="band.kicker">Free &amp; local-first, honestly</span>
     <h2 class="title" data-i18n="band.title">Completely free. Completely yours.</h2>
-    <p class="lead" style="margin:0 auto" data-i18n="band.lead">Nodus is open source under the MIT license, no accounts, no subscriptions, no telemetry. One SQLite vault on disk. AI is bring-your-own-key or fully offline with Ollama and LM Studio. Encrypted automatic backups, a tamper-evident audit ledger, and an MCP server so your own AI tools can query the graph locally.</p>
+    <p class="lead" style="margin:0 auto" data-i18n="band.lead">Nodus is open source under the MIT license, with no accounts, no subscriptions and no telemetry. Everything lives in a single file on your device. AI runs with your own key or fully offline through Ollama and LM Studio. It comes with encrypted automatic backups, a tamper-evident audit ledger, and a built-in server so your own AI tools can query your work locally.</p>
     <div class="pills">
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill1">Free forever (MIT)</span></span>
       <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12.5 5 5L20 6.5"/></svg> <span data-i18n="band.pill2">100% local storage</span></span>
@@ -914,7 +1140,7 @@
     <div class="contrib-copy">
       <span class="kicker" data-i18n="contrib.kicker">Open source, together</span>
       <h2 class="title" data-i18n="contrib.title">Every node counts.</h2>
-      <p class="lead" data-i18n="contrib.lead">Nodus grows one contribution at a time — like grains of sand, each one adds to the whole. A single builder started it; anyone can add the next grain.</p>
+      <p class="lead" data-i18n="contrib.lead">Nodus grows one contribution at a time, like grains of sand that each add to the whole. A single builder started it, and anyone can add the next grain.</p>
       <div class="contrib-actions">
         <a class="btn primary" href="https://github.com/Drakonis96/nodus/pulls" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="18" r="2.6"/><path d="M6 8.6v6.8M18 15.4V12a3 3 0 0 0-3-3h-3l2.4-2.4M11.4 11.4 9 9"/></svg> <span data-i18n="contrib.prs">See the pull requests</span></a>
         <a class="btn" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg> <span data-i18n="contrib.repo">Browse the code</span></a>
@@ -1012,7 +1238,7 @@
   </div>
 </div>
 
-<script src="faq.js?v=20260711-tr"></script>
+<script src="faq.js?v=20260717-vaults"></script>
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
@@ -1082,11 +1308,12 @@ document.getElementById('nmark').addEventListener('click', function () {
 const io = new IntersectionObserver((entries) => {
   entries.forEach((e) => e.isIntersecting && e.target.classList.add('in'));
 }, { threshold: 0.18 });
-document.querySelectorAll('.step, .shot, .media-card, .feat, .vig').forEach((el) => io.observe(el));
+document.querySelectorAll('.step, .shot, .media-card, .feat, .vig, .vault-card').forEach((el) => io.observe(el));
 
 // ---------- typewriter for the writing vignette ----------
 (function () {
   const target = document.getElementById('typewriter');
+  if (!target) return;
   const shot = target.closest('.shot');
   const parts = [
     { t: 'Retrieval practice enhances retention ' },
@@ -1246,31 +1473,31 @@ const LANGS = [
   { c: 'de', n: 'Deutsch' }, { c: 'en', n: 'English' }, { c: 'es', n: 'Español' },
   { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'tr', n: 'Türkçe' }, { c: 'zh', n: '中文' },
 ];
-const VIG = ['v.library', 'v.graph', 'v.ideas', 'v.debates', 'v.gaps', 'v.deep', 'v.writing', 'v.immersion'];
+const VIG = ['v.graph', 'v.deep', 'v.studyTest', 'v.studyChat', 'v.genealogy', 'v.pros', 'v.databases', 'v.dataChat', 'v.teachGrades', 'v.teachGuides'];
 const I18N = {
   es: {
     'nav.how': `Cómo funciona`, 'nav.views': `Vistas`, 'nav.listen': `Escuchar`, 'nav.demo': `Probar la demo`,
-    'hero.h1': `Mil ideas, dispersas como estrellas.<br/><span class="grad">Nodus conecta las constelaciones.</span>`,
-    'hero.sub': `Una app de escritorio local que convierte tu biblioteca de Zotero en un grafo navegable de ideas, autores, debates y huecos, y luego te ayuda a escribir con citas que puedes verificar de verdad.`,
+    'hero.h1': `<span class="hw hw1">Investiga</span> a fondo<br/><span class="hw hw2">Enseña</span> con criterio<br/><span class="hw hw3">Estudia</span> mejor`,
+    'hero.sub': `Una app de escritorio local para el trabajo académico. Cada vault elige un modo — una biblioteca de investigación que se convierte en un grafo de ideas, un espacio para tus asignaturas y tus clases, un archivo levantado desde fuentes primarias, tus propios datos estructurados — sobre un único motor que nunca sale de tu máquina.`,
     'hero.demo': `Probar la demo`, 'hero.download': `Descargar para macOS, Windows y Linux`,
     'hero.meta': `<b>Totalmente gratis y de código abierto.</b> Sin cuentas, sin suscripciones, sin telemetría, y tu corpus nunca sale de tu máquina.`,
     'hero.scroll': `desplázate`,
-    'story.kicker': `Cómo funciona`, 'story.title': `Todo pende de un mismo hilo: la idea.`,
-    'story.lead': `Ni archivos, ni PDFs, ni carpetas. Nodus descompone cada obra de tu biblioteca en sus afirmaciones, hallazgos y constructos reales, y luego sigue el hilo allá donde lleve.`,
-    'step1.t': `Sincroniza tu biblioteca`, 'step1.b': `Apunta Nodus a tus colecciones de Zotero. Lee los archivos adjuntos directamente, sin plugins, sin reindexar, sin subir nada. Los duplicados se detectan y se fusionan sin pérdidas.`,
-    'step2.t': `Extrae las ideas`, 'step2.b': `Un paso de IA (en la nube con tu propia clave, o totalmente sin conexión con Ollama / LM Studio) extrae las afirmaciones, hallazgos, métodos y marcos de cada obra, con evidencia literal y referencia de página para cada uno.`,
-    'step3.t': `Míralas conectarse`, 'step3.b': `Las ideas se enlazan en un grafo vivo: apoya, contradice, matiza, amplía. Dirigido por fuerzas, veloz con WebGL y filtrable por tema, autor o estado de lectura. Aquí tu corpus empieza a parecer un argumento en lugar de un montón.`,
+    'story.kicker': `Cómo funciona`, 'story.title': `De tus fuentes a ideas que puedes usar.`,
+    'story.lead': `Traigas lo que traigas, una biblioteca de investigación, tus propios apuntes de clase, una clase grabada, una caja de registros antiguos o una tabla de datos, Nodus lo lee buscando las ideas y entidades que de verdad contiene. Luego las conecta y te deja hacer preguntas que se sostienen en lo que realmente hay.`,
+    'step1.t': `Trae tu material`, 'step1.b': `Sincroniza una biblioteca de Zotero, suelta tus propios archivos, graba una clase o importa un conjunto de registros. Nodus lee el contenido directamente en tu dispositivo, sin subir nada y sin instalar ningún plugin.`,
+    'step2.t': `Lee el significado`, 'step2.b': `Un paso de IA, en la nube con tu propia clave o totalmente sin conexión, extrae las afirmaciones, conceptos, personas o valores que contiene cada fuente y guarda el pasaje exacto que hay detrás de cada uno. Nada se guarda sin su evidencia.`,
+    'step3.t': `Conecta y responde`, 'step3.b': `Las ideas se enlazan en un mapa vivo, los registros se ordenan en personas y cronologías, las filas se vuelven gráficos. El asistente responde sobre eso y solo sobre eso, así que siempre puedes rastrear una afirmación hasta su origen.`,
     'step4.t': `Interroga el corpus`, 'step4.b': `Nodus extrae lo que tu biblioteca no dice: las contradicciones abiertas se convierten en debates cara a cara con cronología; los enlaces que faltan se vuelven huecos de investigación; tus preguntas se rastrean frente a la cobertura real.`,
     'step5.t': `Escribe con pruebas`, 'step5.b': `El taller de escritura redacta secciones ancladas en el grafo, y se niega a citar nada que no corresponda a un elemento real de Zotero. Deep Research compone informes completos de varias páginas con citas. El mismo copiloto funciona en vivo dentro de Microsoft Word y LibreOffice Writer.`,
     'step6.t': `Y luego, escúchalo`, 'step6.b': `Convierte cualquier informe en audio narrado, o haz un paseo guiado e inmersivo por un rincón de tu corpus. Las voces funcionan en local (Piper, Kokoro), o usa una clave de Hume para voces en la nube.`,
-    'views.kicker': `Las vistas`, 'views.title': `Mira cómo cobra vida cada sección.`, 'views.lead': `Cada viñeta de abajo refleja una vista real de la app, y todas son totalmente explorables en la demo.`,
-    'views.cta': `Explora las 19 vistas en la demo →`, 'v.open': `Abrir en la demo →`,
+    'views.kicker': `Cada vault, en movimiento`, 'views.title': `Mira lo que puede hacer cada modo.`, 'views.lead': `Cada panel de abajo es una vista real de la app, abierta en el modo al que pertenece. Cuanto más bajas, más cosas resulta que hace el mismo motor.`,
+    'views.cta': `Abre las cuatro demos en vivo →`, 'v.open': `Abrir en la demo →`,
     'v.library.t': `Entra Zotero, salen ideas`, 'v.library.b': `Sincroniza tus colecciones, conserva las etiquetas de leído, fusiona duplicados sin pérdidas. Cada obra guarda su estado de análisis, nada se escanea dos veces.`,
     'v.graph.t': `El corpus como constelación`, 'v.graph.b': `Temas, afirmaciones, hallazgos y métodos con aristas tipadas como apoya, contradice y matiza. Los ajustes preestablecidos saltan directamente a contradicciones, huecos o tu ruta de lectura.`,
     'v.ideas.t': `Afirmaciones con pruebas`, 'v.ideas.b': `Cada idea lleva evidencia literal y una referencia de página. Haz clic en una y obtienes sus relaciones, su autor y el pasaje exacto. Nunca afirmaciones huérfanas.`,
     'v.debates.t': `Contradicciones, cara a cara`, 'v.debates.b': `Dos posiciones, los autores de cada lado, su evidencia y la cronología de la disputa, construida automáticamente a partir de las aristas de contradicción del grafo.`,
     'v.gaps.t': `Lo que nadie ha dicho aún`, 'v.gaps.b': `Los enlaces que faltan entre temas se vuelven oportunidades de investigación explícitas, cada una con una pregunta de cobertura redactada y búsqueda de fuentes con un clic.`,
-    'v.deep.t': `Informes que citan de verdad`, 'v.deep.b': `Informes académicos de varias páginas generados en cola, donde cada afirmación remite a una página de tu corpus, con una matriz de apoyo y una edición en audio.`,
+    'v.deep.t': `Informes que citan de verdad, y se escuchan`, 'v.deep.b': `Deep Research escribe varias páginas y comprueba cada cita contra tus fuentes. Una referencia que no corresponde a algo real nunca llega a la página. Luego puedes convertir el informe en un paseo narrado, con una voz generada en tu propia máquina.`,
     'v.writing.t': `Borradores con citas verificables`, 'v.writing.b': `El taller compone desde el grafo y se niega a citar nada que no corresponda a un elemento de Zotero. El mismo copiloto funciona en vivo dentro de Microsoft Word y LibreOffice Writer.`,
     'v.immersion.t': `Escucha pensar a tu corpus`, 'v.immersion.b': `Paseos de audio guiados: panorama, estaciones con citas literales, contrastes, fronteras y un examen final. Las voces se generan en local con Piper y Kokoro.`,
     'listen.kicker': `Escucha tu investigación`, 'listen.title': `Informes que puedes leer. O pulsar play.`,
@@ -1279,7 +1506,7 @@ const I18N = {
     'listen.c2.t': `Paseo de inmersión`, 'listen.c2.b': `«Tu biblioteca como un cielo nocturno», un paseo de audio guiado por una constelación del corpus de muestra.`,
     'listen.c3.t': `Toda voz, local por defecto`, 'listen.c3.b': `Piper y Kokoro sintetizan en tu máquina, no se sube nada. ¿Prefieres voces de estudio en la nube? Usa tu propia clave de Hume.`,
     'band.kicker': `Gratis y local, de verdad`, 'band.title': `Totalmente gratis. Totalmente tuyo.`,
-    'band.lead': `Nodus es de código abierto bajo licencia MIT, sin cuentas, sin suscripciones, sin telemetría. Un único almacén SQLite en disco. La IA es con tu propia clave o totalmente sin conexión con Ollama y LM Studio. Copias de seguridad automáticas cifradas, un registro de auditoría a prueba de manipulaciones y un servidor MCP para que tus propias herramientas de IA consulten el grafo en local.`,
+    'band.lead': `Nodus es de código abierto bajo licencia MIT, sin cuentas, sin suscripciones, sin telemetría. Todo vive en un único archivo en tu dispositivo. La IA es con tu propia clave o totalmente sin conexión con Ollama y LM Studio. Copias de seguridad automáticas cifradas, un registro de auditoría a prueba de manipulaciones y un servidor MCP para que tus propias herramientas de IA consulten el grafo en local.`,
     'band.pill1': `Gratis para siempre (MIT)`, 'band.pill2': `100% almacenamiento local`, 'band.pill3': `IA sin conexión (Ollama · LM Studio)`, 'band.pill4': `Copias cifradas automáticas`, 'band.pill5': `Registro de auditoría`, 'band.pill6': `Servidor MCP integrado`,
     'feat.kicker': `Todo dentro`, 'feat.title': `Una sola app. Todo el ciclo de investigación.`,
     'feat.d1': `Estado del corpus y el siguiente paso recomendado.`, 'feat.d2': `Búsqueda semántica y exacta sobre ideas, autores y pasajes.`, 'feat.d3': `Sincronización con Zotero con fusión de duplicados y recuperación de escaneos.`, 'feat.d4': `Grafo de fuerzas en WebGL de cada idea y relación tipada.`, 'feat.d5': `Tesis, apoyos, objeciones y réplicas, todo arrastrable.`, 'feat.d6': `Afirmaciones y hallazgos con evidencia literal y página.`, 'feat.d7': `Fichas de autor y una matriz de síntesis, canónicas en Zotero.`, 'feat.d8': `Guías, tarjetas y rutas socráticas a partir de tu corpus.`, 'feat.d9': `Paseos de audio narrados con voces generadas en local.`, 'feat.d10': `Lo que tu corpus aún no dice, extraído automáticamente.`, 'feat.d11': `Contradicciones enfrentadas cara a cara con cronología.`, 'feat.d12': `Tus preguntas de investigación contrastadas con evidencia real.`, 'feat.d13': `Las tensiones del grafo se vuelven hipótesis comprobables.`, 'feat.d14': `Un orden sugerido entre obras leídas y no leídas.`, 'feat.d15': `Informes citados de varias páginas, exportables y narrables.`, 'feat.d16': `Borradores con citas verificadas anclados en el grafo.`, 'feat.d17': `El copiloto en vivo dentro de Microsoft Word y LibreOffice Writer (beta).`, 'feat.d18': `Entregables, carpetas y enlaces profundos nodus://.`, 'feat.d19': `Consulta tu grafo desde Claude o cualquier cliente MCP.`, 'feat.d20': `Traducción de contenido por IA que conserva cada enlace de cita.`,
@@ -1289,21 +1516,21 @@ const I18N = {
   },
   fr: {
     'nav.how': `Comment ça marche`, 'nav.views': `Vues`, 'nav.listen': `Écouter`, 'nav.demo': `Essayer la démo`,
-    'hero.h1': `Mille idées, éparpillées comme des étoiles.<br/><span class="grad">Nodus relie les constellations.</span>`,
-    'hero.sub': `Une application de bureau locale qui transforme votre bibliothèque Zotero en un graphe navigable d'idées, d'auteurs, de débats et de lacunes, puis vous aide à écrire avec des citations réellement vérifiables.`,
+    'hero.h1': `<span class="hw hw1">Cherchez</span> plus loin<br/><span class="hw hw2">Enseignez</span> plus finement<br/><span class="hw hw3">Étudiez</span> mieux`,
+    'hero.sub': `Une application de bureau locale pour le travail académique. Chaque coffre choisit un mode — une bibliothèque de recherche qui devient un graphe d'idées, un espace pour vos cours et vos classes, une archive bâtie sur des sources primaires, vos propres données structurées — sur un moteur unique qui ne quitte jamais votre machine.`,
     'hero.demo': `Essayer la démo`, 'hero.download': `Télécharger pour macOS, Windows et Linux`,
     'hero.meta': `<b>Entièrement gratuit et open source.</b> Sans compte, sans abonnement, sans télémétrie, et votre corpus ne quitte jamais votre machine.`,
     'hero.scroll': `défiler`,
-    'story.kicker': `Comment ça marche`, 'story.title': `Tout tient à un seul fil : l'idée.`,
-    'story.lead': `Ni fichiers, ni PDF, ni dossiers. Nodus décompose chaque ouvrage de votre bibliothèque en ses affirmations, résultats et concepts réels, puis suit le fil où qu'il mène.`,
-    'step1.t': `Synchronisez votre bibliothèque`, 'step1.b': `Pointez Nodus vers vos collections Zotero. Il lit directement les fichiers joints, sans plugins, sans réindexation, sans téléversement. Les doublons sont détectés et fusionnés sans perte.`,
-    'step2.t': `Extrayez les idées`, 'step2.b': `Une passe d'IA (dans le cloud avec votre propre clé, ou entièrement hors ligne avec Ollama / LM Studio) extrait les affirmations, résultats, méthodes et cadres de chaque ouvrage, avec une preuve textuelle et une référence de page pour chacun.`,
+    'story.kicker': `Comment ça marche`, 'story.title': `De vos sources à des idées exploitables.`,
+    'story.lead': `Ni fichiers, ni PDF, ni dossiers. Nodus décompose ce que vous lui donnez — articles, chapitres, vos propres notes de cours, un cours enregistré, un acte d'archives — en les affirmations et concepts qu'il contient réellement, puis suit le fil où qu'il mène. Ce qui suit est la route du coffre académique ; les autres modes prennent le même chemin avec leurs propres étapes.`,
+    'step1.t': `Apportez ce que vous avez déjà`, 'step1.b': `Pointez le coffre académique vers vos collections Zotero : il lit directement les fichiers joints, sans plugin, sans réindexation, sans téléversement, et fusionne les doublons sans perte. Le coffre d'étude se passe totalement de Zotero : déposez des PDF, des diapositives, des documents ou de l'audio, ou enregistrez le cours vous-même.`,
+    'step2.t': `Extrayez les idées`, 'step2.b': `Une passe d'IA (dans le cloud avec votre propre clé, ou entièrement hors ligne avec Ollama / LM Studio) extrait les affirmations, résultats, méthodes et cadres de chaque ouvrage, avec une preuve textuelle et une référence de page pour chacun. Rien n'entre dans le graphe sans le passage qui l'appuie.`,
     'step3.t': `Regardez-les se connecter`, 'step3.b': `Les idées se relient en un graphe vivant : soutient, contredit, affine, étend. Dirigé par forces, rapide en WebGL et filtrable par thème, auteur ou statut de lecture. C'est là que votre corpus commence à ressembler à un argument plutôt qu'à un tas.`,
     'step4.t': `Interrogez le corpus`, 'step4.b': `Nodus extrait ce que votre bibliothèque ne dit pas : les contradictions ouvertes deviennent des débats face à face avec une chronologie ; les liens manquants deviennent des lacunes de recherche ; vos questions sont suivies au regard de la couverture réelle.`,
     'step5.t': `Écrivez avec des preuves`, 'step5.b': `L'atelier d'écriture rédige des sections ancrées dans le graphe, et refuse de citer tout ce qui ne correspond pas à un véritable élément Zotero. Deep Research compose des rapports complets de plusieurs pages avec citations. Le même copilote fonctionne en direct dans Microsoft Word et LibreOffice Writer.`,
     'step6.t': `Puis écoutez-le`, 'step6.b': `Transformez n'importe quel rapport en audio narré, ou faites une promenade guidée et immersive dans un coin de votre corpus. Les voix fonctionnent en local (Piper, Kokoro), ou utilisez une clé Hume pour des voix cloud.`,
-    'views.kicker': `Les vues`, 'views.title': `Voyez chaque section prendre vie.`, 'views.lead': `Chaque vignette ci-dessous reflète une vraie vue de l'application, et chacune est entièrement explorable dans la démo.`,
-    'views.cta': `Explorez les 19 vues dans la démo →`, 'v.open': `Ouvrir dans la démo →`,
+    'views.kicker': `Les vues`, 'views.title': `Voyez chaque section prendre vie.`, 'views.lead': `Chaque vignette ci-dessous reflète une vraie vue de l'application, et chacune est explorable dans la démo, dans le mode de coffre auquel elle appartient.`,
+    'views.cta': `Ouvrez les quatre démos →`, 'v.open': `Ouvrir dans la démo →`,
     'v.library.t': `Zotero entre, les idées sortent`, 'v.library.b': `Synchronisez vos collections, gardez les étiquettes « lu », fusionnez les doublons sans perte. Chaque ouvrage conserve son état d'analyse, rien n'est scanné deux fois.`,
     'v.graph.t': `Le corpus comme une constellation`, 'v.graph.b': `Thèmes, affirmations, résultats et méthodes avec des liens typés comme soutient, contredit et affine. Les préréglages sautent directement aux contradictions, aux lacunes ou à votre parcours de lecture.`,
     'v.ideas.t': `Des affirmations avec preuves`, 'v.ideas.b': `Chaque idée porte une preuve textuelle et une référence de page. Cliquez sur l'une d'elles et vous obtenez ses relations, son auteur et le passage exact. Jamais d'affirmations orphelines.`,
@@ -1318,7 +1545,7 @@ const I18N = {
     'listen.c2.t': `Promenade d'immersion`, 'listen.c2.b': `« Votre bibliothèque comme un ciel étoilé », une promenade audio guidée à travers une constellation du corpus d'exemple.`,
     'listen.c3.t': `Chaque voix, locale par défaut`, 'listen.c3.b': `Piper et Kokoro synthétisent sur votre machine, rien n'est téléversé. Vous préférez des voix cloud de qualité studio ? Utilisez votre propre clé Hume.`,
     'band.kicker': `Gratuit et local, honnêtement`, 'band.title': `Entièrement gratuit. Entièrement à vous.`,
-    'band.lead': `Nodus est open source sous licence MIT, sans compte, sans abonnement, sans télémétrie. Un seul coffre SQLite sur le disque. L'IA fonctionne avec votre propre clé ou entièrement hors ligne avec Ollama et LM Studio. Sauvegardes automatiques chiffrées, un journal d'audit inviolable et un serveur MCP pour que vos propres outils d'IA interrogent le graphe en local.`,
+    'band.lead': `Nodus est open source sous licence MIT, sans compte, sans abonnement, sans télémétrie. Tout tient dans un seul fichier sur votre appareil. L'IA fonctionne avec votre propre clé ou entièrement hors ligne avec Ollama et LM Studio. Sauvegardes automatiques chiffrées, un journal d'audit inviolable et un serveur MCP pour que vos propres outils d'IA interrogent le graphe en local.`,
     'band.pill1': `Gratuit à vie (MIT)`, 'band.pill2': `Stockage 100% local`, 'band.pill3': `IA hors ligne (Ollama · LM Studio)`, 'band.pill4': `Sauvegardes chiffrées automatiques`, 'band.pill5': `Journal d'audit`, 'band.pill6': `Serveur MCP intégré`,
     'feat.kicker': `Tout est inclus`, 'feat.title': `Une seule app. Tout le cycle de recherche.`,
     'feat.d1': `État du corpus et prochaine étape recommandée.`, 'feat.d2': `Recherche sémantique et exacte sur idées, auteurs et passages.`, 'feat.d3': `Synchronisation Zotero avec fusion des doublons et récupération de scan.`, 'feat.d4': `Graphe de forces WebGL de chaque idée et relation typée.`, 'feat.d5': `Thèse, soutiens, objections et réfutations, tous déplaçables.`, 'feat.d6': `Affirmations et résultats avec preuve textuelle et page.`, 'feat.d7': `Fiches d'auteur et matrice de synthèse, canoniques Zotero.`, 'feat.d8': `Guides, cartes mémoire et parcours socratiques issus de votre corpus.`, 'feat.d9': `Promenades audio narrées avec voix générées en local.`, 'feat.d10': `Ce que votre corpus ne dit pas encore, extrait automatiquement.`, 'feat.d11': `Contradictions mises face à face avec chronologie.`, 'feat.d12': `Vos questions de recherche confrontées à des preuves réelles.`, 'feat.d13': `Les tensions du graphe deviennent des hypothèses testables.`, 'feat.d14': `Un ordre suggéré parmi les ouvrages lus et non lus.`, 'feat.d15': `Rapports cités de plusieurs pages, exportables et narrables.`, 'feat.d16': `Brouillons aux citations vérifiées ancrés dans le graphe.`, 'feat.d17': `Le copilote en direct dans Microsoft Word et LibreOffice Writer (bêta).`, 'feat.d18': `Livrables, dossiers et liens profonds nodus://.`, 'feat.d19': `Interrogez votre graphe depuis Claude ou tout client MCP.`, 'feat.d20': `Traduction de contenu par IA qui préserve chaque lien de citation.`,
@@ -1328,21 +1555,21 @@ const I18N = {
   },
   it: {
     'nav.how': `Come funziona`, 'nav.views': `Viste`, 'nav.listen': `Ascolta`, 'nav.demo': `Prova la demo`,
-    'hero.h1': `Mille idee, sparse come stelle.<br/><span class="grad">Nodus collega le costellazioni.</span>`,
-    'hero.sub': `Un'app desktop locale che trasforma la tua libreria Zotero in un grafo navigabile di idee, autori, dibattiti e lacune, e poi ti aiuta a scrivere con citazioni davvero verificabili.`,
+    'hero.h1': `<span class="hw hw1">Ricerca</span> più a fondo<br/><span class="hw hw2">Insegna</span> meglio<br/><span class="hw hw3">Studia</span> meglio`,
+    'hero.sub': `Un'app desktop locale per il lavoro accademico. Ogni vault sceglie una modalità — una libreria di ricerca che diventa un grafo di idee, uno spazio per i tuoi corsi e le tue lezioni, un archivio costruito su fonti primarie, i tuoi dati strutturati — su un unico motore che non lascia mai la tua macchina.`,
     'hero.demo': `Prova la demo`, 'hero.download': `Scarica per macOS, Windows e Linux`,
     'hero.meta': `<b>Completamente gratuito e open source.</b> Nessun account, nessun abbonamento, nessuna telemetria, e il tuo corpus non lascia mai la tua macchina.`,
     'hero.scroll': `scorri`,
-    'story.kicker': `Come funziona`, 'story.title': `Tutto dipende da un solo filo: l'idea.`,
-    'story.lead': `Non file, non PDF, non cartelle. Nodus scompone ogni opera della tua libreria nelle sue affermazioni, scoperte e costrutti reali, e poi segue il filo ovunque conduca.`,
-    'step1.t': `Sincronizza la tua libreria`, 'step1.b': `Punta Nodus alle tue raccolte Zotero. Legge direttamente i file allegati, senza plugin, senza reindicizzazione, senza caricamenti. I duplicati vengono rilevati e uniti senza perdite.`,
-    'step2.t': `Estrai le idee`, 'step2.b': `Un passaggio di IA (nel cloud con la tua chiave, o completamente offline con Ollama / LM Studio) estrae affermazioni, scoperte, metodi e framework di ogni opera, con prova testuale e riferimento di pagina per ciascuno.`,
+    'story.kicker': `Come funziona`, 'story.title': `Dalle tue fonti a idee che puoi usare.`,
+    'story.lead': `Non file, non PDF, non cartelle. Nodus scompone ciò che gli dai — articoli, capitoli, i tuoi appunti, una lezione registrata, un documento d'archivio — nelle affermazioni e nei concetti che contiene davvero, e poi segue il filo ovunque conduca. Quella che segue è la rotta del vault accademico; le altre modalità fanno la stessa strada con le proprie tappe.`,
+    'step1.t': `Porta quello che già hai`, 'step1.b': `Punta il vault accademico alle tue raccolte Zotero: legge direttamente i file allegati, senza plugin, senza reindicizzazione, senza caricamenti, e unisce i duplicati senza perdite. Il vault di studio salta del tutto Zotero: trascina PDF, presentazioni, documenti o audio, oppure registra tu stesso la lezione.`,
+    'step2.t': `Estrai le idee`, 'step2.b': `Un passaggio di IA (nel cloud con la tua chiave, o completamente offline con Ollama / LM Studio) estrae affermazioni, scoperte, metodi e framework di ogni opera, con prova testuale e riferimento di pagina per ciascuno. Nulla entra nel grafo senza il passaggio che lo sostiene.`,
     'step3.t': `Guardale connettersi`, 'step3.b': `Le idee si collegano in un grafo vivo: sostiene, contraddice, affina, estende. Diretto da forze, veloce in WebGL e filtrabile per tema, autore o stato di lettura. È qui che il tuo corpus inizia a sembrare un argomento invece di un mucchio.`,
     'step4.t': `Interroga il corpus`, 'step4.b': `Nodus estrae ciò che la tua libreria non dice: le contraddizioni aperte diventano dibattiti faccia a faccia con una cronologia; i collegamenti mancanti diventano lacune di ricerca; le tue domande vengono monitorate rispetto alla copertura reale.`,
     'step5.t': `Scrivi con prove`, 'step5.b': `Il laboratorio di scrittura redige sezioni ancorate al grafo, e si rifiuta di citare qualsiasi cosa non corrisponda a un vero elemento Zotero. Deep Research compone report completi di più pagine con citazioni. Lo stesso copilota funziona dal vivo dentro Microsoft Word e LibreOffice Writer.`,
     'step6.t': `Poi ascoltalo`, 'step6.b': `Trasforma qualsiasi report in audio narrato, o fai una passeggiata guidata e immersiva in un angolo del tuo corpus. Le voci funzionano in locale (Piper, Kokoro), o usa una chiave Hume per voci nel cloud.`,
-    'views.kicker': `Le viste`, 'views.title': `Guarda ogni sezione prendere vita.`, 'views.lead': `Ogni vignetta qui sotto rispecchia una vista reale dell'app, ed è completamente esplorabile nella demo.`,
-    'views.cta': `Esplora tutte le 19 viste nella demo →`, 'v.open': `Apri nella demo →`,
+    'views.kicker': `Le viste`, 'views.title': `Guarda ogni sezione prendere vita.`, 'views.lead': `Ogni vignetta qui sotto rispecchia una vista reale dell'app ed è esplorabile nella demo, nella modalità di vault a cui appartiene.`,
+    'views.cta': `Apri le quattro demo dal vivo →`, 'v.open': `Apri nella demo →`,
     'v.library.t': `Entra Zotero, escono idee`, 'v.library.b': `Sincronizza le tue raccolte, mantieni le etichette di lettura, unisci i duplicati senza perdite. Ogni opera conserva il suo stato di analisi, niente viene scansionato due volte.`,
     'v.graph.t': `Il corpus come costellazione`, 'v.graph.b': `Temi, affermazioni, scoperte e metodi con archi tipizzati come sostiene, contraddice e affina. I preset saltano direttamente a contraddizioni, lacune o al tuo percorso di lettura.`,
     'v.ideas.t': `Affermazioni con prove`, 'v.ideas.b': `Ogni idea porta una prova testuale e un riferimento di pagina. Cliccane una e ottieni le sue relazioni, il suo autore e il passaggio esatto. Mai affermazioni orfane.`,
@@ -1357,7 +1584,7 @@ const I18N = {
     'listen.c2.t': `Passeggiata immersiva`, 'listen.c2.b': `« La tua libreria come un cielo notturno », una passeggiata audio guidata attraverso una costellazione del corpus di esempio.`,
     'listen.c3.t': `Ogni voce, locale per impostazione predefinita`, 'listen.c3.b': `Piper e Kokoro sintetizzano sulla tua macchina, niente viene caricato. Preferisci voci cloud di qualità da studio? Usa la tua chiave Hume.`,
     'band.kicker': `Gratuito e locale, davvero`, 'band.title': `Completamente gratuito. Completamente tuo.`,
-    'band.lead': `Nodus è open source con licenza MIT, senza account, senza abbonamenti, senza telemetria. Un unico archivio SQLite su disco. L'IA funziona con la tua chiave o completamente offline con Ollama e LM Studio. Backup automatici cifrati, un registro di audit a prova di manomissione e un server MCP perché i tuoi strumenti di IA interroghino il grafo in locale.`,
+    'band.lead': `Nodus è open source con licenza MIT, senza account, senza abbonamenti, senza telemetria. Tutto vive in un unico file sul tuo dispositivo. L'IA funziona con la tua chiave o completamente offline con Ollama e LM Studio. Backup automatici cifrati, un registro di audit a prova di manomissione e un server MCP perché i tuoi strumenti di IA interroghino il grafo in locale.`,
     'band.pill1': `Gratis per sempre (MIT)`, 'band.pill2': `Archiviazione 100% locale`, 'band.pill3': `IA offline (Ollama · LM Studio)`, 'band.pill4': `Backup cifrati automatici`, 'band.pill5': `Registro di audit`, 'band.pill6': `Server MCP integrato`,
     'feat.kicker': `Tutto incluso`, 'feat.title': `Un'unica app. L'intero ciclo di ricerca.`,
     'feat.d1': `Stato del corpus e prossimo passo consigliato.`, 'feat.d2': `Ricerca semantica ed esatta su idee, autori e passaggi.`, 'feat.d3': `Sincronizzazione Zotero con unione dei duplicati e recupero delle scansioni.`, 'feat.d4': `Grafo a forze WebGL di ogni idea e relazione tipizzata.`, 'feat.d5': `Tesi, sostegni, obiezioni e repliche, tutti trascinabili.`, 'feat.d6': `Affermazioni e scoperte con prova testuale e pagina.`, 'feat.d7': `Schede autore e una matrice di sintesi, canoniche in Zotero.`, 'feat.d8': `Guide, flashcard e percorsi socratici dal tuo corpus.`, 'feat.d9': `Passeggiate audio narrate con voci generate in locale.`, 'feat.d10': `Ciò che il tuo corpus non dice ancora, estratto automaticamente.`, 'feat.d11': `Contraddizioni messe faccia a faccia con cronologia.`, 'feat.d12': `Le tue domande di ricerca confrontate con prove reali.`, 'feat.d13': `Le tensioni nel grafo diventano ipotesi verificabili.`, 'feat.d14': `Un ordine suggerito tra opere lette e non lette.`, 'feat.d15': `Report citati di più pagine, esportabili e narrabili.`, 'feat.d16': `Bozze con citazioni verificate ancorate al grafo.`, 'feat.d17': `Il copilota dal vivo dentro Microsoft Word e LibreOffice Writer (beta).`, 'feat.d18': `Deliverable, cartelle e link profondi nodus://.`, 'feat.d19': `Interroga il tuo grafo da Claude o qualsiasi client MCP.`, 'feat.d20': `Traduzione di contenuti tramite IA che preserva ogni link di citazione.`,
@@ -1367,21 +1594,21 @@ const I18N = {
   },
   de: {
     'nav.how': `So funktioniert's`, 'nav.views': `Ansichten`, 'nav.listen': `Anhören`, 'nav.demo': `Live-Demo testen`,
-    'hero.h1': `Tausend Ideen, verstreut wie Sterne.<br/><span class="grad">Nodus verbindet die Sternbilder.</span>`,
-    'hero.sub': `Eine lokale Desktop-App, die deine Zotero-Bibliothek in einen navigierbaren Graphen aus Ideen, Autoren, Debatten und Lücken verwandelt und dir dann hilft, mit wirklich überprüfbaren Belegen zu schreiben.`,
+    'hero.h1': `<span class="hw hw1">Forsche</span> tiefer<br/><span class="hw hw2">Lehre</span> klüger<br/><span class="hw hw3">Lerne</span> besser`,
+    'hero.sub': `Eine lokale Desktop-App für akademische Arbeit. Jeder Tresor wählt einen Modus — eine Forschungsbibliothek, die zu einem Graphen aus Ideen wird, ein Arbeitsplatz für deine Kurse und Vorlesungen, ein Archiv aus Primärquellen, deine eigenen strukturierten Daten — über einer Engine, die deinen Rechner nie verlässt.`,
     'hero.demo': `Live-Demo testen`, 'hero.download': `Für macOS, Windows & Linux herunterladen`,
     'hero.meta': `<b>Völlig kostenlos und quelloffen.</b> Keine Konten, keine Abos, keine Telemetrie, und dein Korpus verlässt nie deinen Rechner.`,
     'hero.scroll': `scrollen`,
-    'story.kicker': `So funktioniert's`, 'story.title': `Alles hängt an einem Faden: der Idee.`,
-    'story.lead': `Keine Dateien, keine PDFs, keine Ordner. Nodus zerlegt jedes Werk deiner Bibliothek in seine tatsächlichen Aussagen, Befunde und Konzepte und folgt dann dem Faden, wohin er auch führt.`,
-    'step1.t': `Bibliothek synchronisieren`, 'step1.b': `Richte Nodus auf deine Zotero-Sammlungen. Es liest die angehängten Dateien direkt, ohne Plugins, ohne Neuindexierung, ohne Uploads. Duplikate werden erkannt und verlustfrei zusammengeführt.`,
-    'step2.t': `Ideen extrahieren`, 'step2.b': `Ein KI-Durchlauf (in der Cloud mit deinem eigenen Schlüssel oder komplett offline mit Ollama / LM Studio) extrahiert Aussagen, Befunde, Methoden und Modelle jedes Werks, mit wörtlichem Beleg und Seitenangabe für jede einzelne.`,
+    'story.kicker': `So funktioniert's`, 'story.title': `Von deinen Quellen zu Ideen, die du nutzen kannst.`,
+    'story.lead': `Keine Dateien, keine PDFs, keine Ordner. Nodus zerlegt, was du ihm gibst — Aufsätze, Kapitel, deine eigenen Notizen, eine aufgezeichnete Vorlesung, eine Archivalie — in die Behauptungen und Begriffe, die tatsächlich darin stecken, und folgt dem Faden, wohin er auch führt. Was folgt, ist die Route des akademischen Tresors; die anderen Modi nehmen denselben Weg mit eigenen Haltestellen.`,
+    'step1.t': `Bring mit, was du schon hast`, 'step1.b': `Richte den akademischen Tresor auf deine Zotero-Sammlungen: Er liest die angehängten Dateien direkt, ohne Plugin, ohne Neuindizierung, ohne Uploads, und führt Duplikate verlustfrei zusammen. Der Lern-Tresor kommt ganz ohne Zotero aus: Lege PDFs, Folien, Dokumente oder Audio ab — oder nimm die Vorlesung selbst auf.`,
+    'step2.t': `Ideen extrahieren`, 'step2.b': `Ein KI-Durchgang (in der Cloud mit deinem eigenen Schlüssel oder komplett offline mit Ollama / LM Studio) zieht die Behauptungen, Befunde, Methoden und Rahmen jedes Werks heraus — mit wörtlichem Beleg und Seitenangabe für jede einzelne. Nichts kommt in den Graphen ohne die Stelle, die es stützt.`,
     'step3.t': `Sieh zu, wie sie sich verbinden`, 'step3.b': `Ideen verknüpfen sich zu einem lebendigen Graphen: stützt, widerspricht, verfeinert, erweitert. Kräftebasiert, WebGL-schnell und filterbar nach Thema, Autor oder Lesestatus. Hier beginnt dein Korpus, wie ein Argument statt wie ein Haufen auszusehen.`,
     'step4.t': `Befrage den Korpus`, 'step4.b': `Nodus fördert zutage, was deine Bibliothek nicht sagt: offene Widersprüche werden zu Debatten von Angesicht zu Angesicht mit einer Chronologie; fehlende Verbindungen werden zu Forschungslücken; deine Fragen werden gegen die tatsächliche Abdeckung verfolgt.`,
     'step5.t': `Schreibe mit Belegen`, 'step5.b': `Die Schreibwerkstatt verfasst Abschnitte, die im Graphen verankert sind, und weigert sich, irgendetwas zu zitieren, das nicht auf ein echtes Zotero-Objekt verweist. Deep Research verfasst vollständige mehrseitige Berichte mit Zitaten. Derselbe Copilot läuft live in Microsoft Word und LibreOffice Writer.`,
     'step6.t': `Und dann hör es dir an`, 'step6.b': `Verwandle jeden Bericht in erzähltes Audio oder mach einen immersiven, geführten Rundgang durch eine Ecke deines Korpus. Die Stimmen laufen lokal (Piper, Kokoro), oder nutze einen Hume-Schlüssel für Cloud-Stimmen.`,
-    'views.kicker': `Die Ansichten`, 'views.title': `Sieh jeden Bereich lebendig werden.`, 'views.lead': `Jede Miniatur unten spiegelt eine echte Ansicht der App wider und ist in der Live-Demo vollständig erkundbar.`,
-    'views.cta': `Erkunde alle 19 Ansichten in der Demo →`, 'v.open': `In der Demo öffnen →`,
+    'views.kicker': `Die Ansichten`, 'views.title': `Sieh jeden Bereich lebendig werden.`, 'views.lead': `Jede Miniatur unten spiegelt eine echte Ansicht der App und ist in der Demo erkundbar — im Tresor-Modus, zu dem sie gehört.`,
+    'views.cta': `Öffne die vier Live-Demos →`, 'v.open': `In der Demo öffnen →`,
     'v.library.t': `Zotero rein, Ideen raus`, 'v.library.b': `Synchronisiere deine Sammlungen, behalte die Gelesen-Tags, führe Duplikate verlustfrei zusammen. Jedes Werk trägt seinen Analysestatus, nichts wird zweimal gescannt.`,
     'v.graph.t': `Der Korpus als Sternbild`, 'v.graph.b': `Themen, Aussagen, Befunde und Methoden mit typisierten Kanten wie stützt, widerspricht und verfeinert. Voreinstellungen springen direkt zu Widersprüchen, Lücken oder deiner Leseroute.`,
     'v.ideas.t': `Aussagen mit Belegen`, 'v.ideas.b': `Jede Idee trägt einen wörtlichen Beleg und eine Seitenangabe. Klick eine an und du erhältst ihre Beziehungen, ihren Autor und die exakte Passage. Niemals verwaiste Behauptungen.`,
@@ -1396,7 +1623,7 @@ const I18N = {
     'listen.c2.t': `Immersions-Rundgang`, 'listen.c2.b': `„Deine Bibliothek als Nachthimmel", ein geführter Audio-Rundgang durch ein Sternbild des Beispielkorpus.`,
     'listen.c3.t': `Jede Stimme, standardmäßig lokal`, 'listen.c3.b': `Piper und Kokoro synthetisieren auf deinem Rechner, nichts wird hochgeladen. Lieber Cloud-Stimmen in Studioqualität? Nutze deinen eigenen Hume-Schlüssel.`,
     'band.kicker': `Kostenlos und lokal, ehrlich`, 'band.title': `Völlig kostenlos. Ganz dir gehörend.`,
-    'band.lead': `Nodus ist quelloffen unter der MIT-Lizenz, ohne Konten, ohne Abos, ohne Telemetrie. Ein einziger SQLite-Tresor auf der Festplatte. Die KI läuft mit deinem eigenen Schlüssel oder komplett offline mit Ollama und LM Studio. Verschlüsselte automatische Backups, ein manipulationssicheres Prüfprotokoll und ein MCP-Server, damit deine eigenen KI-Tools den Graphen lokal abfragen können.`,
+    'band.lead': `Nodus ist quelloffen unter der MIT-Lizenz, ohne Konten, ohne Abos, ohne Telemetrie. Alles liegt in einer einzigen Datei auf deinem Gerät. Die KI läuft mit deinem eigenen Schlüssel oder komplett offline mit Ollama und LM Studio. Verschlüsselte automatische Backups, ein manipulationssicheres Prüfprotokoll und ein MCP-Server, damit deine eigenen KI-Tools den Graphen lokal abfragen können.`,
     'band.pill1': `Für immer kostenlos (MIT)`, 'band.pill2': `100% lokaler Speicher`, 'band.pill3': `Offline-KI (Ollama · LM Studio)`, 'band.pill4': `Verschlüsselte Auto-Backups`, 'band.pill5': `Prüfprotokoll`, 'band.pill6': `MCP-Server integriert`,
     'feat.kicker': `Alles drin`, 'feat.title': `Eine App. Der ganze Forschungszyklus.`,
     'feat.d1': `Korpus-Zustand und der nächste empfohlene Schritt.`, 'feat.d2': `Semantische und exakte Suche über Ideen, Autoren, Passagen.`, 'feat.d3': `Zotero-Sync mit Duplikat-Zusammenführung und Scan-Wiederherstellung.`, 'feat.d4': `WebGL-Kräftegraph jeder Idee und typisierten Beziehung.`, 'feat.d5': `These, Stützen, Einwände und Erwiderungen, alle verschiebbar.`, 'feat.d6': `Aussagen und Befunde mit wörtlichem Beleg und Seite.`, 'feat.d7': `Autorenprofile und eine Synthesematrix, Zotero-kanonisch.`, 'feat.d8': `Leitfäden, Karteikarten und sokratische Routen aus deinem Korpus.`, 'feat.d9': `Erzählte Audio-Rundgänge mit lokal erzeugten Stimmen.`, 'feat.d10': `Was dein Korpus noch nicht sagt, automatisch erschlossen.`, 'feat.d11': `Widersprüche Kopf an Kopf mit Chronologie.`, 'feat.d12': `Deine Forschungsfragen an echten Belegen gemessen.`, 'feat.d13': `Spannungen im Graphen werden zu testbaren Hypothesen.`, 'feat.d14': `Eine vorgeschlagene Reihenfolge gelesener und ungelesener Werke.`, 'feat.d15': `Mehrseitige zitierte Berichte, exportierbar und erzählbar.`, 'feat.d16': `Zitatgeprüfte Entwürfe, im Graphen verankert.`, 'feat.d17': `Der Copilot live in Microsoft Word und LibreOffice Writer (Beta).`, 'feat.d18': `Ergebnisse, Ordner und nodus://-Deeplinks.`, 'feat.d19': `Frag deinen Graphen von Claude oder jedem MCP-Client ab.`, 'feat.d20': `KI-Inhaltsübersetzung, die jeden Zitat-Link bewahrt.`,
@@ -1406,21 +1633,21 @@ const I18N = {
   },
   pt: {
     'nav.how': `Como funciona`, 'nav.views': `Vistas`, 'nav.listen': `Ouvir`, 'nav.demo': `Testar a demo`,
-    'hero.h1': `Mil ideias, dispersas como estrelas.<br/><span class="grad">O Nodus liga as constelações.</span>`,
-    'hero.sub': `Um aplicativo de desktop local que transforma a sua biblioteca do Zotero num grafo navegável de ideias, autores, debates e lacunas, e depois ajuda você a escrever com citações que dá para verificar de verdade.`,
+    'hero.h1': `<span class="hw hw1">Investiga</span> a fundo<br/><span class="hw hw2">Ensina</span> com critério<br/><span class="hw hw3">Estuda</span> melhor`,
+    'hero.sub': `Uma app de desktop local para o trabalho acadêmico. Cada cofre escolhe um modo — uma biblioteca de investigação que se torna um grafo de ideias, um espaço para as tuas disciplinas e aulas, um arquivo levantado a partir de fontes primárias, os teus próprios dados estruturados — sobre um único motor que nunca sai da tua máquina.`,
     'hero.demo': `Testar a demo`, 'hero.download': `Baixar para macOS, Windows e Linux`,
     'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e o seu corpus nunca sai da sua máquina.`,
     'hero.scroll': `rolar`,
-    'story.kicker': `Como funciona`, 'story.title': `Tudo pende de um só fio: a ideia.`,
-    'story.lead': `Nem arquivos, nem PDFs, nem pastas. O Nodus decompõe cada obra da sua biblioteca nas suas afirmações, descobertas e construtos reais, e depois segue o fio para onde quer que leve.`,
-    'step1.t': `Sincronize a sua biblioteca`, 'step1.b': `Aponte o Nodus para as suas coleções do Zotero. Ele lê os arquivos anexados diretamente, sem plugins, sem reindexação, sem uploads. Duplicados são detectados e mesclados sem perdas.`,
-    'step2.t': `Extraia as ideias`, 'step2.b': `Uma passagem de IA (na nuvem com a sua própria chave, ou totalmente offline com Ollama / LM Studio) extrai as afirmações, descobertas, métodos e estruturas de cada obra, com evidência literal e referência de página para cada uma.`,
+    'story.kicker': `Como funciona`, 'story.title': `Das tuas fontes a ideias que podes usar.`,
+    'story.lead': `Nem ficheiros, nem PDFs, nem pastas. O Nodus decompõe o que lhe deres — artigos, capítulos, os teus apontamentos, uma aula gravada, um registo de arquivo — nas afirmações e conceitos que realmente contém, e depois segue o fio para onde ele levar. O que se segue é a rota do cofre acadêmico; os outros modos fazem o mesmo caminho com as suas paragens.`,
+    'step1.t': `Traz o que já tens`, 'step1.b': `Aponta o cofre acadêmico às tuas coleções do Zotero: lê os ficheiros anexados diretamente, sem plugins, sem reindexar, sem enviar nada, e funde duplicados sem perdas. O cofre de estudo dispensa o Zotero por completo: larga PDFs, slides, documentos ou áudio, ou grava tu mesmo a aula.`,
+    'step2.t': `Extraia as ideias`, 'step2.b': `Um passo de IA (na nuvem com a tua própria chave, ou totalmente offline com Ollama / LM Studio) extrai as afirmações, achados, métodos e enquadramentos de cada obra, com evidência literal e referência de página para cada um. Nada entra no grafo sem a passagem que o sustenta.`,
     'step3.t': `Veja-as se conectarem`, 'step3.b': `As ideias se ligam num grafo vivo: apoia, contradiz, refina, estende. Dirigido por forças, veloz em WebGL e filtrável por tema, autor ou estado de leitura. É aqui que o seu corpus começa a parecer um argumento em vez de uma pilha.`,
     'step4.t': `Interrogue o corpus`, 'step4.b': `O Nodus extrai o que a sua biblioteca não diz: contradições em aberto viram debates frente a frente com uma cronologia; ligações que faltam viram lacunas de pesquisa; as suas perguntas são acompanhadas em relação à cobertura real.`,
     'step5.t': `Escreva com provas`, 'step5.b': `A oficina de escrita redige seções ancoradas no grafo e se recusa a citar qualquer coisa que não corresponda a um item real do Zotero. O Deep Research compõe relatórios completos de várias páginas com citações. O mesmo copiloto funciona ao vivo dentro do Microsoft Word e do LibreOffice Writer.`,
     'step6.t': `E depois ouça`, 'step6.b': `Transforme qualquer relatório em áudio narrado, ou faça um passeio guiado e imersivo por um canto do seu corpus. As vozes funcionam localmente (Piper, Kokoro), ou use uma chave Hume para vozes na nuvem.`,
-    'views.kicker': `As vistas`, 'views.title': `Veja cada seção ganhar vida.`, 'views.lead': `Cada vinheta abaixo espelha uma vista real do app, e todas são totalmente exploráveis na demo.`,
-    'views.cta': `Explore todas as 19 vistas na demo →`, 'v.open': `Abrir na demo →`,
+    'views.kicker': `As vistas`, 'views.title': `Veja cada seção ganhar vida.`, 'views.lead': `Cada vinheta abaixo reflete uma vista real da app e é explorável na demo, no modo de cofre a que pertence.`,
+    'views.cta': `Abre as quatro demos ao vivo →`, 'v.open': `Abrir na demo →`,
     'v.library.t': `Entra Zotero, saem ideias`, 'v.library.b': `Sincronize as suas coleções, mantenha as etiquetas de lido, mescle duplicados sem perdas. Cada obra guarda o seu estado de análise, nada é escaneado duas vezes.`,
     'v.graph.t': `O corpus como constelação`, 'v.graph.b': `Temas, afirmações, descobertas e métodos com arestas tipadas como apoia, contradiz e refina. As predefinições saltam direto para contradições, lacunas ou a sua rota de leitura.`,
     'v.ideas.t': `Afirmações com provas`, 'v.ideas.b': `Cada ideia carrega evidência literal e uma referência de página. Clique numa e você obtém as suas relações, o seu autor e a passagem exata. Nunca afirmações órfãs.`,
@@ -1435,7 +1662,7 @@ const I18N = {
     'listen.c2.t': `Passeio de imersão`, 'listen.c2.b': `«A sua biblioteca como um céu noturno», um passeio de áudio guiado por uma constelação do corpus de exemplo.`,
     'listen.c3.t': `Cada voz, local por padrão`, 'listen.c3.b': `Piper e Kokoro sintetizam na sua máquina, nada é enviado. Prefere vozes de estúdio na nuvem? Use a sua própria chave Hume.`,
     'band.kicker': `Gratuito e local, de verdade`, 'band.title': `Totalmente gratuito. Totalmente seu.`,
-    'band.lead': `O Nodus é de código aberto sob a licença MIT, sem contas, sem assinaturas, sem telemetria. Um único cofre SQLite no disco. A IA funciona com a sua própria chave ou totalmente offline com Ollama e LM Studio. Backups automáticos criptografados, um registro de auditoria à prova de adulteração e um servidor MCP para que as suas próprias ferramentas de IA consultem o grafo localmente.`,
+    'band.lead': `O Nodus é de código aberto sob a licença MIT, sem contas, sem assinaturas, sem telemetria. Tudo vive num único ficheiro no teu dispositivo. A IA funciona com a sua própria chave ou totalmente offline com Ollama e LM Studio. Backups automáticos criptografados, um registro de auditoria à prova de adulteração e um servidor MCP para que as suas próprias ferramentas de IA consultem o grafo localmente.`,
     'band.pill1': `Grátis para sempre (MIT)`, 'band.pill2': `Armazenamento 100% local`, 'band.pill3': `IA offline (Ollama · LM Studio)`, 'band.pill4': `Backups criptografados automáticos`, 'band.pill5': `Registro de auditoria`, 'band.pill6': `Servidor MCP integrado`,
     'feat.kicker': `Tudo dentro`, 'feat.title': `Um app. Todo o ciclo de pesquisa.`,
     'feat.d1': `Estado do corpus e o próximo passo recomendado.`, 'feat.d2': `Busca semântica e exata sobre ideias, autores e passagens.`, 'feat.d3': `Sincronização com Zotero com mesclagem de duplicados e recuperação de digitalização.`, 'feat.d4': `Grafo de forças em WebGL de cada ideia e relação tipada.`, 'feat.d5': `Tese, apoios, objeções e réplicas, tudo arrastável.`, 'feat.d6': `Afirmações e descobertas com evidência literal e página.`, 'feat.d7': `Fichas de autor e uma matriz de síntese, canônicas no Zotero.`, 'feat.d8': `Guias, flashcards e rotas socráticas a partir do seu corpus.`, 'feat.d9': `Passeios de áudio narrados com vozes geradas localmente.`, 'feat.d10': `O que o seu corpus ainda não diz, extraído automaticamente.`, 'feat.d11': `Contradições postas frente a frente com cronologia.`, 'feat.d12': `As suas perguntas de pesquisa comparadas com evidência real.`, 'feat.d13': `As tensões no grafo viram hipóteses testáveis.`, 'feat.d14': `Uma ordem sugerida entre obras lidas e não lidas.`, 'feat.d15': `Relatórios citados de várias páginas, exportáveis e narráveis.`, 'feat.d16': `Rascunhos com citações verificadas ancorados no grafo.`, 'feat.d17': `O copiloto ao vivo dentro do Microsoft Word e do LibreOffice Writer (beta).`, 'feat.d18': `Entregáveis, pastas e links profundos nodus://.`, 'feat.d19': `Consulte o seu grafo a partir do Claude ou qualquer cliente MCP.`, 'feat.d20': `Tradução de conteúdo por IA que preserva cada link de citação.`,
@@ -1445,21 +1672,21 @@ const I18N = {
   },
   tr: {
     'nav.how': `Nasıl çalışır`, 'nav.views': `Görünümler`, 'nav.listen': `Dinle`, 'nav.demo': `Demoyu dene`,
-    'hero.h1': `Yıldızlar gibi dağılmış bin fikir.<br/><span class="grad">Nodus takımyıldızları birbirine bağlar.</span>`,
-    'hero.sub': `Zotero kitaplığınızı fikirler, yazarlar, tartışmalar ve araştırma boşluklarından oluşan gezilebilir bir grafa dönüştüren; ardından gerçekten doğrulayabileceğiniz atıflarla yazmanıza yardımcı olan yerel öncelikli bir masaüstü uygulaması.`,
+    'hero.h1': `<span class="hw hw1">Araştır</span> daha derin<br/><span class="hw hw2">Öğret</span> daha akıllı<br/><span class="hw hw3">Çalış</span> daha iyi`,
+    'hero.sub': `Akademik çalışma için yerel bir masaüstü uygulaması. Her kasa bir mod seçer — fikirlerin grafiğine dönüşen bir araştırma kütüphanesi, dersleriniz için bir çalışma alanı, birincil kaynaklardan kurulmuş bir arşiv, kendi yapılandırılmış verileriniz — hepsi makinenizden hiç çıkmayan tek bir motorun üzerinde.`,
     'hero.demo': `Demoyu dene`, 'hero.download': `macOS, Windows ve Linux için indir`,
     'hero.meta': `<b>Tamamen ücretsiz ve açık kaynaklı.</b> Hesap yok, abonelik yok, telemetri yok; derleminiz makinenizden ayrılmaz.`,
     'hero.scroll': `aşağı kaydır`,
-    'story.kicker': `Nasıl çalışır`, 'story.title': `Her şey tek bir ipe bağlıdır: fikir.`,
-    'story.lead': `Dosyalar, PDF'ler ya da klasörler değil. Nodus, kitaplığınızdaki her eseri gerçek iddialarına, bulgularına ve kavramlarına ayırır; ardından bu ipin götürdüğü yere kadar izini sürer.`,
-    'step1.t': `Kitaplığınızı eşitleyin`, 'step1.b': `Nodus'u Zotero koleksiyonlarınıza yönlendirin. Ekli dosyaları doğrudan okur; eklenti, yeniden dizinleme ya da yükleme gerekmez. Yinelenen kayıtlar kayıpsız biçimde tespit edilir ve birleştirilir.`,
-    'step2.t': `Fikirleri çıkarın`, 'step2.b': `Bir yapay zekâ geçişi (kendi anahtarınızla bulutta veya Ollama / LM Studio ile tamamen çevrimdışı) her eserin iddialarını, bulgularını, yöntemlerini ve çerçevelerini çıkarır; her biri için birebir kanıt ve sayfa bilgisi sunar.`,
+    'story.kicker': `Nasıl çalışır`, 'story.title': `Kaynaklarından kullanabileceğin fikirlere.`,
+    'story.lead': `Dosyalar değil, PDF'ler değil, klasörler değil. Nodus verdiğiniz her şeyi — makaleler, kitap bölümleri, kendi ders notlarınız, kaydedilmiş bir ders, bir arşiv belgesi — gerçekte içerdiği iddialara ve kavramlara ayırır, sonra ipin ucunu nereye giderse takip eder. Aşağıdaki akademik kasanın rotasıdır; diğer modlar aynı yolu kendi duraklarıyla yürür.`,
+    'step1.t': `Elinizde ne varsa getirin`, 'step1.b': `Akademik kasayı Zotero koleksiyonlarınıza yöneltin: ekli dosyaları doğrudan okur — eklenti yok, yeniden dizinleme yok, yükleme yok — ve kopyaları kayıpsız birleştirir. Çalışma kasası Zotero'yu tümüyle atlar: PDF, slayt, belge ya da ses bırakın; ya da dersi kendiniz kaydedin.`,
+    'step2.t': `Fikirleri çıkarın`, 'step2.b': `Bir yapay zekâ geçişi (kendi anahtarınızla bulutta ya da Ollama / LM Studio ile tamamen çevrimdışı) her eserin iddialarını, bulgularını, yöntemlerini ve çerçevelerini çıkarır; her biri için birebir kanıt ve sayfa referansıyla. Hiçbir şey, kendisini destekleyen pasaj olmadan grafiğe girmez.`,
     'step3.t': `Bağlantılarını görün`, 'step3.b': `Fikirler yaşayan bir grafta bağlanır: destekler, çelişir, inceltir, genişletir. Kuvvet yönelimli, WebGL ile hızlı ve tema, yazar ya da okuma durumuna göre filtrelenebilir. Derleminiz burada bir yığın olmaktan çıkıp bir argümana benzemeye başlar.`,
     'step4.t': `Derlemi sorgulayın`, 'step4.b': `Nodus, kitaplığınızın söylemediklerini açığa çıkarır: açık çelişkiler zaman çizelgeli karşılıklı tartışmalara, eksik bağlantılar araştırma boşluklarına dönüşür; sorularınız gerçek kapsamla karşılaştırılır.`,
     'step5.t': `Kanıtla yazın`, 'step5.b': `Yazma Atölyesi grafta temellenen bölümler taslaklar ve gerçek bir Zotero kaydına bağlanmayan hiçbir şeyi kaynak göstermez. Deep Research, atıflı ve çok sayfalı tam raporlar oluşturur. Aynı yardımcı Microsoft Word ve LibreOffice Writer içinde canlı çalışır.`,
     'step6.t': `Sonra dinleyin`, 'step6.b': `Herhangi bir raporu sesli anlatıma dönüştürün veya derleminizin bir köşesinde rehberli, sürükleyici bir yolculuğa çıkın. Sesler yerel olarak çalışır (Piper, Kokoro); bulut sesleri için kendi Hume anahtarınızı da kullanabilirsiniz.`,
-    'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük sahne uygulamadaki gerçek bir görünümü yansıtır ve hepsi canlı demoda bütünüyle keşfedilebilir.`,
-    'views.cta': `Demodaki 19 görünümün tamamını keşfedin →`, 'v.open': `Demoda aç →`,
+    'views.kicker': `Görünümler`, 'views.title': `Her bölümün canlanışını görün.`, 'views.lead': `Aşağıdaki her küçük görsel uygulamanın gerçek bir görünümünü yansıtır ve ait olduğu kasa modunda demoda gezilebilir.`,
+    'views.cta': `Dört canlı demoyu açın →`, 'v.open': `Demoda aç →`,
     'v.library.t': `Zotero girer, fikirler çıkar`, 'v.library.b': `Koleksiyonlarınızı eşitleyin, okundu etiketlerini koruyun ve yinelenenleri kayıpsız birleştirin. Her eser analiz durumunu saklar; hiçbir şey iki kez taranmaz.`,
     'v.graph.t': `Bir takımyıldız olarak derlem`, 'v.graph.b': `Temalar, iddialar, bulgular ve yöntemler; destekler, çelişir ve inceltir gibi türlendirilmiş kenarlarla bağlanır. Hazır görünümler sizi doğrudan çelişkilere, boşluklara veya okuma rotanıza götürür.`,
     'v.ideas.t': `Kanıtlı iddialar`, 'v.ideas.b': `Her fikir birebir kanıt ve sayfa bilgisi taşır. Birine tıklayın; ilişkilerini, yazarını ve tam pasajı görün. Kaynaksız iddia yok.`,
@@ -1474,7 +1701,7 @@ const I18N = {
     'listen.c2.t': `Daldırma yolculuğu`, 'listen.c2.b': `“Bir gece göğü olarak kitaplığınız”, örnek derlemin bir takımyıldızı boyunca rehberli bir ses yolculuğu.`,
     'listen.c3.t': `Her ses varsayılan olarak yerel`, 'listen.c3.b': `Piper ve Kokoro makinenizde sentezler; hiçbir şey yüklenmez. Stüdyo kalitesinde bulut sesleri mi istiyorsunuz? Kendi Hume anahtarınızı kullanın.`,
     'band.kicker': `Gerçekten ücretsiz ve yerel`, 'band.title': `Tamamen ücretsiz. Tamamen sizin.`,
-    'band.lead': `Nodus MIT lisanslı açık kaynaklıdır; hesap, abonelik ve telemetri içermez. Diskte tek bir SQLite kasası kullanır. Yapay zekâ kendi anahtarınızla veya Ollama ve LM Studio üzerinden tamamen çevrimdışı çalışabilir. Şifreli otomatik yedeklemeler, kurcalamaya dayanıklı denetim günlüğü ve kendi yapay zekâ araçlarınızın grafı yerel olarak sorgulaması için yerleşik bir MCP sunucusu içerir.`,
+    'band.lead': `Nodus MIT lisanslı açık kaynaklıdır; hesap, abonelik ve telemetri içermez. Her şey cihazınızdaki tek bir dosyada tutulur. Yapay zekâ kendi anahtarınızla veya Ollama ve LM Studio üzerinden tamamen çevrimdışı çalışabilir. Şifreli otomatik yedeklemeler, kurcalamaya dayanıklı denetim günlüğü ve kendi yapay zekâ araçlarınızın grafı yerel olarak sorgulaması için yerleşik bir MCP sunucusu içerir.`,
     'band.pill1': `Sonsuza kadar ücretsiz (MIT)`, 'band.pill2': `%100 yerel depolama`, 'band.pill3': `Çevrimdışı yapay zekâ (Ollama · LM Studio)`, 'band.pill4': `Şifreli otomatik yedekler`, 'band.pill5': `Denetim günlüğü`, 'band.pill6': `Yerleşik MCP sunucusu`,
     'feat.kicker': `Her şey içinde`, 'feat.title': `Tek uygulama. Tüm araştırma döngüsü.`,
     'feat.d1': `Derlem sağlığı ve önerilen bir sonraki adım.`, 'feat.d2': `Fikirler, yazarlar ve pasajlar arasında anlamsal ve tam arama.`, 'feat.d3': `Yinelenenleri birleştirme ve tarama kurtarma özellikli Zotero eşitlemesi.`, 'feat.d4': `Her fikir ve türlendirilmiş ilişki için WebGL kuvvet grafı.`, 'feat.d5': `Tez, destekler, itirazlar ve yanıtlar; tümü sürüklenebilir.`, 'feat.d6': `Birebir sayfa kanıtı taşıyan iddialar ve bulgular.`, 'feat.d7': `Zotero'yu esas alan yazar dosyaları ve sentez matrisi.`, 'feat.d8': `Derleminizden kılavuzlar, bilgi kartları ve Sokratik rotalar.`, 'feat.d9': `Yerel üretilen seslerle anlatılan ses yolculukları.`, 'feat.d10': `Derleminizin henüz söylemedikleri, otomatik olarak çıkarılır.`, 'feat.d11': `Zaman çizelgesiyle karşı karşıya getirilen çelişkiler.`, 'feat.d12': `Araştırma sorularınız gerçek kanıtlarla karşılaştırılır.`, 'feat.d13': `Graftaki gerilimler sınanabilir hipotezlere dönüşür.`, 'feat.d14': `Okunmuş ve okunmamış eserler arasında önerilen sıra.`, 'feat.d15': `Dışa aktarılabilir ve seslendirilebilir çok sayfalı atıflı raporlar.`, 'feat.d16': `Grafta temellenen, atıfları doğrulanmış taslaklar.`, 'feat.d17': `Microsoft Word ve LibreOffice Writer içinde canlı yardımcı (beta).`, 'feat.d18': `Çıktılar, klasörler ve nodus:// derin bağlantıları.`, 'feat.d19': `Grafınızı Claude veya herhangi bir MCP istemcisinden sorgulayın.`, 'feat.d20': `Her atıf bağlantısını koruyan yapay zekâ içerik çevirisi.`,
@@ -1484,21 +1711,21 @@ const I18N = {
   },
   zh: {
     'nav.how': `工作原理`, 'nav.views': `视图`, 'nav.listen': `收听`, 'nav.demo': `试用演示`,
-    'hero.h1': `千头万绪，如繁星散落。<br/><span class="grad">Nodus 将星座相连。</span>`,
-    'hero.sub': `一款本地优先的桌面应用，把你的 Zotero 库变成可浏览的想法、作者、争论与空白的图谱，再帮你写出真正可核实的引用。`,
+    'hero.h1': `<span class="hw hw1">研究</span>更深<br/><span class="hw hw2">教学</span>更巧<br/><span class="hw hw3">学习</span>更好`,
+    'hero.sub': `一款面向学术工作的本地桌面应用。每个保险库都会选择一种模式——一座变成观点图谱的研究书库、一个装下你课程与课堂的工作空间、一份由原始档案筑起的档案库、你自己的结构化数据——它们共用同一个引擎，而这一切从不离开你的电脑。`,
     'hero.demo': `试用演示`, 'hero.download': `下载 macOS、Windows 和 Linux 版`,
     'hero.meta': `<b>完全免费且开源。</b> 无需账户、无需订阅、无遥测，你的语料永远不会离开你的设备。`,
     'hero.scroll': `向下滚动`,
-    'story.kicker': `工作原理`, 'story.title': `一切系于一线：想法。`,
-    'story.lead': `不是文件，不是 PDF，也不是文件夹。Nodus 将你库中的每一部作品分解为其真实的论点、发现与概念，然后顺着这条线一路追踪。`,
-    'step1.t': `同步你的库`, 'step1.b': `让 Nodus 指向你的 Zotero 合集。它直接读取附件文件，无需插件、无需重建索引、无需上传。重复项会被检测并无损合并。`,
-    'step2.t': `提取想法`, 'step2.b': `一次 AI 处理（用你自己的密钥在云端，或用 Ollama / LM Studio 完全离线）提取每部作品的论点、发现、方法与框架，每一条都附有原文证据和页码引用。`,
+    'story.kicker': `工作原理`, 'story.title': `从你的资料到可用的观点。`,
+    'story.lead': `不是文件，不是 PDF，不是文件夹。你给它什么——论文、书章、你自己的笔记、一堂录音的课、一份档案记录——Nodus 都会拆成其中真正包含的论断与概念，然后顺着这条线索一路追下去。下面讲的是学术保险库的路线；其他模式走同一条路，只是停靠站不同。`,
+    'step1.t': `把你已有的东西带进来`, 'step1.b': `把学术保险库指向你的 Zotero 分类：它直接读取附件文件，无需插件、无需重新索引、无需上传，并且无损合并重复条目。学习保险库则完全不需要 Zotero：直接拖入 PDF、幻灯片、文档或音频，或者自己把课录下来。`,
+    'step2.t': `提取想法`, 'step2.b': `一次 AI 处理（用你自己的密钥走云端，或用 Ollama / LM Studio 完全离线）会提取每部作品的论断、发现、方法与框架，每一条都带有原文证据和页码。没有支撑它的原文，任何东西都进不了图谱。`,
     'step3.t': `看它们相连`, 'step3.b': `想法连成一张鲜活的图谱：支持、反驳、细化、扩展。力导向布局、WebGL 高速，并可按主题、作者或阅读状态筛选。在这里，你的语料开始像一场论证，而不是一堆资料。`,
     'step4.t': `质询语料`, 'step4.b': `Nodus 挖掘你的库没有说出的东西：开放的矛盾成为带有时间线的正面交锋；缺失的连接成为研究空白；你的问题会对照真实覆盖度被追踪。`,
     'step5.t': `有据地写作`, 'step5.b': `写作工坊撰写扎根于图谱的章节，并拒绝引用任何无法对应到真实 Zotero 条目的内容。Deep Research 撰写完整的多页引用报告。同一个副驾也在 Microsoft Word 和 LibreOffice Writer 中实时运行。`,
     'step6.t': `然后聆听它`, 'step6.b': `把任何报告变成朗读音频，或在你语料的一角来一次沉浸式的引导漫步。语音在本地运行（Piper、Kokoro），或用 Hume 密钥使用云端语音。`,
-    'views.kicker': `各个视图`, 'views.title': `看每个板块活起来。`, 'views.lead': `下面每一幅小画面都映照着应用中真实的视图，每一个都能在演示中完整探索。`,
-    'views.cta': `在演示中探索全部 19 个视图 →`, 'v.open': `在演示中打开 →`,
+    'views.kicker': `各个视图`, 'views.title': `看每个板块活起来。`, 'views.lead': `下面每个小图都对应应用里真实的一个视图，并且都能在演示中、在它所属的保险库模式里探索。`,
+    'views.cta': `打开四个在线演示 →`, 'v.open': `在演示中打开 →`,
     'v.library.t': `输入 Zotero，输出想法`, 'v.library.b': `同步你的合集，保留“已读”标签，无损合并重复项。每部作品都记录其分析状态，绝不重复扫描。`,
     'v.graph.t': `语料如星座`, 'v.graph.b': `主题、论点、发现与方法之间是有类型的连线，如支持、反驳与细化。预设可直接跳转到矛盾、空白或你的阅读路线。`,
     'v.ideas.t': `有凭据的论点`, 'v.ideas.b': `每个想法都带有原文证据和页码引用。点开一个，你就能看到它的关系、作者以及确切的段落。绝无无源之言。`,
@@ -1513,7 +1740,7 @@ const I18N = {
     'listen.c2.t': `沉浸式漫步`, 'listen.c2.b': `《你的书库如夜空》，一段穿越示例语料某个星座的引导式音频漫步。`,
     'listen.c3.t': `每一种声音，默认本地`, 'listen.c3.b': `Piper 和 Kokoro 在你的设备上合成，什么都不会上传。想要录音室级的云端语音？用你自己的 Hume 密钥。`,
     'band.kicker': `免费、本地优先，货真价实`, 'band.title': `完全免费。完全属于你。`,
-    'band.lead': `Nodus 采用 MIT 许可开源，无需账户、无需订阅、无遥测。磁盘上只有一个 SQLite 保险库。AI 使用你自己的密钥，或用 Ollama 和 LM Studio 完全离线。加密的自动备份、防篡改的审计日志，以及一个 MCP 服务器，让你自己的 AI 工具在本地查询图谱。`,
+    'band.lead': `Nodus 采用 MIT 许可开源，无需账户、无需订阅、无遥测。所有内容都保存在你设备上的一个文件里。AI 使用你自己的密钥，或用 Ollama 和 LM Studio 完全离线。加密的自动备份、防篡改的审计日志，以及一个 MCP 服务器，让你自己的 AI 工具在本地查询图谱。`,
     'band.pill1': `永久免费（MIT）`, 'band.pill2': `100% 本地存储`, 'band.pill3': `离线 AI（Ollama · LM Studio）`, 'band.pill4': `加密自动备份`, 'band.pill5': `审计日志`, 'band.pill6': `内置 MCP 服务器`,
     'feat.kicker': `一应俱全`, 'feat.title': `一个应用，覆盖整个研究循环。`,
     'feat.d1': `语料健康状况与下一步推荐操作。`, 'feat.d2': `对想法、作者、段落的语义与精确搜索。`, 'feat.d3': `Zotero 同步，含重复项合并与扫描恢复。`, 'feat.d4': `每个想法与有类型关系的 WebGL 力导向图谱。`, 'feat.d5': `论点、支持、反对与反驳，全部可拖动。`, 'feat.d6': `带原文证据与页码的论点与发现。`, 'feat.d7': `作者档案与综合矩阵，以 Zotero 为准。`, 'feat.d8': `源自你语料的指南、闪卡与苏格拉底式路线。`, 'feat.d9': `用本地生成语音朗读的音频漫步。`, 'feat.d10': `你的语料尚未言及之处，自动挖掘。`, 'feat.d11': `矛盾正面对峙，附带时间线。`, 'feat.d12': `你的研究问题对照真实证据进行追踪。`, 'feat.d13': `图谱中的张力化为可检验的假设。`, 'feat.d14': `在已读与未读作品之间给出建议顺序。`, 'feat.d15': `多页带引用的报告，可导出、可朗读。`, 'feat.d16': `扎根于图谱、经引用核实的草稿。`, 'feat.d17': `在 Microsoft Word 和 LibreOffice Writer 中实时运行的副驾（测试版）。`, 'feat.d18': `成果、文件夹与 nodus:// 深链接。`, 'feat.d19': `从 Claude 或任意 MCP 客户端查询你的图谱。`, 'feat.d20': `保留每个引用链接的 AI 内容翻译。`,
@@ -1527,99 +1754,405 @@ const I18N = {
 // default/fallback, so it needs no entry here; these are merged into the dicts above.
 const I18N_V2 = {
   es: {
-    'nav.modes': `Modos`, 'nav.contrib': `Contribuir`,
-    'modes.kicker': `Modos de bóveda · nuevo en 2.0`, 'modes.title': `Un solo motor. Un modo para cada tipo de corpus.`,
-    'modes.lead': `Cada bóveda tiene un modo que adapta su barra lateral y la personalidad del asistente de IA — el mismo motor de grafo por debajo. Tres ya están disponibles; llegan dos más. Prueba cada modo disponible en la demo.`,
-    'modes.available': `Disponible`, 'modes.soon': `Próximamente`,
-    'modes.academic.t': `Académico`, 'modes.academic.b': `Convierte una biblioteca de Zotero en un grafo de ideas, autores, debates y huecos — y luego escribe con citas que puedes verificar de verdad.`, 'modes.academic.cta': `Abrir la demo académica →`,
-    'modes.genealogy.t': `Genealogía`, 'modes.genealogy.b': `Reconstruye una familia a partir de fuentes primarias: personas, árbol genealógico, cronología, archivo de evidencia, un mapa real — y un genealogista de IA que propone parentescos a partir de la evidencia.`, 'modes.genealogy.cta': `Abrir la demo de genealogía →`,
-    'modes.primary.t': `Fuentes primarias`, 'modes.primary.b': `Documentos de archivo junto a la literatura secundaria, con una extracción crítica de fuentes fiel al documento.`,
-    'modes.databases.t': `Bases de datos`, 'modes.databases.b': `Datos estructurados como tablas tipadas — selección simple/múltiple, números, fechas, relaciones y una columna de resumen con IA — con una sección de Análisis calculada y un chat sobre tus filas.`, 'modes.databases.cta': `Abrir la demo de bases de datos →`,
-    'modes.study.t': `Estudio`, 'modes.study.b': `El espacio del que aprende: el grafo, tarjetas, rutas guiadas y autoevaluación, pensado para comprender más que para investigar.`,
+    'nav.vaults': `Vaults`, 'nav.contrib': `Contribuir`,
+    'vaults.kicker': `Los vaults`, 'vaults.title': `El mismo motor, adaptado a tu trabajo.`,
+    'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento local y los ajustes por debajo son los mismos en todos los modos. Hoy hay cuatro modos utilizables, y cada uno tiene una demo que puedes abrir ahora mismo.`,
+    'vaults.academic.t': `Académico`,
+    'vaults.academic.b': `Para investigar. Apúntalo a una colección de Zotero y descompone cada obra en sus afirmaciones, hallazgos y métodos reales — cada uno con el pasaje literal y la página de la que sale.`,
+    'vaults.academic.f1': `<b>Un grafo de ideas</b>, no de archivos: apoya, contradice, matiza, amplía.`,
+    'vaults.academic.f2': `<b>Debates, huecos y cobertura</b> extraídos de lo que tu biblioteca <i>no</i> resuelve.`,
+    'vaults.academic.f3': `<b>Deep Research</b>: informes de varias páginas donde cada cita corresponde a un elemento real.`,
+    'vaults.academic.f4': `<b>Un copiloto de escritura</b> que funciona también dentro de Word y LibreOffice Writer.`,
+    'vaults.academic.cta': `Abrir la demo académica →`,
+    'vaults.study.t': `Estudio`,
+    'vaults.study.b': `Para aprender — tú o tu alumnado. Cursos, asignaturas, temas y apuntes, con tus propios materiales debajo. Sin necesidad de Zotero y sin subir nada.`,
+    'vaults.study.f1': `<b>Graba una clase</b> y transcríbela con Whisper local — pulsa cualquier línea y saltas a ese segundo.`,
+    'vaults.study.f2': `<b>Pregunta a tus materiales</b>: cada respuesta cita el apunte, la página o el minuto del que sale.`,
+    'vaults.study.f3': `<b>Un mapa de ideas por asignatura</b>, para que dos materias nunca se mezclen.`,
+    'vaults.study.f4': `<b>Preguntas, tarjetas y repaso espaciado</b> a partir de tu contenido — tú apruebas cada una.`,
+    'vaults.study.cta': `Abrir la demo de estudio →`,
+    'vaults.genealogy.t': `Genealogía`,
+    'vaults.genealogy.b': `Para reconstruir personas a partir de fuentes primarias — historia familiar, aunque el método sirve para cualquier investigación con registros: la identidad y el parentesco como hipótesis que los documentos deben probar.`,
+    'vaults.genealogy.f1': `<b>Personas, árbol, cronología y mapa</b>, con GEDCOM de entrada y de salida.`,
+    'vaults.genealogy.f2': `<b>Un archivo de evidencia</b>: censos, padrones, cartas y fotos enlazados a quienes aparecen en ellos.`,
+    'vaults.genealogy.f3': `<b>Un genealogista de IA</b> que propone parentescos desde los registros y nunca añade un vínculo que no hayas confirmado.`,
+    'vaults.genealogy.f4': `<b>Los conflictos se ven</b> — las grafías de época y las fechas inciertas se conservan tal cual.`,
+    'vaults.genealogy.cta': `Abrir la demo de genealogía →`,
+    'vaults.databases.t': `Bases de datos`,
+    'vaults.databases.b': `Para tus propios datos: trabajo de campo, corpus, catálogos, hojas de codificación. Tablas tipadas que sí puedes analizar, sin que una hoja de cálculo convierta tus categorías en texto.`,
+    'vaults.databases.f1': `<b>Tipos de columna de verdad</b>: selección, número, fecha, relación, rollup, fórmula, adjunto.`,
+    'vaults.databases.f2': `<b>La IA propone, la app calcula</b>: correlaciones, chi², ANOVA y regresiones se ejecutan en código, no en un prompt.`,
+    'vaults.databases.f3': `<b>Gráficos dibujados desde tus filas</b> — mapas de calor, dispersión, cajas y bigotes.`,
+    'vaults.databases.f4': `<b>Un chat de datos</b> que responde sobre la tabla real y se niega a inventar un valor.`,
+    'vaults.databases.cta': `Abrir la demo de bases de datos →`,
+    'road.t': `Modos en camino`,
+    'road.b': `Nodus publica su hoja de ruta a la vista. Estos modos aparecen en el selector de vaults pero todavía no son trabajo terminado — preferimos enseñarte el plan a fingir que no existe.`,
+    'road.preview': `Vista previa`, 'road.soon': `Previsto`,
+    'road.teaching.t': `Docencia`, 'road.teaching.b': `Hoy se puede crear, pero está vacío — las secciones de docencia aún se están construyendo.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `El mismo esqueleto, para ficción y mundos construidos en lugar de investigación.`,
+    'road.primary.t': `Fuentes primarias`, 'road.primary.b': `Documentos de archivo junto a la literatura secundaria, con extracción crítica de fuentes.`,
+    'road.testimony.t': `Testimonios`, 'road.testimony.b': `Entrevistas e historia oral: quién habla, transcripciones y qué dijo cada persona exactamente.`,
+    'who.research.t': `Si investigas`,
+    'who.research.b': `Tu lectura se convierte en un corpus que puedes interrogar: qué se discute, qué falta, quién sostiene qué — y borradores cuyas citas corresponden a elementos reales. <b>Académico</b>, <b>Genealogía</b>, <b>Bases de datos</b>.`,
+    'who.teach.t': `Si enseñas`,
+    'who.teach.b': `Prepara el material una vez y saca de él bancos de preguntas, tarjetas e informes — cada uno con el fragmento que lo justifica, para que lo revises antes de que lo vea tu alumnado. <b>Estudio</b> hoy; el modo Docencia está en construcción.`,
+    'who.study.t': `Si estudias`,
+    'who.study.b': `Sube tus propios PDF, diapositivas y apuntes y mantenlos en orden por curso y asignatura. Luego conviértelos en tests y exámenes, repasa con tarjetas y pregúntale a la IA lo que responde solo desde tu material. <b>Estudio</b>.`,
+    'v.study.t': `La clase, de vuelta al segundo exacto`,
+    'v.study.b': `Graba la clase, transcríbela con Whisper local y cada línea sigue siendo pulsable: la respuesta del chat cita el minuto del que sale, y los conceptos se convierten en un mapa de ideas solo de esa asignatura.`,
+    'v.genealogy.t': `Una familia, reconstruida desde los registros`,
+    'v.genealogy.b': `Personas, fechas y lugares salen de censos, padrones y cartas. El asistente propone cómo se conectan y espera a que lo confirmes antes de que nadie entre en el árbol.`,
+    'v.databases.t': `Tú traes los datos, él hace los números`,
+    'v.databases.b': `Convierte tus propios registros en tablas tipadas y pide un análisis. El asistente elige el método y la app lo calcula de verdad, así que una correlación o una regresión es un cálculo, nunca una suposición.`,
+    'v.studyTest.t': `Convierte tus apuntes en un test`,
+    'v.studyTest.b': `Apunta Nodus a un tema y redacta preguntas, tests y exámenes a partir de tu propio material. Practícalos, corrígete y quédate solo con los que apruebes.`,
+    'v.studyChat.t': `Pregúntale a tus apuntes`,
+    'v.studyChat.b': `El chat de estudio responde desde tus apuntes, diapositivas y materiales, y cada respuesta remite a la página de la que sale. Sin adivinar, y sin nada que no pueda enseñarte en tu propio material.`,
+    'v.pros.t': `No solo el parentesco, también quién trató a quién`,
+    'v.pros.b': `Más allá del árbol, Nodus traza la red social de cada persona. Padrinos, testigos, vecinos y socios se vuelven una prosopografía que puedes leer en toda una comunidad.`,
+    'v.dataChat.t': `Pregunta a tu tabla, obtén un gráfico`,
+    'v.dataChat.b': `Pregunta con palabras normales y obtén una respuesta directa sobre tus filas reales, dibujada como gráfico cuando ayuda. Nunca inventa un valor que no esté en tus datos.`,
+    'v.teachGrades.t': `Clases y notas, en privado`,
+    'v.teachGrades.b': `Gestiona tus clases y tus notas en un solo sitio. Cuando la IA ayuda, solo ve códigos anónimos de alumnado, nunca un nombre.`,
+    'v.teachGuides.t': `Guías y exámenes, anclados en tu material`,
+    'v.teachGuides.b': `Redacta guías docentes, programaciones didácticas y situaciones de aprendizaje, además de tests y exámenes, todo a partir de tu propio material. La IA se queda dentro de lo que le diste y no inventa nada.`,
+    'road.t': `Lo que viene`,
+    'road.b': `El selector de vaults ya muestra lo que está en camino. El siguiente que estamos construyendo convierte Nodus en un espacio completo para el profesorado.`,
+    'road.teaching.sub': `Un espacio pensado para la semana real de un docente.`,
+    'road.teaching.b1': `<b>Clases y notas en un solo sitio</b>, donde la IA solo ve códigos anónimos de alumnado, nunca un nombre.`,
+    'road.teaching.b2': `<b>Apuntes, tests y exámenes a partir de tu material</b>, con la IA ceñida a lo que le diste y sin inventar nada.`,
+    'road.teaching.b3': `<b>Guías docentes, programaciones y situaciones de aprendizaje</b>, redactadas en el formato que pide tu institución.`,
+    'road.also': `También en la hoja de ruta`,
     'contrib.kicker': `Código abierto, juntos`, 'contrib.title': `Cada nodo cuenta.`,
     'contrib.lead': `Nodus crece de contribución en contribución — como granos de arena, cada uno suma al conjunto. Lo empezó una sola persona; cualquiera puede añadir el siguiente grano.`,
     'contrib.prs': `Ver los pull requests`, 'contrib.repo': `Explorar el código`, 'contrib.builders': `Las personas que construyen Nodus`, 'contrib.loading': `Cargando colaboradores…`, 'contrib.cap': `Cada grano, una contribución.`, 'contrib.commits': `aportes`,
   },
   fr: {
-    'nav.modes': `Modes`, 'nav.contrib': `Contribuer`,
-    'modes.kicker': `Modes de coffre · nouveau en 2.0`, 'modes.title': `Un seul moteur. Un mode pour chaque type de corpus.`,
-    'modes.lead': `Chaque coffre a un mode qui adapte sa barre latérale et la personnalité de l'assistant IA — le même moteur de graphe en dessous. Trois sont disponibles ; deux autres arrivent. Essayez chaque mode disponible dans la démo.`,
-    'modes.available': `Disponible`, 'modes.soon': `Bientôt`,
-    'modes.academic.t': `Académique`, 'modes.academic.b': `Transformez une bibliothèque Zotero en un graphe d'idées, d'auteurs, de débats et de lacunes — puis écrivez avec des citations réellement vérifiables.`, 'modes.academic.cta': `Ouvrir la démo académique →`,
-    'modes.genealogy.t': `Généalogie`, 'modes.genealogy.b': `Reconstruisez une famille à partir de sources primaires : personnes, arbre généalogique, chronologie, archive de preuves, une vraie carte — et un généalogiste IA qui propose des liens de parenté à partir des preuves.`, 'modes.genealogy.cta': `Ouvrir la démo de généalogie →`,
-    'modes.primary.t': `Sources primaires`, 'modes.primary.b': `Des documents d'archives aux côtés de la littérature secondaire, avec une extraction critique des sources fidèle au document.`,
-    'modes.databases.t': `Bases de données`, 'modes.databases.b': `Des jeux de données structurés comme citoyens de plein droit du graphe, interrogeables avec votre littérature.`,
-    'modes.study.t': `Étude`, 'modes.study.b': `L'espace de l'apprenant : le graphe, des cartes mémoire, des parcours guidés et l'auto-évaluation, pensés pour comprendre plutôt que pour la recherche originale.`,
+    'nav.vaults': `Coffres`, 'nav.contrib': `Contribuer`,
+    'vaults.kicker': `Les coffres`, 'vaults.title': `Le même moteur, adapté à votre travail.`,
+    'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage local et les réglages en dessous restent les mêmes dans chaque mode. Quatre modes sont utilisables aujourd'hui, et chacun a une démo que vous pouvez ouvrir tout de suite.`,
+    'vaults.academic.t': `Académique`,
+    'vaults.academic.b': `Pour la recherche. Pointez-le vers une collection Zotero et il décompose chaque ouvrage en ses affirmations, résultats et méthodes réels — chacun avec le passage textuel et la page dont il provient.`,
+    'vaults.academic.f1': `<b>Un graphe d'idées</b>, pas de fichiers : soutient, contredit, affine, étend.`,
+    'vaults.academic.f2': `<b>Débats, lacunes et couverture</b> extraits de ce que votre bibliothèque ne tranche <i>pas</i>.`,
+    'vaults.academic.f3': `<b>Deep Research</b> : des rapports de plusieurs pages où chaque citation renvoie à un élément réel.`,
+    'vaults.academic.f4': `<b>Un copilote d'écriture</b> qui fonctionne aussi dans Word et LibreOffice Writer.`,
+    'vaults.academic.cta': `Ouvrir la démo académique →`,
+    'vaults.study.t': `Étude`,
+    'vaults.study.b': `Pour apprendre — vous ou vos étudiants. Cours, matières, thèmes et notes, avec vos propres documents en dessous. Sans Zotero, et sans rien téléverser.`,
+    'vaults.study.f1': `<b>Enregistrez un cours</b> et transcrivez-le avec Whisper en local — cliquez sur une ligne et vous sautez à cette seconde.`,
+    'vaults.study.f2': `<b>Interrogez vos documents</b> : chaque réponse cite la note, la page ou l'horodatage dont elle vient.`,
+    'vaults.study.f3': `<b>Une carte d'idées par matière</b>, pour que deux cours ne se mélangent jamais.`,
+    'vaults.study.f4': `<b>Questions, cartes mémoire et révision espacée</b> issues de votre contenu — vous validez chacune.`,
+    'vaults.study.cta': `Ouvrir la démo d'étude →`,
+    'vaults.genealogy.t': `Généalogie`,
+    'vaults.genealogy.b': `Pour reconstituer des personnes à partir de sources primaires — l'histoire familiale, mais la méthode vaut pour toute recherche sur registres : l'identité et la parenté comme hypothèses que les documents doivent prouver.`,
+    'vaults.genealogy.f1': `<b>Personnes, arbre, chronologie et carte</b>, avec import et export GEDCOM.`,
+    'vaults.genealogy.f2': `<b>Une archive de preuves</b> : recensements, registres, lettres et photos liés aux personnes qui y figurent.`,
+    'vaults.genealogy.f3': `<b>Un généalogiste IA</b> qui propose des parentés à partir des actes et n'ajoute jamais un lien que vous n'avez pas confirmé.`,
+    'vaults.genealogy.f4': `<b>Les conflits restent visibles</b> — les graphies d'époque et les dates incertaines sont conservées telles quelles.`,
+    'vaults.genealogy.cta': `Ouvrir la démo de généalogie →`,
+    'vaults.databases.t': `Bases de données`,
+    'vaults.databases.b': `Pour vos propres données : terrain, corpus, catalogues, grilles de codage. Des tables typées que vous pouvez vraiment analyser, sans qu'un tableur transforme vos catégories en texte.`,
+    'vaults.databases.f1': `<b>De vrais types de colonnes</b> : sélection, nombre, date, relation, rollup, formule, pièce jointe.`,
+    'vaults.databases.f2': `<b>L'IA propose, l'app calcule</b> : corrélations, chi², ANOVA et régressions s'exécutent en code, pas dans un prompt.`,
+    'vaults.databases.f3': `<b>Des graphiques tirés de vos lignes</b> — cartes de chaleur, nuages de points, boîtes à moustaches.`,
+    'vaults.databases.f4': `<b>Un chat de données</b> qui répond sur la table réelle et refuse d'inventer une valeur.`,
+    'vaults.databases.cta': `Ouvrir la démo de bases de données →`,
+    'road.t': `Des modes à venir`,
+    'road.b': `Nodus publie sa feuille de route à découvert. Ces modes apparaissent dans le sélecteur de coffres mais ne sont pas encore terminés — nous préférons vous montrer le plan que faire comme s'il n'existait pas.`,
+    'road.preview': `Aperçu`, 'road.soon': `Prévu`,
+    'road.teaching.t': `Enseignement`, 'road.teaching.b': `Sélectionnable aujourd'hui mais vide — les surfaces d'enseignement sont encore en construction.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `La même coquille, pour la fiction et les mondes construits plutôt que la recherche.`,
+    'road.primary.t': `Sources primaires`, 'road.primary.b': `Des archives à côté de la littérature secondaire, avec une extraction critique des sources.`,
+    'road.testimony.t': `Témoignages`, 'road.testimony.b': `Entretiens et histoire orale : qui parle, transcriptions et ce que chacun a réellement dit.`,
+    'who.research.t': `Si vous cherchez`,
+    'who.research.b': `Vos lectures deviennent un corpus que vous pouvez interroger : ce qui est contesté, ce qui manque, qui soutient quoi — et des brouillons dont les citations renvoient à des éléments réels. <b>Académique</b>, <b>Généalogie</b>, <b>Bases de données</b>.`,
+    'who.teach.t': `Si vous enseignez`,
+    'who.teach.b': `Préparez le matériel une fois, puis tirez-en banques de questions, cartes mémoire et synthèses — chacune portant l'extrait qui la justifie, pour vérifier avant que vos étudiants ne la voient. <b>Étude</b> aujourd'hui ; un mode Enseignement est en construction.`,
+    'who.study.t': `Si vous étudiez`,
+    'who.study.b': `Vos cours, diapositives et notes au même endroit : enregistrés et transcrits, cherchables à la seconde, cartographiés en concepts et révisables en répétition espacée. <b>Étude</b>.`,
+    'v.study.t': `Le cours, à la seconde près`,
+    'v.study.b': `Enregistrez le cours, transcrivez-le avec Whisper en local, et chaque ligne reste cliquable : la réponse du chat cite l'horodatage dont elle vient, et les concepts deviennent une carte d'idées propre à cette matière.`,
+    'v.genealogy.t': `Une famille, reconstituée à partir des actes`,
+    'v.genealogy.b': `Les personnes, les dates et les lieux sortent des recensements, des registres et des lettres. L'assistant propose leurs liens et attend votre confirmation avant que quiconque entre dans l'arbre.`,
+    'v.databases.t': `Vous apportez les données, il fait les calculs`,
+    'v.databases.b': `Transformez vos propres relevés en tables typées, puis demandez une analyse. L'assistant choisit la méthode et l'app la calcule pour de vrai, donc une corrélation ou une régression est un calcul, jamais une supposition.`,
     'contrib.kicker': `Open source, ensemble`, 'contrib.title': `Chaque nœud compte.`,
     'contrib.lead': `Nodus grandit une contribution à la fois — comme des grains de sable, chacun s'ajoute à l'ensemble. Une seule personne l'a lancé ; chacun peut ajouter le grain suivant.`,
     'contrib.prs': `Voir les pull requests`, 'contrib.repo': `Parcourir le code`, 'contrib.builders': `Les personnes qui construisent Nodus`, 'contrib.loading': `Chargement des contributeurs…`, 'contrib.cap': `Chaque grain, une contribution.`, 'contrib.commits': `contributions`,
   },
   it: {
-    'nav.modes': `Modalità`, 'nav.contrib': `Contribuisci`,
-    'modes.kicker': `Modalità del vault · novità nella 2.0`, 'modes.title': `Un solo motore. Una modalità per ogni tipo di corpus.`,
-    'modes.lead': `Ogni vault ha una modalità che adatta la barra laterale e la personalità dell'assistente IA — con lo stesso motore a grafo sotto. Tre sono già disponibili; altre due in arrivo. Prova ogni modalità disponibile nella demo.`,
-    'modes.available': `Disponibile`, 'modes.soon': `In arrivo`,
-    'modes.academic.t': `Accademico`, 'modes.academic.b': `Trasforma una libreria Zotero in un grafo di idee, autori, dibattiti e lacune — poi scrivi con citazioni davvero verificabili.`, 'modes.academic.cta': `Apri la demo accademica →`,
-    'modes.genealogy.t': `Genealogia`, 'modes.genealogy.b': `Ricostruisci una famiglia dalle fonti primarie: persone, albero genealogico, cronologia, archivio di prove, una mappa reale — e un genealogista IA che propone parentele a partire dalle prove.`, 'modes.genealogy.cta': `Apri la demo di genealogia →`,
-    'modes.primary.t': `Fonti primarie`, 'modes.primary.b': `Documenti d'archivio accanto alla letteratura secondaria, con un'estrazione critica delle fonti fedele al documento.`,
-    'modes.databases.t': `Database`, 'modes.databases.b': `Dataset strutturati come cittadini di prima classe del grafo, interrogabili insieme alla tua letteratura.`,
-    'modes.study.t': `Studio`, 'modes.study.b': `Lo spazio di chi impara: il grafo, flashcard, percorsi guidati e autovalutazione, pensati per capire più che per la ricerca originale.`,
+    'nav.vaults': `Vault`, 'nav.contrib': `Contribuisci`,
+    'vaults.kicker': `I vault`, 'vaults.title': `Lo stesso motore, adattato al tuo lavoro.`,
+    'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione locale e le impostazioni sotto restano gli stessi in ogni modalità. Oggi quattro modalità sono utilizzabili, e ognuna ha una demo che puoi aprire subito.`,
+    'vaults.academic.t': `Accademico`,
+    'vaults.academic.b': `Per la ricerca. Puntalo a una raccolta Zotero e scompone ogni opera nelle sue affermazioni, scoperte e metodi reali — ciascuno con il passaggio testuale e la pagina da cui proviene.`,
+    'vaults.academic.f1': `<b>Un grafo di idee</b>, non di file: sostiene, contraddice, affina, estende.`,
+    'vaults.academic.f2': `<b>Dibattiti, lacune e copertura</b> estratti da ciò che la tua libreria <i>non</i> risolve.`,
+    'vaults.academic.f3': `<b>Deep Research</b>: report di più pagine dove ogni citazione corrisponde a un elemento reale.`,
+    'vaults.academic.f4': `<b>Un copilota di scrittura</b> che funziona anche dentro Word e LibreOffice Writer.`,
+    'vaults.academic.cta': `Apri la demo accademica →`,
+    'vaults.study.t': `Studio`,
+    'vaults.study.b': `Per imparare — tu o i tuoi studenti. Corsi, materie, argomenti e appunti, con i tuoi materiali sotto. Senza Zotero e senza caricare nulla.`,
+    'vaults.study.f1': `<b>Registra una lezione</b> e trascrivila con Whisper locale — clicca una riga e salti a quel secondo.`,
+    'vaults.study.f2': `<b>Interroga i tuoi materiali</b>: ogni risposta cita l'appunto, la pagina o il minuto da cui viene.`,
+    'vaults.study.f3': `<b>Una mappa di idee per materia</b>, così due corsi non si mescolano mai.`,
+    'vaults.study.f4': `<b>Domande, flashcard e ripasso spaziato</b> dai tuoi contenuti — approvi tu ognuno.`,
+    'vaults.study.cta': `Apri la demo di studio →`,
+    'vaults.genealogy.t': `Genealogia`,
+    'vaults.genealogy.b': `Per ricostruire persone dalle fonti primarie — storia familiare, ma il metodo vale per qualsiasi ricerca su registri: identità e parentela come ipotesi che i documenti devono provare.`,
+    'vaults.genealogy.f1': `<b>Persone, albero, cronologia e mappa</b>, con GEDCOM in entrata e in uscita.`,
+    'vaults.genealogy.f2': `<b>Un archivio di prove</b>: censimenti, registri, lettere e foto collegati alle persone che vi compaiono.`,
+    'vaults.genealogy.f3': `<b>Un genealogista IA</b> che propone parentele dai documenti e non aggiunge mai un legame che non hai confermato.`,
+    'vaults.genealogy.f4': `<b>I conflitti restano visibili</b> — grafie d'epoca e date incerte si conservano così come sono.`,
+    'vaults.genealogy.cta': `Apri la demo di genealogia →`,
+    'vaults.databases.t': `Database`,
+    'vaults.databases.b': `Per i tuoi dati: lavoro sul campo, corpora, cataloghi, schede di codifica. Tabelle tipizzate che puoi davvero analizzare, senza che un foglio di calcolo trasformi le tue categorie in testo.`,
+    'vaults.databases.f1': `<b>Veri tipi di colonna</b>: selezione, numero, data, relazione, rollup, formula, allegato.`,
+    'vaults.databases.f2': `<b>L'IA propone, l'app calcola</b>: correlazioni, chi², ANOVA e regressioni girano in codice, non in un prompt.`,
+    'vaults.databases.f3': `<b>Grafici disegnati dalle tue righe</b> — mappe di calore, dispersione, box plot.`,
+    'vaults.databases.f4': `<b>Una chat sui dati</b> che risponde sulla tabella reale e si rifiuta di inventare un valore.`,
+    'vaults.databases.cta': `Apri la demo di database →`,
+    'road.t': `Modalità in arrivo`,
+    'road.b': `Nodus pubblica la sua roadmap allo scoperto. Queste modalità compaiono nel selettore dei vault ma non sono ancora lavoro finito — preferiamo mostrarti il piano che fingere che non esista.`,
+    'road.preview': `Anteprima`, 'road.soon': `Previsto`,
+    'road.teaching.t': `Didattica`, 'road.teaching.b': `Oggi si può creare, ma è vuoto — le sezioni per la didattica sono ancora in costruzione.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Lo stesso guscio, per la narrativa e i mondi costruiti anziché per la ricerca.`,
+    'road.primary.t': `Fonti primarie`, 'road.primary.b': `Documenti d'archivio accanto alla letteratura secondaria, con estrazione critica delle fonti.`,
+    'road.testimony.t': `Testimonianze`, 'road.testimony.b': `Interviste e storia orale: chi parla, trascrizioni e cosa ha detto davvero ciascuno.`,
+    'who.research.t': `Se fai ricerca`,
+    'who.research.b': `Le tue letture diventano un corpus che puoi interrogare: cosa è controverso, cosa manca, chi sostiene cosa — e bozze le cui citazioni corrispondono a elementi reali. <b>Accademico</b>, <b>Genealogia</b>, <b>Database</b>.`,
+    'who.teach.t': `Se insegni`,
+    'who.teach.b': `Prepara il materiale una volta e ricavane banche di domande, flashcard e sintesi — ognuna con l'estratto che la giustifica, così controlli prima che lo vedano i tuoi studenti. <b>Studio</b> oggi; una modalità Didattica è in costruzione.`,
+    'who.study.t': `Se studi`,
+    'who.study.b': `Lezioni, slide e appunti in un unico posto: registrati e trascritti, cercabili al secondo, mappati come concetti e ripassabili con ripetizione spaziata. <b>Studio</b>.`,
+    'v.study.t': `La lezione, al secondo esatto`,
+    'v.study.b': `Registra la lezione, trascrivila con Whisper locale e ogni riga resta cliccabile: la risposta della chat cita il minuto da cui viene, e i concetti diventano una mappa di idee solo di quella materia.`,
+    'v.genealogy.t': `Una famiglia, ricostruita dai documenti`,
+    'v.genealogy.b': `Persone, date e luoghi escono da censimenti, registri e lettere. L'assistente propone come si collegano e aspetta la tua conferma prima che qualcuno entri nell'albero.`,
+    'v.databases.t': `Porti i dati, ci pensa lui ai numeri`,
+    'v.databases.b': `Trasforma i tuoi dati in tabelle tipizzate, poi chiedi un'analisi. L'assistente sceglie il metodo e l'app lo calcola davvero, così una correlazione o una regressione è un calcolo, mai una supposizione.`,
     'contrib.kicker': `Open source, insieme`, 'contrib.title': `Ogni nodo conta.`,
     'contrib.lead': `Nodus cresce una contribuzione alla volta — come granelli di sabbia, ognuno si aggiunge all'insieme. L'ha iniziato una sola persona; chiunque può aggiungere il prossimo granello.`,
     'contrib.prs': `Guarda le pull request`, 'contrib.repo': `Sfoglia il codice`, 'contrib.builders': `Le persone che costruiscono Nodus`, 'contrib.loading': `Caricamento contributori…`, 'contrib.cap': `Ogni granello, una contribuzione.`, 'contrib.commits': `contributi`,
   },
   de: {
-    'nav.modes': `Modi`, 'nav.contrib': `Mitmachen`,
-    'modes.kicker': `Tresor-Modi · neu in 2.0`, 'modes.title': `Eine Engine. Ein Modus für jede Art von Korpus.`,
-    'modes.lead': `Jeder Tresor hat einen Modus, der die Seitenleiste und die Persönlichkeit des KI-Assistenten anpasst — mit derselben Graph-Engine darunter. Drei sind verfügbar; zwei weitere sind unterwegs. Probiere jeden verfügbaren Modus direkt in der Demo.`,
-    'modes.available': `Verfügbar`, 'modes.soon': `Demnächst`,
-    'modes.academic.t': `Akademisch`, 'modes.academic.b': `Verwandle eine Zotero-Bibliothek in einen Graphen aus Ideen, Autoren, Debatten und Lücken — und schreibe dann mit wirklich überprüfbaren Zitaten.`, 'modes.academic.cta': `Akademische Demo öffnen →`,
-    'modes.genealogy.t': `Genealogie`, 'modes.genealogy.b': `Rekonstruiere eine Familie aus Primärquellen: Personen, Stammbaum, Zeitleiste, Belegarchiv, eine echte Karte — und ein KI-Genealoge, der Verwandtschaft aus den Belegen vorschlägt.`, 'modes.genealogy.cta': `Genealogie-Demo öffnen →`,
-    'modes.primary.t': `Primärquellen`, 'modes.primary.b': `Archivalien neben der Sekundärliteratur, mit quellenkritischer Extraktion, die dem Dokument treu bleibt.`,
-    'modes.databases.t': `Datenbanken`, 'modes.databases.b': `Strukturierte Datensätze als vollwertige Bürger des Graphen, abfragbar neben deiner Literatur.`,
-    'modes.study.t': `Lernen`, 'modes.study.b': `Der Arbeitsplatz für Lernende: der Graph, Karteikarten, geführte Routen und Selbsttests — auf Verstehen statt eigene Forschung ausgelegt.`,
+    'nav.vaults': `Tresore`, 'nav.contrib': `Mitmachen`,
+    'vaults.kicker': `Die Tresore`, 'vaults.title': `Dieselbe Engine, auf deine Arbeit zugeschnitten.`,
+    'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, lokaler Speicher und Einstellungen darunter bleiben in jedem Modus gleich. Vier Modi sind heute nutzbar, und jeder hat eine Demo, die du sofort öffnen kannst.`,
+    'vaults.academic.t': `Akademisch`,
+    'vaults.academic.b': `Für die Forschung. Richte ihn auf eine Zotero-Sammlung, und er zerlegt jedes Werk in seine tatsächlichen Behauptungen, Befunde und Methoden — jeweils mit der wörtlichen Stelle und der Seite, aus der sie stammt.`,
+    'vaults.academic.f1': `<b>Ein Graph aus Ideen</b>, nicht aus Dateien: stützt, widerspricht, präzisiert, erweitert.`,
+    'vaults.academic.f2': `<b>Debatten, Lücken und Abdeckung</b>, gewonnen aus dem, was deine Bibliothek <i>nicht</i> klärt.`,
+    'vaults.academic.f3': `<b>Deep Research</b>: mehrseitige Berichte, in denen jedes Zitat auf einen echten Eintrag zurückgeht.`,
+    'vaults.academic.f4': `<b>Ein Schreib-Copilot</b>, der auch direkt in Word und LibreOffice Writer läuft.`,
+    'vaults.academic.cta': `Akademische Demo öffnen →`,
+    'vaults.study.t': `Lernen`,
+    'vaults.study.b': `Zum Lernen — für dich oder deine Studierenden. Kurse, Fächer, Themen und Notizen, mit deinen eigenen Materialien darunter. Kein Zotero nötig, nichts wird hochgeladen.`,
+    'vaults.study.f1': `<b>Nimm eine Vorlesung auf</b> und transkribiere sie mit lokalem Whisper — klicke eine Zeile an und springst zu dieser Sekunde.`,
+    'vaults.study.f2': `<b>Frag deine Materialien</b>: jede Antwort zitiert die Notiz, die Seite oder den Zeitstempel, aus der sie kommt.`,
+    'vaults.study.f3': `<b>Eine Ideenkarte pro Fach</b>, damit zwei Kurse nie ineinanderlaufen.`,
+    'vaults.study.f4': `<b>Fragen, Karteikarten und verteiltes Wiederholen</b> aus deinen Inhalten — du gibst jede einzelne frei.`,
+    'vaults.study.cta': `Lern-Demo öffnen →`,
+    'vaults.genealogy.t': `Genealogie`,
+    'vaults.genealogy.b': `Um Menschen aus Primärquellen zu rekonstruieren — Familiengeschichte, aber die Methode taugt für jede aktenbasierte Forschung: Identität und Verwandtschaft als Hypothesen, die Dokumente belegen müssen.`,
+    'vaults.genealogy.f1': `<b>Personen, Stammbaum, Zeitleiste und Karte</b>, mit GEDCOM-Import und -Export.`,
+    'vaults.genealogy.f2': `<b>Ein Belegarchiv</b>: Volkszählungen, Register, Briefe und Fotos, verknüpft mit den Menschen darin.`,
+    'vaults.genealogy.f3': `<b>Ein KI-Genealoge</b>, der Verwandtschaft aus den Akten vorschlägt und nie eine Verbindung hinzufügt, die du nicht bestätigt hast.`,
+    'vaults.genealogy.f4': `<b>Widersprüche bleiben sichtbar</b> — zeitgenössische Schreibweisen und unsichere Daten bleiben, wie sie sind.`,
+    'vaults.genealogy.cta': `Genealogie-Demo öffnen →`,
+    'vaults.databases.t': `Datenbanken`,
+    'vaults.databases.b': `Für deine eigenen Daten: Feldarbeit, Korpora, Kataloge, Kodierbögen. Typisierte Tabellen, die du wirklich auswerten kannst, ohne dass eine Tabellenkalkulation deine Kategorien zu Text macht.`,
+    'vaults.databases.f1': `<b>Echte Spaltentypen</b>: Auswahl, Zahl, Datum, Relation, Rollup, Formel, Anhang.`,
+    'vaults.databases.f2': `<b>Die KI schlägt vor, die App rechnet</b>: Korrelationen, Chi², ANOVA und Regressionen laufen in Code, nicht in einem Prompt.`,
+    'vaults.databases.f3': `<b>Diagramme aus deinen Zeilen</b> — Heatmaps, Streudiagramme, Boxplots.`,
+    'vaults.databases.f4': `<b>Ein Daten-Chat</b>, der über die echte Tabelle antwortet und sich weigert, einen Wert zu erfinden.`,
+    'vaults.databases.cta': `Datenbank-Demo öffnen →`,
+    'road.t': `Modi in Arbeit`,
+    'road.b': `Nodus zeigt seine Roadmap offen. Diese Modi sind in der Tresor-Auswahl sichtbar, aber noch keine fertige Arbeit — wir zeigen dir lieber den Plan, als so zu tun, als gäbe es ihn nicht.`,
+    'road.preview': `Vorschau`, 'road.soon': `Geplant`,
+    'road.teaching.t': `Lehre`, 'road.teaching.b': `Heute anlegbar, aber leer — die Lehr-Bereiche werden noch gebaut.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Dieselbe Hülle, für Fiktion und erfundene Welten statt Forschung.`,
+    'road.primary.t': `Primärquellen`, 'road.primary.b': `Archivalien neben der Sekundärliteratur, mit quellenkritischer Extraktion.`,
+    'road.testimony.t': `Zeugnisse`, 'road.testimony.b': `Interviews und Oral History: wer spricht, Transkripte und was jede Person tatsächlich gesagt hat.`,
+    'who.research.t': `Wenn du forschst`,
+    'who.research.b': `Deine Lektüre wird zu einem Korpus, den du befragen kannst: was umstritten ist, was fehlt, wer was stützt — und Entwürfe, deren Zitate auf echte Einträge zurückgehen. <b>Akademisch</b>, <b>Genealogie</b>, <b>Datenbanken</b>.`,
+    'who.teach.t': `Wenn du lehrst`,
+    'who.teach.b': `Baue das Material einmal und hole Fragenpools, Karteikarten und Kurzberichte heraus — jeweils mit der Textstelle, die sie belegt, damit du prüfen kannst, bevor deine Studierenden es sehen. Heute <b>Lernen</b>; ein Lehre-Modus wird gebaut.`,
+    'who.study.t': `Wenn du lernst`,
+    'who.study.b': `Vorlesungen, Folien und Notizen an einem Ort: aufgenommen und transkribiert, sekundengenau durchsuchbar, als Konzepte kartiert und mit verteiltem Wiederholen abfragbar. <b>Lernen</b>.`,
+    'v.study.t': `Die Vorlesung, sekundengenau zurück`,
+    'v.study.b': `Nimm die Vorlesung auf, transkribiere sie mit lokalem Whisper, und jede Zeile bleibt anklickbar: die Antwort im Chat zitiert den Zeitstempel, aus dem sie stammt, und die Konzepte werden zu einer Ideenkarte nur für dieses Fach.`,
+    'v.genealogy.t': `Eine Familie, aus den Akten rekonstruiert`,
+    'v.genealogy.b': `Personen, Daten und Orte kommen aus Zählungen, Registern und Briefen. Der Assistent schlägt vor, wie sie zusammenhängen, und wartet auf deine Bestätigung, bevor jemand in den Stammbaum kommt.`,
+    'v.databases.t': `Du bringst die Daten, es rechnet`,
+    'v.databases.b': `Verwandle deine eigenen Aufzeichnungen in typisierte Tabellen und bitte um eine Auswertung. Der Assistent wählt die Methode, die App rechnet sie wirklich, also ist eine Korrelation oder Regression eine Berechnung, keine Vermutung.`,
     'contrib.kicker': `Open Source, gemeinsam`, 'contrib.title': `Jeder Knoten zählt.`,
     'contrib.lead': `Nodus wächst mit jedem Beitrag — wie Sandkörner fügt sich jedes dem Ganzen hinzu. Eine einzelne Person hat es begonnen; jeder kann das nächste Korn beitragen.`,
     'contrib.prs': `Die Pull Requests ansehen`, 'contrib.repo': `Den Code durchstöbern`, 'contrib.builders': `Die Menschen, die Nodus bauen`, 'contrib.loading': `Mitwirkende werden geladen…`, 'contrib.cap': `Jedes Korn ein Beitrag.`, 'contrib.commits': `Beiträge`,
   },
   pt: {
-    'nav.modes': `Modos`, 'nav.contrib': `Contribuir`,
-    'modes.kicker': `Modos de cofre · novo na 2.0`, 'modes.title': `Um só motor. Um modo para cada tipo de corpus.`,
-    'modes.lead': `Cada cofre tem um modo que adapta a barra lateral e a personalidade do assistente de IA — o mesmo motor de grafo por baixo. Três já estão disponíveis; mais dois a caminho. Experimente cada modo disponível na demo.`,
-    'modes.available': `Disponível`, 'modes.soon': `Em breve`,
-    'modes.academic.t': `Acadêmico`, 'modes.academic.b': `Transforme uma biblioteca do Zotero num grafo de ideias, autores, debates e lacunas — e depois escreva com citações que dá mesmo para verificar.`, 'modes.academic.cta': `Abrir a demo acadêmica →`,
-    'modes.genealogy.t': `Genealogia`, 'modes.genealogy.b': `Reconstrua uma família a partir de fontes primárias: pessoas, árvore genealógica, cronologia, arquivo de evidências, um mapa real — e um genealogista de IA que propõe parentescos a partir das evidências.`, 'modes.genealogy.cta': `Abrir a demo de genealogia →`,
-    'modes.primary.t': `Fontes primárias`, 'modes.primary.b': `Documentos de arquivo ao lado da literatura secundária, com uma extração crítica de fontes fiel ao documento.`,
-    'modes.databases.t': `Bases de dados`, 'modes.databases.b': `Conjuntos de dados estruturados como cidadãos de primeira classe do grafo, consultáveis junto da sua literatura.`,
-    'modes.study.t': `Estudo`, 'modes.study.b': `O espaço de quem aprende: o grafo, flashcards, rotas guiadas e autoavaliação, pensado para compreender mais do que para pesquisa original.`,
+    'nav.vaults': `Cofres`, 'nav.contrib': `Contribuir`,
+    'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
+    'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento local e as definições por baixo são os mesmos em cada modo. Hoje há quatro modos utilizáveis, e cada um tem uma demo que podes abrir já.`,
+    'vaults.academic.t': `Acadêmico`,
+    'vaults.academic.b': `Para investigar. Aponta-o a uma coleção do Zotero e ele decompõe cada obra nas suas afirmações, achados e métodos reais — cada um com a passagem literal e a página de onde saiu.`,
+    'vaults.academic.f1': `<b>Um grafo de ideias</b>, não de ficheiros: apoia, contradiz, matiza, amplia.`,
+    'vaults.academic.f2': `<b>Debates, lacunas e cobertura</b> extraídos do que a tua biblioteca <i>não</i> resolve.`,
+    'vaults.academic.f3': `<b>Deep Research</b>: relatórios de várias páginas onde cada citação corresponde a um item real.`,
+    'vaults.academic.f4': `<b>Um copiloto de escrita</b> que funciona também dentro do Word e do LibreOffice Writer.`,
+    'vaults.academic.cta': `Abrir a demo acadêmica →`,
+    'vaults.study.t': `Estudo`,
+    'vaults.study.b': `Para aprender — tu ou os teus alunos. Cursos, disciplinas, temas e apontamentos, com os teus próprios materiais por baixo. Sem precisar de Zotero e sem enviar nada.`,
+    'vaults.study.f1': `<b>Grava uma aula</b> e transcreve-a com Whisper local — clica numa linha e saltas para esse segundo.`,
+    'vaults.study.f2': `<b>Pergunta aos teus materiais</b>: cada resposta cita o apontamento, a página ou o minuto de onde veio.`,
+    'vaults.study.f3': `<b>Um mapa de ideias por disciplina</b>, para que dois cursos nunca se misturem.`,
+    'vaults.study.f4': `<b>Perguntas, flashcards e revisão espaçada</b> a partir do teu conteúdo — aprovas cada uma.`,
+    'vaults.study.cta': `Abrir a demo de estudo →`,
+    'vaults.genealogy.t': `Genealogia`,
+    'vaults.genealogy.b': `Para reconstruir pessoas a partir de fontes primárias — história familiar, mas o método serve para qualquer investigação com registos: identidade e parentesco como hipóteses que os documentos têm de provar.`,
+    'vaults.genealogy.f1': `<b>Pessoas, árvore, cronologia e mapa</b>, com GEDCOM à entrada e à saída.`,
+    'vaults.genealogy.f2': `<b>Um arquivo de evidências</b>: censos, registos, cartas e fotos ligados a quem neles aparece.`,
+    'vaults.genealogy.f3': `<b>Um genealogista de IA</b> que propõe parentescos a partir dos registos e nunca acrescenta um vínculo que não tenhas confirmado.`,
+    'vaults.genealogy.f4': `<b>Os conflitos ficam à vista</b> — grafias de época e datas incertas mantêm-se tal como estão.`,
+    'vaults.genealogy.cta': `Abrir a demo de genealogia →`,
+    'vaults.databases.t': `Bases de dados`,
+    'vaults.databases.b': `Para os teus próprios dados: trabalho de campo, corpora, catálogos, grelhas de codificação. Tabelas tipadas que consegues mesmo analisar, sem que uma folha de cálculo transforme as tuas categorias em texto.`,
+    'vaults.databases.f1': `<b>Tipos de coluna a sério</b>: seleção, número, data, relação, rollup, fórmula, anexo.`,
+    'vaults.databases.f2': `<b>A IA propõe, a app calcula</b>: correlações, qui², ANOVA e regressões correm em código, não num prompt.`,
+    'vaults.databases.f3': `<b>Gráficos desenhados a partir das tuas linhas</b> — mapas de calor, dispersão, caixa de bigodes.`,
+    'vaults.databases.f4': `<b>Um chat de dados</b> que responde sobre a tabela real e recusa inventar um valor.`,
+    'vaults.databases.cta': `Abrir a demo de bases de dados →`,
+    'road.t': `Modos a caminho`,
+    'road.b': `O Nodus publica o seu roteiro à vista. Estes modos aparecem no seletor de cofres mas ainda não são trabalho terminado — preferimos mostrar-te o plano a fingir que não existe.`,
+    'road.preview': `Pré-visualização`, 'road.soon': `Previsto`,
+    'road.teaching.t': `Docência`, 'road.teaching.b': `Hoje dá para criar, mas está vazio — as secções de docência ainda estão a ser construídas.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `A mesma casca, para ficção e mundos construídos em vez de investigação.`,
+    'road.primary.t': `Fontes primárias`, 'road.primary.b': `Documentos de arquivo ao lado da literatura secundária, com extração crítica de fontes.`,
+    'road.testimony.t': `Testemunhos`, 'road.testimony.b': `Entrevistas e história oral: quem fala, transcrições e o que cada pessoa disse mesmo.`,
+    'who.research.t': `Se investigas`,
+    'who.research.b': `A tua leitura torna-se um corpus que podes interrogar: o que é contestado, o que falta, quem defende o quê — e rascunhos cujas citações correspondem a itens reais. <b>Acadêmico</b>, <b>Genealogia</b>, <b>Bases de dados</b>.`,
+    'who.teach.t': `Se ensinas`,
+    'who.teach.b': `Prepara o material uma vez e tira dele bancos de perguntas, flashcards e sínteses — cada um com o excerto que o justifica, para verificares antes de os teus alunos verem. <b>Estudo</b> hoje; um modo Docência está a ser construído.`,
+    'who.study.t': `Se estudas`,
+    'who.study.b': `Aulas, slides e apontamentos num só sítio: gravados e transcritos, pesquisáveis ao segundo, mapeados como conceitos e revisáveis com repetição espaçada. <b>Estudo</b>.`,
+    'v.study.t': `A aula, de volta ao segundo exato`,
+    'v.study.b': `Grava a aula, transcreve-a com Whisper local e cada linha continua clicável: a resposta do chat cita o minuto de onde veio, e os conceitos tornam-se um mapa de ideias só dessa disciplina.`,
+    'v.genealogy.t': `Uma família, reconstruída a partir dos registos`,
+    'v.genealogy.b': `Pessoas, datas e lugares saem de censos, registos e cartas. O assistente propõe como se ligam e espera pela tua confirmação antes de alguém entrar na árvore.`,
+    'v.databases.t': `Tu trazes os dados, ele faz as contas`,
+    'v.databases.b': `Transforma os teus registos em tabelas tipadas e pede uma análise. O assistente escolhe o método e a app calcula-o a sério, por isso uma correlação ou uma regressão é um cálculo, nunca um palpite.`,
     'contrib.kicker': `Código aberto, juntos`, 'contrib.title': `Cada nó conta.`,
     'contrib.lead': `O Nodus cresce uma contribuição de cada vez — como grãos de areia, cada um soma ao todo. Uma só pessoa começou; qualquer um pode juntar o próximo grão.`,
     'contrib.prs': `Ver os pull requests`, 'contrib.repo': `Explorar o código`, 'contrib.builders': `As pessoas que constroem o Nodus`, 'contrib.loading': `A carregar colaboradores…`, 'contrib.cap': `Cada grão, uma contribuição.`, 'contrib.commits': `contribuições`,
   },
   tr: {
-    'nav.modes': `Modlar`, 'nav.contrib': `Katkıda bulun`,
-    'modes.kicker': `Kasa modları · 2.0'da yeni`, 'modes.title': `Tek bir motor. Her korpus türü için bir mod.`,
-    'modes.lead': `Her kasanın, kenar çubuğunu ve yapay zekâ asistanının kişiliğini uyarlayan bir modu vardır — altta aynı grafik motoru. Üçü bugün hazır; ikisi daha yolda. Hazır olan her modu demoda hemen deneyin.`,
-    'modes.available': `Kullanılabilir`, 'modes.soon': `Yakında`,
-    'modes.academic.t': `Akademik`, 'modes.academic.b': `Bir Zotero kütüphanesini fikirler, yazarlar, tartışmalar ve boşluklardan oluşan bir grafiğe dönüştürün — sonra gerçekten doğrulanabilir kaynaklarla yazın.`, 'modes.academic.cta': `Akademik demoyu aç →`,
-    'modes.genealogy.t': `Soybilim`, 'modes.genealogy.b': `Bir aileyi birincil kaynaklardan yeniden kurun: kişiler, soy ağacı, zaman çizelgesi, kanıt arşivi, gerçek bir harita — ve kanıtlardan akrabalık öneren bir yapay zekâ soybilimcisi.`, 'modes.genealogy.cta': `Soybilim demosunu aç →`,
-    'modes.primary.t': `Birincil Kaynaklar`, 'modes.primary.b': `İkincil literatürün yanında arşiv belgeleri; belgeye sadık kalan kaynak-eleştirel çıkarımla.`,
-    'modes.databases.t': `Veritabanları`, 'modes.databases.b': `Yapılandırılmış veri kümeleri grafiğin birinci sınıf üyeleri olarak, literatürünüzle birlikte sorgulanabilir.`,
-    'modes.study.t': `Çalışma`, 'modes.study.b': `Öğrenenin çalışma alanı: grafik, bilgi kartları, rehberli rotalar ve kendini sınama — özgün araştırmadan çok anlamaya göre ayarlı.`,
+    'nav.vaults': `Kasalar`, 'nav.contrib': `Katkıda bulun`,
+    'vaults.kicker': `Kasalar`, 'vaults.title': `Aynı motor, işine göre biçimlenir.`,
+    'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Altta motor, yerel depolama ve ayarlar her modda aynı kalır. Bugün dört mod kullanılabilir ve her birinin hemen açabileceğiniz bir demosu var.`,
+    'vaults.academic.t': `Akademik`,
+    'vaults.academic.b': `Araştırma için. Bir Zotero koleksiyonuna yöneltin; her eseri gerçek iddialarına, bulgularına ve yöntemlerine ayırsın — her biri geldiği birebir pasaj ve sayfayla.`,
+    'vaults.academic.f1': `<b>Dosyaların değil fikirlerin grafiği</b>: destekler, çelişir, inceltir, genişletir.`,
+    'vaults.academic.f2': `<b>Tartışmalar, boşluklar ve kapsam</b> — kütüphanenizin <i>çözmediği</i> şeylerden çıkarılır.`,
+    'vaults.academic.f3': `<b>Deep Research</b>: her kaynağın gerçek bir kayda çıktığı çok sayfalı raporlar.`,
+    'vaults.academic.f4': `<b>Bir yazma yardımcısı</b> — Word ve LibreOffice Writer içinde de canlı çalışır.`,
+    'vaults.academic.cta': `Akademik demoyu aç →`,
+    'vaults.study.t': `Çalışma`,
+    'vaults.study.b': `Öğrenmek için — kendiniz ya da öğrencileriniz. Dersler, konular, başlıklar ve notlar; altında kendi materyalleriniz. Zotero gerekmez, hiçbir şey yüklenmez.`,
+    'vaults.study.f1': `<b>Dersi kaydedin</b> ve yerel Whisper ile yazıya dökün — herhangi bir satıra tıklayın, o saniyeye atlayın.`,
+    'vaults.study.f2': `<b>Materyallerinize sorun</b>: her yanıt geldiği notu, sayfayı ya da zaman damgasını kaynak gösterir.`,
+    'vaults.study.f3': `<b>Ders başına bir fikir haritası</b>, böylece iki ders asla birbirine karışmaz.`,
+    'vaults.study.f4': `<b>Sorular, bilgi kartları ve aralıklı tekrar</b> kendi içeriğinizden — her birini siz onaylarsınız.`,
+    'vaults.study.cta': `Çalışma demosunu aç →`,
+    'vaults.genealogy.t': `Soybilim`,
+    'vaults.genealogy.b': `İnsanları birincil kaynaklardan yeniden kurmak için — aile tarihi, ama yöntem kayda dayalı her araştırma için geçerli: kimlik ve akrabalık, belgelerin kanıtlaması gereken hipotezlerdir.`,
+    'vaults.genealogy.f1': `<b>Kişiler, soy ağacı, zaman çizelgesi ve harita</b>, GEDCOM giriş ve çıkışıyla.`,
+    'vaults.genealogy.f2': `<b>Bir kanıt arşivi</b>: nüfus sayımları, kütükler, mektuplar ve fotoğraflar, içindeki kişilere bağlı.`,
+    'vaults.genealogy.f3': `<b>Bir yapay zekâ soybilimci</b> — kayıtlardan akrabalık önerir, onaylamadığınız bir bağı asla eklemez.`,
+    'vaults.genealogy.f4': `<b>Çelişkiler görünür kalır</b> — dönemin yazımları ve belirsiz tarihler olduğu gibi korunur.`,
+    'vaults.genealogy.cta': `Soybilim demosunu aç →`,
+    'vaults.databases.t': `Veritabanları`,
+    'vaults.databases.b': `Kendi verileriniz için: saha çalışması, derlemler, kataloglar, kodlama çizelgeleri. Bir hesap tablosu kategorilerinizi metne çevirmeden gerçekten analiz edebileceğiniz tipli tablolar.`,
+    'vaults.databases.f1': `<b>Gerçek sütun türleri</b>: seçim, sayı, tarih, ilişki, rollup, formül, ek.`,
+    'vaults.databases.f2': `<b>Yapay zekâ önerir, uygulama hesaplar</b>: korelasyonlar, ki², ANOVA ve regresyonlar bir istemde değil, kodda çalışır.`,
+    'vaults.databases.f3': `<b>Satırlarınızdan çizilen grafikler</b> — ısı haritaları, saçılım, kutu grafikleri.`,
+    'vaults.databases.f4': `<b>Bir veri sohbeti</b> — gerçek tablo üzerinden yanıtlar, bir değeri uydurmayı reddeder.`,
+    'vaults.databases.cta': `Veritabanı demosunu aç →`,
+    'road.t': `Yolda olan modlar`,
+    'road.b': `Nodus yol haritasını açıkta tutar. Bu modlar kasa seçicide görünür ama henüz bitmiş iş değil — planı size göstermeyi, yokmuş gibi davranmaya tercih ediyoruz.`,
+    'road.preview': `Önizleme`, 'road.soon': `Planlanan`,
+    'road.teaching.t': `Öğretim`, 'road.teaching.b': `Bugün oluşturulabilir ama boş — öğretim bölümleri hâlâ yapılıyor.`,
+    'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Aynı kabuk; araştırma yerine kurgu ve kurulmuş dünyalar için.`,
+    'road.primary.t': `Birincil Kaynaklar`, 'road.primary.b': `İkincil literatürün yanında arşiv belgeleri, kaynak-eleştirel çıkarımla.`,
+    'road.testimony.t': `Tanıklıklar`, 'road.testimony.b': `Görüşmeler ve sözlü tarih: kim konuşuyor, dökümler ve herkesin tam olarak ne dediği.`,
+    'who.research.t': `Araştırıyorsanız`,
+    'who.research.b': `Okumalarınız sorgulayabileceğiniz bir korpusa dönüşür: neyin tartışmalı olduğu, neyin eksik olduğu, kimin neyi savunduğu — ve kaynakları gerçek kayıtlara çıkan taslaklar. <b>Akademik</b>, <b>Soybilim</b>, <b>Veritabanları</b>.`,
+    'who.teach.t': `Öğretiyorsanız`,
+    'who.teach.b': `Materyali bir kez hazırlayın, sonra ondan soru bankaları, bilgi kartları ve özetler çıkarın — her biri kendini gerekçelendiren alıntıyla, öğrencileriniz görmeden kontrol edebilesiniz diye. Bugün <b>Çalışma</b>; bir Öğretim modu yapılıyor.`,
+    'who.study.t': `Öğreniyorsanız`,
+    'who.study.b': `Dersleriniz, slaytlarınız ve notlarınız tek yerde: kaydedilmiş ve yazıya dökülmüş, saniyesine kadar aranabilir, kavram olarak haritalanmış ve aralıklı tekrarla çalışılabilir. <b>Çalışma</b>.`,
+    'v.study.t': `Ders, tam o saniyeye geri`,
+    'v.study.b': `Dersi kaydedin, yerel Whisper ile yazıya dökün; her satır tıklanabilir kalır: sohbetteki yanıt geldiği zaman damgasını gösterir ve kavramlar yalnızca o dersin fikir haritasına dönüşür.`,
+    'v.genealogy.t': `Kayıtlardan yeniden kurulan bir aile`,
+    'v.genealogy.b': `Kişiler, tarihler ve yerler nüfus sayımlarından, kütüklerden ve mektuplardan çıkar. Asistan bağlantılarını önerir ve ağaca kimse girmeden önce onayınızı bekler.`,
+    'v.databases.t': `Veriyi siz getirin, hesabı o yapsın`,
+    'v.databases.b': `Kendi kayıtlarınızı tipli tablolara dönüştürün, sonra bir analiz isteyin. Asistan yöntemi seçer, uygulama gerçekten hesaplar, yani bir korelasyon ya da regresyon bir hesaptır, asla bir tahmin değil.`,
     'contrib.kicker': `Açık kaynak, birlikte`, 'contrib.title': `Her düğüm önemlidir.`,
     'contrib.lead': `Nodus her seferinde bir katkıyla büyür — kum taneleri gibi, her biri bütüne eklenir. Onu tek bir kişi başlattı; bir sonraki taneyi herkes ekleyebilir.`,
     'contrib.prs': `Pull request'leri gör`, 'contrib.repo': `Kodu incele`, 'contrib.builders': `Nodus'u inşa edenler`, 'contrib.loading': `Katkıda bulunanlar yükleniyor…`, 'contrib.cap': `Her tane bir katkı.`, 'contrib.commits': `katkı`,
   },
   zh: {
-    'nav.modes': `模式`, 'nav.contrib': `参与贡献`,
-    'modes.kicker': `保险库模式 · 2.0 新增`, 'modes.title': `同一引擎，为每种语料提供一种模式。`,
-    'modes.lead': `每个保险库都有一个模式，用来调整侧边栏和 AI 助手的角色——底层是同一套图谱引擎。三种现已可用，另有两种即将推出。在演示中即可体验每一种可用模式。`,
-    'modes.available': `可用`, 'modes.soon': `即将推出`,
-    'modes.academic.t': `学术`, 'modes.academic.b': `把 Zotero 书库变成一张由观点、作者、争论与空白构成的图谱——然后用真正可核实的引用来写作。`, 'modes.academic.cta': `打开学术演示 →`,
-    'modes.genealogy.t': `家谱`, 'modes.genealogy.b': `从原始档案重建一个家族：人物、家谱树、时间线、证据档案、真实地图——以及一位从证据中提出亲属关系的 AI 家谱学家。`, 'modes.genealogy.cta': `打开家谱演示 →`,
-    'modes.primary.t': `原始档案`, 'modes.primary.b': `档案记录与二手文献并列，采用忠于文献的来源批判式抽取。`,
-    'modes.databases.t': `数据库`, 'modes.databases.b': `结构化数据集作为图谱的一等公民，可与你的文献一同查询。`,
-    'modes.study.t': `学习`, 'modes.study.b': `学习者的工作台：图谱、闪卡、引导路线与自测，为理解而非原创研究而调校。`,
+    'nav.vaults': `保险库`, 'nav.contrib': `参与贡献`,
+    'vaults.kicker': `保险库`, 'vaults.title': `同一引擎，因你的工作而变。`,
+    'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、本地存储和设置在每种模式下都相同。目前有四种模式可用，每一种都有可以立刻打开的演示。`,
+    'vaults.academic.t': `学术`,
+    'vaults.academic.b': `用于研究。把它指向一个 Zotero 分类，它会把每部著作拆解成真实的论断、发现与方法——每一条都附上出处的原文段落与页码。`,
+    'vaults.academic.f1': `<b>一张观点的图谱</b>，而不是文件：支持、反驳、修正、延伸。`,
+    'vaults.academic.f2': `<b>争论、空白与覆盖度</b>，来自你的书库<i>尚未</i>解决的地方。`,
+    'vaults.academic.f3': `<b>Deep Research</b>：多页报告，每一条引用都能对应到真实条目。`,
+    'vaults.academic.f4': `<b>写作副驾</b>，也能在 Word 和 LibreOffice Writer 里实时运行。`,
+    'vaults.academic.cta': `打开学术演示 →`,
+    'vaults.study.t': `学习`,
+    'vaults.study.b': `用于学习——你自己的，或你学生的。课程、科目、主题与笔记，底下是你自己的材料。不需要 Zotero，也无需上传任何东西。`,
+    'vaults.study.f1': `<b>录下一堂课</b>，用本地 Whisper 转写——点任意一行即可跳到那一秒。`,
+    'vaults.study.f2': `<b>向你的材料提问</b>：每个回答都会标出它来自哪条笔记、哪一页或哪个时间点。`,
+    'vaults.study.f3': `<b>每个科目一张概念图</b>，两门课绝不会互相串味。`,
+    'vaults.study.f4': `<b>题目、闪卡与间隔复习</b>，全部出自你的内容——每一条都由你确认。`,
+    'vaults.study.cta': `打开学习演示 →`,
+    'vaults.genealogy.t': `家谱`,
+    'vaults.genealogy.b': `用原始档案还原一个个人——家族史，但这套方法适用于任何基于档案的研究：身份与亲属关系是假设，必须由文献来证明。`,
+    'vaults.genealogy.f1': `<b>人物、家谱树、时间线与地图</b>，支持 GEDCOM 导入导出。`,
+    'vaults.genealogy.f2': `<b>一座证据档案</b>：户口、登记簿、书信与照片，都与其中出现的人相连。`,
+    'vaults.genealogy.f3': `<b>一位 AI 家谱学家</b>，从档案中提出亲属关系，绝不添加你未确认的连接。`,
+    'vaults.genealogy.f4': `<b>矛盾始终可见</b>——当时的写法与不确定的日期都按原样保留。`,
+    'vaults.genealogy.cta': `打开家谱演示 →`,
+    'vaults.databases.t': `数据库`,
+    'vaults.databases.b': `用于你自己的数据：田野工作、语料、目录、编码表。真正能拿来分析的类型化表格，不必让电子表格把你的类别变成纯文本。`,
+    'vaults.databases.f1': `<b>真正的列类型</b>：选择、数字、日期、关联、汇总、公式、附件。`,
+    'vaults.databases.f2': `<b>AI 提方案，应用做计算</b>：相关、卡方、方差分析与回归都在代码里运行，而不是在提示词里。`,
+    'vaults.databases.f3': `<b>由你的行绘制的图表</b>——热力图、散点图、箱线图。`,
+    'vaults.databases.f4': `<b>数据对话</b>，基于真实表格作答，拒绝编造数值。`,
+    'vaults.databases.cta': `打开数据库演示 →`,
+    'road.t': `即将推出的模式`,
+    'road.b': `Nodus 把路线图公开摆出来。这些模式在保险库选择器里能看到，但还不是完成的工作——我们宁愿给你看计划，也不假装它不存在。`,
+    'road.preview': `预览`, 'road.soon': `计划中`,
+    'road.teaching.t': `教学`, 'road.teaching.b': `今天就能创建，但里面是空的——教学相关板块仍在建设中。`,
+    'road.worldbuilding.t': `世界构建`, 'road.worldbuilding.b': `同样的框架，面向虚构与架空世界，而非研究。`,
+    'road.primary.t': `原始档案`, 'road.primary.b': `档案文献与二手文献并列，采用来源批判式抽取。`,
+    'road.testimony.t': `口述与证言`, 'road.testimony.b': `访谈与口述史：谁在说、转写文本，以及每个人究竟说了什么。`,
+    'who.research.t': `如果你做研究`,
+    'who.research.b': `你的阅读会变成一个可以追问的语料：什么有争议、什么还空着、谁支持什么——以及引用能对应到真实条目的草稿。<b>学术</b>、<b>家谱</b>、<b>数据库</b>。`,
+    'who.teach.t': `如果你教学`,
+    'who.teach.b': `材料准备一次，就能从中得到题库、闪卡与简报——每一条都带着支撑它的原文摘录，让你在学生看到之前先核对。今天是<b>学习</b>模式；教学模式正在建设中。`,
+    'who.study.t': `如果你在学习`,
+    'who.study.b': `课堂、幻灯片与笔记集中一处：录音并转写、可检索到秒、映射成概念，并能用间隔重复来复习。<b>学习</b>。`,
+    'v.study.t': `那堂课，精确回到那一秒`,
+    'v.study.b': `录下课程，用本地 Whisper 转写，每一行都仍可点击：聊天中的回答会标出它来自哪个时间点，而其中的概念会汇成只属于这门课的概念图。`,
+    'v.genealogy.t': `一个家族，从档案中重建`,
+    'v.genealogy.b': `人物、日期与地点从户口、登记簿和书信中被提取出来。助手会提出他们如何相连，并在任何人进入家谱前等待你确认。`,
+    'v.databases.t': `你带来数据，它来算`,
+    'v.databases.b': `把你的记录变成类型化表格，然后请求分析。助手选择方法，应用真正地计算，所以相关或回归是一次运算，而不是猜测。`,
     'contrib.kicker': `开源，携手同行`, 'contrib.title': `每个节点都重要。`,
     'contrib.lead': `Nodus 每次一个贡献地成长——就像一粒粒沙子，每一粒都汇入整体。它由一个人起步；任何人都能添上下一粒沙。`,
     'contrib.prs': `查看 Pull Request`, 'contrib.repo': `浏览代码`, 'contrib.builders': `参与建设 Nodus 的人`, 'contrib.loading': `正在加载贡献者…`, 'contrib.cap': `每一粒，都是一次贡献。`, 'contrib.commits': `次提交`,
@@ -1801,5 +2334,6 @@ function setLang(lang) {
   } else { start(); }
 })();
 </script>
+  <script src="nodi.js?v=20260717orb"></script>
 </body>
 </html>
