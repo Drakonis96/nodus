@@ -920,7 +920,8 @@ body {
   backdrop-filter: blur(18px);
 }
 
-.tutorial-language-card .nodi-svg {
+.tutorial-language-card > .nodi-svg,
+.tutorial-language-card > .nodi-orb {
   margin-inline: auto;
 }
 

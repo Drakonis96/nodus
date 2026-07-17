@@ -36,6 +36,7 @@ test('essential tutorial is global, seen-once, skippable with confirmation and r
   assert.match(css, /\.tutorial-cinema\.tutorial-language-screen/);
   assert.match(css, /place-items: center/);
   assert.match(css, /\.tutorial-language-option/);
+  assert.match(css, /\.tutorial-language-card > \.nodi-svg,\s*\.tutorial-language-card > \.nodi-orb\s*\{[^}]*margin-inline: auto/s, 'classic and orbital Nodi are both centred on the language screen');
   assert.match(css, /grid-template-columns: repeat\(auto-fit, 145px\)/);
   assert.match(css, /height: 3\.5rem/);
   assert.match(css, /width: 100%/);
