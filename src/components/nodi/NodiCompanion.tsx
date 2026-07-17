@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNote, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
+import { vaultTypeColor } from '@shared/vaultTypes';
 import { type NodiRole, type NodiState } from './Nodi';
 import { NodiAvatar } from './NodiAvatar';
 import { Markdown } from '../Markdown';
@@ -172,8 +173,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   const noteRef = useRef({ id: activeNoteId, draft: noteDraft, dirty: noteDirty });
   noteRef.current = { id: activeNoteId, draft: noteDraft, dirty: noteDirty };
 
-  // Light/dark for the notes panel is driven locally (self-contained modifier class)
-  // so it looks right in both the app and the theme-less always-on-top overlay.
+  // Resolve the app theme locally so the independent always-on-top renderer receives
+  // the same surface treatment as in-window Nodi.
   const [systemDark, setSystemDark] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : true
   );
@@ -183,7 +184,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  const notesLight = settings ? settings.theme === 'light' || (settings.theme === 'system' && !systemDark) : false;
+  const lightUi = settings ? settings.theme === 'light' || (settings.theme === 'system' && !systemDark) : false;
 
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [overlayPlacement, setOverlayPlacement] = useState<NodiOverlayPlacement>(() => (
@@ -721,11 +722,17 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     }
   };
 
-  const rootStyle: CSSProperties = isOverlay
+  const rootPositionStyle: CSSProperties = isOverlay
     ? { position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 2147483000 }
     : pos
       ? { position: 'fixed', left: pos.x, top: pos.y, width: figureW, height: figureH, pointerEvents: 'none', zIndex: 45 }
       : { display: 'none' };
+  const rootStyle = {
+    ...rootPositionStyle,
+    // The vault registry is the same colour source used by the app shell, switcher,
+    // dock icon and orb. Keeping it on the root lets every Nodi surface inherit it.
+    ['--nodi-vault-accent' as string]: vaultTypeColor(vaultType),
+  } as CSSProperties;
 
   const anchorStyle: CSSProperties = isOverlay
     ? {
@@ -770,7 +777,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
   };
 
   return (
-    <div className="nodi-companion" style={rootStyle}>
+    <div className={`nodi-companion nodi-theme-${lightUi ? 'light' : 'dark'}`} data-nodi-theme={lightUi ? 'light' : 'dark'} style={rootStyle}>
       <div className={`nodi-anchor open-${horizontal} open-${vertical}`} style={anchorStyle}>
         {helpOpen && (
           <div className="nodi-bubble" data-nodi-interactive>
@@ -903,7 +910,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
         )}
 
         {panel === 'notes' && (
-          <div className={`nodi-panel nodi-notes-panel${notesLight ? ' nodi-light' : ''}`} data-nodi-interactive style={{ height: 460 }}>
+          <div className="nodi-panel nodi-notes-panel" data-nodi-interactive style={{ height: 460 }}>
             <div className="nodi-panel-head">
               {noteView === 'editor' && (
                 <button className="nodi-head-icon" onClick={backToNotes} title={t('Volver')} aria-label={t('Volver')}><Icon name="arrowLeft" size={15} /></button>
