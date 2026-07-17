@@ -43,8 +43,8 @@ test.after(async () => {
   await rm(fxDir, { recursive: true, force: true });
 });
 
-function ctx(options = {}) {
-  return { request: {}, outputFormat: null, options, signal: { cancelled: false }, onPageProgress() {} };
+function ctx(options = {}, outputFormat = null) {
+  return { request: {}, outputFormat, options, signal: { cancelled: false }, onPageProgress() {} };
 }
 async function readDoc(bytes) {
   return pdfjs.getDocument({ data: new Uint8Array(bytes), useSystemFonts: true, isEvalSupported: false, disableFontFace: true }).promise;
@@ -135,4 +135,68 @@ test('B7 — metadata round-trips: write → reload → equal', async () => {
   assert.equal(reloaded.getSubject(), 'Pruebas');
   const keywords = reloaded.getKeywords() ?? '';
   for (const k of ['uno', 'dos', 'tres']) assert.match(keywords, new RegExp(k));
+});
+
+async function imgDims(bytes) {
+  const img = await loadImage(Buffer.from(bytes));
+  return { width: img.width, height: img.height };
+}
+
+test('PDF → images makes one decodable image per page', async () => {
+  const produced = await pdfOps['pdf-to-images'].run([sampleA], ctx({ dpi: 100, quality: 85 }, 'jpeg'));
+  assert.equal(produced.length, 3, 'one image per page');
+  assert.deepEqual(produced.map((p) => p.suffix), ['-p01', '-p02', '-p03']);
+  for (const p of produced) {
+    assert.equal(p.ext, 'jpg');
+    const d = await imgDims(p.data);
+    assert.ok(d.width > 0 && d.height > 0);
+  }
+});
+
+test('compress PDF re-renders to a smaller, re-openable PDF', async () => {
+  const fs = await import('node:fs');
+  // A heavy photo on an A4 page is the case compression is meant for.
+  const photo = buildPhoto(fxDir, 'heavy.jpg', { width: 1600, height: 1200 });
+  const [photoPdf] = await pdfOps['images-to-pdf'].run([photo], ctx({ pageSize: 'a4', orientation: 'portrait', margin: 0 }));
+  const photoPdfPath = path.join(fxDir, 'photo.pdf');
+  fs.writeFileSync(photoPdfPath, Buffer.from(photoPdf.data));
+  const inputSize = photoPdf.data.length;
+  const [out] = await pdfOps['pdf-compress'].run([photoPdfPath], ctx({ quality: '40', dpi: 96 }));
+  assert.ok(out.data.length < inputSize, `compressed ${out.data.length} < ${inputSize}`);
+  assert.equal(await pageCount(out.data), 1, 'same page count');
+});
+
+test('PDF to grayscale stays re-openable with the same page count', async () => {
+  const scanned = await buildScannedPdf(fxDir, 'to-gray.pdf');
+  const [out] = await pdfOps['pdf-grayscale'].run([scanned], ctx({ dpi: 100 }));
+  assert.equal(await pageCount(out.data), 2);
+});
+
+test('page numbers land a searchable label on every page', async () => {
+  const [out] = await pdfOps['pdf-page-numbers'].run([sampleA], ctx({ position: 'bottom-center', start: 1 }));
+  assert.match(await pageText(out.data, 1), /(^|\s)1(\s|$)/);
+  assert.match(await pageText(out.data, 3), /(^|\s)3(\s|$)/);
+});
+
+test('watermark stamps its text on every page', async () => {
+  const [out] = await pdfOps['pdf-watermark'].run([sampleA], ctx({ text: 'CONFIDENCIAL', opacity: 0.3, angle: 45 }));
+  for (let p = 1; p <= 3; p++) assert.match(await pageText(out.data, p), /CONFIDENCIAL/);
+});
+
+test('crop shrinks the page box by the margin', async () => {
+  const before = (await (await readDoc(new Uint8Array((await import('node:fs')).readFileSync(sampleA)))).getPage(1)).view;
+  const [out] = await pdfOps['pdf-crop'].run([sampleA], ctx({ margin: 30 }));
+  const after = (await (await readDoc(out.data)).getPage(1)).view;
+  const widthBefore = before[2] - before[0];
+  const widthAfter = after[2] - after[0];
+  assert.ok(widthAfter < widthBefore, `crop box narrower: ${widthAfter} < ${widthBefore}`);
+  assert.ok(Math.abs(widthBefore - widthAfter - 60) < 2, 'narrowed by ~2×margin');
+});
+
+test('images→PDF with A4 uses a fixed page size regardless of the image', async () => {
+  const png = buildPng(fxDir, 'a4src.png', { width: 300, height: 200 });
+  const [out] = await pdfOps['images-to-pdf'].run([png], ctx({ pageSize: 'a4', orientation: 'portrait', margin: 20 }));
+  const v = (await (await readDoc(out.data)).getPage(1)).getViewport({ scale: 1 });
+  assert.equal(Math.round(v.width), 595);
+  assert.equal(Math.round(v.height), 842);
 });

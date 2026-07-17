@@ -52,6 +52,8 @@ function baseRequest(overrides) {
     options: {},
     outputDir: null,
     mergedName: null,
+    zipOutput: false,
+    zipName: null,
     openFolderOnDone: false,
     ...overrides,
   };
@@ -190,6 +192,44 @@ test('merge produces a single named output attributed to the batch', async () =>
   const out = result.files[0].outputPaths[0];
   assert.equal(path.basename(out), 'combinado.pdf');
   assert.equal(fs.readFileSync(out, 'utf8'), 'merged:2');
+});
+
+test('zipOutput packages every produced file into one archive, none loose', async () => {
+  const dir = scratch('zip');
+  const inputs = ['one.pdf', 'two.pdf'].map((n) => {
+    const p = path.join(dir, n);
+    fs.writeFileSync(p, n);
+    return p;
+  });
+  // Two inputs, each yielding two PNGs → four entries in one zip.
+  const registry = {
+    'pdf-extract-images': {
+      arity: 'each',
+      run: async ([p]) => [
+        { data: enc(`a-${path.basename(p)}`), ext: 'png' },
+        { data: enc(`b-${path.basename(p)}`), ext: 'png' },
+      ],
+    },
+  };
+  const outDir = scratch('zip-out');
+  const result = await runToolkitJob(
+    'zjob',
+    baseRequest({ opId: 'pdf-extract-images', inputPaths: inputs, outputDir: outDir, zipOutput: true, zipName: 'imagenes' }),
+    registry,
+  );
+  assert.ok(result.zipPath, 'a zip path is returned');
+  assert.equal(path.basename(result.zipPath), 'imagenes.zip');
+  assert.ok(fs.existsSync(result.zipPath));
+  // No loose png files were written next to the zip.
+  const loose = fs.readdirSync(outDir).filter((n) => n.endsWith('.png'));
+  assert.deepEqual(loose, [], 'no loose files, only the zip');
+  // The zip really contains four entries (read via the same manual layout: check EOCD count).
+  const AdmZip = require('adm-zip');
+  const names = new AdmZip(fs.readFileSync(result.zipPath)).getEntries().map((e) => e.entryName).sort();
+  assert.equal(names.length, 4, `four entries, got ${names.join(', ')}`);
+  assert.ok(names.every((n) => n.endsWith('.png')));
+  // Both source files point at the zip for "reveal".
+  assert.ok(result.files.every((f) => f.outputPaths[0] === result.zipPath));
 });
 
 test('an unknown operation or too-few inputs is rejected up front', async () => {

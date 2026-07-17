@@ -119,9 +119,115 @@ async function compressImage(input: string, ctx: ToolkitRunContext): Promise<Too
   return [{ data: encodeCanvas(canvas, format, clampQuality(ctx.options.quality ?? 70)), ext: EXT_FOR[format] ?? 'jpg', suffix: ' (comprimido)' }];
 }
 
+/** Crop centered to an aspect ratio like "1:1" or "16:9". */
+async function cropImage(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { createCanvas, loadImage } = await getCanvas();
+  const image = await loadImage(fs.readFileSync(input));
+  const [aw, ah] = String(ctx.options.aspect ?? '1:1').split(':').map((n) => Number(n));
+  const targetRatio = aw > 0 && ah > 0 ? aw / ah : 1;
+  let cw: number;
+  let ch: number;
+  if (image.width / image.height > targetRatio) {
+    ch = image.height;
+    cw = Math.round(ch * targetRatio);
+  } else {
+    cw = image.width;
+    ch = Math.round(cw / targetRatio);
+  }
+  const sx = Math.round((image.width - cw) / 2);
+  const sy = Math.round((image.height - ch) / 2);
+  const canvas = createCanvas(cw, ch);
+  canvas.getContext('2d').drawImage(image, sx, sy, cw, ch, 0, 0, cw, ch);
+  const { format, ext } = outputExtForInput(input);
+  ctx.onPageProgress(1);
+  return [{ data: encodeCanvas(canvas, format, clampQuality(ctx.options.quality ?? 92)), ext, suffix: ' (recortado)' }];
+}
+
+/** Rotate by 90/180/270° or flip horizontally/vertically. */
+async function rotateImage(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { createCanvas, loadImage } = await getCanvas();
+  const image = await loadImage(fs.readFileSync(input));
+  const mode = String(ctx.options.transform ?? 'rotate90');
+  const quarter = mode === 'rotate90' || mode === 'rotate270';
+  const cw = quarter ? image.height : image.width;
+  const ch = quarter ? image.width : image.height;
+  const canvas = createCanvas(cw, ch);
+  const c = canvas.getContext('2d');
+  switch (mode) {
+    case 'rotate90':
+      c.translate(cw, 0);
+      c.rotate(Math.PI / 2);
+      break;
+    case 'rotate180':
+      c.translate(cw, ch);
+      c.rotate(Math.PI);
+      break;
+    case 'rotate270':
+      c.translate(0, ch);
+      c.rotate(-Math.PI / 2);
+      break;
+    case 'flipH':
+      c.translate(cw, 0);
+      c.scale(-1, 1);
+      break;
+    case 'flipV':
+      c.translate(0, ch);
+      c.scale(1, -1);
+      break;
+    default:
+      break;
+  }
+  c.drawImage(image, 0, 0);
+  const { format, ext } = outputExtForInput(input);
+  ctx.onPageProgress(1);
+  return [{ data: encodeCanvas(canvas, format, clampQuality(ctx.options.quality ?? 92)), ext, suffix: ' (rotado)' }];
+}
+
+/** Stamp a text watermark over the image. */
+async function watermarkImage(input: string, ctx: ToolkitRunContext): Promise<ToolkitProduced[]> {
+  const { createCanvas, loadImage } = await getCanvas();
+  const image = await loadImage(fs.readFileSync(input));
+  const text = String(ctx.options.text ?? '').trim() || 'BORRADOR';
+  const opacity = Math.min(0.9, Math.max(0.05, Number(ctx.options.opacity ?? 0.35)));
+  const position = String(ctx.options.position ?? 'bottom-right');
+  const canvas = createCanvas(image.width, image.height);
+  const c = canvas.getContext('2d');
+  c.drawImage(image, 0, 0);
+  const size = Math.max(16, Math.round(Math.min(image.width, image.height) / 14));
+  c.font = `bold ${size}px sans-serif`;
+  c.textBaseline = 'alphabetic';
+  const draw = (x: number, y: number) => {
+    c.fillStyle = `rgba(255,255,255,${opacity})`;
+    c.strokeStyle = `rgba(0,0,0,${opacity * 0.6})`;
+    c.lineWidth = Math.max(1, size / 16);
+    c.strokeText(text, x, y);
+    c.fillText(text, x, y);
+  };
+  const pad = size;
+  const textWidth = c.measureText(text).width;
+  if (position === 'tile') {
+    c.globalAlpha = 1;
+    for (let y = size + pad; y < image.height; y += size * 4) {
+      for (let x = pad; x < image.width; x += textWidth + size * 3) draw(x, y);
+    }
+  } else if (position === 'center') {
+    draw((image.width - textWidth) / 2, image.height / 2);
+  } else if (position === 'top-left') {
+    draw(pad, size + pad);
+  } else {
+    draw(image.width - textWidth - pad, image.height - pad);
+  }
+  const { format, ext } = outputExtForInput(input);
+  ctx.onPageProgress(1);
+  return [{ data: encodeCanvas(canvas, format, clampQuality(ctx.options.quality ?? 92)), ext, suffix: ' (marca de agua)' }];
+}
+
 export const imageOps: ToolkitOpRegistry = {
   'image-convert': { arity: 'each', run: ([input], ctx) => convertImage(input, ctx) },
   'heic-convert': { arity: 'each', run: ([input], ctx) => convertHeic(input, ctx) },
   'image-resize': { arity: 'each', run: ([input], ctx) => resizeImage(input, ctx) },
   'image-compress': { arity: 'each', run: ([input], ctx) => compressImage(input, ctx) },
+  'image-crop': { arity: 'each', run: ([input], ctx) => cropImage(input, ctx) },
+  'image-rotate': { arity: 'each', run: ([input], ctx) => rotateImage(input, ctx) },
+  'image-watermark': { arity: 'each', run: ([input], ctx) => watermarkImage(input, ctx) },
 };

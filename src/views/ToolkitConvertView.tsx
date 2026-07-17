@@ -117,6 +117,9 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
   const [outputFormat, setOutputFormat] = useState<string | null>(null);
   const [options, setOptions] = useState<Record<string, OptionValue>>({});
   const [mergedName, setMergedName] = useState('');
+  const [zipName, setZipName] = useState('');
+  // null = follow the smart default (zip when the job produces multiple files).
+  const [zipOverride, setZipOverride] = useState<boolean | null>(null);
   const [outputDir, setOutputDir] = useState<string | null>(null);
   const [openOnDone, setOpenOnDone] = useState(false);
   const [dragOver, setDragOver] = useState(false);
@@ -144,8 +147,21 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
       setOpId(selectedOp.id);
       setOutputFormat(selectedOp.outputs[0]?.format ?? null);
       setOptions(defaultOptions(selectedOp));
+      setZipOverride(null);
     }
   }, [selectedOp, opId]);
+
+  // A job "produces multiple files" — and so defaults to a ZIP — when it processes
+  // several inputs, or a single input fans out to many outputs (PDF→images, extract
+  // images, split per page). merge operations always yield one file.
+  const producesMultiple = useMemo(() => {
+    if (!selectedOp || selectedOp.arity === 'merge') return false;
+    if (files.length > 1) return true;
+    if (selectedOp.id === 'pdf-to-images' || selectedOp.id === 'pdf-extract-images') return true;
+    if (selectedOp.id === 'pdf-split' && options.mode === 'perPage') return true;
+    return false;
+  }, [selectedOp, files.length, options.mode]);
+  const zipOutput = selectedOp?.arity === 'each' && (zipOverride ?? producesMultiple);
 
   const running = job?.status === 'running';
   const progress = job?.progress ?? null;
@@ -195,6 +211,8 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
       options,
       outputDir,
       mergedName: selectedOp.arity === 'merge' ? mergedName.trim() || null : null,
+      zipOutput,
+      zipName: zipOutput ? zipName.trim() || null : null,
       openFolderOnDone: openOnDone,
     });
   };
@@ -388,6 +406,31 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
                       />
                     </label>
                   )}
+
+                  {selectedOp?.arity === 'each' && (
+                    <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                        <input
+                          type="checkbox"
+                          checked={zipOutput}
+                          onChange={(e) => setZipOverride(e.target.checked)}
+                        />
+                        {t('Empaquetar las salidas en un ZIP')}
+                        {producesMultiple && zipOverride === null && (
+                          <span className="text-xs text-neutral-400">{t('(recomendado para lotes)')}</span>
+                        )}
+                      </label>
+                      {zipOutput && (
+                        <input
+                          type="text"
+                          className="h-9 min-h-9 w-full rounded-lg border border-neutral-300 bg-white px-2.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                          value={zipName}
+                          placeholder={t('Nombre del ZIP')}
+                          onChange={(e) => setZipName(e.target.value)}
+                        />
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </section>
@@ -437,6 +480,19 @@ export function ToolkitConvertView({ onBack }: { onBack: () => void }) {
                   : t('Trabajo terminado.')
                 : `${progress.done}/${progress.total}`}
             </p>
+          )}
+
+          {job?.result?.zipPath && (
+            <div className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+              <Icon name="archive" size={15} className="shrink-0" />
+              <span className="min-w-0 flex-1 truncate">{basename(job.result.zipPath)}</span>
+              <button
+                className="btn btn-ghost h-7 min-h-7 px-2 text-xs"
+                onClick={() => window.nodus.revealToolkitOutput(job.result!.zipPath!)}
+              >
+                {t('Mostrar')}
+              </button>
+            </div>
           )}
         </div>
       </div>

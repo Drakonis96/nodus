@@ -28,6 +28,12 @@ export type ToolkitOpId =
   | 'pdf-extract-images'
   | 'images-to-pdf'
   | 'pdf-metadata'
+  | 'pdf-to-images'
+  | 'pdf-compress'
+  | 'pdf-grayscale'
+  | 'pdf-page-numbers'
+  | 'pdf-watermark'
+  | 'pdf-crop'
   // C — OCR
   | 'ocr-image-to-txt'
   | 'ocr-pdf-to-txt'
@@ -38,6 +44,9 @@ export type ToolkitOpId =
   | 'heic-convert'
   | 'image-resize'
   | 'image-compress'
+  | 'image-crop'
+  | 'image-rotate'
+  | 'image-watermark'
   // E — text
   | 'text-clean-pdf-paste'
   | 'text-change-case'
@@ -134,6 +143,10 @@ export interface ToolkitJobRequest {
   outputDir: string | null;
   /** Base name for a `merge` operation's single output (without extension). */
   mergedName: string | null;
+  /** Package every produced output into one .zip instead of writing loose files. */
+  zipOutput: boolean;
+  /** Base name (without extension) for the packaged zip. */
+  zipName: string | null;
   openFolderOnDone: boolean;
 }
 
@@ -152,6 +165,8 @@ export interface ToolkitJobResult {
   jobId: string;
   files: ToolkitFileProgress[];
   cancelled: boolean;
+  /** Path of the packaged zip when the job requested zipOutput; else null. */
+  zipPath: string | null;
 }
 
 // ── Catalogue ────────────────────────────────────────────────────────────────
@@ -333,6 +348,126 @@ export const TOOLKIT_OPS: ToolkitOp[] = [
     outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
     arity: 'merge',
     minInputs: 1,
+    options: [
+      {
+        key: 'pageSize',
+        label: 'Tamaño de página',
+        type: 'select',
+        default: 'fit',
+        choices: [
+          { value: 'fit', label: 'Ajustar a la imagen' },
+          { value: 'a4', label: 'A4' },
+          { value: 'letter', label: 'Carta (Letter)' },
+        ],
+      },
+      {
+        key: 'orientation',
+        label: 'Orientación',
+        type: 'select',
+        default: 'auto',
+        choices: [
+          { value: 'auto', label: 'Automática' },
+          { value: 'portrait', label: 'Vertical' },
+          { value: 'landscape', label: 'Horizontal' },
+        ],
+      },
+      { key: 'margin', label: 'Margen (pt)', type: 'number', default: 0, min: 0, max: 200 },
+    ],
+  },
+  {
+    id: 'pdf-to-images',
+    category: 'pdf',
+    label: 'PDF → imágenes (una por página)',
+    inputExts: ['pdf'],
+    outputs: [
+      { format: 'jpeg', ext: 'jpg', label: 'JPEG (.jpg)' },
+      { format: 'png', ext: 'png', label: 'PNG (.png)' },
+    ],
+    arity: 'each',
+    options: [
+      { key: 'dpi', label: 'Resolución (ppp)', type: 'number', default: 150, min: 36, max: 600 },
+      { key: 'quality', label: 'Calidad (JPEG)', type: 'number', default: 90, min: 1, max: 100 },
+    ],
+  },
+  {
+    id: 'pdf-compress',
+    category: 'pdf',
+    label: 'Comprimir PDF',
+    description: 'Rasteriza cada página a JPEG (con pérdida). Ideal para PDF escaneados.',
+    inputExts: ['pdf'],
+    outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
+    arity: 'each',
+    options: [
+      {
+        key: 'quality',
+        label: 'Nivel',
+        type: 'select',
+        default: '70',
+        choices: [
+          { value: '40', label: 'Compresión alta' },
+          { value: '70', label: 'Compresión media' },
+          { value: '85', label: 'Compresión baja' },
+        ],
+      },
+      { key: 'dpi', label: 'Resolución (ppp)', type: 'number', default: 150, min: 36, max: 400 },
+    ],
+  },
+  {
+    id: 'pdf-grayscale',
+    category: 'pdf',
+    label: 'PDF a escala de grises',
+    inputExts: ['pdf'],
+    outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
+    arity: 'each',
+    options: [{ key: 'dpi', label: 'Resolución (ppp)', type: 'number', default: 150, min: 36, max: 400 }],
+  },
+  {
+    id: 'pdf-page-numbers',
+    category: 'pdf',
+    label: 'Añadir números de página',
+    inputExts: ['pdf'],
+    outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
+    arity: 'each',
+    options: [
+      {
+        key: 'position',
+        label: 'Posición',
+        type: 'select',
+        default: 'bottom-center',
+        choices: [
+          { value: 'bottom-center', label: 'Abajo centro' },
+          { value: 'bottom-right', label: 'Abajo derecha' },
+          { value: 'bottom-left', label: 'Abajo izquierda' },
+          { value: 'top-center', label: 'Arriba centro' },
+          { value: 'top-right', label: 'Arriba derecha' },
+          { value: 'top-left', label: 'Arriba izquierda' },
+        ],
+      },
+      { key: 'start', label: 'Empezar en', type: 'number', default: 1, min: 0, max: 100000 },
+      { key: 'fontSize', label: 'Tamaño', type: 'number', default: 11, min: 6, max: 48 },
+    ],
+  },
+  {
+    id: 'pdf-watermark',
+    category: 'pdf',
+    label: 'Marca de agua',
+    inputExts: ['pdf'],
+    outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
+    arity: 'each',
+    options: [
+      { key: 'text', label: 'Texto', type: 'text', default: 'BORRADOR', placeholder: 'p. ej. CONFIDENCIAL' },
+      { key: 'opacity', label: 'Opacidad', type: 'number', default: 0.2, min: 0.05, max: 0.9 },
+      { key: 'angle', label: 'Ángulo', type: 'number', default: 45, min: -90, max: 90 },
+    ],
+  },
+  {
+    id: 'pdf-crop',
+    category: 'pdf',
+    label: 'Recortar márgenes',
+    inputExts: ['pdf'],
+    outputs: [{ format: 'pdf', ext: 'pdf', label: 'PDF (.pdf)' }],
+    arity: 'each',
+    options: [{ key: 'margin', label: 'Margen a recortar (pt)', type: 'number', default: 20, min: 0, max: 400 }],
   },
   {
     id: 'pdf-metadata',
@@ -465,6 +600,76 @@ export const TOOLKIT_OPS: ToolkitOp[] = [
     arity: 'each',
     options: [
       { key: 'quality', label: 'Calidad', type: 'number', default: 70, min: 1, max: 100 },
+    ],
+  },
+  {
+    id: 'image-crop',
+    category: 'images',
+    label: 'Recortar imagen (proporción)',
+    inputExts: ['png', 'jpg', 'jpeg', 'webp'],
+    outputs: [{ format: 'same', ext: 'png', label: 'Mismo formato' }],
+    arity: 'each',
+    options: [
+      {
+        key: 'aspect',
+        label: 'Proporción',
+        type: 'select',
+        default: '1:1',
+        choices: [
+          { value: '1:1', label: 'Cuadrado (1:1)' },
+          { value: '4:3', label: '4:3' },
+          { value: '3:2', label: '3:2' },
+          { value: '16:9', label: '16:9' },
+          { value: '9:16', label: 'Vertical (9:16)' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'image-rotate',
+    category: 'images',
+    label: 'Rotar o voltear imagen',
+    inputExts: ['png', 'jpg', 'jpeg', 'webp'],
+    outputs: [{ format: 'same', ext: 'png', label: 'Mismo formato' }],
+    arity: 'each',
+    options: [
+      {
+        key: 'transform',
+        label: 'Transformación',
+        type: 'select',
+        default: 'rotate90',
+        choices: [
+          { value: 'rotate90', label: '90° a la derecha' },
+          { value: 'rotate270', label: '90° a la izquierda' },
+          { value: 'rotate180', label: '180°' },
+          { value: 'flipH', label: 'Voltear horizontal' },
+          { value: 'flipV', label: 'Voltear vertical' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'image-watermark',
+    category: 'images',
+    label: 'Marca de agua en imagen',
+    inputExts: ['png', 'jpg', 'jpeg', 'webp'],
+    outputs: [{ format: 'same', ext: 'png', label: 'Mismo formato' }],
+    arity: 'each',
+    options: [
+      { key: 'text', label: 'Texto', type: 'text', default: 'BORRADOR', placeholder: 'p. ej. © Mi Nombre' },
+      { key: 'opacity', label: 'Opacidad', type: 'number', default: 0.35, min: 0.05, max: 0.9 },
+      {
+        key: 'position',
+        label: 'Posición',
+        type: 'select',
+        default: 'bottom-right',
+        choices: [
+          { value: 'bottom-right', label: 'Abajo derecha' },
+          { value: 'top-left', label: 'Arriba izquierda' },
+          { value: 'center', label: 'Centro' },
+          { value: 'tile', label: 'Mosaico' },
+        ],
+      },
     ],
   },
 
