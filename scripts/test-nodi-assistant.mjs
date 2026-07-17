@@ -189,7 +189,10 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(ipc, /nodi:windowDrag:begin/);
   assert.match(ipc, /nodi:windowDrag:move/);
   assert.match(mascot, /COMPACT_WIDTH = FIGURE_WIDTH \+ MARGIN \* 2/);
+  assert.match(mascot, /movable:\s*false/, 'AppKit must not apply a second, conflicting drag constraint at screen edges');
   assert.match(mascot, /placeWindowAroundNodi/);
+  assert.match(mascot, /const isRepeatedRequest = requestedBounds/, 'clamped pointer movement must not repeatedly invalidate a native edge constraint');
+  assert.match(mascot, /const appliedBounds = win\.getBounds\(\)/, 'renderer placement follows the bounds actually applied by the window manager');
   assert.match(mascot, /const expanded = bounds\.width > COMPACT_WIDTH \|\| bounds\.height > COMPACT_HEIGHT/);
   assert.match(mascot, /windowDrag\.expanded/, 'pressing Nodi must not compact an open radial menu before it closes');
   assert.match(mascot, /screen\.getDisplayNearestPoint/);
@@ -199,6 +202,9 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(component, /updateSettings\(\{ mascotEnabled: false \}\)/);
   assert.match(app, /onSettingsChanged\(\(\) => \{ void reloadSettings\(\); \}\)/, 'the main window unmounts Nodi after an overlay-originated settings change');
   assert.match(component, /closing \? 'closing'/);
+  assert.match(component, /settings\?\.mascotStyle !== 'orb'\) wave\(\)/, 'opening the orb menu cannot replace its continuous float with a snapping rock animation');
+  assert.match(component, /window\.innerWidth - overlayPlacement\.x - figureW/, 'the overlay anchor follows the stable native-window edge during horizontal resize');
+  assert.match(component, /window\.innerHeight - overlayPlacement\.y - figureH/, 'the overlay anchor follows the stable native-window edge during vertical resize');
   assert.match(figure, /closing-accessory-smoke/);
   assert.match(figure, /closing-body-smoke/);
   for (const animation of ['nodi-close-limb', 'nodi-close-accessory', 'nodi-close-face', 'nodi-close-core', 'nodi-close-smoke']) {

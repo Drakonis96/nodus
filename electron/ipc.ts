@@ -768,10 +768,6 @@ export function registerIpc(
     const win = BrowserWindow.fromWebContents(e.sender);
     if (!win) return { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
     const nextPlacement = setMascotWindowExpanded(win, Boolean(expanded));
-    // Reassert the single interaction policy after a native bounds change. On macOS
-    // this also keeps the transparent panel's hit-test state in sync with its new
-    // compact/expanded content bounds.
-    win.setIgnoreMouseEvents(false, { forward: true });
     if (expanded) win.focus();
     return nextPlacement;
   });

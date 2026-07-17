@@ -25,6 +25,7 @@ let mascotWindow: BrowserWindow | null = null;
 let tutorialVisible = false;
 let placement: NodiOverlayPlacement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
 let windowDrag: { cursorX: number; cursorY: number; nodiX: number; nodiY: number; expanded: boolean } | null = null;
+let requestedBounds: { x: number; y: number; width: number; height: number } | null = null;
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(min, value), Math.max(min, max));
 
@@ -45,8 +46,37 @@ function placeWindowAroundNodi(win: BrowserWindow, desiredX: number, desiredY: n
   const x = clamp(idealX, workArea.x, workArea.x + workArea.width - width);
   const y = clamp(idealY, workArea.y, workArea.y + workArea.height - height);
 
-  placement = { x: Math.round(nodiX - x), y: Math.round(nodiY - y), horizontal, vertical };
-  win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) });
+  const nextBounds = { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+  const currentBounds = win.getBounds();
+  const isRepeatedRequest = requestedBounds
+    && requestedBounds.x === nextBounds.x
+    && requestedBounds.y === nextBounds.y
+    && requestedBounds.width === nextBounds.width
+    && requestedBounds.height === nextBounds.height;
+  if (!isRepeatedRequest) {
+    if (
+      currentBounds.x !== nextBounds.x
+      || currentBounds.y !== nextBounds.y
+      || currentBounds.width !== nextBounds.width
+      || currentBounds.height !== nextBounds.height
+    ) {
+      win.setBounds(nextBounds, false);
+    }
+    // Keep the requested rectangle as well as the applied one. AppKit may inset a
+    // compact NSPanel at a screen edge; comparing only against getBounds() would
+    // resend the rejected x=0 request on every pointermove and make the panel rock.
+    requestedBounds = nextBounds;
+  }
+  // Read the applied bounds: native window managers may constrain a requested
+  // position. Placement must describe where Nodi really is, not where we asked the
+  // host window to be, or the next pointer event feeds that error back as a bounce.
+  const appliedBounds = win.getBounds();
+  placement = {
+    x: Math.round(clamp(nodiX - appliedBounds.x, 0, appliedBounds.width - FIGURE_WIDTH)),
+    y: Math.round(clamp(nodiY - appliedBounds.y, 0, appliedBounds.height - FIGURE_HEIGHT)),
+    horizontal,
+    vertical,
+  };
   return placement;
 }
 
@@ -76,7 +106,11 @@ function createMascotWindow(): BrowserWindow {
     transparent: true,
     backgroundColor: '#00000000',
     resizable: false,
-    movable: true,
+    // Movement is implemented below in absolute screen space. Letting AppKit also
+    // treat this panel as user-movable makes macOS constrain a compact window 43px
+    // away from the left edge while the expanded one can reach x=0, so changing
+    // size or dragging at that edge visibly bounces Nodi between both positions.
+    movable: false,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -100,7 +134,12 @@ function createMascotWindow(): BrowserWindow {
   // demote it across Space changes). The 'panel' type above handles the fullscreen /
   // all-Spaces behaviour, so we don't call setVisibleOnAllWorkspaces (which would
   // transform the process type and flicker the Dock icon each time).
-  const applyLevels = () => win.setAlwaysOnTop(true, 'screen-saver');
+  const applyLevels = () => {
+    win.setAlwaysOnTop(true, 'screen-saver');
+    // `movable: false` is not consistently retained when AppKit materialises a
+    // non-activating panel, so enforce it on the live NSWindow as well.
+    win.setMovable(false);
+  };
   applyLevels();
   // Keep the compact host interactive. Enabling it from a forwarded mousemove races
   // a fast click, which makes Nodi appear unresponsive. The compact window is only a
@@ -127,6 +166,7 @@ function createMascotWindow(): BrowserWindow {
     if (mascotWindow === win) {
       mascotWindow = null;
       windowDrag = null;
+      requestedBounds = null;
       placement = { x: MARGIN, y: MARGIN, horizontal: 'left', vertical: 'up' };
     }
   });
