@@ -23,6 +23,10 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string; color: string
   testimonios: { icon: 'microphone', color: '#0891b2', label: 'Testimonios' },
   worldbuilding: { icon: 'globe', color: '#7c3aed', label: 'Worldbuilding' },
   docencia: { icon: 'presentation', color: '#ea580c', label: 'Docencia' },
+  mcp: { icon: 'plug', color: '#2563eb', label: 'Servidor MCP' },
+  nodi: { icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' },
+  toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
+  languages: { icon: 'languages', color: '#db2777', label: 'Idiomas' },
 };
 
 function readLastSeen(): string | null {

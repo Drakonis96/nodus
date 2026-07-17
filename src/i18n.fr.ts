@@ -89,6 +89,7 @@ export const FR: Record<string, string> = {
   'Nueva versión': 'Nouvelle version',
   '¡Tenemos novedades!': 'Nous avons des nouveautés !',
   'Lo más destacado': 'Les temps forts',
+  'Idiomas': 'Langues',
   'APOYO OPCIONAL': 'SOUTIEN FACULTATIF',
   'Explorar las novedades': 'Découvrir les nouveautés',
   'El enlace se abrirá en tu navegador. Nodus no procesa pagos ni recibe información de pago.':
