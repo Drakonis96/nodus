@@ -168,6 +168,13 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(component, /e\.screenX - origin\.screenX/);
   assert.match(component, /e\.screenY - origin\.screenY/);
   assert.match(component, /Math\.hypot\(dx, dy\) < DRAG_THRESHOLD_PX/, 'small pointer jitter remains a click');
+  const pointerDownBody = component.slice(component.indexOf('const onFigurePointerDown'), component.indexOf('const onFigurePointerMove'));
+  const pointerMoveBody = component.slice(component.indexOf('const onFigurePointerMove'), component.indexOf('const finishFigurePointer'));
+  assert.doesNotMatch(pointerDownBody, /setDragging\(true\)/, 'pressing Nodi must not flash the drag pose before the pointer moves');
+  assert.ok(
+    pointerMoveBody.indexOf('Math.hypot(dx, dy) < DRAG_THRESHOLD_PX') < pointerMoveBody.indexOf('setDragging(true)'),
+    'drag visuals only start after the pointer clears the drag threshold',
+  );
   assert.match(component, /onLostPointerCapture=\{onFigurePointerCaptureLost\}/, 'a lost capture cannot leave Nodi stuck dragging');
   assert.match(component, /vertical === 'down' \? Math\.round\(figureH \* 0\.12\)/, 'the downward radial arc clears Nodi’s longer lower limbs');
   assert.match(component, /const RADIAL_NODE_GAP_PX = 58/, 'radial actions keep a deliberate 12px edge-to-edge gap');

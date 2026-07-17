@@ -493,7 +493,6 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
     movedRef.current = false;
     draggingRef.current = false;
     dragOriginRef.current = { screenX: e.screenX, screenY: e.screenY, x: pos?.x ?? 0, y: pos?.y ?? 0 };
-    setDragging(true);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     if (isOverlay) {
       void window.nodus.nodiBeginWindowDrag(e.screenX, e.screenY).then(setOverlayPlacement).catch(() => {});
@@ -510,6 +509,10 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       if (!movedRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
       movedRef.current = true;
       draggingRef.current = true;
+      // A press is still a click until it clears the drag threshold. Applying the
+      // dragging visuals on pointer-down interrupts both mascots' idle animation
+      // for a single click, which reads as a flash and a small vertical jump.
+      setDragging(true);
       if (isOverlay) {
         void window.nodus.nodiDragWindow(e.screenX, e.screenY).then(setOverlayPlacement).catch(() => {});
       }
