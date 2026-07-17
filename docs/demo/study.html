@@ -3,21 +3,20 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Nodus — Genealogy demo</title>
-  <meta name="description" content="Interactive demo of Nodus in Genealogy mode: reconstruct a family from primary sources — persons, family tree, timeline, evidence archive, map and a family-history report."/>
+  <title>Nodus — Study demo</title>
+  <meta name="description" content="Interactive demo of Nodus in Study mode: courses and subjects, a schedule and calendar, materials, recorded classes with transcripts, an idea map per subject, a question bank and spaced review — all local."/>
   <link rel="icon" type="image/svg+xml" href="../assets/nodus-logo.svg"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <link rel="stylesheet" href="demo.css?v=20260717-study3"/>
 </head>
-<body class="demo-page gen">
+<body class="demo-page st">
   <nav class="site-nav">
     <a class="site-logo" href="../index.html"><img src="../assets/nodus-logo.svg" alt=""/> Nodus</a>
     <div class="site-links">
       <a href="../index.html#story" class="hideS">How it works</a>
-      <a href="../index.html#modes" class="hideS">Modes</a>
+      <a href="../index.html#vaults" class="hideS">Vaults</a>
       <a href="../index.html#views" class="hideS">Views</a>
       <a href="../index.html#contrib" class="hideS">Contribute</a>
       <a href="../index.html#faq" class="hideS">FAQ</a>
@@ -30,44 +29,44 @@
   <div class="demo-frame">
     <div class="mac-titlebar">
       <span class="mac-dots"><i></i><i></i><i></i></span>
-      <span class="mac-title">Nodus — Genealogy demo</span>
+      <span class="mac-title">Nodus — Study demo</span>
     </div>
-    <div class="shell gen">
+    <div class="shell st">
     <header class="topbar">
       <a href="../index.html" class="brand" style="text-decoration:none;color:inherit">
         <img src="../assets/nodus-logo.svg" alt="Nodus logo"/> Nodus
       </a>
       <div class="vault-switch" id="vault-switch">
         <button class="vault-btn" onclick="toggleVaultMenu(event)" aria-haspopup="true" aria-expanded="false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
-          <span class="vault-name">Serrano family</span>
-          <span class="vault-mode gen">Genealogy</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg>
+          <span class="vault-name">General Biology</span>
+          <span class="vault-mode st">Study</span>
           <svg class="vchev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <div class="vault-menu" id="vault-menu" role="menu">
           <div class="vault-menu-label">Switch demo mode</div>
-          <a class="vault-opt active" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-tag">Active</span></a>
+          <a class="vault-opt active" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-tag">Active</span></a>
           <a class="vault-opt" href="index.html" role="menuitem"><span class="vm-dot academic"></span><span class="vm-t"><b>Academic</b><span>Learning science library</span></span><span class="vm-load">Open</span></a>
+          <a class="vault-opt" href="genealogy.html" role="menuitem"><span class="vm-dot gen"></span><span class="vm-t"><b>Genealogy</b><span>Serrano family</span></span><span class="vm-load">Open</span></a>
           <a class="vault-opt" href="databases.html" role="menuitem"><span class="vm-dot db"></span><span class="vm-t"><b>Databases</b><span>Field notebook</span></span><span class="vm-load">Open</span></a>
-          <a class="vault-opt" href="study.html" role="menuitem"><span class="vm-dot st"></span><span class="vm-t"><b>Study</b><span>General Biology</span></span><span class="vm-load">Open</span></a>
           <div class="vault-menu-label">Not in the demo yet</div>
           <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Teaching</b><span>Shell in the app · preview</span></span><span class="vm-soon">Preview</span></button>
           <button class="vault-opt disabled" disabled><span class="vm-dot soon"></span><span class="vm-t"><b>Primary Sources</b><span>Archival records + literature</span></span><span class="vm-soon">Soon</span></button>
         </div>
       </div>
       <div class="spacer"></div>
-      <button class="tb-btn" onclick="GUI.chat()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3Z"/></svg>
-        Assistant</button>
-      <button class="tb-btn" onclick="GUI.toast('In the app: add a primary source — a scan, PDF or transcript — to the evidence archive.')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
-        Add source</button>
-      <button class="tb-btn primary" onclick="GUI.toast('In the app: re-indexes the archive and re-extracts people, dates and facts.')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
-        Sync</button>
+      <button class="tb-btn" onclick="window.go('chat')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-7a8 8 0 0 1 8-8h2a8 8 0 0 1 8 4Z"/></svg>
+        Study chat</button>
+      <button class="tb-btn" onclick="GUI.toast('In the app: drop in PDFs, slides, documents or audio — they are extracted, indexed and placed in your course hierarchy.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V5M7 10l5-5 5 5"/><path d="M4 19h16"/></svg>
+        Add material</button>
+      <button class="tb-btn primary" onclick="GUI.toast('In the app: records the class with a live level meter, then transcribes it with local Whisper.')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg>
+        Record class</button>
     </header>
     <div class="demo-banner">
-      <span><b>Web demo · Genealogy mode</b> — a static sample family, free to explore. It mirrors the desktop app but is a simplified snapshot: the real views are richer and change between releases. The AI, record analysis and archive indexing run only in the desktop app (100% free &amp; open source).</span>
+      <span><b>Web demo · Study mode</b> — the vault's own sample workspace, free to explore. It mirrors the desktop app but is a simplified snapshot: the real views are richer and change between releases. The AI, transcription and indexing run only on your machine (100% free &amp; open source).</span>
       <a href="https://github.com/Drakonis96/nodus/releases/latest" target="_blank" rel="noopener">Get the desktop app →</a>
     </div>
     <div class="body">
@@ -76,12 +75,10 @@
     </div>
     </div>
   </div>
-  <div id="chat-root"></div>
   <div id="modal-root"></div>
   <div id="toast" role="status"></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="genealogy-data.js?v=204"></script>
-  <script src="genealogy-app.js?v=204"></script>
+  <script src="study-data.js?v=20260717"></script>
+  <script src="study-app.js?v=20260717b"></script>
   <script src="vault-switch.js?v=201"></script>
   <script>
     (function () {
