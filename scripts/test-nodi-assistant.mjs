@@ -213,6 +213,12 @@ test('Nodi drags in absolute screen space and closes through an animated context
   assert.match(component, /window\.innerWidth - overlayPlacement\.x - figureW/, 'the overlay anchor follows the stable native-window edge during horizontal resize');
   assert.match(component, /window\.innerHeight - overlayPlacement\.y - figureH/, 'the overlay anchor follows the stable native-window edge during vertical resize');
   assert.doesNotMatch(ipc, /if \(expanded\) win\.focus\(\)/, 'opening radial controls must not explicitly focus Electron over the active desktop app');
+  assert.match(component, /vaultTypeColor\(vaultType\)/, 'every Nodi surface inherits the active vault accent');
+  assert.match(component, /nodi-theme-\$\{lightUi \? 'light' : 'dark'\}/, 'all Nodi controls resolve one shared app theme');
+  assert.doesNotMatch(component, /nodi-light/, 'quick notes must not carry a panel-only light theme');
+  assert.match(companionCss, /\.nodi-theme-light \.nodi-node\s*\{[^}]*var\(--nodi-vault-accent/s, 'light radial actions use the vault accent');
+  assert.match(companionCss, /\.nodi-theme-light \.nodi-panel\s*\{[^}]*background:\s*#ffffff/s, 'chat, notifications and notes share the light panel surface');
+  assert.match(companionCss, /\.nodi-theme-light \.nodi-msg\.user\s*\{[^}]*var\(--nodi-vault-accent/s, 'light chat messages use the vault accent');
   assert.match(figure, /closing-accessory-smoke/);
   assert.match(figure, /closing-body-smoke/);
   for (const animation of ['nodi-close-limb', 'nodi-close-accessory', 'nodi-close-face', 'nodi-close-core', 'nodi-close-smoke']) {

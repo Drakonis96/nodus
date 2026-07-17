@@ -196,21 +196,63 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.nodi-note-row').length === 1);
   log('note deleted -> 1 remaining');
 
-  // ── Light theme screenshot ──────────────────────────────────────────────────
+  // ── Shared light theme + active-vault accent ────────────────────────────────
+  await page.evaluate(async () => {
+    const active = await window.nodus.getActiveVault();
+    await window.nodus.setVaultType(active.id, 'databases');
+    const bridge = await window.nodus.createVault({ name: 'Accent bridge', type: 'academic' });
+    await window.nodus.switchVault(bridge.vault.id);
+    await window.nodus.switchVault(active.id);
+  });
+  await page.waitForFunction(() => {
+    const root = document.querySelector('.nodi-companion');
+    return root && getComputedStyle(root).getPropertyValue('--nodi-vault-accent').trim() === '#b30333';
+  }, undefined, { timeout: 10_000 });
   await applyTheme('light');
-  await page.waitForFunction(() => document.querySelector('.nodi-notes-panel')?.classList.contains('nodi-light') ?? false, undefined, { timeout: 10_000 });
+  await page.waitForFunction(() => {
+    const root = document.querySelector('.nodi-companion');
+    return root?.getAttribute('data-nodi-theme') === 'light';
+  }, undefined, { timeout: 10_000 });
   await page.locator('.nodi-note-row').first().waitFor();
+  const lightNotesTheme = await page.locator('.nodi-notes-panel').evaluate((panel) => ({
+    background: getComputedStyle(panel).backgroundColor,
+  }));
+  assert.equal(lightNotesTheme.background, 'rgb(255, 255, 255)');
   await page.screenshot({ path: `${shots}/notes-5-list-light.png` });
   // open editor in light mode
   await page.locator('.nodi-note-open').first().click();
   await ta.waitFor();
+  const lightSaveBackground = await page.locator('.nodi-note-save').evaluate((button) => getComputedStyle(button).backgroundColor);
+  assert.equal(lightSaveBackground, 'rgb(179, 3, 51)', 'quick notes must use the databases-vault accent');
   await page.screenshot({ path: `${shots}/notes-6-editor-light.png` });
-  log('light theme verified');
+  log('light notes theme verified:', JSON.stringify({ ...lightNotesTheme, save: lightSaveBackground }));
+
+  // Notifications and chat use the same white surface and vault accent; quick
+  // notes is no longer the only light panel.
+  await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Cerrar"]').click();
+  await openMenu();
+  await page.locator('[data-nodi-action="ntf"]').click();
+  const notificationPanel = page.locator('.nodi-panel');
+  await notificationPanel.waitFor();
+  assert.equal(await notificationPanel.evaluate((panel) => getComputedStyle(panel).backgroundColor), 'rgb(255, 255, 255)');
+  await notificationPanel.locator('.nodi-panel-head button[aria-label="Cerrar"]').click();
+  await openMenu();
+  await page.locator('[data-nodi-action="chat"]').click();
+  const chatPanel = page.locator('.nodi-chat-panel');
+  await chatPanel.waitFor();
+  const lightChatTheme = await chatPanel.evaluate((panel) => ({
+    background: getComputedStyle(panel).backgroundColor,
+    send: getComputedStyle(panel.querySelector('.nodi-chat-send')).backgroundColor,
+  }));
+  assert.equal(lightChatTheme.background, 'rgb(255, 255, 255)');
+  assert.equal(lightChatTheme.send, 'rgb(179, 3, 51)', 'chat action must use the databases-vault accent');
+  await chatPanel.locator('.nodi-panel-head button[title="Cerrar"]').click();
+  log('notifications + chat share the light theme:', JSON.stringify(lightChatTheme));
 
   // ── Always-on-top overlay ─────────────────────────────────────────────────
   // The same persisted note must be reachable from Nodi's independent desktop
   // window, where the extra "Open Nodus" action brings the radial count to five.
-  await page.evaluate(() => window.nodus.updateSettings({ mascotAlwaysOnTop: true, theme: 'dark' }));
+  await page.evaluate(() => window.nodus.updateSettings({ mascotAlwaysOnTop: true, theme: 'light' }));
   let overlay = null;
   for (let i = 0; i < 40 && !overlay; i++) {
     overlay = app.windows().find((candidate) => candidate.url().includes('mascot'));
@@ -224,19 +266,29 @@ try {
   await overlayFigure.click();
   await overlay.waitForFunction(() => document.querySelectorAll('.nodi-node.open').length === 5);
   await overlay.waitForTimeout(450);
-  const overlayGaps = await overlay.evaluate(() => {
+  const overlayMetrics = await overlay.evaluate(() => {
     const centres = [...document.querySelectorAll('.nodi-node.open')].map((node) => {
       const rect = node.getBoundingClientRect();
       return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     });
-    return centres.slice(1).map((point, i) => Math.hypot(point.x - centres[i].x, point.y - centres[i].y));
+    const styles = [...document.querySelectorAll('.nodi-node.open')].map((node) => ({
+      background: getComputedStyle(node).backgroundColor,
+      color: getComputedStyle(node).color,
+      border: getComputedStyle(node).borderColor,
+    }));
+    return { gaps: centres.slice(1).map((point, i) => Math.hypot(point.x - centres[i].x, point.y - centres[i].y)), styles };
   });
-  overlayGaps.forEach((gap) => assert.ok(gap >= 57 && gap <= 59, `overlay radial centre gap should be 58px, got ${gap}`));
+  overlayMetrics.gaps.forEach((gap) => assert.ok(gap >= 57 && gap <= 59, `overlay radial centre gap should be 58px, got ${gap}`));
+  overlayMetrics.styles.forEach((style) => {
+    assert.equal(style.background, 'rgb(255, 255, 255)', 'every light radial action must have a white surface');
+    assert.equal(style.color, 'rgb(179, 3, 51)', 'every light radial icon must use the vault accent');
+    assert.equal(style.border, 'rgb(179, 3, 51)', 'every light radial border must use the vault accent');
+  });
   await overlay.locator('[data-nodi-action="notes"]').click();
   await overlay.locator('.nodi-notes-panel').waitFor();
   assert.equal(await overlay.locator('.nodi-note-row').count(), 1, 'saved note should be shared with the overlay');
-  await overlay.screenshot({ path: `${shots}/notes-7-overlay-dark.png` });
-  log('always-on-top overlay verified ->', overlayGaps.map((gap) => gap.toFixed(1)).join(', '));
+  await overlay.screenshot({ path: `${shots}/notes-7-overlay-light.png` });
+  log('always-on-top overlay verified ->', overlayMetrics.gaps.map((gap) => gap.toFixed(1)).join(', '));
 
   log('ALL CHECKS PASSED. Shots in', shots);
 } finally {
