@@ -1198,7 +1198,7 @@
   </div>
 </section>
 
-<button id="to-top" aria-label="Back to top" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+<button type="button" id="to-top" aria-label="Back to top">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
 </button>
 
@@ -1243,6 +1243,9 @@
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
 const toTop = document.getElementById('to-top');
+toTop.addEventListener('click', () => {
+  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+});
 addEventListener('scroll', () => {
   nav.classList.toggle('scrolled', scrollY > 24);
   toTop.classList.toggle('show', scrollY > 600);
@@ -2334,6 +2337,6 @@ function setLang(lang) {
   } else { start(); }
 })();
 </script>
-  <script src="nodi.js?v=20260717orb"></script>
+  <script src="nodi.js?v=20260717orb2"></script>
 </body>
 </html>
