@@ -1,3 +1,5 @@
+import type { StudyAcademicYear } from './studyAcademicYears';
+
 export const STUDY_DOCUMENT_KINDS = [
   'apunte',
   'manual',
@@ -36,10 +38,18 @@ export interface StudyNamedEntity extends StudyBaseEntity {
   favorite: boolean;
 }
 
-export type StudyCourse = StudyNamedEntity;
+/**
+ * Courses and subjects are the only entities that carry the academic year; see
+ * {@link ../shared/studyAcademicYears.effectiveAcademicYearId} for how a subject
+ * inherits its course's year when it does not state one.
+ */
+export interface StudyCourse extends StudyNamedEntity {
+  academicYearId: string | null;
+}
 
 export interface StudySubject extends StudyNamedEntity {
   courseId: string;
+  academicYearId: string | null;
 }
 
 export interface StudyTopic extends StudyNamedEntity {
@@ -114,6 +124,7 @@ export interface StudyTemplateContent {
 }
 
 export interface StudyWorkspace {
+  academicYears: StudyAcademicYear[];
   courses: StudyCourse[];
   subjects: StudySubject[];
   topics: StudyTopic[];
@@ -133,7 +144,8 @@ export interface StudyPlacementInput {
   position?: number;
 }
 
-export interface CreateStudyCourseInput {
+/** The visual and descriptive metadata every study entity shares. */
+export interface StudyEntityMetadataInput {
   name: string;
   description?: string | null;
   color?: string | null;
@@ -143,17 +155,26 @@ export interface CreateStudyCourseInput {
   year?: number | null;
 }
 
+/**
+ * Only courses and subjects take an academic year, so it lives here rather than
+ * on {@link StudyEntityMetadataInput} — a topic or a folder that accepted one
+ * would have to silently drop it.
+ */
+export interface CreateStudyCourseInput extends StudyEntityMetadataInput {
+  academicYearId?: string | null;
+}
+
 export interface CreateStudySubjectInput extends CreateStudyCourseInput {
   courseId: string;
 }
 
-export interface CreateStudyTopicInput extends CreateStudyCourseInput {
+export interface CreateStudyTopicInput extends StudyEntityMetadataInput {
   subjectId: string;
   folderId?: string | null;
   parentId?: string | null;
 }
 
-export interface CreateStudyFolderInput extends CreateStudyCourseInput {
+export interface CreateStudyFolderInput extends StudyEntityMetadataInput {
   parentId?: string | null;
   courseId?: string | null;
   subjectId?: string | null;

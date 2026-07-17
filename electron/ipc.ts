@@ -99,6 +99,8 @@ import type {
   DecorativeImageEntityKind,
   DecorativeImageStyle,
   SearchResultKind,
+  CreateStudyAcademicYearInput,
+  UpdateStudyAcademicYearInput,
   CreateStudyCourseInput,
   CreateStudyDocumentInput,
   CreateStudyFolderInput,
@@ -2051,8 +2053,13 @@ export function registerIpc(
 
   // study guide
   h('study:workspace', async (_e, options?: StudyWorkspaceOptions) => studyOrg.getStudyWorkspace(options));
-  h('study:schedule:get', async () => studySchedule.getStudySchedule());
+  h('study:schedule:get', async (_e, academicYearId?: string | null) => studySchedule.getStudySchedule(academicYearId ?? null));
   h('study:schedule:save', async (_e, schedule: StudySchedule) => studySchedule.saveStudySchedule(schedule));
+  h('study:schedule:copy', async (_e, fromAcademicYearId: string | null, toAcademicYearId: string | null) =>
+    studySchedule.copyStudySchedule(fromAcademicYearId, toAcademicYearId));
+  h('study:academicYear:create', async (_e, input: CreateStudyAcademicYearInput) => studyOrg.createStudyAcademicYear(input));
+  h('study:academicYear:update', async (_e, id: string, patch: UpdateStudyAcademicYearInput) => studyOrg.updateStudyAcademicYear(id, patch));
+  h('study:academicYear:delete', async (_e, id: string) => { studyOrg.deleteStudyAcademicYear(id); });
   h('study:course:create', async (_e, input: CreateStudyCourseInput) => studyOrg.createStudyCourse(input));
   h('study:subject:create', async (_e, input: CreateStudySubjectInput) => studyOrg.createStudySubject(input));
   h('study:topic:create', async (_e, input: CreateStudyTopicInput) => studyOrg.createStudyTopic(input));

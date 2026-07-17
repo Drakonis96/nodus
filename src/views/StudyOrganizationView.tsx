@@ -1,12 +1,20 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { StudyDocument, StudyDocumentKind, StudyWorkspace } from '@shared/studyOrg';
-import type { StudyExportFormat, StudyExportScope, StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/types';
+import type { StudyAcademicYear, StudyExportFormat, StudyExportScope, StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/types';
 import { STUDY_DOCUMENT_KINDS } from '@shared/studyOrg';
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { IconEmojiPicker } from '../components/IconEmojiPicker';
 import { StudyGeneratedQuestionsTable, StudyTestGeneratorDialog, type StudyTestScope } from '../components/StudyTestGenerator';
+import {
+  StudyAcademicYearField,
+  StudyAcademicYearManager,
+  StudyAcademicYearScopeSelect,
+  academicYearLabel,
+  useStudyAcademicYearScope,
+} from '../components/StudyAcademicYear';
+import { effectiveAcademicYearId } from '@shared/studyAcademicYears';
 import type { StudyQuestion } from '@shared/studyQuestions';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
 import { t } from '../i18n';
@@ -28,6 +36,8 @@ interface StudyCreateDraft {
   subjectId: string;
   folderId: string;
   parentId: string;
+  /** Prefilled from the year the browser is currently scoped to. */
+  academicYearId?: string;
 }
 
 interface StudyCreateValues extends StudyCreateDraft {
@@ -39,6 +49,8 @@ interface StudyCreateValues extends StudyCreateDraft {
   emoji: string;
   imageData: string;
   year: number | null;
+  /** Empty means "no academic year", or "inherit from the course" for a subject. */
+  academicYearId: string;
 }
 
 const CREATE_TITLES: Record<StudyCreateKind, string> = {
@@ -70,12 +82,14 @@ function StudyCreateDialog({
   initial,
   onSubmit,
   onCancel,
+  onManageAcademicYears,
 }: {
   draft: StudyCreateDraft;
   workspace: StudyWorkspace;
   initial?: StudyBrowserItem | null;
   onSubmit: (values: StudyCreateValues) => Promise<void>;
   onCancel: () => void;
+  onManageAcademicYears?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
@@ -84,6 +98,7 @@ function StudyCreateDialog({
   const [emoji, setEmoji] = useState(initial?.emoji ?? '');
   const [imageData, setImageData] = useState(initial?.imageData ?? '');
   const [year, setYear] = useState(initial?.year?.toString() ?? '');
+  const [academicYearId, setAcademicYearId] = useState(initial?.academicYearId ?? draft.academicYearId ?? '');
   const [courseId, setCourseId] = useState(draft.courseId);
   const [subjectId, setSubjectId] = useState(draft.subjectId);
   const [folderId, setFolderId] = useState(draft.folderId);
@@ -93,6 +108,13 @@ function StudyCreateDialog({
   const [error, setError] = useState<string | null>(null);
   const subjects = workspace.subjects.filter((subject) => subject.courseId === courseId);
   const editing = Boolean(initial);
+  const carriesAcademicYear = draft.kind === 'course' || draft.kind === 'subject';
+  // When editing, `draft.courseId` is blank (the caller only fills it for creation),
+  // so the subject's own course is the only way to know what it would inherit.
+  const parentCourseId = draft.kind === 'subject' ? (editing ? initial?.courseId ?? '' : courseId) : '';
+  const inheritedAcademicYearLabel = draft.kind === 'subject' && !academicYearId
+    ? academicYearLabel(workspace.academicYears, workspace.courses.find((course) => course.id === parentCourseId)?.academicYearId ?? null)
+    : null;
   const requiresCourse = !editing && draft.kind === 'subject';
   const requiresSubject = !editing && (draft.kind === 'topic' || draft.kind === 'folder');
   const valid = Boolean(name.trim()) && (!requiresCourse || Boolean(courseId)) && (!requiresSubject || Boolean(subjectId));
@@ -111,7 +133,7 @@ function StudyCreateDialog({
     setBusy(true);
     setError(null);
     try {
-      await onSubmit({ kind: draft.kind, name: name.trim(), courseId, subjectId, folderId, parentId, documentKind, description: description.trim(), color, icon, emoji: emoji.trim(), imageData, year: year ? Number(year) : null });
+      await onSubmit({ kind: draft.kind, name: name.trim(), courseId, subjectId, folderId, parentId, documentKind, description: description.trim(), color, icon, emoji: emoji.trim(), imageData, year: year ? Number(year) : null, academicYearId });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t('No se pudo crear el elemento.'));
       setBusy(false);
@@ -183,6 +205,16 @@ function StudyCreateDialog({
           <textarea data-testid="study-create-description" className="input mt-1 min-h-20 w-full resize-y text-sm" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t('Añade contexto, objetivos o información útil')} />
         </label>
 
+        {carriesAcademicYear && (
+          <StudyAcademicYearField
+            years={workspace.academicYears}
+            value={academicYearId}
+            onChange={setAcademicYearId}
+            inheritedLabel={inheritedAcademicYearLabel}
+            onCreateRequest={onManageAcademicYears}
+          />
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-xs text-neutral-500">{t('Año')}<input data-testid="study-create-year" className="input mt-1 w-full" type="number" min="1900" max="2200" value={year} onChange={(event) => setYear(event.target.value)} placeholder={String(new Date().getFullYear())} /></label>
           <div className="block text-xs text-neutral-500">{t('Icono o emoji')}<IconEmojiPicker icon={icon} emoji={emoji} onChange={(visual) => { setIcon(visual.icon); setEmoji(visual.emoji); }} /></div>
@@ -245,8 +277,20 @@ interface StudyBrowserItem {
   subjectId: string | null;
   topicId: string | null;
   folderId: string | null;
+  /** What this item states itself; only courses and subjects can have one. */
+  academicYearId: string | null;
+  /**
+   * Every academic year this item takes part in, `null` meaning "none". Usually
+   * one entry, but a course is listed under each year its subjects belong to —
+   * a degree carries its year per subject, and matching only the course's own
+   * (empty) year would empty the browser the moment you filtered by a year.
+   */
+  academicYearIds: (string | null)[];
   meta: string;
 }
+
+/** Item shape before the academic year is derived; see `decorate` in `browserItems`. */
+type StudyBrowserItemDraft = Omit<StudyBrowserItem, 'academicYearId' | 'academicYearIds'>;
 
 function txCount(count: number, singular: string, plural: string): string {
   return `${count} ${t(count === 1 ? singular : plural)}`;
@@ -286,14 +330,26 @@ function StudyBrowserActions({ item, onRename, onMove, onDuplicate, onDelete }: 
   );
 }
 
-function StudyBrowserCollection({ items, layout, onOpen, onRename, onMove, onDuplicate, onDelete }: { items: StudyBrowserItem[]; layout: 'grid' | 'list'; onOpen: (item: StudyBrowserItem) => void; onRename: (item: StudyBrowserItem) => void; onMove: (item: StudyBrowserItem) => void; onDuplicate: (item: StudyBrowserItem) => void; onDelete: (item: StudyBrowserItem) => void }) {
+/**
+ * The academic year(s) an item belongs to, short enough to sit next to its name.
+ * A course spanning more than two years is counted rather than listed, because
+ * the point of the badge is to be readable at a glance.
+ */
+function StudyAcademicYearBadge({ item, academicYears }: { item: StudyBrowserItem; academicYears: readonly StudyAcademicYear[] }) {
+  const labels = item.academicYearIds.map((id) => academicYearLabel(academicYears, id)).filter((label): label is string => Boolean(label)).sort().reverse();
+  if (!labels.length) return null;
+  const text = labels.length > 2 ? t('{count} cursos académicos').replace('{count}', String(labels.length)) : labels.join(' · ');
+  return <span className="ml-1.5 shrink-0 rounded bg-indigo-500/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-indigo-300" title={labels.join(' · ')}>{text}</span>;
+}
+
+function StudyBrowserCollection({ items, layout, academicYears, onOpen, onRename, onMove, onDuplicate, onDelete }: { items: StudyBrowserItem[]; layout: 'grid' | 'list'; academicYears: readonly StudyAcademicYear[]; onOpen: (item: StudyBrowserItem) => void; onRename: (item: StudyBrowserItem) => void; onMove: (item: StudyBrowserItem) => void; onDuplicate: (item: StudyBrowserItem) => void; onDelete: (item: StudyBrowserItem) => void }) {
   const actions = (item: StudyBrowserItem) => <StudyBrowserActions item={item} onRename={() => onRename(item)} onMove={() => onMove(item)} onDuplicate={() => onDuplicate(item)} onDelete={() => onDelete(item)} />;
   if (layout === 'list') return (
     <div className="overflow-x-auto rounded-xl border border-neutral-800">
       <table className="w-full min-w-[760px] border-collapse text-xs" data-testid="study-browser-list">
         <thead className="study-browser-table-head text-left"><tr><th className="px-4 py-2 font-medium">{t('Nombre')}</th><th className="w-32 px-3 py-2 font-medium">{t('Tipo')}</th><th className="w-52 px-3 py-2 font-medium">{t('Contenido')}</th><th className="w-52 px-3 py-2 text-right font-medium">{t('Acciones')}</th></tr></thead>
         <tbody>{items.map((item) => <tr key={`${item.kind}:${item.id}`} data-testid={`study-browser-${item.kind}-${item.id}`} className="border-t border-neutral-800/70 hover:bg-neutral-900/40">
-          <td className="px-4 py-2.5"><button className="flex min-w-0 items-center gap-2 text-left" onClick={() => onOpen(item)}><StudyEntityVisual item={item} /><span className="min-w-0"><span className="block truncate font-medium text-neutral-200">{item.name}</span><span className="block truncate text-[10px] text-neutral-600">{item.description || t('Sin descripción')}{item.year ? ` · ${item.year}` : ''}</span></span></button></td>
+          <td className="px-4 py-2.5"><button className="flex min-w-0 items-center gap-2 text-left" onClick={() => onOpen(item)}><StudyEntityVisual item={item} /><span className="min-w-0"><span className="flex min-w-0 items-center font-medium text-neutral-200"><span className="truncate">{item.name}</span><StudyAcademicYearBadge item={item} academicYears={academicYears} /></span><span className="block truncate text-[10px] text-neutral-600">{item.description || t('Sin descripción')}{item.year ? ` · ${item.year}` : ''}</span></span></button></td>
           <td className="px-3 py-2.5 capitalize text-neutral-500">{t(item.kind === 'course' ? 'Curso' : item.kind === 'subject' ? 'Asignatura' : item.kind === 'folder' ? 'Carpeta' : 'Tema')}</td>
           <td className="px-3 py-2.5 text-indigo-400">{item.meta}</td><td className="px-3 py-2.5">{actions(item)}</td>
         </tr>)}</tbody>
@@ -302,7 +358,7 @@ function StudyBrowserCollection({ items, layout, onOpen, onRename, onMove, onDup
   );
   return <div className="grid content-start gap-3 sm:grid-cols-2 xl:grid-cols-3" data-testid="study-browser-grid">{items.map((item) => (
     <article key={`${item.kind}:${item.id}`} data-testid={`study-browser-${item.kind}-${item.id}`} className="group rounded-xl border border-neutral-800 bg-neutral-900/40 p-4 transition-colors hover:border-indigo-700/60 hover:bg-indigo-950/20">
-      <button className="block w-full text-left" onClick={() => onOpen(item)}><span className="mb-3 block"><StudyEntityVisual item={item} size="lg" /></span><span className="block truncate text-sm font-semibold text-neutral-200">{item.name}</span><span className="mt-1 block text-[10px] font-medium uppercase tracking-wider text-indigo-400">{item.meta}{item.year ? ` · ${item.year}` : ''}</span>{item.description && <span className="mt-2 line-clamp-2 block text-xs leading-5 text-neutral-500">{item.description}</span>}</button>
+      <button className="block w-full text-left" onClick={() => onOpen(item)}><span className="mb-3 block"><StudyEntityVisual item={item} size="lg" /></span><span className="flex min-w-0 items-center text-sm font-semibold text-neutral-200"><span className="truncate">{item.name}</span><StudyAcademicYearBadge item={item} academicYears={academicYears} /></span><span className="mt-1 block text-[10px] font-medium uppercase tracking-wider text-indigo-400">{item.meta}{item.year ? ` · ${item.year}` : ''}</span>{item.description && <span className="mt-2 line-clamp-2 block text-xs leading-5 text-neutral-500">{item.description}</span>}</button>
       <span className="mt-3 flex items-center justify-between border-t border-neutral-800/70 pt-2"><button className="text-xs text-neutral-600 hover:text-indigo-400" onClick={() => onOpen(item)}>{t('Abrir')} <Icon name="chevronRight" size={12} /></button>{actions(item)}</span>
     </article>
   ))}</div>;
@@ -378,6 +434,7 @@ export function StudyOrganizationView({
   const [courseFilterId, setCourseFilterId] = useState('all');
   const [subjectFilterId, setSubjectFilterId] = useState('all');
   const [topicFilterId, setTopicFilterId] = useState('all');
+  const [academicYearManagerOpen, setAcademicYearManagerOpen] = useState(false);
   const [organizationSort, setOrganizationSort] = useState<StudyOrganizationSort>('manual');
   const [editing, setEditing] = useState<StudyDocument | null>(null);
   const [openDocumentIds, setOpenDocumentIds] = useState<string[]>([]);
@@ -466,6 +523,56 @@ export function StudyOrganizationView({
     await reload();
   };
 
+  const { scope: academicYearScope, setScope: setAcademicYearScope } = useStudyAcademicYearScope(workspace?.academicYears);
+
+  /**
+   * The academic year an item is filtered by. Everything below a subject reaches
+   * its year through that subject, so a topic can never disagree with the subject
+   * it lives in.
+   */
+  const academicYearIdFor = useCallback((courseId: string | null, subjectId: string | null): string | null => {
+    if (!workspace) return null;
+    const subject = subjectId ? workspace.subjects.find((item) => item.id === subjectId) : null;
+    if (subject) return effectiveAcademicYearId(subject, workspace.courses);
+    return courseId ? workspace.courses.find((item) => item.id === courseId)?.academicYearId ?? null : null;
+  }, [workspace]);
+
+  /**
+   * The years a course takes part in: its own, plus whatever its subjects
+   * effectively belong to. A course with neither counts as unfiled.
+   */
+  const academicYearIdsForCourse = useCallback((courseId: string): (string | null)[] => {
+    if (!workspace) return [null];
+    const years = new Set<string | null>();
+    const course = workspace.courses.find((item) => item.id === courseId);
+    if (course?.academicYearId) years.add(course.academicYearId);
+    for (const subject of workspace.subjects.filter((item) => item.courseId === courseId)) {
+      years.add(effectiveAcademicYearId(subject, workspace.courses));
+    }
+    if (!years.size) years.add(null);
+    return [...years];
+  }, [workspace]);
+
+  const matchesAcademicYear = useCallback((yearIds: (string | null)[]): boolean => {
+    if (academicYearScope === 'all') return true;
+    return yearIds.includes(academicYearScope === 'none' ? null : academicYearScope);
+  }, [academicYearScope]);
+
+  /** Whether anything is still unfiled, which is what makes "Sin curso académico" worth offering. */
+  const hasUnscopedWork = useMemo(
+    () => Boolean(workspace) && workspace!.courses.some((course) => academicYearIdsForCourse(course.id).includes(null)),
+    [workspace, academicYearIdsForCourse],
+  );
+
+  const academicYearUsage = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (!workspace) return counts;
+    const add = (id: string | null) => { if (id) counts.set(id, (counts.get(id) ?? 0) + 1); };
+    for (const course of workspace.courses) add(course.academicYearId);
+    for (const subject of workspace.subjects) add(subject.academicYearId);
+    return counts;
+  }, [workspace]);
+
   const duplicateBrowserItem = async (item: StudyBrowserItem) => {
     if (item.kind !== 'course') { setLocatingItem({ item, mode: 'duplicate' }); return; }
     await window.nodus.duplicateStudyTree(item.kind, item.id);
@@ -498,7 +605,11 @@ export function StudyOrganizationView({
       subjectId = folder?.subjectId ?? subjectId;
       folderId = target.id;
     }
-    setCreateDraft({ kind, courseId, subjectId, folderId, parentId });
+    // A new course lands in the year you are looking at. Scoping the browser to
+    // 2025/2026 and then having to restate it on every course is the busywork this
+    // whole feature exists to remove.
+    const academicYearId = academicYearScope === 'all' || academicYearScope === 'none' ? '' : academicYearScope;
+    setCreateDraft({ kind, courseId, subjectId, folderId, parentId, academicYearId });
   };
 
   const submitCreate = async (values: StudyCreateValues) => {
@@ -506,10 +617,10 @@ export function StudyOrganizationView({
     let nextTarget: StudyNavigationTarget | null = null;
     let createdDocument: StudyDocument | null = null;
     if (values.kind === 'course') {
-      const item = await window.nodus.createStudyCourse({ name: values.name, ...metadata });
+      const item = await window.nodus.createStudyCourse({ name: values.name, ...metadata, academicYearId: values.academicYearId || null });
       nextTarget = { kind: 'course', id: item.id };
     } else if (values.kind === 'subject') {
-      const item = await window.nodus.createStudySubject({ courseId: values.courseId, name: values.name, ...metadata });
+      const item = await window.nodus.createStudySubject({ courseId: values.courseId, name: values.name, ...metadata, academicYearId: values.academicYearId || null });
       nextTarget = { kind: 'subject', id: item.id };
     } else if (values.kind === 'topic') {
       const item = await window.nodus.createStudyTopic({ subjectId: values.subjectId, folderId: values.folderId || null, parentId: values.parentId || null, name: values.name, ...metadata });
@@ -583,7 +694,23 @@ export function StudyOrganizationView({
       }
       return true;
     };
-    const filter = (items: StudyBrowserItem[]) => items.filter((item) => matchesScope(item) && (!needle || `${item.name} ${item.description ?? ''} ${item.year ?? ''} ${item.meta}`.toLocaleLowerCase().includes(needle))).sort((a, b) => compareStudyOrganization(a, b, organizationSort));
+    // The academic year is derived here rather than at each call site so that every
+    // kind of item resolves it the same way, and so a new listing cannot forget to.
+    const decorate = (item: StudyBrowserItemDraft): StudyBrowserItem => {
+      const own = item.kind === 'course'
+        ? workspace.courses.find((course) => course.id === item.id)?.academicYearId ?? null
+        : item.kind === 'subject'
+          ? workspace.subjects.find((subject) => subject.id === item.id)?.academicYearId ?? null
+          : null;
+      const academicYearIds = item.kind === 'course'
+        ? academicYearIdsForCourse(item.id)
+        : [academicYearIdFor(item.courseId, item.subjectId)];
+      return { ...item, academicYearId: own, academicYearIds };
+    };
+    const filter = (items: StudyBrowserItemDraft[]) => items.map(decorate)
+      .filter((item) => matchesScope(item) && matchesAcademicYear(item.academicYearIds)
+        && (!needle || `${item.name} ${item.description ?? ''} ${item.year ?? ''} ${academicYearLabel(workspace.academicYears, item.academicYearIds.find(Boolean) ?? null) ?? ''} ${item.meta}`.toLocaleLowerCase().includes(needle)))
+      .sort((a, b) => compareStudyOrganization(a, b, organizationSort));
     if (!target) {
       return filter(workspace.courses.map((course) => ({
         kind: 'course', id: course.id, name: course.name, description: course.description, icon: course.icon || 'graduation',
@@ -601,13 +728,13 @@ export function StudyOrganizationView({
       })));
     }
     if (target.kind === 'subject') {
-      const folders: StudyBrowserItem[] = workspace.folders.filter((folder) => folder.subjectId === target.id && !folder.parentId).map((folder) => ({
+      const folders: StudyBrowserItemDraft[] = workspace.folders.filter((folder) => folder.subjectId === target.id && !folder.parentId).map((folder) => ({
         kind: 'folder', id: folder.id, name: folder.name, description: folder.description, icon: folder.icon || 'folder',
         emoji: folder.emoji, imageData: folder.imageData, year: folder.year, color: folder.color, position: folder.position, createdAt: folder.createdAt, updatedAt: folder.updatedAt,
         courseId: folder.courseId, subjectId: folder.subjectId, topicId: null, folderId: folder.id,
         meta: txCount(workspace.topics.filter((topic) => topic.folderId === folder.id && !topic.parentId).length, 'tema de estudio', 'temas de estudio'),
       }));
-      const topics: StudyBrowserItem[] = workspace.topics.filter((topic) => topic.subjectId === target.id && !topic.folderId && !topic.parentId).map((topic) => ({
+      const topics: StudyBrowserItemDraft[] = workspace.topics.filter((topic) => topic.subjectId === target.id && !topic.folderId && !topic.parentId).map((topic) => ({
         kind: 'topic', id: topic.id, name: topic.name, description: topic.description, icon: topic.icon || 'hash',
         emoji: topic.emoji, imageData: topic.imageData, year: topic.year, color: topic.color, position: topic.position, createdAt: topic.createdAt, updatedAt: topic.updatedAt,
         courseId: workspace.subjects.find((subject) => subject.id === topic.subjectId)?.courseId ?? null, subjectId: topic.subjectId, topicId: topic.id, folderId: topic.folderId,
@@ -632,7 +759,7 @@ export function StudyOrganizationView({
       })));
     }
     return [];
-  }, [workspace, target, query, courseFilterId, subjectFilterId, topicFilterId, organizationSort]);
+  }, [workspace, target, query, courseFilterId, subjectFilterId, topicFilterId, organizationSort, matchesAcademicYear, academicYearIdFor, academicYearIdsForCourse]);
 
   const breadcrumbs = useMemo<Array<{ label: string; target: StudyNavigationTarget | null }>>(() => {
     const crumbs: Array<{ label: string; target: StudyNavigationTarget | null }> = [{ label: t('Cursos'), target: null }];
@@ -679,8 +806,14 @@ export function StudyOrganizationView({
   const openDocuments = openDocumentIds.map((id) => workspace.documents.find((document) => document.id === id)).filter((document): document is StudyDocument => Boolean(document));
   const browserLabel = !target ? t('Cursos') : target.kind === 'course' ? t('Asignaturas') : target.kind === 'subject' ? t('Carpetas y temas') : t('Temas');
   const showDocuments = Boolean(target && target.kind !== 'document');
-  const filterSubjects = workspace.subjects.filter((subject) => courseFilterId === 'all' || subject.courseId === courseFilterId);
-  const filterTopics = workspace.topics.filter((topic) => subjectFilterId === 'all' || topic.subjectId === subjectFilterId);
+  // The narrower filters only offer what the selected academic year contains, so the
+  // three of them cannot be combined into a guaranteed-empty result.
+  const academicYearCourses = workspace.courses.filter((course) => matchesAcademicYear(academicYearIdsForCourse(course.id)));
+  const filterSubjects = workspace.subjects.filter((subject) =>
+    (courseFilterId === 'all' ? academicYearCourses.some((course) => course.id === subject.courseId) : subject.courseId === courseFilterId)
+    && matchesAcademicYear([effectiveAcademicYearId(subject, workspace.courses)]));
+  const filterTopics = workspace.topics.filter((topic) =>
+    (subjectFilterId === 'all' ? filterSubjects.some((subject) => subject.id === topic.subjectId) : topic.subjectId === subjectFilterId));
   const testScope = (placementForTarget() ?? {}) as StudyTestScope;
   const canCreateTest = Boolean(target && target.kind !== 'document');
   const runExport = async () => {
@@ -808,7 +941,14 @@ export function StudyOrganizationView({
               <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-600" />
               <input data-testid="study-organization-search" className="input input-with-leading-icon w-full" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar en esta sección…')} />
             </label>
-            <select data-testid="study-organization-course-filter" aria-label={t('Filtrar por curso')} className="input h-9 min-w-40 text-xs" value={courseFilterId} onChange={(event) => { setCourseFilterId(event.target.value); setSubjectFilterId('all'); setTopicFilterId('all'); }}><option value="all">{t('Todos los cursos')}</option>{workspace.courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select>
+            <StudyAcademicYearScopeSelect
+              years={workspace.academicYears}
+              scope={academicYearScope}
+              onScopeChange={(next) => { setAcademicYearScope(next); setCourseFilterId('all'); setSubjectFilterId('all'); setTopicFilterId('all'); }}
+              hasUnscoped={hasUnscopedWork}
+              onManage={() => setAcademicYearManagerOpen(true)}
+            />
+            <select data-testid="study-organization-course-filter" aria-label={t('Filtrar por curso')} className="input h-9 min-w-40 text-xs" value={courseFilterId} onChange={(event) => { setCourseFilterId(event.target.value); setSubjectFilterId('all'); setTopicFilterId('all'); }}><option value="all">{t('Todos los cursos')}</option>{academicYearCourses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select>
             <select data-testid="study-organization-subject-filter" aria-label={t('Filtrar por asignatura')} className="input h-9 min-w-44 text-xs" value={subjectFilterId} onChange={(event) => { setSubjectFilterId(event.target.value); setTopicFilterId('all'); }}><option value="all">{t('Todas las asignaturas')}</option>{filterSubjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
             <select data-testid="study-organization-topic-filter" aria-label={t('Filtrar por tema')} className="input h-9 min-w-40 text-xs" value={topicFilterId} onChange={(event) => setTopicFilterId(event.target.value)}><option value="all">{t('Todos los temas')}</option>{filterTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select>
             <select data-testid="study-organization-sort" aria-label={t('Ordenar')} className="input h-9 min-w-48 text-xs" value={organizationSort} onChange={(event) => setOrganizationSort(event.target.value as StudyOrganizationSort)}><option value="manual">{t('Orden manual')}</option><option value="year-desc">{t('Año: más reciente')}</option><option value="year-asc">{t('Año: más antiguo')}</option><option value="created-desc">{t('Creación: más recientes')}</option><option value="created-asc">{t('Creación: más antiguos')}</option><option value="updated-desc">{t('Actividad reciente')}</option><option value="name-asc">{t('Nombre: A–Z')}</option><option value="name-desc">{t('Nombre: Z–A')}</option></select>
@@ -821,7 +961,7 @@ export function StudyOrganizationView({
             <span className="text-xs text-neutral-600">{browserItems.length}</span>
           </div>
           {browserItems.length > 0 ? (
-            <StudyBrowserCollection items={browserItems} layout={browserLayout} onOpen={(item) => { setEditing(null); onTargetChange({ kind: item.kind, id: item.id }); }} onRename={setRenamingItem} onMove={(item) => setLocatingItem({ item, mode: 'move' })} onDuplicate={(item) => void duplicateBrowserItem(item)} onDelete={setDeletingItem} />
+            <StudyBrowserCollection items={browserItems} layout={browserLayout} academicYears={workspace.academicYears} onOpen={(item) => { setEditing(null); onTargetChange({ kind: item.kind, id: item.id }); }} onRename={setRenamingItem} onMove={(item) => setLocatingItem({ item, mode: 'move' })} onDuplicate={(item) => void duplicateBrowserItem(item)} onDelete={setDeletingItem} />
           ) : (
             <div className="rounded-xl border border-dashed border-neutral-800 px-6 py-10 text-center text-sm text-neutral-500">
               <Icon name={!target ? 'graduation' : target.kind === 'course' ? 'book' : 'folder'} size={24} className="mb-3 text-neutral-700" />
@@ -852,10 +992,12 @@ export function StudyOrganizationView({
           workspace={workspace}
           onSubmit={submitCreate}
           onCancel={() => setCreateDraft(null)}
+          onManageAcademicYears={() => setAcademicYearManagerOpen(true)}
         />
       )}
-      {renamingItem && <StudyCreateDialog initial={renamingItem} draft={{ kind: renamingItem.kind, courseId: '', subjectId: '', folderId: '', parentId: '' }} workspace={workspace} onCancel={() => setRenamingItem(null)} onSubmit={async (values) => { await window.nodus.updateStudyEntity(renamingItem.kind, renamingItem.id, { name: values.name, description: values.description || null, color: values.color || null, icon: values.icon || null, emoji: values.emoji || null, imageData: values.imageData || null, year: values.year }); setRenamingItem(null); await refreshAfterOrganizationChange(); }} />}
-      {editingDocumentMetadata && <StudyCreateDialog initial={{ kind: 'topic', id: editingDocumentMetadata.id, name: editingDocumentMetadata.title, description: editingDocumentMetadata.description, icon: editingDocumentMetadata.icon || 'notebook', emoji: editingDocumentMetadata.emoji, imageData: editingDocumentMetadata.imageData, year: editingDocumentMetadata.year, color: editingDocumentMetadata.color, position: editingDocumentMetadata.position, createdAt: editingDocumentMetadata.createdAt, updatedAt: editingDocumentMetadata.updatedAt, courseId: null, subjectId: null, topicId: null, folderId: null, meta: '' }} draft={{ kind: 'document', courseId: '', subjectId: '', folderId: '', parentId: '' }} workspace={workspace} onCancel={() => setEditingDocumentMetadata(null)} onSubmit={async (values) => { await window.nodus.updateStudyEntity('document', editingDocumentMetadata.id, { title: values.name, description: values.description || null, color: values.color || null, icon: values.icon || null, emoji: values.emoji || null, imageData: values.imageData || null, year: values.year }); setEditingDocumentMetadata(null); await refreshAfterOrganizationChange(); }} />}
+      {academicYearManagerOpen && <StudyAcademicYearManager years={workspace.academicYears} usage={academicYearUsage} onClose={() => setAcademicYearManagerOpen(false)} onChanged={refreshAfterOrganizationChange} />}
+      {renamingItem && <StudyCreateDialog initial={renamingItem} draft={{ kind: renamingItem.kind, courseId: '', subjectId: '', folderId: '', parentId: '' }} workspace={workspace} onManageAcademicYears={() => setAcademicYearManagerOpen(true)} onCancel={() => setRenamingItem(null)} onSubmit={async (values) => { await window.nodus.updateStudyEntity(renamingItem.kind, renamingItem.id, { name: values.name, description: values.description || null, color: values.color || null, icon: values.icon || null, emoji: values.emoji || null, imageData: values.imageData || null, year: values.year, ...(renamingItem.kind === 'course' || renamingItem.kind === 'subject' ? { academicYearId: values.academicYearId || null } : {}) }); setRenamingItem(null); await refreshAfterOrganizationChange(); }} />}
+      {editingDocumentMetadata && <StudyCreateDialog initial={{ kind: 'topic', id: editingDocumentMetadata.id, name: editingDocumentMetadata.title, description: editingDocumentMetadata.description, icon: editingDocumentMetadata.icon || 'notebook', emoji: editingDocumentMetadata.emoji, imageData: editingDocumentMetadata.imageData, year: editingDocumentMetadata.year, color: editingDocumentMetadata.color, position: editingDocumentMetadata.position, createdAt: editingDocumentMetadata.createdAt, updatedAt: editingDocumentMetadata.updatedAt, courseId: null, subjectId: null, topicId: null, folderId: null, academicYearId: null, academicYearIds: [null], meta: '' }} draft={{ kind: 'document', courseId: '', subjectId: '', folderId: '', parentId: '' }} workspace={workspace} onCancel={() => setEditingDocumentMetadata(null)} onSubmit={async (values) => { await window.nodus.updateStudyEntity('document', editingDocumentMetadata.id, { title: values.name, description: values.description || null, color: values.color || null, icon: values.icon || null, emoji: values.emoji || null, imageData: values.imageData || null, year: values.year }); setEditingDocumentMetadata(null); await refreshAfterOrganizationChange(); }} />}
       {locatingItem && workspace && <StudyEntityLocationDialog item={locatingItem.item} mode={locatingItem.mode} workspace={workspace} onCancel={() => setLocatingItem(null)} onSave={async (destination) => { let entityId = locatingItem.item.id; if (locatingItem.mode === 'duplicate') entityId = (await window.nodus.duplicateStudyTree(locatingItem.item.kind, locatingItem.item.id)).id; if (locatingItem.item.kind !== 'course') await window.nodus.moveStudyEntity(locatingItem.item.kind, entityId, destination); setLocatingItem(null); await refreshAfterOrganizationChange(); }} />}
       {deletingItem && <ConfirmModal title={t('Eliminar elemento')} message={t('«{name}» y todo su contenido se moverán a la papelera.').replace('{name}', deletingItem.name)} confirmLabel={t('Mover a la papelera')} danger onCancel={() => setDeletingItem(null)} onConfirm={() => void window.nodus.setStudyLifecycle(deletingItem.kind, deletingItem.id, 'trash').then(async () => { setDeletingItem(null); await refreshAfterOrganizationChange(); })} />}
       {zoteroMaterialImportOpen && <ZoteroMaterialImportModal placement={placementForTarget() ?? {}} onClose={() => setZoteroMaterialImportOpen(false)} onImported={async () => { announceStudyWorkspaceChanged(); await reload(); }} />}
