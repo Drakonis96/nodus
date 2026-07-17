@@ -646,12 +646,12 @@ try {
   assert.equal(convertResult.outputs.length, 1, 'one PDF was produced');
   const producedPdf = convertResult.outputs[0];
   assert.ok(existsSync(producedPdf), 'the produced PDF exists on disk');
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const pdfBytes = await readFile(producedPdf);
-  const pdfDoc = await pdfjs.getDocument({ data: new Uint8Array(pdfBytes), isEvalSupported: false }).promise;
-  assert.ok(pdfDoc.numPages > 0, 'the produced PDF has pages');
-  const firstPageText = (await (await pdfDoc.getPage(1)).getTextContent()).items.map((it) => it.str ?? '').join(' ');
-  assert.match(firstPageText, /Titulo Principal/, 'the PDF carries the document text');
+  const toolkitPdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const producedPdfBytes = await readFile(producedPdf);
+  const producedPdfDoc = await toolkitPdfjs.getDocument({ data: new Uint8Array(producedPdfBytes), isEvalSupported: false }).promise;
+  assert.ok(producedPdfDoc.numPages > 0, 'the produced PDF has pages');
+  const producedPdfText = (await (await producedPdfDoc.getPage(1)).getTextContent()).items.map((it) => it.str ?? '').join(' ');
+  assert.match(producedPdfText, /Titulo Principal/, 'the PDF carries the document text');
   await rm(toolkitDir, { recursive: true, force: true });
 
   // …and hands back a way home.
