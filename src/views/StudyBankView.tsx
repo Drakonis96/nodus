@@ -14,9 +14,11 @@ import type {
   StudyFlashcard,
   StudyWorkspace,
 } from '@shared/types';
-import { STUDY_QUESTION_TYPES } from '@shared/studyQuestions';
+import { STUDY_GENERATABLE_QUESTION_TYPES, STUDY_QUESTION_TYPES } from '@shared/studyQuestions';
+import type { StudyGeneratableQuestionType } from '@shared/studyQuestions';
 import { Icon, Spinner } from '../components/ui';
 import { t } from '../i18n';
+import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 const TYPE_LABELS: Record<StudyQuestionType, string> = {
   short: 'Respuesta breve', essay: 'Desarrollo', definition: 'Definición', relation: 'Relación', comparison: 'Comparación',
@@ -76,7 +78,7 @@ export function StudyBankView({
   const [showGenerator, setShowGenerator] = useState(false);
   const [generated, setGenerated] = useState<StudyQuestionInput[]>([]);
   const [sourceKeys, setSourceKeys] = useState<string[]>([]);
-  const [generationType, setGenerationType] = useState<StudyQuestionType>('short');
+  const [generationType, setGenerationType] = useState<StudyGeneratableQuestionType>('single_choice');
   const [generationDifficulty, setGenerationDifficulty] = useState<StudyQuestionDifficulty>('mixed');
   const [generationCount, setGenerationCount] = useState(8);
   const [collectionName, setCollectionName] = useState('');
@@ -150,7 +152,7 @@ export function StudyBankView({
         cognitiveLevels: ['remember', 'understand', 'analyze', 'apply'], subjectId: subjectId || null,
       });
       setGenerated(result.questions);
-      if (!result.questions.length) setError('Las fuentes no permitieron generar preguntas válidas sin duplicados.');
+      if (!result.questions.length) setError(studyQuestionGenerationEmptyMessage(result));
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(false); }
   };
@@ -204,7 +206,10 @@ export function StudyBankView({
       {showGenerator && <section className="m-4 rounded-xl border border-indigo-900/60 bg-indigo-950/15 p-4" data-testid="study-question-generator">
         <div className="flex flex-wrap items-end gap-3">
           <label className="text-xs text-neutral-500">{t('Cantidad')}<input className="input mt-1 w-20" type="number" min="1" max="40" value={generationCount} onChange={(event) => setGenerationCount(Number(event.target.value))} /></label>
-          <label className="text-xs text-neutral-500">{t('Tipo')}<select className="input mt-1" value={generationType} onChange={(event) => setGenerationType(event.target.value as StudyQuestionType)}>{STUDY_QUESTION_TYPES.map((value) => <option key={value} value={value}>{t(TYPE_LABELS[value])}</option>)}</select></label>
+          {/* Only the types the generator can really produce: the rest stay available for
+              a question written by hand above, but asking the AI for one used to return a
+              single_choice question wearing the requested type's name. */}
+          <label className="text-xs text-neutral-500">{t('Tipo')}<select data-testid="study-generation-type" className="input mt-1" value={generationType} onChange={(event) => setGenerationType(event.target.value as StudyGeneratableQuestionType)}>{STUDY_GENERATABLE_QUESTION_TYPES.map((value) => <option key={value} value={value}>{t(TYPE_LABELS[value])}</option>)}</select></label>
           <label className="text-xs text-neutral-500">{t('Dificultad')}<select className="input mt-1" value={generationDifficulty} onChange={(event) => setGenerationDifficulty(event.target.value as StudyQuestionDifficulty)}>{(['mixed', 'easy', 'medium', 'hard'] as const).map((value) => <option key={value} value={value}>{t(DIFFICULTY_LABELS[value])}</option>)}</select></label>
           <button className="btn btn-primary" disabled={busy || (!sourceKeys.length && !sources.length)} onClick={() => void generate()}>{busy ? <Spinner label={t('Generando…')} /> : <><Icon name="wand" />{t('Generar borradores')}</>}</button>
         </div>

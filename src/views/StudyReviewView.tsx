@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { StudyFlashcard, StudyQuestion, StudyWorkspace } from '@shared/types';
 import { Icon, Spinner } from '../components/ui';
 import { t } from '../i18n';
+import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 type ReviewKind = 'test' | 'exam' | 'flashcards';
 type ReviewItem = { id: string; front: string; back: string; card?: StudyFlashcard };
@@ -41,6 +42,7 @@ export function StudyReviewView() {
         const sources = (await window.nodus.listStudyAssistantSources()).filter((entry) => (!subjectId || entry.scope.subjectId === subjectId) && (!topicId || entry.scope.topicId === topicId));
         if (!sources.length) throw new Error(t('No hay contenido indexado en este ámbito.'));
         const generated = await window.nodus.generateStudyQuestions({ sourceKeys: sources.map((entry) => entry.sourceKey), count, difficulty: 'mixed', cognitiveLevels: kind === 'flashcards' ? ['remember', 'understand'] : ['remember', 'understand', 'analyze', 'apply'], types: [kind === 'test' ? 'single_choice' : kind === 'exam' ? 'essay' : 'definition'], subjectId: subjectId || null, customPrompt: prompt.trim() });
+        if (!generated.questions.length) throw new Error(studyQuestionGenerationEmptyMessage(generated));
         const saved: StudyQuestion[] = [];
         const nextGroupTag = `nodus-group:${kind}:${Date.now()}`;
         for (const question of generated.questions) saved.push(await window.nodus.createStudyQuestion({ ...question, tags: [...new Set([...(question.tags ?? []), `nodus:${kind}`, nextGroupTag])], generationPrompt: prompt.trim(), status: 'approved', locked: true }));

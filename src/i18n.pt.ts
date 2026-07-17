@@ -4751,6 +4751,7 @@ export const PT: Record<string, string> = {
   'Iconos': 'Ícones',
   'Emojis': 'Emojis',
   'No se pudo generar ninguna pregunta válida.': 'Não foi possível gerar nenhuma pergunta válida.',
+  'Las {count} preguntas generadas ya estaban en tu banco y se descartaron por duplicadas. Añade o cambia las fuentes, pide más preguntas, o elimina o archiva las anteriores.': 'As {count} perguntas geradas já estavam no teu banco e foram descartadas por serem duplicadas. Acrescenta ou muda as fontes, pede mais perguntas, ou elimina ou arquiva as anteriores.',
   'Crear test con IA': 'Criar teste com IA',
   'Se usarán el elemento actual y todos sus contenidos anidados que ya estén indexados.':
     'Serão utilizados o elemento atual e todos os respetivos conteúdos aninhados que já estejam indexados.',

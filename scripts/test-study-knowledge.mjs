@@ -63,6 +63,33 @@ try {
 
   const merged = ai.mergeStudyKnowledgeExtractions([extraction, { ideas: [{ ...extraction.ideas[0], key: 'duplicate', statement: 'Una formulación más extensa sobre la separación de poderes.' }], relations: [] }]);
   assert.equal(merged.ideas.length, 1, 'duplicate labels from separate chunks are merged');
+
+  // Relation vocabulary drift must cost the offending relation, never the extraction.
+  // Observed live against gemini-2.5-flash-lite: it emits `produces`, and leaks the IDEA
+  // type `consequence` into relations because the prompt lists both vocabularies together.
+  // A strict guard rejected the whole payload, every retry hit the same drift, and idea
+  // extraction failed outright with "El JSON no cumple el esquema esperado".
+  const drifted = {
+    ideas: [
+      { key: 'i1', type: 'process', label: 'Fase luminosa', statement: 'La fase luminosa produce ATP y NADPH.', role: 'principal', confidence: 0.9, evidence: [{ quote: 'La fase luminosa produce ATP y NADPH', location: 'p. 2' }] },
+      { key: 'i2', type: 'concept', label: 'Ciclo de Calvin', statement: 'El ciclo de Calvin fija el CO2.', role: 'principal', confidence: 0.9, evidence: [{ quote: 'El ciclo de Calvin fija el dioxido de carbono', location: 'p. 3' }] },
+    ],
+    relations: [
+      { from: 'i1', to: 'i2', type: 'produces', basis: 'Aporta ATP y NADPH.', confidence: 0.9 },
+      { from: 'i1', to: 'i2', type: 'consequence', basis: 'Leak del vocabulario de ideas.', confidence: 0.8 },
+      { from: 'i2', to: 'i1', type: 'depends_on', basis: 'El ciclo consume ATP y NADPH.', confidence: 0.9 },
+    ],
+  };
+  assert.ok(ai.isStudyKnowledgeExtraction(drifted), 'off-vocabulary relation types do not invalidate a sound extraction');
+  const mergedDrift = ai.mergeStudyKnowledgeExtractions([drifted]);
+  assert.equal(mergedDrift.ideas.length, 2, 'both ideas survive an off-vocabulary relation');
+  assert.deepEqual(mergedDrift.relations.map((relation) => relation.type), ['depends_on'],
+    'unknown relation types are dropped, not coerced onto the generic `related`');
+  // Ideas stay strict: they are the payload, so a malformed one is a real defect.
+  assert.equal(ai.isStudyKnowledgeExtraction({ ideas: [{ key: 'i1', type: 'not_a_type', label: 'x', statement: 'y', evidence: [] }], relations: [] }), false,
+    'an idea with an unknown type is still rejected');
+  assert.equal(ai.isStudyKnowledgeExtraction({ ideas: [], relations: [{ from: 'i1', to: 'i2' }] }), false,
+    'a relation without a type string is still rejected');
   assert.match(ai.buildStudyKnowledgePrompt('Tema', 'Texto').system, /citas textuales exactas/i);
   const policySource = await readFile(path.join(repoRoot, 'electron/ai/studyAiPolicy.ts'), 'utf8');
   assert.match(policySource, /externalConsentKey/);

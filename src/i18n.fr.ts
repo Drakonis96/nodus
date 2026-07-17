@@ -4796,6 +4796,7 @@ export const FR: Record<string, string> = {
   'Iconos': 'Icônes',
   'Emojis': 'Emojis',
   'No se pudo generar ninguna pregunta válida.': 'Aucune question valide n\'a pu être générée.',
+  'Las {count} preguntas generadas ya estaban en tu banco y se descartaron por duplicadas. Añade o cambia las fuentes, pide más preguntas, o elimina o archiva las anteriores.': 'Les {count} questions générées figuraient déjà dans votre banque et ont été écartées comme doublons. Ajoutez ou changez les sources, demandez plus de questions, ou supprimez ou archivez les précédentes.',
   'Crear test con IA': 'Créer un test avec l\'IA',
   'Se usarán el elemento actual y todos sus contenidos anidados que ya estén indexados.':
     'L\'élément actuel et tout son contenu imbriqué déjà indexé seront utilisés.',

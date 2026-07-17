@@ -3,7 +3,7 @@ import type {
   StudyQuestionGenerationResult,
   StudyQuestionInput,
 } from '@shared/studyQuestions';
-import { findSimilarStudyQuestion, parseStudyDevelopmentQuestionBlocks, parseStudyQuestionBlocks, studyQuestionSimilarity } from '@shared/studyQuestions';
+import { findSimilarStudyQuestion, parseStudyDevelopmentQuestionBlocks, parseStudyQuestionBlocks, studyGeneratedQuestionType, studyQuestionSimilarity, STUDY_GENERATABLE_QUESTION_TYPES } from '@shared/studyQuestions';
 import { compressStudyAssistantEvidence, studyAssistantSourceKey } from '@shared/studyAssistant';
 import type { StudySearchIndexEntry, StudySearchOptions } from '@shared/studySearch';
 import { listStudyQuestions } from '../db/studyQuestionsRepo';
@@ -127,6 +127,11 @@ function applySource(question: StudyQuestionInput, entries: StudySearchIndexEntr
 export async function generateStudyQuestions(request: StudyQuestionGenerationRequest): Promise<StudyQuestionGenerationResult> {
   if (!request.types.length) throw new Error('Selecciona al menos un tipo de pregunta.');
   if (!request.cognitiveLevels.length) throw new Error('Selecciona al menos un nivel cognitivo.');
+  // The prompt has only a development and a multiple-choice shape, so anything outside
+  // STUDY_GENERATABLE_QUESTION_TYPES used to come back as a single_choice question under
+  // the requested name. Refuse it instead of quietly substituting a different type.
+  const unsupported = request.types.filter((type) => !(STUDY_GENERATABLE_QUESTION_TYPES as readonly string[]).includes(type));
+  if (unsupported.length) throw new Error(`La generación con IA aún no admite estos tipos de pregunta: ${unsupported.join(', ')}. Créalos a mano en el banco de preguntas.`);
   const sourceKeys = nestedSourceKeys(request);
   const retrievalQuery = queryFor(request);
   const entries = await retrieveStudyAssistantEntries(retrievalQuery, searchOptions(request), sourceKeys, Math.min(80, Math.max(24, sourceKeys.length * 4)));
@@ -145,7 +150,16 @@ export async function generateStudyQuestions(request: StudyQuestionGenerationReq
     (model) => completeText({ system: prompt.system, user: prompt.user, temperature: aiSettings.studyAiTemperature, maxTokens: Math.min(aiSettings.studyAiMaxOutputTokens, Math.max(1800, prompt.count * prompt.optionCount * 90)), reasoning: 'off' }, model));
   const raw = prompt.development ? parseStudyDevelopmentQuestionBlocks(completed.value) : parseStudyQuestionBlocks(completed.value, prompt.optionCount); const model = completed.model;
   if (!raw.length) throw new Error('La IA no devolvió preguntas con el formato Q, * y - solicitado.');
-  const existing = listStudyQuestions({ archived: true }); const accepted: StudyQuestionInput[] = []; let rejectedDuplicates = 0;
+  // The parsers name the FORMAT they read (development prose or multiple choice); this
+  // names what the run was for. A flashcard run reads the multiple-choice format but is
+  // a `definition` card, and recording that keeps it distinguishable from a test item.
+  const generatedType = studyGeneratedQuestionType(request.types);
+  // Deduplicate within the same type only. A definition flashcard and a single_choice
+  // test question can legitimately cover one concept — they are different study artifacts
+  // — so comparing across every type meant that generating a test first silently left a
+  // later flashcard run with nothing to show for itself.
+  const existing = listStudyQuestions({ archived: true }).filter((question) => question.type === generatedType);
+  const accepted: StudyQuestionInput[] = []; let rejectedDuplicates = 0;
   for (const normalized of raw) {
     const duplicate = findSimilarStudyQuestion(normalized.prompt, [
       ...existing,
@@ -154,6 +168,7 @@ export async function generateStudyQuestions(request: StudyQuestionGenerationReq
     if (duplicate) { rejectedDuplicates += 1; continue; }
     accepted.push({
       ...applySource(normalized, entries, request.selection),
+      type: generatedType,
       difficulty: request.difficulty === 'mixed' ? normalized.difficulty : request.difficulty,
       courseId: request.courseId ?? normalized.courseId ?? null,
       subjectId: request.subjectId ?? normalized.subjectId ?? null,

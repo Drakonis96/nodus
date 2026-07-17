@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { StudyAssistantSourceOption, StudyAttempt, StudyFlashcard, StudyGradingRun, StudyQuestion, StudyRubric, StudyWorkspace } from '@shared/types';
 import { Icon, Spinner } from './ui';
 import { t } from '../i18n';
+import { studyQuestionGenerationEmptyMessage } from '../studyQuestions';
 
 export interface StudyTestScope { courseId?: string | null; subjectId?: string | null; folderId?: string | null; topicId?: string | null }
 type AssessmentKind = 'test' | 'exam' | 'flashcards';
@@ -62,7 +63,7 @@ export function StudyTestGeneratorDialog({ kind = 'test', scope, scopeTitle, onC
     setBusy(true); setError('');
     try {
       const generated = await window.nodus.generateStudyQuestions({ sourceKeys, count, optionCount: kind === 'test' ? optionCount : undefined, customPrompt: customPrompt.trim(), difficulty: 'mixed', cognitiveLevels: kind === 'flashcards' ? ['remember', 'understand'] : ['remember', 'understand', 'analyze', 'apply'], types: [kind === 'test' ? 'single_choice' : kind === 'exam' ? 'essay' : 'definition'] });
-      if (!generated.questions.length) throw new Error(t('No se pudo generar ninguna pregunta válida.'));
+      if (!generated.questions.length) throw new Error(studyQuestionGenerationEmptyMessage(generated));
       const categoryTag = `nodus:${kind}`;
       const groupTag = `nodus-group:${kind}:${Date.now()}`;
       const saved: StudyQuestion[] = []; for (const question of generated.questions) saved.push(await window.nodus.createStudyQuestion({ ...question, tags: [...new Set([...(question.tags ?? []), categoryTag, groupTag])], generationPrompt: customPrompt.trim(), status: 'approved', locked: true }));

@@ -6,6 +6,26 @@ export const STUDY_QUESTION_TYPES = [
   'true_false', 'single_choice', 'multiple_choice', 'fill_blank', 'ordering', 'matching',
 ] as const;
 export type StudyQuestionType = typeof STUDY_QUESTION_TYPES[number];
+
+/**
+ * The subset the AI generator can actually produce. buildStudyQuestionPrompt has exactly
+ * two shapes — a development prompt parsed into `essay`, and a multiple-choice prompt
+ * parsed into `single_choice` — and a flashcard run reuses the multiple-choice shape but
+ * records `definition`, because the artifact is a card rather than a test item.
+ *
+ * Every other STUDY_QUESTION_TYPES value remains valid for a question a person writes by
+ * hand, which is why the two lists differ. Offering the full list for *generation* meant
+ * asking for `true_false` or `matching` and silently receiving a four-option
+ * single_choice question, so keep any generation picker bound to this list.
+ */
+export const STUDY_GENERATABLE_QUESTION_TYPES = ['single_choice', 'essay', 'definition'] as const;
+export type StudyGeneratableQuestionType = typeof STUDY_GENERATABLE_QUESTION_TYPES[number];
+
+/** The type a generation run stores, given the requested types. */
+export function studyGeneratedQuestionType(types: readonly StudyQuestionType[]): StudyGeneratableQuestionType {
+  if (types.includes('essay')) return 'essay';
+  return types.length === 1 && types[0] === 'definition' ? 'definition' : 'single_choice';
+}
 export type StudyQuestionDifficulty = 'easy' | 'medium' | 'hard' | 'mixed';
 export type StudyCognitiveLevel = 'remember' | 'understand' | 'analyze' | 'apply' | 'synthesize';
 export type StudyQuestionStatus = 'pending' | 'approved' | 'problematic' | 'discarded';

@@ -38,6 +38,18 @@ let currentTitle: string | null = null;
 const IDEA_TYPES = new Set(['concept', 'definition', 'principle', 'process', 'cause', 'consequence', 'example', 'debate']);
 const RELATION_TYPES = new Set(['related', 'supports', 'contrasts', 'causes', 'depends_on', 'part_of', 'applies']);
 
+/**
+ * Shape check for a model extraction. Relation *validity* is deliberately not asserted
+ * here: mergeStudyKnowledgeExtractions already drops relations whose endpoints don't
+ * resolve to a returned idea, so per-relation validity has always been the merge step's
+ * job — and rejecting the whole payload over one relation is catastrophically lossy.
+ * Models drift off the relation vocabulary routinely (gemini-2.5-flash-lite emits
+ * `produces`, and leaks the idea type `consequence` into relations because the prompt
+ * lists both vocabularies together); when it did, this guard threw away 27 sound ideas
+ * and 34 sound relations, and the retries hit the same drift until extraction failed
+ * outright with "El JSON no cumple el esquema esperado". Ideas stay strict: they are the
+ * payload, and one malformed idea is a real defect rather than off-vocabulary noise.
+ */
 export function isStudyKnowledgeExtraction(value: unknown): value is StudyKnowledgeExtraction {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as StudyKnowledgeExtraction;
@@ -45,7 +57,7 @@ export function isStudyKnowledgeExtraction(value: unknown): value is StudyKnowle
     && candidate.ideas.every((idea) => idea && typeof idea.key === 'string' && typeof idea.label === 'string'
       && typeof idea.statement === 'string' && IDEA_TYPES.has(idea.type) && Array.isArray(idea.evidence))
     && candidate.relations.every((relation) => relation && typeof relation.from === 'string' && typeof relation.to === 'string'
-      && RELATION_TYPES.has(relation.type));
+      && typeof relation.type === 'string');
 }
 
 export function buildStudyKnowledgePrompt(title: string, text: string) {
@@ -93,7 +105,13 @@ export function mergeStudyKnowledgeExtractions(parts: StudyKnowledgeExtraction[]
     }
     for (const relation of part.relations) {
       const from = localKey.get(relation.from); const to = localKey.get(relation.to);
-      if (from && to && from !== to) relations.push({ ...relation, from, to, confidence: Number.isFinite(relation.confidence) ? relation.confidence : 0.5 });
+      // Off-vocabulary types are dropped, not coerced. Mapping an unknown type onto the
+      // generic `related` would render a `refutes`/`contradicts` edge the model actually
+      // meant as a neutral association — a claim the graph would state and nobody made.
+      // Dropping the edge asserts nothing, and matches how unresolved endpoints are handled.
+      if (from && to && from !== to && RELATION_TYPES.has(relation.type)) {
+        relations.push({ ...relation, from, to, confidence: Number.isFinite(relation.confidence) ? relation.confidence : 0.5 });
+      }
     }
   }
   const uniqueRelations = new Map<string, ExtractedStudyRelation>();

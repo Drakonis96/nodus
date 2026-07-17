@@ -121,9 +121,10 @@ try {
   assert.match(prompt.system, /Formato obligatorio/);
   assert.match(prompt.system, /no es evidencia/i, 'concept planning never replaces source grounding');
   assert.match(prompt.user, /MAPA CONCEPTUAL DE LA ASIGNATURA/);
-  const generated = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['short', 'single_choice'], model: { provider: 'ollama', model: 'question-verifier' } });
+  const generated = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['single_choice'], model: { provider: 'ollama', model: 'question-verifier' } });
   assert.equal(generated.questions.length, 2, 'near-identical generated question is rejected');
   assert.equal(generated.rejectedDuplicates, 1);
+  assert.ok(generated.questions.every((question) => question.type === 'single_choice'), 'a single_choice run stores single_choice');
   assert.equal(generated.questions[0].documentId, document.id);
   assert.equal(generated.questions[0].source.excerpt, mockStudyEntries[0].text, 'source evidence is copied from the index, never trusted from model output');
   assert.equal(generated.ideaCount, 2, 'the assessment infers its subject from selected sources and retrieves its ideas');
@@ -133,6 +134,26 @@ try {
   const generationAudit = JSON.parse(generated.questions[0].generationPrompt);
   assert.equal(generationAudit.knowledgeIdeaIds.length, 2, 'used idea ids are persisted for auditability');
   assert.equal(generationAudit.knowledgeConnectionIds.length, 1, 'used connection ids are persisted for auditability');
+
+  // The prompt has only a development and a multiple-choice shape, so a request for any
+  // other type used to return a single_choice question wearing the requested name — the
+  // bank's generation picker offered all 13 types and 11 of them quietly lied.
+  assert.deepEqual([...shared.STUDY_GENERATABLE_QUESTION_TYPES], ['single_choice', 'essay', 'definition']);
+  for (const type of shared.STUDY_QUESTION_TYPES.filter((value) => !shared.STUDY_GENERATABLE_QUESTION_TYPES.includes(value))) {
+    await assert.rejects(() => ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 1, difficulty: 'mixed', cognitiveLevels: ['remember'], types: [type], model: { provider: 'ollama', model: 'question-verifier' } }),
+      /aún no admite estos tipos/, `generation refuses ${type} instead of substituting single_choice`);
+  }
+  assert.equal(shared.studyGeneratedQuestionType(['definition']), 'definition', 'a flashcard run is stored as a definition, not as a test item');
+  assert.equal(shared.studyGeneratedQuestionType(['essay']), 'essay');
+  assert.equal(shared.studyGeneratedQuestionType(['single_choice']), 'single_choice');
+
+  // A flashcard run must not be deduplicated against the test questions already banked
+  // above: they cover the same material on purpose, and cross-type matching silently
+  // left the student with an empty flashcard deck and no explanation.
+  for (const question of generated.questions) bank.createStudyQuestion({ ...question, status: 'approved' }, 'create', true);
+  const cards = await ai.generateStudyQuestions({ sourceKeys: [`document:${document.id}`], count: 3, difficulty: 'mixed', cognitiveLevels: ['remember', 'understand'], types: ['definition'], model: { provider: 'ollama', model: 'question-verifier' } });
+  assert.ok(cards.questions.length >= 1, 'flashcards survive test questions that already cover the same source');
+  assert.ok(cards.questions.every((question) => question.type === 'definition'), 'a flashcard run stores definition');
 
   const legacy = new Database(path.join(root, 'legacy-v57.sqlite'));
   for (const migration of migrations.filter((item) => item.version <= 57).sort((a, b) => a.version - b.version)) {
@@ -149,6 +170,13 @@ try {
   const view = await readFile(path.join(repoRoot, 'src/views/StudyBankView.tsx'), 'utf8');
   for (const marker of ['study-question-bank', 'study-question-table', 'study-question-table-row', 'study-question-answer-card', 'study-question-save', 'study-question-search-mode', 'study-question-edit', 'study-question-versions', 'study-question-similar']) assert.match(view, new RegExp(marker));
   assert.match(view, /Abrir fuente/);
+  // The generation picker must offer only what the engine can build, while the hand-written
+  // question editor above it keeps the full vocabulary. Binding the two lists together in
+  // the view is what let the picker drift into promising eleven types nobody implemented.
+  const generationPicker = view.slice(view.indexOf('data-testid="study-generation-type"'));
+  assert.match(generationPicker.slice(0, 400), /STUDY_GENERATABLE_QUESTION_TYPES\.map/, 'the generation picker is bound to the generatable types');
+  assert.doesNotMatch(generationPicker.slice(0, 400), /STUDY_QUESTION_TYPES\.map/, 'the generation picker never offers the full hand-authoring vocabulary');
+  assert.match(view, /useState<StudyGeneratableQuestionType>\('single_choice'\)/, 'the picker defaults to a type the generator can actually produce');
   closeDb();
   console.log('Study questions phase 10a tests passed!');
 } finally { await rm(root, { recursive: true, force: true }); }

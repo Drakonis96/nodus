@@ -4803,6 +4803,7 @@ export const DE: Record<string, string> = {
   'Iconos': 'Symbole',
   'Emojis': 'Emojis',
   'No se pudo generar ninguna pregunta válida.': 'Es konnte keine gültige Frage generiert werden.',
+  'Las {count} preguntas generadas ya estaban en tu banco y se descartaron por duplicadas. Añade o cambia las fuentes, pide más preguntas, o elimina o archiva las anteriores.': 'Alle {count} generierten Fragen waren bereits in deiner Sammlung und wurden als Duplikate verworfen. Ergänze oder ändere die Quellen, fordere mehr Fragen an, oder lösche oder archiviere die vorhandenen.',
   'Crear test con IA': 'Test mit KI erstellen',
   'Se usarán el elemento actual y todos sus contenidos anidados que ya estén indexados.':
     'Das aktuelle Element und alle bereits indexierten verschachtelten Inhalte werden verwendet.',

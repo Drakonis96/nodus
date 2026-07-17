@@ -99,6 +99,24 @@ function genericContextOverflowMessage(): string {
 }
 
 /**
+ * Output ceiling hit mid-JSON: retrying the same request verbatim reproduces it, so this
+ * has to say what the reader can actually change. On a local server that is the context
+ * window and nothing else — the budget here is whatever is left of it after the prompt,
+ * so a 4k window leaves ~1.7k for output while a full idea extraction wants ~7k, and no
+ * amount of retrying closes that gap. Telling someone to "analyse a smaller fragment"
+ * would be advice they cannot take: chunk sizes are fixed in code, not exposed in the UI.
+ */
+function truncatedJsonMessage(model: ModelRef, maxTokens: number): string {
+  const label = PROVIDER_LABELS[model.provider] ?? model.provider;
+  const cut = `La respuesta de «${model.model}» (${label}) se cortó al alcanzar el límite de ${maxTokens.toLocaleString('es')} tokens de salida y el JSON quedó incompleto.`;
+  if (isLocalProvider(model.provider) || model.provider === 'nodus') {
+    const knob = model.provider === 'ollama' ? 'num_ctx' : 'Context Length';
+    return `${cut} El espacio de salida es lo que queda de la ventana de contexto tras el prompt: amplíala en ${label} (${knob}), elige un modelo local con más contexto o usa un proveedor en la nube para esta tarea.`;
+  }
+  return `${cut} Usa un modelo con mayor límite de salida o reduce el tamaño de la tarea.`;
+}
+
+/**
  * Size max_tokens to a local model's real context window, refusing up front when the
  * prompt itself won't fit. Returns the max_tokens to use; throws an actionable AiError
  * (config → the scan queue pauses once instead of failing every item) when there is no
@@ -350,6 +368,15 @@ async function rawComplete(
     if (!content.trim()) {
       throw new AiError(`Respuesta vacía del proveedor de IA (${choice?.finish_reason ?? 'sin finish_reason'}).`, false);
     }
+    // A structured response cut off at the output ceiling is not partial data, it is
+    // broken data: extractJson's jsonrepair pass closes the dangling braces without a
+    // word, so the caller silently stores a fraction of the ideas — or trips the schema
+    // guard and reports "el JSON no cumple el esquema esperado", which sends the reader
+    // hunting for a prompt bug that isn't there. Refuse instead. Prose (jsonMode=false)
+    // stays untouched: a clipped sentence is still usable, an unterminated object is not.
+    if (jsonMode && choice?.finish_reason === 'length') {
+      throw new AiError(truncatedJsonMessage(model, maxTokens), false);
+    }
     return content;
   } catch (e: any) {
     if (e instanceof AiError) throw e;
@@ -452,15 +479,24 @@ async function parseOrRepair<T>(
   guard: (v: unknown) => v is T,
   perf?: PerfContext
 ): Promise<T> {
+  let parsed: unknown;
   try {
-    const parsed = extractJson(text);
-    if (guard(parsed)) return parsed;
-    throw new AiError('El JSON no cumple el esquema esperado');
-  } catch (e) {
-    const repaired = await repairJson(model, text, e, guard, perf);
+    parsed = extractJson(text);
+  } catch (parseError) {
+    // Genuinely unparseable output — extractJson already recovers code fences, prose
+    // wrappers and truncation locally via jsonrepair, so reaching here means only a
+    // repair round-trip can still salvage the text (e.g. two objects run together).
+    const repaired = await repairJson(model, text, parseError, guard, perf);
     if (repaired) return repaired;
-    throw e;
+    throw parseError;
   }
+  if (guard(parsed)) return parsed;
+  // Well-formed JSON that misses the schema. repairJson asks the model for "the same
+  // object as valid JSON, sin añadir campos, sin inventar datos" — instructions it
+  // cannot follow and also fix a missing field, so it can only echo the mismatch back
+  // and fail this same guard. Skip the billed call and let completeJson retry the real
+  // prompt at a lower temperature, which is what actually recovers.
+  throw new AiError('El JSON no cumple el esquema esperado');
 }
 
 /**
