@@ -83,6 +83,10 @@ try {
     'nodus_list_persons',
     'nodus_get_person',
     'nodus_list_kin_suggestions',
+    'nodus_list_events',
+    'nodus_list_archive_items',
+    'nodus_get_archive_item',
+    'nodus_search_archive',
     'nodus_list_databases',
     'nodus_get_database_schema',
     'nodus_query_database',
@@ -113,13 +117,120 @@ try {
   assert.equal(capabilities.counts.themes, 1);
   assert.equal(capabilities.counts.passages, 2);
   assert.equal(capabilities.counts.databases, 0, 'capabilities reports the databases count');
+  assert.equal(capabilities.counts.persons, 0, 'capabilities reports the records-layer person count');
+  assert.equal(capabilities.counts.events, 0, 'capabilities reports the records-layer event count');
+  assert.equal(capabilities.counts.archiveItems, 0, 'capabilities reports the archive count');
+  assert.ok(Array.isArray(capabilities.enums.eventTypes), 'capabilities exposes the event-type vocabulary');
   assert.ok(capabilities.vault.active.type, 'capabilities exposes the active vault type');
 
-  // Read-only genealogy tools are wired and safe on a non-genealogy corpus.
+  // Read-only genealogy tools are wired and safe on a non-genealogy corpus, and use
+  // the same paginated shape as every other list tool.
   const personList = await callTool(server, 'nodus_list_persons', { limit: 10, offset: 0 });
-  assert.deepEqual(personList, { persons: [], total: 0 }, 'nodus_list_persons callable, empty without a records layer');
+  assert.deepEqual(
+    personList,
+    { persons: [], total: 0, limit: 10, offset: 0, hasMore: false },
+    'nodus_list_persons callable, empty without a records layer'
+  );
   const kinList = await callTool(server, 'nodus_list_kin_suggestions', { limit: 10, offset: 0 });
-  assert.deepEqual(kinList, { suggestions: [], total: 0 }, 'nodus_list_kin_suggestions callable, empty');
+  assert.deepEqual(
+    kinList,
+    { suggestions: [], total: 0, limit: 10, offset: 0, hasMore: false },
+    'nodus_list_kin_suggestions callable, empty'
+  );
+  const emptyEvents = await callTool(server, 'nodus_list_events', { limit: 10, offset: 0 });
+  assert.equal(emptyEvents.total, 0, 'nodus_list_events callable, empty without a records layer');
+  const emptyArchive = await callTool(server, 'nodus_list_archive_items', { limit: 10, offset: 0 });
+  assert.equal(emptyArchive.total, 0, 'nodus_list_archive_items callable, empty without an archive');
+
+  // Records layer: persons, events (timeline) and the evidence archive.
+  const entities = require(path.join(repoRoot, 'electron/db/entitiesRepo.ts'));
+  const archiveRepo = require(path.join(repoRoot, 'electron/db/archiveRepo.ts'));
+  const juan = entities.createPerson({ displayName: 'Juan García', sex: 'male', birthDate: '1890' });
+  const maria = entities.createPerson({ displayName: 'María López', sex: 'female' });
+  entities.createEvent({
+    type: 'baptism',
+    label: 'Bautismo de Juan',
+    date: '1890-05-02',
+    participants: [
+      { personId: juan.personId, role: 'principal' },
+      { personId: maria.personId, role: 'mother' },
+    ],
+  });
+  entities.createEvent({
+    type: 'marriage',
+    label: 'Matrimonio de Juan',
+    date: '1915-11-20',
+    participants: [{ personId: juan.personId, role: 'principal' }],
+  });
+
+  const allEvents = await callTool(server, 'nodus_list_events', { limit: 10, offset: 0 });
+  assert.equal(allEvents.total, 2);
+  assert.equal(allEvents.events[0].type, 'baptism', 'events come back in chronological order');
+  assert.ok(
+    allEvents.events[0].participants.some((p) => p.name === 'María López' && p.role === 'mother'),
+    'events carry their participants with roles'
+  );
+  const baptisms = await callTool(server, 'nodus_list_events', { type: 'baptism', limit: 10, offset: 0 });
+  assert.equal(baptisms.total, 1, 'events filter by type');
+  const windowed = await callTool(server, 'nodus_list_events', { from: '1900', to: '1920', limit: 10, offset: 0 });
+  assert.equal(windowed.total, 1, 'events filter by date window');
+  assert.equal(windowed.events[0].type, 'marriage');
+  const juanEvents = await callTool(server, 'nodus_list_events', { personId: juan.personId, limit: 10, offset: 0 });
+  assert.equal(juanEvents.total, 2, 'events filter by participant');
+  const badPersonEvents = await callToolRaw(server, 'nodus_list_events', { personId: 'per_missing', limit: 10, offset: 0 });
+  assert.equal(badPersonEvents.isError, true);
+  assert.equal(JSON.parse(badPersonEvents.content[0].text).error.category, 'not_found');
+
+  const seededPersons = await callTool(server, 'nodus_list_persons', { limit: 1, offset: 0 });
+  assert.equal(seededPersons.total, 2);
+  assert.equal(seededPersons.hasMore, true, 'person list paginates with hasMore');
+
+  const padronesFolder = archiveRepo.createFolder('Padrones');
+  const padron = archiveRepo.createItem({
+    folderId: padronesFolder.folderId,
+    title: 'Padrón municipal de 1890',
+    kind: 'image',
+    docType: 'census_padron',
+    extractedText: 'Juan García figura como jornalero en el padrón municipal de 1890.',
+    description: 'Hoja del padrón con la familia García.',
+    source: 'Archivo Municipal, caja 12',
+    tags: ['padrón'],
+  });
+  archiveRepo.linkItemPerson(padron.itemId, juan.personId);
+  archiveRepo.createItem({
+    title: 'Partida de bautismo',
+    kind: 'pdf',
+    extractedText: 'Partida de bautismo de la parroquia, año 1890.',
+  });
+
+  const archiveList = await callTool(server, 'nodus_list_archive_items', { limit: 10, offset: 0 });
+  assert.equal(archiveList.total, 2);
+  const compactItem = archiveList.items.find((item) => item.itemId === padron.itemId);
+  assert.equal('extractedText' in compactItem, false, 'archive list returns snippets, not full text');
+  assert.match(compactItem.extractedTextSnippet, /jornalero/);
+  assert.deepEqual(compactItem.folders, ['Padrones'], 'archive list resolves folder names');
+  assert.deepEqual(compactItem.linkedPersons, ['Juan García']);
+  const archiveByQuery = await callTool(server, 'nodus_list_archive_items', { query: 'jornalero', limit: 10, offset: 0 });
+  assert.equal(archiveByQuery.total, 1, 'archive filters by text query');
+  const archiveByKind = await callTool(server, 'nodus_list_archive_items', { kinds: ['pdf'], limit: 10, offset: 0 });
+  assert.equal(archiveByKind.total, 1, 'archive filters by kind');
+  const archiveByTag = await callTool(server, 'nodus_list_archive_items', { tags: ['padrón'], limit: 10, offset: 0 });
+  assert.equal(archiveByTag.total, 1, 'archive filters by tag');
+  const archiveByPerson = await callTool(server, 'nodus_list_archive_items', { personId: juan.personId, limit: 10, offset: 0 });
+  assert.equal(archiveByPerson.total, 1, 'archive filters by linked person');
+  const archiveByDocType = await callTool(server, 'nodus_list_archive_items', { docTypes: ['census_padron'], limit: 10, offset: 0 });
+  assert.equal(archiveByDocType.total, 1, 'archive filters by document type');
+
+  const fullItem = await callTool(server, 'nodus_get_archive_item', { itemId: padron.itemId });
+  assert.match(fullItem.extractedText, /jornalero/, 'get_archive_item returns the full text');
+  assert.equal(fullItem.source, 'Archivo Municipal, caja 12');
+  const missingItem = await callToolRaw(server, 'nodus_get_archive_item', { itemId: 'ait_missing' });
+  assert.equal(missingItem.isError, true);
+  assert.equal(JSON.parse(missingItem.content[0].text).error.category, 'not_found');
+
+  const archiveAiError = await callToolRaw(server, 'nodus_search_archive', { query: 'jornalero', limit: 5, minSimilarity: 0.35 });
+  assert.equal(archiveAiError.isError, true, 'semantic archive search requires embeddings');
+  assert.equal(JSON.parse(archiveAiError.content[0].text).error.category, 'ai_unconfigured');
 
   // Read-only databases-mode tools: list, schema, query (decoded values), get row.
   const dbmode = require(path.join(repoRoot, 'electron/db/databasesRepo.ts'));
@@ -180,6 +291,96 @@ try {
   const qFormula = await callTool(server, 'nodus_query_database', { databaseId: mdb.id, query: 'pesado', limit: 10, offset: 0 });
   assert.equal(qFormula.total, 1, 'a formula value is searchable over MCP');
 
+  // Typed filters + sorts: the same engine as the in-app filter bar, addressed by
+  // column NAME and option LABEL so an MCP client never needs internal ids.
+  const mRow2 = dbmode.createRow(mdb.id);
+  dbmode.setCell(mRow2.id, mName.id, 'Perro');
+  dbmode.setCell(mRow2.id, mNum.id, '2');
+  const heavy = await callTool(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Peso', op: 'gt', value: '3' }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(heavy.total, 1, 'numeric filter narrows the rows');
+  assert.equal(heavy.rows[0].fields.Nombre, 'Gato');
+  assert.equal(heavy.hasMore, false, 'query_database uses the standard paginated shape');
+  const byLabel = await callTool(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Estado', op: 'isAnyOf', value: ['vivo'] }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(byLabel.total, 1, 'select filter accepts option labels');
+  assert.equal(byLabel.rows[0].fields.Nombre, 'Gato');
+  const eitherOr = await callTool(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: {
+      conjunction: 'or',
+      conditions: [
+        { column: 'Peso', op: 'gt', value: '3' },
+        { column: 'Nombre', op: 'contains', value: 'perro' },
+      ],
+    },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(eitherOr.total, 2, 'or-conjunction unions the conditions');
+  const sortedDesc = await callTool(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    sorts: [{ column: 'Peso', dir: 'desc' }],
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(sortedDesc.rows[0].fields.Nombre, 'Gato', 'sorts order rows by column value');
+  const sortedAsc = await callTool(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    sorts: [{ column: 'Peso', dir: 'asc' }],
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(sortedAsc.rows[0].fields.Nombre, 'Perro');
+
+  const badColumn = await callToolRaw(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Altura', op: 'gt', value: '3' }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(badColumn.isError, true);
+  const badColumnError = JSON.parse(badColumn.content[0].text).error;
+  assert.equal(badColumnError.category, 'invalid_input');
+  assert.match(badColumnError.message, /Peso/, 'unknown-column error lists the available columns');
+  const badOp = await callToolRaw(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Nombre', op: 'gt', value: '3' }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(badOp.isError, true);
+  assert.match(JSON.parse(badOp.content[0].text).error.message, /contains/, 'invalid-operator error lists the valid operators');
+  const badOption = await callToolRaw(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Estado', op: 'isAnyOf', value: ['muerto'] }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(badOption.isError, true);
+  assert.match(JSON.parse(badOption.content[0].text).error.message, /vivo/, 'unknown-option error lists the available labels');
+  const missingValue = await callToolRaw(server, 'nodus_query_database', {
+    databaseId: mdb.id,
+    filter: { conjunction: 'and', conditions: [{ column: 'Peso', op: 'gt' }] },
+    limit: 10,
+    offset: 0,
+  });
+  assert.equal(missingValue.isError, true);
+  assert.equal(JSON.parse(missingValue.content[0].text).error.category, 'invalid_input');
+
+  // A single row resolves its relation columns to target labels and names its database.
+  const rowDetail = await callTool(server, 'nodus_get_database_row', { rowId: mRow.id });
+  assert.equal(rowDetail.database.name, 'MCP DB', 'row detail names its parent database');
+  assert.deepEqual(rowDetail.fields['Vínculo'], [{ label: 'Enlazado', kind: 'db_row' }], 'row detail resolves relation targets to labels');
+
   // Read-only study-vault tools expose organisation, grounded search, questions
   // and progress without allowing an MCP client to mutate learning state.
   const studyOrg = require(path.join(repoRoot, 'electron/db/studyOrgRepo.ts'));
@@ -215,6 +416,16 @@ try {
   assert.ok(studySearch.results.some((result) => result.sourceId === studyDoc.id), 'study search returns grounded document snippets');
   const questionList = await callTool(server, 'nodus_study_list_questions', { query: 'solutos', favorite: false, limit: 10, offset: 0 });
   assert.ok(questionList.questions.some((question) => question.id === studyQuestion.id));
+  const byCourse = await callTool(server, 'nodus_study_list_questions', { courseId: studyCourse.id, favorite: false, limit: 10, offset: 0 });
+  assert.equal(byCourse.total, 1, 'questions filter by course');
+  const otherCourse = await callTool(server, 'nodus_study_list_questions', { courseId: 'course_missing', favorite: false, limit: 10, offset: 0 });
+  assert.equal(otherCourse.total, 0);
+  const byType = await callTool(server, 'nodus_study_list_questions', { type: 'short', favorite: false, limit: 10, offset: 0 });
+  assert.equal(byType.total, 1, 'questions filter by type');
+  const byDifficulty = await callTool(server, 'nodus_study_list_questions', { difficulty: 'hard', favorite: false, limit: 10, offset: 0 });
+  assert.equal(byDifficulty.total, 0, 'questions filter by difficulty');
+  const byStatus = await callTool(server, 'nodus_study_list_questions', { status: 'pending', favorite: false, limit: 10, offset: 0 });
+  assert.equal(byStatus.total, 1, 'questions filter by review status');
   const studyProgress = await callTool(server, 'nodus_study_get_progress');
   assert.equal(typeof studyProgress.progress.dueCards, 'number');
   assert.ok(Array.isArray(studyProgress.planner.events));
@@ -438,6 +649,19 @@ try {
     });
     assert.equal(badScope.isError, true);
     assert.equal(JSON.parse(badScope.content[0].text).error.category, 'not_found');
+
+    // Semantic archive search: with embeddings in place, only the similar document
+    // clears the threshold and comes back compact with its similarity.
+    const archiveItems = archiveRepo.listItems();
+    const partida = archiveItems.find((item) => item.itemId !== padron.itemId);
+    archiveRepo.setItemEmbedding(padron.itemId, [1, 0], 'test-model', 'hash-padron');
+    archiveRepo.setItemEmbedding(partida.itemId, [0, 1], 'test-model', 'hash-partida');
+    const archiveHits = await callTool(server, 'nodus_search_archive', { query: 'jornalero', limit: 5, minSimilarity: 0.35 });
+    assert.equal(archiveHits.items.length, 1, 'only the similar archive item clears the threshold');
+    assert.equal(archiveHits.items[0].itemId, padron.itemId);
+    assert.ok(archiveHits.items[0].similarity > 0.9);
+    assert.equal('extractedText' in archiveHits.items[0], false, 'archive search returns compact items');
+    assert.equal(archiveHits.indexed, 2, 'archive search reports index coverage');
   } finally {
     aiClient.embed = originalEmbed;
   }

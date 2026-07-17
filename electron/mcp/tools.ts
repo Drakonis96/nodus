@@ -33,12 +33,22 @@ import * as researchQuestions from '../db/researchMapRepo';
 import * as themes from '../db/themesRepo';
 import * as tutorRoutes from '../db/tutorRepo';
 import * as workSummaries from '../db/workSummariesRepo';
-import { listPersons, getPerson, listEvents, listEvidenceFor } from '../db/entitiesRepo';
+import { listPersons, getPerson, listEvents, listEvidenceFor, recordCounts } from '../db/entitiesRepo';
+import * as archive from '../db/archiveRepo';
 import * as dbMode from '../db/databasesRepo';
 import { decodeCheckbox, decodeMultiSelect, decodeNumber } from '@shared/databases';
 import { comparableType, type FormulaSpec } from '@shared/databaseFormula';
 import { describeFormula } from '@shared/databaseFormulaEval';
-import type { DatabaseColumn, DatabaseRow } from '@shared/types';
+import {
+  applyDatabaseFilter,
+  sortDatabaseRows,
+  operatorsForColumn,
+  opNeedsValue,
+  type FilterCondition,
+  type FilterOp,
+} from '@shared/databaseFilters';
+import { STUDY_QUESTION_TYPES, type StudyQuestionType } from '@shared/studyQuestions';
+import type { ArchiveItem, DatabaseColumn, DatabaseRow, HistoricalEventType } from '@shared/types';
 import { kinOf } from '../db/relationshipsRepo';
 import { listOpenSuggestions, listSuggestionsForPerson } from '../db/kinshipSuggestionsRepo';
 import * as writingDrafts from '../db/writingDraftsRepo';
@@ -92,6 +102,44 @@ const WRITING_KINDS = [
   'chapter_section',
   'research_question',
 ] as const;
+const EVENT_TYPES = [
+  'birth',
+  'baptism',
+  'marriage',
+  'death',
+  'burial',
+  'census',
+  'residence',
+  'migration',
+  'occupation',
+  'other',
+] as const satisfies readonly HistoricalEventType[];
+const ARCHIVE_KINDS = ['image', 'csv', 'xlsx', 'pdf', 'text', 'other'] as const;
+const STUDY_QUESTION_TYPE_VALUES = STUDY_QUESTION_TYPES as unknown as [string, ...string[]];
+// The question-bank filter matches stored per-question difficulty; 'mixed' only exists
+// as a generation setting, so it is not offered here.
+const STUDY_QUESTION_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+const STUDY_QUESTION_STATUSES = ['pending', 'approved', 'problematic', 'discarded'] as const;
+// The same operator vocabulary the in-app filter bar uses (shared/databaseFilters).
+const DB_FILTER_OPS = [
+  'contains',
+  'notContains',
+  'equals',
+  'notEquals',
+  'isEmpty',
+  'notEmpty',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'before',
+  'after',
+  'isAnyOf',
+  'isNoneOf',
+  'hasAllOf',
+  'isChecked',
+  'isUnchecked',
+] as const satisfies readonly FilterOp[];
 
 const modelSchema = z
   .object({
@@ -360,6 +408,83 @@ function dbRowRecord(columns: DatabaseColumn[], row: DatabaseRow): { id: string;
   return { id: row.id, fields };
 }
 
+/** Resolve a column reference (id or case-insensitive name) with a helpful error. */
+function dbResolveColumn(columns: DatabaseColumn[], ref: string): DatabaseColumn {
+  const needle = ref.trim().toLowerCase();
+  const found = columns.find((c) => c.id === ref) ?? columns.find((c) => c.name.toLowerCase() === needle);
+  if (!found) {
+    throw new McpToolError(
+      'invalid_input',
+      `No column named "${ref}" exists in this database. Available columns: ${columns.map((c) => c.name).join(', ')}.`
+    );
+  }
+  return found;
+}
+
+/** Build a shared-engine FilterCondition from an MCP condition (labels → option ids). */
+function dbBuildCondition(
+  columns: DatabaseColumn[],
+  input: { column: string; op: FilterOp; value?: string | string[] }
+): FilterCondition {
+  const column = dbResolveColumn(columns, input.column);
+  const allowed = operatorsForColumn(column);
+  if (!allowed.includes(input.op)) {
+    throw new McpToolError(
+      'invalid_input',
+      `Operator "${input.op}" does not apply to column "${column.name}" (${comparableType(column)}). Valid operators: ${
+        allowed.length ? allowed.join(', ') : 'none — this column is not filterable'
+      }.`
+    );
+  }
+  if (opNeedsValue(input.op) && (input.value === undefined || (Array.isArray(input.value) && input.value.length === 0))) {
+    throw new McpToolError('invalid_input', `Operator "${input.op}" on column "${column.name}" requires a value.`);
+  }
+  let value: string | string[] | undefined = input.value;
+  const type = comparableType(column);
+  if ((type === 'select' || type === 'multi_select') && input.value !== undefined) {
+    const labels = Array.isArray(input.value) ? input.value : [input.value];
+    value = labels.map((label) => {
+      const needle = label.trim().toLowerCase();
+      const option = column.options.find((o) => o.id === label) ?? column.options.find((o) => o.label.toLowerCase() === needle);
+      if (!option) {
+        throw new McpToolError(
+          'invalid_input',
+          `Column "${column.name}" has no option "${label}". Available options: ${column.options.map((o) => o.label).join(', ')}.`
+        );
+      }
+      return option.id;
+    });
+  }
+  return { id: `mcp-${column.id}-${input.op}`, columnId: column.id, op: input.op, value };
+}
+
+// ── Genealogy / records decode helpers ────────────────────────────────────────
+
+/** Compact archive item for list results: metadata plus text snippets, never the blob. */
+function compactArchiveItem(item: ArchiveItem, folderNames: Map<string, string>) {
+  return {
+    itemId: item.itemId,
+    title: item.title,
+    kind: item.kind,
+    docType: item.docType,
+    year: item.year,
+    fileName: item.fileName,
+    mimeType: item.mimeType,
+    hasFile: item.hasBlob,
+    folders: item.folderIds.map((id) => folderNames.get(id) ?? id),
+    tags: item.tags,
+    linkedPersons: item.linkedPersons.map((p) => p.displayName),
+    source: item.source,
+    descriptionSnippet: snippet(item.description, 300) || null,
+    extractedTextSnippet: snippet(item.extractedText, 300) || null,
+    updatedAt: item.updatedAt,
+  };
+}
+
+function archiveFolderNames(): Map<string, string> {
+  return new Map(archive.listFolders().map((folder) => [folder.folderId, folder.name]));
+}
+
 function dbRowSearchText(columns: DatabaseColumn[], row: DatabaseRow): string {
   return columns
     .map((col) => {
@@ -493,25 +618,32 @@ export function registerTools(server: McpServer): void {
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    tool(() => ({
-      version: app.getVersion(),
-      vault: vaultContext(),
-      counts: {
-        ideas: count('ideas'),
-        works: count('works'),
-        themes: count('themes'),
-        debates: getDebates().length,
-        gaps: count('gaps'),
-        authors: count('authors'),
-        passages: count('passages'),
-        notes: count('notes'),
-        databases: dbMode.listDatabases().length,
-        studyCourses: studyOrg.getStudyWorkspace().courses.length,
-        studyDocuments: studyOrg.getStudyWorkspace().documents.length,
-        studyQuestions: studyQuestions.listStudyQuestions().length,
-      },
-      enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS },
-    }))
+    tool(() => {
+      const records = recordCounts();
+      const studyWorkspace = studyOrg.getStudyWorkspace();
+      return {
+        version: app.getVersion(),
+        vault: vaultContext(),
+        counts: {
+          ideas: count('ideas'),
+          works: count('works'),
+          themes: count('themes'),
+          debates: getDebates().length,
+          gaps: count('gaps'),
+          authors: count('authors'),
+          passages: count('passages'),
+          notes: count('notes'),
+          persons: records.persons,
+          events: records.events,
+          archiveItems: archive.archiveCounts().items,
+          databases: dbMode.listDatabases().length,
+          studyCourses: studyWorkspace.courses.length,
+          studyDocuments: studyWorkspace.documents.length,
+          studyQuestions: studyQuestions.listStudyQuestions().length,
+        },
+        enums: { ideaTypes: IDEA_TYPES, edgeTypes: EDGE_TYPES, gapKinds: GAP_KINDS, eventTypes: EVENT_TYPES },
+      };
+    })
   );
 
   server.registerTool(
@@ -1575,7 +1707,7 @@ export function registerTools(server: McpServer): void {
           birthDate: p.birthDate,
           deathDate: p.deathDate,
         }));
-        return { persons: all.slice(offset, offset + limit), total: all.length };
+        return page('persons', all, limit, offset);
       })()
   );
 
@@ -1644,7 +1776,153 @@ export function registerTools(server: McpServer): void {
           strength: s.strength,
           evidence: s.evidence.filter((ev) => ev.quote).map((ev) => ({ quote: ev.quote, location: ev.location, signal: ev.signal })),
         }));
-        return { suggestions: all.slice(offset, offset + limit), total: all.length };
+        return page('suggestions', all, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_events',
+    {
+      title: 'List timeline events',
+      description:
+        'Lists the historical events of the records ontology (genealogy / primary-source vaults) in chronological order — the same data behind the Nodus timeline. Optional filters: personId (events the person participates in), type (birth|baptism|marriage|death|burial|census|residence|migration|occupation|other), and a from/to window over the sortable date (ISO prefix, e.g. "1890" or "1890-05"). Each event carries its participants with their roles. Read-only; returns an empty list in vaults without a records layer.',
+      inputSchema: {
+        ...paginationSchema,
+        personId: z.string().trim().min(1).optional(),
+        type: z.enum(EVENT_TYPES).optional(),
+        from: z.string().trim().min(1).max(30).optional().describe('Earliest sortable date, ISO prefix (e.g. "1890" or "1890-05-01").'),
+        to: z.string().trim().min(1).max(30).optional().describe('Latest sortable date, ISO prefix.'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, personId, type, from, to }) =>
+      tool(() => {
+        if (personId && !getPerson(personId)) throw notFound('person', personId);
+        const events = listEvents({ personId, type, from, to });
+        const paged = page('events', events, limit, offset);
+        return {
+          ...paged,
+          events: paged.events.map((e) => ({
+            eventId: e.eventId,
+            type: e.type,
+            label: e.label,
+            date: e.date,
+            place: e.placeName,
+            notes: e.notes,
+            participants: e.participants.map((p) => ({ personId: p.personId, name: p.displayName ?? null, role: p.role })),
+          })),
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_list_archive_items',
+    {
+      title: 'List archive documents',
+      description:
+        'Lists the evidence-archive documents of a genealogy / primary-source vault (record photos, scans, transcribed certificates, exports) with their document type, year, folders, tags and linked persons. Optional filters: query (title/description/text), docTypes, kinds, tags, personId (documents linked to that person) and a year window. Returns compact rows with text snippets; use nodus_get_archive_item for the full extracted text and metadata. File binaries are never returned. Read-only; empty in vaults without an archive.',
+      inputSchema: {
+        ...paginationSchema,
+        query: querySchema,
+        docTypes: z.array(z.string().trim().min(1).max(200)).max(25).optional().describe('Document-type ids (see each item\'s docType).'),
+        kinds: z.array(z.enum(ARCHIVE_KINDS)).max(6).optional(),
+        tags: z.array(z.string().trim().min(1).max(200)).max(25).optional(),
+        personId: z.string().trim().min(1).optional(),
+        yearFrom: z.number().int().min(0).max(3000).optional(),
+        yearTo: z.number().int().min(0).max(3000).optional(),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ limit, offset, query, docTypes, kinds, tags, personId, yearFrom, yearTo }) =>
+      tool(() => {
+        if (personId && !getPerson(personId)) throw notFound('person', personId);
+        const items = archive.listItems({
+          search: query,
+          docTypes,
+          kinds,
+          tags,
+          personIds: personId ? [personId] : undefined,
+          yearFrom,
+          yearTo,
+        });
+        const folderNames = archiveFolderNames();
+        const compact = items.map((item) => compactArchiveItem(item, folderNames));
+        return page('items', compact, limit, offset);
+      })()
+  );
+
+  server.registerTool(
+    'nodus_get_archive_item',
+    {
+      title: 'Get archive document',
+      description:
+        'Gets one evidence-archive document by itemId: full extracted text, description, provenance (source), document type with its metadata form values, folders, tags and linked persons. The file binary itself is not returned. Read-only.',
+      inputSchema: { itemId: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ itemId }) =>
+      tool(() => {
+        const item = archive.getItem(itemId);
+        if (!item) throw notFound('archive item', itemId);
+        const folderNames = archiveFolderNames();
+        return {
+          itemId: item.itemId,
+          title: item.title,
+          kind: item.kind,
+          docType: item.docType,
+          metadata: item.metadata,
+          year: item.year,
+          fileName: item.fileName,
+          mimeType: item.mimeType,
+          bytes: item.bytes,
+          hasFile: item.hasBlob,
+          folders: item.folderIds.map((id) => folderNames.get(id) ?? id),
+          tags: item.tags,
+          linkedPersons: item.linkedPersons.map((p) => ({ personId: p.personId, displayName: p.displayName })),
+          source: item.source,
+          description: item.description,
+          extractedText: item.extractedText,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+        };
+      })()
+  );
+
+  server.registerTool(
+    'nodus_search_archive',
+    {
+      title: 'Search archive documents semantically',
+      description:
+        'Finds evidence-archive documents ranked by semantic similarity to the query — the direct way to locate which records discuss a person, place or fact when exact words differ (period spellings, synonyms). Searches the embedded extracted text/description of archive items; documents without indexed text are not found (index them from the Nodus archive view). Returns compact items with a similarity score; use nodus_get_archive_item for full text. Requires an embedding provider already configured in Nodus. Read-only.',
+      inputSchema: {
+        query: z.string().trim().min(1).max(8_000),
+        limit: z.number().int().min(1).max(50).default(10),
+        minSimilarity: z
+          .number()
+          .min(0)
+          .max(1)
+          .default(0.35)
+          .describe('Cosine similarity threshold; 0.35 is the same value the Nodus archive discovery uses.'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    ({ query, limit, minSimilarity }) =>
+      tool(async () => {
+        const vector = await embed(query);
+        if (!vector) {
+          throw new McpToolError(
+            'ai_unconfigured',
+            'No embeddings available. Configure the embedding provider and key in Nodus Settings.'
+          );
+        }
+        const hits = archive.findArchiveItemsSimilar(vector, { limit, minSimilarity });
+        const folderNames = archiveFolderNames();
+        const embedding = archive.archiveEmbeddingCount();
+        return {
+          items: hits.map((hit) => ({ ...compactArchiveItem(hit, folderNames), similarity: hit.similarity })),
+          indexed: embedding.indexed,
+          indexable: embedding.total,
+        };
       })()
   );
 
@@ -1700,24 +1978,55 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Query database rows',
       description:
-        'Lists a database\'s rows with human-readable field values (select/multi-select resolved to labels, checkboxes to booleans, attachments to file names, relations to a link count). Optional `query` filters to rows whose text contains it. Read-only; paginated.',
+        'Lists a database\'s rows with human-readable field values (select/multi-select resolved to labels, checkboxes to booleans, attachments to file names, relations to a link count). Three composable narrowing mechanisms: `query` (substring over all of a row\'s text), `filter` (typed conditions — the same engine as the in-app filter bar; reference columns by name or id, select/multi-select values by option label) and `sorts` (multi-column, applied in order; empty values always sort last). Get the columns, their types and option labels from nodus_get_database_schema first. Read-only; paginated.',
       inputSchema: {
         databaseId: z.string().trim().min(1),
         query: querySchema,
+        filter: z
+          .object({
+            conjunction: z.enum(['and', 'or']).default('and'),
+            conditions: z
+              .array(
+                z.object({
+                  column: z.string().trim().min(1).describe('Column name (case-insensitive) or column id.'),
+                  op: z.enum(DB_FILTER_OPS),
+                  value: z
+                    .union([z.string(), z.array(z.string()).max(50)])
+                    .optional()
+                    .describe('Text/number/date as string; option labels (or ids) for select/multi-select. Omit for isEmpty/notEmpty/isChecked/isUnchecked.'),
+                })
+              )
+              .min(1)
+              .max(20),
+          })
+          .optional()
+          .describe('Typed row filter. Number columns compare numerically (gt/gte/lt/lte), date columns support before/after, select columns isAnyOf/isNoneOf/hasAllOf.'),
+        sorts: z
+          .array(z.object({ column: z.string().trim().min(1), dir: z.enum(['asc', 'desc']).default('asc') }))
+          .max(5)
+          .optional(),
         limit: z.number().int().min(1).max(200).default(50),
         offset: z.number().int().min(0).default(0),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ databaseId, query, limit, offset }) =>
+    ({ databaseId, query, filter, sorts, limit, offset }) =>
       tool(() => {
         const detail = dbMode.getDatabaseDetail(databaseId);
         if (!detail) throw notFound('database', databaseId);
         let rows = dbMode.listRows(databaseId, { sort: 'position' });
+        if (filter) {
+          const conditions = filter.conditions.map((cond) => dbBuildCondition(detail.columns, cond));
+          rows = applyDatabaseFilter(rows, detail.columns, { conjunction: filter.conjunction, conditions });
+        }
+        if (sorts?.length) {
+          const rules = sorts.map((s) => ({ columnId: dbResolveColumn(detail.columns, s.column).id, dir: s.dir }));
+          rows = sortDatabaseRows(rows, detail.columns, rules);
+        }
         const q = query?.trim().toLowerCase();
         if (q) rows = rows.filter((r) => dbRowSearchText(detail.columns, r).includes(q));
-        const total = rows.length;
-        return { rows: rows.slice(offset, offset + limit).map((r) => dbRowRecord(detail.columns, r)), total };
+        const paged = page('rows', rows, limit, offset);
+        return { ...paged, rows: paged.rows.map((r) => dbRowRecord(detail.columns, r)) };
       })()
   );
 
@@ -1725,7 +2034,8 @@ export function registerTools(server: McpServer): void {
     'nodus_get_database_row',
     {
       title: 'Get a database row',
-      description: 'Gets one database row by id, with its field values decoded to human-readable form. Read-only.',
+      description:
+        'Gets one database row by id, with its field values decoded to human-readable form. Unlike nodus_query_database (which reports relation columns as link counts), here each relation column resolves to the labels of its linked targets. Read-only.',
       inputSchema: { rowId: z.string().trim().min(1) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -1734,7 +2044,20 @@ export function registerTools(server: McpServer): void {
         const row = dbMode.getRow(rowId);
         if (!row) throw notFound('row', rowId);
         const detail = dbMode.getDatabaseDetail(row.databaseId);
-        return dbRowRecord(detail?.columns ?? [], row);
+        if (!detail) throw notFound('database', row.databaseId);
+        const record = dbRowRecord(detail.columns, row);
+        for (const col of detail.columns) {
+          if (col.type !== 'relation') continue;
+          record.fields[col.name] = dbMode.listRelations(row.id, col.id).map((rel) => ({
+            label: rel.label,
+            kind: rel.targetKind,
+            ...(rel.vaultName ? { vault: rel.vaultName } : {}),
+          }));
+        }
+        return {
+          database: { id: detail.database.id, name: detail.database.name },
+          ...record,
+        };
       })()
   );
 
@@ -1819,20 +2142,33 @@ export function registerTools(server: McpServer): void {
     {
       title: 'List study questions',
       description:
-        'Lists compact, source-grounded questions from the active study vault. Read-only; lifecycle and grading actions remain inside Nodus.',
+        'Lists compact, source-grounded questions from the active study vault, filterable by course/subject/topic, question type, difficulty and review status. Read-only; lifecycle and grading actions remain inside Nodus.',
       inputSchema: {
         query: querySchema,
+        courseId: z.string().trim().min(1).optional(),
         subjectId: z.string().trim().min(1).optional(),
         topicId: z.string().trim().min(1).optional(),
+        type: z.enum(STUDY_QUESTION_TYPE_VALUES).optional(),
+        difficulty: z.enum(STUDY_QUESTION_DIFFICULTIES).optional(),
+        status: z.enum(STUDY_QUESTION_STATUSES).optional(),
         favorite: z.boolean().default(false),
         limit: z.number().int().min(1).max(200).default(50),
         offset: z.number().int().min(0).default(0),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    ({ query, subjectId, topicId, favorite, limit, offset }) =>
+    ({ query, courseId, subjectId, topicId, type, difficulty, status, favorite, limit, offset }) =>
       tool(() => {
-        const questions = studyQuestions.listStudyQuestions({ search: query, subjectId, topicId, favorite });
+        const questions = studyQuestions.listStudyQuestions({
+          search: query,
+          courseId,
+          subjectId,
+          topicId,
+          type: type as StudyQuestionType | undefined,
+          difficulty,
+          status,
+          favorite,
+        });
         const compact = questions.map((question) => ({
           id: question.id,
           shortId: question.shortId,
