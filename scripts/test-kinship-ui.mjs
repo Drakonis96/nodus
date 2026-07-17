@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const [editor, picker, social, tree, dossier, dossierLayout, people, settings, styles, kinshipModel] = await Promise.all([
+const [editor, picker, social, tree, dossier, dossierLayout, people, settings, styles, kinshipModel, relationsView] = await Promise.all([
   readFile(path.join(root, 'src/components/KinshipEditor.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/PersonMultiSelect.tsx'), 'utf8'),
   readFile(path.join(root, 'src/components/RelationsSection.tsx'), 'utf8'),
@@ -16,6 +16,7 @@ const [editor, picker, social, tree, dossier, dossierLayout, people, settings, s
   readFile(path.join(root, 'electron/db/settingsRepo.ts'), 'utf8'),
   readFile(path.join(root, 'src/index.css'), 'utf8'),
   readFile(path.join(root, 'shared/treeKinship.ts'), 'utf8'),
+  readFile(path.join(root, 'src/views/RelationsView.tsx'), 'utf8'),
 ]);
 
 test('tree sidebar and person dossier share the persistent relationship editor', () => {
@@ -154,4 +155,12 @@ test('dossier action buttons grow for translated labels without overflowing', ()
 
 test('people list leaves room above the first selectable person', () => {
   assert.match(people, /data-testid="persons-list"[^>]*className="[^"]*overflow-y-auto[^"]*pt-2[^"]*"/);
+});
+
+test('the social network labels contacts, which Sigma hides by size by default', () => {
+  // Contacts are drawn smaller than people; Sigma skips the label of any node under
+  // labelRenderedSizeThreshold (default 6), which rendered every contact as an
+  // anonymous dot. The network exists to name who is who, so the threshold is off.
+  assert.match(relationsView, /labelRenderedSizeThreshold: 0/);
+  assert.match(relationsView, /renderLabels: true/);
 });

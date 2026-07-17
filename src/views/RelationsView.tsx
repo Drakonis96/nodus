@@ -141,6 +141,10 @@ export function RelationsView({ onOpenPersons }: { onOpenPersons?: () => void })
       allowInvalidContainer: true,
       renderLabels: true,
       renderEdgeLabels: true,
+      // Sigma hides the label of any node drawn smaller than this (default 6), which
+      // left every contact — drawn at 5 — as an anonymous dot. This network is small
+      // and its whole point is naming who is who, so never hide a name by size.
+      labelRenderedSizeThreshold: 0,
       labelSize: 12,
       labelColor: { color: lightTheme ? '#18181b' : '#f4f4f5' },
       edgeLabelSize: 11,

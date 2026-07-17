@@ -95,6 +95,21 @@ try {
   assert.equal(fam.marriageDate, '1873', 'marriage event surfaced on the family');
   assert.equal(fam.marriagePlace, 'Sevilla');
 
+  // An adoptive parent link must survive export → re-import: exporting it as a plain
+  // CHIL silently turned adopted children into birth children (audit 2026-07).
+  const adoptee = ent.createPerson({ displayName: 'Adela Adoptada', sex: 'female', birthDate: '1955' });
+  rel.addRelationship(juan.personId, adoptee.personId, 'parent', 'user_asserted', 'adoptive');
+  const withAdoption = bridge.buildGedcomData();
+  const adoptiveFamily = withAdoption.families.find((f) => (f.adoptedChildren ?? []).length > 0);
+  assert.ok(adoptiveFamily, 'the derived family marks its adopted child');
+  const adoptionText = bridge.exportGedcom();
+  assert.match(adoptionText, /2 PEDI adopted/, 'export carries the adoption as FAMC/PEDI');
+
+  const reimported = ged.parseGedcom(adoptionText);
+  const backFamily = reimported.families.find((f) => (f.adoptedChildren ?? []).length > 0);
+  assert.ok(backFamily, 'a re-parsed export still knows which child was adopted');
+  assert.equal(backFamily.adoptedChildren.length, 1);
+
   console.log('GEDCOM bridge test passed!');
 } finally {
   await rm(root, { recursive: true, force: true });

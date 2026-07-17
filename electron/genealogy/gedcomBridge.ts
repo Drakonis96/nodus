@@ -71,15 +71,17 @@ export function importGedcom(text: string): GedcomImportResult {
       addRelationship(husband, wife, 'spouse', 'user_asserted');
       relationships++;
     }
+    const adopted = new Set(fam.adoptedChildren ?? []);
     for (const childXref of fam.children) {
       const child = idByXref.get(childXref);
       if (!child) continue;
+      const subtype = adopted.has(childXref) ? 'adoptive' : null;
       if (husband) {
-        addRelationship(husband, child, 'parent', 'user_asserted');
+        addRelationship(husband, child, 'parent', 'user_asserted', subtype);
         relationships++;
       }
       if (wife) {
-        addRelationship(wife, child, 'parent', 'user_asserted');
+        addRelationship(wife, child, 'parent', 'user_asserted', subtype);
         relationships++;
       }
     }
@@ -139,11 +141,15 @@ export function toGedcomData(persons: Person[], relationships: Relationship[], e
   // Parent edges → group children by their parent set; spouse pairs → couples.
   const parentsOf = new Map<string, string[]>();
   const spousePairs = new Set<string>();
+  // A child whose link to a parent is adoptive; carried to GEDCOM as FAMC/PEDI so an
+  // adoption isn't silently exported as a birth.
+  const adoptedChildren = new Set<string>();
   for (const r of relationships) {
     if (r.type === 'parent') {
       const list = parentsOf.get(r.toPerson) ?? [];
       list.push(r.fromPerson);
       parentsOf.set(r.toPerson, list);
+      if (r.subtype === 'adoptive') adoptedChildren.add(r.toPerson);
     } else if (r.type === 'spouse') {
       spousePairs.add(pairKey(r.fromPerson, r.toPerson));
     }
@@ -179,6 +185,7 @@ export function toGedcomData(persons: Person[], relationships: Relationship[], e
       husband: husband ? xrefByPerson.get(husband)! : null,
       wife: wife ? xrefByPerson.get(wife)! : null,
       children: group.children.map((c) => xrefByPerson.get(c)!).filter(Boolean),
+      adoptedChildren: group.children.filter((c) => adoptedChildren.has(c)).map((c) => xrefByPerson.get(c)!).filter(Boolean),
       marriageDate: marr?.date ?? null,
       marriagePlace: marr?.placeName ?? null,
     });
