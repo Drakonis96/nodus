@@ -4,7 +4,7 @@ import { releaseNotesForMajor, type ReleaseNoteScope } from '@shared/releaseNote
 import type { AppLanguage } from '@shared/types';
 import { Icon } from './ui';
 import { t } from '../i18n';
-import { Nodi } from './nodi/Nodi';
+import { NodiAvatar } from './nodi/NodiAvatar';
 
 // Shown once after the app updates, with the complete release history for the
 // current major version. "Last seen" lives in localStorage (a pure renderer
@@ -112,7 +112,7 @@ export function WhatsNewModal({
           </div>
           <motion.div className="whats-new-nodi" initial={{ opacity: 0, scale: .7, rotate: -8 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ delay: .18, duration: .5, type: 'spring', stiffness: 170 }}>
             <div className="whats-new-nodi-glow" />
-            <Nodi state="celebrating" height={205} />
+            <NodiAvatar state="celebrating" height={205} />
             <span>{t('¡Tenemos novedades!')}</span>
           </motion.div>
         </header>

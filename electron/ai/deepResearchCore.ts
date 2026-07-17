@@ -4,6 +4,7 @@ import type {
   DeepResearchReport,
   DeepResearchRequest,
   DeepResearchTargetLength,
+  PromptLanguage,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
   WritingWorkshopIdeaCandidate,
@@ -78,7 +79,7 @@ export interface DeepResearchPlan {
 
 export interface PlanInput {
   objective: string;
-  language: 'es' | 'en' | 'fr' | 'tr';
+  language: PromptLanguage;
   audience?: string;
   /** Soft target number of sections the planner should aim for. */
   sectionCount: number;
@@ -102,7 +103,7 @@ export interface CitationMenuItem {
 
 export interface SectionInput {
   objective: string;
-  language: 'es' | 'en' | 'fr' | 'tr';
+  language: PromptLanguage;
   audience?: string;
   section: DeepResearchPlanSection;
   targetWords: number;
@@ -113,7 +114,7 @@ export interface SectionInput {
 
 export interface FinalizeInput {
   objective: string;
-  language: 'es' | 'en' | 'fr' | 'tr';
+  language: PromptLanguage;
   planTitle: string;
   sectionTitles: string[];
   ideasCovered: number;
@@ -400,7 +401,7 @@ export async function orchestrateDeepResearch(
 
 function sectionInput(
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr' | 'tr',
+  language: PromptLanguage,
   section: DeepResearchPlanSection,
   targetWords: number,
   isConclusion: boolean,
@@ -454,7 +455,7 @@ export function resolveSectionPlan(
 
 export function buildPlanInput(
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr' | 'tr',
+  language: PromptLanguage,
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
@@ -486,7 +487,7 @@ export function buildPlanInput(
 async function planWithFallback(
   deps: DeepResearchDeps,
   request: DeepResearchRequest,
-  language: 'es' | 'en' | 'fr' | 'tr',
+  language: PromptLanguage,
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
   targetPages: { min: number; max: number }
@@ -891,7 +892,7 @@ export function assembleMarkdown(
   written: { section: DeepResearchPlanSection; markdown: string }[],
   references: string[],
   finalize: FinalizeResult,
-  language: 'es' | 'en' | 'fr' | 'tr'
+  language: PromptLanguage
 ): string {
   const L = labels(language);
   const parts: string[] = [];
@@ -1088,7 +1089,7 @@ function dedupe(items: string[]): string[] {
   return [...new Set(items.map((i) => i.trim()).filter(Boolean))];
 }
 
-function labels(language: 'es' | 'en' | 'fr' | 'tr') {
+function labels(language: PromptLanguage) {
   if (language === 'en') {
     return { abstract: 'Abstract', limitations: 'Limitations', references: 'References', noReferences: 'No sources cited.' };
   }
@@ -1097,6 +1098,15 @@ function labels(language: 'es' | 'en' | 'fr' | 'tr') {
   }
   if (language === 'tr') {
     return { abstract: 'Özet', limitations: 'Sınırlılıklar', references: 'Kaynakça', noReferences: 'Kaynak belirtilmedi.' };
+  }
+  if (language === 'de') {
+    return { abstract: 'Zusammenfassung', limitations: 'Einschränkungen', references: 'Literaturverzeichnis', noReferences: 'Keine Quellen angegeben.' };
+  }
+  if (language === 'pt') {
+    return { abstract: 'Resumo', limitations: 'Limitações', references: 'Bibliografia', noReferences: 'Nenhuma fonte citada.' };
+  }
+  if (language === 'pt-BR') {
+    return { abstract: 'Resumo', limitations: 'Limitações', references: 'Referências', noReferences: 'Nenhuma fonte citada.' };
   }
   return { abstract: 'Resumen', limitations: 'Limitaciones', references: 'Referencias', noReferences: 'Sin fuentes citadas.' };
 }

@@ -662,9 +662,66 @@ try {
     assert.ok(archiveHits.items[0].similarity > 0.9);
     assert.equal('extractedText' in archiveHits.items[0], false, 'archive search returns compact items');
     assert.equal(archiveHits.indexed, 2, 'archive search reports index coverage');
+    assert.equal(archiveHits.warning, undefined, 'no warning while the archive is indexed');
+
+    // An indexed corpus reports coverage and stays silent…
+    assert.equal(semantic.indexed, 2, 'passage search reports how many passages are indexed');
+    assert.equal(semantic.indexable, 2);
+    assert.equal(semantic.warning, undefined, 'no warning while the passages are indexed');
+
+    // …but an UNINDEXED corpus must never answer with a bare empty list: that reads as
+    // "the corpus does not discuss this" when it only means "nothing was embedded".
+    const unindexed = await callTool(server, 'nodus_search_ideas', { query: 'turismo visual', limit: 5 });
+    assert.deepEqual(unindexed.ideas, [], 'no ideas carry embeddings in this fixture');
+    assert.equal(unindexed.indexed, 0, 'idea search reports zero coverage');
+    assert.equal(unindexed.indexable, 2, 'and how many ideas could be indexed');
+    assert.match(unindexed.warning ?? '', /not mean the corpus lacks the topic/i, 'and warns that the empty result is not an absence of evidence');
+
+    // Coverage is model-scoped: re-embedding under a different model must resurface the
+    // warning, because the stored vectors can no longer match the configured model.
+    const stale = getDb().prepare('UPDATE passages SET embedding_model = ?');
+    stale.run('some-other-model');
+    const afterModelChange = await callTool(server, 'nodus_search_passages', { query: 'turismo visual', limit: 10, minSimilarity: 0.18 });
+    assert.equal(afterModelChange.passages.length, 0, 'vectors from another model cannot match');
+    assert.equal(afterModelChange.indexed, 0, 'so coverage drops to zero');
+    assert.ok(afterModelChange.warning, 'and the empty result is flagged rather than read as absence');
+    stale.run(embedConfig.model);
   } finally {
     aiClient.embed = originalEmbed;
   }
+
+  // A tool that writes before calling the AI must not leave the write behind when the
+  // AI step fails: the client is told the call errored, so nothing may survive it.
+  const researchMapRepo = require(path.join(repoRoot, 'electron/db/researchMapRepo.ts'));
+  const questionsBefore = researchMapRepo.listResearchQuestions().length;
+  const coverageError = await callToolRaw(server, 'nodus_ask_coverage_question', { question: '¿Deja basura al fallar?' });
+  assert.equal(coverageError.isError, true, 'coverage mapping fails without an AI provider');
+  assert.equal(JSON.parse(coverageError.content[0].text).error.category, 'ai_unconfigured');
+  assert.equal(
+    researchMapRepo.listResearchQuestions().length,
+    questionsBefore,
+    'a failed coverage question must be rolled back, not left orphaned in the vault'
+  );
+
+  // The vault the tools SERVE is the database this process has open, which is not always
+  // the registry's activeVaultId — a second Nodus instance can rewrite that file while
+  // this connection stays on the old vault. Reporting the registry's answer would label
+  // this vault's data with another vault's name, so capabilities must name the open one
+  // and warn. Kept last: it deliberately leaves the registry pointing elsewhere.
+  const vaultRegistry = require(path.join(repoRoot, 'electron/vaults/vaultRegistry.ts'));
+  const servingVaultId = vaultRegistry.getActiveVault().id;
+  const otherVault = vaultRegistry.createVault('Otra bóveda', 'estudio');
+  vaultRegistry.setActiveVault(otherVault.id); // rewrites the registry; the open DB does not move
+  const diverged = await callTool(server, 'nodus_get_capabilities');
+  assert.equal(diverged.vault.active.id, servingVaultId, 'capabilities names the vault whose data it serves, not the registry’s');
+  assert.match(diverged.vault.warning ?? '', /Otra bóveda/, 'and warns that the app has since switched vaults');
+  assert.ok(
+    diverged.vault.available.find((vault) => vault.id === servingVaultId).active,
+    'the served vault is the one flagged active in the list'
+  );
+  vaultRegistry.setActiveVault(servingVaultId);
+  const realigned = await callTool(server, 'nodus_get_capabilities');
+  assert.equal(realigned.vault.warning, undefined, 'no warning once the registry and the open database agree');
 
   closeDb();
   console.log('mcp tool contract test passed');

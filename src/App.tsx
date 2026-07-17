@@ -24,6 +24,7 @@ import { hasPendingWhatsNew, WhatsNewModal } from './components/WhatsNewModal';
 import { StartupUpdateModal } from './components/StartupUpdateModal';
 import { RecoverySetupWizard } from './views/RecoverySetupWizard';
 import { NodiMascot } from './components/nodi/NodiMascot';
+import { NodiStyleModal } from './components/NodiStyleModal';
 import { Icon } from './components/ui';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { t, tx, setActiveLang } from './i18n';
@@ -167,6 +168,9 @@ export function App() {
   const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
   const [whatsNewSettled, setWhatsNewSettled] = useState(() => !hasPendingWhatsNew());
   const [manualWhatsNewOpen, setManualWhatsNewOpen] = useState(false);
+  // Set once the startup update check is done with the screen, so the one-time Nodi
+  // choice can queue up behind it instead of fighting it for the foreground.
+  const [updateSettled, setUpdateSettled] = useState(false);
   useEffect(() => setActiveVaultQueryScope(activeVault?.id ?? null), [activeVault?.id]);
   // Resolved light/dark (accounts for 'system'); drives the macOS dock icon.
   const [isDark, setIsDark] = useState<boolean>(() =>
@@ -798,6 +802,10 @@ export function App() {
         language={settings.uiLanguage}
         onLanguageChosen={async (language) => {
           await window.nodus.updateSettings(preferencesForTutorialLanguage(language));
+          await reloadSettings();
+        }}
+        onNodiStyleChosen={async (mascotStyle) => {
+          await window.nodus.updateSettings({ mascotStyle, mascotStyleChosen: true });
           await reloadSettings();
         }}
         onComplete={async () => {
@@ -1484,7 +1492,19 @@ export function App() {
         />
       )}
 
-      {whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal />}
+      {whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal onSettled={() => setUpdateSettled(true)} />}
+
+      {/* Users who already saw the cinematic tutorial were never offered the choice of
+          Nodi, so it is made here instead — once, behind the update check. New users
+          pick inside the tutorial and reach this already chosen. */}
+      {updateSettled && !manualWhatsNewOpen && !isPreviewVault &&
+        settings.onboardingComplete &&
+        settings.basicsTutorialVersion > 0 &&
+        !recoveryStatus?.needsSetup &&
+        settings.mascotEnabled &&
+        !settings.mascotStyleChosen && (
+          <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
+        )}
 
       <NodiMascot settings={settings} />
     </div>

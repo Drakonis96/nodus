@@ -97,6 +97,23 @@ export const PT_BR: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi é o nó que acompanha o aplicativo, flutuando no canto inferior direito. Clique em Nodi para abrir o chat, suas notificações e a ajuda.',
   'Mostrar a Nodi': 'Mostrar o Nodi',
+  'Aspecto de Nodi': 'Aparência do Nodi',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Escolha o Nodi que acompanha você. A mudança vale em todo o app.',
+  'Nodi clásico': 'Nodi clássico',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'O personagem de sempre, com seus gestos e seus trajes de acordo com o espaço.',
+  'Nodi orbe': 'Nodi orbe',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'Uma esfera de vidro com uma constelação dentro, tingida com a cor do seu espaço.',
+  'Color del orbe': 'Cor do orbe',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'O orbe assume a cor do espaço ativo e muda junto com você ao trocar de espaço.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'O orbe mantém sempre a cor que você escolher, seja qual for o espaço.',
+  'Automático: según la bóveda activa': 'Automático: de acordo com o espaço ativo',
+  'Manual: un color fijo': 'Manual: uma cor fixa',
+  'Azul Nodi': 'Azul Nodi',
+  'Ahora puedes elegir a tu Nodi': 'Agora você pode escolher o seu Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'O Nodi tem uma segunda aparência: um orbe, mais sóbrio e discreto. Fique com o de sempre ou experimente.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'Você pode mudar quando quiser em Configurações › Interface › Mascote Nodi.',
   'Mantener siempre visible sobre otras apps': 'Manter sempre visível sobre outros aplicativos',
   'Trajes de Nodi según la bóveda': 'Trajes de Nodi de acordo com o espaço',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
@@ -3419,6 +3436,9 @@ export const PT_BR: Record<string, string> = {
   'testigo': 'testemunha',
   'oficiante': 'oficiante',
   'otro': 'outro',
+  'ficha': 'ficha',
+  'bautismo': 'batismo',
+  'entierro': 'enterro',
   'nacimiento': 'nascimento',
   'defunción': 'falecimento',
   'Añadidos: {a} · duplicados omitidos: {d}': 'Adicionados: {a} · duplicados ignorados: {d}',

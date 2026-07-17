@@ -182,6 +182,28 @@ Este vault es un gestor de bases de datos estructuradas (tablas con columnas tip
   },
 ];
 
+/**
+ * The accent colour of each vault type — the single source of truth for every surface
+ * that paints a vault in its own colour: the switcher badges and creation grid, the
+ * dock icon, and Nodi's orb when its colour follows the active vault. Keep these in
+ * step with the app logos; a type added above must be added here too.
+ */
+export const VAULT_TYPE_COLORS: Record<VaultType, string> = {
+  academic: '#6366f1',
+  estudio: '#0f766e',
+  primary_sources: '#6366f1',
+  genealogy: '#ca8a04',
+  databases: '#b30333',
+  testimonios: '#0891b2',
+  worldbuilding: '#7c3aed',
+  docencia: '#ea580c',
+};
+
+/** Accent colour for a vault type; unknown/absent types fall back to the academic indigo. */
+export function vaultTypeColor(value: unknown): string {
+  return VAULT_TYPE_COLORS[normalizeVaultType(value)];
+}
+
 /** Selectable shells whose product sections are visible but intentionally inert. */
 export const PREVIEW_VAULT_TYPES: VaultType[] = ['docencia', 'worldbuilding'];
 

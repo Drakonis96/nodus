@@ -109,3 +109,45 @@ test('serialized output has HEAD/TRLR and lineage-linked header', () => {
   assert.match(text, /2 VERS 5\.5\.1/);
   assert.match(text, /0 TRLR\n$/);
 });
+
+test('adoption survives a serialize → parse round-trip via FAMC/PEDI', () => {
+  // GEDCOM records an adoptive link on the child, not the family. Exporting it as a
+  // plain CHIL silently turned adopted children into birth children (audit 2026-07).
+  const data = {
+    persons: [
+      { xref: '@I1@', name: 'Pedro Padre', given: 'Pedro', surname: 'Padre', sex: 'M', birthDate: null, birthPlace: null, deathDate: null, deathPlace: null },
+      { xref: '@I2@', name: 'Adela Adoptada', given: 'Adela', surname: 'Adoptada', sex: 'F', birthDate: null, birthPlace: null, deathDate: null, deathPlace: null },
+      { xref: '@I3@', name: 'Hugo Natural', given: 'Hugo', surname: 'Natural', sex: 'M', birthDate: null, birthPlace: null, deathDate: null, deathPlace: null },
+    ],
+    families: [
+      { xref: '@F1@', husband: '@I1@', wife: null, children: ['@I2@', '@I3@'], adoptedChildren: ['@I2@'], marriageDate: null, marriagePlace: null },
+    ],
+  };
+  const text = ged.serializeGedcom(data);
+  assert.match(text, /1 FAMC @F1@\n2 PEDI adopted/, 'the adopted child carries FAMC + PEDI');
+  const back = ged.parseGedcom(text);
+  assert.deepEqual(back.families[0].adoptedChildren, ['@I2@']);
+  assert.deepEqual(back.families[0].children.sort(), ['@I2@', '@I3@']);
+});
+
+test('a FAMC/PEDI link from another tool is honoured even without a CHIL back-reference', () => {
+  const text = [
+    '0 HEAD', '0 @I1@ INDI', '1 NAME Ana /Madre/', '1 SEX F',
+    '0 @I2@ INDI', '1 NAME Luis /Hijo/', '1 SEX M', '1 FAMC @F1@', '2 PEDI adopted',
+    '0 @F1@ FAM', '1 WIFE @I1@', '0 TRLR', '',
+  ].join('\n');
+  const data = ged.parseGedcom(text);
+  assert.deepEqual(data.families[0].adoptedChildren, ['@I2@']);
+  assert.deepEqual(data.families[0].children, ['@I2@'], 'the child is linked to the family it names');
+});
+
+test('a birth-pedigree FAMC is not mistaken for an adoption', () => {
+  const text = [
+    '0 HEAD', '0 @I1@ INDI', '1 NAME Ana /Madre/',
+    '0 @I2@ INDI', '1 NAME Luis /Hijo/', '1 FAMC @F1@', '2 PEDI birth',
+    '0 @F1@ FAM', '1 WIFE @I1@', '1 CHIL @I2@', '0 TRLR', '',
+  ].join('\n');
+  const data = ged.parseGedcom(text);
+  assert.deepEqual(data.families[0].adoptedChildren, []);
+  assert.deepEqual(data.families[0].children, ['@I2@']);
+});

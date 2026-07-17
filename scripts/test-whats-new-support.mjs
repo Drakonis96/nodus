@@ -13,7 +13,7 @@ const icons = await readFile(path.join(root, 'src/components/ui.tsx'), 'utf8');
 
 assert.match(modal, /data-testid="whats-new-paypal-support"/);
 assert.match(modal, /data-testid="whats-new-cinematic-modal"/);
-assert.match(modal, /Nodi state="celebrating"/);
+assert.match(modal, /NodiAvatar state="celebrating"/);
 assert.match(modal, /whats-new-confetti/);
 assert.match(modal, /initial=\{\{ opacity: 0, y: 28, scale: \.96 \}\}/);
 assert.doesNotMatch(modal, /data-testid="whats-new-support-paypal"/);

@@ -97,6 +97,23 @@ export const DE: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi ist der Knoten, der die App begleitet und unten rechts schwebt. Klicken Sie auf Nodi, um den Chat, Ihre Benachrichtigungen und die Hilfe zu öffnen.',
   'Mostrar a Nodi': 'Nodi anzeigen',
+  'Aspecto de Nodi': 'Aussehen von Nodi',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Wählen Sie den Nodi, der Sie begleitet. Die Änderung gilt in der gesamten App.',
+  'Nodi clásico': 'Klassischer Nodi',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'Die vertraute Figur, mit ihren Gesten und ihren Kostümen je nach Arbeitsbereich.',
+  'Nodi orbe': 'Nodi-Orb',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'Eine Glaskugel mit einer Konstellation darin, gefärbt in der Farbe Ihres Arbeitsbereichs.',
+  'Color del orbe': 'Farbe des Orbs',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'Der Orb übernimmt die Farbe des aktiven Arbeitsbereichs und wechselt mit Ihnen mit.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'Der Orb behält immer die von Ihnen gewählte Farbe, unabhängig vom Arbeitsbereich.',
+  'Automático: según la bóveda activa': 'Automatisch: nach dem aktiven Arbeitsbereich',
+  'Manual: un color fijo': 'Manuell: eine feste Farbe',
+  'Azul Nodi': 'Nodi-Blau',
+  'Ahora puedes elegir a tu Nodi': 'Sie können jetzt Ihren Nodi wählen',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'Nodi hat ein zweites Aussehen: einen Orb, schlichter und dezenter. Behalten Sie den vertrauten oder probieren Sie ihn aus.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'Sie können das jederzeit unter Einstellungen › Oberfläche › Maskottchen Nodi ändern.',
   'Mantener siempre visible sobre otras apps': 'Immer über anderen Apps sichtbar halten',
   'Trajes de Nodi según la bóveda': 'Nodi-Kostüme je nach Arbeitsbereich',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
@@ -3453,6 +3470,9 @@ export const DE: Record<string, string> = {
   'testigo': 'Zeuge',
   'oficiante': 'Amtsperson',
   'otro': 'Sonstiges',
+  'ficha': 'Datenblatt',
+  'bautismo': 'Taufe',
+  'entierro': 'Bestattung',
   'nacimiento': 'Geburt',
   'defunción': 'Tod',
   'Añadidos: {a} · duplicados omitidos: {d}': 'Hinzugefügt: {a} · Duplikate übersprungen: {d}',

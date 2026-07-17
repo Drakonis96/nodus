@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { AppSettings, ModelRef, NodiChatMessage, NodiContextKind, NodiConversation, NodiNotification, NodiOverlayPlacement, VaultType } from '@shared/types';
-import { Nodi, type NodiRole, type NodiState } from './Nodi';
+import { type NodiRole, type NodiState } from './Nodi';
+import { NodiAvatar } from './NodiAvatar';
 import { Markdown } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
 import { Icon } from '../ui';
@@ -676,7 +677,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
           onLostPointerCapture={onFigurePointerCaptureLost}
           onContextMenu={onFigureContextMenu}
         >
-          <Nodi state={nodiState} role={role} height={figureH} draggable={!closing} raiseArm={!closing && unread > 0} className={dragging ? 'dragging' : undefined} />
+          <NodiAvatar settings={settings} state={nodiState} role={role} height={figureH} draggable={!closing} raiseArm={!closing && unread > 0} className={dragging ? 'dragging' : undefined} />
           {!closing && !menuOpen && unread > 0 && <span className="nodi-figure-badge">{unread > 9 ? '9+' : unread}</span>}
         </div>
       </div>

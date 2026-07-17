@@ -186,6 +186,9 @@ const OUTPUT_LANGUAGE_NAME: Record<Exclude<PromptLanguage, 'es'>, string> = {
   en: 'INGLÉS (English)',
   fr: 'FRANCÉS (Français)',
   tr: 'TURCO (Türkçe)',
+  de: 'ALEMÁN (Deutsch)',
+  pt: 'PORTUGUÉS DE PORTUGAL (português europeu)',
+  'pt-BR': 'PORTUGUÉS DE BRASIL (português brasileiro)',
 };
 
 function outputLanguageDirective(lang: Exclude<PromptLanguage, 'es'>): string {

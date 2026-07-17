@@ -2,6 +2,11 @@
 // builders against a deterministic academic-scale fixture and guard the renderer
 // contracts that keep the initial Sigma scene bounded. Runs under Electron-as-Node
 // so better-sqlite3 uses the same ABI as the desktop app.
+//
+// The builders must stay linear in the corpus so they cannot starve the main
+// process (the starvation that moved this work onto a worker thread in v1.3.0).
+// That bound is asserted with the work counters in `meterDb`, never with elapsed
+// ms — see the comment there for the measurements behind that choice.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -23,20 +28,26 @@ if (!process.argv.includes('--electron-graph-progressive-test')) {
   process.exit(0);
 }
 
+// Ceiling on how many times a builder may touch each row it reads out of the
+// database. Today the overview sits at ~2.7 and a theme scene at ~6.0, which leaves
+// room for another linear pass or two; a pairwise scan over the corpus lands at
+// ~6,400. See `meterDb` for why this is the bound under test rather than elapsed ms.
+const MAX_FIELD_READS_PER_ROW = 12;
+
 const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-graph-progressive-'));
 try {
   const Database = require('better-sqlite3');
   const db = new Database(path.join(root, 'graph.sqlite'));
   createSchema(db);
   seedAcademicFixture(db);
-  globalThis.__graphProgressiveTestDb = db;
+  const meter = meterDb(db);
+  globalThis.__graphProgressiveTestDb = meter.db;
 
   const graphModule = await bundleGraphService();
   const graph = await import(pathToFileURL(graphModule).href);
 
-  const overviewStarted = performance.now();
-  const overview = graph.buildIdeaGraphOverview();
-  const overviewMs = performance.now() - overviewStarted;
+  const overviewWork = meter.measure(() => graph.buildIdeaGraphOverview());
+  const overview = overviewWork.result;
   const overviewBytes = Buffer.byteLength(JSON.stringify(overview));
   assert.equal(overview.nodes.length, 12, 'overview returns one compact node per graph theme');
   assert.ok(overview.nodes.every((node) => node.type === 'theme'), 'overview contains no idea nodes');
@@ -44,12 +55,21 @@ try {
   assert.ok(overview.nodes.every((node) => node.workIds.length === 0), 'overview omits work-id payloads');
   assert.ok(overview.edges.length > 0, 'overview aggregates cross-theme relations');
   assert.ok(overviewBytes < 100_000, `overview payload remains compact (${overviewBytes} bytes)`);
-  assert.ok(overviewMs < 1_500, `overview fixture build remains bounded (${overviewMs.toFixed(1)} ms)`);
+  assert.equal(
+    overviewWork.statements,
+    4,
+    'overview reads the corpus with four fixed queries (themes, explicit and inferred '
+      + 'memberships, visible edges) rather than one per theme or per idea'
+  );
+  assert.ok(
+    overviewWork.readsPerRow < MAX_FIELD_READS_PER_ROW,
+    `overview work stays linear in the corpus (${overviewWork.readsPerRow.toFixed(1)} field `
+      + `reads across ${overviewWork.rows} rows)`
+  );
   assertGraphIntegrity(overview);
 
-  const themeStarted = performance.now();
-  const theme = graph.buildIdeaThemeGraph('Tema 0', 90);
-  const themeMs = performance.now() - themeStarted;
+  const themeWork = meter.measure(() => graph.buildIdeaThemeGraph('Tema 0', 90));
+  const theme = themeWork.result;
   const ideaNodes = theme.nodes.filter((node) => node.type !== 'theme');
   const activeNodes = ideaNodes.filter((node) => node.themes.includes('tema 0'));
   const bridgeNodes = ideaNodes.filter((node) => !node.themes.includes('tema 0'));
@@ -58,7 +78,17 @@ try {
   assert.ok(bridgeNodes.length <= 60, 'cross-theme context respects its bridge cap');
   assert.ok(ideaNodes.length <= 150, 'default theme scene never ships more than 150 ideas');
   assert.ok(themeBytes < 1_000_000, `theme payload remains bounded (${themeBytes} bytes)`);
-  assert.ok(themeMs < 1_500, `theme fixture build remains bounded (${themeMs.toFixed(1)} ms)`);
+  assert.equal(
+    themeWork.statements,
+    7,
+    'theme scene reads the corpus with seven fixed queries (the overview four plus ideas, '
+      + 'occurrences and edge feedback) rather than one per selected idea'
+  );
+  assert.ok(
+    themeWork.readsPerRow < MAX_FIELD_READS_PER_ROW,
+    `theme work stays linear in the corpus (${themeWork.readsPerRow.toFixed(1)} field `
+      + `reads across ${themeWork.rows} rows)`
+  );
   assertGraphIntegrity(theme);
 
   const clamped = graph.buildIdeaThemeGraph('Tema 0', 1);
@@ -70,8 +100,9 @@ try {
   await assertRendererContracts();
   db.close();
   console.log(
-    `progressive graph test passed (overview ${overviewMs.toFixed(1)} ms/${overviewBytes} B; `
-      + `theme ${themeMs.toFixed(1)} ms/${themeBytes} B/${ideaNodes.length} ideas)`
+    `progressive graph test passed (overview ${overviewBytes} B/${overviewWork.rows} rows/`
+      + `${overviewWork.readsPerRow.toFixed(1)} reads per row; theme ${themeBytes} B/`
+      + `${ideaNodes.length} ideas/${themeWork.readsPerRow.toFixed(1)} reads per row)`
   );
 } finally {
   await rm(root, { recursive: true, force: true });
@@ -152,6 +183,82 @@ function seedAcademicFixture(db) {
       }
     }
   })();
+}
+
+/** Counts the work a graph builder does, in units that do not depend on the machine
+ * running the test.
+ *
+ * This replaces a pair of `performance.now()` budgets (`< 1_500` ms each), which
+ * could not do the job they were written for. Measured against this fixture on an
+ * idle M-series laptop: the honest overview builder takes ~110 ms, and injecting the
+ * exact regression the budget existed to catch — an O(N^2) pairwise scan over the
+ * 7,200 rows, the shape that starved the main process before v1.3.0 — takes ~200 ms
+ * and passed the 1,500 ms budget comfortably. On the maintainer's machine the honest
+ * builder measured 1,013–2,345 ms across three idle runs, so it failed that same
+ * budget about a third of the time on its own, and near-always under the parallel
+ * load of `npm test` (~130 files at once, on a shared macos runner in CI). A 10x
+ * machine spread and a 2x run-to-run spread cannot resolve a 1.8x regression: the
+ * elapsed ms measured the runner, not the builder, at any threshold.
+ *
+ * Rows are handed out wrapped in counting proxies, so `readsPerRow` tracks how many
+ * times a builder walks the corpus it loaded: ~2.7 for the overview and ~6.0 for a
+ * theme scene, against ~6,400 for the pairwise scan above. Every counter here is
+ * identical on every machine and on every run. The one blind spot: it sees reads of
+ * rows the database handed out, so a builder that first copied rows into private
+ * objects and then scanned those pairwise would not register.
+ */
+function meterDb(db) {
+  let statements = 0;
+  let rows = 0;
+  let fieldReads = 0;
+
+  const meterRow = (row) => new Proxy(row, {
+    get(target, prop) {
+      if (typeof prop === 'string') fieldReads++;
+      return target[prop];
+    },
+  });
+  const meterStatement = (statement) => new Proxy(statement, {
+    get(target, prop) {
+      const value = target[prop];
+      if (typeof value !== 'function') return value;
+      if (prop !== 'all' && prop !== 'get') return value.bind(target);
+      return (...args) => {
+        statements++;
+        const result = value.apply(target, args);
+        if (Array.isArray(result)) {
+          rows += result.length;
+          return result.map(meterRow);
+        }
+        if (result && typeof result === 'object') {
+          rows++;
+          return meterRow(result);
+        }
+        return result;
+      };
+    },
+  });
+
+  return {
+    db: new Proxy(db, {
+      get(target, prop) {
+        if (prop === 'prepare') return (...args) => meterStatement(target.prepare(...args));
+        const value = target[prop];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }),
+    measure(run) {
+      const before = { statements, rows, fieldReads };
+      const result = run();
+      const used = {
+        result,
+        statements: statements - before.statements,
+        rows: rows - before.rows,
+        fieldReads: fieldReads - before.fieldReads,
+      };
+      return { ...used, readsPerRow: used.rows ? used.fieldReads / used.rows : 0 };
+    },
+  };
 }
 
 function assertGraphIntegrity(graph) {
