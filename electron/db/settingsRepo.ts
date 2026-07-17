@@ -1,6 +1,7 @@
 import { getDb } from './database';
 import type { AppSettings } from '@shared/types';
 import { DEFAULT_EMBEDDING_MODELS, DEFAULT_LOCAL_BASE_URLS, normalizeEmbeddingProvider } from '@shared/providers';
+import { NODI_ORB_DEFAULT_COLOR } from '@shared/nodiOrb';
 import { lockedApiKeyProviders, providerKeyMap } from '../secrets/secretStore';
 import { GRANULAR_MODEL_KEYS, migrateModelSettings } from '@shared/modelSettings';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
@@ -95,6 +96,12 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   mascotEnabled: true,
   mascotAlwaysOnTop: false,
   mascotVaultCostumes: true,
+  // The classic Nodi stays the default: an existing install must never wake up with a
+  // different mascot. New users and upgraders are asked once, then this holds their pick.
+  mascotStyle: 'classic',
+  mascotStyleChosen: false,
+  mascotOrbColorMode: 'auto',
+  mascotOrbColor: NODI_ORB_DEFAULT_COLOR,
   concurrency: 1,
   chatReasoning: 'off',
   openRouterThroughput: true,

@@ -159,6 +159,15 @@ try {
     buttons.map((button) => { const box = button.getBoundingClientRect(); return `${Math.round(box.width)}x${Math.round(box.height)}`; }));
   assert.equal(new Set(languageButtonSizes).size, 1, `every cinematic tutorial language button has the same dimensions: ${languageButtonSizes.join(', ')}`);
   await page.getByTestId('tutorial-language-fr').click();
+  // Second screen: which Nodi guides the rest. It speaks the language just chosen, and
+  // records the choice so the one-time modal never asks again after the tutorial.
+  await page.getByTestId('basics-tutorial-nodi-style').waitFor({ timeout: 30_000 });
+  await page.getByText('Quel Nodi préférez-vous ?', { exact: true }).waitFor();
+  await page.getByTestId('nodi-style-classic').click();
+  await waitForCondition('elección de Nodi registrada', () => page.evaluate(async () => {
+    const settings = await window.nodus.getSettings();
+    return settings.mascotStyle === 'classic' && settings.mascotStyleChosen === true;
+  }));
   await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
   // French now has a full UI translation, so choosing it keeps the French interface
   // instead of borrowing the English one.

@@ -9,6 +9,7 @@
 // changes, so no icon variants need to be pre-baked at build time.
 
 import markGeometry from '@shared/nodusMark.json';
+import { vaultTypeColor } from '@shared/vaultTypes';
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(255, Math.round(n)));
@@ -101,13 +102,7 @@ export async function buildDockIconDataUrl(color: string, dark: boolean): Promis
   return canvas.toDataURL('image/png');
 }
 
-/** Accent colour for a vault type — mirrors VAULT_TYPE_COLOR / the app logos. */
+/** Accent colour for a vault type — the app logos and the vault switcher use the same map. */
 export function dockColorForVaultType(type: string | undefined): string {
-  if (type === 'genealogy') return '#ca8a04';
-  if (type === 'databases') return '#b30333';
-  if (type === 'estudio') return '#0f766e';
-  if (type === 'testimonios') return '#0891b2';
-  if (type === 'worldbuilding') return '#7c3aed';
-  if (type === 'docencia') return '#ea580c';
-  return '#6366f1';
+  return vaultTypeColor(type);
 }

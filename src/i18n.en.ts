@@ -82,6 +82,23 @@ export const EN: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi is the node that accompanies the app, floating at the bottom right. Click Nodi to open chat, your notifications, and help.',
   'Mostrar a Nodi': 'Show Nodi',
+  'Aspecto de Nodi': 'Nodi look',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Choose the Nodi that keeps you company. The change applies across the app.',
+  'Nodi clásico': 'Classic Nodi',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'The long-standing character, with its gestures and its per-vault costumes.',
+  'Nodi orbe': 'Orb Nodi',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'A glass sphere with a constellation inside, tinted with your vault’s colour.',
+  'Color del orbe': 'Orb colour',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'The orb takes the active vault’s colour and follows you as you switch vaults.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'The orb always keeps the colour you choose, whatever the vault.',
+  'Automático: según la bóveda activa': 'Automatic: follow the active vault',
+  'Manual: un color fijo': 'Manual: a fixed colour',
+  'Azul Nodi': 'Nodi blue',
+  'Ahora puedes elegir a tu Nodi': 'You can now choose your Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'Nodi has a second look: an orb, soberer and more discreet. Keep the one you know, or give it a try.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'You can change this anytime in Settings › Interface › Nodi mascot.',
   'Mantener siempre visible sobre otras apps': 'Keep on top of other apps',
   'Trajes de Nodi según la bóveda': 'Nodi costumes per vault',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':

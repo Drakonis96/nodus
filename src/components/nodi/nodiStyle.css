@@ -1,0 +1,140 @@
+/* The "which Nodi?" picker and the one-time modal that carries it. */
+
+.nodi-style-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+}
+
+.nodi-style-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: 1rem .9rem 1.15rem;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 1.1rem;
+  background: rgba(255, 255, 255, .04);
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+.nodi-style-option:hover,
+.nodi-style-option:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, .5);
+  background: rgba(255, 255, 255, .07);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .3);
+  outline: none;
+}
+.nodi-style-option.selected {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, .14);
+  box-shadow: 0 0 0 1px #6366f1 inset;
+}
+.nodi-style-option b { font-size: .95rem; font-weight: 650; }
+.nodi-style-body { color: #a3a3a3; font-size: .78rem; line-height: 1.35; }
+
+.light .nodi-style-option { border-color: rgba(15, 23, 42, .14); background: rgba(15, 23, 42, .03); }
+.light .nodi-style-option:hover,
+.light .nodi-style-option:focus-visible { border-color: rgba(15, 23, 42, .4); background: rgba(15, 23, 42, .06); }
+.light .nodi-style-option.selected { background: rgba(99, 102, 241, .1); }
+.light .nodi-style-body { color: #64748b; }
+
+/* The two mascots have different natural footprints; a fixed box keeps the cards
+   the same size and both figures sitting on the same baseline. */
+.nodi-style-figure {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 160px;
+  pointer-events: none;
+}
+.nodi-style-figure > svg { max-width: 100%; }
+
+/* ── the one-time modal ────────────────────────────────────────────────────────── */
+.nodi-style-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 74; /* above the startup update modal (72), which it follows */
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(2 6 23 / .8);
+  backdrop-filter: blur(10px);
+}
+.nodi-style-cinema {
+  position: relative;
+  display: flex;
+  width: min(660px, 100%);
+  max-height: min(90vh, 760px);
+  flex-direction: column;
+  overflow: hidden auto;
+  padding: 1.9rem 1.7rem 1.6rem;
+  border: 1px solid rgb(148 163 184 / .25);
+  border-radius: 26px;
+  color: #e7e5e4;
+  background: #090d16;
+  box-shadow: 0 40px 120px rgb(0 0 0 / .58), 0 0 0 1px rgb(255 255 255 / .04) inset;
+  text-align: center;
+}
+.light .nodi-style-cinema {
+  border-color: rgb(30 41 59 / .2);
+  color: #172033;
+  background: #f8fafc;
+  box-shadow: 0 35px 100px rgb(15 23 42 / .28);
+}
+/* The aurora is inset -25% to bleed past the card, so it lives in its own clipped
+   layer: left in the flow it would add a scrollbar, and the rule below would drag it
+   out of `position: absolute` and give it real height. */
+.nodi-style-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.nodi-style-cinema > *:not(.nodi-style-glow) { position: relative; z-index: 2; }
+.nodi-style-cinema .nodi-style-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  color: #9ca3af;
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.nodi-style-cinema h2 {
+  margin-top: .5rem;
+  font-size: clamp(1.4rem, 3.4vw, 1.95rem);
+  font-weight: 650;
+}
+.nodi-style-cinema .nodi-style-lede {
+  margin: .45rem auto 0;
+  max-width: 46ch;
+  color: #9ca3af;
+  font-size: .87rem;
+  line-height: 1.5;
+}
+.light .nodi-style-cinema .nodi-style-lede,
+.light .nodi-style-cinema .nodi-style-kicker { color: #64748b; }
+.nodi-style-cinema .nodi-style-grid { margin-top: 1.4rem; }
+/* Inside the tutorial the picker reuses the language screen's card, so it needs the
+   same breathing room under the lede that .tutorial-language-grid gets. */
+.tutorial-language-card .nodi-style-grid { margin-top: 1.5rem; }
+.nodi-style-cinema .nodi-style-foot {
+  margin-top: 1.2rem;
+  color: #6b7280;
+  font-size: .74rem;
+}
+
+@media (max-width: 620px) {
+  .nodi-style-grid { grid-template-columns: 1fr; }
+  .nodi-style-figure { height: 130px; }
+  .nodi-style-backdrop { padding: 12px; }
+  .nodi-style-cinema { border-radius: 20px; padding: 1.4rem 1.1rem; }
+}

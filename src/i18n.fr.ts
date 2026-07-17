@@ -97,6 +97,23 @@ export const FR: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi est le nœud qui accompagne l\'application, flottant en bas à droite. Cliquez sur Nodi pour ouvrir le chat, vos notifications et l\'aide.',
   'Mostrar a Nodi': 'Afficher Nodi',
+  'Aspecto de Nodi': 'Apparence de Nodi',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Choisissez le Nodi qui vous accompagne. Le changement s\'applique dans toute l\'application.',
+  'Nodi clásico': 'Nodi classique',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'Le personnage de toujours, avec ses gestes et ses tenues selon l\'espace.',
+  'Nodi orbe': 'Nodi orbe',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'Une sphère de verre contenant une constellation, teintée de la couleur de votre espace.',
+  'Color del orbe': 'Couleur de l\'orbe',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'L\'orbe prend la couleur de l\'espace actif et change lorsque vous changez d\'espace.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'L\'orbe conserve toujours la couleur que vous choisissez, quel que soit l\'espace.',
+  'Automático: según la bóveda activa': 'Automatique : selon l\'espace actif',
+  'Manual: un color fijo': 'Manuel : une couleur fixe',
+  'Azul Nodi': 'Bleu Nodi',
+  'Ahora puedes elegir a tu Nodi': 'Vous pouvez désormais choisir votre Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'Nodi a une seconde apparence : un orbe, plus sobre et plus discret. Gardez celui que vous connaissez ou essayez-le.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'Vous pourrez le changer à tout moment dans Paramètres › Interface › Mascotte Nodi.',
   'Mantener siempre visible sobre otras apps': 'Toujours garder au premier plan sur les autres applications',
   'Trajes de Nodi según la bóveda': 'Tenues de Nodi selon l\'espace',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':

@@ -1,9 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AppLanguage } from '@shared/types';
+import type { AppLanguage, NodiStyle } from '@shared/types';
 import type { TutorialLanguage } from '@shared/tutorialPreferences';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { Nodi, type NodiState } from '../components/nodi/Nodi';
+import { type NodiState } from '../components/nodi/Nodi';
+import { NodiAvatar } from '../components/nodi/NodiAvatar';
+import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
 
@@ -298,8 +300,11 @@ function CompactSlides(language: Exclude<TutorialLanguage, 'es' | 'en'>): Slide[
   return COMPACT_SLIDES[language].map((slide, index) => ({ ...slide, nodi: states[index], content: <><p>{slide.body}</p>{slide.tip && <Tip warning={index === 4 || index === 6 || index === 7 || index === 9}>{slide.tip}</Tip>}</> }));
 }
 
-export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { language: AppLanguage; onLanguageChosen: (language: TutorialLanguage) => void | Promise<void>; onComplete: () => void | Promise<void> }) {
+export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, onComplete }: { language: AppLanguage; onLanguageChosen: (language: TutorialLanguage) => void | Promise<void>; onNodiStyleChosen: (style: NodiStyle) => void | Promise<void>; onComplete: () => void | Promise<void> }) {
   const [tutorialLanguage, setTutorialLanguage] = useState<TutorialLanguage | null>(null);
+  // Which Nodi guides the rest of the tutorial is the user's first real choice, so the
+  // deck that follows is already staged by the companion they picked.
+  const [styleChosen, setStyleChosen] = useState(false);
   const activeLanguage = tutorialLanguage ?? language;
   const slides = useMemo(() => activeLanguage === 'es' ? SpanishSlides() : activeLanguage === 'en' ? EnglishSlides() : CompactSlides(activeLanguage), [activeLanguage]);
   const [index, setIndex] = useState(0);
@@ -307,18 +312,18 @@ export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { lan
   const slide = slides[index];
   const last = index === slides.length - 1;
   const ui = {
-    es: { guide: 'GUÍA ESENCIAL', skip: 'Saltar tutorial', back: 'Anterior', next: 'Siguiente', finish: 'Empezar a usar Nodus', pace: 'Usa las flechas para avanzar a tu ritmo', hello: '¡Hola! Soy Nodi.', done: 'Ya tienes lo esencial.' },
-    en: { guide: 'ESSENTIAL GUIDE', skip: 'Skip tutorial', back: 'Back', next: 'Next', finish: 'Start using Nodus', pace: 'Use the arrows to move at your own pace', hello: "Hi! I'm Nodi.", done: 'You have the essentials.' },
-    fr: { guide: 'GUIDE ESSENTIEL', skip: 'Passer le guide', back: 'Précédent', next: 'Suivant', finish: 'Commencer avec Nodus', pace: 'Avancez à votre rythme avec les flèches', hello: 'Bonjour ! Je suis Nodi.', done: 'Vous avez les bases.' },
-    tr: { guide: 'TEMEL REHBER', skip: 'Rehberi atla', back: 'Geri', next: 'İleri', finish: 'Nodus’u kullanmaya başla', pace: 'Oklarla kendi hızınızda ilerleyin', hello: 'Merhaba! Ben Nodi.', done: 'Artık temel bilgilere sahipsiniz.' },
-    de: { guide: 'GRUNDLAGEN', skip: 'Anleitung überspringen', back: 'Zurück', next: 'Weiter', finish: 'Nodus verwenden', pace: 'Mit den Pfeilen in Ihrem Tempo fortfahren', hello: 'Hallo! Ich bin Nodi.', done: 'Jetzt kennen Sie die Grundlagen.' },
-    it: { guide: 'GUIDA ESSENZIALE', skip: 'Salta la guida', back: 'Indietro', next: 'Avanti', finish: 'Inizia a usare Nodus', pace: 'Usa le frecce e procedi al tuo ritmo', hello: 'Ciao! Sono Nodi.', done: 'Ora conosci le basi.' },
-    pt: { guide: 'GUIA ESSENCIAL', skip: 'Saltar o guia', back: 'Anterior', next: 'Seguinte', finish: 'Começar a usar o Nodus', pace: 'Use as setas para avançar ao seu ritmo', hello: 'Olá! Sou o Nodi.', done: 'Já conhece o essencial.' },
-    'pt-BR': { guide: 'GUIA ESSENCIAL', skip: 'Pular tutorial', back: 'Anterior', next: 'Próximo', finish: 'Começar a usar o Nodus', pace: 'Use as setas para avançar no seu ritmo', hello: 'Olá! Eu sou o Nodi.', done: 'Agora você já conhece o essencial.' },
-    zh: { guide: '基础指南', skip: '跳过教程', back: '上一步', next: '下一步', finish: '开始使用 Nodus', pace: '使用箭头按自己的节奏浏览', hello: '你好！我是 Nodi。', done: '你已经掌握基础知识了。' },
-    ja: { guide: '基本ガイド', skip: 'チュートリアルをスキップ', back: '戻る', next: '次へ', finish: 'Nodusを使い始める', pace: '矢印で自分のペースで進めます', hello: 'こんにちは！Nodiです。', done: '基本はこれで完了です。' },
-    ru: { guide: 'ОСНОВНОЕ РУКОВОДСТВО', skip: 'Пропустить обучение', back: 'Назад', next: 'Далее', finish: 'Начать работу с Nodus', pace: 'Используйте стрелки и двигайтесь в своём темпе', hello: 'Привет! Я Ноди.', done: 'Теперь вы знаете основы.' },
-    uk: { guide: 'ОСНОВНИЙ ПОСІБНИК', skip: 'Пропустити навчання', back: 'Назад', next: 'Далі', finish: 'Почати роботу з Nodus', pace: 'Використовуйте стрілки та рухайтеся у своєму темпі', hello: 'Привіт! Я Ноді.', done: 'Тепер ви знаєте основи.' },
+    es: { guide: 'GUÍA ESENCIAL', skip: 'Saltar tutorial', back: 'Anterior', next: 'Siguiente', finish: 'Empezar a usar Nodus', pace: 'Usa las flechas para avanzar a tu ritmo', hello: '¡Hola! Soy Nodi.', done: 'Ya tienes lo esencial.', nodiTitle: '¿Con qué Nodi te quedas?', nodiLede: 'Nodi te acompañará por la app y te guiará en este tutorial. Podrás cambiarlo cuando quieras en Ajustes.', nodiClassic: 'Nodi clásico', nodiClassicBody: 'El personaje, con sus gestos y sus trajes según la bóveda.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Una esfera de cristal, más sobria, con el color de tu bóveda.' },
+    en: { guide: 'ESSENTIAL GUIDE', skip: 'Skip tutorial', back: 'Back', next: 'Next', finish: 'Start using Nodus', pace: 'Use the arrows to move at your own pace', hello: "Hi! I'm Nodi.", done: 'You have the essentials.', nodiTitle: 'Which Nodi do you want?', nodiLede: 'Nodi will keep you company across the app and guide this tutorial. You can change this anytime in Settings.', nodiClassic: 'Classic Nodi', nodiClassicBody: 'The character, with its gestures and its per-vault outfits.', nodiOrb: 'Orb Nodi', nodiOrbBody: 'A soberer glass sphere, tinted with your vault’s colour.' },
+    fr: { guide: 'GUIDE ESSENTIEL', skip: 'Passer le guide', back: 'Précédent', next: 'Suivant', finish: 'Commencer avec Nodus', pace: 'Avancez à votre rythme avec les flèches', hello: 'Bonjour ! Je suis Nodi.', done: 'Vous avez les bases.', nodiTitle: 'Quel Nodi préférez-vous ?', nodiLede: 'Nodi vous accompagnera dans l’app et guidera ce guide. Vous pourrez en changer dans les réglages.', nodiClassic: 'Nodi classique', nodiClassicBody: 'Le personnage, avec ses gestes et ses tenues selon le coffre.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Une sphère de verre, plus sobre, aux couleurs de votre coffre.' },
+    tr: { guide: 'TEMEL REHBER', skip: 'Rehberi atla', back: 'Geri', next: 'İleri', finish: 'Nodus’u kullanmaya başla', pace: 'Oklarla kendi hızınızda ilerleyin', hello: 'Merhaba! Ben Nodi.', done: 'Artık temel bilgilere sahipsiniz.', nodiTitle: 'Hangi Nodi olsun?', nodiLede: 'Nodi uygulamada size eşlik edecek ve bu rehberde yol gösterecek. Daha sonra Ayarlar’dan değiştirebilirsiniz.', nodiClassic: 'Klasik Nodi', nodiClassicBody: 'Hareketleri ve kasaya göre kıyafetleriyle karakter.', nodiOrb: 'Küre Nodi', nodiOrbBody: 'Kasanızın rengini alan, daha sade bir cam küre.' },
+    de: { guide: 'GRUNDLAGEN', skip: 'Anleitung überspringen', back: 'Zurück', next: 'Weiter', finish: 'Nodus verwenden', pace: 'Mit den Pfeilen in Ihrem Tempo fortfahren', hello: 'Hallo! Ich bin Nodi.', done: 'Jetzt kennen Sie die Grundlagen.', nodiTitle: 'Welcher Nodi soll es sein?', nodiLede: 'Nodi begleitet Sie durch die App und durch diese Anleitung. Sie können das jederzeit in den Einstellungen ändern.', nodiClassic: 'Klassischer Nodi', nodiClassicBody: 'Die Figur, mit Gesten und Outfits je nach Vault.', nodiOrb: 'Nodi-Orb', nodiOrbBody: 'Eine schlichtere Glaskugel in der Farbe Ihres Vaults.' },
+    it: { guide: 'GUIDA ESSENZIALE', skip: 'Salta la guida', back: 'Indietro', next: 'Avanti', finish: 'Inizia a usare Nodus', pace: 'Usa le frecce e procedi al tuo ritmo', hello: 'Ciao! Sono Nodi.', done: 'Ora conosci le basi.', nodiTitle: 'Quale Nodi preferisci?', nodiLede: 'Nodi ti accompagnerà nell’app e in questa guida. Potrai cambiarlo quando vuoi nelle impostazioni.', nodiClassic: 'Nodi classico', nodiClassicBody: 'Il personaggio, con i suoi gesti e i costumi in base al vault.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Una sfera di vetro, più sobria, con il colore del tuo vault.' },
+    pt: { guide: 'GUIA ESSENCIAL', skip: 'Saltar o guia', back: 'Anterior', next: 'Seguinte', finish: 'Começar a usar o Nodus', pace: 'Use as setas para avançar ao seu ritmo', hello: 'Olá! Sou o Nodi.', done: 'Já conhece o essencial.', nodiTitle: 'Com que Nodi fica?', nodiLede: 'O Nodi vai acompanhá-lo pela app e guiar este guia. Pode mudar quando quiser nas definições.', nodiClassic: 'Nodi clássico', nodiClassicBody: 'A personagem, com os seus gestos e trajes conforme o cofre.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Uma esfera de vidro, mais sóbria, com a cor do seu cofre.' },
+    'pt-BR': { guide: 'GUIA ESSENCIAL', skip: 'Pular tutorial', back: 'Anterior', next: 'Próximo', finish: 'Começar a usar o Nodus', pace: 'Use as setas para avançar no seu ritmo', hello: 'Olá! Eu sou o Nodi.', done: 'Agora você já conhece o essencial.', nodiTitle: 'Com qual Nodi você fica?', nodiLede: 'O Nodi vai te acompanhar pelo app e guiar este tutorial. Você pode mudar quando quiser nas configurações.', nodiClassic: 'Nodi clássico', nodiClassicBody: 'O personagem, com seus gestos e trajes conforme o cofre.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Uma esfera de vidro, mais sóbria, com a cor do seu cofre.' },
+    zh: { guide: '基础指南', skip: '跳过教程', back: '上一步', next: '下一步', finish: '开始使用 Nodus', pace: '使用箭头按自己的节奏浏览', hello: '你好！我是 Nodi。', done: '你已经掌握基础知识了。', nodiTitle: '你想要哪个 Nodi？', nodiLede: 'Nodi 会在应用中陪伴你，并引导这份教程。之后可以随时在设置中更改。', nodiClassic: '经典 Nodi', nodiClassicBody: '原本的角色，有动作，也会随资料库换装。', nodiOrb: '光球 Nodi', nodiOrbBody: '更沉稳的玻璃球，会染上你资料库的颜色。' },
+    ja: { guide: '基本ガイド', skip: 'チュートリアルをスキップ', back: '戻る', next: '次へ', finish: 'Nodusを使い始める', pace: '矢印で自分のペースで進めます', hello: 'こんにちは！Nodiです。', done: '基本はこれで完了です。', nodiTitle: 'どちらのNodiにしますか？', nodiLede: 'Nodiがアプリの中で寄り添い、このガイドを案内します。設定でいつでも変更できます。', nodiClassic: 'クラシックNodi', nodiClassicBody: 'おなじみのキャラクター。しぐさとVaultごとの衣装つき。', nodiOrb: 'オーブNodi', nodiOrbBody: '落ち着いたガラスの球体。Vaultの色に染まります。' },
+    ru: { guide: 'ОСНОВНОЕ РУКОВОДСТВО', skip: 'Пропустить обучение', back: 'Назад', next: 'Далее', finish: 'Начать работу с Nodus', pace: 'Используйте стрелки и двигайтесь в своём темпе', hello: 'Привет! Я Ноди.', done: 'Теперь вы знаете основы.', nodiTitle: 'Какой Ноди вам ближе?', nodiLede: 'Ноди будет сопровождать вас в приложении и в этом руководстве. Это можно изменить в настройках.', nodiClassic: 'Классический Ноди', nodiClassicBody: 'Персонаж с жестами и нарядами по типу хранилища.', nodiOrb: 'Ноди-сфера', nodiOrbBody: 'Более строгая стеклянная сфера цвета вашего хранилища.' },
+    uk: { guide: 'ОСНОВНИЙ ПОСІБНИК', skip: 'Пропустити навчання', back: 'Назад', next: 'Далі', finish: 'Почати роботу з Nodus', pace: 'Використовуйте стрілки та рухайтеся у своєму темпі', hello: 'Привіт! Я Ноді.', done: 'Тепер ви знаєте основи.', nodiTitle: 'Який Ноді вам ближчий?', nodiLede: 'Ноді супроводжуватиме вас у застосунку та в цьому посібнику. Це можна змінити в налаштуваннях.', nodiClassic: 'Класичний Ноді', nodiClassicBody: 'Персонаж із жестами та вбранням за типом сховища.', nodiOrb: 'Ноді-сфера', nodiOrbBody: 'Стриманіша скляна сфера у кольорі вашого сховища.' },
   }[activeLanguage];
 
   // The tutorial has its own staged Nodi. Suspend the real companion as long as
@@ -329,7 +334,7 @@ export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { lan
   }, []);
 
   useEffect(() => {
-    if (!tutorialLanguage) return;
+    if (!tutorialLanguage || !styleChosen) return;
     const onKey = (event: KeyboardEvent) => {
       if (confirmSkip) return;
       if (event.key === 'ArrowRight' || event.key === 'Enter') setIndex((value) => Math.min(slides.length - 1, value + 1));
@@ -338,9 +343,24 @@ export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { lan
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [confirmSkip, slides.length, tutorialLanguage]);
+  }, [confirmSkip, slides.length, styleChosen, tutorialLanguage]);
 
-  if (!tutorialLanguage) return <div className="tutorial-cinema tutorial-language-screen" data-testid="basics-tutorial-language" role="dialog" aria-modal="true" aria-labelledby="tutorial-language-title"><div className="tutorial-aurora" aria-hidden="true" /><main className="tutorial-language-card"><Nodi state="waving" height={190} /><p className="tutorial-eyebrow tutorial-language-brand"><Icon name="languages" size={15} /> NODUS</p><h1 id="tutorial-language-title">Choose the language for the tutorial</h1><div className="tutorial-language-grid">{TUTORIAL_LANGUAGES.map(({ code, label, flag }) => <button key={code} data-testid={`tutorial-language-${code}`} className="tutorial-language-option" style={{ '--tutorial-flag': flag } as React.CSSProperties} onClick={() => { setTutorialLanguage(code); setIndex(0); void onLanguageChosen(code); }}>{label}</button>)}</div></main></div>;
+  if (!tutorialLanguage) return <div className="tutorial-cinema tutorial-language-screen" data-testid="basics-tutorial-language" role="dialog" aria-modal="true" aria-labelledby="tutorial-language-title"><div className="tutorial-aurora" aria-hidden="true" /><main className="tutorial-language-card"><NodiAvatar state="waving" height={190} /><p className="tutorial-eyebrow tutorial-language-brand"><Icon name="languages" size={15} /> NODUS</p><h1 id="tutorial-language-title">Choose the language for the tutorial</h1><div className="tutorial-language-grid">{TUTORIAL_LANGUAGES.map(({ code, label, flag }) => <button key={code} data-testid={`tutorial-language-${code}`} className="tutorial-language-option" style={{ '--tutorial-flag': flag } as React.CSSProperties} onClick={() => { setTutorialLanguage(code); setIndex(0); void onLanguageChosen(code); }}>{label}</button>)}</div></main></div>;
+
+  // Second screen, in the language just chosen: pick the companion. It gates the deck
+  // the same way the language does, which also keeps it clear of the 13-slide indexes.
+  if (!styleChosen) return <div className="tutorial-cinema tutorial-language-screen" data-testid="basics-tutorial-nodi-style" role="dialog" aria-modal="true" aria-labelledby="tutorial-nodi-style-title">
+    <div className="tutorial-aurora" aria-hidden="true" />
+    <main className="tutorial-language-card">
+      <p className="tutorial-eyebrow tutorial-language-brand"><Icon name="sparkles" size={15} /> NODUS</p>
+      <h1 id="tutorial-nodi-style-title">{ui.nodiTitle}</h1>
+      <p>{ui.nodiLede}</p>
+      <NodiStylePicker
+        labels={{ classicTitle: ui.nodiClassic, classicBody: ui.nodiClassicBody, orbTitle: ui.nodiOrb, orbBody: ui.nodiOrbBody }}
+        onPick={(style) => { setStyleChosen(true); setIndex(0); void onNodiStyleChosen(style); }}
+      />
+    </main>
+  </div>;
 
   const motionProfiles = [
     { y: [0, -7, 0], rotate: [0, 1, 0] }, { x: [0, 5, 0], rotate: [0, -2, 0] }, { scale: [1, 1.025, 1], y: [0, -3, 0] },
@@ -356,7 +376,7 @@ export function BasicsTutorial({ language, onLanguageChosen, onComplete }: { lan
     <header className="tutorial-topbar"><span>NODUS · {ui.guide}</span><button onClick={() => setConfirmSkip(true)}>{ui.skip}</button></header>
     <div className="tutorial-progress" aria-label={`${index + 1}/${slides.length}`}>{slides.map((_, itemIndex) => <button key={itemIndex} className={itemIndex <= index ? 'active' : ''} onClick={() => setIndex(itemIndex)} aria-label={`${itemIndex + 1}`} />)}</div>
     <main className="tutorial-stage">
-      <motion.aside key={`nodi-${index}`} className="tutorial-nodi" animate={stagedNodiMotion} transition={{ duration: last ? .8 : 2.8 + index * .12, repeat: index >= 3 && !last ? 0 : Infinity, ease: 'easeInOut' }}><Nodi state={stagedNodiState} height={250} raiseArm={index === 0} /><div className="tutorial-speech">{index === 0 ? ui.hello : last ? ui.done : `${index + 1} / ${slides.length}`}</div></motion.aside>
+      <motion.aside key={`nodi-${index}`} className="tutorial-nodi" animate={stagedNodiMotion} transition={{ duration: last ? .8 : 2.8 + index * .12, repeat: index >= 3 && !last ? 0 : Infinity, ease: 'easeInOut' }}><NodiAvatar state={stagedNodiState} height={250} raiseArm={index === 0} /><div className="tutorial-speech">{index === 0 ? ui.hello : last ? ui.done : `${index + 1} / ${slides.length}`}</div></motion.aside>
       <AnimatePresence mode="wait">
         <motion.article key={index} initial={{ opacity: 0, x: 60, filter: 'blur(8px)' }} animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, x: -50, filter: 'blur(8px)' }} transition={{ duration: .38 }} className="tutorial-card">
           <div className="tutorial-eyebrow"><Icon name={slide.icon} size={15} />{slide.eyebrow}</div>

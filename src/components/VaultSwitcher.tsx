@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { VaultSummary, VaultType } from '@shared/types';
-import { isPreviewVaultType, VAULT_TYPES } from '@shared/vaultTypes';
+import { isPreviewVaultType, VAULT_TYPE_COLORS, VAULT_TYPES } from '@shared/vaultTypes';
 import { t, tx } from '../i18n';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
@@ -37,16 +37,7 @@ const CREATE_VAULT_TYPES: VaultType[] = [
   'genealogy', 'worldbuilding',
 ];
 const isComingSoonVaultType = (type: VaultType) => COMING_SOON_VAULT_TYPES.includes(type);
-const VAULT_TYPE_COLOR: Record<string, string> = {
-  academic: '#6366f1',
-  estudio: '#0f766e',
-  primary_sources: '#6366f1',
-  genealogy: '#ca8a04',
-  databases: '#b30333',
-  testimonios: '#0891b2',
-  worldbuilding: '#7c3aed',
-  docencia: '#ea580c',
-};
+const VAULT_TYPE_COLOR = VAULT_TYPE_COLORS;
 
 type VaultPhase = 'pre-alpha' | 'alpha' | 'beta';
 
