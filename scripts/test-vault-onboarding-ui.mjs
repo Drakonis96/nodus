@@ -18,8 +18,11 @@ test('worldbuilding and teaching use their own visible vault icons', async () =>
   assert.match(app, /vaultTypeIcon\(activeVault\.type\)/);
   assert.match(ui, /globe:/);
   assert.match(ui, /presentation:/);
-  assert.match(dock, /type === 'worldbuilding'.*#7c3aed/);
-  assert.match(dock, /type === 'docencia'.*#ea580c/);
+  // Vault accents live once in shared/vaultTypes; the dock reads them from there.
+  const vaultTypes = await read('shared/vaultTypes.ts');
+  assert.match(vaultTypes, /worldbuilding: '#7c3aed'/);
+  assert.match(vaultTypes, /docencia: '#ea580c'/);
+  assert.match(dock, /vaultTypeColor\(type\)/);
 });
 
 test('preview vaults bypass setup and every automatic tutorial', async () => {

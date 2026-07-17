@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { UpdateCheckResponse, UpdateCheckStatus } from '@shared/types';
 import { t } from '../i18n';
 import { Icon } from './ui';
-import { Nodi, type NodiState } from './nodi/Nodi';
+import { type NodiState } from './nodi/Nodi';
+import { NodiAvatar } from './nodi/NodiAvatar';
 
 const SESSION_KEY = 'nodus.startupUpdateChecked';
 
@@ -102,7 +103,7 @@ function markShownThisSession(): void {
   }
 }
 
-export function StartupUpdateModal() {
+export function StartupUpdateModal({ onSettled }: { onSettled?: () => void } = {}) {
   const [shouldShow] = useState(shouldShowThisSession);
   const [open, setOpen] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -118,6 +119,12 @@ export function StartupUpdateModal() {
     markShownThisSession();
     setOpen(true);
   }, [shouldShow]);
+
+  // Nothing will be shown this session, so anything queued behind this modal must not
+  // wait for a close that will never come.
+  useEffect(() => {
+    if (!shouldShow) onSettled?.();
+  }, [shouldShow, onSettled]);
 
   useEffect(() => {
     if (!shouldShow) return;
@@ -146,6 +153,11 @@ export function StartupUpdateModal() {
 
   if (!open || !shouldShow) return null;
 
+  const close = () => {
+    setOpen(false);
+    onSettled?.();
+  };
+
   const retry = () => {
     setUpdate({ status: 'checking', message: '', version: __APP_VERSION__, progress: null });
     setAttempt((current) => current + 1);
@@ -162,7 +174,7 @@ export function StartupUpdateModal() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: .22 }}
-      onMouseDown={() => setOpen(false)}
+      onMouseDown={close}
     >
       <motion.section
         className="startup-update-cinema"
@@ -178,7 +190,7 @@ export function StartupUpdateModal() {
       >
         <header className="startup-update-hero">
           <div className="startup-update-aurora" aria-hidden="true" />
-          <button className="startup-update-close" onClick={() => setOpen(false)} aria-label={t('Cerrar')}>
+          <button className="startup-update-close" onClick={close} aria-label={t('Cerrar')}>
             <Icon name="x" size={16} />
           </button>
           <div className="startup-update-hero-copy">
@@ -187,7 +199,7 @@ export function StartupUpdateModal() {
             <p>{t('Comprobamos automáticamente que tengas la versión más reciente y segura de Nodus.')}</p>
           </div>
           <div className="startup-update-nodi">
-            <Nodi state={presentation.nodiState} height={162} />
+            <NodiAvatar state={presentation.nodiState} height={162} />
           </div>
         </header>
 
@@ -220,7 +232,7 @@ export function StartupUpdateModal() {
         <footer className="startup-update-footer">
           {canRetry && <button className="startup-update-secondary" onClick={retry}><Icon name="refresh" size={14} /> {t('Comprobar de nuevo')}</button>}
           {canInstall && <button className="startup-update-primary" onClick={() => void install()}><Icon name="refresh" size={14} /> {t('Reiniciar')}</button>}
-          {!canInstall && <button className="startup-update-primary" onClick={() => setOpen(false)}>{update.status === 'downloading' || update.status === 'available' ? t('Continuar en segundo plano') : t('¡Entendido!')} <Icon name="chevronRight" size={14} /></button>}
+          {!canInstall && <button className="startup-update-primary" onClick={close}>{update.status === 'downloading' || update.status === 'available' ? t('Continuar en segundo plano') : t('¡Entendido!')} <Icon name="chevronRight" size={14} /></button>}
         </footer>
       </motion.section>
     </motion.div>

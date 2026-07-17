@@ -1028,6 +1028,13 @@ export interface GenerateTranslationRequest {
   model?: ModelRef | null;
 }
 
+/** The two Nodi the user can choose between: the classic character, or the orb — a
+ *  glass sphere holding a constellation, for users who want a soberer companion. */
+export type NodiStyle = 'classic' | 'orb';
+
+/** Whether the orb follows the active vault's accent colour or a colour the user picked. */
+export type NodiOrbColorMode = 'auto' | 'manual';
+
 export interface AppSettings {
   embeddingProvider: EmbeddingProvider;
   embeddingModel: string;
@@ -1155,8 +1162,22 @@ export interface AppSettings {
   // operating systems that allow it. When off, Nodi lives inside the app window only.
   mascotAlwaysOnTop: boolean;
   // Whether Nodi wears a per-vault accessory (cap / sprout / study glasses). When off,
-  // the plain Nodi is shown in every vault.
+  // the plain Nodi is shown in every vault. Only applies to the classic Nodi — the orb
+  // wears its vault as a colour instead (see mascotOrbColorMode).
   mascotVaultCostumes: boolean;
+  // Which Nodi is drawn everywhere: the classic character or the "orb", a sober glass
+  // sphere holding a constellation. Existing installs keep the classic one.
+  mascotStyle: NodiStyle;
+  // True once the user has been offered the choice between the two Nodi — in the
+  // cinematic tutorial, or in the one-time modal shown to users who already saw it.
+  // Guards that modal so it can never be shown twice.
+  mascotStyleChosen: boolean;
+  // Orb only: 'auto' recolours the orb to the active vault's accent as you switch
+  // vaults; 'manual' pins it to mascotOrbColor.
+  mascotOrbColorMode: NodiOrbColorMode;
+  // Orb only: the accent (hex) used when mascotOrbColorMode is 'manual'. Every other
+  // colour in the orb is derived from this one's hue.
+  mascotOrbColor: string;
   concurrency: number;
   // Reasoning effort for interactive long-form calls (chat, tutor, debate, writing).
   // Scans always run with reasoning off for speed, regardless of this value.

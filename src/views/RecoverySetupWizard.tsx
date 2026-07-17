@@ -8,7 +8,7 @@ import type {
   RecoveryStatus,
 } from '@shared/types';
 import { Icon } from '../components/ui';
-import { Nodi } from '../components/nodi/Nodi';
+import { NodiAvatar } from '../components/nodi/NodiAvatar';
 
 type Mode = 'create' | 'restore';
 
@@ -64,7 +64,7 @@ export function RecoverySetupWizard({
       <div className="recovery-cinema" data-testid="recovery-setup-success">
         <div className="recovery-aurora" aria-hidden="true" />
         <motion.main className="recovery-card recovery-success" initial={{ opacity: 0, y: 24, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }}>
-          <Nodi state="celebrating" height={220} />
+          <NodiAvatar state="celebrating" height={220} />
           <div>
             <span className="recovery-kicker"><Icon name="check" size={14} /> {t('RECUPERACIÓN ACTIVADA')}</span>
             <h1>{mode === 'create' ? (t('Tus datos ya están protegidos')) : (t('Tus datos se han recuperado'))}</h1>
@@ -96,7 +96,7 @@ export function RecoverySetupWizard({
       <div className="recovery-aurora" aria-hidden="true" />
       <motion.main className="recovery-card" initial={{ opacity: 0, y: 28, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }}>
         <aside className="recovery-hero">
-          <Nodi state={busy ? 'loading' : status.previousInstallation ? 'discovering' : 'waving'} height={235} />
+          <NodiAvatar state={busy ? 'loading' : status.previousInstallation ? 'discovering' : 'waving'} height={235} />
           <span className="recovery-kicker"><Icon name="archive" size={14} /> NODUS · {t('PROTECCIÓN DE DATOS')}</span>
           <h1>{status.previousInstallation ? (t('Hemos detectado una instalación anterior')) : (t('Elige dónde proteger Nodus'))}</h1>
           <p>{status.previousInstallation

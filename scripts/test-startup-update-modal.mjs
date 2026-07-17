@@ -14,8 +14,11 @@ const [modal, app, main, styles, translations] = await Promise.all([
 ]);
 
 test('the app performs one visible update check per launch after release notes settle', () => {
-  assert.match(app, /whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal \/>/);
+  assert.match(app, /whatsNewSettled && !manualWhatsNewOpen && <StartupUpdateModal[\s\S]*?\/>/);
   assert.match(app, /<WhatsNewModal[\s\S]*onSettled=\{\(\) => setWhatsNewSettled\(true\)\}/);
+  // The one-time Nodi choice queues behind this modal, so a launch that never shows it
+  // must still settle or that modal would wait forever.
+  assert.match(modal, /if \(!shouldShow\) onSettled\?\.\(\);/);
   assert.match(modal, /sessionStorage\.getItem\(SESSION_KEY\)/);
   assert.match(modal, /sessionStorage\.setItem\(SESSION_KEY, '1'\)/);
   assert.match(modal, /window\.nodus\.checkForUpdates\(\)/);
