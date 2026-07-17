@@ -159,6 +159,15 @@ try {
     buttons.map((button) => { const box = button.getBoundingClientRect(); return `${Math.round(box.width)}x${Math.round(box.height)}`; }));
   assert.equal(new Set(languageButtonSizes).size, 1, `every cinematic tutorial language button has the same dimensions: ${languageButtonSizes.join(', ')}`);
   await page.getByTestId('tutorial-language-fr').click();
+  // Second screen: which Nodi guides the rest. It speaks the language just chosen, and
+  // records the choice so the one-time modal never asks again after the tutorial.
+  await page.getByTestId('basics-tutorial-nodi-style').waitFor({ timeout: 30_000 });
+  await page.getByText('Quel Nodi préférez-vous ?', { exact: true }).waitFor();
+  await page.getByTestId('nodi-style-classic').click();
+  await waitForCondition('elección de Nodi registrada', () => page.evaluate(async () => {
+    const settings = await window.nodus.getSettings();
+    return settings.mascotStyle === 'classic' && settings.mascotStyleChosen === true;
+  }));
   await page.getByTestId('basics-tutorial').waitFor({ timeout: 30_000 });
   // French now has a full UI translation, so choosing it keeps the French interface
   // instead of borrowing the English one.
@@ -448,6 +457,177 @@ try {
   assert.equal(await page.locator('select[title="Modelo del chat"]').inputValue(), 'openrouter::smoke-chat-model');
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
+
+  // ── Header: the centre badge yields to the rails instead of overlapping ────
+  // A hard left:50% badge sat under the action rail as soon as it grew (the AI
+  // alert, a hovered label, a dragged-wide sidebar). Measure the real boxes and
+  // assert the geometry survives every state that widens a rail.
+  const HEADER_GAP = 12;
+  // The badge only renders from the xl breakpoint up (xl:inline-flex); below it the
+  // element is display:none by design and there is nothing to measure. The app asks
+  // for a 1440px window, but a headless CI runner can be pinned to a smaller screen
+  // (macOS CI comes up at the 1024px minWidth). Try to widen the real window to xl,
+  // then measure: if the display cannot host it these steps are skipped with a log
+  // rather than failing — the geometry itself is still fully covered by the unit
+  // sweep in scripts/test-header-layout.mjs.
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.setBounds({ width: 1440, height: Math.max(win.getBounds().height, 900) });
+  }).catch(() => {});
+  await page.waitForTimeout(300);
+  const headerViewportWidth = await page.evaluate(() => window.innerWidth);
+  const readHeaderGeometry = () => page.evaluate(() => {
+    const badge = document.querySelector('[data-testid="header-vault-badge"]');
+    const logo = document.querySelector('[data-testid="sidebar-header-toggle"]');
+    const actions = document.querySelector('[data-testid="header-actions"]');
+    const header = actions?.closest('header');
+    if (!badge || !logo || !actions || !header) return null;
+    const box = (el) => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, width: r.width }; };
+    return {
+      badge: box(badge),
+      logo: box(logo),
+      actions: box(actions),
+      header: box(header),
+      fits: badge.getAttribute('data-badge-fits'),
+      visible: getComputedStyle(badge).visibility === 'visible',
+    };
+  });
+  // A rail that grows is a layout change; the badge answers it through a
+  // ResizeObserver, so it lands a frame later. Poll for the settled position rather
+  // than sampling once — a real overlap never settles and still fails, loudly, with
+  // the measurements that prove it.
+  const headerBadgeSafety = (g) => {
+    if (!g) return { safe: false, why: 'header geometry unreadable' };
+    if (!g.visible) {
+      return g.fits === 'false'
+        ? { safe: true, why: 'badge hidden because it reported it cannot fit' }
+        : { safe: false, why: `badge is invisible but reported fits=${g.fits}` };
+    }
+    if (g.badge.left < g.logo.right + HEADER_GAP - 0.5) {
+      return { safe: false, why: `badge.left ${g.badge.left.toFixed(1)} crosses logo.right ${g.logo.right.toFixed(1)} + ${HEADER_GAP}` };
+    }
+    if (g.badge.right > g.actions.left - HEADER_GAP + 0.5) {
+      return { safe: false, why: `badge.right ${g.badge.right.toFixed(1)} crosses actions.left ${g.actions.left.toFixed(1)} - ${HEADER_GAP}` };
+    }
+    return { safe: true, why: 'clear of both rails' };
+  };
+  const assertHeaderBadgeSafe = async (label) => {
+    let geometry = null;
+    let safety = { safe: false, why: 'never measured' };
+    const deadline = Date.now() + 5_000;
+    do {
+      geometry = await readHeaderGeometry();
+      safety = headerBadgeSafety(geometry);
+      if (safety.safe) return geometry;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
+    assert.fail(`the header badge never settled clear of the rails (${label}): ${safety.why}`);
+  };
+
+  if (headerViewportWidth < 1280) {
+    console.log(`[e2e] header centre badge steps skipped: window is ${headerViewportWidth}px (< xl), where the badge is display:none by design; geometry covered by scripts/test-header-layout.mjs`);
+  } else {
+    // The model warning is pinned open in this profile (no synthesis model yet at
+    // first launch) — the exact state that used to overlap. Force both cases.
+    const originalSynthesis = (await page.evaluate(() => window.nodus.getSettings())).synthesisModel;
+    await page.evaluate(() => window.nodus.updateSettings({ synthesisModel: null }));
+    await waitForCondition('aviso de modelo de IA visible', async () =>
+      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) > 0);
+    const withAlert = await assertHeaderBadgeSafe('con el aviso de IA abierto');
+
+    await page.evaluate((model) => window.nodus.updateSettings({ synthesisModel: model }), originalSynthesis);
+    await waitForCondition('aviso de modelo de IA retirado', async () =>
+      (await page.getByText('Configura un modelo de IA', { exact: true }).count()) === 0);
+    // With the alert gone there is room again, so the badge must return to the true
+    // centre — the resting position the design calls for. Waited for rather than
+    // sampled: the clamped spot it is leaving is itself "clear of the rails", so a
+    // single read could catch it mid-return.
+    const badgeCentreOffset = async () => {
+      const g = await readHeaderGeometry();
+      if (!g?.visible) return null;
+      return Math.abs((g.badge.left + g.badge.width / 2) - (g.header.left + g.header.width / 2));
+    };
+    await waitForCondition('el badge vuelve al centro exacto', async () => {
+      const offset = await badgeCentreOffset();
+      return offset !== null && offset <= 1;
+    });
+    const roomy = await assertHeaderBadgeSafe('sin el aviso');
+    assert.ok(roomy.visible, 'the badge shows on a roomy header');
+    assert.ok(
+      withAlert.badge.left < roomy.badge.left,
+      `the alert pushed the badge off centre (${withAlert.badge.left}) and it came back (${roomy.badge.left})`
+    );
+
+    // Hovering a rail button opens its label and widens the rail mid-flight.
+    await page.locator('[data-tour="toolkit"]').hover();
+    await page.waitForTimeout(400);
+    await assertHeaderBadgeSafe('con una etiqueta desplegada al pasar el ratón');
+    await page.mouse.move(0, 300);
+    await page.waitForTimeout(400);
+
+    // A sidebar dragged to its maximum walks the logo towards the badge.
+    await page.evaluate(() => localStorage.setItem('nodus.sidebarWidth', '360'));
+    await page.reload();
+    await page.getByTestId('app-shell').waitFor();
+    await page.waitForTimeout(600);
+    await assertHeaderBadgeSafe('con la barra lateral al máximo');
+    await page.evaluate(() => localStorage.setItem('nodus.sidebarWidth', '176'));
+    await page.reload();
+    await page.getByTestId('app-shell').waitFor();
+    await page.waitForTimeout(400);
+    console.log('[e2e] header centre badge stays centred, yields to both rails and never overlaps');
+  }
+
+  // ── Nodus Toolkit: hub geometry, tool navigation and the way back ──────────
+  // The hub's promise is three cards that read as one set, so the sizes are
+  // measured on the real rendered shell rather than trusted from the classes.
+  await page.locator('[data-tour="toolkit"]').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
+  const toolCards = ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const cardBoxes = [];
+  for (const testId of toolCards) {
+    const box = await page.getByTestId(testId).boundingBox();
+    assert.ok(box, `${testId} is visible in the hub`);
+    cardBoxes.push({ testId, ...box });
+  }
+  assert.equal(
+    new Set(cardBoxes.map((b) => `${Math.round(b.width)}x${Math.round(b.height)}`)).size,
+    1,
+    `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
+  );
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 1, 'the cards share one baseline row');
+  // Each card's icon tile is square and its glyph sits dead centre in it.
+  for (const testId of toolCards) {
+    const centring = await page.getByTestId(testId).evaluate((card) => {
+      const tile = card.querySelector('span');
+      const glyph = tile?.querySelector('svg');
+      if (!tile || !glyph) return null;
+      const t = tile.getBoundingClientRect();
+      const g = glyph.getBoundingClientRect();
+      return {
+        square: Math.round(t.width) === Math.round(t.height),
+        dx: Math.abs((t.left + t.width / 2) - (g.left + g.width / 2)),
+        dy: Math.abs((t.top + t.height / 2) - (g.top + g.height / 2)),
+      };
+    });
+    assert.ok(centring, `${testId} renders an icon tile`);
+    assert.equal(centring.square, true, `${testId} icon tile is square`);
+    assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
+  }
+  // The two unbuilt tools must be inert, not dead ends: clicking does nothing.
+  for (const testId of ['toolkit-card-presenter', 'toolkit-card-aiocr']) {
+    assert.equal(await page.getByTestId(testId).isDisabled(), true, `${testId} is not openable yet`);
+  }
+  await page.getByTestId('toolkit-card-presenter').click({ force: true });
+  assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
+  // Nodus Convert opens and hands back a way home.
+  await page.getByTestId('toolkit-card-convert').click();
+  await page.getByTestId('toolkit-convert-page').waitFor({ timeout: 10_000 });
+  await page.getByText('El conversor está en construcción.', { exact: true }).waitFor();
+  await page.getByTestId('toolkit-back').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
+  assert.equal(await page.getByTestId('toolkit-convert-page').count(), 0, 'back returns to the hub');
+  console.log('[e2e] toolkit hub: equal cards, centred icons, inert coming-soon tools and a way back');
 
   // ── Search result: an idea reuses the Ideas section's detail modal ─────────
   assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');

@@ -27,6 +27,12 @@ export interface GedcomFamily {
   husband: string | null; // person xref
   wife: string | null;
   children: string[];
+  /**
+   * Child xrefs whose link to this family is adoptive rather than birth. GEDCOM
+   * expresses this on the CHILD's record (`1 FAMC @F1@` + `2 PEDI adopted`), which is
+   * what Gramps and Ancestry read, so it round-trips through them.
+   */
+  adoptedChildren?: string[];
   marriageDate: string | null;
   marriagePlace: string | null;
 }
@@ -145,9 +151,26 @@ export function parseGedcom(text: string): GedcomData {
         husband: child(rec, 'HUSB')?.value || null,
         wife: child(rec, 'WIFE')?.value || null,
         children: rec.children.filter((c) => c.tag === 'CHIL').map((c) => c.value).filter(Boolean),
+        adoptedChildren: [],
         marriageDate: marriage.date,
         marriagePlace: marriage.place,
       });
+    }
+  }
+
+  // Adoption lives on the child's FAMC link, so it can only be attached once every
+  // family exists. A child may name a family that has no CHIL back-reference (some
+  // exporters only write one direction), so the link is added when it is missing.
+  const familyByXref = new Map(families.map((family) => [family.xref, family]));
+  for (const rec of roots) {
+    if (rec.tag !== 'INDI' || !rec.xref) continue;
+    for (const famc of rec.children.filter((c) => c.tag === 'FAMC')) {
+      const family = familyByXref.get(famc.value);
+      if (!family) continue;
+      const pedigree = child(famc, 'PEDI')?.value?.trim().toLowerCase();
+      if (pedigree !== 'adopted') continue;
+      if (!family.children.includes(rec.xref)) family.children.push(rec.xref);
+      if (!family.adoptedChildren!.includes(rec.xref)) family.adoptedChildren!.push(rec.xref);
     }
   }
   return { persons, families };
@@ -178,12 +201,24 @@ export function serializeGedcom(data: GedcomData): string {
     '1 CHAR UTF-8',
   ];
 
+  // GEDCOM records an adoptive link on the child (FAMC + PEDI), not on the family.
+  const adoptiveFamiliesByChild = new Map<string, string[]>();
+  for (const family of data.families) {
+    for (const child of family.adoptedChildren ?? []) {
+      adoptiveFamiliesByChild.set(child, [...(adoptiveFamiliesByChild.get(child) ?? []), family.xref]);
+    }
+  }
+
   for (const p of data.persons) {
     lines.push(`0 ${p.xref} INDI`);
     lines.push(`1 NAME ${nameValue(p)}`);
     if (p.sex) lines.push(`1 SEX ${p.sex}`);
     lines.push(...eventLines('BIRT', p.birthDate, p.birthPlace));
     lines.push(...eventLines('DEAT', p.deathDate, p.deathPlace));
+    for (const famXref of adoptiveFamiliesByChild.get(p.xref) ?? []) {
+      lines.push(`1 FAMC ${famXref}`);
+      lines.push('2 PEDI adopted');
+    }
   }
 
   for (const f of data.families) {

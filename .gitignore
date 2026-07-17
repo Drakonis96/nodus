@@ -10,6 +10,15 @@ release/
 *.nodus
 *.sqlite
 
+# Personal photos used to verify the image tools stay on the machine that runs
+# them: a real camera file carries device, timestamp and location metadata, and
+# this repository is public. Point the verify scripts at a path outside the tree
+# (see design/nodus-toolkit-plan.md §6.2-bis) instead of adding one here.
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+
 # Local credentials and signing material must never be committed.
 .env
 .env.*

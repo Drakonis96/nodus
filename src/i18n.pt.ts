@@ -97,6 +97,23 @@ export const PT: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'O Nodi é o nó que acompanha a app, flutuando em baixo à direita. Clique no Nodi para abrir o chat, as suas notificações e a ajuda.',
   'Mostrar a Nodi': 'Mostrar o Nodi',
+  'Aspecto de Nodi': 'Aspeto do Nodi',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Escolha o Nodi que o acompanha. A alteração aplica-se em toda a app.',
+  'Nodi clásico': 'Nodi clássico',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'A personagem de sempre, com os seus gestos e os seus trajes consoante o espaço.',
+  'Nodi orbe': 'Nodi orbe',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'Uma esfera de vidro com uma constelação lá dentro, tingida com a cor do seu espaço.',
+  'Color del orbe': 'Cor do orbe',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'O orbe assume a cor do espaço ativo e muda consigo ao mudar de espaço.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'O orbe mantém sempre a cor que escolher, seja qual for o espaço.',
+  'Automático: según la bóveda activa': 'Automático: consoante o espaço ativo',
+  'Manual: un color fijo': 'Manual: uma cor fixa',
+  'Azul Nodi': 'Azul Nodi',
+  'Ahora puedes elegir a tu Nodi': 'Já pode escolher o seu Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'O Nodi tem um segundo aspeto: um orbe, mais sóbrio e discreto. Fique com o de sempre ou experimente-o.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'Pode alterá-lo quando quiser em Definições › Interface › Mascote Nodi.',
   'Mantener siempre visible sobre otras apps': 'Manter sempre visível sobre outras apps',
   'Trajes de Nodi según la bóveda': 'Trajes do Nodi consoante o espaço',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
@@ -3413,6 +3430,9 @@ export const PT: Record<string, string> = {
   'testigo': 'testemunha',
   'oficiante': 'oficiante',
   'otro': 'outro',
+  'ficha': 'ficha',
+  'bautismo': 'batismo',
+  'entierro': 'enterro',
   'nacimiento': 'nascimento',
   'defunción': 'óbito',
   'Añadidos: {a} · duplicados omitidos: {d}': 'Adicionados: {a} · duplicados omitidos: {d}',
@@ -5304,5 +5324,31 @@ export const PT: Record<string, string> = {
   'Se reemplazará por completo el horario del curso académico de destino. Las asignaturas colocadas seguirán siendo las de este curso.': 'O horário do ano letivo de destino será totalmente substituído. As disciplinas colocadas continuam a ser as deste ano.',
   'Curso académico de destino': 'Ano letivo de destino',
   'Elige un curso académico…': 'Escolhe um ano letivo…',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Ferramentas',
+  'Abrir Nodus Toolkit': 'Abrir o Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Utilitários locais para investigação, docência e estudo: converta e processe ficheiros sem sair do Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Converta documentos, PDF e imagens, com OCR ligeiro e utilitários de texto, um a um ou em lote.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Apresente PDFs como diapositivos, com vista do apresentador, notas do orador e anotações em direto.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'OCR assistido por IA para digitalizações difíceis, com revisão página a página e integração com os seus espaços.',
+  'En desarrollo': 'Em desenvolvimento',
+  'Volver a Herramientas': 'Voltar às Ferramentas',
+  'El conversor está en construcción.': 'O conversor está em construção.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Tudo será processado no seu computador, nada é enviado para nenhum serviço, e o ficheiro original nunca é modificado.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'Utilitários PDF: unir, dividir, rodar, extrair páginas e imagens, metadados',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documentos: PDF, DOCX, EPUB, Markdown, HTML e texto',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'OCR ligeiro local, com PDF pesquisável a partir de digitalizações',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Imagens: converter formato (incluindo HEIC), redimensionar e comprimir em lote',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Texto: limpar texto colado de PDF, maiúsculas/minúsculas, legendas e checksums',
 // <<END_PT>>
 };

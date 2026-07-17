@@ -97,6 +97,23 @@ export const FR: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi est le nœud qui accompagne l\'application, flottant en bas à droite. Cliquez sur Nodi pour ouvrir le chat, vos notifications et l\'aide.',
   'Mostrar a Nodi': 'Afficher Nodi',
+  'Aspecto de Nodi': 'Apparence de Nodi',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Choisissez le Nodi qui vous accompagne. Le changement s\'applique dans toute l\'application.',
+  'Nodi clásico': 'Nodi classique',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'Le personnage de toujours, avec ses gestes et ses tenues selon l\'espace.',
+  'Nodi orbe': 'Nodi orbe',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'Une sphère de verre contenant une constellation, teintée de la couleur de votre espace.',
+  'Color del orbe': 'Couleur de l\'orbe',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'L\'orbe prend la couleur de l\'espace actif et change lorsque vous changez d\'espace.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'L\'orbe conserve toujours la couleur que vous choisissez, quel que soit l\'espace.',
+  'Automático: según la bóveda activa': 'Automatique : selon l\'espace actif',
+  'Manual: un color fijo': 'Manuel : une couleur fixe',
+  'Azul Nodi': 'Bleu Nodi',
+  'Ahora puedes elegir a tu Nodi': 'Vous pouvez désormais choisir votre Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'Nodi a une seconde apparence : un orbe, plus sobre et plus discret. Gardez celui que vous connaissez ou essayez-le.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'Vous pourrez le changer à tout moment dans Paramètres › Interface › Mascotte Nodi.',
   'Mantener siempre visible sobre otras apps': 'Toujours garder au premier plan sur les autres applications',
   'Trajes de Nodi según la bóveda': 'Tenues de Nodi selon l\'espace',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
@@ -3447,6 +3464,9 @@ export const FR: Record<string, string> = {
   'testigo': 'témoin',
   'oficiante': 'officiant',
   'otro': 'autre',
+  'ficha': 'fiche',
+  'bautismo': 'baptême',
+  'entierro': 'inhumation',
   'nacimiento': 'naissance',
   'defunción': 'décès',
   'Añadidos: {a} · duplicados omitidos: {d}': 'Ajoutés : {a} · doublons ignorés : {d}',
@@ -5353,5 +5373,31 @@ export const FR: Record<string, string> = {
   'Se reemplazará por completo el horario del curso académico de destino. Las asignaturas colocadas seguirán siendo las de este curso.': 'L’emploi du temps de l’année scolaire de destination sera entièrement remplacé. Les matières placées restent celles de cette année.',
   'Curso académico de destino': 'Année scolaire de destination',
   'Elige un curso académico…': 'Choisissez une année scolaire…',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Outils',
+  'Abrir Nodus Toolkit': 'Ouvrir Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Des utilitaires locaux pour la recherche, l’enseignement et l’étude : convertissez et traitez vos fichiers sans quitter Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Convertissez documents, PDF et images, avec OCR léger et utilitaires de texte, un par un ou par lots.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Présentez des PDF sous forme de diapositives, avec vue du présentateur, notes de l’orateur et annotations en direct.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'OCR assisté par IA pour les numérisations difficiles, avec révision page par page et intégration à vos espaces.',
+  'En desarrollo': 'En développement',
+  'Volver a Herramientas': 'Retour aux outils',
+  'El conversor está en construcción.': 'Le convertisseur est en construction.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Tout sera traité sur votre ordinateur, rien n’est envoyé à aucun service, et le fichier original n’est jamais modifié.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'Utilitaires PDF : fusionner, diviser, pivoter, extraire pages et images, métadonnées',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documents : PDF, DOCX, EPUB, Markdown, HTML et texte',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'OCR léger local, avec PDF interrogeable à partir de numérisations',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Images : convertir le format (y compris HEIC), redimensionner et compresser par lots',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Texte : nettoyer le texte collé depuis un PDF, casse, sous-titres et sommes de contrôle',
 // <<END_FR>>
 };

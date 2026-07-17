@@ -82,6 +82,23 @@ export const EN: Record<string, string> = {
   'Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.':
     'Nodi is the node that accompanies the app, floating at the bottom right. Click Nodi to open chat, your notifications, and help.',
   'Mostrar a Nodi': 'Show Nodi',
+  'Aspecto de Nodi': 'Nodi look',
+  'Elige el Nodi que te acompaña. El cambio se aplica en toda la app.': 'Choose the Nodi that keeps you company. The change applies across the app.',
+  'Nodi clásico': 'Classic Nodi',
+  'El personaje de siempre, con sus gestos y sus trajes según la bóveda.': 'The long-standing character, with its gestures and its per-vault costumes.',
+  'Nodi orbe': 'Orb Nodi',
+  'Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.':
+    'A glass sphere with a constellation inside, tinted with your vault’s colour.',
+  'Color del orbe': 'Orb colour',
+  'El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.': 'The orb takes the active vault’s colour and follows you as you switch vaults.',
+  'El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.': 'The orb always keeps the colour you choose, whatever the vault.',
+  'Automático: según la bóveda activa': 'Automatic: follow the active vault',
+  'Manual: un color fijo': 'Manual: a fixed colour',
+  'Azul Nodi': 'Nodi blue',
+  'Ahora puedes elegir a tu Nodi': 'You can now choose your Nodi',
+  'Nodi tiene un segundo aspecto: un orbe, más sobrio y discreto. Quédate con el de siempre o pruébalo.':
+    'Nodi has a second look: an orb, soberer and more discreet. Keep the one you know, or give it a try.',
+  'Podrás cambiarlo cuando quieras en Ajustes › Interfaz › Mascota Nodi.': 'You can change this anytime in Settings › Interface › Nodi mascot.',
   'Mantener siempre visible sobre otras apps': 'Keep on top of other apps',
   'Trajes de Nodi según la bóveda': 'Nodi costumes per vault',
   'Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.':
@@ -3604,6 +3621,9 @@ export const EN: Record<string, string> = {
   'oficiante': 'officiant',
   'otro': 'other',
   // Fact labels (FACT_LABEL values, rendered via t())
+  'ficha': 'record',
+  'bautismo': 'baptism',
+  'entierro': 'burial',
   'nacimiento': 'birth',
   'defunción': 'death',
 
@@ -5589,5 +5609,31 @@ export const EN: Record<string, string> = {
   'Se reemplazará por completo el horario del curso académico de destino. Las asignaturas colocadas seguirán siendo las de este curso.': 'The destination academic year’s timetable will be replaced entirely. The subjects placed in it stay the ones from this year.',
   'Curso académico de destino': 'Destination academic year',
   'Elige un curso académico…': 'Choose an academic year…',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Tools',
+  'Abrir Nodus Toolkit': 'Open Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Local utilities for research, teaching and study: convert and process files without leaving Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Convert documents, PDFs and images, with light OCR and text utilities, one at a time or in bulk.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Present PDFs as slides, with a presenter view, speaker notes and live annotations.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'AI-assisted OCR for difficult scans, with page-by-page review and integration with your vaults.',
+  'En desarrollo': 'In development',
+  'Volver a Herramientas': 'Back to Tools',
+  'El conversor está en construcción.': 'The converter is under construction.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Everything will be processed on your computer, nothing is uploaded to any service, and the original file is never modified.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'PDF utilities: merge, split, rotate, extract pages and images, metadata',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documents: PDF, DOCX, EPUB, Markdown, HTML and plain text',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'Light local OCR, with searchable PDFs from scans',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Images: convert formats (including HEIC), resize and compress in bulk',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Text: clean PDF-pasted text, letter case, subtitles and checksums',
 // <<END_EN>>
 };

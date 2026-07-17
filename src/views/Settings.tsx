@@ -16,12 +16,15 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { confirm } from '../components/feedback';
 import { Icon, PROVIDER_LABELS } from '../components/ui';
 import { ModelPicker } from '../components/ModelPicker';
+import { NodiStylePicker } from '../components/nodi/NodiStylePicker';
+import { vaultTypeLabel } from '../components/VaultSwitcher';
 import { SttSettings } from '../components/SttSettings';
 import { LocalAiModelsSettings } from '../components/LocalAiModelsSettings';
 import { NAV_GROUPS, orderedNav } from '../navigation';
 import { t, tx } from '../i18n';
 import { updateStatusMessage } from '../updateStatus';
 import { DEFAULT_EMBEDDING_MODELS, EMBEDDING_PROVIDERS } from '@shared/providers';
+import { ORB_COLOR_CHOICES, orbHue } from '@shared/nodiOrb';
 import { effectiveSidebarHidden, isViewAllowedForVaultType } from '@shared/vaultTypes';
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'system' | 'data' | 'about';
@@ -427,7 +430,7 @@ export function Settings({
           <Section title={t('Idioma')}>
             <Row label={t('Idioma de la interfaz')}>
               <select
-                className="input"
+                className="input w-full md:w-64"
                 value={settings.uiLanguage}
                 onChange={(e) => patch({ uiLanguage: e.target.value as AppSettings['uiLanguage'] })}
               >
@@ -441,13 +444,16 @@ export function Settings({
             </Row>
             <Row label={t('Idioma de los prompts (idioma de las ideas generadas)')}>
               <select
-                className="input"
+                className="input w-full md:w-64"
                 value={settings.promptLanguage}
                 onChange={(e) => patch({ promptLanguage: e.target.value as AppSettings['promptLanguage'] })}
               >
                 <option value="es">Español</option>
                 <option value="en">English</option>
                 <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="pt">Português (Portugal)</option>
+                <option value="pt-BR">Português (Brasil)</option>
                 <option value="tr">Türkçe</option>
               </select>
             </Row>
@@ -520,7 +526,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante') && (
+      {visibleSettingsSection('interface', 'Mascota Nodi', 'nodi mascota mascot flotante superpuesta always on top encima escritorio companion acompanante aspecto orbe esfera color') && (
           <Section title={t('Mascota Nodi')}>
             <p className="text-xs text-neutral-500 -mt-1">
               {t('Nodi es el nodo que acompaña la app, flotando abajo a la derecha. Haz clic en Nodi para abrir el chat, tus notificaciones y la ayuda.')}
@@ -529,6 +535,62 @@ export function Settings({
               <label className="text-sm text-neutral-300">{t('Mostrar a Nodi')}</label>
               <input type="checkbox" checked={settings.mascotEnabled} onChange={(e) => void patch({ mascotEnabled: e.target.checked })} />
             </div>
+            <div>
+              <label className="text-sm text-neutral-300">{t('Aspecto de Nodi')}</label>
+              <p className="mt-0.5 mb-2 text-xs text-neutral-500">{t('Elige el Nodi que te acompaña. El cambio se aplica en toda la app.')}</p>
+              <NodiStylePicker
+                value={settings.mascotStyle}
+                orbHue={orbHue(settings, activeVault?.type ?? null)}
+                height={110}
+                labels={{
+                  classicTitle: t('Nodi clásico'),
+                  classicBody: t('El personaje de siempre, con sus gestos y sus trajes según la bóveda.'),
+                  orbTitle: t('Nodi orbe'),
+                  orbBody: t('Una esfera de cristal con una constelación dentro, que se tiñe del color de tu bóveda.'),
+                }}
+                onPick={(mascotStyle) => void patch({ mascotStyle, mascotStyleChosen: true })}
+              />
+            </div>
+            {settings.mascotStyle === 'orb' && (
+              <>
+                <label className="block text-sm text-neutral-300">
+                  {t('Color del orbe')}
+                  <span className="mt-0.5 block text-xs font-normal text-neutral-500">
+                    {settings.mascotOrbColorMode === 'auto'
+                      ? t('El orbe toma el color de la bóveda activa y cambia contigo al cambiar de bóveda.')
+                      : t('El orbe mantiene siempre el color que elijas, sea cual sea la bóveda.')}
+                  </span>
+                  <select
+                    className="input mt-2 max-w-md"
+                    value={settings.mascotOrbColorMode}
+                    onChange={(e) => void patch({ mascotOrbColorMode: e.target.value as AppSettings['mascotOrbColorMode'] })}
+                  >
+                    <option value="auto">{t('Automático: según la bóveda activa')}</option>
+                    <option value="manual">{t('Manual: un color fijo')}</option>
+                  </select>
+                </label>
+                {settings.mascotOrbColorMode === 'manual' && (
+                  <div className="flex flex-wrap items-center gap-2" data-testid="nodi-orb-palette">
+                    {ORB_COLOR_CHOICES.map(({ hex, type }) => {
+                      const label = type ? vaultTypeLabel(type) : t('Azul Nodi');
+                      const selected = settings.mascotOrbColor.toLowerCase() === hex.toLowerCase();
+                      return (
+                        <button
+                          key={hex}
+                          type="button"
+                          title={label}
+                          aria-label={label}
+                          aria-pressed={selected}
+                          onClick={() => void patch({ mascotOrbColor: hex })}
+                          className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${selected ? 'border-white ring-2 ring-white/30' : 'border-white/20'}`}
+                          style={{ backgroundColor: hex }}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
             <label className="block text-sm text-neutral-300">
               {t('Modelo del chat de Nodi')}
               <span className="mt-0.5 block text-xs font-normal text-neutral-500">{t('Este selector es independiente del asistente de investigación y del resto de funciones de IA.')}</span>
@@ -548,20 +610,23 @@ export function Settings({
                 onChange={(e) => void patch({ mascotAlwaysOnTop: e.target.checked })}
               />
             </div>
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <label className="text-sm text-neutral-300">{t('Trajes de Nodi según la bóveda')}</label>
-                <p className="mt-0.5 text-xs text-neutral-500">
-                  {t('Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.')}
-                </p>
+            {/* Costumes are a classic-Nodi idea: the orb wears its vault as a colour. */}
+            {settings.mascotStyle === 'classic' && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <label className="text-sm text-neutral-300">{t('Trajes de Nodi según la bóveda')}</label>
+                  <p className="mt-0.5 text-xs text-neutral-500">
+                    {t('Nodi lleva un pequeño accesorio según el modo de la bóveda (birrete, brote, gafas de estudio). Desactívalo para ver el Nodi normal en todas.')}
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={settings.mascotVaultCostumes}
+                  disabled={!settings.mascotEnabled}
+                  onChange={(e) => void patch({ mascotVaultCostumes: e.target.checked })}
+                />
               </div>
-              <input
-                type="checkbox"
-                checked={settings.mascotVaultCostumes}
-                disabled={!settings.mascotEnabled}
-                onChange={(e) => void patch({ mascotVaultCostumes: e.target.checked })}
-              />
-            </div>
+            )}
           </Section>
       )}
 

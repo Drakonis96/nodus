@@ -8,16 +8,19 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
 test('study vault uses its teal header logo and the shared dock accent', async () => {
-  const [app, logo, dock] = await Promise.all([
+  const [app, logo, dock, vaultTypes] = await Promise.all([
     read('src/App.tsx'),
     read('src/assets/nodus-logo-teal.svg'),
     read('src/dockIcon.ts'),
+    read('shared/vaultTypes.ts'),
   ]);
   assert.match(app, /import nodusLogoTeal/);
   assert.match(app, /isEstudio \? nodusLogoTeal/);
   assert.match(app, /data-vault-logo=.*isEstudio \? 'estudio'/s);
   assert.match(logo, /#0f766e/i);
-  assert.match(dock, /type === 'estudio'\) return '#0f766e'/);
+  // The accent lives once in shared/vaultTypes; the dock reads it from there.
+  assert.match(vaultTypes, /estudio: '#0f766e'/);
+  assert.match(dock, /vaultTypeColor\(type\)/);
 });
 
 test('macOS keeps the last vault and theme dock icon after Nodus exits', async () => {
@@ -122,7 +125,8 @@ test('study materials expose downloadable hover actions and pedagogical Deep Res
   assert.match(navigation, /studyDeepResearch/);
   assert.match(app, /view === 'studyDeepResearch'/);
   assert.match(app, /isStudy/);
-  for (const language of ['es', 'en', 'fr', 'tr']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
+  for (const language of ['es', 'en', 'fr', 'tr', 'de', 'pt']) assert.match(deep, new RegExp(`\\n  ${language}: \\{`));
+  assert.match(deep, /\n {2}'pt-BR': \{/);
   assert.match(deep, /conceptos complejos paso a paso/);
   assert.match(deep, /retrieveStudyAssistantEntries/);
   assert.match(deep, /kinds: \['material', 'document', 'transcript'\]/);
