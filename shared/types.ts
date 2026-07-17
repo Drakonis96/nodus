@@ -371,6 +371,16 @@ export type {
   StudyWorkspace,
   StudyWorkspaceOptions,
 } from './studyOrg';
+import type {
+  CreateStudyAcademicYearInput,
+  StudyAcademicYear,
+  UpdateStudyAcademicYearInput,
+} from './studyAcademicYears';
+export type {
+  CreateStudyAcademicYearInput,
+  StudyAcademicYear,
+  UpdateStudyAcademicYearInput,
+} from './studyAcademicYears';
 import type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { ArchiveMatchMode, ArchiveSortKey } from './archiveFilters';
 export type { VaultType };
@@ -5200,8 +5210,17 @@ export interface NodusApi {
   // study guide
   /** Complete local organization snapshot for the active study vault. */
   getStudyWorkspace(options?: StudyWorkspaceOptions): Promise<StudyWorkspace>;
-  getStudySchedule(): Promise<StudySchedule>;
+  /** The weekly grid for one academic year; `null` is the unscoped timetable. */
+  getStudySchedule(academicYearId?: string | null): Promise<StudySchedule>;
+  /** Replaces the grid of `schedule.academicYearId` only; other years are untouched. */
   saveStudySchedule(schedule: StudySchedule): Promise<StudySchedule>;
+  /** Overwrites the destination year's grid with a copy of the source year's. */
+  copyStudySchedule(fromAcademicYearId: string | null, toAcademicYearId: string | null): Promise<StudySchedule>;
+  /** Creates the year, or returns the existing one with the same canonical label. */
+  createStudyAcademicYear(input: CreateStudyAcademicYearInput): Promise<StudyAcademicYear>;
+  updateStudyAcademicYear(id: string, patch: UpdateStudyAcademicYearInput): Promise<StudyAcademicYear | null>;
+  /** Unlinks the year from its courses and subjects; their content is kept. */
+  deleteStudyAcademicYear(id: string): Promise<void>;
   createStudyCourse(input: CreateStudyCourseInput): Promise<StudyCourse>;
   createStudySubject(input: CreateStudySubjectInput): Promise<StudySubject>;
   createStudyTopic(input: CreateStudyTopicInput): Promise<StudyTopic>;
@@ -5213,6 +5232,7 @@ export interface NodusApi {
   setPrimaryStudyPlacement(documentId: string, input: StudyPlacementInput): Promise<StudyPlacement>;
   removeStudyPlacement(id: string): Promise<void>;
   setStudyLifecycle(kind: StudyEntityKind, id: string, action: StudyLifecycleAction): Promise<void>;
+  /** The copy keeps the original's academic year; re-file it by editing the copy. */
   duplicateStudyTree(kind: StudyEntityKind, id: string): Promise<StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument>;
   createStudyTag(input: CreateStudyTagInput): Promise<StudyTag>;
   updateStudyTag(id: string, patch: Partial<CreateStudyTagInput> & { favorite?: boolean; position?: number }): Promise<StudyTag | null>;

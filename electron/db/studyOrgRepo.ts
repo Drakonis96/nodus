@@ -1,5 +1,16 @@
 import crypto from 'node:crypto';
 import type {
+  CreateStudyAcademicYearInput,
+  StudyAcademicYear,
+  UpdateStudyAcademicYearInput,
+} from '@shared/studyAcademicYears';
+import {
+  defaultAcademicYearRange,
+  isAcademicYearDate,
+  normalizeAcademicYearLabel,
+  parseAcademicYearStart,
+} from '@shared/studyAcademicYears';
+import type {
   CreateStudyCourseInput,
   CreateStudyDocumentInput,
   CreateStudyFolderInput,
@@ -29,6 +40,7 @@ import { getDb } from './database';
 type Row = Record<string, unknown>;
 
 const PREFIX = {
+  academicYear: 'ACY',
   course: 'CRS',
   subject: 'SUB',
   topic: 'TOP',
@@ -79,8 +91,19 @@ function named(row: Row) {
   };
 }
 
-const toCourse = (row: Row): StudyCourse => named(row);
-const toSubject = (row: Row): StudySubject => ({ ...named(row), courseId: String(row.course_id) });
+const toAcademicYear = (row: Row): StudyAcademicYear => ({
+  ...base(row),
+  label: String(row.label),
+  startDate: String(row.start_date),
+  endDate: String(row.end_date),
+  color: row.color ? String(row.color) : null,
+});
+const toCourse = (row: Row): StudyCourse => ({ ...named(row), academicYearId: row.academic_year_id ? String(row.academic_year_id) : null });
+const toSubject = (row: Row): StudySubject => ({
+  ...named(row),
+  courseId: String(row.course_id),
+  academicYearId: row.academic_year_id ? String(row.academic_year_id) : null,
+});
 const toTopic = (row: Row): StudyTopic => ({
   ...named(row),
   subjectId: String(row.subject_id),
@@ -148,6 +171,7 @@ export function getStudyWorkspace(options: StudyWorkspaceOptions = {}): StudyWor
   const tags = list('study_tags').map(toTag);
   const tagIds = new Set(tags.map((tag) => tag.id));
   return {
+    academicYears: (db.prepare(`SELECT * FROM study_academic_years${where} ORDER BY start_date DESC, label DESC`).all() as Row[]).map(toAcademicYear),
     courses: list('study_courses').map(toCourse),
     subjects: list('study_subjects').map(toSubject),
     topics: list('study_topics').map(toTopic),
@@ -170,27 +194,112 @@ function nextPosition(table: string, scopeColumn?: string, scopeValue?: string |
   return Number(row.value);
 }
 
+/**
+ * Rejects an academic year id that does not exist, so a typo in an IPC payload
+ * surfaces as an error instead of a course that silently belongs to no year.
+ * The FK would catch it too, but only as an opaque SQLITE_CONSTRAINT.
+ */
+function assertAcademicYearExists(id: string | null | undefined): string | null {
+  if (!id) return null;
+  if (!getDb().prepare('SELECT 1 FROM study_academic_years WHERE id = ? AND deleted_at IS NULL').get(id)) {
+    throw new Error('El curso académico seleccionado no existe.');
+  }
+  return id;
+}
+
+/**
+ * Creates an academic year, or returns the existing one with the same canonical
+ * label. Returning rather than throwing mirrors {@link createStudyTag}: "2024/25"
+ * and "2024/2025" are the same year, and a duplicate-name error would be a
+ * pedantic answer to what is really a request for the year that already exists.
+ */
+export function createStudyAcademicYear(input: CreateStudyAcademicYearInput): StudyAcademicYear {
+  const db = getDb();
+  const label = normalizeAcademicYearLabel(input.label);
+  if (!label) throw new Error('Escribe el curso académico como 2024/2025.');
+  const existing = db.prepare('SELECT * FROM study_academic_years WHERE label = ?').get(label) as Row | undefined;
+  if (existing) return toAcademicYear(existing);
+  const fallback = defaultAcademicYearRange(parseAcademicYearStart(label)!);
+  const startDate = input.startDate || fallback.startDate;
+  const endDate = input.endDate || fallback.endDate;
+  assertAcademicYearRange(startDate, endDate);
+  const key = ids('academicYear');
+  const timestamp = now();
+  db.prepare(`INSERT INTO study_academic_years
+    (id, short_id, label, start_date, end_date, color, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .run(key.id, key.shortId, label, startDate, endDate, input.color ?? null, nextPosition('study_academic_years'), timestamp, timestamp);
+  return toAcademicYear(db.prepare('SELECT * FROM study_academic_years WHERE id = ?').get(key.id) as Row);
+}
+
+function assertAcademicYearRange(startDate: string, endDate: string): void {
+  if (!isAcademicYearDate(startDate) || !isAcademicYearDate(endDate)) throw new Error('Las fechas del curso académico deben tener el formato AAAA-MM-DD.');
+  if (startDate >= endDate) throw new Error('El curso académico debe terminar después de empezar.');
+}
+
+export function updateStudyAcademicYear(id: string, patch: UpdateStudyAcademicYearInput): StudyAcademicYear | null {
+  const db = getDb();
+  const current = db.prepare('SELECT * FROM study_academic_years WHERE id = ?').get(id) as Row | undefined;
+  if (!current) return null;
+  const assignments: string[] = [];
+  const values: unknown[] = [];
+  if (patch.label !== undefined) {
+    const label = normalizeAcademicYearLabel(patch.label);
+    if (!label) throw new Error('Escribe el curso académico como 2024/2025.');
+    const clash = db.prepare('SELECT id FROM study_academic_years WHERE label = ? AND id <> ?').get(label, id) as Row | undefined;
+    if (clash) throw new Error(`El curso académico ${label} ya existe.`);
+    assignments.push('label = ?'); values.push(label);
+  }
+  if (patch.startDate !== undefined || patch.endDate !== undefined) {
+    const startDate = patch.startDate ?? String(current.start_date);
+    const endDate = patch.endDate ?? String(current.end_date);
+    assertAcademicYearRange(startDate, endDate);
+    assignments.push('start_date = ?', 'end_date = ?'); values.push(startDate, endDate);
+  }
+  if (patch.color !== undefined) { assignments.push('color = ?'); values.push(patch.color ?? null); }
+  if (patch.position !== undefined) { assignments.push('position = ?'); values.push(patch.position); }
+  if (assignments.length) {
+    db.prepare(`UPDATE study_academic_years SET ${assignments.join(', ')}, updated_at = ? WHERE id = ?`).run(...values, now(), id);
+  }
+  return toAcademicYear(db.prepare('SELECT * FROM study_academic_years WHERE id = ?').get(id) as Row);
+}
+
+/**
+ * Deletes an academic year for real, unlinking whatever pointed at it.
+ *
+ * Deliberately never cascades into courses or subjects: the year is a label on
+ * work, not a container of it, and dropping a year the user mislabelled must not
+ * take a term's materials with it. The FKs are ON DELETE SET NULL for courses and
+ * subjects, and the timetable rows for that year are the only thing that cannot
+ * outlive it, so those cascade.
+ */
+export function deleteStudyAcademicYear(id: string): void {
+  getDb().prepare('DELETE FROM study_academic_years WHERE id = ?').run(id);
+}
+
 export function createStudyCourse(input: CreateStudyCourseInput): StudyCourse {
   const db = getDb();
+  const academicYearId = assertAcademicYearExists(input.academicYearId);
   const key = ids('course');
   const timestamp = now();
   db.prepare(`INSERT INTO study_courses
-    (id, short_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, short_id, name, description, color, icon, emoji, image_data, year, academic_year_id, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(key.id, key.shortId, normalizeStudyName(input.name), input.description ?? null, input.color ?? null, input.icon ?? null,
-      input.emoji ?? null, input.imageData ?? null, input.year ?? null, nextPosition('study_courses'), timestamp, timestamp);
+      input.emoji ?? null, input.imageData ?? null, input.year ?? null, academicYearId, nextPosition('study_courses'), timestamp, timestamp);
   return toCourse(db.prepare('SELECT * FROM study_courses WHERE id = ?').get(key.id) as Row);
 }
 
 export function createStudySubject(input: CreateStudySubjectInput): StudySubject {
   const db = getDb();
+  const academicYearId = assertAcademicYearExists(input.academicYearId);
   const key = ids('subject');
   const timestamp = now();
   db.prepare(`INSERT INTO study_subjects
-    (id, short_id, course_id, name, description, color, icon, emoji, image_data, year, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, short_id, course_id, name, description, color, icon, emoji, image_data, year, academic_year_id, position, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .run(key.id, key.shortId, input.courseId, normalizeStudyName(input.name), input.description ?? null, input.color ?? null,
-      input.icon ?? null, input.emoji ?? null, input.imageData ?? null, input.year ?? null,
+      input.icon ?? null, input.emoji ?? null, input.imageData ?? null, input.year ?? null, academicYearId,
       nextPosition('study_subjects', 'course_id', input.courseId), timestamp, timestamp);
   return toSubject(db.prepare('SELECT * FROM study_subjects WHERE id = ?').get(key.id) as Row);
 }
@@ -352,10 +461,17 @@ export function updateStudyEntity(kind: StudyEntityKind, id: string, patch: Reco
   const table = TABLES[kind];
   const allowed = kind === 'document'
     ? new Set(['title', 'kind', 'contentMarkdown', 'description', 'color', 'icon', 'emoji', 'imageData', 'year', 'favorite', 'pinned', 'locked', 'position'])
-    : new Set(['name', 'description', 'color', 'icon', 'emoji', 'imageData', 'year', 'favorite', 'position', 'courseId', 'subjectId', 'parentId', ...(kind === 'topic' ? ['folderId'] : [])]);
+    : new Set(['name', 'description', 'color', 'icon', 'emoji', 'imageData', 'year', 'favorite', 'position', 'courseId', 'subjectId', 'parentId',
+      ...(kind === 'topic' ? ['folderId'] : []),
+      // Only these two have the column; a topic patch carrying it would otherwise
+      // build an UPDATE against a column that does not exist.
+      ...(kind === 'course' || kind === 'subject' ? ['academicYearId'] : [])]);
   const column = (key: string) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
   const entries = Object.entries(patch).filter(([key]) => allowed.has(key));
   if (!entries.length) return getStudyEntity(kind, id);
+  if (Object.hasOwn(patch, 'academicYearId') && allowed.has('academicYearId')) {
+    assertAcademicYearExists((patch.academicYearId as string | null) ?? null);
+  }
   if (kind === 'topic' && Object.hasOwn(patch, 'parentId')) assertNoTopicCycle(id, (patch.parentId as string | null) ?? null);
   if (kind === 'folder' && Object.hasOwn(patch, 'parentId')) assertNoFolderCycle(id, (patch.parentId as string | null) ?? null);
   const values = entries.map(([key, value]) => {
@@ -692,13 +808,15 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
 
     for (const oldId of scope.course) {
       const old = getStudyEntity('course', oldId) as StudyCourse;
-      const copy = createStudyCourse({ name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
+      const copy = createStudyCourse({ name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year, academicYearId: old.academicYearId });
       courseMap.set(oldId, copy.id); if (oldId === id) root = copy;
     }
     for (const oldId of scope.subject) {
       const old = getStudyEntity('subject', oldId) as StudySubject;
       const targetCourse = courseMap.get(old.courseId) ?? old.courseId;
-      const copy = createStudySubject({ courseId: targetCourse, name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
+      // Copying the year verbatim keeps an inheriting subject inheriting, so pointing
+      // the copied course at next September carries its subjects along.
+      const copy = createStudySubject({ courseId: targetCourse, name: `${old.name}${oldId === id ? ' (copia)' : ''}`, description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year, academicYearId: old.academicYearId });
       subjectMap.set(oldId, copy.id); if (oldId === id) root = copy;
     }
     const pendingTopics = [...scope.topic];

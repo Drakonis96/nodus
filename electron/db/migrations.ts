@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 80;
+export const SCHEMA_VERSION = 81;
 
 export const migrations: Migration[] = [
   {
@@ -2711,6 +2711,60 @@ export const migrations: Migration[] = [
       -- catalogue is ~800 KB per file) moved hundreds of MB over IPC just to draw a 40px
       -- box. NULL for non-images and for attachments added before this column existed.
       ALTER TABLE db_attachments ADD COLUMN thumb BLOB;
+    `,
+  },
+  {
+    version: 81,
+    up: /* sql */ `
+      -- The academic year ("2024/2025") is the scope study vaults were missing: the
+      -- same subject is taught again every September with new materials and a new
+      -- timetable, and last year's has to stay readable rather than be overwritten.
+      -- The date range is stored, not just the label, because it is what lets the
+      -- app work out which year is the current one without a stored "current" flag
+      -- that goes stale the September after somebody sets it.
+      CREATE TABLE study_academic_years (
+        id TEXT PRIMARY KEY, short_id TEXT NOT NULL UNIQUE, label TEXT NOT NULL,
+        start_date TEXT NOT NULL, end_date TEXT NOT NULL, color TEXT,
+        position INTEGER NOT NULL DEFAULT 0, archived_at TEXT, deleted_at TEXT,
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_study_academic_years_label ON study_academic_years(label);
+
+      -- Only courses and subjects carry the year. Topics, folders and documents reach
+      -- it through the subject that owns them, so there is one place to change it and
+      -- no way for a topic and its subject to claim different years. Both columns are
+      -- nullable because the two real shapes disagree about where the year belongs: a
+      -- school course *is* one year (set it there, subjects inherit), while a degree
+      -- spans several (leave the course open, set it per subject).
+      ALTER TABLE study_courses ADD COLUMN academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE SET NULL;
+      ALTER TABLE study_subjects ADD COLUMN academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE SET NULL;
+      CREATE INDEX idx_study_courses_academic_year ON study_courses(academic_year_id, position);
+      CREATE INDEX idx_study_subjects_academic_year ON study_subjects(academic_year_id, course_id, position);
+
+      -- The weekly timetable stops being a vault-wide singleton and becomes one grid
+      -- per academic year. Cells reach their year through their period, so only
+      -- periods carry the column. Existing rows keep NULL and stay reachable as the
+      -- "no academic year" timetable rather than being adopted into a year the user
+      -- never chose.
+      ALTER TABLE study_schedule_periods ADD COLUMN academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE CASCADE;
+      CREATE INDEX idx_study_schedule_periods_year ON study_schedule_periods(academic_year_id, section, position);
+
+      -- Day colours were keyed by day alone, which cannot hold one palette per year.
+      -- SQLite cannot widen a primary key in place, so the table is rebuilt. The
+      -- unique index goes through COALESCE because NULLs are distinct in a SQLite
+      -- index, and a bare (academic_year_id, day) index would let the unscoped
+      -- timetable accumulate two colours for the same Monday.
+      CREATE TABLE study_schedule_day_styles_v81 (
+        day TEXT NOT NULL CHECK(day IN ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')),
+        academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE CASCADE,
+        color TEXT
+      );
+      INSERT INTO study_schedule_day_styles_v81 (day, academic_year_id, color)
+        SELECT day, NULL, color FROM study_schedule_day_styles;
+      DROP TABLE study_schedule_day_styles;
+      ALTER TABLE study_schedule_day_styles_v81 RENAME TO study_schedule_day_styles;
+      CREATE UNIQUE INDEX idx_study_schedule_day_styles_key
+        ON study_schedule_day_styles(COALESCE(academic_year_id, ''), day);
     `,
   },
 ];

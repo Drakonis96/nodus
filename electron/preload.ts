@@ -472,8 +472,12 @@ const api: NodusApi = {
   exportAuthorSyntheses: (request) => ipcRenderer.invoke('authors:exportSyntheses', request),
 
   getStudyWorkspace: (options) => ipcRenderer.invoke('study:workspace', options),
-  getStudySchedule: () => ipcRenderer.invoke('study:schedule:get'),
+  getStudySchedule: (academicYearId) => ipcRenderer.invoke('study:schedule:get', academicYearId ?? null),
   saveStudySchedule: (schedule) => ipcRenderer.invoke('study:schedule:save', schedule),
+  copyStudySchedule: (fromAcademicYearId, toAcademicYearId) => ipcRenderer.invoke('study:schedule:copy', fromAcademicYearId, toAcademicYearId),
+  createStudyAcademicYear: (input) => ipcRenderer.invoke('study:academicYear:create', input),
+  updateStudyAcademicYear: (id, patch) => ipcRenderer.invoke('study:academicYear:update', id, patch),
+  deleteStudyAcademicYear: (id) => ipcRenderer.invoke('study:academicYear:delete', id).then(() => undefined),
   createStudyCourse: (input) => ipcRenderer.invoke('study:course:create', input),
   createStudySubject: (input) => ipcRenderer.invoke('study:subject:create', input),
   createStudyTopic: (input) => ipcRenderer.invoke('study:topic:create', input),

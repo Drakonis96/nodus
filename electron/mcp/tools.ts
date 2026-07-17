@@ -2129,7 +2129,8 @@ export function registerTools(server: McpServer): void {
     {
       title: 'Get study workspace',
       description:
-        'Returns the active vault\'s study organisation: courses, subjects, topics and compact document metadata. Read-only. Empty arrays mean that the active vault has no study layer.',
+        'Returns the active vault\'s study organisation: academic years, courses, subjects, topics and compact document metadata. Read-only. Empty arrays mean that the active vault has no study layer. '
+        + 'Courses and subjects carry an academicYearId into academicYears (label "2024/2025"); a subject whose academicYearId is null belongs to its course\'s year, and null on both means no academic year is set.',
       inputSchema: { includeArchived: z.boolean().default(false) },
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -2137,6 +2138,9 @@ export function registerTools(server: McpServer): void {
       tool(() => {
         const workspace = studyOrg.getStudyWorkspace({ includeArchived });
         return {
+          // Without the year rows an academicYearId is an opaque uuid the client
+          // cannot turn back into "2024/2025".
+          academicYears: workspace.academicYears,
           courses: workspace.courses,
           subjects: workspace.subjects,
           topics: workspace.topics,

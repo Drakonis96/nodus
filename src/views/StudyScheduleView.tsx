@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { StudySchedule, StudyScheduleDay, StudySchedulePeriod, StudyScheduleSection, StudySubject, StudyWorkspace } from '@shared/types';
 import { STUDY_SCHEDULE_DAYS } from '@shared/studySchedule';
+import { effectiveAcademicYearId } from '@shared/studyAcademicYears';
 import { IconEmojiPicker } from '../components/IconEmojiPicker';
+import { currentStudyAcademicYear, StudyAcademicYearManager, StudyAcademicYearScopeSelect, useStudyAcademicYearScope } from '../components/StudyAcademicYear';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED } from '../components/StudySidebar';
 import { Icon, Spinner } from '../components/ui';
 import { t } from '../i18n';
@@ -35,14 +37,30 @@ export function StudyScheduleView() {
   const [error, setError] = useState('');
   const [cellEditor, setCellEditor] = useState<CellEditor | null>(null);
   const [activeDayActions, setActiveDayActions] = useState<StudyScheduleDay | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTarget, setCopyTarget] = useState('');
 
-  const load = async () => {
+  const { scope, setScope, resolved } = useStudyAcademicYearScope(workspace?.academicYears);
+  /**
+   * A timetable is one grid, so the shared "all" scope has to collapse to a single
+   * year here. It resolves to the current one — opening Horarios in October and
+   * being shown an empty unscoped grid would look like the data was lost.
+   */
+  const academicYearId = useMemo(() => {
+    if (scope === 'none') return null;
+    if (scope !== 'all') return resolved?.id ?? null;
+    return currentStudyAcademicYear(workspace?.academicYears ?? [])?.id ?? null;
+  }, [scope, resolved, workspace]);
+
+  const load = useCallback(async (yearId: string | null) => {
     try {
-      const [nextSchedule, nextWorkspace] = await Promise.all([window.nodus.getStudySchedule(), window.nodus.getStudyWorkspace()]);
+      const [nextSchedule, nextWorkspace] = await Promise.all([window.nodus.getStudySchedule(yearId), window.nodus.getStudyWorkspace()]);
       setSchedule(nextSchedule); setWorkspace(nextWorkspace); setError('');
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-  };
-  useEffect(() => { void load(); const reload = () => void window.nodus.getStudyWorkspace().then(setWorkspace); window.addEventListener(STUDY_WORKSPACE_CHANGED, reload); return () => window.removeEventListener(STUDY_WORKSPACE_CHANGED, reload); }, []);
+  }, []);
+  useEffect(() => { void load(academicYearId); }, [load, academicYearId]);
+  useEffect(() => { const reload = () => void window.nodus.getStudyWorkspace().then(setWorkspace); window.addEventListener(STUDY_WORKSPACE_CHANGED, reload); return () => window.removeEventListener(STUDY_WORKSPACE_CHANGED, reload); }, []);
   useEffect(() => {
     if (!cellEditor) return;
     const closeOnOutsideClick = (event: MouseEvent) => {
@@ -63,14 +81,28 @@ export function StudyScheduleView() {
     };
   }, [cellEditor]);
 
-  const subjects = workspace?.subjects ?? [];
-  const subjectById = useMemo(() => new Map(subjects.map((subject) => [subject.id, subject])), [subjects]);
+  /**
+   * Only the subjects of the year on screen can be placed in it. Offering every
+   * subject the vault ever had is how a teacher ends up with last year's group in
+   * this year's Tuesday slot.
+   */
+  const subjects = useMemo(() => {
+    const all = workspace?.subjects ?? [];
+    if (!workspace || !academicYearId) return all;
+    return all.filter((subject) => effectiveAcademicYearId(subject, workspace.courses) === academicYearId);
+  }, [workspace, academicYearId]);
+  // Cells written before a subject moved year still have to render, so lookups go
+  // through every subject rather than the filtered list.
+  const subjectById = useMemo(() => new Map((workspace?.subjects ?? []).map((subject) => [subject.id, subject])), [workspace]);
   const periods = (section: StudyScheduleSection) => schedule?.periods.filter((period) => period.section === section).sort((a, b) => a.position - b.position) ?? [];
   const cellAt = (day: StudyScheduleDay, periodId: string) => schedule?.cells.find((cell) => cell.day === day && cell.periodId === periodId) ?? null;
 
   const persist = async (next: StudySchedule) => {
-    setSchedule(next); setSaving(true); setError('');
-    try { setSchedule(await window.nodus.saveStudySchedule(next)); }
+    // Stamping the year on the way out rather than trusting what was loaded means a
+    // save that races a year change cannot write this grid over another year's.
+    const scoped = { ...next, academicYearId };
+    setSchedule(scoped); setSaving(true); setError('');
+    try { setSchedule(await window.nodus.saveStudySchedule(scoped)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setSaving(false); }
   };
@@ -129,11 +161,51 @@ export function StudyScheduleView() {
   return <div className="study-schedule-page h-full overflow-y-auto bg-neutral-50 p-5 text-neutral-900 dark:bg-neutral-950/20 dark:text-neutral-100" data-testid="study-schedule-view">
     <div className="mx-auto max-w-7xl space-y-5">
       <header className="flex flex-wrap items-end gap-3">
-        <div className="mr-auto"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">{t('Organización')}</p><h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{t('Horarios')}</h1><p className="mt-1 text-sm text-neutral-500">{t('Organiza tus asignaturas por días y franjas de mañana o tarde.')}</p></div>
+        <div className="mr-auto"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-teal-600 dark:text-teal-400">{t('Organización')}</p><h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{t('Horarios')}</h1><p className="mt-1 text-sm text-neutral-500">{t('Cada curso académico tiene su propio horario. Organiza tus asignaturas por días y franjas de mañana o tarde.')}</p></div>
         {saving && <Spinner label={t('Guardando…')} />}
+        <StudyAcademicYearScopeSelect
+          years={workspace.academicYears}
+          scope={academicYearId ?? 'none'}
+          onScopeChange={setScope}
+          hasUnscoped
+          allowAll={false}
+          onManage={() => setManagerOpen(true)}
+          testId="study-schedule-academic-year"
+        />
+        <button data-testid="study-schedule-copy-open" className="btn btn-secondary" title={t('Copiar este horario a otro curso académico')} disabled={!workspace.academicYears.length} onClick={() => { setCopyTarget(''); setCopyOpen(true); }}><Icon name="copy" />{t('Copiar a otro curso académico')}</button>
         <button data-testid="study-schedule-add-morning" className="btn btn-primary" onClick={() => addPeriod('morning')}><Icon name="sun" />{t('Añadir franja de mañana')}</button>
         <button data-testid="study-schedule-add-afternoon" className="btn btn-primary" onClick={() => addPeriod('afternoon')}><Icon name="plus" />{t('Añadir franja de tarde')}</button>
       </header>
+
+      {copyOpen && (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4" data-testid="study-schedule-copy-panel">
+          <p className="text-sm font-semibold text-neutral-200">{t('Copiar este horario a otro curso académico')}</p>
+          <p className="mt-1 text-xs text-neutral-500">{t('Se reemplazará por completo el horario del curso académico de destino. Las asignaturas colocadas seguirán siendo las de este curso.')}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <select data-testid="study-schedule-copy-target" aria-label={t('Curso académico de destino')} className="input h-9 min-w-52 text-xs" value={copyTarget} onChange={(event) => setCopyTarget(event.target.value)}>
+              <option value="">{t('Elige un curso académico…')}</option>
+              {workspace.academicYears.filter((year) => year.id !== academicYearId).map((year) => <option key={year.id} value={year.id}>{year.label}</option>)}
+              {academicYearId !== null && <option value="none">{t('Sin curso académico')}</option>}
+            </select>
+            <button
+              data-testid="study-schedule-copy-confirm"
+              className="btn btn-primary h-9"
+              disabled={!copyTarget || saving}
+              onClick={() => void (async () => {
+                setSaving(true); setError('');
+                try {
+                  await window.nodus.copyStudySchedule(academicYearId, copyTarget === 'none' ? null : copyTarget);
+                  setCopyOpen(false);
+                  // Land on the copy: the reason to make one is to start editing it.
+                  setScope(copyTarget === 'none' ? 'none' : copyTarget);
+                } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+                finally { setSaving(false); }
+              })()}
+            >{t('Copiar')}</button>
+            <button className="btn btn-ghost h-9" onClick={() => setCopyOpen(false)}>{t('Cancelar')}</button>
+          </div>
+        </div>
+      )}
       {error && <div className="rounded-xl border border-red-900/60 bg-red-950/20 px-4 py-3 text-sm text-red-300">{error}</div>}
 
       <section className="study-schedule-panel overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-black/10 dark:border-neutral-800 dark:bg-neutral-950/50">
@@ -150,6 +222,7 @@ export function StudyScheduleView() {
 
       <section className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-5" data-testid="study-schedule-subject-styles"><div><h2 className="text-base font-semibold text-neutral-200">{t('Aspecto de las asignaturas')}</h2><p className="mt-1 text-xs text-neutral-500">{t('Los cambios también se aplicarán en Cursos y asignaturas.')}</p></div>{subjects.length ? <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{subjects.map((subject) => <article key={subject.id} className={`study-schedule-subject-style rounded-xl border border-neutral-800 p-3 ${subject.color ? 'has-color' : ''}`} style={subject.color ? { '--subject-color': subject.color } as CSSProperties : undefined}><div className="flex items-start gap-2"><SubjectMark subject={subject} /><strong className="min-w-0 flex-1 break-words text-sm leading-5 text-neutral-200">{subject.name}</strong><label className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-neutral-700" style={{ backgroundColor: subject.color || undefined }} title={t('Color de la asignatura')}><Icon name="palette" size={13} className={subject.color ? 'text-white' : 'text-neutral-500'} /><input data-testid={`study-schedule-subject-color-${subject.id}`} className="sr-only" type="color" value={subject.color || '#0f766e'} onChange={(event) => void styleSubject(subject, { color: event.target.value })} /></label><button data-testid={`study-schedule-subject-clear-${subject.id}`} className="btn btn-ghost h-9 w-9 shrink-0 p-0 disabled:cursor-not-allowed disabled:opacity-30" title={t('Vaciar color')} aria-label={t('Vaciar color')} disabled={!subject.color} onClick={() => void styleSubject(subject, { color: null })}><Icon name="x" size={12} /></button></div><div className="mt-2"><IconEmojiPicker icon={subject.icon || 'book'} emoji={subject.emoji || ''} onChange={(value) => void styleSubject(subject, value)} /></div></article>)}</div> : <div className="mt-4 rounded-xl border border-dashed border-neutral-800 p-8 text-center text-sm text-neutral-500">{t('Añade asignaturas en Cursos y asignaturas para poder colocarlas en el horario.')}</div>}</section>
     </div>
+    {managerOpen && <StudyAcademicYearManager years={workspace.academicYears} usage={new Map()} onClose={() => setManagerOpen(false)} onChanged={async () => { announceStudyWorkspaceChanged(); await load(academicYearId); }} />}
     {cellEditor && <div data-study-schedule-editor data-testid="study-schedule-cell-popover" className="fixed z-[130] rounded-xl border border-neutral-200 bg-white p-3 text-neutral-900 shadow-2xl dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100" style={cellEditorStyle} role="dialog" aria-modal="false" aria-labelledby="study-schedule-cell-title"><div className="flex items-start gap-2"><div className="min-w-0 flex-1"><h2 id="study-schedule-cell-title" className="text-sm font-semibold">{t('Añadir al horario')}</h2><p className="mt-0.5 truncate text-[11px] text-neutral-500">{t(DAY_LABELS[cellEditor.day])} · {schedule.periods.find((period) => period.id === cellEditor.periodId)?.label}</p></div><button className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800" aria-label={t('Cerrar')} onClick={() => setCellEditor(null)}><Icon name="x" size={13} /></button></div><div className="mt-3 grid grid-cols-2 gap-2"><button data-testid="study-schedule-kind-subject" className={`rounded-lg border p-2.5 text-left transition-colors ${cellEditor.kind === 'subject' ? 'border-teal-500 bg-teal-50 text-neutral-900 dark:bg-teal-950/40 dark:text-neutral-100' : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'}`} onClick={() => setCellEditor({ ...cellEditor, kind: 'subject', activityTitle: '' })}><div className="flex items-center gap-2"><Icon name="book" size={14} /><strong className="text-xs">{t('Asignatura')}</strong></div><span className="mt-1 block text-[10px] leading-tight text-neutral-500">{t('Elegir una asignatura existente')}</span></button><button data-testid="study-schedule-kind-activity" className={`rounded-lg border p-2.5 text-left transition-colors ${cellEditor.kind === 'activity' ? 'border-indigo-500 bg-indigo-50 text-neutral-900 dark:bg-indigo-950/40 dark:text-neutral-100' : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'}`} onClick={() => setCellEditor({ ...cellEditor, kind: 'activity', subjectId: '' })}><div className="flex items-center gap-2"><Icon name="clock" size={14} /><strong className="text-xs">{t('Actividad independiente')}</strong></div><span className="mt-1 block text-[10px] leading-tight text-neutral-500">{t('Añadir una actividad con nombre propio')}</span></button></div>{cellEditor.kind === 'subject' && <label className="mt-3 block text-xs text-neutral-500">{t('Asignatura')}<select autoFocus className="input mt-1 w-full" value={cellEditor.subjectId} onChange={(event) => setCellEditor({ ...cellEditor, subjectId: event.target.value })}><option value="">{t('Selecciona una asignatura…')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>}{cellEditor.kind === 'activity' && <label className="mt-3 block text-xs text-neutral-500">{t('Nombre de la actividad')}<input autoFocus data-testid="study-schedule-activity-title" className="input mt-1 w-full" maxLength={160} value={cellEditor.activityTitle} onChange={(event) => setCellEditor({ ...cellEditor, activityTitle: event.target.value })} placeholder={t('Ej. Tutoría, gimnasio o biblioteca')} onKeyDown={(event) => { if (event.key === 'Enter') saveCellEditor(); }} /></label>}<div className="mt-3 flex items-center justify-end gap-2 border-t border-neutral-200 pt-3 dark:border-neutral-700">{cellAt(cellEditor.day, cellEditor.periodId) && <button className="btn btn-ghost mr-auto h-8 px-2 text-red-500" title={t('Vaciar celda')} aria-label={t('Vaciar celda')} onClick={() => { setCell(cellEditor.day, cellEditor.periodId, null); setCellEditor(null); }}><Icon name="trash" size={13} /></button>}<button className="btn btn-ghost h-8 px-3" onClick={() => setCellEditor(null)}>{t('Cancelar')}</button><button data-testid="study-schedule-cell-save" className="btn btn-primary h-8 px-3" disabled={(cellEditor.kind === 'subject' && !cellEditor.subjectId) || (cellEditor.kind === 'activity' && !cellEditor.activityTitle.trim()) || !cellEditor.kind} onClick={saveCellEditor}>{t('Guardar')}</button></div></div>}
   </div>;
 }

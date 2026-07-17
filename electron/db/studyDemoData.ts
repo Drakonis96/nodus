@@ -1,3 +1,4 @@
+import { DEFAULT_ACADEMIC_YEAR_START_MONTH, defaultAcademicYearRange, formatAcademicYearLabel } from '@shared/studyAcademicYears';
 import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -52,6 +53,7 @@ const ID = {
   ideaProducers: 'demo-study-idea-producers',
   ideaTransfer: 'demo-study-idea-transfer',
   ideaDissipation: 'demo-study-idea-dissipation',
+  academicYear: 'demo-study-academic-year',
 } as const;
 
 function demoWav(): Buffer {
@@ -80,11 +82,21 @@ export function seedStudyDemoData(): boolean {
   const examAt = new Date(now.getTime() + 12 * 86_400_000).toISOString();
   const weekEnd = new Date(now.getTime() + 7 * 86_400_000).toISOString();
 
+  // Derived from today rather than hard-coded so the sample vault always opens on a
+  // current academic year instead of one that expired when the fixture was written.
+  const demoYearStart = now.getMonth() + 1 >= DEFAULT_ACADEMIC_YEAR_START_MONTH ? now.getFullYear() : now.getFullYear() - 1;
+  const demoYearRange = defaultAcademicYearRange(demoYearStart);
+
   db.transaction(() => {
+    db.prepare(`INSERT INTO study_academic_years
+      (id,short_id,label,start_date,end_date,color,position,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?)`)
+      .run(ID.academicYear, 'ACY-DEMO1', formatAcademicYearLabel(demoYearStart), demoYearRange.startDate, demoYearRange.endDate, '#0f766e', 0, createdAt, updatedAt);
+
     db.prepare(`INSERT INTO study_courses
-      (id,short_id,name,description,color,icon,favorite,position,created_at,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?)`)
-      .run(ID.course, 'CRS-DEMO1', 'Biología general', 'Curso de ejemplo local para explorar el vault de estudio.', '#0f766e', 'graduation', 1, 0, createdAt, updatedAt);
+      (id,short_id,name,description,color,icon,favorite,position,academic_year_id,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(ID.course, 'CRS-DEMO1', 'Biología general', 'Curso de ejemplo local para explorar el vault de estudio.', '#0f766e', 'graduation', 1, 0, ID.academicYear, createdAt, updatedAt);
 
     const insertSubject = db.prepare(`INSERT INTO study_subjects
       (id,short_id,course_id,name,description,color,icon,favorite,position,created_at,updated_at)
@@ -298,9 +310,11 @@ export function seedStudyDemoData(): boolean {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(ID.studySession, 'SES-DEMO1', ID.block, ID.subjectCell, ID.topicMembrane, 'focus', 25, 1_380, 1, createdAt, updatedAt, 'Repaso completado; revisar ósmosis mañana.', createdAt, updatedAt);
 
-    const insertPeriod = db.prepare('INSERT INTO study_schedule_periods (id,section,label,start_time,end_time,position) VALUES (?,?,?,?,?,?)');
-    insertPeriod.run(ID.scheduleMorning, 'morning', 'Primera hora', '09:00', '10:00', 0);
-    insertPeriod.run(ID.scheduleAfternoon, 'afternoon', 'Tarde', '16:00', '17:00', 0);
+    // Scoped to the demo year, so the sample timetable is the one Horarios opens on
+    // rather than sitting in the unscoped bucket nobody would think to look in.
+    const insertPeriod = db.prepare('INSERT INTO study_schedule_periods (id,section,label,start_time,end_time,position,academic_year_id) VALUES (?,?,?,?,?,?,?)');
+    insertPeriod.run(ID.scheduleMorning, 'morning', 'Primera hora', '09:00', '10:00', 0, ID.academicYear);
+    insertPeriod.run(ID.scheduleAfternoon, 'afternoon', 'Tarde', '16:00', '17:00', 0, ID.academicYear);
     const insertCell = db.prepare('INSERT INTO study_schedule_cells (day,period_id,subject_id) VALUES (?,?,?)');
     insertCell.run('monday', ID.scheduleMorning, ID.subjectCell);
     insertCell.run('wednesday', ID.scheduleMorning, ID.subjectEco);
@@ -353,6 +367,7 @@ export function clearStudyDemoData(): void {
       DELETE FROM study_folders WHERE id LIKE 'demo-study-%';
       DELETE FROM study_subjects WHERE id LIKE 'demo-study-%';
       DELETE FROM study_courses WHERE id LIKE 'demo-study-%';
+      DELETE FROM study_academic_years WHERE id LIKE 'demo-study-%';
     `);
   })();
   clearStudyAssistantDemoConversation();

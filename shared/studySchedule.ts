@@ -19,6 +19,12 @@ export interface StudyScheduleCell {
 }
 
 export interface StudySchedule {
+  /**
+   * The academic year this grid belongs to. `null` is the unscoped timetable —
+   * where vaults that predate academic years keep theirs, and where a user who
+   * never defines a year keeps working.
+   */
+  academicYearId: string | null;
   periods: StudySchedulePeriod[];
   cells: StudyScheduleCell[];
   dayColors: Record<StudyScheduleDay, string | null>;
