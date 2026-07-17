@@ -5303,5 +5303,31 @@ export const PT_BR: Record<string, string> = {
   'Todavía no has añadido nada.': 'Você ainda não adicionou nada.',
   '¿Quitar «{name}»?': 'Remover “{name}”?',
   'Restablecer ancho': 'Redefinir largura',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Ferramentas',
+  'Abrir Nodus Toolkit': 'Abrir o Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Utilitários locais para pesquisa, docência e estudo: converta e processe arquivos sem sair do Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Converta documentos, PDFs e imagens, com OCR leve e utilitários de texto, um a um ou em lote.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Apresente PDFs como slides, com visão do apresentador, notas do orador e anotações ao vivo.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'OCR assistido por IA para digitalizações difíceis, com revisão página a página e integração com os seus espaços.',
+  'En desarrollo': 'Em desenvolvimento',
+  'Volver a Herramientas': 'Voltar às Ferramentas',
+  'El conversor está en construcción.': 'O conversor está em construção.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Tudo será processado no seu computador, nada é enviado a nenhum serviço, e o arquivo original nunca é modificado.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'Utilitários de PDF: mesclar, dividir, girar, extrair páginas e imagens, metadados',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documentos: PDF, DOCX, EPUB, Markdown, HTML e texto',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'OCR leve local, com PDF pesquisável a partir de digitalizações',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Imagens: converter formato (incluindo HEIC), redimensionar e comprimir em lote',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Texto: limpar texto colado de PDF, maiúsculas/minúsculas, legendas e checksums',
 // <<END_PT_BR>>
 };

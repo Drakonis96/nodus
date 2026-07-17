@@ -5344,5 +5344,31 @@ export const FR: Record<string, string> = {
   'Todavía no has añadido nada.': 'Vous n’avez encore rien ajouté.',
   '¿Quitar «{name}»?': 'Retirer « {name} » ?',
   'Restablecer ancho': 'Réinitialiser la largeur',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Outils',
+  'Abrir Nodus Toolkit': 'Ouvrir Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Des utilitaires locaux pour la recherche, l’enseignement et l’étude : convertissez et traitez vos fichiers sans quitter Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Convertissez documents, PDF et images, avec OCR léger et utilitaires de texte, un par un ou par lots.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Présentez des PDF sous forme de diapositives, avec vue du présentateur, notes de l’orateur et annotations en direct.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'OCR assisté par IA pour les numérisations difficiles, avec révision page par page et intégration à vos espaces.',
+  'En desarrollo': 'En développement',
+  'Volver a Herramientas': 'Retour aux outils',
+  'El conversor está en construcción.': 'Le convertisseur est en construction.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Tout sera traité sur votre ordinateur, rien n’est envoyé à aucun service, et le fichier original n’est jamais modifié.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'Utilitaires PDF : fusionner, diviser, pivoter, extraire pages et images, métadonnées',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documents : PDF, DOCX, EPUB, Markdown, HTML et texte',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'OCR léger local, avec PDF interrogeable à partir de numérisations',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Images : convertir le format (y compris HEIC), redimensionner et compresser par lots',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Texte : nettoyer le texte collé depuis un PDF, casse, sous-titres et sommes de contrôle',
 // <<END_FR>>
 };

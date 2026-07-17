@@ -5580,5 +5580,31 @@ export const EN: Record<string, string> = {
   'Todavía no has añadido nada.': 'You have not added anything yet.',
   '¿Quitar «{name}»?': 'Remove “{name}”?',
   'Restablecer ancho': 'Reset width',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Tools',
+  'Abrir Nodus Toolkit': 'Open Nodus Toolkit',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Local utilities for research, teaching and study: convert and process files without leaving Nodus.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Convert documents, PDFs and images, with light OCR and text utilities, one at a time or in bulk.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Present PDFs as slides, with a presenter view, speaker notes and live annotations.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'AI-assisted OCR for difficult scans, with page-by-page review and integration with your vaults.',
+  'En desarrollo': 'In development',
+  'Volver a Herramientas': 'Back to Tools',
+  'El conversor está en construcción.': 'The converter is under construction.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Everything will be processed on your computer, nothing is uploaded to any service, and the original file is never modified.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'PDF utilities: merge, split, rotate, extract pages and images, metadata',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Documents: PDF, DOCX, EPUB, Markdown, HTML and plain text',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'Light local OCR, with searchable PDFs from scans',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Images: convert formats (including HEIC), resize and compress in bulk',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Text: clean PDF-pasted text, letter case, subtitles and checksums',
 // <<END_EN>>
 };
