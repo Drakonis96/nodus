@@ -5,7 +5,7 @@ import { NodiAvatar } from './NodiAvatar';
 import { Markdown } from '../Markdown';
 import { ModelPicker } from '../ModelPicker';
 import { Icon } from '../ui';
-import { setActiveLang, t, tx } from '../../i18n';
+import { errorText, setActiveLang, t, tr, tx } from '../../i18n';
 import './companion.css';
 
 /** Nodi wears a subtle accessory that reflects the active vault's mode. */
@@ -671,7 +671,7 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
       );
       assistantText = answer || assistantText;
     } catch (err) {
-      assistantText ||= `⚠️ ${err instanceof Error ? err.message : t('No se pudo responder.')}`;
+      assistantText ||= `⚠️ ${err instanceof Error ? errorText(err) : t('No se pudo responder.')}`;
     } finally {
       const finalMessages: NodiChatMessage[] = [...next, { role: 'assistant', content: assistantText }];
       setMessages(finalMessages);
@@ -753,8 +753,8 @@ export function NodiCompanion({ context, costumes }: { context: Ctx; costumes?: 
                   <div key={n.id} className={`nodi-ntf${n.read ? '' : ' unread'}`}>
                     <span className="nodi-ntf-dot" style={{ background: DOT[n.kind] }} />
                     <div style={{ minWidth: 0 }}>
-                      <div className="nodi-ntf-title">{n.title}</div>
-                      {n.body && <div className="nodi-ntf-body">{n.body}</div>}
+                      <div className="nodi-ntf-title">{tr(n.title)}</div>
+                      {n.body && <div className="nodi-ntf-body">{tr(n.body)}</div>}
                       <div className="nodi-ntf-time">{relTime(n.createdAt)}</div>
                     </div>
                   </div>

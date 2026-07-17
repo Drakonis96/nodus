@@ -1246,9 +1246,9 @@ export function Library({
                       : 'border-indigo-800/70 bg-indigo-950/30 text-indigo-200'
                   }`}
                   onClick={() => toggleStatusFlag(flag)}
-                  title={`${t('Quitar')} ${labelFor(flag)}`}
+                  title={`${t('Quitar')} ${t(labelFor(flag))}`}
                 >
-                  {labelFor(flag)} <Icon name="x" size={12} />
+                  {t(labelFor(flag))} <Icon name="x" size={12} />
                 </button>
               );
             })}

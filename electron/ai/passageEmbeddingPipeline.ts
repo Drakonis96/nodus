@@ -7,6 +7,7 @@ import { planRetrievalChunks, resolveWorkText } from '../extraction/textExtracto
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { embedMany } from './aiClient';
 import { addNotification } from '../notifications';
+import { uiText } from '@shared/uiLanguage';
 
 type ProgressListener = (progress: PassageEmbeddingProgress) => void;
 
@@ -197,10 +198,12 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
     state.running = false;
     emit();
     if (!state.stopRequested && state.totalPassages > 0) {
-      const english = getSettings().uiLanguage === 'en';
+      const language = getSettings().uiLanguage;
       addNotification({
-        title: state.error ? (english ? 'Text indexing needs attention' : 'La indexación de textos necesita atención') : (english ? 'Text index completed' : 'Índice de textos completado'),
-        body: state.error ? state.error : (english ? `${state.passagesEmbedded} passages indexed across ${state.works.length} work(s).` : `${state.passagesEmbedded} fragmentos indexados en ${state.works.length} obra(s).`),
+        title: state.error
+          ? uiText(language, { es: 'La indexación de textos necesita atención', en: 'Text indexing needs attention', fr: 'L’indexation des textes nécessite votre attention', de: 'Die Textindexierung erfordert Aufmerksamkeit', pt: 'A indexação de textos requer atenção', 'pt-BR': 'A indexação de textos requer atenção' })
+          : uiText(language, { es: 'Índice de textos completado', en: 'Text index completed', fr: 'Index des textes terminé', de: 'Textindex abgeschlossen', pt: 'Índice de textos concluído', 'pt-BR': 'Índice de textos concluído' }),
+        body: state.error ? state.error : uiText(language, { es: `${state.passagesEmbedded} fragmentos indexados en ${state.works.length} obra(s).`, en: `${state.passagesEmbedded} passages indexed across ${state.works.length} work(s).`, fr: `${state.passagesEmbedded} passages indexés dans ${state.works.length} œuvre(s).`, de: `${state.passagesEmbedded} Passagen in ${state.works.length} Werk(en) indexiert.`, pt: `${state.passagesEmbedded} passagens indexadas em ${state.works.length} obra(s).`, 'pt-BR': `${state.passagesEmbedded} trechos indexados em ${state.works.length} obra(s).` }),
         kind: state.error ? 'warning' : 'success',
         dedupeKey: `passage-embeddings:${state.error ? 'error' : 'complete'}`,
       });

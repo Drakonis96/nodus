@@ -458,7 +458,7 @@ app.whenReady().then(() => {
   if (settings.mcpEnabled) void startMcpServer();
   if (settings.copilotEnabled) void startCopilotServer();
   // Nodi mascot: open the always-on-top desktop window when the user has opted into it.
-  seedWelcomeNotification();
+  seedWelcomeNotification(settings.uiLanguage);
   startStudyCalendarReminders();
   applyMascotWindow();
   setupAutoUpdates();

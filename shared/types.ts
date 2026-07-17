@@ -2694,6 +2694,7 @@ export interface ReadingPathEntry {
   relatedGaps: string[];
   relatedIdeas: string[];
   connectedAuthors: string[];
+  citedBy: number;
   reason: string;
 }
 

@@ -133,15 +133,23 @@ export function ReadingPathView({
         </div>
       )}
 
-      {plan && <p className="text-sm text-neutral-400 mb-4">{plan.summary}</p>}
+      {plan && (
+        <p className="text-sm text-neutral-400 mb-4">
+          {tx('Ruta optimizada por {strategy}: {shown} lecturas priorizadas de {total} obras, agrupadas en fases manejables.', {
+            strategy: t(STRATEGY_LABELS[plan.strategy]),
+            shown: plan.shownWorks,
+            total: plan.totalWorks,
+          })}
+        </p>
+      )}
 
       <div className="space-y-7">
         {phases.map((phase) => (
           <section key={phase.id}>
             <div className="flex flex-wrap items-end gap-2 mb-2">
               <div>
-                <h2 className="text-base font-semibold">{phase.title}</h2>
-                <p className="text-xs text-neutral-500">{phase.objective}</p>
+                <h2 className="text-base font-semibold">{t(phase.title)}</h2>
+                <p className="text-xs text-neutral-500">{t(phase.objective)}</p>
               </div>
               <div className="flex-1" />
               <Badge>{phase.entries.length}/{phase.totalCandidates}</Badge>
@@ -221,7 +229,7 @@ function ReadingEntryCard({
           {entry.analysis.gapCount > 0 && <Badge color="amber">{tx('{n} huecos', { n: entry.analysis.gapCount })}</Badge>}
           {entry.bridgeScore >= 0.45 && <Badge color="indigo">{t('puente')}</Badge>}
         </div>
-        <p className="text-xs text-neutral-400 mt-2 line-clamp-2">{entry.reason}</p>
+        <p className="text-xs text-neutral-400 mt-2 line-clamp-2">{localizedReadingReason(entry)}</p>
         {entry.orientationSummary && (
           <p className="text-[11px] text-neutral-500 mt-1 line-clamp-2">
             <span className="text-neutral-400">{t('Resumen (orientación):')} </span>{entry.orientationSummary}
@@ -247,7 +255,7 @@ function ReadingEntryCard({
                 selection: ASSISTANT_CONTEXTS.reading,
                 prompt:
                   `${t('Usa esta lectura de la ruta como punto de partida. Explica por qué es prioritaria, qué ideas/huecos conecta y qué debería leer después.')}\n\n` +
-                  `${entry.title}\n${entry.reason}`,
+                  `${entry.title}\n${localizedReadingReason(entry)}`,
               })
             }
           >
@@ -260,6 +268,29 @@ function ReadingEntryCard({
       </div>
     </div>
   );
+}
+
+function localizedReadingReason(entry: ReadingPathEntry): string {
+  const parts: string[] = [];
+  parts.push(entry.read ? t('Marcada como leída por la etiqueta de Zotero.') : t('Pendiente de lectura.'));
+  if (entry.analysis.hasIdeas) parts.push(tx('{n} idea(s) extraída(s).', { n: entry.analysis.ideaCount }));
+  if (entry.analysis.hasThemes) parts.push(tx('{n} tema(s) detectado(s).', { n: entry.analysis.themeCount }));
+  if (entry.analysis.hasContradictions) parts.push(tx('{n} contradicción(es) o refutación(es).', { n: entry.analysis.contradictionCount }));
+  if (entry.analysis.hasGaps) parts.push(tx('{n} hueco(s) asociado(s).', { n: entry.analysis.gapCount }));
+  if (entry.relatedGaps.length > 0 || entry.gapScore >= 0.2) parts.push(t('Alta conexión con huecos de investigación.'));
+  if (entry.foundationalScore >= 0.45) {
+    parts.push(entry.citedBy > 0
+      ? tx('Posible texto de base ({n} cita(s) internas aproximadas).', { n: entry.citedBy })
+      : t('Posible texto de base.'));
+  }
+  if (entry.bridgeScore >= 0.45) parts.push(t('Conecta varias líneas temáticas o relaciones del grafo.'));
+  if (entry.authorConnectivityScore >= 0.45) parts.push(t('Autoría conectada con otros nodos del corpus.'));
+  if (entry.recencyScore >= 0.72) parts.push(t('Aporta actualización reciente.'));
+  if (entry.interestScore >= 0.4) parts.push(t('Coincide con las prioridades indicadas.'));
+  if (entry.analysis.lightStatus !== 'done' || entry.analysis.deepStatus !== 'done' || !entry.analysis.hasIdeas) {
+    parts.push(t('Conviene completar análisis antes de decidir su papel en el mapa.'));
+  }
+  return parts.join(' ');
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

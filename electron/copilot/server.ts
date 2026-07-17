@@ -148,7 +148,7 @@ async function serveAddin(req: IncomingMessage, res: ServerResponse, urlPath: st
         .toString('utf8')
         .replace(/__COPILOT_TOKEN__/g, ensureToken())
         .replace(/__COPILOT_PORT__/g, String(port))
-        .replace(/__COPILOT_LANG__/g, getSettings().uiLanguage === 'en' ? 'en' : 'es');
+        .replace(/__COPILOT_LANG__/g, getSettings().uiLanguage === 'es' ? 'es' : 'en');
     }
     res.writeHead(200, { 'Content-Type': STATIC_TYPES[ext] ?? 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(body);

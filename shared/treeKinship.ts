@@ -296,12 +296,12 @@ export interface TreeKinshipInput {
   persons?: TreePersonAttr[];
 }
 
-/** Falls back <lang> → EN → ES, like the renderer's `t()`. */
+/** Falls back <lang> → EN, like the renderer's `t()`. */
 export function treeKinshipLabel(context: TreeKinshipContext, language: AppLanguage = 'es'): string {
   // A generated label describes this exact path, so prefer it in any language over
   // the role's generic label ("Descendiente") — that is why it wins the lookup.
   const generated = context.labels;
-  if (generated) return generated[language] ?? generated.en ?? generated.es ?? TREE_KINSHIP_ROLE_LABEL_EN[context.role];
+  if (generated) return generated[language] ?? generated.en ?? TREE_KINSHIP_ROLE_LABEL_EN[context.role];
   return (TREE_KINSHIP_ROLE_LABELS[language] ?? TREE_KINSHIP_ROLE_LABEL_EN)[context.role]
     ?? TREE_KINSHIP_ROLE_LABEL_EN[context.role];
 }

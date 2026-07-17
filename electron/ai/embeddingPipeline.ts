@@ -12,6 +12,7 @@ import { allWorkSummaryRows, clearAllWorkSummaryEmbeddings, summaryNeedsEmbeddin
 import { embed } from './aiClient';
 import { clearAllPassages } from '../db/passagesRepo';
 import { addNotification } from '../notifications';
+import { uiText } from '@shared/uiLanguage';
 import { getSettings } from '../db/settingsRepo';
 
 type ProgressListener = (p: EmbeddingPipelineProgress) => void;
@@ -270,10 +271,12 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
     state.running = false;
     emit();
     if (!state.stopRequested && state.totalIdeas > 0) {
-      const english = getSettings().uiLanguage === 'en';
+      const language = getSettings().uiLanguage;
       addNotification({
-        title: state.error ? (english ? 'Semantic indexing needs attention' : 'La indexación semántica necesita atención') : (english ? 'Idea embeddings completed' : 'Embeddings de ideas completados'),
-        body: state.error ? state.error : (english ? `${state.ideasEmbedded} ideas indexed across ${state.works.length} work(s).` : `${state.ideasEmbedded} ideas indexadas en ${state.works.length} obra(s).`),
+        title: state.error
+          ? uiText(language, { es: 'La indexación semántica necesita atención', en: 'Semantic indexing needs attention', fr: 'L’indexation sémantique nécessite votre attention', de: 'Die semantische Indexierung erfordert Aufmerksamkeit', pt: 'A indexação semântica requer atenção', 'pt-BR': 'A indexação semântica requer atenção' })
+          : uiText(language, { es: 'Embeddings de ideas completados', en: 'Idea embeddings completed', fr: 'Embeddings d’idées terminés', de: 'Ideen-Embeddings abgeschlossen', pt: 'Embeddings de ideias concluídos', 'pt-BR': 'Embeddings de ideias concluídos' }),
+        body: state.error ? state.error : uiText(language, { es: `${state.ideasEmbedded} ideas indexadas en ${state.works.length} obra(s).`, en: `${state.ideasEmbedded} ideas indexed across ${state.works.length} work(s).`, fr: `${state.ideasEmbedded} idées indexées dans ${state.works.length} œuvre(s).`, de: `${state.ideasEmbedded} Ideen in ${state.works.length} Werk(en) indexiert.`, pt: `${state.ideasEmbedded} ideias indexadas em ${state.works.length} obra(s).`, 'pt-BR': `${state.ideasEmbedded} ideias indexadas em ${state.works.length} obra(s).` }),
         kind: state.error ? 'warning' : 'success',
         dedupeKey: `idea-embeddings:${state.error ? 'error' : 'complete'}`,
       });
