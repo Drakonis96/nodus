@@ -99,10 +99,11 @@ test('the hub renders three tools and only Nodus Convert can be opened', async (
   // Honesty: the two unbuilt tools are inert, and the convert page never claims
   // to convert anything yet.
   assert.equal((view.match(/state="soon"/g) ?? []).length, 2, 'presenter and OCR workspace are marked coming soon');
-  assert.equal((view.match(/state="wip"/g) ?? []).length, 1, 'only Nodus Convert is in development');
+  assert.equal((view.match(/state="wip"/g) ?? []).length, 1, 'only Nodus Convert is openable');
   assert.match(view, /const disabled = state === 'soon'/);
   assert.match(view, /onClick=\{disabled \? undefined : onOpen\}/, 'a coming-soon card has no click handler');
-  assert.match(view, /El conversor está en construcción\./);
+  // The convert card now opens the real converter, not a placeholder.
+  assert.match(view, /<ToolkitConvertView onBack=/, 'Nodus Convert renders the functional converter');
 });
 
 test('the hub cards share one shape: equal size, centred icons, pinned badges', async () => {
@@ -118,10 +119,16 @@ test('the hub cards share one shape: equal size, centred icons, pinned badges', 
 });
 
 test('a tool page returns to the hub and keeps the header action row uniform', async () => {
-  const [view, app] = await Promise.all([read('src/views/ToolkitView.tsx'), read('src/App.tsx')]);
-  assert.ok(view.includes('data-testid="toolkit-back"'), 'the back control exists');
-  assert.match(view, /<Icon name="chevronLeft"/, 'back uses the shared chevron icon');
-  assert.match(view, /aria-label=\{t\('Volver a Herramientas'\)\}/, 'the back control is labelled for screen readers');
+  const [view, convert, app] = await Promise.all([
+    read('src/views/ToolkitView.tsx'),
+    read('src/views/ToolkitConvertView.tsx'),
+    read('src/App.tsx'),
+  ]);
+  // The convert workspace owns its own back-to-hub control.
+  assert.ok(convert.includes('data-testid="toolkit-back"'), 'the back control exists');
+  assert.match(convert, /<Icon name="chevronLeft"/, 'back uses the shared chevron icon');
+  assert.match(convert, /aria-label=\{t\('Volver a Herramientas'\)\}/, 'the back control is labelled for screen readers');
+  assert.match(view, /onBack=\{\(\) => setPage\('home'\)\}/, 'the hub passes a back handler to the tool');
   // Header actions are icon-only buttons of one height; the toolkit must not be
   // the odd one out.
   assert.match(app, /icon="tools"\n\s+label=\{t\('Herramientas'\)\}/, 'the header exposes the toolkit');
@@ -130,11 +137,14 @@ test('a tool page returns to the hub and keeps the header action row uniform', a
   assert.match(app, /const ToolkitView = lazy\(/, 'the view is code-split like its siblings');
 });
 
-test('Nodi documents the toolkit without promising unbuilt features', async () => {
+test('Nodi documents the toolkit with its real, honest state', async () => {
   const docs = await read('shared/nodiDocumentation.ts');
   assert.match(docs, /## Herramientas \(Nodus Toolkit\)/);
-  assert.match(docs, /ninguna procesa archivos todavía/, 'the guide states the real state');
-  assert.match(docs, /No lo describas como disponible/, 'the guide forbids claiming availability');
+  // Nodus Convert is functional now; the guide says so and stays honest about the
+  // two tools still to come.
+  assert.match(docs, /Nodus Convert ya funciona/, 'the guide states Convert works');
+  assert.match(docs, /PDF Presenter y OCR Workspace .*«Próximamente»/, 'the guide keeps the other two as coming soon');
+  assert.match(docs, /determinista y 100 % offline/, 'the guide states the privacy/offline principle');
   // The roadmap line must no longer list the Toolkit as merely planned.
   assert.ok(
     !/El roadmap también contempla Nodus Toolkit/.test(docs),

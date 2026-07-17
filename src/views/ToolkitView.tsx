@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
+import { ToolkitConvertView } from './ToolkitConvertView';
 
 type ToolkitPage = 'home' | 'convert';
 
@@ -61,68 +62,6 @@ function ToolCard({ testid, icon, name, description, state, onOpen }: ToolCardPr
   );
 }
 
-/** Cabecera de una herramienta: volver al hub + identidad de la herramienta. */
-function ToolHeader({ icon, name, subtitle, onBack }: { icon: string; name: string; subtitle: string; onBack: () => void }) {
-  return (
-    <header className="flex items-center gap-3">
-      <button
-        data-testid="toolkit-back"
-        className="btn btn-ghost h-9 min-h-9 justify-center px-2.5 py-0 leading-none"
-        onClick={onBack}
-        title={t('Volver a Herramientas')}
-        aria-label={t('Volver a Herramientas')}
-      >
-        <Icon name="chevronLeft" className="shrink-0" />
-      </button>
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-        <Icon name={icon} size={20} />
-      </span>
-      <div className="min-w-0">
-        <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{name}</h1>
-        <p className="text-sm text-neutral-500">{subtitle}</p>
-      </div>
-    </header>
-  );
-}
-
-function ConvertPage({ onBack }: { onBack: () => void }) {
-  // Categorías previstas del conversor; se muestran como avance honesto de lo
-  // que llegará por fases (ver design/nodus-toolkit-plan.md, F2–F6).
-  const upcoming: Array<{ icon: string; label: string }> = [
-    { icon: 'copy', label: t('Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos') },
-    { icon: 'book', label: t('Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto') },
-    { icon: 'scanText', label: t('OCR ligero local, con PDF buscable a partir de escaneados') },
-    { icon: 'image', label: t('Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote') },
-    { icon: 'edit', label: t('Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums') },
-  ];
-  return (
-    <div data-testid="toolkit-convert-page" className="mx-auto max-w-3xl space-y-6">
-      <ToolHeader
-        icon="swap"
-        name="Nodus Convert"
-        subtitle={t('Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.')}
-        onBack={onBack}
-      />
-      <section className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/40">
-        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('El conversor está en construcción.')}</p>
-        <p className="mt-1 text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-          {t('Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.')}
-        </p>
-        <ul className="mt-4 flex flex-col gap-2.5">
-          {upcoming.map((item) => (
-            <li key={item.icon} className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                <Icon name={item.icon} size={13} />
-              </span>
-              <span className="leading-relaxed">{item.label}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
-}
-
 export function ToolkitView() {
   const [page, setPageState] = useState<ToolkitPage>(lastToolkitPage);
   const setPage = (next: ToolkitPage) => {
@@ -133,7 +72,7 @@ export function ToolkitView() {
   return (
     <div className="h-full overflow-y-auto px-6 py-6 max-md:px-4">
       {page === 'convert' ? (
-        <ConvertPage onBack={() => setPage('home')} />
+        <ToolkitConvertView onBack={() => setPage('home')} />
       ) : (
         <div data-testid="toolkit-home" className="mx-auto max-w-5xl space-y-6">
           <header className="flex items-start gap-3">

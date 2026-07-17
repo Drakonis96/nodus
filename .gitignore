@@ -39,3 +39,6 @@ __pycache__/
 
 # Locally generated analysis reports
 reports/
+
+# Nodus Toolkit test caches (Tesseract traineddata, etc.)
+scripts/.cache/

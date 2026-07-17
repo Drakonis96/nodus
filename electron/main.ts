@@ -410,6 +410,11 @@ function setupAutoUpdates(): void {
 
 app.whenReady().then(() => {
   restorePersistedDockIcon();
+  // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
+  // opt-in network call), so downloads persist across sessions in userData.
+  if (!process.env.NODUS_TESSDATA_CACHE) {
+    process.env.NODUS_TESSDATA_CACHE = path.join(app.getPath('userData'), 'tessdata');
+  }
   getDb(); // open + migrate before anything touches data
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.

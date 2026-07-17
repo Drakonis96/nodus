@@ -155,6 +155,9 @@ import type {
 // alias for a runtime value import.
 const MANUAL_IDEA_MARKER = 'manual-idea';
 import { getSettings, updateSettings } from './db/settingsRepo';
+import { runToolkitJob, type ToolkitSignal } from './toolkit/toolkitJobs';
+import { TOOLKIT_REGISTRY } from './toolkit/convert';
+import type { ToolkitJobRequest } from '@shared/toolkitTypes';
 import { localizeIpcPayload, localizeRuntimeError } from '@shared/uiLanguage';
 import { getMcpStatus, regenerateMcpToken, restartMcpServer, startMcpServer, stopMcpServer } from './mcp';
 import { getCopilotStatus, regenerateCopilotToken, restartCopilotServer, startCopilotServer, stopCopilotServer } from './copilot/server';
@@ -3098,6 +3101,56 @@ export function registerIpc(
   // app.dock. No-op (and never throws) on Windows/Linux.
   h('dock:setIcon', async (_e, pngDataUrl: string) => {
     setPersistentDockIcon(pngDataUrl);
+  });
+
+  // ── Nodus Toolkit (Convert) ─────────────────────────────────────────────────
+  // The job runs in main and streams a progress snapshot back per state change;
+  // the renderer's background-jobs store keeps it alive across navigation. Each
+  // in-flight job holds a cancellation flag keyed by its jobId.
+  const toolkitSignals = new Map<string, ToolkitSignal>();
+  h('toolkit:job:run', async (e, jobId: string, request: ToolkitJobRequest) => {
+    const signal: ToolkitSignal = { cancelled: false };
+    toolkitSignals.set(jobId, signal);
+    try {
+      const result = await runToolkitJob(jobId, request, TOOLKIT_REGISTRY, {
+        signal,
+        onProgress: (progress) => e.sender.send('toolkit:job:event', jobId, progress),
+      });
+      if (request.openFolderOnDone && !result.cancelled) {
+        const firstOutput = result.files.flatMap((f) => f.outputPaths)[0];
+        if (firstOutput) shell.showItemInFolder(firstOutput);
+      }
+      return result;
+    } finally {
+      toolkitSignals.delete(jobId);
+    }
+  });
+  h('toolkit:job:cancel', async (_e, jobId: string) => {
+    const signal = toolkitSignals.get(jobId);
+    if (signal) signal.cancelled = true;
+  });
+  h('toolkit:pickFiles', async (e, extensions: string[]) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const filters = extensions.length
+      ? [{ name: 'Archivos compatibles', extensions }]
+      : [{ name: 'Todos los archivos', extensions: ['*'] }];
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Añadir archivos',
+      properties: ['openFile', 'multiSelections'],
+      filters,
+    });
+    return picked.canceled ? [] : picked.filePaths;
+  });
+  h('toolkit:pickOutputDir', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const picked = await dialog.showOpenDialog(win ?? undefined!, {
+      title: 'Carpeta de salida',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return picked.canceled || picked.filePaths.length === 0 ? null : picked.filePaths[0];
+  });
+  h('toolkit:showInFolder', async (_e, filePath: string) => {
+    shell.showItemInFolder(filePath);
   });
 
   // Stream queue progress to the renderer.

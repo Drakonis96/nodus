@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "2.3.8",
+  "version": "2.4.0",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": "Nodus",
   "license": "MIT",
@@ -16,6 +16,7 @@
     "verify:study-whisper": "node scripts/verify-study-whisper.mjs",
     "verify:study-improve-local": "node scripts/verify-study-improve-local.mjs",
     "verify:api-key-recovery-macos": "node scripts/verify-api-key-recovery-macos.mjs",
+    "verify:toolkit-heic": "node scripts/verify-toolkit-heic.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
     "lint": "eslint . --ext .ts,.tsx",
     "icons": "node scripts/generate-icons.mjs",
@@ -53,6 +54,7 @@
     "graphology": "^0.26.0",
     "graphology-communities-louvain": "^2.0.2",
     "graphology-layout-forceatlas2": "^0.10.1",
+    "heic-decode": "^2.1.0",
     "jsonrepair": "^3.14.0",
     "katex": "^0.17.0",
     "kokoro-js": "^1.2.1",

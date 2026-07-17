@@ -1,8 +1,29 @@
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 
+// Type-only re-export of the Nodus Toolkit type surface, so NodusApi (and callers
+// that import from '@shared/types') get the toolkit types from one place. The
+// runtime catalogue (TOOLKIT_OPS, toolkitOp, …) is imported directly from
+// '@shared/toolkitTypes' to preserve this file's no-runtime-import rule.
+export type {
+  ToolkitCategory,
+  ToolkitOpId,
+  ToolkitOutput,
+  ToolkitOptionType,
+  ToolkitOptionField,
+  ToolkitArity,
+  ToolkitOp,
+  ToolkitProduced,
+  ToolkitFileStatus,
+  ToolkitFileProgress,
+  ToolkitJobRequest,
+  ToolkitJobProgress,
+  ToolkitJobResult,
+} from './toolkitTypes';
+
 // Type-only import (erased at compile time) — keeps the no-runtime-import rule intact.
 import type { VaultType } from './vaultTypes';
+import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from './toolkitTypes';
 import type { CsvImportPlanData } from './databaseCsv';
 import type { BulkAttachOptions } from './databaseBulk';
 import type {
@@ -1220,6 +1241,13 @@ export interface AppSettings {
   ocrEnabled: boolean;
   ocrLanguages: string;
   ocrMaxPages: number;
+  // Nodus Toolkit (Convert). No DB schema; plain JSON settings.
+  /** Tesseract languages the Toolkit's OCR operations use, e.g. "spa+eng". */
+  toolkitOcrLanguages: string;
+  /** Destination folder for Toolkit outputs; null = write beside each original. */
+  toolkitOutputDir: string | null;
+  /** Open the destination folder when a Toolkit job finishes. */
+  toolkitOpenFolderOnDone: boolean;
   // Deep scan chunking strategy. Standard preserves the legacy chunk size.
   deepContextMode: DeepContextMode;
   deepStandardChunkWords: number;
@@ -5756,6 +5784,21 @@ export interface NodusApi {
 
   // macOS dock icon (dynamic: follows theme + active vault). No-op elsewhere.
   setDockIcon(pngDataUrl: string): Promise<void>;
+
+  // Nodus Toolkit — local, deterministic file conversion. The job runs in main
+  // and streams progress back; it survives navigation because the renderer's
+  // background-jobs store re-subscribes. Cancellation is by jobId.
+  runToolkitJob(
+    request: ToolkitJobRequest,
+    handlers: { onProgress: (progress: ToolkitJobProgress) => void },
+  ): Promise<ToolkitJobResult>;
+  cancelToolkitJob(jobId: string): Promise<void>;
+  /** Open a file picker limited to the given extensions (empty = any file). */
+  pickToolkitFiles(extensions: string[]): Promise<string[]>;
+  /** Pick a destination folder; null when cancelled. */
+  pickToolkitOutputDir(): Promise<string | null>;
+  /** Reveal a produced file in the OS file manager. */
+  revealToolkitOutput(filePath: string): Promise<void>;
 }
 
 export interface WorkFilter {

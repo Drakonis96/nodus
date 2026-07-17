@@ -22,6 +22,7 @@ const mainExternals = [
   'adm-zip',
   'tesseract.js',
   '@napi-rs/canvas',
+  'heic-decode',
   '@anthropic-ai/sdk',
   '@google/genai',
   '@huggingface/transformers',

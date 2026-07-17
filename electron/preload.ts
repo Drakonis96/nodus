@@ -1056,6 +1056,25 @@ const api: NodusApi = {
   },
 
   setDockIcon: (pngDataUrl) => ipcRenderer.invoke('dock:setIcon', pngDataUrl),
+
+  // Nodus Toolkit (Convert). Progress is pushed on 'toolkit:job:event' filtered
+  // by a per-run jobId, mirroring the Nodi chat-stream pattern.
+  runToolkitJob: async (request, handlers) => {
+    const jobId = `toolkit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onEvent = (_e: unknown, id: string, progress: Parameters<typeof handlers.onProgress>[0]) => {
+      if (id === jobId) handlers.onProgress(progress);
+    };
+    ipcRenderer.on('toolkit:job:event', onEvent);
+    try {
+      return await ipcRenderer.invoke('toolkit:job:run', jobId, request);
+    } finally {
+      ipcRenderer.removeListener('toolkit:job:event', onEvent);
+    }
+  },
+  cancelToolkitJob: (jobId) => ipcRenderer.invoke('toolkit:job:cancel', jobId).then(() => undefined),
+  pickToolkitFiles: (extensions) => ipcRenderer.invoke('toolkit:pickFiles', extensions),
+  pickToolkitOutputDir: () => ipcRenderer.invoke('toolkit:pickOutputDir'),
+  revealToolkitOutput: (filePath) => ipcRenderer.invoke('toolkit:showInFolder', filePath).then(() => undefined),
 };
 
 contextBridge.exposeInMainWorld('nodus', api);
