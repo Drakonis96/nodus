@@ -5333,5 +5333,31 @@ export const DE: Record<string, string> = {
   'Todavía no has añadido nada.': 'Du hast noch nichts hinzugefügt.',
   '¿Quitar «{name}»?': '„{name}“ entfernen?',
   'Restablecer ancho': 'Breite zurücksetzen',
+  // ── Nodus Toolkit (Herramientas hub) ───────────────────────────────────────
+  'Herramientas': 'Werkzeuge',
+  'Abrir Nodus Toolkit': 'Nodus Toolkit öffnen',
+  'Utilidades locales para investigación, docencia y estudio: convierte y procesa archivos sin salir de Nodus.':
+    'Lokale Werkzeuge für Forschung, Lehre und Studium: Dateien konvertieren und verarbeiten, ohne Nodus zu verlassen.',
+  'Convierte documentos, PDF e imágenes, con OCR ligero y utilidades de texto, de uno en uno o en lote.':
+    'Konvertiert Dokumente, PDFs und Bilder, mit leichter OCR und Textwerkzeugen, einzeln oder im Stapel.',
+  'Presenta PDFs como diapositivas, con vista del presentador, notas del orador y anotaciones en directo.':
+    'Präsentiert PDFs als Folien, mit Referentenansicht, Vortragsnotizen und Live-Anmerkungen.',
+  'OCR asistido por IA para escaneados difíciles, con revisión página a página e integración con tus bóvedas.':
+    'KI-gestützte OCR für schwierige Scans, mit seitenweiser Durchsicht und Integration in Ihre Arbeitsbereiche.',
+  'En desarrollo': 'In Entwicklung',
+  'Volver a Herramientas': 'Zurück zu den Werkzeugen',
+  'El conversor está en construcción.': 'Der Konverter befindet sich im Aufbau.',
+  'Todo se procesará en tu equipo, sin subir nada a ningún servicio, y nunca se modificará el archivo original.':
+    'Alles wird auf Ihrem Rechner verarbeitet, nichts wird an einen Dienst hochgeladen, und die Originaldatei wird nie verändert.',
+  'Utilidades PDF: unir, dividir, rotar, extraer páginas e imágenes, metadatos':
+    'PDF-Werkzeuge: zusammenführen, teilen, drehen, Seiten und Bilder extrahieren, Metadaten',
+  'Documentos: PDF, DOCX, EPUB, Markdown, HTML y texto':
+    'Dokumente: PDF, DOCX, EPUB, Markdown, HTML und Text',
+  'OCR ligero local, con PDF buscable a partir de escaneados':
+    'Leichte lokale OCR, mit durchsuchbaren PDFs aus Scans',
+  'Imágenes: convertir formato (incluido HEIC), redimensionar y comprimir en lote':
+    'Bilder: Format konvertieren (auch HEIC), skalieren und im Stapel komprimieren',
+  'Texto: limpiar texto pegado de PDF, mayúsculas, subtítulos y checksums':
+    'Text: aus PDF eingefügten Text bereinigen, Groß-/Kleinschreibung, Untertitel und Prüfsummen',
 // <<END_DE>>
 };

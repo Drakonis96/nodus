@@ -1,13 +1,13 @@
 import type { CorpusHealthBucketId, ResearchContextSelection } from '@shared/types';
 
-export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'settings';
+export type View = 'home' | 'search' | 'library' | 'graph' | 'argument' | 'ideas' | 'authors' | 'persons' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
 /** Sidebar section groups, in render order. Home and Settings are pinned outside
  * any group (first/last); every other section belongs to exactly one group.
  * Reordering (in Settings) happens within a group. */
-export type NavGroupId = 'explore' | 'analyze' | 'create';
+export type NavGroupId = 'explore' | 'analyze' | 'create' | 'tools';
 
 export interface NavItem {
   id: View;
@@ -26,6 +26,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
   { id: 'explore', label: 'Explorar' },
   { id: 'analyze', label: 'Analizar' },
   { id: 'create', label: 'Escribir' },
+  { id: 'tools', label: 'Herramientas' },
 ];
 
 // Canonical sidebar sections in their default order, grouped. Home is always
@@ -81,6 +82,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'writing', label: 'Escritura', icon: 'edit', group: 'create' },
   { id: 'projects', label: 'Proyectos', icon: 'folder', group: 'create' },
   { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },
+  // Herramientas — el hub del Nodus Toolkit (conversión y proceso de archivos).
+  // Vista universal: disponible en todos los tipos de vault.
+  { id: 'toolkit', label: 'Nodus Toolkit', icon: 'tools', group: 'tools' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 

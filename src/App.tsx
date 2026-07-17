@@ -83,6 +83,7 @@ const RelationsView = lazy(() => import('./views/RelationsView').then((module) =
 const MapView = lazy(() => import('./views/MapView').then((module) => ({ default: module.MapView })));
 const ArchiveView = lazy(() => import('./views/ArchiveView').then((module) => ({ default: module.ArchiveView })));
 const ImmersionView = lazy(() => import('./views/ImmersionView').then((module) => ({ default: module.ImmersionView })));
+const ToolkitView = lazy(() => import('./views/ToolkitView').then((module) => ({ default: module.ToolkitView })));
 const Settings = lazy(() => import('./views/Settings').then((module) => ({ default: module.Settings })));
 const CollectionsModal = lazy(() => import('./views/CollectionsModal').then((module) => ({ default: module.CollectionsModal })));
 const ResearchAssistantModal = lazy(() => import('./views/ResearchAssistantModal').then((module) => ({ default: module.ResearchAssistantModal })));
@@ -875,6 +876,13 @@ export function App() {
             title={(settings.chatModel ?? settings.synthesisModel) ? t('Abrir asistente de investigación') : t('Configura un modelo de IA')}
             onClick={() => openAssistant()}
           />
+          <HeaderAction
+            dataTour="toolkit"
+            icon="tools"
+            label={t('Herramientas')}
+            title={t('Abrir Nodus Toolkit')}
+            onClick={() => setView('toolkit')}
+          />
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
               académicas; genealogía y bases de datos no sincronizan con Zotero. */}
           {!isGenealogy && !isDatabases && !isEstudio && (
@@ -1274,6 +1282,7 @@ export function App() {
           {view === 'notes' && (
             <NotesView onOpenGraph={(target) => navigate('graph', target)} focusNote={noteTarget} />
           )}
+          {view === 'toolkit' && <ToolkitView />}
           {view === 'settings' && (
             <Settings
               settings={settings}

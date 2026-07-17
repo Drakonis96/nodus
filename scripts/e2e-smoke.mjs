@@ -449,6 +449,57 @@ try {
   await page.locator('button[title="Cerrar"]').click();
   console.log('[e2e] header has no global model selector');
 
+  // ── Nodus Toolkit: hub geometry, tool navigation and the way back ──────────
+  // The hub's promise is three cards that read as one set, so the sizes are
+  // measured on the real rendered shell rather than trusted from the classes.
+  await page.locator('[data-tour="toolkit"]').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
+  const toolCards = ['toolkit-card-convert', 'toolkit-card-presenter', 'toolkit-card-aiocr'];
+  const cardBoxes = [];
+  for (const testId of toolCards) {
+    const box = await page.getByTestId(testId).boundingBox();
+    assert.ok(box, `${testId} is visible in the hub`);
+    cardBoxes.push({ testId, ...box });
+  }
+  assert.equal(
+    new Set(cardBoxes.map((b) => `${Math.round(b.width)}x${Math.round(b.height)}`)).size,
+    1,
+    `every toolkit card has the same dimensions: ${cardBoxes.map((b) => `${b.testId} ${Math.round(b.width)}x${Math.round(b.height)}`).join(', ')}`
+  );
+  assert.equal(new Set(cardBoxes.map((b) => Math.round(b.y))).size, 1, 'the cards share one baseline row');
+  // Each card's icon tile is square and its glyph sits dead centre in it.
+  for (const testId of toolCards) {
+    const centring = await page.getByTestId(testId).evaluate((card) => {
+      const tile = card.querySelector('span');
+      const glyph = tile?.querySelector('svg');
+      if (!tile || !glyph) return null;
+      const t = tile.getBoundingClientRect();
+      const g = glyph.getBoundingClientRect();
+      return {
+        square: Math.round(t.width) === Math.round(t.height),
+        dx: Math.abs((t.left + t.width / 2) - (g.left + g.width / 2)),
+        dy: Math.abs((t.top + t.height / 2) - (g.top + g.height / 2)),
+      };
+    });
+    assert.ok(centring, `${testId} renders an icon tile`);
+    assert.equal(centring.square, true, `${testId} icon tile is square`);
+    assert.ok(centring.dx <= 0.5 && centring.dy <= 0.5, `${testId} icon is centred (dx ${centring.dx}, dy ${centring.dy})`);
+  }
+  // The two unbuilt tools must be inert, not dead ends: clicking does nothing.
+  for (const testId of ['toolkit-card-presenter', 'toolkit-card-aiocr']) {
+    assert.equal(await page.getByTestId(testId).isDisabled(), true, `${testId} is not openable yet`);
+  }
+  await page.getByTestId('toolkit-card-presenter').click({ force: true });
+  assert.equal(await page.getByTestId('toolkit-home').count(), 1, 'a coming-soon card never navigates away from the hub');
+  // Nodus Convert opens and hands back a way home.
+  await page.getByTestId('toolkit-card-convert').click();
+  await page.getByTestId('toolkit-convert-page').waitFor({ timeout: 10_000 });
+  await page.getByText('El conversor está en construcción.', { exact: true }).waitFor();
+  await page.getByTestId('toolkit-back').click();
+  await page.getByTestId('toolkit-home').waitFor({ timeout: 10_000 });
+  assert.equal(await page.getByTestId('toolkit-convert-page').count(), 0, 'back returns to the hub');
+  console.log('[e2e] toolkit hub: equal cards, centred icons, inert coming-soon tools and a way back');
+
   // ── Search result: an idea reuses the Ideas section's detail modal ─────────
   assert.equal(await page.evaluate(() => window.nodus.seedDemoData()), true, 'demo corpus seeded for search smoke');
   await page.reload();

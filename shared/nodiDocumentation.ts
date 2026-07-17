@@ -32,7 +32,8 @@ export const NODUS_DOCUMENTATION = `# Guía interna verificable de Nodus
 - Las claves de proveedores se configuran en Ajustes > Proveedores. Los modelos favoritos se eligen allí y cada función conserva su propio selector.
 
 ## Cabecera y controles globales
-- En el extremo derecho de la cabecera están, en este orden general: Bóvedas, Comandos, Asistente, controles condicionales del vault, Sugerir / Reportar, Roadmap, selector de tema claro/oscuro y Ajustes.
+- En el extremo derecho de la cabecera están, en este orden general: Bóvedas, Comandos, Asistente, Herramientas, controles condicionales del vault, Sugerir / Reportar, Roadmap, selector de tema claro/oscuro y Ajustes.
+- Herramientas abre el hub Nodus Toolkit; está justo después del botón Asistente.
 - Roadmap está en la parte superior derecha, antes del selector de tema y del icono de Ajustes.
 - El selector de tema claro/oscuro está inmediatamente antes de Ajustes.
 - Bóvedas abre el selector para cambiar, crear, renombrar, duplicar, restablecer o eliminar bóvedas según la acción disponible.
@@ -76,9 +77,16 @@ ${ROADMAP_GUIDE}
 - El Calendario ofrece vistas mensual, semanal y anual, eventos con avisos y exportación a iCloud o Google Calendar.
 - El Banco de preguntas contiene preguntas, tests, exámenes y flashcards; una flashcard se abre en su modal específico.
 
+## Herramientas (Nodus Toolkit)
+- Herramientas es una sección de la barra lateral, en su propio grupo, y también tiene un icono en la cabecera. Aparece en todos los tipos de vault.
+- Su página principal es un hub con tres tarjetas: Nodus Convert, PDF Presenter y OCR Workspace.
+- Estado real de las tres: ninguna procesa archivos todavía. Nodus Convert se abre y muestra un avance de lo previsto, marcado «En desarrollo»; PDF Presenter y OCR Workspace son tarjetas marcadas «Próximamente» y no se pueden abrir.
+- Nodus Convert está previsto para conversión local de documentos, PDF e imágenes, OCR ligero y utilidades de texto, individual o en lote. No lo describas como disponible ni prometas conversiones concretas.
+- Dentro de una herramienta, un botón a la izquierda de su título vuelve al hub de Herramientas.
+
 ## Tipos no disponibles todavía
 - Fuentes primarias, Testimonios, Worldbuilding y Docencia figuran como tipos futuros; no deben describirse como vaults seleccionables actualmente.
-- El roadmap también contempla Nodus Toolkit, Nodus PDF Presenter, Nodus OCR Workspace, Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios.
+- El roadmap también contempla Servidor, compartir vaults y trabajo colaborativo, y otros vaults sugeridos por usuarios. Nodus Toolkit ya tiene sección visible, pero sus herramientas siguen en desarrollo.
 
 ## Protocolo para responder sobre la interfaz
 - Usa los nombres exactos de esta guía y, si está seleccionada, la Vista actual.
