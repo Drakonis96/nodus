@@ -314,7 +314,13 @@ export function SearchView({
               onChange={(e) => setQuery(e.target.value)}
             />
             {loading && (
-              <Icon name="sync" size={15} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-neutral-500" />
+              // The centring `-translate-y-1/2` must stay on this wrapper, never on the
+              // spinning icon: `animate-spin`'s keyframe sets `transform: rotate(360deg)`,
+              // which would replace the translate and make the icon slide up and down
+              // instead of turning (360deg decomposes to the identity matrix).
+              <span className="absolute right-3 top-1/2 flex -translate-y-1/2">
+                <Icon name="sync" size={15} className="animate-spin text-neutral-500" />
+              </span>
             )}
           </div>
         )}
