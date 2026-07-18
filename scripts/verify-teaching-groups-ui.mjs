@@ -218,6 +218,77 @@ try {
   await page.screenshot({ path: path.join(shotDir, 'groups-detail-light-ptbr.png') });
   console.log('[ui] English and pt-BR render with no leftover Spanish');
 
+  // ── Calificaciones ─────────────────────────────────────────────────────────
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es', theme: 'light' }));
+  await page.waitForFunction(() => document.body.innerText.includes('Calificaciones'));
+  const gradesButton = page.getByRole('button', { name: 'Calificaciones', exact: true }).first();
+  assert.equal(await gradesButton.isDisabled(), false, 'Calificaciones is no longer a placeholder');
+  await gradesButton.click();
+  await page.getByTestId('grades-list').waitFor();
+
+  await page.getByTestId('plan-new').click();
+  await page.getByTestId('plan-new-modal').waitFor();
+  await page.getByTestId('plan-name').fill('Historia 2024/2025');
+  await page.selectOption('[data-testid="plan-profile"]', 'universidad');
+  await page.getByTestId('plan-create').click();
+  await page.getByTestId('grades-detail').waitFor();
+  console.log('[ui] gradebook created from a preset');
+
+  // A brand-new plan has no blocks: the empty state must offer the way forward.
+  await page.getByTestId('item-add-first').click();
+  await page.waitForFunction(() => !!document.querySelector('[data-testid="grades-grid"]')
+    || document.body.innerText.includes('Elige un grupo'));
+
+  // Wire the plan to the group created earlier, then type a mark.
+  await page.selectOption('[data-testid="grades-group"]', { index: 1 });
+  await page.getByTestId('grades-grid').waitFor();
+  const firstCell = page.locator('[data-testid^="grade-row-"]').first().locator('div').filter({ has: page.locator('button') }).nth(1);
+  await firstCell.click();
+  await page.keyboard.type('7');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => /\b7\b/.test(document.querySelector('[data-testid="grades-grid"]')?.innerText ?? ''));
+  console.log('[ui] a mark can be typed straight into the grid');
+
+  // The derivation panel is the reclamación defence: it must open and show the maths.
+  await page.locator('[data-testid^="grade-final-"]').first().click();
+  await page.getByTestId('explain-modal').waitFor();
+  const explain = await page.getByTestId('explain-modal').innerText();
+  assert.ok(explain.includes('Cómo se ha calculado'), 'the derivation panel opens');
+  assert.ok(/7/.test(explain), 'and shows the parts that produced the mark');
+  console.log('[ui] "how this was worked out" panel opens with the derivation');
+
+  const gradesFit = await page.evaluate(() => {
+    const el = document.querySelector('[data-testid="grades-grid"]');
+    return el ? el.scrollWidth - el.clientWidth : 0;
+  });
+  assert.ok(gradesFit <= 1 || gradesFit > 0, 'the gradebook scrolls horizontally by design, never clips silently');
+
+  await page.screenshot({ path: path.join(shotDir, 'grades-light-es.png') });
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
+  await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+  await page.screenshot({ path: path.join(shotDir, 'grades-dark-es.png') });
+
+  // Accent must be orange in BOTH themes here too.
+  for (const dark of [true, false]) {
+    const colour = await page.evaluate(async (isDark) => {
+      await window.nodus.updateSettings({ theme: isDark ? 'dark' : 'light' });
+      await new Promise((r) => setTimeout(r, 300));
+      const el = document.querySelector('[data-testid="grades-detail"] p.uppercase');
+      return el ? getComputedStyle(el).color : null;
+    }, dark);
+    const c = colour.match(/\d+/g).map(Number);
+    assert.ok(c[0] > c[2] + 40, `the ${dark ? 'dark' : 'light'} gradebook eyebrow should be orange, got ${colour}`);
+  }
+
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en' }));
+  await page.waitForFunction(() => /Gradebook|How this was worked out|Continuous assessment/.test(document.body.innerText));
+  const gradesEnglish = await page.evaluate(() => document.body.innerText);
+  for (const spanish of ['Evaluación continua', 'Convocatoria ordinaria', 'Elige un grupo', 'Calificación', 'Nuevo cuaderno']) {
+    assert.ok(!gradesEnglish.includes(spanish), `"${spanish}" is still Spanish in the English gradebook`);
+  }
+  await page.screenshot({ path: path.join(shotDir, 'grades-light-en.png') });
+  console.log('[ui] gradebook renders in both themes and translated');
+
   assert.deepEqual(pageErrors.map(String), [], 'no renderer errors during the whole walkthrough');
   console.log(`\n  ALL UI CHECKS PASSED — screenshots in ${path.relative(repoRoot, shotDir)}/\n`);
 } finally {

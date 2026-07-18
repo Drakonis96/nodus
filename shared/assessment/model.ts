@@ -142,8 +142,9 @@ export interface MinNotMetPolicy {
 
 export interface NotPresentedPolicy {
   enabled: boolean;
-  /** Code written in the record, e.g. `NP`. */
-  label: string;
+  /** Code written in the record, e.g. `NP`. Not a translatable label: institutions
+   *  use their own, and it must appear verbatim in the official record. */
+  code: string;
   /**
    * Numeric equivalent when the record is numeric, or null to leave it out of any
    * average. Note this genuinely differs *within* one region between stages, so it

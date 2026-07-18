@@ -505,7 +505,7 @@ export function computeGrade(input: ComputeInput): GradeResult {
   };
   if (notPresented) {
     record.numeric = np.value;
-    record.qualitative = np.label;
+    record.qualitative = np.code;
   }
 
   return {

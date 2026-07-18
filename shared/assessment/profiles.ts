@@ -69,7 +69,7 @@ function baseRules(): PlanRules {
     // mid-term grade reflects what has actually been taught.
     notAssessedPenalizes: false,
     minNotMet: { mode: 'raw', capAt: 4.9 },
-    np: { enabled: true, label: 'NP', value: null, triggerPct: null },
+    np: { enabled: true, code: 'NP', value: null, triggerPct: null },
     honours: null,
     ratchet: false,
     advisories: {
@@ -93,7 +93,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       decimals: 1,
       record: 'numeric',
       qualitativeBands: UNIVERSITY_BANDS,
-      np: { enabled: true, label: 'NP', value: null, triggerPct: 0.5 },
+      np: { enabled: true, code: 'NP', value: null, triggerPct: 0.5 },
       // RD 1125/2003 art. 5.6 fija el 9 y el 5%, pero NO dice sobre qué unidad se
       // cuenta ni cómo se redondea: cada universidad lo resuelve distinto (y alguna
       // se contradice a sí misma). De ahí que las tres cosas sean ajustables.
@@ -130,7 +130,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       // La evaluación es continua y sumativa: lo ya conseguido no se pierde.
       ratchet: true,
       // Sin convocatoria extraordinaria en la etapa, "no presentado" no tiene sentido.
-      np: { enabled: false, label: 'NP', value: null, triggerPct: null },
+      np: { enabled: false, code: 'NP', value: null, triggerPct: null },
       honours: null,
       advisories: {
         maxMinToAverage: null,
@@ -150,7 +150,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       decimals: 0,
       qualitativeBands: SECONDARY_BANDS,
       ratchet: true,
-      np: { enabled: false, label: 'NP', value: null, triggerPct: null },
+      np: { enabled: false, code: 'NP', value: null, triggerPct: null },
       honours: null,
       advisories: {
         maxMinToAverage: null,
@@ -176,7 +176,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       ratchet: true,
       // Donde existe, el equivalente numérico de "no presentado" varía entre etapas
       // dentro de una misma comunidad, así que se configura aquí y no en el código.
-      np: { enabled: true, label: 'NP', value: 1, triggerPct: null },
+      np: { enabled: true, code: 'NP', value: 1, triggerPct: null },
       honours: null,
       advisories: { maxMinToAverage: null, maxNonRecoverablePct: null, equalSiblingWeights: false, source: '' },
     },
@@ -191,7 +191,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       decimals: 0,
       rounding: 'halfUp',
       qualitativeBands: SECONDARY_BANDS,
-      np: { enabled: true, label: 'NP', value: 0, triggerPct: null },
+      np: { enabled: true, code: 'NP', value: 0, triggerPct: null },
       honours: null,
       advisories: { maxMinToAverage: null, maxNonRecoverablePct: null, equalSiblingWeights: false, source: '' },
     },
@@ -207,7 +207,7 @@ export const ASSESSMENT_PROFILES: AssessmentProfile[] = [
       decimals: 0,
       rounding: 'halfUp',
       qualitativeBands: SECONDARY_BANDS,
-      np: { enabled: true, label: 'RC', value: null, triggerPct: null },
+      np: { enabled: true, code: 'RC', value: null, triggerPct: null },
       honours: null,
       advisories: { maxMinToAverage: null, maxNonRecoverablePct: null, equalSiblingWeights: false, source: '' },
     },

@@ -10,6 +10,7 @@ export type TeachingView =
   | 'studyRecordings'
   | 'studyQuestions'
   | 'teachingGroups'
+  | 'teachingGrades'
   | 'teachingExams'
   | 'teachingRubrics';
 
@@ -35,7 +36,7 @@ const TEACHING_GROUPS: TeachingGroup[] = [
     { label: 'Banco de preguntas', icon: 'help', view: 'studyQuestions' },
     { label: 'Rúbricas', icon: 'table', view: 'teachingRubrics' },
     { label: 'Exámenes', icon: 'notebook', view: 'teachingExams' },
-    { label: 'Calificaciones', icon: 'chartBar' },
+    { label: 'Calificaciones', icon: 'chartBar', view: 'teachingGrades' },
   ] },
   { label: 'Crear', items: [
     { label: 'Guía docente / Programación', icon: 'book' },

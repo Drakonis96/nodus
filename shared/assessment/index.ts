@@ -7,3 +7,4 @@
 export * from './model';
 export * from './profiles';
 export * from './engine';
+export * from './grid';

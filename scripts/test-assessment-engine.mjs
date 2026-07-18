@@ -43,6 +43,9 @@ try {
     validatePlan,
     defaultItem,
     defaultEntry,
+    gradebookToGrid,
+    anonymousGrid,
+    GRID_COL,
     assessmentProfile,
     ASSESSMENT_PROFILES,
     AGGREGATIONS,
@@ -325,7 +328,7 @@ try {
     const items = [item('a', { weight: 60 }), item('b', { weight: 40 })];
     const np = computeGrade({ plan, items, entries: [mark('b', 7)] });
     assert.equal(np.record.notPresented, true, 'leaving most of the assessment unattempted is not a zero');
-    assert.equal(np.record.qualitative, 'NP');
+    assert.equal(np.record.qualitative, 'NP', 'the record carries the code the plan configures');
     assert.equal(np.passed, false);
 
     const attended = computeGrade({ plan, items, entries: [mark('a', 7)] });
@@ -465,6 +468,101 @@ try {
           `${aggregation}: produces a finite grade`);
       }
     }
+  }
+
+  // ── 18. The grid adapter ───────────────────────────────────────────────────
+  {
+    const plan = planWith('universidad');
+    const items = [
+      item('examen', { name: 'Examen', weight: 50, aggregation: 'sum', position: 0 }),
+      item('q1', { name: 'P1', parentId: 'examen', maxPoints: 4, position: 0 }),
+      item('q2', { name: 'P2', parentId: 'examen', maxPoints: 6, position: 1 }),
+      item('practica', { name: 'Práctica', weight: 50, position: 1 }),
+    ];
+    const students = [
+      { id: 'st1', givenNames: 'Ana', surnames: 'Peña López', pseudonymCode: 'STU_7K3Q', position: 0 },
+      { id: 'st2', givenNames: 'Juan', surnames: 'García Ruiz', pseudonymCode: 'STU_MMMM', position: 1 },
+    ];
+    const entries = [
+      { ...defaultEntry('st1', 'q1', { rawValue: 4, status: 'evaluated' }) },
+      { ...defaultEntry('st1', 'q2', { rawValue: 5, status: 'evaluated' }) },
+      { ...defaultEntry('st1', 'practica', { rawValue: 8, status: 'evaluated' }) },
+      { ...defaultEntry('st2', 'q1', { rawValue: 2, status: 'evaluated' }) },
+      { ...defaultEntry('st2', 'practica', { rawValue: 4, status: 'evaluated' }) },
+    ];
+
+    const grid = gradebookToGrid({ plan, items, entries, students });
+
+    // Columns read in plan order, with each block's subtotal AFTER its parts.
+    assert.deepEqual(
+      grid.columns.map((c) => c.name),
+      ['Identificador', 'Nombre', 'Apellidos', 'P1', 'P2', 'Examen', 'Práctica', 'Calificación'],
+    );
+    assert.ok(grid.columns.every((c) => c.options && c.config), 'columns carry the shape the grid expects');
+
+    // Leaves show what was typed; blocks show the computed subtotal.
+    const ana = grid.rows.find((r) => r.id === 'st1');
+    assert.equal(ana.cells.q1, '4', 'a leaf shows the teacher’s own number');
+    assert.equal(ana.cells.examen, '9', 'a block shows its subtotal on the plan scale');
+    assert.equal(ana.cells[GRID_COL.final], '8.5', '9*0.5 + 8*0.5');
+    assert.equal(ana.cells[GRID_COL.code], 'STU_7K3Q');
+
+    // An unassessed leaf stays blank rather than becoming a zero.
+    const juan = grid.rows.find((r) => r.id === 'st2');
+    assert.equal(juan.cells.q2, null, 'nothing typed means an empty cell, not a zero');
+    assert.ok(grid.results.st2.trace, 'every row keeps its derivation for the "why" panel');
+
+    // A qualitative-only plan emits no number at all.
+    const qualitative = gradebookToGrid({ plan: planWith('secundaria-cualitativa'), items, entries, students });
+    assert.ok(!qualitative.columns.some((c) => c.id === GRID_COL.final), 'no numeric column when the record has none');
+    const term = qualitative.rows.find((r) => r.id === 'st1').cells[GRID_COL.qualitative];
+    assert.ok(['SU', 'BI', 'NT', 'SB'].includes(term), `records a term, got ${term}`);
+
+    // Hiding the codes, and stripping names for anything that leaves the machine.
+    assert.ok(!gradebookToGrid({ plan, items, entries, students, showCodes: false })
+      .columns.some((c) => c.id === GRID_COL.code));
+    // Translated headers must still be dropped: anonymousGrid keys on id, not name.
+    const translated = gradebookToGrid({ plan, items, entries, students, labels: { givenNames: 'First name', surnames: 'Surname' } });
+    assert.ok(translated.columns.some((c) => c.name === 'First name'), 'column names follow the caller language');
+    assert.ok(!anonymousGrid(translated).columns.some((c) => c.name === 'First name'),
+      'and the anonymiser still strips them, because it keys on id');
+    const anon = anonymousGrid(grid);
+    assert.ok(!anon.columns.some((c) => c.name === 'Nombre' || c.name === 'Apellidos'));
+    assert.ok(anon.rows.every((r) => !('__given__' in r.cells) && !('__surnames__' in r.cells)),
+      'no student name survives into an analysable grid');
+    assert.equal(anon.rows[0].cells[GRID_COL.code], 'STU_7K3Q', 'but the identifier does, so rows stay traceable');
+    assert.equal(anon.rows[0].cells.examen, '9', 'and so do the marks');
+  }
+
+  // ── 19. The grid really is consumable by the database machinery ────────────
+  //
+  // Asserting "it produces the right shape" would be circular. This runs the REAL
+  // filter, sort and statistics functions over the produced grid, which is the actual
+  // claim: the gradebook inherits that stack instead of reimplementing it.
+  {
+    const dbOut = path.join(tmp, 'dbstack.mjs');
+    await build({
+      entryPoints: [path.join(repoRoot, 'scripts/fixtures/db-stack-entry.ts')],
+      outfile: dbOut, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent',
+    });
+    const { sortDatabaseRows, describe, numericValues } = await import(pathToFileURL(dbOut).href);
+
+    const plan = planWith('universidad');
+    const items = [item('t1', { name: 'T1', weight: 100 })];
+    const students = Array.from({ length: 5 }, (_, i) => ({
+      id: `s${i}`, givenNames: `A${i}`, surnames: 'X', pseudonymCode: `STU_000${i}`, position: i,
+    }));
+    const entries = [3, 5, 7, 9, 10].map((v, i) => defaultEntry(`s${i}`, 't1', { rawValue: v, status: 'evaluated' }));
+    const grid = gradebookToGrid({ plan, items, entries, students });
+    const finalCol = grid.columns.find((c) => c.id === GRID_COL.final);
+
+    const sorted = sortDatabaseRows(grid.rows, grid.columns, [{ columnId: finalCol.id, dir: 'desc' }]);
+    assert.deepEqual(sorted.map((r) => r.cells[finalCol.id]), ['10', '9', '7', '5', '3'],
+      'the real sorter orders the gradebook without any adaptation');
+
+    const stats = describe(numericValues(finalCol, grid.rows));
+    assert.equal(stats.n, 5, 'the real statistics engine reads the grade column');
+    assert.equal(stats.mean, 6.8, 'and computes over it directly');
   }
 
   console.log('assessment engine: OK');

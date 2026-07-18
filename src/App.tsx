@@ -56,6 +56,7 @@ const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').the
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
 const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
 const TeachingGroupsView = lazy(() => import('./views/TeachingGroupsView').then((module) => ({ default: module.TeachingGroupsView })));
+const TeachingGradesView = lazy(() => import('./views/TeachingGradesView').then((module) => ({ default: module.TeachingGradesView })));
 const RubricsView = lazy(() => import('./views/RubricsView').then((module) => ({ default: module.RubricsView })));
 const ExamBuilderView = lazy(() => import('./views/ExamBuilderView').then((module) => ({ default: module.ExamBuilderView })));
 const StudyOrganizationView = lazy(() => import('./views/StudyOrganizationView').then((module) => ({ default: module.StudyOrganizationView })));
@@ -1327,6 +1328,7 @@ export function App() {
           />}
           {view === 'teachingExams' && <ExamBuilderView />}
           {view === 'teachingGroups' && <TeachingGroupsView />}
+          {view === 'teachingGrades' && <TeachingGradesView />}
           {view === 'teachingRubrics' && <RubricsView />}
           {view === 'studyReview' && <StudyReviewView />}
           {view === 'studyDeepResearch' && <DeepResearchView
