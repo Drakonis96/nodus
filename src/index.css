@@ -1362,6 +1362,116 @@ body {
 .light.estudio .border-indigo-700\/60 { border-color: rgba(15, 118, 110, 0.45); }
 .light.estudio .border-indigo-800\/60 { border-color: rgba(15, 118, 110, 0.30); }
 
+/* Teaching vault → orange (#ea580c) accent instead of the indigo default. Same remap
+   strategy as .estudio / .databases: override the accent utility classes used across
+   the app with the Tailwind orange scale so the teaching workspace reads as a distinct
+   orange surface without touching any component API. */
+.docencia { --tw-ring-color: rgba(234, 88, 12, 0.48); }
+.docencia .btn-primary { background-color: #ea580c; }
+.docencia .btn-primary:hover { background-color: #c2410c; }
+.docencia .text-indigo-100 { color: #ffedd5; }
+.docencia .text-indigo-200 { color: #fed7aa; }
+.docencia .text-indigo-300 { color: #fdba74; }
+.docencia .text-indigo-400 { color: #fb923c; }
+.docencia .text-indigo-500 { color: #f97316; }
+.docencia .text-indigo-600 { color: #ea580c; }
+.docencia .text-indigo-700 { color: #c2410c; }
+.docencia .text-indigo-900 { color: #7c2d12; }
+.docencia .hover\:text-indigo-300:hover { color: #fdba74; }
+.docencia .hover\:text-indigo-400:hover { color: #fb923c; }
+.docencia .bg-indigo-400 { background-color: #fb923c; }
+.docencia .bg-indigo-500 { background-color: #f97316; }
+.docencia .bg-indigo-600 { background-color: #ea580c; }
+.docencia .hover\:bg-indigo-500:hover { background-color: #f97316; }
+.docencia .bg-indigo-50 { background-color: #fff7ed; }
+.docencia .bg-indigo-100 { background-color: #ffedd5; }
+.docencia .bg-indigo-900 { background-color: #7c2d12; }
+.docencia .bg-indigo-950 { background-color: #431407; }
+.docencia .bg-indigo-600\/15 { background-color: rgba(234, 88, 12, 0.15); }
+.docencia .bg-indigo-600\/20 { background-color: rgba(234, 88, 12, 0.2); }
+.docencia .bg-indigo-900\/40 { background-color: rgba(124, 45, 18, 0.4); }
+.docencia .bg-indigo-900\/50 { background-color: rgba(124, 45, 18, 0.5); }
+.docencia .bg-indigo-950\/20 { background-color: rgba(67, 20, 7, 0.2); }
+.docencia .bg-indigo-950\/25 { background-color: rgba(67, 20, 7, 0.25); }
+.docencia .bg-indigo-950\/30 { background-color: rgba(67, 20, 7, 0.3); }
+.docencia .bg-indigo-950\/40 { background-color: rgba(67, 20, 7, 0.4); }
+.docencia .border-indigo-500 { border-color: #f97316; }
+.docencia .border-indigo-600 { border-color: #ea580c; }
+.docencia .border-indigo-700 { border-color: #c2410c; }
+.docencia .border-indigo-800 { border-color: #9a3412; }
+.docencia .border-indigo-700\/60 { border-color: rgba(194, 65, 12, 0.6); }
+.docencia .border-indigo-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia .hover\:border-indigo-700\/60:hover { border-color: rgba(194, 65, 12, 0.6); }
+.docencia .ring-indigo-500 { --tw-ring-color: #f97316; }
+
+.light.docencia .bg-indigo-950,
+.light.docencia .bg-indigo-950\/20,
+.light.docencia .bg-indigo-950\/25,
+.light.docencia .bg-indigo-950\/30,
+.light.docencia .bg-indigo-950\/40 { background-color: #ffedd5; }
+.light.docencia .bg-indigo-900,
+.light.docencia .bg-indigo-900\/40,
+.light.docencia .bg-indigo-900\/50 { background-color: #fed7aa; }
+.light.docencia .bg-indigo-600\/15 { background-color: rgba(234, 88, 12, 0.10); }
+.light.docencia .bg-indigo-600\/20 { background-color: rgba(234, 88, 12, 0.14); }
+.light.docencia .text-indigo-100,
+.light.docencia .text-indigo-200 { color: #7c2d12; }
+.light.docencia .text-indigo-300 { color: #c2410c; }
+.light.docencia .text-indigo-400 { color: #ea580c; }
+.light.docencia .border-indigo-700,
+.light.docencia .border-indigo-700\/60 { border-color: rgba(234, 88, 12, 0.45); }
+.light.docencia .border-indigo-800\/60 { border-color: rgba(234, 88, 12, 0.30); }
+
+/* The study section views (organisation, schedule, calendar, materials, recordings)
+   bake in a hardcoded teal accent rather than the remappable indigo, so teaching also
+   repaints those teal utilities → orange. Plain utilities first (light + dark base),
+   then the dark: variants (root carries .docencia and .dark together). */
+.docencia .text-teal-100 { color: #ffedd5; }
+.docencia .text-teal-200 { color: #fed7aa; }
+.docencia .text-teal-300 { color: #fdba74; }
+.docencia .text-teal-400 { color: #fb923c; }
+.docencia .text-teal-500 { color: #f97316; }
+.docencia .text-teal-600 { color: #ea580c; }
+.docencia .text-teal-700 { color: #c2410c; }
+.docencia .text-teal-900 { color: #7c2d12; }
+.docencia .hover\:text-teal-400:hover { color: #fb923c; }
+.docencia .hover\:text-teal-600:hover { color: #ea580c; }
+.docencia .bg-teal-50 { background-color: #fff7ed; }
+.docencia .bg-teal-100 { background-color: #ffedd5; }
+.docencia .bg-teal-500 { background-color: #f97316; }
+.docencia .bg-teal-600 { background-color: #ea580c; }
+.docencia .bg-teal-700 { background-color: #c2410c; }
+.docencia .bg-teal-950 { background-color: #431407; }
+.docencia .bg-teal-600\/15 { background-color: rgba(234, 88, 12, 0.15); }
+.docencia .bg-teal-900\/30 { background-color: rgba(124, 45, 18, 0.3); }
+.docencia .bg-teal-50\/95 { background-color: rgba(255, 247, 237, 0.95); }
+.docencia .hover\:bg-teal-50:hover { background-color: #fff7ed; }
+.docencia .hover\:bg-teal-100:hover { background-color: #ffedd5; }
+.docencia .hover\:bg-teal-50\/60:hover { background-color: rgba(255, 247, 237, 0.6); }
+.docencia .border-teal-200 { border-color: #fed7aa; }
+.docencia .border-teal-500 { border-color: #f97316; }
+.docencia .hover\:border-teal-500:hover { border-color: #f97316; }
+.docencia .hover\:border-teal-600:hover { border-color: #ea580c; }
+.docencia .hover\:border-teal-800:hover { border-color: #9a3412; }
+.docencia .ring-teal-100 { --tw-ring-color: #ffedd5; }
+.docencia .ring-teal-500 { --tw-ring-color: #f97316; }
+.docencia .ring-teal-900 { --tw-ring-color: #7c2d12; }
+.docencia.dark .dark\:text-teal-100 { color: #ffedd5; }
+.docencia.dark .dark\:text-teal-200 { color: #fed7aa; }
+.docencia.dark .dark\:text-teal-300 { color: #fdba74; }
+.docencia.dark .dark\:text-teal-400 { color: #fb923c; }
+.docencia.dark .dark\:bg-teal-400 { background-color: #fb923c; }
+.docencia.dark .dark\:bg-teal-950 { background-color: #431407; }
+.docencia.dark .dark\:bg-teal-950\/20 { background-color: rgba(67, 20, 7, 0.2); }
+.docencia.dark .dark\:bg-teal-950\/40 { background-color: rgba(67, 20, 7, 0.4); }
+.docencia.dark .dark\:bg-teal-950\/60 { background-color: rgba(67, 20, 7, 0.6); }
+.docencia.dark .dark\:bg-teal-950\/90 { background-color: rgba(67, 20, 7, 0.9); }
+.docencia.dark .dark\:hover\:bg-teal-950:hover { background-color: #431407; }
+.docencia.dark .dark\:hover\:bg-teal-950\/20:hover { background-color: rgba(67, 20, 7, 0.2); }
+.docencia.dark .dark\:border-teal-800\/60 { border-color: rgba(154, 52, 18, 0.6); }
+.docencia.dark .dark\:border-teal-900\/50 { border-color: rgba(124, 45, 18, 0.5); }
+.docencia.dark .dark\:hover\:border-teal-700:hover { border-color: #c2410c; }
+
 /* Databases vault → Nodus crimson (#B30333) accent instead of the indigo default.
    Same remap strategy as .genealogy: override the accent utility classes used
    across the app with the crimson scale and its lighter/darker gradient shades. */
@@ -1496,8 +1606,19 @@ body {
   border-color: #cc0a3a;
 }
 
+/* The text size is a DEFAULT, not an override. `:where()` carries zero specificity, so
+   a `text-xs` (or `text-[11px]`) utility written on the element wins, as its author
+   intended. Before this, `.input` sat after `@tailwind utilities` and its `text-sm`
+   silently forced 14px on every field that asked for 12px — the boxes were then sized
+   for text they never actually got, which is what made dense forms feel cramped.
+   Padding is deliberately NOT moved here: it keeps the documented
+   `.input-with-leading-icon` / `.input-with-trailing-action` escape hatches below. */
+:where(.input) {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
 .input {
-  @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;
+  @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500;
 }
 .light .input {
   @apply bg-white border-neutral-300 text-neutral-900 placeholder:text-neutral-500;
@@ -1507,6 +1628,19 @@ body {
    leading icon, use this class instead of `pl-*` — its two-class selector wins. */
 .input.input-with-leading-icon {
   padding-left: 2rem;
+}
+/* Same trick for a control pinned inside the field's right edge (the rubric cell's AI
+   button): a plain `pr-*` utility loses to `.input`'s `px-3` and the text runs under it. */
+.input.input-with-trailing-action {
+  padding-right: 2rem;
+}
+
+/* A textarea that grows with what is typed instead of hiding it behind a scrollbar.
+   `min-height` stays the floor and `max-height` the ceiling, so a long entry expands
+   only up to a point. Chromium supports `field-sizing`; anywhere it is not supported
+   this degrades to today's fixed-height box rather than breaking the layout. */
+textarea.input-autosize {
+  field-sizing: content;
 }
 
 /* Selects: drop the OS-native control and give every `<select class="input">` the

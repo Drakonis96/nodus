@@ -40,7 +40,7 @@ import { confirm } from '../components/feedback';
 import { SigmaGraph } from './graph/SigmaGraph';
 import { GraphErrorBoundary } from './graph/GraphErrorBoundary';
 import { GRAPH_NODE_TYPES, EDGE_TYPE_COLORS, type GraphFilters } from './graph/model';
-import { t, tx } from '../i18n';
+import { t, tx, getActiveLang } from '../i18n';
 import {
   IMMERSION_GENERATION_JOB_KEY,
   IMMERSION_DOSSIER_JOB_PREFIX,
@@ -457,7 +457,7 @@ type ImmersionSortKey = 'recent' | 'oldest' | 'title';
 
 function formatImmersionDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(getActiveLang(), { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
     return iso;
   }

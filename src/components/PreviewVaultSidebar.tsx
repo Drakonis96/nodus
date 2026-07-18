@@ -5,23 +5,9 @@ import { Icon } from './ui';
 interface PreviewItem { label: string; icon: string }
 interface PreviewGroup { label: string; items: PreviewItem[] }
 
-const DOCENCIA_GROUPS: PreviewGroup[] = [
-  { label: 'Organización', items: [
-    { label: 'Cursos y asignaturas', icon: 'graduation' }, { label: 'Grupos', icon: 'users' },
-    { label: 'Horarios', icon: 'clock' }, { label: 'Calendario', icon: 'calendar' },
-    { label: 'Materiales', icon: 'book' }, { label: 'Grabaciones', icon: 'microphone' },
-  ] },
-  { label: 'Evaluación', items: [
-    { label: 'Banco de preguntas', icon: 'help' }, { label: 'Rúbricas', icon: 'table' },
-    { label: 'Exámenes', icon: 'notebook' }, { label: 'Calificaciones', icon: 'chartBar' },
-  ] },
-  { label: 'Crear', items: [
-    { label: 'Guía docente / Programación', icon: 'book' }, { label: 'Unidades didácticas', icon: 'layers' },
-    { label: 'Situaciones de aprendizaje', icon: 'bulb' }, { label: 'Adaptaciones', icon: 'users' },
-    { label: 'Notas', icon: 'notebook' }, { label: 'Proyectos de innovación', icon: 'flask' },
-  ] },
-];
-
+// Teaching ('docencia') graduated from a preview shell into a real workspace (it
+// reuses the study organisation surfaces), so worldbuilding is the only remaining
+// preview type rendered here.
 const WORLDBUILDING_GROUPS: PreviewGroup[] = [
   { label: 'Explorar', items: [
     { label: 'Enciclopedia', icon: 'book' }, { label: 'Personajes', icon: 'users' },
@@ -42,7 +28,7 @@ const WORLDBUILDING_GROUPS: PreviewGroup[] = [
 ];
 
 export function PreviewVaultSidebar({ type }: { type: VaultType }) {
-  const groups = type === 'docencia' ? DOCENCIA_GROUPS : WORLDBUILDING_GROUPS;
+  const groups = WORLDBUILDING_GROUPS;
   const item = (entry: PreviewItem, key: string) => <button key={key} type="button" disabled aria-disabled="true" title={t('Disponible próximamente')} className="flex w-full cursor-not-allowed items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-600 opacity-70"><Icon name={entry.icon} className="opacity-70" />{t(entry.label)}</button>;
   return <div data-testid={`preview-vault-sidebar-${type}`} className="flex flex-col gap-1">
     {item({ label: 'Inicio', icon: 'home' }, 'home')}

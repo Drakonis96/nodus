@@ -4,10 +4,8 @@
 // Chromium I/O (it never blocks the main event loop), so it runs in main. It is
 // covered by the e2e run, not the unit suite (there is no headless printToPDF).
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
-import { BrowserWindow } from 'electron';
+import { htmlToPdfBytes } from '../../export/htmlToPdf';
 import { markdownToHtml } from '@shared/toolkitMarkdown';
 import type { ToolkitOpRegistry } from '../toolkitJobs';
 import type { ToolkitProduced } from '@shared/toolkitTypes';
@@ -38,27 +36,19 @@ function buildPrintableHtml(input: string): string {
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${title}</title><style>${PRINT_CSS}</style></head><body>${body}</body></html>`;
 }
 
+/**
+ * Uses the shared helper so this converter inherits the deferred window teardown:
+ * destroying the BrowserWindow synchronously after `printToPDF` races Chromium's own
+ * cleanup and the NEXT conversion in the session fails with `ERR_FAILED (-2)` — which
+ * matters here more than anywhere, since converting several files is the normal case.
+ *
+ * This stylesheet has no `@page` rule, so the printer margins have to come from here.
+ */
 async function renderToPdf(input: string): Promise<ToolkitProduced[]> {
-  const html = buildPrintableHtml(input);
-  const tmp = path.join(os.tmpdir(), `nodus-toolkit-print-${crypto.randomBytes(6).toString('hex')}.html`);
-  fs.writeFileSync(tmp, html, 'utf8');
-  const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
-  try {
-    await win.loadFile(tmp);
-    const pdf = await win.webContents.printToPDF({
-      printBackground: true,
-      margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
-      pageSize: 'A4',
-    });
-    return [{ data: new Uint8Array(pdf), ext: 'pdf' }];
-  } finally {
-    if (!win.isDestroyed()) win.destroy();
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      /* best effort */
-    }
-  }
+  const pdf = await htmlToPdfBytes(buildPrintableHtml(input), {
+    margins: { top: 0.6, bottom: 0.6, left: 0.6, right: 0.6 },
+  });
+  return [{ data: new Uint8Array(pdf), ext: 'pdf' }];
 }
 
 export const renderPdfOps: ToolkitOpRegistry = {
