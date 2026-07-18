@@ -9,6 +9,8 @@ export type TeachingView =
   | 'studyLibrary'
   | 'studyRecordings'
   | 'studyQuestions'
+  | 'teachingGroups'
+  | 'teachingGrades'
   | 'teachingExams'
   | 'teachingRubrics';
 
@@ -23,8 +25,8 @@ interface TeachingGroup { label: string; items: TeachingItem[] }
  */
 const TEACHING_GROUPS: TeachingGroup[] = [
   { label: 'Organización', items: [
-    { label: 'Cursos y asignaturas', icon: 'graduation', view: 'studyCourses' },
-    { label: 'Grupos', icon: 'users' },
+    { label: 'Cursos, asignaturas y grupos', icon: 'graduation', view: 'studyCourses' },
+    { label: 'Grupos', icon: 'users', view: 'teachingGroups' },
     { label: 'Horarios', icon: 'clock', view: 'studySchedule' },
     { label: 'Calendario', icon: 'calendar', view: 'studyCalendar' },
     { label: 'Materiales', icon: 'book', view: 'studyLibrary' },
@@ -34,7 +36,7 @@ const TEACHING_GROUPS: TeachingGroup[] = [
     { label: 'Banco de preguntas', icon: 'help', view: 'studyQuestions' },
     { label: 'Rúbricas', icon: 'table', view: 'teachingRubrics' },
     { label: 'Exámenes', icon: 'notebook', view: 'teachingExams' },
-    { label: 'Calificaciones', icon: 'chartBar' },
+    { label: 'Calificaciones', icon: 'chartBar', view: 'teachingGrades' },
   ] },
   { label: 'Crear', items: [
     { label: 'Guía docente / Programación', icon: 'book' },

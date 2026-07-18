@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import type { EdgeType, ModelRef, GraphNodeType } from '@shared/types';
 import { t } from '../i18n';
 
@@ -249,4 +249,65 @@ export function Spinner({ label }: { label?: string }) {
 export function TypeDot({ type }: { type: GraphNodeType }) {
   const color = type === 'author' ? '#a3a3a3' : NODE_COLORS[type];
   return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />;
+}
+
+/**
+ * Backdrop for the app's ad-hoc modals.
+ *
+ * Closes on Escape and on a click outside the panel, which ConfirmModal already did
+ * and every hand-rolled modal did not — a dialog that can only be dismissed by finding
+ * its button traps the user, and traps automated checks too.
+ */
+/**
+ * Open backdrops, innermost last.
+ *
+ * Every backdrop listens on `window`, so without a stack an Escape inside a nested
+ * dialog closes BOTH it and its parent — the user loses the screen behind the one they
+ * meant to dismiss. Only the topmost entry acts.
+ */
+const backdropStack: symbol[] = [];
+
+export function ModalBackdrop({
+  onClose,
+  children,
+  zIndex = 130,
+}: {
+  onClose: () => void;
+  children: React.ReactNode;
+  zIndex?: number;
+}) {
+  // The handler is read through a ref so this effect can depend on NOTHING and run
+  // exactly once per mount. Depending on `onClose` — which is a fresh closure on every
+  // render — would re-register the parent dialog ON TOP of a child it already opened,
+  // and Escape would then dismiss the wrong one.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    const id = Symbol('backdrop');
+    backdropStack.push(id);
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (backdropStack[backdropStack.length - 1] !== id) return;
+      closeRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      const index = backdropStack.indexOf(id);
+      if (index >= 0) backdropStack.splice(index, 1);
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 grid place-items-center bg-black/60 p-4"
+      style={{ zIndex }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      {children}
+    </div>
+  );
 }

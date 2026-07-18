@@ -289,6 +289,12 @@ import * as studyMaterials from './db/studyMaterialsRepo';
 import * as studyRecordings from './db/studyRecordingsRepo';
 import * as teachingExams from './db/teachingExamsRepo';
 import * as teachingRubrics from './db/teachingRubricsRepo';
+import * as teachingGroups from './db/teachingGroupsRepo';
+import * as teachingGrades from './db/teachingGradesRepo';
+import { importAssessmentPlan, draftStudentFeedback } from './ai/assessmentImport';
+import { actaPdfBytes, actaDocxBytes, boletinPdfBytes, gradebookCsv, gradebookXlsx } from './export/gradebookExport';
+import type { ActaExportInput, BoletinExportInput, GradebookExportFormat } from './export/gradebookExport';
+import type { TeachingGroupInput } from '@shared/teachingGroups';
 import * as teachingLogos from './db/teachingLogosRepo';
 import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
 import { rubricDocxBytes, rubricPdfBytes } from './export/rubricExport';
@@ -2415,6 +2421,81 @@ export function registerIpc(
   h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
   h('study:recordings:get', async (_e, id: string) => studyRecordings.getStudyRecording(id));
   h('study:recordings:content', async (_e, id: string) => studyRecordings.getStudyRecordingContent(id));
+  // ---- Gradebook (teaching vault) ----
+  h('teaching:plans:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGrades.listAssessmentPlans(options ?? {}));
+  h('teaching:plans:get', async (_e, id: string) => teachingGrades.getAssessmentPlan(id));
+  h('teaching:plans:create', async (_e, input: Parameters<typeof teachingGrades.createAssessmentPlan>[0]) => teachingGrades.createAssessmentPlan(input));
+  h('teaching:plans:update', async (_e, id: string, patch: Parameters<typeof teachingGrades.updateAssessmentPlan>[1]) => teachingGrades.updateAssessmentPlan(id, patch));
+  h('teaching:plans:publish', async (_e, id: string) => teachingGrades.publishAssessmentPlan(id));
+  h('teaching:plans:revise', async (_e, id: string) => teachingGrades.reviseAssessmentPlan(id));
+  h('teaching:plans:delete', async (_e, id: string) => {
+    teachingGrades.deleteAssessmentPlan(id);
+    return null;
+  });
+  h('teaching:items:create', async (_e, planId: string, input: Parameters<typeof teachingGrades.createAssessmentItem>[1]) => teachingGrades.createAssessmentItem(planId, input));
+  h('teaching:items:update', async (_e, id: string, patch: Parameters<typeof teachingGrades.updateAssessmentItem>[1]) => teachingGrades.updateAssessmentItem(id, patch));
+  h('teaching:items:delete', async (_e, id: string) => {
+    teachingGrades.deleteAssessmentItem(id);
+    return null;
+  });
+  h('teaching:items:reorder', async (_e, planId: string, orderedIds: string[]) => teachingGrades.reorderAssessmentItems(planId, orderedIds));
+  h('teaching:entries:list', async (_e, planId: string, convocatoria?: string) => teachingGrades.listGradeEntries(planId, convocatoria ?? 'ordinaria'));
+  h('teaching:entries:set', async (_e, input: Parameters<typeof teachingGrades.setGradeEntry>[0]) => teachingGrades.setGradeEntry(input));
+  h('teaching:entries:clear', async (_e, studentId: string, itemId: string, convocatoria?: string) => {
+    teachingGrades.clearGradeEntry(studentId, itemId, convocatoria ?? 'ordinaria');
+    return null;
+  });
+  h('teaching:export:acta', async (_e, format: GradebookExportFormat, input: ActaExportInput, grid?: { columns: unknown[]; rows: unknown[] }) => {
+    const base = (input.header.subject || 'acta').replace(/[\\/:*?"<>|]+/g, '-') || 'acta';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar acta',
+      defaultPath: `${base}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    if (format === 'pdf') fs.writeFileSync(picked.filePath, await actaPdfBytes(input));
+    else if (format === 'docx') fs.writeFileSync(picked.filePath, await actaDocxBytes(input));
+    else if (format === 'xlsx') fs.writeFileSync(picked.filePath, gradebookXlsx((grid?.columns ?? []) as never, (grid?.rows ?? []) as never));
+    else fs.writeFileSync(picked.filePath, gradebookCsv((grid?.columns ?? []) as never, (grid?.rows ?? []) as never), 'utf8');
+    return { path: picked.filePath };
+  });
+  h('teaching:export:boletin', async (_e, input: BoletinExportInput) => {
+    const base = (input.student.name || input.student.code || 'boletin').replace(/[\\/:*?"<>|]+/g, '-');
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar boletín',
+      defaultPath: `${base}.pdf`,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    fs.writeFileSync(picked.filePath, await boletinPdfBytes(input));
+    return { path: picked.filePath };
+  });
+  h('teaching:items:fromExam', async (_e, planId: string, examId: string, weight?: number) => teachingGrades.addExamBlock(planId, examId, weight ?? 0));
+  h('teaching:items:fromRubric', async (_e, planId: string, rubricId: string, weight?: number) => teachingGrades.addRubricItem(planId, rubricId, weight ?? 0));
+  h('teaching:entries:rubric:set', async (_e, input: Parameters<typeof teachingGrades.setRubricEvaluation>[0]) => teachingGrades.setRubricEvaluation(input));
+  h('teaching:entries:rubric:get', async (_e, studentId: string, itemId: string, convocatoria?: string) => teachingGrades.getRubricEvaluation(studentId, itemId, convocatoria ?? 'ordinaria'));
+  h('teaching:plans:import', async (_e, request: { planId: string; text: string }) => importAssessmentPlan(request));
+  h('teaching:plans:apply', async (_e, planId: string, proposal: Parameters<typeof teachingGrades.applyProposedPlan>[1]) => teachingGrades.applyProposedPlan(planId, proposal));
+  h('teaching:feedback:draft', async (_e, request: Parameters<typeof draftStudentFeedback>[0]) => draftStudentFeedback(request));
+  h('teaching:entries:cohort', async (_e, planId: string, groupId: string, convocatoria?: string) => teachingGrades.cohortStats(planId, groupId, convocatoria ?? 'ordinaria'));
+
+  // ---- Student groups (teaching vault) ----
+  h('teaching:groups:list', async (_e, options?: { subjectId?: string | null; academicYearId?: string | null }) => teachingGroups.listTeachingGroups(options ?? {}));
+  h('teaching:groups:get', async (_e, id: string) => teachingGroups.getTeachingGroup(id));
+  h('teaching:groups:create', async (_e, input: TeachingGroupInput) => teachingGroups.createTeachingGroup(input));
+  h('teaching:groups:update', async (_e, id: string, patch: Parameters<typeof teachingGroups.updateTeachingGroup>[1]) => teachingGroups.updateTeachingGroup(id, patch));
+  h('teaching:groups:delete', async (_e, id: string) => {
+    teachingGroups.deleteTeachingGroup(id);
+    return null;
+  });
+  h('teaching:groups:student:add', async (_e, groupId: string, count?: number) => teachingGroups.addTeachingStudent(groupId, count ?? 1));
+  h('teaching:groups:student:update', async (_e, id: string, patch: Parameters<typeof teachingGroups.updateTeachingStudent>[1]) => teachingGroups.updateTeachingStudent(id, patch));
+  h('teaching:groups:student:delete', async (_e, id: string) => {
+    teachingGroups.deleteTeachingStudent(id);
+    return null;
+  });
+  h('teaching:groups:import', async (_e, targetGroupId: string, sourceGroupId: string) => teachingGroups.importStudentsFromGroup(targetGroupId, sourceGroupId));
+
   // ---- Rubric builder (teaching vault) ----
   h('teaching:rubrics:list', async (_e, options?: { subjectId?: string | null; search?: string }) => teachingRubrics.listTeachingRubrics(options ?? {}));
   h('teaching:rubrics:get', async (_e, id: string) => teachingRubrics.getTeachingRubric(id));

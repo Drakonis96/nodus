@@ -400,7 +400,7 @@ export function RubricsView() {
                           />
                           <button
                             data-testid={`rubric-cell-ai-${rowIndex}-${level.id}`}
-                            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-md bg-neutral-900/70 text-indigo-400 hover:bg-indigo-600/20 dark:bg-neutral-900/70"
+                            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-md bg-neutral-200/80 text-indigo-600 hover:bg-indigo-600/20 dark:bg-neutral-900/70 dark:text-indigo-400"
                             title={t('Redactar este descriptor con IA')}
                             aria-label={t('Redactar este descriptor con IA')}
                             disabled={busyCell === key}

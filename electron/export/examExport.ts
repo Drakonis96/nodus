@@ -1,4 +1,4 @@
-import { renderExamHtml } from '@shared/examHtml';
+import { trueFalseAnswer, renderExamHtml } from '@shared/examHtml';
 import { htmlToPdfBytes } from './htmlToPdf';
 import {
   examAnswerLines,
@@ -294,11 +294,12 @@ export async function examDocxBytes(exam: TeachingExam, questions: ExamQuestion[
       const def = examQuestionTypeDef(question.type);
       let answer = question.solution;
       if (question.type === 'multiple_choice') {
-        const correct = question.options.findIndex((option) => option.correct);
-        answer = [correct >= 0 ? `${examOptionLetter(correct)}) ${question.options[correct]?.text ?? ''}` : '', answer].filter(Boolean).join(' — ');
+        const shownOptions = question.options.filter((option) => option.text.trim());
+        const correct = shownOptions.findIndex((option) => option.correct);
+        answer = [correct >= 0 ? `${examOptionLetter(correct)}) ${shownOptions[correct]?.text ?? ''}` : '', answer].filter(Boolean).join(' — ');
       } else if (question.type === 'true_false') {
-        const isTrue = question.options.find((option) => option.correct)?.text === 'Verdadero';
-        answer = [isTrue ? labels.trueLabel : labels.falseLabel, answer].filter(Boolean).join(' — ');
+        const tfAnswer = trueFalseAnswer(question);
+        answer = [tfAnswer == null ? '' : tfAnswer ? labels.trueLabel : labels.falseLabel, answer].filter(Boolean).join(' — ');
       } else if (question.type === 'matching') {
         const pairs = question.pairs.filter((pair) => pair.left.trim() && pair.right.trim()).map((_, pairIndex) => `${pairIndex + 1}–${examOptionLetter(pairIndex)}`).join(', ');
         answer = [pairs, answer].filter(Boolean).join(' — ');

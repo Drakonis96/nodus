@@ -42,3 +42,6 @@ reports/
 
 # Nodus Toolkit test caches (Tesseract traineddata, etc.)
 scripts/.cache/
+
+# Local verification screenshots (scripts/verify-*-ui.mjs)
+.tmp-shots/

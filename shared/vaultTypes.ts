@@ -277,7 +277,9 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
   studyDeepResearch: ['estudio'],
-  // The exam paper builder belongs to the teaching vault only.
+  // Student rosters, the exam paper builder and rubrics belong to teaching only.
+  teachingGroups: ['docencia'],
+  teachingGrades: ['docencia'],
   teachingExams: ['docencia'],
   teachingRubrics: ['docencia'],
 };

@@ -153,6 +153,12 @@ import type {
   TeachingRubric,
   TeachingRubricInput,
 } from './teachingRubrics';
+import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
+export type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
+import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRules } from './assessment/model';
+import type { ProposedPlan } from './assessmentImport';
+export type * from './assessmentImport';
+export type * from './assessment/model';
 import type {
   StudyIdeaDetail,
   StudyIdeaSummary,
@@ -1158,6 +1164,13 @@ export interface AppSettings {
   /** Legacy mirror kept for older settings payloads; privacyMode is authoritative. */
   studyAiLocalOnly: boolean;
   studyAiConfirmExternal: boolean;
+  /**
+   * Replace student names with opaque codes (`STU_7K3Q`) before any teaching text
+   * reaches an AI provider, and map them back on the way in. On by default: rosters
+   * hold the names of minors. Covers chat and structured (JSON) calls only —
+   * embeddings, image analysis and audio transcription still see the raw text.
+   */
+  studentPseudonymsEnabled: boolean;
   studyAiMaxInputChars: number;
   studyAiMaxOutputTokens: number;
   studyAiTemperature: number;
@@ -5401,6 +5414,48 @@ export interface NodusApi {
   listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
   getStudyRecording(id: string): Promise<StudyRecordingDetail>;
   getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  // Gradebook (teaching vault). The plan is the programación / guía docente.
+  listAssessmentPlans(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<AssessmentPlan[]>;
+  getAssessmentPlan(id: string): Promise<{ plan: AssessmentPlan; items: AssessmentItem[] }>;
+  createAssessmentPlan(input: { name: string; subjectId: string; academicYearId?: string | null; profile?: string }): Promise<AssessmentPlan>;
+  updateAssessmentPlan(id: string, patch: { name?: string; academicYearId?: string | null; profile?: string; rules?: Partial<PlanRules> }): Promise<AssessmentPlan>;
+  publishAssessmentPlan(id: string): Promise<AssessmentPlan>;
+  reviseAssessmentPlan(id: string): Promise<AssessmentPlan>;
+  deleteAssessmentPlan(id: string): Promise<void>;
+  createAssessmentItem(planId: string, input: Partial<AssessmentItem>): Promise<AssessmentItem>;
+  updateAssessmentItem(id: string, patch: Partial<AssessmentItem>): Promise<AssessmentItem>;
+  deleteAssessmentItem(id: string): Promise<void>;
+  reorderAssessmentItems(planId: string, orderedIds: string[]): Promise<AssessmentItem[]>;
+  listGradeEntries(planId: string, convocatoria?: string): Promise<GradeEntry[]>;
+  setGradeEntry(input: { studentId: string; itemId: string; convocatoria?: string; rawValue?: number | null; status?: GradeEntry['status']; isOverride?: boolean; note?: string }): Promise<GradeEntry>;
+  clearGradeEntry(studentId: string, itemId: string, convocatoria?: string): Promise<void>;
+  gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
+  importAssessmentPlan(request: { planId: string; text: string }): Promise<ProposedPlan>;
+  applyProposedPlan(planId: string, proposal: ProposedPlan): Promise<AssessmentItem[]>;
+  exportGradebookActa(format: 'pdf' | 'docx' | 'csv' | 'xlsx', input: unknown, grid?: { columns: unknown[]; rows: unknown[] }): Promise<{ path: string } | null>;
+  exportGradebookBoletin(input: unknown): Promise<{ path: string } | null>;
+  addExamBlock(planId: string, examId: string, weight?: number): Promise<AssessmentItem[]>;
+  addRubricItem(planId: string, rubricId: string, weight?: number): Promise<AssessmentItem[]>;
+  setRubricEvaluation(input: { studentId: string; itemId: string; convocatoria?: string; levels: Record<string, string> }): Promise<GradeEntry>;
+  getRubricEvaluation(studentId: string, itemId: string, convocatoria?: string): Promise<Record<string, string>>;
+  draftStudentFeedback(request: { planId: string; groupId: string; studentId: string; summary: string }): Promise<{ text: string; warnings: string[] }>;
+  // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
+  // predate academic years; omitting it returns every year.
+  listTeachingGroups(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<TeachingGroup[]>;
+  getTeachingGroup(id: string): Promise<TeachingGroup>;
+  createTeachingGroup(input: TeachingGroupInput): Promise<TeachingGroup>;
+  updateTeachingGroup(
+    id: string,
+    patch: Partial<Pick<TeachingGroup, 'name' | 'academicYearId' | 'expectedSize' | 'position'>>,
+  ): Promise<TeachingGroup>;
+  deleteTeachingGroup(id: string): Promise<void>;
+  addTeachingStudent(groupId: string, count?: number): Promise<TeachingGroup>;
+  updateTeachingStudent(
+    id: string,
+    patch: Partial<Pick<TeachingStudent, 'givenNames' | 'surnames' | 'comments' | 'position'>>,
+  ): Promise<TeachingStudent>;
+  deleteTeachingStudent(id: string): Promise<void>;
+  importStudentsFromGroup(targetGroupId: string, sourceGroupId: string): Promise<TeachingGroup>;
   // Rubric builder (teaching vault).
   listTeachingRubrics(options?: { subjectId?: string | null; search?: string }): Promise<TeachingRubric[]>;
   getTeachingRubric(id: string): Promise<TeachingRubric>;

@@ -133,6 +133,9 @@ const INDIRECT_KEY_SOURCES = [
   // Rubric level-set presets and the quality-check messages, rendered as
   // t(preset.label) / t(issue.message) in RubricsView.
   { file: 'shared/teachingRubrics.ts', pattern: /\b(?:label|message):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Assessment presets: the model picker renders t(p.label) / t(p.hint) when creating a
+  // gradebook, so those strings never appear literally inside a t() call.
+  { file: 'shared/assessment/profiles.ts', pattern: /\b(?:label|hint):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Formula recipe / operation / statistic names and hints, rendered as t(r.label) / t(r.hint).
   { file: 'shared/databaseFormula.ts', pattern: /\b(?:label|hint):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // validateFormula's problems, surfaced through t(problem) in the editor and t(error) in the

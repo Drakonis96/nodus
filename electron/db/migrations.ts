@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 85;
+export const SCHEMA_VERSION = 87;
 
 export const migrations: Migration[] = [
   {
@@ -2881,6 +2881,164 @@ export const migrations: Migration[] = [
       ALTER TABLE teaching_exam_questions
         ADD COLUMN parent_id TEXT REFERENCES teaching_exam_questions(id) ON DELETE CASCADE;
       CREATE INDEX idx_teaching_exam_questions_parent ON teaching_exam_questions(parent_id, position);
+    `,
+  },
+  {
+    version: 86,
+    up: /* sql */ `
+      -- Student groups (teaching vault): the class list a teacher keeps per subject.
+      --
+      -- A group hangs off a SUBJECT, not a course, because the per-student comment is
+      -- inherently subject-scoped — what you note about a student in History is not what
+      -- you note in Geography. Modelling groups as shared rosters (group ⇄ subject
+      -- many-to-many) would force splitting identity from annotation into two tables to
+      -- save nothing but retyping, which the "import from another group" action below
+      -- solves far more cheaply.
+      --
+      -- academic_year_id is carried HERE rather than inherited from the subject: a group
+      -- belongs to one academic year the same way a course does, and that is exactly what
+      -- makes a new year start from an empty list instead of dragging last year's
+      -- students along. It is SET NULL rather than CASCADE so deleting a year archives
+      -- the scoping, never the roster.
+      CREATE TABLE teaching_groups (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        subject_id TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE SET NULL,
+        -- The "total number of students" the teacher declares up front; used once to
+        -- pre-create that many blank rows. A starting point, never a limit.
+        expected_size INTEGER NOT NULL DEFAULT 0,
+        position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_groups_subject ON teaching_groups(subject_id, academic_year_id);
+
+      -- pseudonym_code is a STORED column, not derived from the name: it has to survive
+      -- a rename, and deriving it from the name (initials, a hash) would defeat the
+      -- point of showing it to an AI instead of the name. See shared/studentPseudonyms.ts.
+      CREATE TABLE teaching_students (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        given_names TEXT NOT NULL DEFAULT '',
+        surnames TEXT NOT NULL DEFAULT '',
+        comments TEXT NOT NULL DEFAULT '',
+        pseudonym_code TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_students_code ON teaching_students(group_id, pseudonym_code);
+      CREATE INDEX idx_teaching_students_group ON teaching_students(group_id, position);
+    `,
+  },
+  {
+    version: 87,
+    up: /* sql */ `
+      -- Gradebook (teaching vault).
+      --
+      -- The plan IS the programación didáctica / guía docente, and it is versioned on
+      -- purpose: no state norm prescribes how a grade is computed, so what actually
+      -- binds a teacher — and what a grade challenge is resolved against — is the
+      -- document they published. Once published_at is set the plan is frozen and an
+      -- edit produces a new version, so a mark can always be recomputed against the
+      -- rules that were in force when it was given.
+      --
+      -- rules_json holds the whole PlanRules object (scale, rounding, thresholds,
+      -- not-presented policy, honours quota, advisories). It is stored as one blob
+      -- rather than as columns because it is always read and written whole, and
+      -- because every institution needs a different subset of it.
+      CREATE TABLE teaching_assessment_plans (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        subject_id TEXT NOT NULL REFERENCES study_subjects(id) ON DELETE CASCADE,
+        academic_year_id TEXT REFERENCES study_academic_years(id) ON DELETE SET NULL,
+        profile TEXT NOT NULL DEFAULT 'libre',
+        rules_json TEXT NOT NULL DEFAULT '{}',
+        published_at TEXT,
+        version INTEGER NOT NULL DEFAULT 1,
+        parent_version_id TEXT REFERENCES teaching_assessment_plans(id) ON DELETE SET NULL,
+        archived_at TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_plans_subject ON teaching_assessment_plans(subject_id, academic_year_id);
+
+      -- The evaluation tree. weight and weight_alt are the two columns of a guía
+      -- docente's evaluation table (continuous vs non-continuous assessment) over the
+      -- SAME tree — not two trees, which is how the document itself is laid out.
+      --
+      -- The source_* columns keep provenance: a column generated from an exam question
+      -- can be traced back to it, and competency_code/criterion_code carry the LOMLOE
+      -- traceability that a regional inspection asks for.
+      CREATE TABLE teaching_assessment_items (
+        id TEXT PRIMARY KEY,
+        plan_id TEXT NOT NULL REFERENCES teaching_assessment_plans(id) ON DELETE CASCADE,
+        parent_id TEXT REFERENCES teaching_assessment_items(id) ON DELETE CASCADE,
+        name TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL DEFAULT 'activity',
+        position INTEGER NOT NULL DEFAULT 0,
+        weight REAL NOT NULL DEFAULT 1,
+        weight_alt REAL NOT NULL DEFAULT 1,
+        aggregation TEXT NOT NULL DEFAULT 'weighted',
+        entry_mode TEXT NOT NULL DEFAULT 'numeric',
+        max_points REAL NOT NULL DEFAULT 10,
+        min_to_average REAL,
+        is_mandatory INTEGER NOT NULL DEFAULT 0,
+        is_recoverable INTEGER NOT NULL DEFAULT 1,
+        target REAL,
+        best_of INTEGER,
+        conditional_min REAL,
+        source_exam_id TEXT REFERENCES teaching_exams(id) ON DELETE SET NULL,
+        source_exam_question_id TEXT REFERENCES teaching_exam_questions(id) ON DELETE SET NULL,
+        source_rubric_id TEXT REFERENCES teaching_rubrics(id) ON DELETE SET NULL,
+        competency_code TEXT,
+        criterion_code TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_items_plan ON teaching_assessment_items(plan_id, parent_id, position);
+
+      -- THE ATOM. status is orthogonal to raw_value, which is the whole reason a blank
+      -- cell need not mean zero: "sin evaluar" renormalises the weights, "no entregado"
+      -- may score zero, and "exento" never counts either way.
+      --
+      -- convocatoria is part of the key rather than a separate table so an ordinary and
+      -- an extraordinary mark for the same item coexist and can be compared.
+      CREATE TABLE teaching_grade_entries (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL REFERENCES teaching_assessment_items(id) ON DELETE CASCADE,
+        convocatoria TEXT NOT NULL DEFAULT 'ordinaria',
+        raw_value REAL,
+        status TEXT NOT NULL DEFAULT 'not_assessed',
+        is_override INTEGER NOT NULL DEFAULT 0,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_entries_key
+        ON teaching_grade_entries(student_id, item_id, convocatoria);
+      CREATE INDEX idx_teaching_entries_item ON teaching_grade_entries(item_id, convocatoria);
+
+      -- Per-student rubric marks. Rubrics themselves store their grid as JSON because
+      -- they are edited whole, but an EVALUATION is queried per criterion, so it gets
+      -- real rows.
+      CREATE TABLE teaching_rubric_evaluations (
+        id TEXT PRIMARY KEY,
+        entry_id TEXT NOT NULL REFERENCES teaching_grade_entries(id) ON DELETE CASCADE,
+        criterion_id TEXT NOT NULL,
+        level_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_rubric_eval_key
+        ON teaching_rubric_evaluations(entry_id, criterion_id);
     `,
   },
 ];
