@@ -6029,4 +6029,10 @@ export const DE: Record<string, string> = {
   "Usar «no presentado»": "„Nicht angetreten“ verwenden",
   "Valor más repetido": "Häufigster Wert",
   "Última nota": "Letzte Note",
+  "Al aplicarlo se reemplazará la estructura actual del cuaderno.": "Das Anwenden ersetzt die aktuelle Struktur des Notenhefts.",
+  "Importar de mi guía docente": "Aus meinem Modulhandbuch importieren",
+  "Nota mínima para promediar: {min}": "Mindestnote zum Mitteln: {min}",
+  "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Füge den Bewertungsteil ein. Die KI schlägt die Struktur vor, du bestätigst sie. Sie berechnet nie Noten.",
+  "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Abschlussprüfung 50 %, Arbeiten 30 %, Mitarbeit 20 %…",
+  "{n} elementos · los pesos suman {sum}": "{n} Elemente · Gewichte ergeben {sum}",
 };

@@ -291,6 +291,7 @@ import * as teachingExams from './db/teachingExamsRepo';
 import * as teachingRubrics from './db/teachingRubricsRepo';
 import * as teachingGroups from './db/teachingGroupsRepo';
 import * as teachingGrades from './db/teachingGradesRepo';
+import { importAssessmentPlan, draftStudentFeedback } from './ai/assessmentImport';
 import type { TeachingGroupInput } from '@shared/teachingGroups';
 import * as teachingLogos from './db/teachingLogosRepo';
 import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
@@ -2442,6 +2443,9 @@ export function registerIpc(
     teachingGrades.clearGradeEntry(studentId, itemId, convocatoria ?? 'ordinaria');
     return null;
   });
+  h('teaching:plans:import', async (_e, request: { planId: string; text: string }) => importAssessmentPlan(request));
+  h('teaching:plans:apply', async (_e, planId: string, proposal: Parameters<typeof teachingGrades.applyProposedPlan>[1]) => teachingGrades.applyProposedPlan(planId, proposal));
+  h('teaching:feedback:draft', async (_e, request: Parameters<typeof draftStudentFeedback>[0]) => draftStudentFeedback(request));
   h('teaching:entries:cohort', async (_e, planId: string, groupId: string, convocatoria?: string) => teachingGrades.cohortStats(planId, groupId, convocatoria ?? 'ordinaria'));
 
   // ---- Student groups (teaching vault) ----

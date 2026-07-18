@@ -216,7 +216,11 @@ function installRuntimeHooks(userData) {
   const originalResolve = Module._resolveFilename;
   Module._resolveFilename = function (request, ...args) {
     if (request.startsWith('@shared/')) {
-      return originalResolve.call(this, path.join(repoRoot, 'shared', `${request.slice('@shared/'.length)}.ts`), ...args);
+      // A shared module may be a file OR a directory with an index, so try both.
+      const rest = request.slice('@shared/'.length);
+      const direct = path.join(repoRoot, 'shared', `${rest}.ts`);
+      const asIndex = path.join(repoRoot, 'shared', rest, 'index.ts');
+      return originalResolve.call(this, fs.existsSync(direct) ? direct : asIndex, ...args);
     }
     return originalResolve.call(this, request, ...args);
   };

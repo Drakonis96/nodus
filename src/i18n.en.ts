@@ -6256,4 +6256,10 @@ export const EN: Record<string, string> = {
   "Usar «no presentado»": "Use “not presented”",
   "Valor más repetido": "Most frequent value",
   "Última nota": "Latest mark",
+  "Al aplicarlo se reemplazará la estructura actual del cuaderno.": "Applying this replaces the gradebook's current structure.",
+  "Importar de mi guía docente": "Import from my course guide",
+  "Nota mínima para promediar: {min}": "Minimum mark to average: {min}",
+  "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Paste the assessment section. The AI proposes the structure; you confirm it. It never computes grades.",
+  "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Final exam 50%, coursework 30%, participation 20%…",
+  "{n} elementos · los pesos suman {sum}": "{n} items · weights add up to {sum}",
 };

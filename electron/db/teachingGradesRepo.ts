@@ -8,6 +8,7 @@ import {
   type GradeEntry,
   type PlanRules,
 } from '@shared/assessment';
+import type { ProposedPlan as ProposedPlanShape, ProposedItem as ProposedItemShape } from '@shared/assessmentImport';
 
 type Row = Record<string, unknown>;
 
@@ -427,6 +428,39 @@ export function clearGradeEntry(studentId: string, itemId: string, convocatoria 
   getDb()
     .prepare('DELETE FROM teaching_grade_entries WHERE student_id = ? AND item_id = ? AND convocatoria = ?')
     .run(studentId, itemId, convocatoria);
+}
+
+/**
+ * Writes an AI proposal into the plan, replacing whatever structure it had.
+ *
+ * Replacing rather than merging is deliberate: the teacher has just reviewed the whole
+ * proposal, and silently interleaving it with an existing tree would produce something
+ * nobody approved. Marks already recorded cascade away with the old items, which is why
+ * this is offered on empty or draft plans.
+ */
+export function applyProposedPlan(planId: string, proposal: ProposedPlanShape): AssessmentItem[] {
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare('DELETE FROM teaching_assessment_items WHERE plan_id = ?').run(planId);
+    const insert = (nodes: ProposedItemShape[], parentId: string | null) => {
+      nodes.forEach((node, index) => {
+        const created = createAssessmentItem(planId, {
+          parentId,
+          name: node.name,
+          kind: (node.children?.length ?? 0) > 0 ? 'block' : 'activity',
+          weight: node.weight,
+          weightAlt: node.weight,
+          position: index,
+          minToAverage: node.minToAverage ?? null,
+          isMandatory: node.isMandatory ?? false,
+          isRecoverable: node.isRecoverable ?? true,
+        });
+        if (node.children?.length) insert(node.children, created.id);
+      });
+    };
+    insert(proposal.items, null);
+  })();
+  return listAssessmentItems(planId);
 }
 
 /**

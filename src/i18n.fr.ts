@@ -6020,4 +6020,10 @@ export const FR: Record<string, string> = {
   "Usar «no presentado»": "Utiliser « non présenté »",
   "Valor más repetido": "Valeur la plus fréquente",
   "Última nota": "Dernière note",
+  "Al aplicarlo se reemplazará la estructura actual del cuaderno.": "L’appliquer remplacera la structure actuelle du carnet.",
+  "Importar de mi guía docente": "Importer depuis mon syllabus",
+  "Nota mínima para promediar: {min}": "Note minimale pour la moyenne : {min}",
+  "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Collez la section évaluation. L’IA propose la structure ; vous la validez. Elle ne calcule jamais de notes.",
+  "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Examen final 50 %, travaux 30 %, participation 20 %…",
+  "{n} elementos · los pesos suman {sum}": "{n} éléments · les poids totalisent {sum}",
 };

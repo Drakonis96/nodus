@@ -23,7 +23,7 @@ export function resolveStudyAiTaskModel(task: StudyAiTask, explicit?: ModelRef |
   return model;
 }
 
-export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalConsentKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
+export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitModel?: ModelRef | null; subjectId?: string | null; inputChars: number; outputChars?: (value: T) => number; allowFallback?: () => boolean; externalPurpose?: string; externalDetail?: string; externalConsentKey?: string }, operation: (model: ModelRef) => Promise<T>): Promise<{ value: T; model: ModelRef; fallbackUsed: boolean }> {
   const settings = getSettings(); if (input.inputChars > settings.studyAiMaxInputChars) throw new Error(`La solicitud supera el límite configurado de ${settings.studyAiMaxInputChars.toLocaleString('es-ES')} caracteres.`);
   const summary = getStudyAiUsageSummary(); if (summary.budgetUsd > 0 && summary.knownCostUsd >= summary.budgetUsd) throw new Error('Se ha alcanzado el presupuesto mensual de IA para estudio.');
   const primary = resolveStudyAiTaskModel(input.task, input.explicitModel, input.subjectId);
@@ -48,7 +48,13 @@ export async function runStudyAiTask<T>(input: { task: StudyAiTask; explicitMode
       const response = dialog.showMessageBoxSync({
         type: 'warning', title: 'Datos fuera del dispositivo',
         message: `Nodus enviará esta solicitud de estudio a ${candidate.model.provider} (${candidate.model.model}).`,
-        detail: `Finalidad: ${input.externalPurpose ?? input.task}. Se enviarán hasta ${input.inputChars.toLocaleString('es-ES')} caracteres según tus límites.`,
+        // externalDetail is where a caller states what its own privacy layer does and
+        // does NOT cover. This dialog is the moment the user authorises the send, so it
+        // is the only honest place to say it.
+        detail: [
+          `Finalidad: ${input.externalPurpose ?? input.task}. Se enviarán hasta ${input.inputChars.toLocaleString('es-ES')} caracteres según tus límites.`,
+          input.externalDetail,
+        ].filter(Boolean).join('\n\n'),
         buttons: ['Cancelar', 'Continuar'], defaultId: 0, cancelId: 0, noLink: true,
       });
       if (response !== 1) throw new Error('Envío externo cancelado por el usuario.');

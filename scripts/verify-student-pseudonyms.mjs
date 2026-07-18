@@ -206,6 +206,61 @@ try {
   );
   console.log(`  ✓ streaming clean across ${deltas.length} deltas`);
 
+  /* 5. The real product features -------------------------------------------- */
+  //
+  // Everything above exercises the layer directly. These two drive the actual
+  // gradebook code paths, which is what a user will hit.
+  const grades = require(path.join(repoRoot, 'electron/db/teachingGradesRepo.ts'));
+  const groupsRepo = require(path.join(repoRoot, 'electron/db/teachingGroupsRepo.ts'));
+  const ai = require(path.join(repoRoot, 'electron/ai/assessmentImport.ts'));
+  const { getDb } = require(path.join(repoRoot, 'electron/db/database.ts'));
+  const sql = getDb();
+  const stampNow = '2026-01-01T00:00:00.000Z';
+  sql.prepare(`INSERT INTO study_courses (id, short_id, name, position, created_at, updated_at)
+               VALUES ('c1','c1','Curso',0,?,?)`).run(stampNow, stampNow);
+  sql.prepare(`INSERT INTO study_subjects (id, short_id, course_id, name, position, created_at, updated_at)
+               VALUES ('sub1','sub1','c1','Historia',0,?,?)`).run(stampNow, stampNow);
+  settingsRepo.updateSettings({ [`${'study'}Model`]: model, chatModel: model, studyAiConfirmExternal: false });
+
+  const grp = groupsRepo.createTeachingGroup({ name: '1ºA', subjectId: 'sub1', expectedSize: 2 });
+  groupsRepo.updateTeachingStudent(grp.students[0].id, { givenNames: 'Ana María', surnames: 'Peña López' });
+  groupsRepo.updateTeachingStudent(grp.students[1].id, { givenNames: 'Juan', surnames: 'García Ruiz' });
+  const gradePlan = grades.createAssessmentPlan({ name: 'Historia', subjectId: 'sub1', profile: 'universidad' });
+
+  // 5a. Import a real-looking evaluation table.
+  const guia = [
+    'Sistema de evaluación — Ponderación',
+    'Prueba final: 50 %. La calificación mínima será de 4 sobre 10 para poder promediar.',
+    'Elaboración de trabajos teóricos: 30 %.',
+    'Valoración de la participación con aprovechamiento en clase: 20 %.',
+  ].join('\n');
+  const proposal = await ai.importAssessmentPlan({ planId: gradePlan.id, text: guia });
+  console.log('  import   :', proposal.items.map((i) => `${i.name} ${i.weight}%`).join(' | ').slice(0, 150));
+  assert.ok(proposal.items.length >= 3, `the model found the blocks; got ${JSON.stringify(proposal.items).slice(0, 200)}`);
+  const total = proposal.items.reduce((sum, i) => sum + i.weight, 0);
+  assert.ok(Math.abs(total - 100) < 0.01, `weights are read verbatim, got ${total}`);
+  assert.ok(proposal.items.some((i) => i.minToAverage != null && Math.abs(i.minToAverage - 0.4) < 0.01),
+    'the "4 sobre 10 para promediar" clause becomes a 0.4 threshold');
+  console.log('  ✓ guía docente imported into a weighted tree with its threshold');
+
+  // The proposal really applies, and the engine computes over it.
+  const applied = grades.applyProposedPlan(gradePlan.id, proposal);
+  assert.ok(applied.length >= 3, 'the proposal is written into the plan');
+  console.log(`  ✓ applied: ${applied.length} items now in the plan`);
+
+  // 5b. Feedback drafting — the first production consumer of the privacy layer.
+  wire.length = 0;
+  const feedback = await ai.draftStudentFeedback({
+    planId: gradePlan.id, groupId: grp.id, studentId: grp.students[0].id,
+    summary: 'Prueba final: 8/10. Trabajos: 6/10. Participación: 9/10.',
+  });
+  console.log('  feedback :', feedback.text.replace(/\s+/g, ' ').slice(0, 160));
+  if (provider !== 'gemini') {
+    assert.ok(wire.length === 0 || !NAMES.test(wireText()), 'no student name reached the provider');
+  }
+  assert.ok(!/STU_/i.test(feedback.text), 'the teacher reads names, not codes');
+  console.log('  ✓ feedback drafted through the pseudonymisation layer');
+
   console.log(`\n  ALL CHECKS PASSED for ${provider}/${modelId}\n`);
 } catch (cause) {
   failed = true;
@@ -223,7 +278,11 @@ function installRuntimeHooks(userData) {
   const originalResolve = Module._resolveFilename;
   Module._resolveFilename = function (request, ...args) {
     if (request.startsWith('@shared/')) {
-      return originalResolve.call(this, path.join(repoRoot, 'shared', `${request.slice('@shared/'.length)}.ts`), ...args);
+      // A shared module may be a file OR a directory with an index, so try both.
+      const rest = request.slice('@shared/'.length);
+      const direct = path.join(repoRoot, 'shared', `${rest}.ts`);
+      const asIndex = path.join(repoRoot, 'shared', rest, 'index.ts');
+      return originalResolve.call(this, fs.existsSync(direct) ? direct : asIndex, ...args);
     }
     return originalResolve.call(this, request, ...args);
   };

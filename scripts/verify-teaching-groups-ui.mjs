@@ -310,6 +310,18 @@ try {
   assert.equal(savedRules.passAt, 0.45, 'and a pass mark that is not 5');
   console.log('[ui] plan rules persist, including a 0,7 threshold and a 4,5 pass mark');
 
+  // The import modal must be reachable and state plainly what the AI does and does not
+  // do. Running the model itself is covered by scripts/verify-student-pseudonyms.mjs
+  // against Ollama and Gemini; this checks the surface a teacher actually sees.
+  await page.getByTestId('plan-import-open').click();
+  await page.getByTestId('plan-import-modal').waitFor();
+  const importCopy = await page.getByTestId('plan-import-modal').innerText();
+  assert.ok(/Nunca calcula notas/.test(importCopy), 'the import modal says the AI never computes grades');
+  await page.getByTestId('import-text').fill('Prueba final 50 %, trabajos 30 %, participación 20 %.');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('plan-import-modal').waitFor({ state: 'detached' });
+  console.log('[ui] AI import modal opens, states its limits and closes on Escape');
+
   // Publishing freezes the plan; revising must offer a new version instead.
   await page.getByTestId('plan-publish').click();
   await page.getByTestId('plan-revise').waitFor();

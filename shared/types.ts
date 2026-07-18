@@ -156,6 +156,8 @@ import type {
 import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
 export type { TeachingGroup, TeachingGroupInput, TeachingStudent } from './teachingGroups';
 import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRules } from './assessment/model';
+import type { ProposedPlan } from './assessmentImport';
+export type * from './assessmentImport';
 export type * from './assessment/model';
 import type {
   StudyIdeaDetail,
@@ -5428,6 +5430,9 @@ export interface NodusApi {
   setGradeEntry(input: { studentId: string; itemId: string; convocatoria?: string; rawValue?: number | null; status?: GradeEntry['status']; isOverride?: boolean; note?: string }): Promise<GradeEntry>;
   clearGradeEntry(studentId: string, itemId: string, convocatoria?: string): Promise<void>;
   gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
+  importAssessmentPlan(request: { planId: string; text: string }): Promise<ProposedPlan>;
+  applyProposedPlan(planId: string, proposal: ProposedPlan): Promise<AssessmentItem[]>;
+  draftStudentFeedback(request: { planId: string; groupId: string; studentId: string; summary: string }): Promise<{ text: string; warnings: string[] }>;
   // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
   // predate academic years; omitting it returns every year.
   listTeachingGroups(options?: { subjectId?: string | null; academicYearId?: string | null }): Promise<TeachingGroup[]>;

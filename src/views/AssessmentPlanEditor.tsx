@@ -10,7 +10,8 @@ import {
   type PlanRules,
   type RoundingMode,
 } from '@shared/assessment';
-import { Icon, ModalBackdrop } from '../components/ui';
+import { Icon, ModalBackdrop, Spinner } from '../components/ui';
+import { proposedWeightTotal, countProposedItems, type ProposedPlan } from '@shared/assessmentImport';
 import { t, tx } from '../i18n';
 
 /**
@@ -64,6 +65,7 @@ export function AssessmentPlanEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const warnings = useMemo(() => validatePlan(plan, items), [plan, items]);
   const byParent = useMemo(() => {
@@ -170,9 +172,114 @@ export function AssessmentPlanEditor({
           )}
         </div>
 
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button className="btn btn-ghost mr-auto" data-testid="plan-import-open" onClick={() => setImporting(true)}>
+            <Icon name="bulb" size={13} />{t('Importar de mi guía docente')}
+          </button>
           <button className="btn btn-primary" data-testid="plan-editor-close" onClick={onClose}>{t('Hecho')}</button>
         </div>
+      </section>
+      {importing && (
+        <ImportModal
+          planId={plan.id}
+          onCancel={() => setImporting(false)}
+          onApplied={async () => { setImporting(false); await onChanged(); }}
+        />
+      )}
+    </ModalBackdrop>
+  );
+}
+
+/* ------------------------------------------------------------------ import --- */
+
+/**
+ * Paste the evaluation section of your own guía docente or programación; the model
+ * proposes a structure and YOU confirm it before anything is written. It proposes
+ * structure only — the grade is always computed by the engine, never by the model.
+ */
+function ImportModal({
+  planId, onCancel, onApplied,
+}: {
+  planId: string;
+  onCancel: () => void;
+  onApplied: () => Promise<void>;
+}) {
+  const [text, setText] = useState('');
+  const [proposal, setProposal] = useState<ProposedPlan | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const analyse = async () => {
+    setBusy(true); setError('');
+    try { setProposal(await window.nodus.importAssessmentPlan({ planId, text })); }
+    catch (cause) { setError(String((cause as Error)?.message ?? cause)); }
+    finally { setBusy(false); }
+  };
+
+  const apply = async () => {
+    if (!proposal) return;
+    setBusy(true);
+    try { await window.nodus.applyProposedPlan(planId, proposal); await onApplied(); }
+    catch (cause) { setError(String((cause as Error)?.message ?? cause)); setBusy(false); }
+  };
+
+  const renderProposed = (items: ProposedPlan['items'], depth = 0) => items.map((item, index) => (
+    <div key={`${depth}-${index}`} style={{ paddingLeft: depth * 14 }} className="border-b border-neutral-200 py-1 dark:border-neutral-800/60">
+      <div className="flex items-baseline gap-2">
+        <span className="min-w-0 flex-1 truncate">{item.name}</span>
+        <span className="shrink-0 text-[10px] text-neutral-500">{item.weight}%</span>
+      </div>
+      {item.minToAverage != null && (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400">
+          {tx('Nota mínima para promediar: {min}', { min: item.minToAverage })}
+        </p>
+      )}
+      {item.evidence && <p className="truncate text-[10px] text-neutral-500">“{item.evidence}”</p>}
+      {item.children && renderProposed(item.children, depth + 1)}
+    </div>
+  ));
+
+  return (
+    <ModalBackdrop onClose={onCancel} zIndex={140}>
+      <section className="card-modal flex max-h-[80vh] w-full max-w-xl flex-col p-5" role="dialog" aria-modal="true"
+        aria-label={t('Importar de mi guía docente')} data-testid="plan-import-modal">
+        <h2 className="text-base font-semibold">{t('Importar de mi guía docente')}</h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          {t('Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.')}
+        </p>
+
+        {error && <p className="mt-2 text-sm text-red-500" data-testid="import-error">{error}</p>}
+
+        {!proposal ? (
+          <>
+            <textarea className="input mt-3 min-h-[180px] flex-1 text-xs" data-testid="import-text" value={text}
+              placeholder={t('Prueba final 50 %, trabajos 30 %, participación 20 %…')}
+              onChange={(e) => setText(e.target.value)} />
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button>
+              <button className="btn btn-primary" data-testid="import-run" disabled={busy || !text.trim()} onClick={() => void analyse()}>
+                {busy ? <Spinner label={t('Analizando…')} /> : t('Analizar')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mt-3 min-h-0 flex-1 overflow-auto text-xs" data-testid="import-proposal">
+              {renderProposed(proposal.items)}
+            </div>
+            <p className="mt-2 text-[11px] text-neutral-500">
+              {tx('{n} elementos · los pesos suman {sum}', { n: countProposedItems(proposal), sum: proposedWeightTotal(proposal) })}
+            </p>
+            {proposal.notes && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">{proposal.notes}</p>}
+            <p className="mt-2 text-[11px] text-neutral-500">{t('Al aplicarlo se reemplazará la estructura actual del cuaderno.')}</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn btn-ghost" data-testid="import-back" onClick={() => setProposal(null)}>{t('Volver')}</button>
+              <button className="btn btn-primary" data-testid="import-apply" disabled={busy} onClick={() => void apply()}>
+                {t('Aplicar')}
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </ModalBackdrop>
   );
