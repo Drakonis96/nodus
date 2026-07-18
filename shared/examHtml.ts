@@ -137,12 +137,15 @@ function answerKeyHtml(exam: TeachingExam, blocks: ReturnType<typeof groupExamQu
       const def = examQuestionTypeDef(question.type);
       let answer = escapeMultiline(question.solution);
       if (question.type === 'multiple_choice') {
-        const correct = question.options.findIndex((option) => option.correct);
-        const letter = correct >= 0 ? `${examOptionLetter(correct)}) ${escapeHtml(question.options[correct]?.text ?? '')}` : '';
+        // Letter over the SAME list the paper letters: the paper drops blank options
+        // before lettering, so indexing the unfiltered array cites the wrong letter as
+        // soon as a question has an empty option — and a wrong key is worse than none.
+        const shown = question.options.filter((option) => option.text.trim());
+        const correct = shown.findIndex((option) => option.correct);
+        const letter = correct >= 0 ? `${examOptionLetter(correct)}) ${escapeHtml(shown[correct]?.text ?? '')}` : '';
         answer = [letter, answer].filter(Boolean).join(' — ');
       } else if (question.type === 'true_false') {
-        const isTrue = question.options.find((option) => option.correct)?.text === 'Verdadero';
-        answer = [escapeHtml(isTrue ? labels.trueLabel : labels.falseLabel), answer].filter(Boolean).join(' — ');
+        answer = [escapeHtml(trueFalseAnswerLabel(question, labels)), answer].filter(Boolean).join(' — ');
       } else if (question.type === 'matching') {
         const pairs = question.pairs
           .filter((pair) => pair.left.trim() && pair.right.trim())
@@ -232,6 +235,45 @@ const STYLES = `
   @media (max-width: 540px) { .preview-body .sheet { zoom: 0.5; } }
   @media (max-width: 440px) { .preview-body .sheet { zoom: 0.4; } }
 `;
+
+/**
+ * The recorded answer to a true/false question.
+ *
+ * A question typed by hand carries NO options — the builder only shows an options
+ * editor for types flagged `needsOptions`, and true/false is not one — so the old
+ * `options.find(o => o.correct)?.text === 'Verdadero'` was false for every manual
+ * question and the key printed "Falso" for all of them. A teacher marking with that
+ * key marks wrongly, which is the worst failure this document can have.
+ *
+ * It also compared against a hardcoded Spanish string, so translating the option text
+ * would have silently flipped every key.
+ *
+ * Returns null when nothing has been recorded, so the caller can stay silent instead
+ * of asserting an answer nobody gave.
+ */
+export function trueFalseAnswer(question: Pick<ExamQuestion, 'options' | 'solution'>): boolean | null {
+  const correct = question.options?.find((option) => option.correct);
+  if (correct) {
+    const text = (correct.text ?? '').trim().toLowerCase();
+    if (text) return !/^(f|false|falso|falsch|faux)/.test(text);
+    // Flagged correct but unlabelled: the flag is the answer.
+    return true;
+  }
+  // Fall back to what the teacher typed in the solution field.
+  const written = (question.solution ?? '').trim().toLowerCase();
+  if (!written) return null;
+  if (/^(v|t|true|verdadero|verdadeiro|vrai|wahr|richtig)/.test(written)) return true;
+  if (/^(f|false|falso|falsch|faux)/.test(written)) return false;
+  return null;
+}
+
+function trueFalseAnswerLabel(
+  question: Pick<ExamQuestion, 'options' | 'solution'>,
+  labels: { trueLabel: string; falseLabel: string },
+): string {
+  const value = trueFalseAnswer(question);
+  return value == null ? '' : value ? labels.trueLabel : labels.falseLabel;
+}
 
 export function renderExamHtml(exam: TeachingExam, questions: ExamQuestion[], options: ExamHtmlOptions = {}): string {
   const labels = examDocumentLabels(exam.language);
