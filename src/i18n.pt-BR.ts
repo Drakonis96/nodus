@@ -5985,4 +5985,8 @@ export const PT_BR: Record<string, string> = {
   "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Cole a seção de avaliação. A IA propõe a estrutura; você confirma. Ela nunca calcula notas.",
   "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Prova final 50 %, trabalhos 30 %, participação 20 %…",
   "{n} elementos · los pesos suman {sum}": "{n} itens · os pesos somam {sum}",
+  "Desde un examen": "A partir de uma prova",
+  "Desde una rúbrica": "A partir de uma rubrica",
+  "Se creará una columna por pregunta, con su numeración y su puntuación.": "Será criada uma coluna por questão, com sua numeração e pontuação.",
+  "Se creará una columna que se evalúa abriendo la rúbrica.": "Será criada uma coluna avaliada ao abrir a rubrica.",
 };

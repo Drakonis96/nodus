@@ -2443,6 +2443,10 @@ export function registerIpc(
     teachingGrades.clearGradeEntry(studentId, itemId, convocatoria ?? 'ordinaria');
     return null;
   });
+  h('teaching:items:fromExam', async (_e, planId: string, examId: string, weight?: number) => teachingGrades.addExamBlock(planId, examId, weight ?? 0));
+  h('teaching:items:fromRubric', async (_e, planId: string, rubricId: string, weight?: number) => teachingGrades.addRubricItem(planId, rubricId, weight ?? 0));
+  h('teaching:entries:rubric:set', async (_e, input: Parameters<typeof teachingGrades.setRubricEvaluation>[0]) => teachingGrades.setRubricEvaluation(input));
+  h('teaching:entries:rubric:get', async (_e, studentId: string, itemId: string, convocatoria?: string) => teachingGrades.getRubricEvaluation(studentId, itemId, convocatoria ?? 'ordinaria'));
   h('teaching:plans:import', async (_e, request: { planId: string; text: string }) => importAssessmentPlan(request));
   h('teaching:plans:apply', async (_e, planId: string, proposal: Parameters<typeof teachingGrades.applyProposedPlan>[1]) => teachingGrades.applyProposedPlan(planId, proposal));
   h('teaching:feedback:draft', async (_e, request: Parameters<typeof draftStudentFeedback>[0]) => draftStudentFeedback(request));

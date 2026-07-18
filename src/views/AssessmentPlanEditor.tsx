@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AGGREGATIONS,
   ROUNDING_MODES,
@@ -66,6 +66,7 @@ export function AssessmentPlanEditor({
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [picking, setPicking] = useState<'exam' | 'rubric' | null>(null);
 
   const warnings = useMemo(() => validatePlan(plan, items), [plan, items]);
   const byParent = useMemo(() => {
@@ -166,6 +167,8 @@ export function AssessmentPlanEditor({
                 parentId, name: t('Nuevo elemento'), weight: 0,
               }))}
               onDelete={(id) => run(() => window.nodus.deleteAssessmentItem(id))}
+              onFromExam={async () => setPicking('exam')}
+              onFromRubric={async () => setPicking('rubric')}
             />
           ) : (
             <RulesTab rules={plan.rules} onPatch={patchRules} />
@@ -179,6 +182,18 @@ export function AssessmentPlanEditor({
           <button className="btn btn-primary" data-testid="plan-editor-close" onClick={onClose}>{t('Hecho')}</button>
         </div>
       </section>
+      {picking && (
+        <SourcePicker
+          kind={picking}
+          onCancel={() => setPicking(null)}
+          onPick={async (id, weight) => {
+            await run(() => picking === 'exam'
+              ? window.nodus.addExamBlock(plan.id, id, weight)
+              : window.nodus.addRubricItem(plan.id, id, weight));
+            setPicking(null);
+          }}
+        />
+      )}
       {importing && (
         <ImportModal
           planId={plan.id}
@@ -186,6 +201,75 @@ export function AssessmentPlanEditor({
           onApplied={async () => { setImporting(false); await onChanged(); }}
         />
       )}
+    </ModalBackdrop>
+  );
+}
+
+/* ------------------------------------------------------------------ source --- */
+
+/**
+ * Builds a block from something the teacher already made.
+ *
+ * An exam already carries the numbering and the points per question, and a rubric
+ * already carries its own maximum — retyping either is work the app can spare them,
+ * and a column that keeps its source id can always be traced back to it.
+ */
+function SourcePicker({
+  kind, onCancel, onPick,
+}: {
+  kind: 'exam' | 'rubric';
+  onCancel: () => void;
+  onPick: (id: string, weight: number) => Promise<void>;
+}) {
+  const [options, setOptions] = useState<{ id: string; title: string }[]>([]);
+  const [chosen, setChosen] = useState('');
+  const [weight, setWeight] = useState('0');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const list = kind === 'exam'
+        ? (await window.nodus.listTeachingExams()).map((e) => ({ id: e.id, title: e.title }))
+        : (await window.nodus.listTeachingRubrics()).map((r) => ({ id: r.id, title: r.title }));
+      if (!active) return;
+      setOptions(list);
+      setChosen(list[0]?.id ?? '');
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [kind]);
+
+  return (
+    <ModalBackdrop onClose={onCancel} zIndex={140}>
+      <section className="card-modal w-full max-w-md p-5" role="dialog" aria-modal="true"
+        aria-label={kind === 'exam' ? t('Desde un examen') : t('Desde una rúbrica')} data-testid="source-picker">
+        <h2 className="text-base font-semibold">{kind === 'exam' ? t('Desde un examen') : t('Desde una rúbrica')}</h2>
+        <p className="mt-1 text-xs text-neutral-500">
+          {kind === 'exam'
+            ? t('Se creará una columna por pregunta, con su numeración y su puntuación.')
+            : t('Se creará una columna que se evalúa abriendo la rúbrica.')}
+        </p>
+        {loading ? <Spinner label={t('Cargando…')} /> : options.length === 0 ? (
+          <p className="mt-4 text-sm text-neutral-500">
+            {kind === 'exam' ? t('Todavía no has creado ningún examen.') : t('Todavía no has creado ninguna rúbrica.')}
+          </p>
+        ) : (
+          <>
+            <select className="input mt-4 w-full" data-testid="source-select" value={chosen} onChange={(e) => setChosen(e.target.value)}>
+              {options.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+            <label className="mt-3 block text-xs font-medium">{t('Peso')}</label>
+            <input type="number" className="input mt-1 w-full" data-testid="source-weight" value={weight}
+              onChange={(e) => setWeight(e.target.value)} />
+          </>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <button className="btn btn-ghost" onClick={onCancel}>{t('Cancelar')}</button>
+          <button className="btn btn-primary" data-testid="source-add" disabled={!chosen}
+            onClick={() => void onPick(chosen, Number(weight) || 0)}>{t('Añadir')}</button>
+        </div>
+      </section>
     </ModalBackdrop>
   );
 }
@@ -288,7 +372,7 @@ function ImportModal({
 /* --------------------------------------------------------------- structure --- */
 
 function StructureTab({
-  plan, items, byParent, expanded, onExpand, onPatch, onAdd, onDelete,
+  plan, items, byParent, expanded, onExpand, onPatch, onAdd, onDelete, onFromExam, onFromRubric,
 }: {
   plan: AssessmentPlan;
   items: AssessmentItem[];
@@ -298,6 +382,8 @@ function StructureTab({
   onPatch: (id: string, patch: Partial<AssessmentItem>) => Promise<void>;
   onAdd: (parentId: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onFromExam: () => Promise<void>;
+  onFromRubric: () => Promise<void>;
 }) {
   const renderLevel = (parentId: string | null, depth: number) => {
     const siblings = byParent.get(parentId) ?? [];
@@ -356,9 +442,17 @@ function StructureTab({
     <div className="text-xs" data-testid="plan-structure">
       {items.length === 0 && <p className="py-4 text-neutral-500">{t('Este cuaderno todavía no tiene bloques de evaluación.')}</p>}
       {renderLevel(null, 0)}
-      <button className="btn btn-primary mt-3 h-8" data-testid="item-add-root" onClick={() => void onAdd(null)}>
-        <Icon name="plus" size={13} />{t('Añadir bloque')}
-      </button>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="btn btn-primary h-8" data-testid="item-add-root" onClick={() => void onAdd(null)}>
+          <Icon name="plus" size={13} />{t('Añadir bloque')}
+        </button>
+        <button className="btn btn-ghost h-8" data-testid="item-from-exam" onClick={() => void onFromExam()}>
+          <Icon name="notebook" size={13} />{t('Desde un examen')}
+        </button>
+        <button className="btn btn-ghost h-8" data-testid="item-from-rubric" onClick={() => void onFromRubric()}>
+          <Icon name="table" size={13} />{t('Desde una rúbrica')}
+        </button>
+      </div>
     </div>
   );
 }

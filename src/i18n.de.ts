@@ -6035,4 +6035,8 @@ export const DE: Record<string, string> = {
   "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Füge den Bewertungsteil ein. Die KI schlägt die Struktur vor, du bestätigst sie. Sie berechnet nie Noten.",
   "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Abschlussprüfung 50 %, Arbeiten 30 %, Mitarbeit 20 %…",
   "{n} elementos · los pesos suman {sum}": "{n} Elemente · Gewichte ergeben {sum}",
+  "Desde un examen": "Aus einer Prüfung",
+  "Desde una rúbrica": "Aus einem Bewertungsraster",
+  "Se creará una columna por pregunta, con su numeración y su puntuación.": "Es wird eine Spalte je Aufgabe angelegt, mit Nummerierung und Punkten.",
+  "Se creará una columna que se evalúa abriendo la rúbrica.": "Es wird eine Spalte angelegt, die über das Raster bewertet wird.",
 };

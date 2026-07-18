@@ -55,6 +55,10 @@ try {
                VALUES ('c1','c1','Curso',0,?,?)`).run(stamp, stamp);
   sql.prepare(`INSERT INTO study_subjects (id, short_id, course_id, name, position, created_at, updated_at)
                VALUES ('sub1','sub1','c1','Historia',0,?,?)`).run(stamp, stamp);
+  // A second subject that the cascade section below does NOT delete, so the exam and
+  // rubric blocks still have something to hang off afterwards.
+  sql.prepare(`INSERT INTO study_subjects (id, short_id, course_id, name, position, created_at, updated_at)
+               VALUES ('sub2','sub2','c1','Lengua',0,?,?)`).run(stamp, stamp);
 
   const group = groups.createTeachingGroup({ name: '1ºA', subjectId: 'sub1', academicYearId: 'y1', expectedSize: 3 });
   const [ana, juan, rosa] = group.students;
@@ -219,6 +223,108 @@ try {
   sql.prepare('DELETE FROM study_subjects WHERE id = ?').run('sub1');
   assert.equal(count('teaching_assessment_plans', 'subject_id = ?', 'sub1'), 0, 'plans cascade with their subject');
   assert.equal(count('teaching_assessment_items', 'plan_id = ?', plan.id), 0, 'taking their items');
+
+  // ── From an exam: one column per QUESTION, never per section ───────────────
+  {
+    const examsRepo = require(path.join(repoRoot, 'electron/db/teachingExamsRepo.ts'));
+    const exam = examsRepo.createTeachingExam({ title: 'Parcial', subjectId: 'sub2' });
+    const section = examsRepo.addTeachingExamQuestion(exam.id, { type: 'section', prompt: 'Lee el texto' });
+    examsRepo.addTeachingExamQuestion(exam.id, { type: 'short', prompt: 'Define romanticismo', points: 2, parentId: section.id });
+    examsRepo.addTeachingExamQuestion(exam.id, { type: 'short', prompt: 'Cita dos autores', points: 3, parentId: section.id });
+    examsRepo.addTeachingExamQuestion(exam.id, { type: 'essay', prompt: 'Comenta el fragmento', points: 7 });
+
+    const p2 = repo.createAssessmentPlan({ name: 'Con examen', subjectId: 'sub2', profile: 'universidad' });
+    const built = repo.addExamBlock(p2.id, exam.id, 60);
+    const block = built.find((i) => i.parentId === null);
+    const leaves = built.filter((i) => i.parentId === block.id);
+
+    // The section statement is NOT a column: its worth IS the sum of its children, so
+    // emitting one would double-count the paper.
+    assert.equal(leaves.length, 3, 'one column per question, none for the section statement');
+    assert.equal(block.maxPoints, 12, 'the block is worth the exam total (2+3+7), not the plan scale');
+    assert.equal(block.aggregation, 'sum', 'an exam is marked out of its total, not averaged');
+    assert.deepEqual(leaves.map((l) => l.maxPoints).sort((a, b) => a - b), [2, 3, 7]);
+    assert.ok(leaves.every((l) => l.sourceExamQuestionId), 'every column traces back to its question');
+    assert.ok(leaves[0].name.startsWith('1.'), `the header is the printed numbering, got ${leaves[0].name}`);
+
+    // Marking it end to end lands on the plan's scale.
+    const g2 = groups.createTeachingGroup({ name: 'X', subjectId: 'sub2', expectedSize: 1 });
+    for (const leaf of leaves) repo.setGradeEntry({ studentId: g2.students[0].id, itemId: leaf.id, rawValue: leaf.maxPoints });
+    const detail = repo.getAssessmentPlan(p2.id);
+    const result = computeGrade({
+      plan: detail.plan, items: detail.items,
+      entries: repo.listGradeEntries(p2.id).filter((e) => e.studentId === g2.students[0].id),
+    });
+    assert.equal(result.record.numeric, 10, 'full marks on every question is a 10');
+  }
+
+  // ── From a rubric: the mark lands in the ordinary entry ────────────────────
+  {
+    const rubricsRepo = require(path.join(repoRoot, 'electron/db/teachingRubricsRepo.ts'));
+    const rubric = rubricsRepo.createTeachingRubric({ title: 'Exposición', subjectId: 'sub2' });
+    const full = rubricsRepo.getTeachingRubric(rubric.id);
+    assert.ok(full.criteria.length > 0 && full.levels.length > 0, 'a new rubric starts with a usable grid');
+
+    const p3 = repo.createAssessmentPlan({ name: 'Con rúbrica', subjectId: 'sub2', profile: 'universidad' });
+    const withRubric = repo.addRubricItem(p3.id, rubric.id, 100);
+    const item = withRubric[0];
+    assert.equal(item.entryMode, 'rubric');
+    assert.equal(item.sourceRubricId, rubric.id, 'the column remembers which rubric marks it');
+
+    const g3 = groups.createTeachingGroup({ name: 'Y', subjectId: 'sub2', expectedSize: 1 });
+    const best = full.levels.reduce((a, b) => (a.score >= b.score ? a : b));
+    const levels = Object.fromEntries(full.criteria.map((c) => [c.id, best.id]));
+    const entry = repo.setRubricEvaluation({ studentId: g3.students[0].id, itemId: item.id, levels });
+
+    // The derived total is written into the ordinary entry, so filters, sorts, stats
+    // and every export treat it as a plain number.
+    assert.equal(entry.status, 'evaluated');
+    assert.ok(entry.rawValue > 0, 'picking the top level everywhere yields the rubric maximum');
+    assert.ok(Math.abs(entry.rawValue - item.maxPoints) < 0.01, 'and that maximum is the column maximum');
+    assert.deepEqual(repo.getRubricEvaluation(g3.students[0].id, item.id), levels, 'the per-criterion picks round-trip');
+
+    // A MIDDLE level is what separates "fraction of each criterion's worth" from a raw
+    // sum of level scores: with the top level everywhere the two formulas coincide.
+    if (full.levels.length > 2) {
+      const mid = [...full.levels].sort((a, b) => a.score - b.score)[1];
+      const midLevels = Object.fromEntries(full.criteria.map((c) => [c.id, mid.id]));
+      const midEntry = repo.setRubricEvaluation({ studentId: g3.students[0].id, itemId: item.id, levels: midLevels });
+      const expected = (mid.score / best.score) * item.maxPoints;
+      assert.ok(Math.abs(midEntry.rawValue - expected) < 0.05,
+        `a middle level scales with the criterion's worth: expected ~${expected}, got ${midEntry.rawValue}`);
+    }
+
+    // A WEIGHTED rubric is what actually distinguishes "fraction of each criterion's
+    // worth" from a raw sum of level scores — on an unweighted one the two formulas are
+    // mathematically identical, so testing only that proves nothing about the weighting.
+    {
+      const weighted = rubricsRepo.createTeachingRubric({ title: 'Ponderada', subjectId: 'sub2' });
+      const base = rubricsRepo.getTeachingRubric(weighted.id);
+      rubricsRepo.updateTeachingRubric(weighted.id, {
+        weighted: true,
+        criteria: base.criteria.map((c, i) => ({ ...c, weight: i === 0 ? 60 : 20 })),
+      });
+      const wr = rubricsRepo.getTeachingRubric(weighted.id);
+      const wItems = repo.addRubricItem(p3.id, weighted.id, 0);
+      const wItem = wItems.find((i) => i.sourceRubricId === weighted.id);
+      const top = wr.levels.reduce((a, b) => (a.score >= b.score ? a : b));
+
+      // Top level on the 60 % criterion only: the mark must reflect THAT criterion's
+      // share, not one third of the scale.
+      const only = repo.setRubricEvaluation({
+        studentId: g3.students[0].id, itemId: wItem.id, levels: { [wr.criteria[0].id]: top.id },
+      });
+      const expected = (wr.scaleMax * 60) / 100;
+      assert.ok(Math.abs(only.rawValue - expected) < 0.05,
+        `a weighted criterion contributes its own share: expected ~${expected}, got ${only.rawValue}`);
+    }
+
+    // Re-marking replaces the previous picks rather than accumulating them.
+    const worst = full.levels.reduce((a, b) => (a.score <= b.score ? a : b));
+    repo.setRubricEvaluation({ studentId: g3.students[0].id, itemId: item.id, levels: { [full.criteria[0].id]: worst.id } });
+    assert.equal(Object.keys(repo.getRubricEvaluation(g3.students[0].id, item.id)).length, 1,
+      're-marking replaces the previous evaluation');
+  }
 
   console.log('teaching grades (repo): OK');
 

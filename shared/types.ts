@@ -5432,6 +5432,10 @@ export interface NodusApi {
   gradebookCohortStats(planId: string, groupId: string, convocatoria?: string): Promise<{ maxByItem: Record<string, number> }>;
   importAssessmentPlan(request: { planId: string; text: string }): Promise<ProposedPlan>;
   applyProposedPlan(planId: string, proposal: ProposedPlan): Promise<AssessmentItem[]>;
+  addExamBlock(planId: string, examId: string, weight?: number): Promise<AssessmentItem[]>;
+  addRubricItem(planId: string, rubricId: string, weight?: number): Promise<AssessmentItem[]>;
+  setRubricEvaluation(input: { studentId: string; itemId: string; convocatoria?: string; levels: Record<string, string> }): Promise<GradeEntry>;
+  getRubricEvaluation(studentId: string, itemId: string, convocatoria?: string): Promise<Record<string, string>>;
   draftStudentFeedback(request: { planId: string; groupId: string; studentId: string; summary: string }): Promise<{ text: string; warnings: string[] }>;
   // Student groups (teaching vault). `academicYearId: null` scopes to the groups that
   // predate academic years; omitting it returns every year.

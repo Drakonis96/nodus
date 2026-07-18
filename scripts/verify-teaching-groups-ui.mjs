@@ -310,6 +310,28 @@ try {
   assert.equal(savedRules.passAt, 0.45, 'and a pass mark that is not 5');
   console.log('[ui] plan rules persist, including a 0,7 threshold and a 4,5 pass mark');
 
+  // ── Building a block from an exam the teacher already made ─────────────────
+  await page.getByTestId('plan-tab-structure').click();
+  await page.getByTestId('plan-structure').waitFor();
+  await page.getByTestId('item-from-exam').click();
+  await page.getByTestId('source-picker').waitFor();
+  const examCopy = await page.getByTestId('source-picker').innerText();
+  // With no exams in this profile the picker must say so rather than offering an empty
+  // dropdown that silently does nothing.
+  assert.ok(/columna por pregunta/.test(examCopy), 'the picker explains what it will build');
+  assert.ok(/Todavía no has creado ningún examen/.test(examCopy) || await page.getByTestId('source-select').count() > 0,
+    'it either lists exams or says there are none');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('source-picker').waitFor({ state: 'detached' });
+
+  await page.getByTestId('item-from-rubric').click();
+  await page.getByTestId('source-picker').waitFor();
+  assert.ok(/abriendo la rúbrica/.test(await page.getByTestId('source-picker').innerText()));
+  await page.keyboard.press('Escape');
+  await page.getByTestId('source-picker').waitFor({ state: 'detached' });
+  assert.ok(await page.getByTestId('plan-editor').count() === 1, 'Escape closed only the picker, not the editor');
+  console.log('[ui] exam and rubric pickers open, explain themselves and close cleanly');
+
   // The import modal must be reachable and state plainly what the AI does and does not
   // do. Running the model itself is covered by scripts/verify-student-pseudonyms.mjs
   // against Ollama and Gemini; this checks the surface a teacher actually sees.

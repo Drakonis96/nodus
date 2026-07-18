@@ -9,6 +9,10 @@ import {
   type PlanRules,
 } from '@shared/assessment';
 import type { ProposedPlan as ProposedPlanShape, ProposedItem as ProposedItemShape } from '@shared/assessmentImport';
+import { flattenExamBlocks, groupExamQuestions, examTotalPoints } from '@shared/teachingExams';
+import { getTeachingExam } from './teachingExamsRepo';
+import { getTeachingRubric } from './teachingRubricsRepo';
+import { criterionMaxPoints, rubricMaxScore } from '@shared/teachingRubrics';
 
 type Row = Record<string, unknown>;
 
@@ -428,6 +432,136 @@ export function clearGradeEntry(studentId: string, itemId: string, convocatoria 
   getDb()
     .prepare('DELETE FROM teaching_grade_entries WHERE student_id = ? AND item_id = ? AND convocatoria = ?')
     .run(studentId, itemId, convocatoria);
+}
+
+/**
+ * Turns an existing exam into a block with one column per question.
+ *
+ * The exam already carries the structure a teacher would otherwise retype: numbering,
+ * per-question points, and section statements. Two things must be right:
+ *
+ *  · ONE COLUMN PER LEAF. A section statement is not marked — its worth IS the sum of
+ *    its sub-questions, so emitting a column for it too would double-count the paper.
+ *  · The column header is the printed numbering ("3.b"), because that is what the
+ *    teacher is reading off the script in front of them.
+ *
+ * Aggregation is `sum`: an exam is marked out of its own total, not averaged.
+ */
+export function addExamBlock(planId: string, examId: string, weight = 0): AssessmentItem[] {
+  const exam = getTeachingExam(examId);
+  const leaves = flattenExamBlocks(groupExamQuestions(exam.questions));
+  if (leaves.length === 0) throw new Error('Este examen todavía no tiene preguntas.');
+
+  const block = createAssessmentItem(planId, {
+    name: exam.title || 'Examen',
+    kind: 'block',
+    weight,
+    weightAlt: weight,
+    aggregation: 'sum',
+    maxPoints: examTotalPoints(exam.questions),
+    sourceExamId: exam.id,
+  });
+  leaves.forEach((leaf, index) => {
+    const prompt = (leaf.question.prompt ?? '').replace(/\s+/g, ' ').trim();
+    createAssessmentItem(planId, {
+      parentId: block.id,
+      name: prompt ? `${leaf.number}. ${prompt.slice(0, 40)}` : leaf.number,
+      kind: 'activity',
+      position: index,
+      weight: leaf.question.points,
+      weightAlt: leaf.question.points,
+      maxPoints: leaf.question.points,
+      entryMode: 'points',
+      sourceExamId: exam.id,
+      sourceExamQuestionId: leaf.question.id,
+    });
+  });
+  return listAssessmentItems(planId);
+}
+
+/**
+ * Adds a column marked with an existing rubric.
+ *
+ * The item's maximum is the rubric's own maximum, so the mark a teacher records by
+ * picking levels lands on the plan's scale without a second conversion.
+ */
+export function addRubricItem(planId: string, rubricId: string, weight = 0): AssessmentItem[] {
+  const rubric = getTeachingRubric(rubricId);
+  createAssessmentItem(planId, {
+    name: rubric.title || 'Rúbrica',
+    kind: 'activity',
+    weight,
+    weightAlt: weight,
+    entryMode: 'rubric',
+    maxPoints: rubricMaxScore(rubric),
+    sourceRubricId: rubric.id,
+  });
+  return listAssessmentItems(planId);
+}
+
+/**
+ * Records which level a student reached on each rubric criterion, and writes the
+ * resulting total into the ordinary grade entry so the engine, the grid, the filters
+ * and every export treat it as a plain number.
+ */
+export function setRubricEvaluation(input: {
+  studentId: string;
+  itemId: string;
+  convocatoria?: string;
+  levels: Record<string, string>;
+}): GradeEntry {
+  const db = getDb();
+  const convocatoria = input.convocatoria ?? 'ordinaria';
+  const item = db.prepare('SELECT * FROM teaching_assessment_items WHERE id = ?').get(input.itemId) as Row | undefined;
+  if (!item?.source_rubric_id) throw new Error('Esta columna no se evalúa con rúbrica.');
+  const rubric = getTeachingRubric(String(item.source_rubric_id));
+
+  let total = 0;
+  for (const criterion of rubric.criteria) {
+    const levelId = input.levels[criterion.id];
+    const level = rubric.levels.find((l) => l.id === levelId);
+    if (!level) continue;
+    const best = Math.max(...rubric.levels.map((l) => l.score), 1);
+    total += (level.score / best) * criterionMaxPoints(rubric, criterion);
+  }
+
+  const entry = setGradeEntry({
+    studentId: input.studentId,
+    itemId: input.itemId,
+    convocatoria,
+    rawValue: Math.round(total * 100) / 100,
+    status: 'evaluated',
+  });
+
+  const row = db
+    .prepare('SELECT id FROM teaching_grade_entries WHERE student_id = ? AND item_id = ? AND convocatoria = ?')
+    .get(input.studentId, input.itemId, convocatoria) as Row;
+  const stamp = now();
+  db.transaction(() => {
+    db.prepare('DELETE FROM teaching_rubric_evaluations WHERE entry_id = ?').run(row.id);
+    for (const [criterionId, levelId] of Object.entries(input.levels)) {
+      if (!levelId) continue;
+      db.prepare(
+        `INSERT INTO teaching_rubric_evaluations (id, entry_id, criterion_id, level_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(crypto.randomUUID(), row.id, criterionId, levelId, stamp, stamp);
+    }
+  })();
+  return entry;
+}
+
+export function getRubricEvaluation(studentId: string, itemId: string, convocatoria = 'ordinaria'): Record<string, string> {
+  const rows = getDb()
+    .prepare(
+      `SELECT r.criterion_id AS c, r.level_id AS l
+         FROM teaching_rubric_evaluations r
+         JOIN teaching_grade_entries e ON e.id = r.entry_id
+        WHERE e.student_id = ? AND e.item_id = ? AND e.convocatoria = ?`,
+    )
+    .all(studentId, itemId, convocatoria) as Row[];
+  const out: Record<string, string> = {};
+  for (const row of rows) out[String(row.c)] = String(row.l);
+  return out;
 }
 
 /**

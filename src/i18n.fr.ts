@@ -6026,4 +6026,8 @@ export const FR: Record<string, string> = {
   "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Collez la section évaluation. L’IA propose la structure ; vous la validez. Elle ne calcule jamais de notes.",
   "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Examen final 50 %, travaux 30 %, participation 20 %…",
   "{n} elementos · los pesos suman {sum}": "{n} éléments · les poids totalisent {sum}",
+  "Desde un examen": "Depuis un examen",
+  "Desde una rúbrica": "Depuis une grille",
+  "Se creará una columna por pregunta, con su numeración y su puntuación.": "Une colonne par question sera créée, avec sa numérotation et ses points.",
+  "Se creará una columna que se evalúa abriendo la rúbrica.": "Une colonne sera créée, évaluée en ouvrant la grille.",
 };

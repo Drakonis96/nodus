@@ -6262,4 +6262,8 @@ export const EN: Record<string, string> = {
   "Pega el apartado de evaluación. La IA propone la estructura; tú la confirmas. Nunca calcula notas.": "Paste the assessment section. The AI proposes the structure; you confirm it. It never computes grades.",
   "Prueba final 50 %, trabajos 30 %, participación 20 %…": "Final exam 50%, coursework 30%, participation 20%…",
   "{n} elementos · los pesos suman {sum}": "{n} items · weights add up to {sum}",
+  "Desde un examen": "From an exam",
+  "Desde una rúbrica": "From a rubric",
+  "Se creará una columna por pregunta, con su numeración y su puntuación.": "One column per question will be created, with its numbering and its points.",
+  "Se creará una columna que se evalúa abriendo la rúbrica.": "A column will be created that is marked by opening the rubric.",
 };
