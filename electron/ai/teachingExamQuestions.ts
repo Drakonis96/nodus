@@ -154,7 +154,13 @@ function buildQuestion(type: ExamQuestionType, raw: RawQuestion, optionCount: nu
 }
 
 export async function generateExamQuestion(request: ExamQuestionGenerationRequest): Promise<ExamQuestionGenerationResult> {
-  const type = isExamQuestionType(request.type) ? request.type : 'short_essay';
+  // Refuse an unknown type rather than quietly substituting another one: a caller that
+  // asked for a multiple-choice question and silently received an essay would look
+  // like a model failure and get debugged in the wrong place.
+  if (!isExamQuestionType(request.type)) {
+    throw new Error(`Tipo de pregunta desconocido: ${String(request.type)}.`);
+  }
+  const type = request.type;
   const instruction = request.instruction.trim();
   if (!instruction) throw new Error('Escribe qué quieres que genere la IA para esta pregunta.');
   const def = examQuestionTypeDef(type);

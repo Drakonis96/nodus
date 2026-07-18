@@ -121,10 +121,35 @@ interface RawRubric {
   criteria?: unknown;
 }
 
-function isRawRubric(value: unknown): value is RawRubric {
-  if (typeof value !== 'object' || value === null) return false;
-  const raw = value as RawRubric;
-  return Array.isArray(raw.criteria) && Array.isArray(raw.levels);
+/**
+ * Guard for a generated rubric, built for the SHAPE THAT WAS ASKED FOR.
+ *
+ * A guard that only checks "are these arrays?" accepts a rubric with one criterion
+ * when the teacher asked for four — and because completeJson only retries when the
+ * guard fails, the retry machinery that exists precisely to recover from a weak first
+ * answer never fires. The teacher gets a visibly wrong rubric instead of a second
+ * attempt at a right one.
+ *
+ * So the guard demands the requested counts and non-empty descriptors. When a model
+ * cannot manage it after the retries, failing loudly beats returning a rubric the
+ * teacher has to rebuild by hand.
+ */
+function makeRubricGuard(criteriaCount: number, levelCount: number) {
+  return (value: unknown): value is RawRubric => {
+    if (typeof value !== 'object' || value === null) return false;
+    const raw = value as RawRubric;
+    if (!Array.isArray(raw.criteria) || !Array.isArray(raw.levels)) return false;
+    if (raw.levels.length !== levelCount) return false;
+    if (raw.criteria.length !== criteriaCount) return false;
+    return raw.criteria.every((criterion) => {
+      if (typeof criterion !== 'object' || criterion === null) return false;
+      const item = criterion as { name?: unknown; descriptors?: unknown };
+      if (typeof item.name !== 'string' || !item.name.trim()) return false;
+      // The descriptors ARE the rubric: one per level, none blank.
+      if (!Array.isArray(item.descriptors) || item.descriptors.length !== levelCount) return false;
+      return item.descriptors.every((d) => typeof d === 'string' && d.trim().length > 0);
+    });
+  };
 }
 
 const asText = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -208,7 +233,7 @@ export async function generateRubric(request: RubricGenerationRequest): Promise<
           maxTokens: Math.max(1500, Math.min(settings.studyAiMaxOutputTokens, 4000)),
           reasoning: 'off',
         },
-        isRawRubric,
+        makeRubricGuard(criteriaCount, levelCount),
         model
       )
   );

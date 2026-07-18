@@ -93,11 +93,17 @@ export async function draftStudentFeedback(request: FeedbackRequest): Promise<{ 
   const scope = buildPseudonymScope(students);
   const label = labelFor(scope, request.studentId);
 
+  // "Use the identifier ALWAYS" produced text that reads badly once the codes are
+  // mapped back: "Estimada familia de <nombre>, <nombre> ha demostrado…". The model
+  // cannot know the code will become a name, so the instruction has to ask for the
+  // shape the TEACHER will read, not the shape the model sees.
   const system = [
     'Eres un docente redactando un comentario breve y constructivo sobre el rendimiento',
-    'de un estudiante, dirigido a la familia. Dos o tres frases, en el idioma del texto.',
-    'Refiérete al estudiante SIEMPRE por el identificador que aparece en los datos.',
-    'No inventes datos que no estén en el resumen.',
+    'de un estudiante, dirigido a su familia. Dos o tres frases, en el idioma del texto.',
+    'EMPIEZA el comentario nombrando al estudiante por su identificador exacto, y no',
+    'vuelvas a nombrarlo: a partir de ahí refiérete a él o ella con pronombres o con',
+    '«el estudiante». No empieces con fórmulas de saludo como «Estimada familia».',
+    'No inventes datos que no estén en el resumen: comenta solo lo que aparece en él.',
   ].join('\n');
   const user = `Estudiante: ${label}\n\n${request.summary}`;
 
