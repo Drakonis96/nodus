@@ -83,6 +83,30 @@
       categories: { all: '全部', basics: '入门', rigor: '学术严谨性', ai: 'AI 与配置', features: '功能' },
       results: '显示 {shown} / {total} 个问题', empty: '没有匹配的问题。可尝试搜索供应商名称、“嵌入”、“引用”或“本地 AI”。',
     },
+    ja: {
+      nav: 'よくある質問', kicker: '始める前に',
+      title: 'Nodus、AI、学術的厳密さ：基本事項。',
+      lead: '安全な始め方、AI設定の選び方、アプリにできること・できないことを明確に説明します。',
+      search: '質問を検索…', searchLabel: 'よくある質問を検索', clear: '検索をクリア', categoriesLabel: '質問のカテゴリ',
+      categories: { all: 'すべて', basics: 'はじめに', rigor: '学術的厳密さ', ai: 'AIと設定', features: '機能' },
+      results: '{total}件中 {shown}件を表示', empty: '一致する質問がありません。プロバイダ名、「埋め込み」、「引用」、「ローカルAI」などを試してください。',
+    },
+    uk: {
+      nav: 'Поширені запитання', kicker: 'Перед початком',
+      title: 'Nodus, ШІ та академічна суворість: головне.',
+      lead: 'Чіткі відповіді для безпечного старту, вибору налаштування ШІ та розуміння можливостей застосунку.',
+      search: 'Шукати у запитаннях…', searchLabel: 'Пошук у поширених запитаннях', clear: 'Очистити пошук', categoriesLabel: 'Категорії запитань',
+      categories: { all: 'Усі', basics: 'Перші кроки', rigor: 'Академічна суворість', ai: 'ШІ та налаштування', features: 'Функції' },
+      results: 'Показано {shown} з {total} запитань', empty: 'Немає відповідних запитань. Спробуйте назву постачальника, «ембединги», «цитування» або «локальний ШІ».',
+    },
+    ru: {
+      nav: 'Частые вопросы', kicker: 'Перед началом',
+      title: 'Nodus, ИИ и академическая строгость: главное.',
+      lead: 'Понятные ответы для безопасного старта, выбора настройки ИИ и понимания возможностей приложения.',
+      search: 'Искать в вопросах…', searchLabel: 'Поиск в частых вопросах', clear: 'Очистить поиск', categoriesLabel: 'Категории вопросов',
+      categories: { all: 'Все', basics: 'Начало работы', rigor: 'Академическая строгость', ai: 'ИИ и настройка', features: 'Функции' },
+      results: 'Показано {shown} из {total} вопросов', empty: 'Нет подходящих вопросов. Попробуйте название провайдера, «эмбеддинги», «цитаты» или «локальный ИИ».',
+    },
   };
 
   const FAQ = {
@@ -267,6 +291,34 @@
   FAQ.pt = translateCompact('pt');
   FAQ.tr = translateCompact('tr');
   FAQ.zh = translateCompact('zh');
+
+  // Keep the FAQ aligned with the landing page's two Portuguese variants. The
+  // underlying answers stay in the same canonical order and retain their ids.
+  const regionalizePt = (items, replacements) => items.map((item) => {
+    let q = item.q;
+    let answer = item.a;
+    replacements.forEach(([from, to]) => { q = q.replace(from, to); answer = answer.replace(from, to); });
+    return { ...item, q, a: answer };
+  });
+  UI['pt-BR'] = { ...UI.pt };
+  UI['pt-PT'] = {
+    ...UI.pt,
+    title: 'Nodus, IA e rigor académico: o essencial.',
+    lead: 'Respostas claras para começar com segurança, escolher uma configuração de IA e compreender o que a aplicação pode ou não fazer.',
+    search: 'Pesquisar nas perguntas…', searchLabel: 'Pesquisar nas perguntas frequentes', clear: 'Limpar pesquisa',
+    categoriesLabel: 'Categorias de perguntas',
+    categories: { all: 'Todas', basics: 'Primeiros passos', rigor: 'Rigor académico', ai: 'IA e configuração', features: 'Funcionalidades' },
+    results: 'A mostrar {shown} de {total} perguntas', empty: 'Nenhuma pergunta corresponde. Experimenta um fornecedor, “embeddings”, “citações” ou “IA local”.',
+  };
+  FAQ['pt-BR'] = regionalizePt(FAQ.pt, [
+    [/ficheiros/g, 'arquivos'], [/ficheiro/g, 'arquivo'], [/registos/g, 'registros'], [/registo/g, 'registro'],
+    [/apontamentos/g, 'anotações'], [/definições/g, 'configurações'], [/secções/g, 'seções'], [/investigação/g, 'pesquisa'],
+    [/teus/g, 'seus'], [/tuas/g, 'suas'], [/teu/g, 'seu'], [/tua/g, 'sua'],
+  ]);
+  FAQ['pt-PT'] = regionalizePt(FAQ.pt, [
+    [/acadêmic/gi, 'académic'], [/aplicativo/g, 'aplicação'], [/configurações/g, 'definições'],
+    [/baixar/g, 'descarregar'], [/Baixe/g, 'Descarrega'], [/seções/g, 'secções'], [/pesquisa/g, 'investigação'],
+  ]);
 
   function translateCompact(lang) {
     return COMPACT[lang].map((item, index) => ({ ...item, id: FAQ.en[index].id, cat: FAQ.en[index].cat }));
