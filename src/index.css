@@ -1447,6 +1447,55 @@ body {
 .light.databases .border-indigo-900\/70 { border-color: rgba(179, 3, 51, 0.28); }
 .light.databases .ring-indigo-600\/40 { --tw-ring-color: rgba(179, 3, 51, 0.35); }
 
+/* The full database record is rendered above the workspace, so neutral modal
+   utilities used to make it look like a grey/white form detached from the active
+   crimson vault. These semantic surfaces keep the record in the Databases theme
+   in both modes while retaining enough contrast for editable fields. */
+.databases .database-record-modal {
+  background: #19070d;
+  border-color: rgba(204, 10, 58, 0.55);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(179, 3, 51, 0.12);
+}
+.databases .database-record-header {
+  background: rgba(77, 1, 22, 0.55);
+  border-color: rgba(204, 10, 58, 0.28);
+}
+.databases .database-record-row:hover {
+  background: rgba(77, 1, 22, 0.24);
+}
+.databases .database-record-field {
+  background: rgba(43, 0, 16, 0.72);
+  border-color: rgba(204, 10, 58, 0.3);
+}
+.databases .database-record-field:hover,
+.databases .database-record-field:focus-within {
+  border-color: rgba(226, 58, 99, 0.72);
+}
+.light.databases .database-record-backdrop {
+  background: rgba(56, 16, 29, 0.32);
+}
+.light.databases .database-record-modal {
+  background: #fffafb;
+  border-color: #efafc0;
+  box-shadow: 0 28px 80px rgba(77, 1, 22, 0.22), 0 0 0 1px rgba(179, 3, 51, 0.08);
+}
+.light.databases .database-record-header {
+  background: #fff1f4;
+  border-color: #f3c3cf;
+}
+.light.databases .database-record-row:hover {
+  background: #fff1f4;
+}
+.light.databases .database-record-field {
+  background: #fff5f7;
+  border-color: #efc2ce;
+}
+.light.databases .database-record-field:hover,
+.light.databases .database-record-field:focus-within {
+  background: #ffffff;
+  border-color: #cc0a3a;
+}
+
 .input {
   @apply bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500;
 }
