@@ -74,7 +74,7 @@ try {
   assert.equal(dbmode.databaseStats(database.id).rowCount, 2, 'rows seeded in databases vault');
 
   // Every other selectable vault type uses the same complete SQLite contract and
-  // must be present too, including the two preview workspaces.
+  // must be present too, including teaching and the worldbuilding preview workspace.
   const extraVaults = [];
   for (const [name, type] of [['Estudio', 'estudio'], ['Mundo', 'worldbuilding'], ['Docencia', 'docencia']]) {
     const vault = vaults.createVault(name, type);

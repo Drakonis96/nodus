@@ -25,7 +25,10 @@
     "dist": "npm run build && electron-builder",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux",
+    "verify:exam-generation": "node scripts/verify-exam-generation.mjs",
+    "verify:exam-pdf": "node scripts/verify-exam-pdf.mjs",
+    "verify:rubric-generation": "node scripts/verify-rubric-generation.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

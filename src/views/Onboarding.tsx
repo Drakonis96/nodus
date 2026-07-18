@@ -53,7 +53,7 @@ export function Onboarding({
   // The onboarding adapts to the active vault: only academic research starts with
   // Zotero. Genealogy, databases and study use a short intro → AI → done flow.
   const vaultType = activeVault?.type ?? 'academic';
-  const simple = vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio';
+  const simple = vaultType === 'genealogy' || vaultType === 'databases' || vaultType === 'estudio' || vaultType === 'docencia';
   const aiStep = simple ? 1 : 3; // the "AI provider" step index
   const doneStep = simple ? 2 : 4; // the final step index
 
@@ -185,6 +185,11 @@ export function Onboarding({
           ? {
               subtitle: t('Organiza cursos, apuntes, materiales y repasos en un espacio de aprendizaje local.'),
               body: t('Empieza creando tus cursos y asignaturas. Después podrás importar archivos o enlazar materiales de Zotero de forma opcional, grabar clases, generar preguntas y repasar con ayuda de la IA.'),
+            }
+        : vaultType === 'docencia'
+          ? {
+              subtitle: t('Organiza tu docencia: cursos, materiales, horarios y clases en un espacio local y privado.'),
+              body: t('Empieza creando tus cursos y asignaturas. Después podrás importar archivos o enlazar materiales de Zotero de forma opcional, planificar horarios y calendario, y grabar tus clases.'),
             }
         : { subtitle: '', body: '' };
 

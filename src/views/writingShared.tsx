@@ -4,7 +4,7 @@ import { Badge, Icon } from '../components/ui';
 import { Markdown, type MarkdownCitation } from '../components/Markdown';
 import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
-import { t, tx } from '../i18n';
+import { t, tx, getActiveLang } from '../i18n';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 
 /** Human labels for every workshop/report kind (deep reports use `deep_research`). */
@@ -368,5 +368,5 @@ export function formatSavedDraftDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
-    : new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+    : new Intl.DateTimeFormat(getActiveLang(), { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }

@@ -53,7 +53,11 @@ test('shipped and preview vaults are selectable; announced future vaults remain 
   assert.equal(vt.getVaultTypeDef('genealogy').available, true);
   assert.equal(vt.getVaultTypeDef('estudio').available, true);
   assert.equal(vt.getVaultTypeDef('databases').available, true);
-  for (const preview of ['worldbuilding', 'docencia']) {
+  // docencia (teaching) graduated from a preview shell into a real workspace.
+  assert.equal(vt.getVaultTypeDef('docencia').available, true);
+  assert.equal(vt.isPreviewVaultType('docencia'), false);
+  assert.equal(vt.isViewAllowedForVaultType('settings', 'docencia'), true);
+  for (const preview of ['worldbuilding']) {
     assert.equal(vt.getVaultTypeDef(preview).available, true, `${preview} preview is selectable`);
     assert.equal(vt.isPreviewVaultType(preview), true);
     assert.equal(vt.isViewAllowedForVaultType('home', preview), true);
@@ -89,20 +93,19 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.doesNotMatch(picker, /className=\{`card max-h-\[90vh\]/, 'translucent cards must not be used as modal panels');
 });
 
-test('teaching and worldbuilding previews expose their complete inert bilingual sidebars', async () => {
+test('the worldbuilding preview exposes its complete inert bilingual sidebar', async () => {
   const [sidebar, app, english] = await Promise.all([
     readFile(path.join(repoRoot, 'src/components/PreviewVaultSidebar.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8'),
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
-  for (const label of ['Cursos y asignaturas', 'Grupos', 'Horarios', 'Calendario', 'Materiales', 'Grabaciones', 'Banco de preguntas', 'Rúbricas', 'Exámenes', 'Calificaciones', 'Guía docente / Programación', 'Unidades didácticas', 'Situaciones de aprendizaje', 'Adaptaciones', 'Proyectos de innovación', 'Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Escenas', 'Tramas', 'Manuscritos']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Chat del mundo', 'Grafo del mundo', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Consistencia', 'Preguntas abiertas', 'Escenas', 'Tramas', 'Manuscritos']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in preview sidebar`);
   }
   assert.match(sidebar, /disabled aria-disabled="true"/);
   assert.match(app, /<PreviewVaultSidebar type=\{activeVault\.type\}/);
   assert.match(app, /preview-vault-home-/);
   assert.match(english, /'World chat'/);
-  assert.match(english, /'Teaching guide \/ Course planning'/);
 });
 
 test('the header vault action uses a stable localized label', async () => {
@@ -197,6 +200,40 @@ test('all dedicated study views are scoped to estudio', () => {
       assert.equal(vt.isViewAllowedForVaultType(view, other), false, `${view} hidden in ${other}`);
     }
   }
+});
+
+test('teaching reuses the study organisation surfaces and hides the research universals', () => {
+  // The shared organisation + evaluation surfaces are allowed in BOTH estudio and
+  // docencia (courses, schedule, calendar, materials, recordings, and the question bank).
+  for (const view of ['studyCourses', 'studySchedule', 'studyCalendar', 'studyLibrary', 'studyRecordings', 'studyQuestions']) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
+    assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), true, `${view} allowed in docencia`);
+  }
+  // The study-only surfaces stay exclusive to estudio and never leak into teaching.
+  for (const view of ['studySearch', 'studyChat', 'studyIdeas', 'studyGraph', 'studyReview', 'studyDeepResearch']) {
+    assert.equal(vt.isViewAllowedForVaultType(view, 'estudio'), true, `${view} allowed in estudio`);
+    assert.equal(vt.isViewAllowedForVaultType(view, 'docencia'), false, `${view} hidden in docencia`);
+  }
+  // Teaching hides the same research/authoring universals the study mode hides.
+  const hidden = vt.defaultHiddenViewsForType('docencia');
+  for (const h of ['search', 'library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch', 'notes']) {
+    assert.ok(hidden.includes(h), `${h} hidden in docencia`);
+  }
+  assert.match(vt.vaultTypePromptPack('docencia'), /MODO DOCENCIA/);
+});
+
+test('the teaching sidebar keeps the Tools group and never duplicates its own sections', async () => {
+  const app = await readFile(path.join(repoRoot, 'src/App.tsx'), 'utf8');
+  const branch = /if \(isDocencia\) \{([\s\S]*?)\n              \}/.exec(app);
+  assert.ok(branch, 'the docencia sidebar branch must exist');
+  const body = branch[1];
+  assert.match(body, /<TeachingSidebar/, 'the teaching sections come from TeachingSidebar');
+  // Only the tools group may come from the generic nav: rendering explore/analyze there
+  // would print Question bank, Rubrics and Exams a second time.
+  assert.match(body, /navGroups\.filter\(\(group\) => group\.id === 'tools'\)/);
+  assert.ok(!/navGroups\.map/.test(body), 'the docencia branch must not render every nav group');
+  // The Toolkit is a universal view, so it must not be hidden for teaching.
+  assert.ok(!vt.defaultHiddenViewsForType('docencia').includes('toolkit'), 'toolkit must stay visible in teaching');
 });
 
 test('defaultHiddenViewsForType returns a fresh copy (no shared mutation)', () => {

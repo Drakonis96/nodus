@@ -11,6 +11,7 @@ import { PassageProgressBar } from './components/PassageProgressBar';
 import { VaultSwitcher, vaultTypeIcon, vaultTypeLabel } from './components/VaultSwitcher';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
+import { TeachingSidebar } from './components/TeachingSidebar';
 import { PreviewVaultSidebar } from './components/PreviewVaultSidebar';
 import { FeedbackHost } from './components/feedback';
 import { Tour } from './views/Tour';
@@ -44,6 +45,7 @@ import nodusLogo from './assets/nodus-logo.svg';
 import nodusLogoGold from './assets/nodus-logo-gold.svg';
 import nodusLogoCrimson from './assets/nodus-logo-crimson.svg';
 import nodusLogoTeal from './assets/nodus-logo-teal.svg';
+import nodusLogoOrange from './assets/nodus-logo-orange.svg';
 import { buildDockIconDataUrl, dockColorForVaultType } from './dockIcon';
 
 const DatabasesView = lazy(() => import('./views/DatabasesView').then((module) => ({ default: module.DatabasesView })));
@@ -52,6 +54,9 @@ const DatabasesAnalysisView = lazy(() => import('./views/DatabasesAnalysisView')
 const DatabasesChatView = lazy(() => import('./views/DatabasesChatView').then((module) => ({ default: module.DatabasesChatView })));
 const DatabasesSearchView = lazy(() => import('./views/DatabasesSearchView').then((module) => ({ default: module.DatabasesSearchView })));
 const StudyHome = lazy(() => import('./views/StudyHome').then((module) => ({ default: module.StudyHome })));
+const TeachingHome = lazy(() => import('./views/TeachingHome').then((module) => ({ default: module.TeachingHome })));
+const RubricsView = lazy(() => import('./views/RubricsView').then((module) => ({ default: module.RubricsView })));
+const ExamBuilderView = lazy(() => import('./views/ExamBuilderView').then((module) => ({ default: module.ExamBuilderView })));
 const StudyOrganizationView = lazy(() => import('./views/StudyOrganizationView').then((module) => ({ default: module.StudyOrganizationView })));
 const StudyScheduleView = lazy(() => import('./views/StudyScheduleView').then((module) => ({ default: module.StudyScheduleView })));
 const StudyCalendarView = lazy(() => import('./views/StudyCalendarView').then((module) => ({ default: module.StudyCalendarView })));
@@ -356,6 +361,11 @@ export function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('estudio', isEstudio);
   }, [isEstudio]);
+  // Teaching vaults wear an orange accent and reuse the study organisation surfaces.
+  const isDocencia = activeVault?.type === 'docencia';
+  useEffect(() => {
+    document.documentElement.classList.toggle('docencia', isDocencia);
+  }, [isDocencia]);
 
   // Accessibility preferences are applied at the document root so dialogs,
   // floating panels and every vault inherit them consistently.
@@ -764,14 +774,14 @@ export function App() {
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
-    if (!isGenealogy && !isDatabases && !isEstudio) {
+    if (!isGenealogy && !isDatabases && !isEstudio && !isDocencia) {
       actions.unshift(
         { id: 'act:sync', label: t('Actualizar (sincronizar Zotero)'), section: t('Acciones'), icon: 'sync', keywords: 'sync sincronizar', run: () => void onSync() },
         { id: 'act:collections', label: t('Colecciones'), section: t('Acciones'), icon: 'folder', keywords: 'collections zotero', run: () => setCollectionsOpen(true) },
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDark, onSync, openAssistant, reloadSettings]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isGenealogy, isDatabases, isEstudio, isDocencia, isDark, onSync, openAssistant, reloadSettings]);
 
   if (loadError) {
     return (
@@ -872,8 +882,8 @@ export function App() {
         >
           <img
             data-testid="nodus-logo"
-            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : 'academic'}
-            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : nodusLogo}
+            data-vault-logo={isGenealogy ? 'genealogy' : isDatabases ? 'databases' : isEstudio ? 'estudio' : isDocencia ? 'docencia' : 'academic'}
+            src={isGenealogy ? nodusLogoGold : isDatabases ? nodusLogoCrimson : isEstudio ? nodusLogoTeal : isDocencia ? nodusLogoOrange : nodusLogo}
             alt=""
             className="h-7 w-7"
           />
@@ -954,8 +964,9 @@ export function App() {
             onClick={() => setView('toolkit')}
           />
           {/* Colecciones y Actualizar dependen de Zotero → solo en bóvedas
-              académicas; genealogía y bases de datos no sincronizan con Zotero. */}
-          {!isGenealogy && !isDatabases && !isEstudio && (
+              académicas; genealogía, bases de datos, estudio y docencia no
+              sincronizan con Zotero. */}
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
             <HeaderAction
               dataTour="collections"
               icon="folder"
@@ -969,7 +980,7 @@ export function App() {
             title={t('Enviar una propuesta o reporte a GitHub')}
             onClick={() => setFeedbackOpen(true)}
           />
-          {!isGenealogy && !isDatabases && !isEstudio && (
+          {!isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
             <HeaderAction
               dataTour="sync"
               icon="refresh"
@@ -1131,6 +1142,21 @@ export function App() {
                   </>
                 );
               }
+              if (isDocencia) {
+                return (
+                  <>
+                    {navButton(homeItem)}
+                    <TeachingSidebar
+                      activeView={view}
+                      onNavigate={(targetView) => { setStudyTarget(null); if (targetView !== 'studyLibrary') setStudyMaterialTarget(null); if (targetView !== 'studyRecordings') setStudyRecordingTarget(null); setStudyGraphTarget(null); setView(targetView); }}
+                    />
+                    {/* Only the tools group: Explorar/Analizar/Escribir are already
+                        covered by TeachingSidebar, so rendering them would duplicate. */}
+                    {navGroups.filter((group) => group.id === 'tools').map((group) => renderGroup(group))}
+                    <div className="mt-2 flex flex-col gap-1">{navButton(settingsItem)}</div>
+                  </>
+                );
+              }
               return (
                 <>
                   {navButton(homeItem)}
@@ -1195,10 +1221,16 @@ export function App() {
               onLoadDemo={loadStudyDemo}
             />
           )}
+          {view === 'home' && isDocencia && (
+            <TeachingHome
+              onNavigate={setView}
+              onOpenDocument={(id) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }}
+            />
+          )}
           {view === 'home' && isPreviewVault && activeVault && (
             <div className="grid h-full place-items-center bg-neutral-50 p-8 text-center dark:bg-neutral-950" data-testid={`preview-vault-home-${activeVault.type}`}><div className="max-w-md"><Icon name={vaultTypeIcon(activeVault.type)} size={34} className="mx-auto mb-4 text-violet-500" /><span className="rounded border border-violet-500/50 bg-violet-500/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-300">PREVIEW</span><h1 className="mt-4 text-xl font-semibold">{vaultTypeLabel(activeVault.type)}</h1><p className="mt-2 text-sm leading-6 text-neutral-500">{t('Este vault muestra la estructura prevista. Sus secciones todavía no permiten realizar acciones.')}</p></div></div>
           )}
-          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isPreviewVault && (
+          {view === 'home' && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && !isPreviewVault && (
             <HomeView
               vaultId={activeVault?.id ?? null}
               settings={settings}
@@ -1292,6 +1324,8 @@ export function App() {
             onOpenMaterial={(id) => { setStudyMaterialTarget(id); setView('studyLibrary'); }}
             onOpenRecording={(id, timestamp) => { setStudyRecordingTarget({ id, timestamp: timestamp ?? null }); setView('studyRecordings'); }}
           />}
+          {view === 'teachingExams' && <ExamBuilderView />}
+          {view === 'teachingRubrics' && <RubricsView />}
           {view === 'studyReview' && <StudyReviewView />}
           {view === 'studyDeepResearch' && <DeepResearchView
             settings={settings}
@@ -1398,7 +1432,7 @@ export function App() {
       {feedbackOpen && <FeedbackModal onClose={() => setFeedbackOpen(false)} />}
       {roadmapOpen && <RoadmapModal onClose={() => setRoadmapOpen(false)} />}
 
-      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && (
+      {!isPreviewVault && settings.onboardingComplete && settings.basicsTutorialVersion > 0 && !settings.tourComplete && !isGenealogy && !isDatabases && !isEstudio && !isDocencia && (
         <Tour
           onNavigate={setView}
           onClose={async () => {
@@ -1469,7 +1503,7 @@ export function App() {
       {!isPreviewVault && settings.onboardingComplete &&
         settings.basicsTutorialVersion > 0 &&
         !recoveryStatus?.needsSetup &&
-        (isGenealogy || isDatabases || isEstudio || settings.tourComplete) &&
+        (isGenealogy || isDatabases || isEstudio || isDocencia || settings.tourComplete) &&
         settings.advancedTourComplete &&
         (!isGenealogy || settings.genealogyTourComplete) &&
         (!isDatabases || settings.databasesTourComplete) &&

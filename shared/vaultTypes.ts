@@ -177,8 +177,32 @@ Este vault es un gestor de bases de datos estructuradas (tablas con columnas tip
   {
     id: 'docencia',
     available: true,
-    defaultHiddenViews: [],
-    promptPack: '',
+    // Teaching reuses the study organisation surfaces (courses & subjects, schedule,
+    // calendar, materials, recordings). Like the study mode it hides the
+    // research/authoring universals, leaving a focused teaching workspace. The user
+    // can re-enable any universal section from Settings.
+    defaultHiddenViews: [
+      'search',
+      'library',
+      'graph',
+      'argument',
+      'ideas',
+      'authors',
+      'immersion',
+      'gaps',
+      'debate',
+      'research',
+      'hypothesis',
+      'reading',
+      'deepResearch',
+      'writing',
+      'projects',
+      'notes',
+    ],
+    promptPack: `
+
+═══ CONTEXTO DEL VAULT — MODO DOCENCIA ═══
+Este vault es el espacio de trabajo de un DOCENTE: preparación de clases, materiales, evaluación y organización académica (cursos, asignaturas, horarios, calendario y grabaciones de clase). Ayuda con un enfoque didáctico y práctico: adapta el nivel al alumnado, propón objetivos y criterios de evaluación claros, y sugiere actividades, recursos y formas de evaluar concretos. No inventes datos, citas ni normativa que no estén en el corpus; cuando falte información, dilo.`,
   },
 ];
 
@@ -205,7 +229,7 @@ export function vaultTypeColor(value: unknown): string {
 }
 
 /** Selectable shells whose product sections are visible but intentionally inert. */
-export const PREVIEW_VAULT_TYPES: VaultType[] = ['docencia', 'worldbuilding'];
+export const PREVIEW_VAULT_TYPES: VaultType[] = ['worldbuilding'];
 
 export function isPreviewVaultType(value: unknown): boolean {
   return PREVIEW_VAULT_TYPES.includes(normalizeVaultType(value));
@@ -235,19 +259,27 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   dbAnalysis: ['databases'],
   dbChat: ['databases'],
   // Study mode owns its academic organisation, materials and question bank.
-  // They must never leak into research/records/database vaults.
-  studyCourses: ['estudio'],
-  studySchedule: ['estudio'],
-  studyCalendar: ['estudio'],
+  // They must never leak into research/records/database vaults. The teaching
+  // ('docencia') mode reuses the shared organisation surfaces — courses & subjects,
+  // schedule, calendar, materials and recordings — so those five are scoped to both.
+  // The study-only surfaces (search, chat, ideas, graph, question bank, review,
+  // deep research) stay exclusive to 'estudio'.
+  studyCourses: ['estudio', 'docencia'],
+  studySchedule: ['estudio', 'docencia'],
+  studyCalendar: ['estudio', 'docencia'],
   studySearch: ['estudio'],
-  studyLibrary: ['estudio'],
-  studyRecordings: ['estudio'],
+  studyLibrary: ['estudio', 'docencia'],
+  studyRecordings: ['estudio', 'docencia'],
   studyChat: ['estudio'],
   studyIdeas: ['estudio'],
   studyGraph: ['estudio'],
-  studyQuestions: ['estudio'],
+  // The question bank is shared with teaching (its Evaluación section).
+  studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
   studyDeepResearch: ['estudio'],
+  // The exam paper builder belongs to the teaching vault only.
+  teachingExams: ['docencia'],
+  teachingRubrics: ['docencia'],
 };
 
 const BY_ID = new Map<VaultType, VaultTypeDef>(VAULT_TYPES.map((def) => [def.id, def]));

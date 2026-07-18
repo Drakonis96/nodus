@@ -7,7 +7,7 @@ export interface Migration {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 81;
+export const SCHEMA_VERSION = 85;
 
 export const migrations: Migration[] = [
   {
@@ -2765,6 +2765,122 @@ export const migrations: Migration[] = [
       ALTER TABLE study_schedule_day_styles_v81 RENAME TO study_schedule_day_styles;
       CREATE UNIQUE INDEX idx_study_schedule_day_styles_key
         ON study_schedule_day_styles(COALESCE(academic_year_id, ''), day);
+    `,
+  },
+  {
+    version: 82,
+    up: /* sql */ `
+      -- Exam paper builder (teaching vault). This is deliberately NOT study_assessments:
+      -- that models an interactive test taken on screen and assembled from the shared
+      -- question bank, whose 0.78 similarity dedup would silently drop freshly generated
+      -- items. An exam paper is a printed document, so its questions are owned by the
+      -- exam (cascade delete), carry layout intent (answer lines, option/pair shape, an
+      -- embedded image) and never pollute the bank.
+      CREATE TABLE teaching_exams (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        language TEXT NOT NULL DEFAULT 'es',
+        target_question_count INTEGER NOT NULL DEFAULT 10,
+        -- Header fields and logos are a single JSON blob each: they are read and written
+        -- as a whole by the builder and never queried by column.
+        header_json TEXT NOT NULL DEFAULT '{}',
+        logos_json TEXT NOT NULL DEFAULT '[]',
+        position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_exams_subject ON teaching_exams(subject_id, updated_at DESC);
+
+      CREATE TABLE teaching_exam_questions (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        exam_id TEXT NOT NULL REFERENCES teaching_exams(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL DEFAULT 0,
+        type TEXT NOT NULL,
+        prompt TEXT NOT NULL DEFAULT '',
+        points REAL NOT NULL DEFAULT 1,
+        options_json TEXT NOT NULL DEFAULT '[]',
+        pairs_json TEXT NOT NULL DEFAULT '[]',
+        items_json TEXT NOT NULL DEFAULT '[]',
+        image_data_url TEXT,
+        image_caption TEXT NOT NULL DEFAULT '',
+        answer_lines INTEGER,
+        solution TEXT NOT NULL DEFAULT '',
+        ai_prompt TEXT NOT NULL DEFAULT '',
+        generated_by TEXT NOT NULL DEFAULT 'manual',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_exam_questions_exam ON teaching_exam_questions(exam_id, position);
+    `,
+  },
+  {
+    version: 83,
+    up: /* sql */ `
+      -- Rubrics (teaching vault). Levels and criteria are stored as JSON rather than
+      -- child tables: a rubric is always read, edited and exported as one whole grid,
+      -- never queried by cell, and keeping it in one row makes the history list a plain
+      -- SELECT and versioning trivial.
+      CREATE TABLE teaching_rubrics (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        subject_id TEXT REFERENCES study_subjects(id) ON DELETE SET NULL,
+        course_id TEXT REFERENCES study_courses(id) ON DELETE SET NULL,
+        language TEXT NOT NULL DEFAULT 'es',
+        scale_max REAL NOT NULL DEFAULT 5,
+        weighted INTEGER NOT NULL DEFAULT 0,
+        levels_json TEXT NOT NULL DEFAULT '[]',
+        criteria_json TEXT NOT NULL DEFAULT '[]',
+        position INTEGER NOT NULL DEFAULT 0,
+        archived_at TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_teaching_rubrics_subject ON teaching_rubrics(subject_id, updated_at DESC);
+    `,
+  },
+  {
+    version: 84,
+    up: /* sql */ `
+      -- A reusable logo library: a teacher stamps the same crest on every exam, so the
+      -- image is stored once here and copied into each exam that uses it (the exam stays
+      -- self-contained, and deleting a library entry never blanks an existing paper).
+      CREATE TABLE teaching_logos (
+        id TEXT PRIMARY KEY,
+        short_id TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        data_url TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      -- Until the teacher picks a language for THIS exam, the document follows the
+      -- interface language; once they choose, that choice is remembered per exam.
+      ALTER TABLE teaching_exams ADD COLUMN language_locked INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
+  {
+    version: 85,
+    up: /* sql */ `
+      -- Section statements: a shared text/case/image (type = 'section') that several
+      -- sub-questions hang from. The sub-questions point at it through parent_id, so a
+      -- standalone question can still follow a section — which a flat "everything after
+      -- this header belongs to it" marker could never express.
+      --
+      -- ON DELETE CASCADE: removing the statement removes the questions that only made
+      -- sense underneath it. The builder warns before doing so.
+      ALTER TABLE teaching_exam_questions
+        ADD COLUMN parent_id TEXT REFERENCES teaching_exam_questions(id) ON DELETE CASCADE;
+      CREATE INDEX idx_teaching_exam_questions_parent ON teaching_exam_questions(parent_id, position);
     `,
   },
 ];

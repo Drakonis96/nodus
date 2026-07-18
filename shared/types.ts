@@ -131,6 +131,29 @@ import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan,
 import type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
 import type { StudySchedule } from './studySchedule';
 import type {
+  ExamExportFormat,
+  ExamExportOptions,
+  ExamImagePick,
+  TeachingLogo,
+  ExamQuestion,
+  ExamQuestionGenerationRequest,
+  ExamQuestionGenerationResult,
+  ExamQuestionInput,
+  TeachingExam,
+  TeachingExamDetail,
+  TeachingExamInput,
+} from './teachingExams';
+import type {
+  RubricCellFillRequest,
+  RubricCellFillResult,
+  RubricExportFormat,
+  RubricExportOptions,
+  RubricGenerationRequest,
+  RubricGenerationResult,
+  TeachingRubric,
+  TeachingRubricInput,
+} from './teachingRubrics';
+import type {
   StudyIdeaDetail,
   StudyIdeaSummary,
   StudyKnowledgeGraph,
@@ -5378,6 +5401,36 @@ export interface NodusApi {
   listStudyRecordings(options?: StudyRecordingListOptions): Promise<StudyRecordingSummary[]>;
   getStudyRecording(id: string): Promise<StudyRecordingDetail>;
   getStudyRecordingContent(id: string): Promise<StudyRecordingContent>;
+  // Rubric builder (teaching vault).
+  listTeachingRubrics(options?: { subjectId?: string | null; search?: string }): Promise<TeachingRubric[]>;
+  getTeachingRubric(id: string): Promise<TeachingRubric>;
+  createTeachingRubric(input?: TeachingRubricInput): Promise<TeachingRubric>;
+  updateTeachingRubric(id: string, patch: Partial<TeachingRubricInput>): Promise<TeachingRubric>;
+  deleteTeachingRubric(id: string): Promise<void>;
+  duplicateTeachingRubric(id: string): Promise<TeachingRubric>;
+  setTeachingRubricCell(id: string, criterionId: string, levelId: string, text: string): Promise<TeachingRubric>;
+  fillRubricCell(request: RubricCellFillRequest): Promise<RubricCellFillResult>;
+  generateRubric(request: RubricGenerationRequest): Promise<RubricGenerationResult>;
+  pickRubricSourceFile(): Promise<{ filePath: string; name: string } | null>;
+  exportTeachingRubric(id: string, format: RubricExportFormat, options?: RubricExportOptions): Promise<{ path: string } | null>;
+  // Exam paper builder (teaching vault).
+  listTeachingExams(options?: { subjectId?: string | null }): Promise<TeachingExam[]>;
+  getTeachingExam(id: string): Promise<TeachingExamDetail>;
+  createTeachingExam(input: TeachingExamInput): Promise<TeachingExamDetail>;
+  updateTeachingExam(id: string, patch: Partial<TeachingExamInput>): Promise<TeachingExamDetail>;
+  deleteTeachingExam(id: string): Promise<void>;
+  duplicateTeachingExam(id: string): Promise<TeachingExamDetail>;
+  addTeachingExamQuestion(examId: string, input: ExamQuestionInput): Promise<ExamQuestion>;
+  updateTeachingExamQuestion(id: string, patch: Partial<ExamQuestionInput>): Promise<ExamQuestion>;
+  deleteTeachingExamQuestion(id: string): Promise<void>;
+  reorderTeachingExamQuestions(examId: string, orderedIds: string[]): Promise<ExamQuestion[]>;
+  generateExamQuestion(request: ExamQuestionGenerationRequest): Promise<ExamQuestionGenerationResult>;
+  pickExamImage(kind: 'logo' | 'figure'): Promise<ExamImagePick | null>;
+  listTeachingLogos(): Promise<TeachingLogo[]>;
+  addTeachingLogo(name: string, dataUrl: string): Promise<TeachingLogo>;
+  importTeachingLogo(): Promise<TeachingLogo | null>;
+  deleteTeachingLogo(id: string): Promise<void>;
+  exportTeachingExam(id: string, format: ExamExportFormat, options?: ExamExportOptions): Promise<{ path: string } | null>;
   createStudyRecording(input: StudyRecordingCreateInput): Promise<StudyRecordingImportResult>;
   importStudyRecordings(scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>): Promise<StudyRecordingImportResult[]>;
   updateStudyRecording(id: string, patch: StudyRecordingUpdateInput): Promise<StudyRecordingSummary>;

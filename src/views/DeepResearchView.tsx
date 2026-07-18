@@ -28,7 +28,7 @@ import { DraftActionBar, DraftResultMain, SupportMatrix } from './writingShared'
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
 import { AudioPanel } from '../components/AudioPanel';
 import { FindInPage } from '../components/FindInPage';
-import { t, tx } from '../i18n';
+import { t, tx, getActiveLang } from '../i18n';
 import {
   DEEP_RESEARCH_MAIN_JOB_KEY,
   clearFinishedDeepResearch,
@@ -63,7 +63,7 @@ type SortKey = 'recent' | 'oldest' | 'title';
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(getActiveLang(), { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
     return iso;
   }

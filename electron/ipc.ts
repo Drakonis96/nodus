@@ -287,6 +287,29 @@ import * as studyEditor from './db/studyEditorRepo';
 import * as studyStyles from './db/studyStylesRepo';
 import * as studyMaterials from './db/studyMaterialsRepo';
 import * as studyRecordings from './db/studyRecordingsRepo';
+import * as teachingExams from './db/teachingExamsRepo';
+import * as teachingRubrics from './db/teachingRubricsRepo';
+import * as teachingLogos from './db/teachingLogosRepo';
+import { fillRubricCell, generateRubric } from './ai/teachingRubrics';
+import { rubricDocxBytes, rubricPdfBytes } from './export/rubricExport';
+import type {
+  RubricCellFillRequest,
+  RubricExportFormat,
+  RubricExportOptions,
+  RubricGenerationRequest,
+  TeachingRubricInput,
+} from '@shared/teachingRubrics';
+import { generateExamQuestion } from './ai/teachingExamQuestions';
+import { examDocxBytes, examPdfBytes } from './export/examExport';
+import {
+  effectiveExamLanguage,
+  MAX_EXAM_IMAGE_BYTES,
+  type ExamExportFormat,
+  type ExamExportOptions,
+  type ExamQuestionGenerationRequest,
+  type ExamQuestionInput,
+  type TeachingExamInput,
+} from '@shared/teachingExams';
 import { transcribeStudyAudio as transcribeOpenAiStudyAudio } from './ai/studyTranscription';
 import {
   cancelWhisperCpp,
@@ -2392,6 +2415,111 @@ export function registerIpc(
   h('study:recordings:list', async (_e, options?: StudyRecordingListOptions) => studyRecordings.listStudyRecordings(options));
   h('study:recordings:get', async (_e, id: string) => studyRecordings.getStudyRecording(id));
   h('study:recordings:content', async (_e, id: string) => studyRecordings.getStudyRecordingContent(id));
+  // ---- Rubric builder (teaching vault) ----
+  h('teaching:rubrics:list', async (_e, options?: { subjectId?: string | null; search?: string }) => teachingRubrics.listTeachingRubrics(options ?? {}));
+  h('teaching:rubrics:get', async (_e, id: string) => teachingRubrics.getTeachingRubric(id));
+  h('teaching:rubrics:create', async (_e, input?: TeachingRubricInput) => teachingRubrics.createTeachingRubric(input ?? {}));
+  h('teaching:rubrics:update', async (_e, id: string, patch: Partial<TeachingRubricInput>) => teachingRubrics.updateTeachingRubric(id, patch));
+  h('teaching:rubrics:delete', async (_e, id: string) => {
+    teachingRubrics.deleteTeachingRubric(id);
+    return null;
+  });
+  h('teaching:rubrics:duplicate', async (_e, id: string) => teachingRubrics.duplicateTeachingRubric(id));
+  h('teaching:rubrics:cell', async (_e, id: string, criterionId: string, levelId: string, text: string) => teachingRubrics.setTeachingRubricCell(id, criterionId, levelId, text));
+  h('teaching:rubrics:cell:fill', async (_e, request: RubricCellFillRequest) => fillRubricCell(request));
+  h('teaching:rubrics:generate', async (_e, request: RubricGenerationRequest) => generateRubric(request));
+  h('teaching:rubrics:pickFile', async () => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Elegir el documento con las instrucciones de la tarea',
+      properties: ['openFile'],
+      filters: [{ name: 'Documentos', extensions: ['pdf', 'docx', 'doc', 'txt', 'md', 'rtf', 'odt'] }],
+    });
+    if (picked.canceled || !picked.filePaths.length) return null;
+    return { filePath: picked.filePaths[0], name: path.basename(picked.filePaths[0]) };
+  });
+  h('teaching:rubrics:export', async (_e, id: string, format: RubricExportFormat, options?: RubricExportOptions) => {
+    const rubric = teachingRubrics.getTeachingRubric(id);
+    const baseName = (rubric.title || 'rubrica').replace(/[\\/:*?"<>|]+/g, '-') || 'rubrica';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar rúbrica',
+      defaultPath: `${baseName}.${format}`,
+      filters: [format === 'pdf' ? { name: 'PDF', extensions: ['pdf'] } : { name: 'Word', extensions: ['docx'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    const bytes = format === 'pdf' ? await rubricPdfBytes(rubric, options ?? {}) : await rubricDocxBytes(rubric, options ?? {});
+    fs.writeFileSync(picked.filePath, bytes);
+    return { path: picked.filePath };
+  });
+
+  // ---- Exam paper builder (teaching vault) ----
+  h('teaching:exams:list', async (_e, options?: { subjectId?: string | null }) => teachingExams.listTeachingExams(options ?? {}));
+  h('teaching:exams:get', async (_e, id: string) => teachingExams.getTeachingExam(id));
+  h('teaching:exams:create', async (_e, input: TeachingExamInput) => teachingExams.createTeachingExam(input));
+  h('teaching:exams:update', async (_e, id: string, patch: Partial<TeachingExamInput>) => teachingExams.updateTeachingExam(id, patch));
+  h('teaching:exams:delete', async (_e, id: string) => {
+    teachingExams.deleteTeachingExam(id);
+    return null;
+  });
+  h('teaching:exams:duplicate', async (_e, id: string) => teachingExams.duplicateTeachingExam(id));
+  h('teaching:exams:question:add', async (_e, examId: string, input: ExamQuestionInput) => teachingExams.addTeachingExamQuestion(examId, input));
+  h('teaching:exams:question:update', async (_e, id: string, patch: Partial<ExamQuestionInput>) => teachingExams.updateTeachingExamQuestion(id, patch));
+  h('teaching:exams:question:delete', async (_e, id: string) => {
+    teachingExams.deleteTeachingExamQuestion(id);
+    return null;
+  });
+  h('teaching:exams:question:reorder', async (_e, examId: string, orderedIds: string[]) => teachingExams.reorderTeachingExamQuestions(examId, orderedIds));
+  h('teaching:exams:question:generate', async (_e, request: ExamQuestionGenerationRequest) => generateExamQuestion(request));
+  h('teaching:exams:pickImage', async (_e, kind: 'logo' | 'figure') => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: kind === 'logo' ? 'Elegir logotipo' : 'Elegir imagen de la pregunta',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || !picked.filePaths.length) return null;
+    const filePath = picked.filePaths[0];
+    // Both logos and figures are downscaled on import: the raw file used to be embedded
+    // as base64 in the row, the preview and every export, which was slow and could be
+    // refused outright. Resizing makes any picture the teacher owns work.
+    if (kind === 'logo') return teachingLogos.importLogoFromFile(filePath);
+    const stat = fs.statSync(filePath);
+    if (stat.size > MAX_EXAM_IMAGE_BYTES * 4) throw new Error('Esa imagen es demasiado grande.');
+    return teachingLogos.importImageFromFile(filePath);
+  });
+  h('teaching:logos:list', async () => teachingLogos.listTeachingLogos());
+  h('teaching:logos:add', async (_e, name: string, dataUrl: string) => teachingLogos.addTeachingLogo(name, dataUrl));
+  h('teaching:logos:import', async () => {
+    const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {
+      title: 'Añadir logotipo a la biblioteca',
+      properties: ['openFile'],
+      filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tif', 'tiff'] }],
+    });
+    if (picked.canceled || !picked.filePaths.length) return null;
+    const imported = await teachingLogos.importLogoFromFile(picked.filePaths[0]);
+    return teachingLogos.addTeachingLogo(imported.name, imported.dataUrl);
+  });
+  h('teaching:logos:delete', async (_e, id: string) => {
+    teachingLogos.deleteTeachingLogo(id);
+    return null;
+  });
+  h('teaching:exams:export', async (_e, id: string, format: ExamExportFormat, options?: ExamExportOptions) => {
+    const exam = teachingExams.getTeachingExam(id);
+    const baseName = (exam.header.examTitle?.trim() || exam.title).replace(/[\\/:*?"<>|]+/g, '-') || 'examen';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: 'Descargar examen',
+      defaultPath: `${baseName}.${format}`,
+      filters: [format === 'pdf' ? { name: 'PDF', extensions: ['pdf'] } : { name: 'Word', extensions: ['docx'] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    // The document follows the interface language until the teacher picks one for
+    // this exam; from then on their choice wins.
+    const printed = { ...exam, language: effectiveExamLanguage(exam, getSettings().uiLanguage) };
+    const bytes = format === 'pdf'
+      ? await examPdfBytes(printed, printed.questions, options ?? {})
+      : await examDocxBytes(printed, printed.questions, options ?? {});
+    fs.writeFileSync(picked.filePath, bytes);
+    return { path: picked.filePath };
+  });
+
   h('study:recordings:create', async (_e, input: StudyRecordingCreateInput) => studyRecordings.createStudyRecording(input));
   h('study:recordings:import', async (_e, scope?: Omit<StudyRecordingCreateInput, 'bytes' | 'fileName' | 'mimeType'>) => {
     const picked = await dialog.showOpenDialog(getWindow() ?? undefined!, {

@@ -127,6 +127,12 @@ const INDIRECT_KEY_SOURCES = [
   { file: 'shared/databaseCsv.ts', pattern: /\bpick\([^,]+,\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Column type + rollup function names, rendered as t(columnTypeDef(x).label) / t(f.label).
   { file: 'shared/databases.ts', pattern: /\blabel:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Exam question-type catalogue (label/description) and the builder's validation
+  // messages, rendered as t(def.label) / t(issue.message) in ExamBuilderView.
+  { file: 'shared/teachingExams.ts', pattern: /\b(?:label|description|message):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Rubric level-set presets and the quality-check messages, rendered as
+  // t(preset.label) / t(issue.message) in RubricsView.
+  { file: 'shared/teachingRubrics.ts', pattern: /\b(?:label|message):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Formula recipe / operation / statistic names and hints, rendered as t(r.label) / t(r.hint).
   { file: 'shared/databaseFormula.ts', pattern: /\b(?:label|hint):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // validateFormula's problems, surfaced through t(problem) in the editor and t(error) in the
@@ -178,6 +184,82 @@ function stripNonKeyLiterals(arg) {
     .replace(/\[[^\]]*(["'])(?:\\.|(?!\1).)*?\1\s*\]/g, '');
 }
 
+/** Slice the balanced {...} or [...] literal that starts at `openIdx`. */
+function sliceBalanced(src, openIdx) {
+  const open = src[openIdx];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  for (let i = openIdx; i < src.length; i++) {
+    const c = src[i];
+    if (c === open) depth++;
+    else if (c === close) { depth--; if (depth === 0) return src.slice(openIdx, i + 1); }
+    else if (c === "'" || c === '"' || c === '`') {
+      const q = c; i++;
+      while (i < src.length && src[i] !== q) i += src[i] === '\\' ? 2 : 1;
+    }
+  }
+  return src.slice(openIdx);
+}
+
+// A value that reads like a display label (so we translate it) rather than an enum
+// key, icon name or css class (which we must not): has a space, or starts uppercase,
+// or carries a Spanish diacritic. This keeps 'Fácil'/'Lun'/'Sesión de estudio' and
+// drops 'graduation'/'bg-red-500'/'short'/'pending'.
+const isDisplayLabel = (v) => /\s/.test(v) || /^[A-ZÁÉÍÓÚÑ¿¡]/.test(v) || /[ñáéíóúÁÉÍÓÚÑ]/.test(v);
+
+// Values a followed map holds that are NOT translatable UI prose and must be dropped,
+// or the test would demand a bogus translation: css/gradients/tailwind classes; format
+// acronyms (CSV, PDF, EPUB — language-neutral); language endonyms (shown in their own
+// name); and the lowercase, punctuation-free keyword blobs used for settings search.
+function isNotTranslatable(v) {
+  if (/[#(){}]|gradient|linear-|radial-|rgba?\(|\d\s*%|border-|bg-|text-|rounded|shadow|ring-|\bflex\b|\bgrid\b|px-|py-|-\d/.test(v)) return true;
+  if (/^[A-Z0-9][A-Z0-9./+-]{1,5}$/.test(v)) return true; // acronyms / format tokens
+  if (/^(English|Deutsch|Français|Italiano|Português|Português do Brasil|Türkçe|Español|Nederlands|Polski)$/.test(v)) return true;
+  const words = v.trim().split(/\s+/);
+  if (words.length >= 4 && !/[A-ZÁÉÍÓÚÑ¿¡.?!:]/.test(v)) return true; // search-keyword blob
+  return false;
+}
+
+/**
+ * Follow the label MAPS/ARRAYS a file hands to t() indirectly — `t(MAP[x])`,
+ * `t(cond ? MAP[a] : MAP[b])`, `Object.entries(MAP).map(([, l]) => t(l))`,
+ * `ARR.map((x) => t(x))` — and record their display-label string values. This is the
+ * pattern that keeps shipping Spanish (DAY_LABELS, TYPE_LABELS, STARTERS, WEEKDAYS…):
+ * the literal scan can't see the string because it lives in a const, not in the call.
+ */
+function collectMapLabels(src, file, record, unescape) {
+  const defRe = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]*)?=\s*([[{])/g;
+  let m;
+  while ((m = defRe.exec(src))) {
+    const name = m[1];
+    const isArray = m[2] === '[';
+    const body = sliceBalanced(src, m.index + m[0].length - 1);
+    const consumed =
+      new RegExp(`\\bt[x]?\\([^)]*\\b${name}\\s*\\[`).test(src) ||           // t(NAME[..]) incl. ternaries
+      new RegExp(`\\bt[x]?\\(\\s*${name}\\s*\\)`).test(src) ||               // t(NAME)
+      new RegExp(`\\bObject\\.(?:entries|values)\\(\\s*${name}\\s*\\)`).test(src) ||
+      // array of primitive strings mapped with a t() in the file: t(element). An array
+      // of OBJECTS (contains `{`) is mapped by its fields, not its elements → skip.
+      (isArray && !body.includes('{') && new RegExp(`\\b${name}\\.(?:map|flatMap|forEach)\\(`).test(src) && /\bt[x]?\(/.test(src));
+    if (consumed) {
+      for (const s of body.matchAll(/(["'])((?:\\.|(?!\1).)*?)\1/g)) {
+        const v = unescape(s[2]);
+        if (isDisplayLabel(v) && !isNotTranslatable(v)) record(v, file);
+      }
+      continue;
+    }
+    // Array of OBJECTS mapped with t(x.field), e.g. DESTINATIONS.map(d => t(d.title)):
+    // collect only the human-text fields, keyed by field name so non-text fields
+    // (icon, view, color) are never demanded.
+    if (new RegExp(`\\b${name}\\.(?:map|flatMap|forEach)\\(`).test(src) && /\bt[x]?\(\s*\w+\.\w/.test(src)) {
+      for (const s of body.matchAll(/\b(?:label|title|description|hint|subtitle|body|name|text|caption|heading|tooltip|summary)\s*:\s*(["'])((?:\\.|(?!\1).)*?)\1/g)) {
+        const v = unescape(s[2]);
+        if (isDisplayLabel(v) && !isNotTranslatable(v)) record(v, file);
+      }
+    }
+  }
+}
+
 /** Every key the renderer asks t()/tx() for, mapped to the file that asks. */
 function collectTranslatableStrings() {
   const found = new Map(); // string -> file
@@ -195,6 +277,7 @@ function collectTranslatableStrings() {
         record(unescape(m[2]), f);
       }
     }
+    collectMapLabels(src, f, record, unescape);
   }
   for (const { file, pattern } of INDIRECT_KEY_SOURCES) {
     const full = path.join(repoRoot, file);
@@ -411,6 +494,18 @@ test('keys reached indirectly and through ternaries are collected', () => {
   }
   assert.ok(strings.has('Proveedores'), 'Settings tab labels must be collected');
   assert.ok(strings.has('Ocultar contraseña'), 'keys inside a t(cond ? … : …) ternary must be collected');
+});
+
+test('seeded Spanish data labels are translated on screen, not left raw', () => {
+  // The schedule seeds 'Mañana'/'Tarde' into the DB. They are user-editable, so the
+  // view must translate them only while untouched — otherwise an English interface
+  // shows Spanish in the slot name box.
+  const schedule = fs.readFileSync(path.join(repoRoot, 'src/views/StudyScheduleView.tsx'), 'utf8');
+  assert.match(schedule, /function periodLabel/, 'the untouched-default translation helper must exist');
+  assert.match(schedule, /value=\{periodLabel\(period\)\}/, 'the slot name box must render the translated label');
+  for (const key of ['Mañana', 'Tarde', 'Lunes', 'Viernes']) {
+    assert.ok(enKeys.has(key), `"${key}" must have an English translation`);
+  }
 });
 
 test('genealogy vault-type + section labels are translated', () => {

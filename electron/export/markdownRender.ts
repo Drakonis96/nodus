@@ -1,9 +1,9 @@
-import { BrowserWindow } from 'electron';
+import { htmlToPdfBytes } from './htmlToPdf';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared Markdown → HTML / PDF rendering used by both project and writing-workshop
 // exports. Keeps `nodus://` citations readable (label kept, url listed at the end)
-// and renders through an offscreen BrowserWindow so PDFs match on-screen typography.
+// and prints through Chromium so PDFs match on-screen typography.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function stripMarkdownLinks(text: string): string {
@@ -122,12 +122,15 @@ function renderHtml(markdown: string, title: string): string {
 </html>`;
 }
 
+/**
+ * Goes through the shared helper rather than driving its own BrowserWindow: that is
+ * where the deferred-destroy fix lives (destroying the window synchronously breaks the
+ * NEXT export in the session with `ERR_FAILED`), and it loads from a temp file instead
+ * of a `data:` URL, so an embedded image can no longer overflow the URL length limit.
+ *
+ * This stylesheet sets its page margin in `body`, not in an `@page` rule, so zero
+ * printer margins are correct here.
+ */
 export async function markdownToPdf(markdown: string, title: string): Promise<Buffer> {
-  const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true } });
-  try {
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(renderHtml(markdown, title))}`);
-    return await win.webContents.printToPDF({ printBackground: true, pageSize: 'A4' });
-  } finally {
-    win.destroy();
-  }
+  return htmlToPdfBytes(renderHtml(markdown, title));
 }
