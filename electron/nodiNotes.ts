@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { deriveNodiNoteTitle } from '@shared/nodiNotes';
 import type { NodiNote, NodiNoteInput } from '@shared/types';
 
 // Quick Markdown notes for the Nodi companion. Stored as a small JSON file in the
@@ -19,26 +20,13 @@ function storePath(): string {
   return path.join(app.getPath('userData'), 'nodi-notes.json');
 }
 
-/** The note's title is the first meaningful line, stripped of Markdown markers so
- *  the list reads as plain text. Empty when the note has no text yet; the renderer
- *  shows a localized "untitled" label in that case. */
-function deriveTitle(content: string): string {
-  for (const raw of content.split('\n')) {
-    const line = raw
-      .replace(/^\s{0,3}#{1,6}\s+/, '')
-      .replace(/^\s{0,3}[-*+>]\s+/, '')
-      .replace(/[*_`~]/g, '')
-      .trim();
-    if (line) return line.slice(0, 100);
-  }
-  return '';
-}
-
 function normalizeNote(value: NodiNote): NodiNote {
   const content = typeof value.content === 'string' ? value.content : '';
+  const explicitTitle = value.titleExplicit === true ? String(value.title || '').trim() : '';
   return {
     id: String(value.id || crypto.randomUUID()),
-    title: (String(value.title || '').trim() || deriveTitle(content)).slice(0, 100),
+    title: (explicitTitle || deriveNodiNoteTitle(content)).slice(0, 100),
+    titleExplicit: Boolean(explicitTitle),
     content,
     createdAt: Number(value.createdAt) || Date.now(),
     updatedAt: Number(value.updatedAt) || Date.now(),
@@ -75,9 +63,11 @@ export function saveNodiNote(input: NodiNoteInput): NodiNote {
   const existing = existingIndex >= 0 ? store.notes[existingIndex] : null;
   const now = Date.now();
   const content = typeof input.content === 'string' ? input.content : '';
+  const explicitTitle = String(input.title || '').trim();
   const note = normalizeNote({
     id: existing?.id ?? crypto.randomUUID(),
-    title: deriveTitle(content),
+    title: explicitTitle || deriveNodiNoteTitle(content),
+    titleExplicit: Boolean(explicitTitle),
     content,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,

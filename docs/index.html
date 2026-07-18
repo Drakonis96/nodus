@@ -80,9 +80,36 @@
   .gh-badge svg { width: 16px; height: 16px; fill: currentColor; }
   .gh-badge .stars { display: inline-flex; align-items: center; gap: 4px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--amber); }
   .gh-badge .stars svg { width: 13px; height: 13px; fill: var(--amber); }
-  .lang-select { appearance: none; -webkit-appearance: none; background-color: var(--card); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a7a2bd' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 7px 28px 7px 11px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
-  .lang-select:hover { border-color: rgba(167,139,250,0.5); }
-  .lang-select option { background: #14121f; color: var(--text); }
+  .lang-picker { position: relative; }
+  .lang-trigger {
+    display: inline-flex; align-items: center; gap: 8px; min-width: 146px; height: 36px; padding: 0 10px;
+    border: 1px solid var(--border); border-radius: 11px; background: rgba(255,255,255,.045); color: var(--text);
+    font: 600 12.5px/1 var(--sans); cursor: pointer; transition: border-color .2s, background .2s, box-shadow .2s;
+  }
+  .lang-trigger:hover, .lang-trigger[aria-expanded="true"] { border-color: rgba(167,139,250,.52); background: rgba(139,92,246,.1); }
+  .lang-trigger:focus-visible { outline: 3px solid rgba(139,92,246,.25); outline-offset: 2px; }
+  .lang-flag { font-size: 17px; line-height: 1; filter: saturate(.92); }
+  .lang-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lang-chevron { width: 14px; height: 14px; margin-left: auto; color: var(--text-2); transition: transform .2s; }
+  .lang-trigger[aria-expanded="true"] .lang-chevron { transform: rotate(180deg); }
+  .lang-menu {
+    position: absolute; z-index: 70; top: calc(100% + 9px); right: 0; width: 242px; max-height: min(430px, calc(100vh - 84px)); overflow-y: auto;
+    padding: 7px; border: 1px solid rgba(167,139,250,.24); border-radius: 15px;
+    background: #12101d; box-shadow: 0 22px 60px rgba(0,0,0,.62); backdrop-filter: blur(18px);
+    transform-origin: top right; animation: lang-menu-in .16s ease-out;
+  }
+  .lang-menu[hidden] { display: none; }
+  @keyframes lang-menu-in { from { opacity: 0; transform: translateY(-5px) scale(.98); } to { opacity: 1; transform: none; } }
+  .lang-option {
+    display: grid; grid-template-columns: 28px minmax(0,1fr) 18px; align-items: center; gap: 9px; width: 100%;
+    padding: 9px 10px; border: 0; border-radius: 10px; background: transparent; color: #c8c3d8;
+    font: 600 12.5px/1.25 var(--sans); text-align: left; cursor: pointer;
+  }
+  .lang-option:hover, .lang-option:focus-visible { outline: none; background: rgba(139,92,246,.12); color: var(--text); }
+  .lang-option[aria-selected="true"] { background: rgba(139,92,246,.18); color: #ddd6fe; }
+  .lang-option .lang-flag { display: grid; width: 27px; height: 27px; place-items: center; border-radius: 8px; background: rgba(255,255,255,.055); }
+  .lang-check { width: 15px; height: 15px; opacity: 0; color: var(--violet-2); }
+  .lang-option[aria-selected="true"] .lang-check { opacity: 1; }
 
   /* ---------- hero ---------- */
   .hero { position: relative; min-height: 100vh; display: grid; place-items: center; text-align: center; overflow: hidden; }
@@ -145,6 +172,7 @@
 
   /* ---------- sections ---------- */
   section { position: relative; padding: 110px 24px; }
+  #vaults { scroll-margin-top: 64px; }
   .wrap { max-width: 1080px; margin: 0 auto; }
   .kicker {
     display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700;
@@ -184,7 +212,16 @@
     opacity: 0; transform: translateY(34px); transition: all 0.8s cubic-bezier(0.2,0.7,0.3,1);
   }
   .shot.in { opacity: 1; transform: none; }
-  .shot:nth-child(even) .shot-txt { order: 2; }
+  .shot[data-vault-view="academic"] { order: 1; }
+  .shot[data-vault-view="teaching"] { order: 2; }
+  .shot[data-vault-view="study"] { order: 3; }
+  .shot[data-vault-view="genealogy"] { order: 4; }
+  .shot[data-vault-view="databases"] { order: 5; }
+  .shot[data-vault-view="academic"][data-view-index="2"] .shot-txt,
+  .shot[data-vault-view="study"][data-view-index="2"] .shot-txt,
+  .shot[data-vault-view="databases"][data-view-index="2"] .shot-txt,
+  .shot[data-vault-view="teaching"]:not([data-view-index="2"]) .shot-txt,
+  .shot[data-vault-view="genealogy"]:not([data-view-index="2"]) .shot-txt { order: 2; }
   .shot h3 { font-size: 20px; margin: 0 0 8px; }
   .shot p { color: var(--text-2); margin: 0; font-size: 15px; }
   .shot .tag { font-size: 11.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--violet-2); }
@@ -402,6 +439,46 @@
   .vig-guide .verify { margin-top: 12px; }
   .in .vig-guide .verify { animation: rowIn 0.5s ease 0.9s forwards; }
 
+  /* study + teaching planners */
+  .vig-planner .planner-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .vig-planner .planner-head b { font-size:12px; }
+  .vig-planner .planner-head span { font-size:10px; color:var(--text-3); }
+  .vig-planner .week { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .vig-planner .day { min-width:0; border:1px solid var(--border); border-radius:9px; padding:7px 5px; background:rgba(255,255,255,0.025); }
+  .vig-planner .day > b { display:block; margin-bottom:6px; font-size:9px; text-align:center; color:var(--text-3); text-transform:uppercase; }
+  .vig-planner .event { min-height:38px; border-radius:7px; padding:6px; font-size:8.5px; line-height:1.35; color:color-mix(in srgb,var(--acc) 65%,white); border:1px solid color-mix(in srgb,var(--acc) 35%,transparent); background:color-mix(in srgb,var(--acc) 10%,transparent); opacity:0; transform:translateY(8px); }
+  .vig-planner .event + .event { margin-top:5px; }
+  .in .vig-planner .event { animation:rowIn .45s ease forwards; }
+  .in .vig-planner .day:nth-child(2) .event { animation-delay:.12s; } .in .vig-planner .day:nth-child(3) .event { animation-delay:.24s; }
+  .in .vig-planner .day:nth-child(4) .event { animation-delay:.36s; } .in .vig-planner .day:nth-child(5) .event { animation-delay:.48s; }
+  .vig-planner .planner-foot { display:flex; gap:8px; margin-top:11px; }
+  .vig-planner .planner-foot span { flex:1; padding:7px 9px; border-radius:8px; font-size:9.5px; color:var(--text-2); border:1px solid var(--border); background:rgba(255,255,255,.025); }
+
+  /* genealogy evidence archive */
+  .vig-archive .archive-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .vig-archive .source-card { padding:10px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,.025); opacity:0; transform:translateY(10px); }
+  .in .vig-archive .source-card { animation:rowIn .45s ease forwards; }
+  .in .vig-archive .source-card:nth-child(2) { animation-delay:.15s; } .in .vig-archive .source-card:nth-child(3) { animation-delay:.3s; } .in .vig-archive .source-card:nth-child(4) { animation-delay:.45s; }
+  .vig-archive .source-card b { display:block; font-size:10.5px; color:#fde68a; }
+  .vig-archive .source-card span { display:block; margin-top:3px; font-size:9px; color:var(--text-3); }
+  .vig-archive .evidence-line { display:flex; align-items:center; gap:7px; margin-top:11px; padding:8px 10px; border-radius:9px; font-size:10px; color:#fcd34d; border:1px solid rgba(251,191,36,.28); background:rgba(251,191,36,.06); }
+  .vig-archive .evidence-line i { width:7px; height:7px; border-radius:50%; background:#fbbf24; box-shadow:0 0 0 4px rgba(251,191,36,.1); }
+
+  /* database schema builder */
+  .vig-schema .schema-grid { display:grid; grid-template-columns:1fr 34px 1fr; align-items:center; gap:8px; }
+  .vig-schema .schema-table { border:1px solid rgba(255,95,126,.25); border-radius:11px; overflow:hidden; background:rgba(179,3,51,.045); opacity:0; }
+  .in .vig-schema .schema-table { animation:holeIn .45s ease forwards; } .in .vig-schema .schema-table:last-child { animation-delay:.35s; }
+  .vig-schema .schema-title { padding:8px 10px; font-size:10.5px; font-weight:700; color:#ff9bad; border-bottom:1px solid rgba(255,95,126,.18); }
+  .vig-schema .schema-field { display:flex; justify-content:space-between; gap:7px; padding:6px 10px; font-size:9.5px; color:var(--text-2); border-bottom:1px solid #1d1d1d; }
+  .vig-schema .schema-field:last-child { border-bottom:0; }
+  .vig-schema .schema-field em { color:#9a6771; font-style:normal; font-size:8.5px; }
+  .vig-schema .schema-link { display:flex; align-items:center; }
+  .vig-schema .schema-link i { display:block; width:100%; height:2px; background:#ff5f7e; position:relative; transform:scaleX(0); }
+  .in .vig-schema .schema-link i { animation:schemaLink .6s ease .55s forwards; }
+  .vig-schema .schema-link i::after { content:''; position:absolute; right:-1px; top:-3px; width:7px; height:7px; border-top:2px solid #ff5f7e; border-right:2px solid #ff5f7e; transform:rotate(45deg); }
+  @keyframes schemaLink { to { transform:scaleX(1); } }
+  .vig-schema .schema-note { margin-top:12px; padding:8px 10px; border-radius:9px; font-size:10px; color:#ff9bad; border:1px solid rgba(255,95,126,.25); background:rgba(255,95,126,.06); }
+
   /* audio player embedded in a vignette */
   .vig-player { margin-top: 12px; }
   .shot .try.soon { color: var(--text-3); font-weight: 600; cursor: default; }
@@ -562,7 +639,7 @@
 
   @media (max-width: 820px) {
     .shot { grid-template-columns: 1fr; gap: 18px; }
-    .shot:nth-child(even) .shot-txt { order: 0; }
+    .shot .shot-txt { order: 0 !important; }
     .story .step { margin-left: 10px; padding-left: 30px; grid-template-columns: 1fr; }
     .story .step .num { left: -26px; width: 48px; height: 48px; font-size: 16px; top: 40px; }
     .story .step h3, .story .step p, .story .step .views { grid-column: 1; }
@@ -572,75 +649,73 @@
     .nav { padding: 12px 16px; gap: 12px; }
     .nav .links { gap: 12px; }
     .nav .links a.btn.primary { display: none; }
-    .lang-select { padding: 7px 26px 7px 9px; }
+    .lang-trigger { min-width: 0; width: 46px; padding: 0; justify-content: center; }
+    .lang-trigger .lang-name, .lang-trigger .lang-chevron { display: none; }
+    .lang-menu { position: fixed; top: 65px; right: 12px; width: min(250px, calc(100vw - 24px)); }
     .faq-item summary { align-items: flex-start; flex-direction: column; gap: 4px; padding-left: 16px; }
     .faq-answer { padding-left: 16px; padding-right: 16px; }
   }
 
   /* ---------- vaults ---------- */
-  /* Each vault carries the accent colour the app itself gives it
-     (VAULT_TYPE_COLOR in src/components/VaultSwitcher.tsx), so the site and the
-     product never disagree about what "the study vault" looks like. */
-  .vaults-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-top: 42px; }
-  .vault-card {
-    --vc: var(--violet); position: relative; display: flex; flex-direction: column; padding: 26px 26px 24px; border-radius: 18px;
-    border: 1px solid var(--border); background: var(--card);
-    transition: transform .2s, border-color .2s, background .2s;
-    opacity: 0; transform: translateY(20px);
+  /* These are the product colours from VAULT_TYPE_COLORS in shared/vaultTypes.ts. */
+  .vault-selector { display: flex; flex-wrap: wrap; gap: 10px; margin: 36px 0 18px; }
+  .vault-tag[data-vault="academic"] { order: 1; }
+  .vault-tag[data-vault="teaching"] { order: 2; }
+  .vault-tag[data-vault="study"] { order: 3; }
+  .vault-tag[data-vault="genealogy"] { order: 4; }
+  .vault-tag[data-vault="databases"] { order: 5; }
+  .vault-tag[data-vault="primary"] { order: 6; }
+  .vault-tag[data-vault="testimony"] { order: 7; }
+  .vault-tag[data-vault="prosopography"] { order: 8; }
+  .vault-tag {
+    --vc: var(--violet); display: inline-flex; align-items: center; gap: 9px; min-height: 40px; padding: 8px 15px;
+    border-radius: 999px; border: 1px solid color-mix(in srgb, var(--vc) 52%, var(--border));
+    background: color-mix(in srgb, var(--vc) 10%, transparent); color: color-mix(in srgb, var(--vc) 54%, white);
+    font: 700 12.5px/1 var(--sans); cursor: pointer; transition: transform .2s, background .2s, border-color .2s, box-shadow .2s, color .2s;
   }
-  .vault-card.in { opacity: 1; transform: none; }
-  .vault-card.live { cursor: pointer; }
-  .vault-card.live:hover { border-color: color-mix(in srgb, var(--vc) 55%, transparent); transform: translateY(-3px); background: color-mix(in srgb, var(--vc) 6%, transparent); }
-  .vault-top { display: flex; align-items: center; gap: 13px; margin-bottom: 15px; }
-  .vault-ic { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0;
-    background: color-mix(in srgb, var(--vc) 18%, transparent); color: var(--vc); }
-  .vault-ic svg { width: 23px; height: 23px; }
-  .vault-card h3 { font-family: var(--serif); font-size: 22px; margin: 0; font-weight: 700; color: var(--text); }
-  /* The maturity badge is pinned to the corner so it never reflows the title row. */
-  .vault-stage { position: absolute; top: 24px; right: 24px; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 4px 11px; border-radius: 999px; white-space: nowrap; border: 1px solid; }
-  .vault-stage.stable { color: #6ee7b7; border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.1); }
-  .vault-stage.beta { color: #fcd34d; border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.08); }
-  .vault-stage.alpha { color: #fdba74; border-color: rgba(249,115,22,0.35); background: rgba(249,115,22,0.08); }
-  .vault-stage.prealpha { color: #f0abfc; border-color: rgba(232,121,249,0.32); background: rgba(232,121,249,0.08); }
-  .vault-card > p { color: var(--text-2); font-size: 14px; margin: 0 0 16px; line-height: 1.62; }
-  .vault-feats { list-style: none; margin: 0 0 20px; padding: 0; display: grid; gap: 9px; }
-  .vault-feats li { position: relative; padding-left: 17px; font-size: 13.2px; color: var(--text-2); line-height: 1.55; }
-  .vault-feats li::before {
-    content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%;
-    background: var(--vc);
+  .vault-tag::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--vc); box-shadow: 0 0 12px color-mix(in srgb, var(--vc) 70%, transparent); }
+  .vault-tag:hover { transform: translateY(-2px); border-color: var(--vc); background: color-mix(in srgb, var(--vc) 17%, transparent); color: #fff; }
+  .vault-tag[aria-selected="true"] { color: #fff; border-color: var(--vc); background: var(--vc); box-shadow: 0 8px 25px color-mix(in srgb, var(--vc) 25%, transparent); }
+  .vault-tag[aria-selected="true"]::before { background: #fff; box-shadow: none; }
+  .vault-tag:focus-visible { outline: 3px solid color-mix(in srgb, var(--vc) 38%, transparent); outline-offset: 3px; }
+
+  .vault-panel {
+    --vc: var(--violet); position: relative; overflow: hidden; display: grid; grid-template-columns: minmax(0,.88fr) minmax(0,1.12fr); gap: 42px;
+    min-height: 390px; padding: clamp(28px,4vw,46px); border-radius: 24px;
+    border: 1px solid color-mix(in srgb, var(--vc) 36%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--vc) 10%, var(--bg2)) 0%, rgba(14,12,23,.96) 48%, rgba(8,7,13,.98) 100%);
+    box-shadow: 0 28px 70px rgba(0,0,0,.28); animation: vault-panel-in .36s cubic-bezier(.2,.75,.25,1);
   }
-  .vault-feats b { color: var(--text); font-weight: 600; }
-  .vault-feats i { color: var(--text-2); font-style: italic; }
-  .vault-try { margin-top: auto; font-size: 13.5px; font-weight: 600; color: var(--vc); }
-  @media (max-width: 720px) { .vaults-grid { grid-template-columns: 1fr; } }
-
-  /* roadmap — a teaser for the next mode, then a compact row of the rest */
-  .road { margin-top: 26px; padding: 24px; border-radius: 18px; border: 1px dashed var(--border); background: rgba(255,255,255,0.015); }
-  .road h4 { margin: 0 0 4px; font-size: 15px; }
-  .road > p { margin: 0 0 20px; color: var(--text-2); font-size: 13.5px; max-width: 640px; }
-
-  /* teaching teaser — the prominent next vault */
-  .teach-teaser { --vc: var(--violet); border-radius: 16px; border: 1px solid color-mix(in srgb, var(--vc) 30%, var(--border)); background: color-mix(in srgb, var(--vc) 7%, transparent); padding: 20px 22px; }
-  .teach-head { display: flex; align-items: center; gap: 13px; margin-bottom: 14px; }
-  .teach-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0;
-    background: color-mix(in srgb, var(--vc) 20%, transparent); color: var(--vc); }
-  .teach-ic svg { width: 21px; height: 21px; }
-  .teach-head h5 { margin: 0; font-family: var(--serif); font-size: 20px; font-weight: 700; }
-  .teach-head > div > span { font-size: 13px; color: var(--text-2); }
-  .teach-feats { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .teach-feats li { position: relative; padding-left: 18px; font-size: 13.2px; color: var(--text-2); line-height: 1.55; }
-  .teach-feats li::before { content: ''; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--vc); }
-  .teach-feats b { color: var(--text); font-weight: 600; }
-
-  .road-more { margin-top: 20px; }
-  .road-more-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; }
-  .road-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-  .road-item { --vc: var(--violet); display: flex; gap: 11px; align-items: flex-start; padding: 13px 15px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); }
-  .road-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0;
-    background: color-mix(in srgb, var(--vc) 16%, transparent); color: var(--vc); }
-  .road-ic svg { width: 15px; height: 15px; }
-  .road-item b { display: block; font-size: 13.5px; }
-  .road-item span { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .vault-panel[hidden] { display: none; }
+  .vault-panel::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--vc); }
+  .vault-panel::after { content: ''; position: absolute; width: 270px; height: 270px; left: -105px; bottom: -145px; border-radius: 50%; background: var(--vc); filter: blur(90px); opacity: .13; pointer-events: none; }
+  @keyframes vault-panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .vault-panel-copy, .vault-capabilities { position: relative; z-index: 1; }
+  .vault-panel-copy { display: flex; flex-direction: column; align-items: flex-start; }
+  .vault-panel-head { display: flex; align-items: center; gap: 15px; margin-bottom: 23px; }
+  .vault-panel-icon { width: 58px; height: 58px; border-radius: 17px; display: grid; place-items: center; color: color-mix(in srgb, var(--vc) 62%, white); background: color-mix(in srgb, var(--vc) 18%, transparent); border: 1px solid color-mix(in srgb, var(--vc) 32%, transparent); }
+  .vault-panel-icon svg { width: 28px; height: 28px; }
+  .vault-panel h3 { margin: 0; font: 700 clamp(27px,3vw,35px)/1.1 var(--serif); }
+  .vault-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 7px; color: color-mix(in srgb, var(--vc) 55%, white); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .vault-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .vault-status.soon { color: #fcd34d; }
+  .vault-panel-copy > p { color: var(--text-2); font-size: 15px; line-height: 1.72; margin: 0 0 26px; }
+  .vault-panel-cta { margin-top: auto; display: inline-flex; align-items: center; gap: 8px; color: color-mix(in srgb, var(--vc) 58%, white); font-size: 13.5px; font-weight: 700; }
+  button.vault-panel-cta { padding: 0; border: 0; background: none; font-family: inherit; cursor: pointer; }
+  .vault-panel-cta:hover { color: #fff; }
+  .vault-capabilities { align-self: center; border-top: 1px solid color-mix(in srgb, var(--vc) 24%, var(--border)); }
+  .vault-capability { display: grid; grid-template-columns: 34px 1fr; gap: 13px; padding: 15px 2px; border-bottom: 1px solid color-mix(in srgb, var(--vc) 18%, var(--border)); }
+  .vault-capability > span { color: color-mix(in srgb, var(--vc) 58%, white); font: 700 10px/1.55 var(--sans); letter-spacing: .08em; }
+  .vault-capability p { margin: 0; color: var(--text-2); font-size: 13.2px; line-height: 1.55; }
+  .vault-capability b { color: var(--text); font-weight: 650; }
+  .vault-capability i { font-style: italic; }
+  @media (max-width: 760px) {
+    .vault-selector { gap: 8px; margin-top: 30px; }
+    .vault-tag { min-height: 38px; padding: 7px 12px; }
+    .vault-panel { grid-template-columns: 1fr; gap: 30px; min-height: 0; border-radius: 19px; }
+    .vault-panel-copy > p { max-width: 620px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .vault-panel { animation: none; } }
 
   /* audience strip */
   .who { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 44px; }
@@ -680,7 +755,14 @@
     <a href="#views" class="hideS" data-i18n="nav.views">Views</a>
     <a href="#contrib" class="hideS" data-i18n="nav.contrib">Contribute</a>
     <a href="#faq" class="hideS" id="faq-nav-link">FAQ</a>
-    <select class="lang-select" id="lang-select" aria-label="Language"></select>
+    <div class="lang-picker" id="lang-picker">
+      <button class="lang-trigger" id="lang-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-menu" aria-label="Choose language">
+        <span class="lang-flag" id="lang-current-flag" aria-hidden="true">🇬🇧</span>
+        <span class="lang-name" id="lang-current-name">English</span>
+        <svg class="lang-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="lang-menu" id="lang-menu" role="listbox" aria-labelledby="lang-trigger" hidden></div>
+    </div>
     <a class="gh-badge" href="https://github.com/Drakonis96/nodus" target="_blank" rel="noopener" title="Star Nodus on GitHub">
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
       <span class="lbl">Star</span>
@@ -727,117 +809,137 @@
   <div class="wrap">
     <span class="kicker" data-i18n="vaults.kicker">The vaults</span>
     <h2 class="title" data-i18n="vaults.title">The same engine, shaped to your work.</h2>
-    <p class="lead" data-i18n="vaults.lead">A vault is a single file on your device, holding one project. Its mode decides which sections appear and how the AI assistant is briefed. The engine, the private storage and the settings underneath stay the same across every mode. Four modes are ready today, and each one opens in a live demo right here.</p>
+    <p class="lead" data-i18n="vaults.lead">A vault is a single file on your device, holding one project. Its mode decides which sections appear and how the AI assistant is briefed. The engine, private storage and settings stay the same across every mode. Five modes are available today; Primary Sources, Testimony and Prosopography show what is coming next.</p>
 
-    <div class="vaults-grid">
-      <a class="vault-card live" href="demo/index.html" style="--vc:#818cf8">
-        <div class="vault-top">
-          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5 6 17M12 7.5 18 17M7.5 19h9"/></svg></span>
-          <h3 data-i18n="vaults.academic.t">Academic</h3>
-        </div>
-        <p data-i18n="vaults.academic.b">For research. Point it at your Zotero library and every work turns into the claims, findings and methods it actually makes, each one carrying the exact passage and page it came from.</p>
-        <ul class="vault-feats">
-          <li data-i18n="vaults.academic.f1"><b>A graph of ideas</b> rather than files, linked by supports, contradicts and refines.</li>
-          <li data-i18n="vaults.academic.f2"><b>Debates and open gaps</b> surfaced from what your sources leave unsettled.</li>
-          <li data-i18n="vaults.academic.f3"><b>Deep Research reports</b> whose every citation lands on a real item.</li>
-          <li data-i18n="vaults.academic.f4"><b>A writing copilot</b> that runs inside Word and LibreOffice Writer.</li>
-        </ul>
-        <span class="vault-try" data-i18n="vaults.academic.cta">Open the academic demo →</span>
-      </a>
-
-      <a class="vault-card live" href="demo/study.html" style="--vc:#2dd4bf">
-        <div class="vault-top">
-          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg></span>
-          <h3 data-i18n="vaults.study.t">Study</h3>
-        </div>
-        <p data-i18n="vaults.study.b">For learning. Everything you study, kept in order by course and subject, with your own notes and materials underneath. No Zotero, nothing uploaded.</p>
-        <ul class="vault-feats">
-          <li data-i18n="vaults.study.f1"><b>Organised by course, subject and topic</b>, so your whole term sits in one place.</li>
-          <li data-i18n="vaults.study.f2"><b>Tests and exams from your own material</b>, ready to practise and mark yourself.</li>
-          <li data-i18n="vaults.study.f3"><b>Ask the AI about your notes</b> and it answers only from what you actually have.</li>
-          <li data-i18n="vaults.study.f4"><b>Flashcards and spaced review</b> built from your content, each one yours to approve.</li>
-        </ul>
-        <span class="vault-try" data-i18n="vaults.study.cta">Open the study demo →</span>
-      </a>
-
-      <a class="vault-card live" href="demo/genealogy.html" style="--vc:#fbbf24">
-        <div class="vault-top">
-          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span>
-          <h3 data-i18n="vaults.genealogy.t">Genealogy</h3>
-        </div>
-        <p data-i18n="vaults.genealogy.b">For rebuilding people from primary sources. Family history is the obvious use, but the method fits any record work. Identity and kinship stay hypotheses until the documents prove them.</p>
-        <ul class="vault-feats">
-          <li data-i18n="vaults.genealogy.f1"><b>People, a family tree, a timeline and a map</b>, with GEDCOM in and out.</li>
-          <li data-i18n="vaults.genealogy.f2"><b>An evidence archive</b> of censuses, registers, letters and photos, each tied to the people inside it.</li>
-          <li data-i18n="vaults.genealogy.f3"><b>An AI genealogist</b> that proposes kinship from the records and never adds a link you have not confirmed.</li>
-          <li data-i18n="vaults.genealogy.f4"><b>Conflicts stay visible</b>, with period spellings and uncertain dates left as they are.</li>
-        </ul>
-        <span class="vault-try" data-i18n="vaults.genealogy.cta">Open the genealogy demo →</span>
-      </a>
-
-      <a class="vault-card live" href="demo/databases.html" style="--vc:#ff5f7e">
-        <div class="vault-top">
-          <span class="vault-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
-          <h3 data-i18n="vaults.databases.t">Databases</h3>
-        </div>
-        <p data-i18n="vaults.databases.b">For your own data. Fieldwork, corpora, catalogues, coding sheets. Typed tables you can genuinely analyse, without a spreadsheet flattening your categories into plain text.</p>
-        <ul class="vault-feats">
-          <li data-i18n="vaults.databases.f1"><b>Real column types</b> for select, number, date, relation, rollup, formula and attachments.</li>
-          <li data-i18n="vaults.databases.f2"><b>The AI plans, the app computes.</b> Correlations, chi-square, ANOVA and regressions run in code, not in a prompt.</li>
-          <li data-i18n="vaults.databases.f3"><b>Charts drawn straight from your rows</b>, from heatmaps to scatter and box plots.</li>
-          <li data-i18n="vaults.databases.f4"><b>A data chat</b> that answers over the real table and refuses to invent a value.</li>
-        </ul>
-        <span class="vault-try" data-i18n="vaults.databases.cta">Open the databases demo →</span>
-      </a>
+    <div class="vault-selector" role="tablist" aria-label="Vault modes">
+      <button class="vault-tag" id="vault-tab-academic" role="tab" aria-selected="true" aria-controls="vault-panel-academic" tabindex="0" style="--vc:#6366f1" data-vault="academic" data-i18n="vaults.academic.t">Academic</button>
+      <button class="vault-tag" id="vault-tab-study" role="tab" aria-selected="false" aria-controls="vault-panel-study" tabindex="-1" style="--vc:#0f766e" data-vault="study" data-i18n="vaults.study.t">Study</button>
+      <button class="vault-tag" id="vault-tab-genealogy" role="tab" aria-selected="false" aria-controls="vault-panel-genealogy" tabindex="-1" style="--vc:#ca8a04" data-vault="genealogy" data-i18n="vaults.genealogy.t">Genealogy</button>
+      <button class="vault-tag" id="vault-tab-databases" role="tab" aria-selected="false" aria-controls="vault-panel-databases" tabindex="-1" style="--vc:#b30333" data-vault="databases" data-i18n="vaults.databases.t">Databases</button>
+      <button class="vault-tag" id="vault-tab-teaching" role="tab" aria-selected="false" aria-controls="vault-panel-teaching" tabindex="-1" style="--vc:#ea580c" data-vault="teaching" data-i18n="road.teaching.t">Teaching</button>
+      <button class="vault-tag" id="vault-tab-primary" role="tab" aria-selected="false" aria-controls="vault-panel-primary" tabindex="-1" style="--vc:#6366f1" data-vault="primary" data-i18n="road.primary.t">Primary Sources</button>
+      <button class="vault-tag" id="vault-tab-testimony" role="tab" aria-selected="false" aria-controls="vault-panel-testimony" tabindex="-1" style="--vc:#0891b2" data-vault="testimony" data-i18n="road.testimony.t">Testimony</button>
+      <button class="vault-tag" id="vault-tab-prosopography" role="tab" aria-selected="false" aria-controls="vault-panel-prosopography" tabindex="-1" style="--vc:#c026d3" data-vault="prosopography" data-i18n="vaults.prosopography.t">Prosopography</button>
     </div>
 
-    <div class="road">
-      <h4 data-i18n="road.t">Coming next</h4>
-      <p data-i18n="road.b">The vault picker already lists what is on the way. The one we are building next turns Nodus into a full workspace for teachers.</p>
-
-      <div class="teach-teaser" style="--vc:#fb923c">
-        <div class="teach-head">
-          <span class="teach-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg></span>
-          <div><h5 data-i18n="road.teaching.t">Teaching</h5><span data-i18n="road.teaching.sub">A workspace built around a teacher's real week.</span></div>
+    <div id="vault-panels">
+      <article class="vault-panel" id="vault-panel-academic" role="tabpanel" aria-labelledby="vault-tab-academic" style="--vc:#6366f1">
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5 6 17M12 7.5 18 17M7.5 19h9"/></svg></span><div><h3 data-i18n="vaults.academic.t">Academic</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p data-i18n="vaults.academic.b">For research. Point it at your Zotero library and every work turns into the claims, findings and methods it actually makes, each one carrying the exact passage and page it came from.</p>
+          <a class="vault-panel-cta" href="demo/index.html" data-i18n="vaults.academic.cta">Open the academic demo →</a>
         </div>
-        <ul class="teach-feats">
-          <li data-i18n="road.teaching.b1"><b>Classes and grades in one place</b>, where the AI only ever sees anonymous student codes, never a name.</li>
-          <li data-i18n="road.teaching.b2"><b>Notes, tests and exams from your own material</b>, with the AI held to what you gave it and nothing invented.</li>
-          <li data-i18n="road.teaching.b3"><b>Teaching guides, unit plans and learning situations</b>, drafted in the format your institution expects.</li>
-        </ul>
-      </div>
-
-      <div class="road-more">
-        <span class="road-more-label" data-i18n="road.also">Also on the roadmap</span>
-        <div class="road-grid">
-          <div class="road-item" style="--vc:#a78bfa">
-            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18Z"/></svg></span>
-            <div><b data-i18n="road.worldbuilding.t">Worldbuilding</b><span data-i18n="road.worldbuilding.b">The same shell, aimed at fiction and invented worlds rather than research.</span></div>
-          </div>
-          <div class="road-item" style="--vc:#818cf8">
-            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span>
-            <div><b data-i18n="road.primary.t">Primary Sources</b><span data-i18n="road.primary.b">Archival records beside secondary literature, with source-critical extraction.</span></div>
-          </div>
-          <div class="road-item" style="--vc:#22d3ee">
-            <span class="road-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>
-            <div><b data-i18n="road.testimony.t">Testimony</b><span data-i18n="road.testimony.b">Interviews and oral history, tracking who spoke and what each person said.</span></div>
-          </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.academic.f1"><b>Turn your Zotero library into a graph of ideas</b>, linking claims, findings and methods to their exact passage and page.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.academic.f2"><b>Surface debates, contradictions and research gaps</b>, then explore them through semantic search, coverage analysis and reading paths.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.academic.f3"><b>Research and write with verifiable citations</b> through Deep Research, the writing workshop and copilots for Word and LibreOffice.</p></div>
         </div>
-      </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-study" role="tabpanel" aria-labelledby="vault-tab-study" style="--vc:#0f766e" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg></span><div><h3 data-i18n="vaults.study.t">Study</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p data-i18n="vaults.study.b">For learning. Everything you study, kept in order by course and subject, with your own notes and materials underneath. No Zotero, nothing uploaded.</p>
+          <a class="vault-panel-cta" href="demo/study.html" data-i18n="vaults.study.cta">Open the study demo →</a>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.study.f1"><b>Organise your study material by academic year, course and subject</b>, then add timetables, deadlines and events to the calendar with reminders.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.study.f2"><b>Record and transcribe classes locally</b>, read PDFs and EPUBs, and ask questions that return to the exact page, note or second.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.study.f3"><b>Turn your own material into question banks, tests, exams and flashcards</b>, with spaced review and progress tracking.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-genealogy" role="tabpanel" aria-labelledby="vault-tab-genealogy" style="--vc:#ca8a04" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span><div><h3 data-i18n="vaults.genealogy.t">Genealogy</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p data-i18n="vaults.genealogy.b">For rebuilding people from primary sources. Family history is the obvious use, but the method fits any record work. Identity and kinship stay hypotheses until the documents prove them.</p>
+          <a class="vault-panel-cta" href="demo/genealogy.html" data-i18n="vaults.genealogy.cta">Open the genealogy demo →</a>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.genealogy.f1"><b>Reconstruct people across a family tree, timeline and map</b>, with GEDCOM import and export and every event linked to its evidence.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.genealogy.f2"><b>Build a connected archive of censuses, registers, letters and photographs</b>, tied to the people, places and events found inside them.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.genealogy.f3"><b>Review suggested identities and kinship as evidence-based hypotheses</b>, keeping conflicts, period spellings and uncertain dates visible.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-databases" role="tabpanel" aria-labelledby="vault-tab-databases" style="--vc:#b30333" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><div><h3 data-i18n="vaults.databases.t">Databases</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p data-i18n="vaults.databases.b">For your own data. Fieldwork, corpora, catalogues, coding sheets. Typed tables you can genuinely analyse, without a spreadsheet flattening your categories into plain text.</p>
+          <a class="vault-panel-cta" href="demo/databases.html" data-i18n="vaults.databases.cta">Open the databases demo →</a>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.databases.f1"><b>Build structured databases with real field types</b>, relations, formulas, rollups, attachments, CSV import and reusable filtered views.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.databases.f2"><b>Run reproducible analysis and charts over your actual rows</b>, from correlations and chi-square to ANOVA and regressions.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.databases.f3"><b>Ask questions in plain language and automate classification with AI columns</b>, without inventing a field or value that is not in your data.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-teaching" role="tabpanel" aria-labelledby="vault-tab-teaching" style="--vc:#ea580c" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg></span><div><h3 data-i18n="road.teaching.t">Teaching</h3><span class="vault-status" data-i18n="vaults.status.available">Available now</span></div></div>
+          <p data-i18n="vaults.teaching.b">For the teacher's real week: plan courses, organise classes, create assessment and follow progress without separating the material from the work it generates.</p>
+          <button class="vault-panel-cta" type="button" onclick="openDl()" data-i18n="vaults.teaching.cta">Download Nodus to start →</button>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.teaching.f1"><b>Plan academic years, courses and classes in one place</b>, with timetables, calendars, teaching guides and unit plans connected.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.teaching.f2"><b>Create learning situations, tests, exams and rubrics from your own material</b>, ready for you to review and adapt.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.teaching.f3"><b>Track grades, progress and feedback privately</b>, using anonymous student codes whenever AI assists.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-primary" role="tabpanel" aria-labelledby="vault-tab-primary" style="--vc:#6366f1" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span><div><h3 data-i18n="road.primary.t">Primary Sources</h3><span class="vault-status soon" data-i18n="vaults.status.soon">Coming soon</span></div></div>
+          <p data-i18n="vaults.primary.b">A source-critical workspace for archival records, manuscripts and historical collections, with every interpretation kept beside the document that supports it.</p>
+          <span class="vault-panel-cta" data-i18n="vaults.roadmap">On the roadmap</span>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.primary.f1"><b>Build a faithful archive from scans, photographs and manuscripts</b>, with OCR, transcription, provenance and the original image kept together.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.primary.f2"><b>Apply source criticism while extracting people, places, events and claims</b>, separating what the document says from what you infer.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.primary.f3"><b>Connect sources into timelines, maps and research dossiers</b>, comparing versions and conflicting accounts with exact page-level evidence.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-testimony" role="tabpanel" aria-labelledby="vault-tab-testimony" style="--vc:#0891b2" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span><div><h3 data-i18n="road.testimony.t">Testimony</h3><span class="vault-status soon" data-i18n="vaults.status.soon">Coming soon</span></div></div>
+          <p data-i18n="vaults.testimony.b">A careful home for interviews and oral history, built to preserve each speaker's voice, context and exact words throughout the research process.</p>
+          <span class="vault-panel-cta" data-i18n="vaults.roadmap">On the roadmap</span>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.testimony.f1"><b>Import audio and video with local transcription and speaker separation</b>, keeping every passage linked to a clickable timestamp.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.testimony.f2"><b>Manage speakers, roles, consent and access conditions</b>, so the ethical context remains visible wherever testimony is used.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.testimony.f3"><b>Code themes, compare accounts and build a searchable oral-history corpus</b> that returns every finding to the exact clip and exchange.</p></div>
+        </div>
+      </article>
+
+      <article class="vault-panel" id="vault-panel-prosopography" role="tabpanel" aria-labelledby="vault-tab-prosopography" style="--vc:#c026d3" hidden>
+        <div class="vault-panel-copy">
+          <div class="vault-panel-head"><span class="vault-panel-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="m9 8.5 2 6M15 8.5l-2 6M9.5 7h5"/></svg></span><div><h3 data-i18n="vaults.prosopography.t">Prosopography</h3><span class="vault-status soon" data-i18n="vaults.status.soon">Coming soon</span></div></div>
+          <p data-i18n="vaults.prosopography.b">A collective-biography workspace for reconstructing a defined group from scattered sources, then studying careers, institutions, mobility and structures of power without losing the people behind the pattern.</p>
+          <span class="vault-panel-cta" data-i18n="vaults.roadmap">On the roadmap</span>
+        </div>
+        <div class="vault-capabilities">
+          <div class="vault-capability"><span>01</span><p data-i18n="vaults.prosopography.f1"><b>Build a source-linked biographical catalogue for a defined cohort</b>, using a flexible research questionnaire for names, offices, careers, affiliations, places and events.</p></div>
+          <div class="vault-capability"><span>02</span><p data-i18n="vaults.prosopography.f2"><b>Resolve name variants, homonyms and uncertain identities without hiding doubt</b>, with evidence-based merge or split suggestions that only the researcher can confirm.</p></div>
+          <div class="vault-capability"><span>03</span><p data-i18n="vaults.prosopography.f3"><b>Reveal patterns across people, careers and institutions</b> through cohort comparison, network analysis, timelines, maps and statistics that remain traceable to each person and source.</p></div>
+        </div>
+      </article>
     </div>
 
     <div class="who">
       <div class="who-card">
         <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5 5-2Z"/></svg> <span data-i18n="who.research.t">If you research</span></h4>
-        <p data-i18n="who.research.b">Your reading turns into a corpus you can question. You see what is contested, what is missing and who backs what, then draft with citations that land on real items. <b>Academic</b>, <b>Genealogy</b> and <b>Databases</b>.</p>
+        <p data-i18n="who.research.b">Turn sources and data into a corpus you can question, map and write from. Use <b>Academic</b>, <b>Genealogy</b> and <b>Databases</b> today; <b>Primary Sources</b>, <b>Testimony</b> and <b>Prosopography</b> are coming for archival, oral-history and collective-biography research.</p>
       </div>
       <div class="who-card">
         <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1"/><path d="M12 16v5M8 21h8"/></svg> <span data-i18n="who.teach.t">If you teach</span></h4>
-        <p data-i18n="who.teach.b">Build your material once and get tests, exams and teaching guides out of it, each grounded in what you wrote and nothing invented. A dedicated Teaching mode is on the way, and the <b>Study</b> vault already covers a lot of it.</p>
+        <p data-i18n="who.teach.b">Plan courses, classes, assessment and feedback in <b>Teaching</b>, and give learners a grounded workspace in <b>Study</b>. The forthcoming <b>Primary Sources</b>, <b>Testimony</b> and <b>Prosopography</b> vaults will also support source-based seminars and research-led teaching.</p>
       </div>
       <div class="who-card">
         <h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 9-10-5L2 9l10 5 10-5Z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/></svg> <span data-i18n="who.study.t">If you study</span></h4>
-        <p data-i18n="who.study.b">Upload your own PDFs, slides and notes and keep them in order by course and subject. Then turn them into tests and exams, review with flashcards, and ask the AI questions it answers only from your material. <b>Study</b>.</p>
+        <p data-i18n="who.study.b">Organise materials, schedules, practice and progress in <b>Study</b>. For advanced projects, <b>Academic</b>, <b>Genealogy</b> and <b>Databases</b> are available now; <b>Primary Sources</b>, <b>Testimony</b> and <b>Prosopography</b> will add specialist paths for archival and social research.</p>
       </div>
     </div>
   </div>
@@ -882,8 +984,8 @@
     <div class="shots">
 
       <!-- Academic 1 · Graph -->
-      <div class="shot" style="--acc:#818cf8">
-        <div class="shot-txt"><div class="tag">Academic</div><h3>Your reading becomes a map</h3>
+      <div class="shot" data-vault-view="academic" data-view-index="1" style="--acc:#818cf8">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.academic.t">Academic</div><h3>Your reading becomes a map</h3>
           <p>Every work breaks into the claims and findings it makes, and they link into one living map of supports, contradictions and refinements. A pile of papers starts to read like an argument.</p>
           <a class="try" href="demo/index.html#graph">Open in the demo →</a></div>
         <div class="vig vig-graph"><div class="vbar"><i></i><i></i><i></i><span>GRAPH · 12 NODES</span></div>
@@ -908,8 +1010,8 @@
       </div>
 
       <!-- Academic 2 · Deep Research + audio -->
-      <div class="shot" style="--acc:#818cf8">
-        <div class="shot-txt"><div class="tag">Academic</div><h3>Reports that cite for real, read aloud</h3>
+      <div class="shot" data-vault-view="academic" data-view-index="2" style="--acc:#818cf8">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.academic.t">Academic</div><h3>Reports that cite for real, read aloud</h3>
           <p>Deep Research writes several pages and checks every citation against your sources. A reference that does not resolve to something real never makes the page. Then you can turn the finished report into a narrated walk, in a local voice or a studio-grade cloud one.</p>
           <a class="try" href="demo/index.html#deepResearch">Open in the demo →</a></div>
         <div class="vig vig-research"><div class="vbar"><i></i><i></i><i></i><span>DEEP RESEARCH · READ OR PLAY</span></div>
@@ -931,9 +1033,27 @@
         </div>
       </div>
 
+      <!-- Academic 3 · Debates and research gaps -->
+      <div class="shot" data-vault-view="academic" data-view-index="3" style="--acc:#818cf8">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.academic.t">Academic</div><h3>See where the literature disagrees</h3>
+          <p>Nodus sets competing claims face to face with their evidence and chronology, then turns missing connections into explicit research questions you can pursue.</p>
+          <a class="try" href="demo/index.html#debate">Open in the demo →</a></div>
+        <div class="vig vig-debate"><div class="vbar"><i></i><i></i><i></i><span>DEBATE · EVIDENCE ON BOTH SIDES</span></div>
+          <div class="vbody">
+            <div class="cols">
+              <div class="colA"><h5>Retrieval improves transfer</h5><div class="ev">Karpicke &amp; Blunt, 2011 · p. 774</div><div class="ev">Roediger &amp; Butler, 2011 · p. 21</div></div>
+              <div class="vs">VS</div>
+              <div class="colB"><h5>Benefit depends on complexity</h5><div class="ev">Van Gog &amp; Sweller, 2015 · p. 39</div><div class="ev">Leahy et al., 2015 · p. 68</div></div>
+            </div>
+            <div class="tl"><b>2006</b><i></i><span>debate develops</span><i></i><b>2015</b></div>
+            <div class="gq" style="opacity:1;margin-top:14px">Research gap · Which task conditions reverse the effect?</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Study 1 · Tests from your notes -->
-      <div class="shot" style="--acc:#2dd4bf">
-        <div class="shot-txt"><div class="tag">Study</div><h3>Turn your notes into a test</h3>
+      <div class="shot" data-vault-view="study" data-view-index="1" style="--acc:#2dd4bf">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.study.t">Study</div><h3>Turn your notes into a test</h3>
           <p>Point Nodus at a topic and it drafts questions, tests and exams from your own material. Practise them, mark yourself, and keep only the ones you approve.</p>
           <a class="try" href="demo/study.html#questions">Open in the demo →</a></div>
         <div class="vig vig-quiz"><div class="vbar"><i></i><i></i><i></i><span>QUESTION BANK · FROM YOUR NOTES</span></div>
@@ -949,8 +1069,8 @@
       </div>
 
       <!-- Study 2 · Ask your notes -->
-      <div class="shot" style="--acc:#2dd4bf">
-        <div class="shot-txt"><div class="tag">Study</div><h3>Ask your notes anything</h3>
+      <div class="shot" data-vault-view="study" data-view-index="2" style="--acc:#2dd4bf">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.study.t">Study</div><h3>Ask your notes anything</h3>
           <p>The study chat answers from your notes, slides and materials, and every reply points back to the page it came from. No guessing, and nothing it cannot show you in your own material.</p>
           <a class="try" href="demo/study.html#chat">Open in the demo →</a></div>
         <div class="vig vig-chat"><div class="vbar"><i></i><i></i><i></i><span>STUDY CHAT · GROUNDED LOCALLY</span></div>
@@ -962,9 +1082,29 @@
         </div>
       </div>
 
+      <!-- Study 3 · Academic planner -->
+      <div class="shot" data-vault-view="study" data-view-index="3" style="--acc:#2dd4bf">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.study.t">Study</div><h3>Your whole academic year, under control</h3>
+          <p>Organise materials by year, course and subject, then bring timetables, deadlines, exams and study sessions into one calendar with reminders and progress.</p>
+          <a class="try" href="demo/study.html#calendar">Open in the demo →</a></div>
+        <div class="vig vig-planner"><div class="vbar"><i></i><i></i><i></i><span>STUDY PLANNER · WEEK 8</span></div>
+          <div class="vbody">
+            <div class="planner-head"><b>History · Year 2</b><span>3 deadlines this week</span></div>
+            <div class="week">
+              <div class="day"><b>Mon</b><div class="event">Modern history<br/>10:00</div></div>
+              <div class="day"><b>Tue</b><div class="event">Read ch. 4<br/>45 min</div></div>
+              <div class="day"><b>Wed</b><div class="event">Seminar<br/>12:30</div></div>
+              <div class="day"><b>Thu</b><div class="event">Essay draft<br/>Due 18:00</div></div>
+              <div class="day"><b>Fri</b><div class="event">Flashcards<br/>32 due</div></div>
+            </div>
+            <div class="planner-foot"><span>Course materials · 18</span><span>Weekly progress · 74%</span></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Genealogy 1 · Tree + AI suggestion -->
-      <div class="shot" style="--acc:#fbbf24">
-        <div class="shot-txt"><div class="tag">Genealogy</div><h3>A family, rebuilt from the records</h3>
+      <div class="shot" data-vault-view="genealogy" data-view-index="1" style="--acc:#fbbf24">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.genealogy.t">Genealogy</div><h3>A family, rebuilt from the records</h3>
           <p>People, dates and places are pulled out of censuses, registers and letters. The assistant proposes how they connect and waits for you to confirm before anyone joins the tree.</p>
           <a class="try" href="demo/genealogy.html#tree">Open in the demo →</a></div>
         <div class="vig vig-tree"><div class="vbar"><i></i><i></i><i></i><span>FAMILY TREE · 1 SUGGESTION</span></div>
@@ -987,8 +1127,8 @@
       </div>
 
       <!-- Genealogy 2 · Prosopography -->
-      <div class="shot" style="--acc:#fbbf24">
-        <div class="shot-txt"><div class="tag">Genealogy</div><h3>Not only kin, but who knew whom</h3>
+      <div class="shot" data-vault-view="genealogy" data-view-index="2" style="--acc:#fbbf24">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.genealogy.t">Genealogy</div><h3>Not only kin, but who knew whom</h3>
           <p>Beyond the family tree, Nodus maps the social web around each person. Godparents, witnesses, neighbours and business partners become a prosopography you can read across a whole community.</p>
           <a class="try" href="demo/genealogy.html#relations">Open in the demo →</a></div>
         <div class="vig vig-relations"><div class="vbar"><i></i><i></i><i></i><span>SOCIAL RELATIONS · PROSOPOGRAPHY</span></div>
@@ -1014,9 +1154,27 @@
         </div>
       </div>
 
+      <!-- Genealogy 3 · Evidence archive -->
+      <div class="shot" data-vault-view="genealogy" data-view-index="3" style="--acc:#fbbf24">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.genealogy.t">Genealogy</div><h3>Every life event keeps its evidence</h3>
+          <p>Build a connected archive of registers, censuses, letters and photographs. Every birth, marriage, residence and relationship stays traceable to the exact record that supports it.</p>
+          <a class="try" href="demo/genealogy.html#archive">Open in the demo →</a></div>
+        <div class="vig vig-archive"><div class="vbar"><i></i><i></i><i></i><span>SOURCE ARCHIVE · 4 LINKED RECORDS</span></div>
+          <div class="vbody">
+            <div class="archive-grid">
+              <div class="source-card"><b>Marriage register</b><span>1890 · image + transcription</span></div>
+              <div class="source-card"><b>Municipal census</b><span>1901 · household 47</span></div>
+              <div class="source-card"><b>Personal letter</b><span>1901 · 3 people mentioned</span></div>
+              <div class="source-card"><b>Family photograph</b><span>c. 1904 · 5 identities</span></div>
+            </div>
+            <div class="evidence-line"><i></i><span>Marriage · Casimiro + Dolores · supported by 2 independent records</span></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Databases 1 · computed analysis -->
-      <div class="shot" style="--acc:#ff5f7e">
-        <div class="shot-txt"><div class="tag">Databases</div><h3>You bring the data, it runs the numbers</h3>
+      <div class="shot" data-vault-view="databases" data-view-index="1" style="--acc:#ff5f7e">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.databases.t">Databases</div><h3>You bring the data, it runs the numbers</h3>
           <p>Turn your own records into typed tables, then ask for an analysis. The assistant picks the method and the app computes it for real, so a correlation or a regression is a calculation, never a guess.</p>
           <a class="try" href="demo/databases.html#dbAnalysis">Open in the demo →</a></div>
         <div class="vig vig-db"><div class="vbar"><i></i><i></i><i></i><span>ANALYSIS · FIELD NOTEBOOK</span></div>
@@ -1044,8 +1202,8 @@
       </div>
 
       <!-- Databases 2 · Data chat + chart -->
-      <div class="shot" style="--acc:#ff5f7e">
-        <div class="shot-txt"><div class="tag">Databases</div><h3>Ask your table, get a chart</h3>
+      <div class="shot" data-vault-view="databases" data-view-index="2" style="--acc:#ff5f7e">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.databases.t">Databases</div><h3>Ask your table, get a chart</h3>
           <p>Ask a question in plain words and get a straight answer over the real rows, drawn as a chart when it helps. It never invents a value that is not in your data.</p>
           <a class="try" href="demo/databases.html#dbChat">Open in the demo →</a></div>
         <div class="vig vig-dchat"><div class="vbar"><i></i><i></i><i></i><span>DATA CHAT · OVER YOUR ROWS</span></div>
@@ -1061,11 +1219,28 @@
         </div>
       </div>
 
+      <!-- Databases 3 · Relational schema -->
+      <div class="shot" data-vault-view="databases" data-view-index="3" style="--acc:#ff5f7e">
+        <div class="shot-txt"><div class="tag" data-i18n="vaults.databases.t">Databases</div><h3>Model your data without flattening it</h3>
+          <p>Create typed fields, relations, formulas, rollups and reusable filtered views. Import a CSV, connect tables, and let AI columns classify rows without inventing data.</p>
+          <a class="try" href="demo/databases.html#db:DEMO1">Open in the demo →</a></div>
+        <div class="vig vig-schema"><div class="vbar"><i></i><i></i><i></i><span>SCHEMA BUILDER · 2 RELATED TABLES</span></div>
+          <div class="vbody">
+            <div class="schema-grid">
+              <div class="schema-table"><div class="schema-title">Excavation units</div><div class="schema-field"><span>Site</span><em>text</em></div><div class="schema-field"><span>Depth</span><em>number</em></div><div class="schema-field"><span>Finds</span><em>relation</em></div></div>
+              <div class="schema-link"><i></i></div>
+              <div class="schema-table"><div class="schema-title">Finds catalogue</div><div class="schema-field"><span>Object</span><em>text</em></div><div class="schema-field"><span>Material</span><em>select</em></div><div class="schema-field"><span>Unit</span><em>relation</em></div></div>
+            </div>
+            <div class="schema-note">AI column · classify material from description · 58 rows ready for review</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Teaching 1 · Gradebook, anonymised -->
-      <div class="shot" style="--acc:#fb923c">
-        <div class="shot-txt"><div class="tag">Teaching · coming next</div><h3>Classes and grades, kept private</h3>
+      <div class="shot" data-vault-view="teaching" data-view-index="1" style="--acc:#fb923c">
+        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>Classes and grades, kept private</h3>
           <p>Manage your classes and grades in one place. When the AI helps, it only ever sees anonymous student codes, never a name.</p>
-          <span class="try soon">Coming to the teaching vault</span></div>
+          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
         <div class="vig vig-grade"><div class="vbar"><i></i><i></i><i></i><span>GRADEBOOK · ANONYMISED FOR AI</span></div>
           <div class="vbody">
             <table class="dbmini gradebook">
@@ -1084,10 +1259,10 @@
       </div>
 
       <!-- Teaching 2 · Guides & exams -->
-      <div class="shot" style="--acc:#fb923c">
-        <div class="shot-txt"><div class="tag">Teaching · coming next</div><h3>Guides and exams, grounded in your material</h3>
+      <div class="shot" data-vault-view="teaching" data-view-index="2" style="--acc:#fb923c">
+        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>Guides and exams, grounded in your material</h3>
           <p>Draft teaching guides, unit plans and learning situations, plus tests and exams, all built from your own material. The AI stays inside what you gave it and invents nothing.</p>
-          <span class="try soon">Coming to the teaching vault</span></div>
+          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
         <div class="vig vig-guide"><div class="vbar"><i></i><i></i><i></i><span>TEACHING GUIDE · FROM YOUR MATERIAL</span></div>
           <div class="vbody">
             <div class="gsec"><span class="gsec-k">Objectives</span><div class="gsec-l" style="--w:92%"></div><div class="gsec-l" style="--w:74%"></div></div>
@@ -1097,6 +1272,26 @@
             <span class="verify" style="color:#fdba74;border-color:rgba(251,146,60,0.4);background:rgba(251,146,60,0.08)">
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:11px;height:11px"><path d="m4 12.5 5 5L20 6.5"/></svg>
               Built only from your material. Nothing invented.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teaching 3 · Course and class planning -->
+      <div class="shot" data-vault-view="teaching" data-view-index="3" style="--acc:#fb923c">
+        <div class="shot-txt"><div class="tag" data-i18n="road.teaching.t">Teaching</div><h3>From the academic year to tomorrow's class</h3>
+          <p>Plan courses, units and individual classes in one connected calendar. Keep timetables, teaching guides, materials and assessment milestones together instead of rebuilding the plan every week.</p>
+          <span class="try soon" data-i18n="vaults.teaching.available">Available in the Teaching vault</span></div>
+        <div class="vig vig-planner"><div class="vbar"><i></i><i></i><i></i><span>COURSE PLANNER · TERM 1</span></div>
+          <div class="vbody">
+            <div class="planner-head"><b>Biology · Year 10</b><span>Unit 3 of 8</span></div>
+            <div class="week">
+              <div class="day"><b>Mon</b><div class="event">Cell membrane<br/>Lesson</div></div>
+              <div class="day"><b>Tue</b><div class="event">Lab setup<br/>Materials</div></div>
+              <div class="day"><b>Wed</b><div class="event">Transport<br/>Lab</div></div>
+              <div class="day"><b>Thu</b><div class="event">Review<br/>Rubric</div></div>
+              <div class="day"><b>Fri</b><div class="event">Quiz<br/>Assessment</div></div>
+            </div>
+            <div class="planner-foot"><span>Teaching guide · linked</span><span>Assessment · ready</span></div>
           </div>
         </div>
       </div>
@@ -1238,7 +1433,7 @@
   </div>
 </div>
 
-<script src="faq.js?v=20260717-vaults"></script>
+<script src="faq.js?v=20260718-languages"></script>
 <script>
 // ---------- nav shadow ----------
 const nav = document.getElementById('nav');
@@ -1250,6 +1445,38 @@ addEventListener('scroll', () => {
   nav.classList.toggle('scrolled', scrollY > 24);
   toTop.classList.toggle('show', scrollY > 600);
 }, { passive: true });
+
+// ---------- vault tag selector ----------
+(function () {
+  const tabs = [...document.querySelectorAll('.vault-tag[role="tab"]')]
+    .sort((a, b) => Number(getComputedStyle(a).order) - Number(getComputedStyle(b).order));
+  const panels = [...document.querySelectorAll('.vault-panel[role="tabpanel"]')];
+  if (!tabs.length || !panels.length) return;
+
+  function activate(tab, moveFocus) {
+    tabs.forEach((item) => {
+      const active = item === tab;
+      item.setAttribute('aria-selected', String(active));
+      item.tabIndex = active ? 0 : -1;
+    });
+    panels.forEach((panel) => { panel.hidden = panel.id !== tab.getAttribute('aria-controls'); });
+    if (moveFocus) tab.focus();
+  }
+
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => activate(tab, false));
+    tab.addEventListener('keydown', (event) => {
+      let next = null;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = tabs[(index + 1) % tabs.length];
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = tabs[(index - 1 + tabs.length) % tabs.length];
+      if (event.key === 'Home') next = tabs[0];
+      if (event.key === 'End') next = tabs[tabs.length - 1];
+      if (!next) return;
+      event.preventDefault();
+      activate(next, true);
+    });
+  });
+})();
 
 // ---------- hero constellation canvas ----------
 (function () {
@@ -1473,10 +1700,19 @@ fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 
 
 // ---------- i18n (landing page only) ----------
 const LANGS = [
-  { c: 'de', n: 'Deutsch' }, { c: 'en', n: 'English' }, { c: 'es', n: 'Español' },
-  { c: 'fr', n: 'Français' }, { c: 'it', n: 'Italiano' }, { c: 'pt', n: 'Português' }, { c: 'tr', n: 'Türkçe' }, { c: 'zh', n: '中文' },
+  { c: 'de', n: 'Deutsch', f: '🇩🇪' }, { c: 'en', n: 'English', f: '🇬🇧' }, { c: 'es', n: 'Español', f: '🇪🇸' },
+  { c: 'fr', n: 'Français', f: '🇫🇷' }, { c: 'it', n: 'Italiano', f: '🇮🇹' }, { c: 'ja', n: '日本語', f: '🇯🇵' },
+  { c: 'pt-PT', n: 'Português (Portugal)', f: '🇵🇹' }, { c: 'pt-BR', n: 'Português (Brasil)', f: '🇧🇷' },
+  { c: 'ru', n: 'Русский', f: '🇷🇺' }, { c: 'tr', n: 'Türkçe', f: '🇹🇷' },
+  { c: 'uk', n: 'Українська', f: '🇺🇦' }, { c: 'zh', n: '中文', f: '🇨🇳' },
 ];
-const VIG = ['v.graph', 'v.deep', 'v.studyTest', 'v.studyChat', 'v.genealogy', 'v.pros', 'v.databases', 'v.dataChat', 'v.teachGrades', 'v.teachGuides'];
+const VIG = [
+  'v.graph', 'v.deep', 'v.academicEvidence',
+  'v.studyTest', 'v.studyChat', 'v.studyPlanner',
+  'v.genealogy', 'v.pros', 'v.genealogyArchive',
+  'v.databases', 'v.dataChat', 'v.databaseBuilder',
+  'v.teachGrades', 'v.teachGuides', 'v.teachPlanner',
+];
 const I18N = {
   es: {
     'nav.how': `Cómo funciona`, 'nav.views': `Vistas`, 'nav.listen': `Escuchar`, 'nav.demo': `Probar la demo`,
@@ -1759,35 +1995,53 @@ const I18N_V2 = {
   es: {
     'nav.vaults': `Vaults`, 'nav.contrib': `Contribuir`,
     'vaults.kicker': `Los vaults`, 'vaults.title': `El mismo motor, adaptado a tu trabajo.`,
-    'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento local y los ajustes por debajo son los mismos en todos los modos. Hoy hay cuatro modos utilizables, y cada uno tiene una demo que puedes abrir ahora mismo.`,
+    'vaults.lead': `Un vault es un único archivo en tu dispositivo con un proyecto dentro. Su modo decide qué secciones aparecen y cómo se instruye al asistente de IA. El motor, el almacenamiento privado y los ajustes son los mismos en todos los modos. Hoy hay cinco modos disponibles; Fuentes primarias, Testimonio y Prosopografía muestran lo que llegará después.`,
     'vaults.academic.t': `Académico`,
     'vaults.academic.b': `Para investigar. Apúntalo a una colección de Zotero y descompone cada obra en sus afirmaciones, hallazgos y métodos reales — cada uno con el pasaje literal y la página de la que sale.`,
-    'vaults.academic.f1': `<b>Un grafo de ideas</b>, no de archivos: apoya, contradice, matiza, amplía.`,
-    'vaults.academic.f2': `<b>Debates, huecos y cobertura</b> extraídos de lo que tu biblioteca <i>no</i> resuelve.`,
-    'vaults.academic.f3': `<b>Deep Research</b>: informes de varias páginas donde cada cita corresponde a un elemento real.`,
+    'vaults.academic.f1': `<b>Convierte tu biblioteca de Zotero en un grafo de ideas</b>, conectando afirmaciones, hallazgos y métodos con su pasaje y página exactos.`,
+    'vaults.academic.f2': `<b>Descubre debates, contradicciones y huecos de investigación</b>, y explóralos con búsqueda semántica, análisis de cobertura y rutas de lectura.`,
+    'vaults.academic.f3': `<b>Investiga y escribe con citas verificables</b> mediante Deep Research, el taller de escritura y los copilotos para Word y LibreOffice.`,
     'vaults.academic.f4': `<b>Un copiloto de escritura</b> que funciona también dentro de Word y LibreOffice Writer.`,
     'vaults.academic.cta': `Abrir la demo académica →`,
     'vaults.study.t': `Estudio`,
     'vaults.study.b': `Para aprender — tú o tu alumnado. Cursos, asignaturas, temas y apuntes, con tus propios materiales debajo. Sin necesidad de Zotero y sin subir nada.`,
-    'vaults.study.f1': `<b>Graba una clase</b> y transcríbela con Whisper local — pulsa cualquier línea y saltas a ese segundo.`,
-    'vaults.study.f2': `<b>Pregunta a tus materiales</b>: cada respuesta cita el apunte, la página o el minuto del que sale.`,
-    'vaults.study.f3': `<b>Un mapa de ideas por asignatura</b>, para que dos materias nunca se mezclen.`,
+    'vaults.study.f1': `<b>Organiza tus materiales por año académico, curso y asignatura</b>, y añade horarios, fechas límite y eventos al calendario con recordatorios.`,
+    'vaults.study.f2': `<b>Graba y transcribe clases en local</b>, lee PDF y EPUB, y haz preguntas que vuelven a la página, el apunte o el segundo exactos.`,
+    'vaults.study.f3': `<b>Convierte tu propio material en bancos de preguntas, tests, exámenes y tarjetas</b>, con repaso espaciado y seguimiento del progreso.`,
     'vaults.study.f4': `<b>Preguntas, tarjetas y repaso espaciado</b> a partir de tu contenido — tú apruebas cada una.`,
     'vaults.study.cta': `Abrir la demo de estudio →`,
     'vaults.genealogy.t': `Genealogía`,
     'vaults.genealogy.b': `Para reconstruir personas a partir de fuentes primarias — historia familiar, aunque el método sirve para cualquier investigación con registros: la identidad y el parentesco como hipótesis que los documentos deben probar.`,
-    'vaults.genealogy.f1': `<b>Personas, árbol, cronología y mapa</b>, con GEDCOM de entrada y de salida.`,
-    'vaults.genealogy.f2': `<b>Un archivo de evidencia</b>: censos, padrones, cartas y fotos enlazados a quienes aparecen en ellos.`,
-    'vaults.genealogy.f3': `<b>Un genealogista de IA</b> que propone parentescos desde los registros y nunca añade un vínculo que no hayas confirmado.`,
+    'vaults.genealogy.f1': `<b>Reconstruye personas en un árbol, una cronología y un mapa</b>, con importación y exportación GEDCOM y cada acontecimiento enlazado a su evidencia.`,
+    'vaults.genealogy.f2': `<b>Crea un archivo conectado de censos, padrones, cartas y fotografías</b>, ligado a las personas, lugares y acontecimientos que contienen.`,
+    'vaults.genealogy.f3': `<b>Revisa identidades y parentescos sugeridos como hipótesis basadas en evidencia</b>, manteniendo visibles los conflictos, las grafías de época y las fechas inciertas.`,
     'vaults.genealogy.f4': `<b>Los conflictos se ven</b> — las grafías de época y las fechas inciertas se conservan tal cual.`,
     'vaults.genealogy.cta': `Abrir la demo de genealogía →`,
     'vaults.databases.t': `Bases de datos`,
     'vaults.databases.b': `Para tus propios datos: trabajo de campo, corpus, catálogos, hojas de codificación. Tablas tipadas que sí puedes analizar, sin que una hoja de cálculo convierta tus categorías en texto.`,
-    'vaults.databases.f1': `<b>Tipos de columna de verdad</b>: selección, número, fecha, relación, rollup, fórmula, adjunto.`,
-    'vaults.databases.f2': `<b>La IA propone, la app calcula</b>: correlaciones, chi², ANOVA y regresiones se ejecutan en código, no en un prompt.`,
-    'vaults.databases.f3': `<b>Gráficos dibujados desde tus filas</b> — mapas de calor, dispersión, cajas y bigotes.`,
+    'vaults.databases.f1': `<b>Crea bases de datos estructuradas con tipos de campo reales</b>, relaciones, fórmulas, rollups, adjuntos, importación CSV y vistas filtradas reutilizables.`,
+    'vaults.databases.f2': `<b>Ejecuta análisis y gráficos reproducibles sobre tus filas reales</b>, desde correlaciones y chi² hasta ANOVA y regresiones.`,
+    'vaults.databases.f3': `<b>Pregunta en lenguaje natural y automatiza clasificaciones con columnas de IA</b>, sin inventar ningún campo o valor que no exista en tus datos.`,
     'vaults.databases.f4': `<b>Un chat de datos</b> que responde sobre la tabla real y se niega a inventar un valor.`,
     'vaults.databases.cta': `Abrir la demo de bases de datos →`,
+    'vaults.status.available': `Disponible ahora`, 'vaults.status.soon': `Próximamente`,
+    'vaults.roadmap': `En la hoja de ruta`,
+    'vaults.teaching.b': `Para la semana real de un docente: planifica cursos, organiza clases, crea evaluaciones y sigue el progreso sin separar el material del trabajo que genera.`,
+    'vaults.teaching.cta': `Descarga Nodus para empezar →`, 'vaults.teaching.available': `Disponible en el vault de Docencia`,
+    'vaults.teaching.f1': `<b>Planifica años académicos, cursos y clases en un solo sitio</b>, con horarios, calendarios, guías docentes y programaciones conectados.`,
+    'vaults.teaching.f2': `<b>Crea situaciones de aprendizaje, tests, exámenes y rúbricas a partir de tu material</b>, listos para que los revises y adaptes.`,
+    'vaults.teaching.f3': `<b>Sigue notas, progreso y feedback con privacidad</b>, usando códigos anónimos de alumnado siempre que interviene la IA.`,
+    'vaults.teaching.f4': `<b>Progreso y feedback de cada clase</b>, conectado con las actividades y las evidencias que hay detrás.`,
+    'vaults.primary.b': `Un espacio de crítica de fuentes para documentos de archivo, manuscritos y colecciones históricas, con cada interpretación junto al documento que la sustenta.`,
+    'vaults.primary.f1': `<b>Crea un archivo fiel desde escaneos, fotografías y manuscritos</b>, con OCR, transcripción, procedencia e imagen original siempre juntos.`,
+    'vaults.primary.f2': `<b>Aplica crítica de fuentes al extraer personas, lugares, acontecimientos y afirmaciones</b>, separando lo que dice el documento de lo que tú infieres.`,
+    'vaults.primary.f3': `<b>Conecta las fuentes en cronologías, mapas y dosieres de investigación</b>, comparando versiones y relatos en conflicto con evidencia de página exacta.`,
+    'vaults.primary.f4': `<b>Compara versiones y relatos en conflicto</b>, con cada conclusión trazable hasta una página o fragmento exactos.`,
+    'vaults.testimony.b': `Un espacio cuidadoso para entrevistas e historia oral, diseñado para conservar la voz, el contexto y las palabras exactas de cada persona durante toda la investigación.`,
+    'vaults.testimony.f1': `<b>Importa audio y vídeo con transcripción local y separación de hablantes</b>, manteniendo cada pasaje enlazado a una marca de tiempo pulsable.`,
+    'vaults.testimony.f2': `<b>Gestiona hablantes, roles, consentimiento y condiciones de acceso</b>, para que el contexto ético siga visible allí donde se use un testimonio.`,
+    'vaults.testimony.f3': `<b>Codifica temas, compara relatos y crea un corpus de historia oral buscable</b> que devuelve cada hallazgo al clip y al intercambio exactos.`,
+    'vaults.testimony.f4': `<b>Crea colecciones de historia oral buscables y citables</b> que vuelven al clip exacto detrás de cada hallazgo.`,
     'road.t': `Modos en camino`,
     'road.b': `Nodus publica su hoja de ruta a la vista. Estos modos aparecen en el selector de vaults pero todavía no son trabajo terminado — preferimos enseñarte el plan a fingir que no existe.`,
     'road.preview': `Vista previa`, 'road.soon': `Previsto`,
@@ -1795,12 +2049,17 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `El mismo esqueleto, para ficción y mundos construidos en lugar de investigación.`,
     'road.primary.t': `Fuentes primarias`, 'road.primary.b': `Documentos de archivo junto a la literatura secundaria, con extracción crítica de fuentes.`,
     'road.testimony.t': `Testimonios`, 'road.testimony.b': `Entrevistas e historia oral: quién habla, transcripciones y qué dijo cada persona exactamente.`,
+    'vaults.prosopography.t': `Prosopografía`,
+    'vaults.prosopography.b': `Un espacio de biografía colectiva para reconstruir un grupo definido a partir de fuentes dispersas y estudiar después carreras, instituciones, movilidad y estructuras de poder sin perder a las personas detrás del patrón.`,
+    'vaults.prosopography.f1': `<b>Crea un catálogo biográfico enlazado a las fuentes para una cohorte definida</b>, con un cuestionario de investigación flexible para nombres, cargos, carreras, afiliaciones, lugares y acontecimientos.`,
+    'vaults.prosopography.f2': `<b>Resuelve variantes de nombre, homónimos e identidades inciertas sin ocultar la duda</b>, con propuestas de fusión o separación basadas en evidencia que solo confirma el investigador.`,
+    'vaults.prosopography.f3': `<b>Descubre patrones entre personas, carreras e instituciones</b> mediante comparación de cohortes, análisis de redes, cronologías, mapas y estadísticas trazables hasta cada persona y fuente.`,
     'who.research.t': `Si investigas`,
-    'who.research.b': `Tu lectura se convierte en un corpus que puedes interrogar: qué se discute, qué falta, quién sostiene qué — y borradores cuyas citas corresponden a elementos reales. <b>Académico</b>, <b>Genealogía</b>, <b>Bases de datos</b>.`,
+    'who.research.b': `Convierte fuentes y datos en un corpus que puedes interrogar, cartografiar y usar para escribir. Usa hoy <b>Académico</b>, <b>Genealogía</b> y <b>Bases de datos</b>; <b>Fuentes primarias</b>, <b>Testimonio</b> y <b>Prosopografía</b> llegarán para la investigación de archivo, historia oral y biografía colectiva.`,
     'who.teach.t': `Si enseñas`,
-    'who.teach.b': `Prepara el material una vez y saca de él bancos de preguntas, tarjetas e informes — cada uno con el fragmento que lo justifica, para que lo revises antes de que lo vea tu alumnado. <b>Estudio</b> hoy; el modo Docencia está en construcción.`,
+    'who.teach.b': `Planifica cursos, clases, evaluación y feedback en <b>Docencia</b>, y ofrece al alumnado un espacio fundamentado en <b>Estudio</b>. Los futuros vaults de <b>Fuentes primarias</b>, <b>Testimonio</b> y <b>Prosopografía</b> apoyarán también seminarios con fuentes y docencia basada en investigación.`,
     'who.study.t': `Si estudias`,
-    'who.study.b': `Sube tus propios PDF, diapositivas y apuntes y mantenlos en orden por curso y asignatura. Luego conviértelos en tests y exámenes, repasa con tarjetas y pregúntale a la IA lo que responde solo desde tu material. <b>Estudio</b>.`,
+    'who.study.b': `Organiza materiales, horarios, práctica y progreso en <b>Estudio</b>. Para proyectos avanzados ya están disponibles <b>Académico</b>, <b>Genealogía</b> y <b>Bases de datos</b>; <b>Fuentes primarias</b>, <b>Testimonio</b> y <b>Prosopografía</b> añadirán itinerarios especializados de investigación archivística y social.`,
     'v.study.t': `La clase, de vuelta al segundo exacto`,
     'v.study.b': `Graba la clase, transcríbela con Whisper local y cada línea sigue siendo pulsable: la respuesta del chat cita el minuto del que sale, y los conceptos se convierten en un mapa de ideas solo de esa asignatura.`,
     'v.genealogy.t': `Una familia, reconstruida desde los registros`,
@@ -1819,6 +2078,16 @@ const I18N_V2 = {
     'v.teachGrades.b': `Gestiona tus clases y tus notas en un solo sitio. Cuando la IA ayuda, solo ve códigos anónimos de alumnado, nunca un nombre.`,
     'v.teachGuides.t': `Guías y exámenes, anclados en tu material`,
     'v.teachGuides.b': `Redacta guías docentes, programaciones didácticas y situaciones de aprendizaje, además de tests y exámenes, todo a partir de tu propio material. La IA se queda dentro de lo que le diste y no inventa nada.`,
+    'v.academicEvidence.t': `Mira dónde discrepa la literatura`,
+    'v.academicEvidence.b': `Nodus enfrenta afirmaciones rivales con sus evidencias y su cronología, y convierte las conexiones que faltan en preguntas de investigación explícitas que puedes perseguir.`,
+    'v.studyPlanner.t': `Todo tu curso académico, bajo control`,
+    'v.studyPlanner.b': `Organiza materiales por año, curso y asignatura, y reúne horarios, fechas límite, exámenes y sesiones de estudio en un calendario con recordatorios y progreso.`,
+    'v.genealogyArchive.t': `Cada acontecimiento conserva su evidencia`,
+    'v.genealogyArchive.b': `Crea un archivo conectado de registros, censos, cartas y fotografías. Cada nacimiento, matrimonio, residencia y parentesco sigue siendo trazable hasta el documento exacto que lo sustenta.`,
+    'v.databaseBuilder.t': `Modela tus datos sin aplanarlos`,
+    'v.databaseBuilder.b': `Crea tipos de campo, relaciones, fórmulas, rollups y vistas filtradas reutilizables. Importa CSV, conecta tablas y deja que las columnas de IA clasifiquen filas sin inventar datos.`,
+    'v.teachPlanner.t': `Del curso académico a la clase de mañana`,
+    'v.teachPlanner.b': `Planifica cursos, unidades y clases en un calendario conectado. Mantén juntos horarios, guías, materiales e hitos de evaluación sin rehacer el plan cada semana.`,
     'road.t': `Lo que viene`,
     'road.b': `El selector de vaults ya muestra lo que está en camino. El siguiente que estamos construyendo convierte Nodus en un espacio completo para el profesorado.`,
     'road.teaching.sub': `Un espacio pensado para la semana real de un docente.`,
@@ -1833,7 +2102,7 @@ const I18N_V2 = {
   fr: {
     'nav.vaults': `Coffres`, 'nav.contrib': `Contribuer`,
     'vaults.kicker': `Les coffres`, 'vaults.title': `Le même moteur, adapté à votre travail.`,
-    'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage local et les réglages en dessous restent les mêmes dans chaque mode. Quatre modes sont utilisables aujourd'hui, et chacun a une démo que vous pouvez ouvrir tout de suite.`,
+    'vaults.lead': `Un coffre est un seul fichier sur votre appareil, contenant un projet. Son mode décide des sections affichées et de la façon dont l'assistant IA est briefé. Le moteur, le stockage privé et les réglages restent les mêmes dans chaque mode. Cinq modes sont disponibles aujourd'hui ; Sources primaires, Témoignages et Prosopographie montrent ce qui viendra ensuite.`,
     'vaults.academic.t': `Académique`,
     'vaults.academic.b': `Pour la recherche. Pointez-le vers une collection Zotero et il décompose chaque ouvrage en ses affirmations, résultats et méthodes réels — chacun avec le passage textuel et la page dont il provient.`,
     'vaults.academic.f1': `<b>Un graphe d'idées</b>, pas de fichiers : soutient, contredit, affine, étend.`,
@@ -1869,18 +2138,29 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `La même coquille, pour la fiction et les mondes construits plutôt que la recherche.`,
     'road.primary.t': `Sources primaires`, 'road.primary.b': `Des archives à côté de la littérature secondaire, avec une extraction critique des sources.`,
     'road.testimony.t': `Témoignages`, 'road.testimony.b': `Entretiens et histoire orale : qui parle, transcriptions et ce que chacun a réellement dit.`,
+    'vaults.status.soon': `Bientôt`, 'vaults.roadmap': `Sur la feuille de route`,
+    'vaults.prosopography.t': `Prosopographie`,
+    'vaults.prosopography.b': `Un espace de biographie collective pour reconstituer un groupe défini à partir de sources dispersées, puis étudier carrières, institutions, mobilités et structures de pouvoir sans perdre de vue les personnes derrière les tendances.`,
+    'vaults.prosopography.f1': `<b>Construisez un catalogue biographique relié aux sources pour une cohorte définie</b>, avec un questionnaire de recherche flexible sur les noms, fonctions, carrières, affiliations, lieux et événements.`,
+    'vaults.prosopography.f2': `<b>Distinguez variantes de noms, homonymes et identités incertaines sans masquer le doute</b>, grâce à des propositions de fusion ou de séparation fondées sur les preuves que seul le chercheur peut valider.`,
+    'vaults.prosopography.f3': `<b>Révélez les structures entre personnes, carrières et institutions</b> par comparaison de cohortes, analyse de réseaux, chronologies, cartes et statistiques traçables jusqu'à chaque personne et source.`,
     'who.research.t': `Si vous cherchez`,
-    'who.research.b': `Vos lectures deviennent un corpus que vous pouvez interroger : ce qui est contesté, ce qui manque, qui soutient quoi — et des brouillons dont les citations renvoient à des éléments réels. <b>Académique</b>, <b>Généalogie</b>, <b>Bases de données</b>.`,
+    'who.research.b': `Transformez sources et données en un corpus à interroger, cartographier et mobiliser dans vos écrits. Utilisez dès maintenant <b>Académique</b>, <b>Généalogie</b> et <b>Bases de données</b> ; <b>Sources primaires</b>, <b>Témoignage</b> et <b>Prosopographie</b> arrivent pour les archives, l’histoire orale et la biographie collective.`,
     'who.teach.t': `Si vous enseignez`,
-    'who.teach.b': `Préparez le matériel une fois, puis tirez-en banques de questions, cartes mémoire et synthèses — chacune portant l'extrait qui la justifie, pour vérifier avant que vos étudiants ne la voient. <b>Étude</b> aujourd'hui ; un mode Enseignement est en construction.`,
+    'who.teach.b': `Planifiez cours, séances, évaluations et retours dans <b>Enseignement</b>, et offrez aux apprenants un espace fondé sur leurs contenus dans <b>Étude</b>. Les futurs coffres <b>Sources primaires</b>, <b>Témoignage</b> et <b>Prosopographie</b> serviront aussi les séminaires sur sources et l’enseignement par la recherche.`,
     'who.study.t': `Si vous étudiez`,
-    'who.study.b': `Vos cours, diapositives et notes au même endroit : enregistrés et transcrits, cherchables à la seconde, cartographiés en concepts et révisables en répétition espacée. <b>Étude</b>.`,
+    'who.study.b': `Organisez documents, emploi du temps, exercices et progression dans <b>Étude</b>. Pour les projets avancés, <b>Académique</b>, <b>Généalogie</b> et <b>Bases de données</b> sont disponibles ; <b>Sources primaires</b>, <b>Témoignage</b> et <b>Prosopographie</b> ajouteront des parcours spécialisés en recherche archivistique et sociale.`,
     'v.study.t': `Le cours, à la seconde près`,
     'v.study.b': `Enregistrez le cours, transcrivez-le avec Whisper en local, et chaque ligne reste cliquable : la réponse du chat cite l'horodatage dont elle vient, et les concepts deviennent une carte d'idées propre à cette matière.`,
     'v.genealogy.t': `Une famille, reconstituée à partir des actes`,
     'v.genealogy.b': `Les personnes, les dates et les lieux sortent des recensements, des registres et des lettres. L'assistant propose leurs liens et attend votre confirmation avant que quiconque entre dans l'arbre.`,
     'v.databases.t': `Vous apportez les données, il fait les calculs`,
     'v.databases.b': `Transformez vos propres relevés en tables typées, puis demandez une analyse. L'assistant choisit la méthode et l'app la calcule pour de vrai, donc une corrélation ou une régression est un calcul, jamais une supposition.`,
+    'v.academicEvidence.t': `Voyez où la littérature diverge`, 'v.academicEvidence.b': `Nodus confronte les thèses concurrentes, leurs preuves et leur chronologie, puis transforme les liens manquants en questions de recherche explicites.`,
+    'v.studyPlanner.t': `Toute votre année universitaire sous contrôle`, 'v.studyPlanner.b': `Classez vos documents par année, cursus et matière, puis réunissez emploi du temps, échéances, examens et révisions dans un calendrier avec rappels et progression.`,
+    'v.genealogyArchive.t': `Chaque événement conserve ses preuves`, 'v.genealogyArchive.b': `Créez une archive reliée de registres, recensements, lettres et photographies. Chaque naissance, mariage, domicile et parenté reste traçable jusqu'au document exact.`,
+    'v.databaseBuilder.t': `Modélisez vos données sans les aplatir`, 'v.databaseBuilder.b': `Créez des champs typés, relations, formules, agrégations et vues filtrées. Importez un CSV, reliez les tables et classez les lignes par IA sans inventer de données.`,
+    'v.teachPlanner.t': `De l'année universitaire au cours de demain`, 'v.teachPlanner.b': `Planifiez cursus, unités et séances dans un calendrier relié, avec horaires, guides, supports et jalons d'évaluation réunis.`,
     'contrib.kicker': `Open source, ensemble`, 'contrib.title': `Chaque nœud compte.`,
     'contrib.lead': `Nodus grandit une contribution à la fois — comme des grains de sable, chacun s'ajoute à l'ensemble. Une seule personne l'a lancé ; chacun peut ajouter le grain suivant.`,
     'contrib.prs': `Voir les pull requests`, 'contrib.repo': `Parcourir le code`, 'contrib.builders': `Les personnes qui construisent Nodus`, 'contrib.loading': `Chargement des contributeurs…`, 'contrib.cap': `Chaque grain, une contribution.`, 'contrib.commits': `contributions`,
@@ -1888,7 +2168,7 @@ const I18N_V2 = {
   it: {
     'nav.vaults': `Vault`, 'nav.contrib': `Contribuisci`,
     'vaults.kicker': `I vault`, 'vaults.title': `Lo stesso motore, adattato al tuo lavoro.`,
-    'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione locale e le impostazioni sotto restano gli stessi in ogni modalità. Oggi quattro modalità sono utilizzabili, e ognuna ha una demo che puoi aprire subito.`,
+    'vaults.lead': `Un vault è un unico file sul tuo dispositivo, con dentro un progetto. La sua modalità decide quali sezioni compaiono e come viene istruito l'assistente IA. Il motore, l'archiviazione privata e le impostazioni restano gli stessi in ogni modalità. Oggi sono disponibili cinque modalità; Fonti primarie, Testimonianze e Prosopografia mostrano ciò che arriverà in seguito.`,
     'vaults.academic.t': `Accademico`,
     'vaults.academic.b': `Per la ricerca. Puntalo a una raccolta Zotero e scompone ogni opera nelle sue affermazioni, scoperte e metodi reali — ciascuno con il passaggio testuale e la pagina da cui proviene.`,
     'vaults.academic.f1': `<b>Un grafo di idee</b>, non di file: sostiene, contraddice, affina, estende.`,
@@ -1924,18 +2204,29 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Lo stesso guscio, per la narrativa e i mondi costruiti anziché per la ricerca.`,
     'road.primary.t': `Fonti primarie`, 'road.primary.b': `Documenti d'archivio accanto alla letteratura secondaria, con estrazione critica delle fonti.`,
     'road.testimony.t': `Testimonianze`, 'road.testimony.b': `Interviste e storia orale: chi parla, trascrizioni e cosa ha detto davvero ciascuno.`,
+    'vaults.status.soon': `Prossimamente`, 'vaults.roadmap': `Nella roadmap`,
+    'vaults.prosopography.t': `Prosopografia`,
+    'vaults.prosopography.b': `Uno spazio di biografia collettiva per ricostruire un gruppo definito da fonti disperse e studiare poi carriere, istituzioni, mobilità e strutture di potere senza perdere le persone dietro i modelli.`,
+    'vaults.prosopography.f1': `<b>Crea un catalogo biografico collegato alle fonti per una coorte definita</b>, con un questionario di ricerca flessibile per nomi, incarichi, carriere, affiliazioni, luoghi ed eventi.`,
+    'vaults.prosopography.f2': `<b>Risolvi varianti del nome, omonimi e identità incerte senza nascondere il dubbio</b>, con proposte di unione o separazione basate sulle prove che solo il ricercatore può confermare.`,
+    'vaults.prosopography.f3': `<b>Rivela modelli tra persone, carriere e istituzioni</b> tramite confronto tra coorti, analisi delle reti, cronologie, mappe e statistiche riconducibili a ogni persona e fonte.`,
     'who.research.t': `Se fai ricerca`,
-    'who.research.b': `Le tue letture diventano un corpus che puoi interrogare: cosa è controverso, cosa manca, chi sostiene cosa — e bozze le cui citazioni corrispondono a elementi reali. <b>Accademico</b>, <b>Genealogia</b>, <b>Database</b>.`,
+    'who.research.b': `Trasforma fonti e dati in un corpus da interrogare, mappare e usare nella scrittura. Usa oggi <b>Accademico</b>, <b>Genealogia</b> e <b>Database</b>; <b>Fonti primarie</b>, <b>Testimonianza</b> e <b>Prosopografia</b> arriveranno per la ricerca archivistica, la storia orale e la biografia collettiva.`,
     'who.teach.t': `Se insegni`,
-    'who.teach.b': `Prepara il materiale una volta e ricavane banche di domande, flashcard e sintesi — ognuna con l'estratto che la giustifica, così controlli prima che lo vedano i tuoi studenti. <b>Studio</b> oggi; una modalità Didattica è in costruzione.`,
+    'who.teach.b': `Pianifica corsi, lezioni, valutazioni e feedback in <b>Didattica</b>, e offri agli studenti uno spazio fondato sui materiali in <b>Studio</b>. I futuri vault <b>Fonti primarie</b>, <b>Testimonianza</b> e <b>Prosopografia</b> sosterranno anche seminari sulle fonti e didattica basata sulla ricerca.`,
     'who.study.t': `Se studi`,
-    'who.study.b': `Lezioni, slide e appunti in un unico posto: registrati e trascritti, cercabili al secondo, mappati come concetti e ripassabili con ripetizione spaziata. <b>Studio</b>.`,
+    'who.study.b': `Organizza materiali, orari, esercitazioni e progressi in <b>Studio</b>. Per progetti avanzati sono già disponibili <b>Accademico</b>, <b>Genealogia</b> e <b>Database</b>; <b>Fonti primarie</b>, <b>Testimonianza</b> e <b>Prosopografia</b> aggiungeranno percorsi specialistici per la ricerca archivistica e sociale.`,
     'v.study.t': `La lezione, al secondo esatto`,
     'v.study.b': `Registra la lezione, trascrivila con Whisper locale e ogni riga resta cliccabile: la risposta della chat cita il minuto da cui viene, e i concetti diventano una mappa di idee solo di quella materia.`,
     'v.genealogy.t': `Una famiglia, ricostruita dai documenti`,
     'v.genealogy.b': `Persone, date e luoghi escono da censimenti, registri e lettere. L'assistente propone come si collegano e aspetta la tua conferma prima che qualcuno entri nell'albero.`,
     'v.databases.t': `Porti i dati, ci pensa lui ai numeri`,
     'v.databases.b': `Trasforma i tuoi dati in tabelle tipizzate, poi chiedi un'analisi. L'assistente sceglie il metodo e l'app lo calcola davvero, così una correlazione o una regressione è un calcolo, mai una supposizione.`,
+    'v.academicEvidence.t': `Scopri dove la letteratura è in disaccordo`, 'v.academicEvidence.b': `Nodus mette a confronto tesi rivali, prove e cronologia, poi trasforma i collegamenti mancanti in domande di ricerca esplicite.`,
+    'v.studyPlanner.t': `Tutto l'anno accademico sotto controllo`, 'v.studyPlanner.b': `Organizza i materiali per anno, corso e materia, e riunisci orari, scadenze, esami e sessioni di studio in un calendario con promemoria e progressi.`,
+    'v.genealogyArchive.t': `Ogni evento conserva le sue prove`, 'v.genealogyArchive.b': `Crea un archivio collegato di registri, censimenti, lettere e fotografie. Ogni nascita, matrimonio, residenza e parentela resta riconducibile al documento esatto.`,
+    'v.databaseBuilder.t': `Modella i dati senza appiattirli`, 'v.databaseBuilder.b': `Crea campi tipizzati, relazioni, formule, rollup e viste filtrate. Importa CSV, collega tabelle e usa colonne IA per classificare righe senza inventare dati.`,
+    'v.teachPlanner.t': `Dall'anno accademico alla lezione di domani`, 'v.teachPlanner.b': `Pianifica corsi, unità e lezioni in un calendario collegato, tenendo insieme orari, guide, materiali e scadenze di valutazione.`,
     'contrib.kicker': `Open source, insieme`, 'contrib.title': `Ogni nodo conta.`,
     'contrib.lead': `Nodus cresce una contribuzione alla volta — come granelli di sabbia, ognuno si aggiunge all'insieme. L'ha iniziato una sola persona; chiunque può aggiungere il prossimo granello.`,
     'contrib.prs': `Guarda le pull request`, 'contrib.repo': `Sfoglia il codice`, 'contrib.builders': `Le persone che costruiscono Nodus`, 'contrib.loading': `Caricamento contributori…`, 'contrib.cap': `Ogni granello, una contribuzione.`, 'contrib.commits': `contributi`,
@@ -1943,7 +2234,7 @@ const I18N_V2 = {
   de: {
     'nav.vaults': `Tresore`, 'nav.contrib': `Mitmachen`,
     'vaults.kicker': `Die Tresore`, 'vaults.title': `Dieselbe Engine, auf deine Arbeit zugeschnitten.`,
-    'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, lokaler Speicher und Einstellungen darunter bleiben in jedem Modus gleich. Vier Modi sind heute nutzbar, und jeder hat eine Demo, die du sofort öffnen kannst.`,
+    'vaults.lead': `Ein Tresor ist eine einzige Datei auf deinem Gerät, die ein Projekt enthält. Sein Modus entscheidet, welche Bereiche erscheinen und wie der KI-Assistent gebrieft wird. Engine, privater Speicher und Einstellungen bleiben in jedem Modus gleich. Fünf Modi sind heute verfügbar; Primärquellen, Zeugnisse und Prosopographie zeigen, was als Nächstes kommt.`,
     'vaults.academic.t': `Akademisch`,
     'vaults.academic.b': `Für die Forschung. Richte ihn auf eine Zotero-Sammlung, und er zerlegt jedes Werk in seine tatsächlichen Behauptungen, Befunde und Methoden — jeweils mit der wörtlichen Stelle und der Seite, aus der sie stammt.`,
     'vaults.academic.f1': `<b>Ein Graph aus Ideen</b>, nicht aus Dateien: stützt, widerspricht, präzisiert, erweitert.`,
@@ -1979,18 +2270,29 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Dieselbe Hülle, für Fiktion und erfundene Welten statt Forschung.`,
     'road.primary.t': `Primärquellen`, 'road.primary.b': `Archivalien neben der Sekundärliteratur, mit quellenkritischer Extraktion.`,
     'road.testimony.t': `Zeugnisse`, 'road.testimony.b': `Interviews und Oral History: wer spricht, Transkripte und was jede Person tatsächlich gesagt hat.`,
+    'vaults.status.soon': `Demnächst`, 'vaults.roadmap': `Auf der Roadmap`,
+    'vaults.prosopography.t': `Prosopographie`,
+    'vaults.prosopography.b': `Ein Arbeitsbereich für kollektive Biografien, der eine definierte Gruppe aus verstreuten Quellen rekonstruiert und anschließend Karrieren, Institutionen, Mobilität und Machtstrukturen untersucht, ohne die Menschen hinter den Mustern aus dem Blick zu verlieren.`,
+    'vaults.prosopography.f1': `<b>Erstelle für eine definierte Kohorte einen quellengebundenen biografischen Katalog</b>, mit einem flexiblen Forschungsfragebogen zu Namen, Ämtern, Karrieren, Zugehörigkeiten, Orten und Ereignissen.`,
+    'vaults.prosopography.f2': `<b>Kläre Namensvarianten, Namensgleichheiten und unsichere Identitäten, ohne Zweifel zu verbergen</b>, mit evidenzbasierten Vorschlägen zum Zusammenführen oder Trennen, die nur Forschende bestätigen können.`,
+    'vaults.prosopography.f3': `<b>Erkenne Muster zwischen Personen, Karrieren und Institutionen</b> durch Kohortenvergleich, Netzwerkanalyse, Zeitleisten, Karten und Statistiken, die zu jeder Person und Quelle zurückverfolgbar bleiben.`,
     'who.research.t': `Wenn du forschst`,
-    'who.research.b': `Deine Lektüre wird zu einem Korpus, den du befragen kannst: was umstritten ist, was fehlt, wer was stützt — und Entwürfe, deren Zitate auf echte Einträge zurückgehen. <b>Akademisch</b>, <b>Genealogie</b>, <b>Datenbanken</b>.`,
+    'who.research.b': `Verwandle Quellen und Daten in ein Korpus, das du befragen, kartieren und zum Schreiben nutzen kannst. Heute stehen <b>Akademisch</b>, <b>Genealogie</b> und <b>Datenbanken</b> bereit; <b>Primärquellen</b>, <b>Zeitzeugenberichte</b> und <b>Prosopografie</b> folgen für Archiv-, Oral-History- und kollektivbiografische Forschung.`,
     'who.teach.t': `Wenn du lehrst`,
-    'who.teach.b': `Baue das Material einmal und hole Fragenpools, Karteikarten und Kurzberichte heraus — jeweils mit der Textstelle, die sie belegt, damit du prüfen kannst, bevor deine Studierenden es sehen. Heute <b>Lernen</b>; ein Lehre-Modus wird gebaut.`,
+    'who.teach.b': `Plane Kurse, Unterricht, Bewertung und Feedback in <b>Lehre</b> und gib Lernenden mit <b>Lernen</b> einen quellengebundenen Arbeitsbereich. Die kommenden Tresore <b>Primärquellen</b>, <b>Zeitzeugenberichte</b> und <b>Prosopografie</b> unterstützen zudem quellenbasierte Seminare und forschendes Lehren.`,
     'who.study.t': `Wenn du lernst`,
-    'who.study.b': `Vorlesungen, Folien und Notizen an einem Ort: aufgenommen und transkribiert, sekundengenau durchsuchbar, als Konzepte kartiert und mit verteiltem Wiederholen abfragbar. <b>Lernen</b>.`,
+    'who.study.b': `Ordne Materialien, Termine, Übungen und Fortschritt in <b>Lernen</b>. Für anspruchsvollere Projekte sind <b>Akademisch</b>, <b>Genealogie</b> und <b>Datenbanken</b> verfügbar; <b>Primärquellen</b>, <b>Zeitzeugenberichte</b> und <b>Prosopografie</b> ergänzen spezialisierte Wege für Archiv- und Sozialforschung.`,
     'v.study.t': `Die Vorlesung, sekundengenau zurück`,
     'v.study.b': `Nimm die Vorlesung auf, transkribiere sie mit lokalem Whisper, und jede Zeile bleibt anklickbar: die Antwort im Chat zitiert den Zeitstempel, aus dem sie stammt, und die Konzepte werden zu einer Ideenkarte nur für dieses Fach.`,
     'v.genealogy.t': `Eine Familie, aus den Akten rekonstruiert`,
     'v.genealogy.b': `Personen, Daten und Orte kommen aus Zählungen, Registern und Briefen. Der Assistent schlägt vor, wie sie zusammenhängen, und wartet auf deine Bestätigung, bevor jemand in den Stammbaum kommt.`,
     'v.databases.t': `Du bringst die Daten, es rechnet`,
     'v.databases.b': `Verwandle deine eigenen Aufzeichnungen in typisierte Tabellen und bitte um eine Auswertung. Der Assistent wählt die Methode, die App rechnet sie wirklich, also ist eine Korrelation oder Regression eine Berechnung, keine Vermutung.`,
+    'v.academicEvidence.t': `Sieh, wo die Literatur widerspricht`, 'v.academicEvidence.b': `Nodus stellt konkurrierende Aussagen mit Belegen und Chronologie gegenüber und macht fehlende Verbindungen zu konkreten Forschungsfragen.`,
+    'v.studyPlanner.t': `Das ganze Studienjahr im Griff`, 'v.studyPlanner.b': `Ordne Materialien nach Jahr, Kurs und Fach und bündele Stundenplan, Fristen, Prüfungen und Lernzeiten in einem Kalender mit Erinnerungen und Fortschritt.`,
+    'v.genealogyArchive.t': `Jedes Lebensereignis behält seinen Beleg`, 'v.genealogyArchive.b': `Baue ein verknüpftes Archiv aus Registern, Zählungen, Briefen und Fotos. Geburt, Heirat, Wohnort und Verwandtschaft bleiben bis zum genauen Dokument verfolgbar.`,
+    'v.databaseBuilder.t': `Modelliere Daten, ohne sie zu verflachen`, 'v.databaseBuilder.b': `Erstelle Feldtypen, Beziehungen, Formeln, Rollups und gefilterte Ansichten. Importiere CSV, verknüpfe Tabellen und klassifiziere Zeilen per KI, ohne Daten zu erfinden.`,
+    'v.teachPlanner.t': `Vom Schuljahr bis zur morgigen Stunde`, 'v.teachPlanner.b': `Plane Kurse, Einheiten und Stunden in einem verbundenen Kalender und halte Stundenpläne, Leitfäden, Material und Bewertungstermine zusammen.`,
     'contrib.kicker': `Open Source, gemeinsam`, 'contrib.title': `Jeder Knoten zählt.`,
     'contrib.lead': `Nodus wächst mit jedem Beitrag — wie Sandkörner fügt sich jedes dem Ganzen hinzu. Eine einzelne Person hat es begonnen; jeder kann das nächste Korn beitragen.`,
     'contrib.prs': `Die Pull Requests ansehen`, 'contrib.repo': `Den Code durchstöbern`, 'contrib.builders': `Die Menschen, die Nodus bauen`, 'contrib.loading': `Mitwirkende werden geladen…`, 'contrib.cap': `Jedes Korn ein Beitrag.`, 'contrib.commits': `Beiträge`,
@@ -1998,7 +2300,7 @@ const I18N_V2 = {
   pt: {
     'nav.vaults': `Cofres`, 'nav.contrib': `Contribuir`,
     'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
-    'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento local e as definições por baixo são os mesmos em cada modo. Hoje há quatro modos utilizáveis, e cada um tem uma demo que podes abrir já.`,
+    'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
     'vaults.academic.t': `Acadêmico`,
     'vaults.academic.b': `Para investigar. Aponta-o a uma coleção do Zotero e ele decompõe cada obra nas suas afirmações, achados e métodos reais — cada um com a passagem literal e a página de onde saiu.`,
     'vaults.academic.f1': `<b>Um grafo de ideias</b>, não de ficheiros: apoia, contradiz, matiza, amplia.`,
@@ -2034,18 +2336,29 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `A mesma casca, para ficção e mundos construídos em vez de investigação.`,
     'road.primary.t': `Fontes primárias`, 'road.primary.b': `Documentos de arquivo ao lado da literatura secundária, com extração crítica de fontes.`,
     'road.testimony.t': `Testemunhos`, 'road.testimony.b': `Entrevistas e história oral: quem fala, transcrições e o que cada pessoa disse mesmo.`,
+    'vaults.status.soon': `Em breve`, 'vaults.roadmap': `No roteiro`,
+    'vaults.prosopography.t': `Prosopografia`,
+    'vaults.prosopography.b': `Um espaço de biografia coletiva para reconstruir um grupo definido a partir de fontes dispersas e depois estudar carreiras, instituições, mobilidade e estruturas de poder sem perder as pessoas por detrás dos padrões.`,
+    'vaults.prosopography.f1': `<b>Cria um catálogo biográfico ligado às fontes para uma coorte definida</b>, com um questionário de investigação flexível para nomes, cargos, carreiras, afiliações, lugares e acontecimentos.`,
+    'vaults.prosopography.f2': `<b>Resolve variantes de nome, homónimos e identidades incertas sem esconder a dúvida</b>, com propostas de fusão ou separação baseadas em evidências que só o investigador pode confirmar.`,
+    'vaults.prosopography.f3': `<b>Revela padrões entre pessoas, carreiras e instituições</b> através da comparação de coortes, análise de redes, cronologias, mapas e estatísticas rastreáveis até cada pessoa e fonte.`,
     'who.research.t': `Se investigas`,
-    'who.research.b': `A tua leitura torna-se um corpus que podes interrogar: o que é contestado, o que falta, quem defende o quê — e rascunhos cujas citações correspondem a itens reais. <b>Acadêmico</b>, <b>Genealogia</b>, <b>Bases de dados</b>.`,
+    'who.research.b': `Transforma fontes e dados num corpus que podes interrogar, mapear e usar na escrita. Usa hoje <b>Académico</b>, <b>Genealogia</b> e <b>Bases de dados</b>; <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> chegarão para investigação de arquivo, história oral e biografia coletiva.`,
     'who.teach.t': `Se ensinas`,
-    'who.teach.b': `Prepara o material uma vez e tira dele bancos de perguntas, flashcards e sínteses — cada um com o excerto que o justifica, para verificares antes de os teus alunos verem. <b>Estudo</b> hoje; um modo Docência está a ser construído.`,
+    'who.teach.b': `Planeia cursos, aulas, avaliação e feedback em <b>Docência</b>, e dá aos alunos um espaço fundamentado em <b>Estudo</b>. Os futuros cofres de <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> apoiarão também seminários com fontes e ensino orientado pela investigação.`,
     'who.study.t': `Se estudas`,
-    'who.study.b': `Aulas, slides e apontamentos num só sítio: gravados e transcritos, pesquisáveis ao segundo, mapeados como conceitos e revisáveis com repetição espaçada. <b>Estudo</b>.`,
+    'who.study.b': `Organiza materiais, horários, prática e progresso em <b>Estudo</b>. Para projetos avançados, <b>Académico</b>, <b>Genealogia</b> e <b>Bases de dados</b> já estão disponíveis; <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> acrescentarão percursos especializados de investigação arquivística e social.`,
     'v.study.t': `A aula, de volta ao segundo exato`,
     'v.study.b': `Grava a aula, transcreve-a com Whisper local e cada linha continua clicável: a resposta do chat cita o minuto de onde veio, e os conceitos tornam-se um mapa de ideias só dessa disciplina.`,
     'v.genealogy.t': `Uma família, reconstruída a partir dos registos`,
     'v.genealogy.b': `Pessoas, datas e lugares saem de censos, registos e cartas. O assistente propõe como se ligam e espera pela tua confirmação antes de alguém entrar na árvore.`,
     'v.databases.t': `Tu trazes os dados, ele faz as contas`,
     'v.databases.b': `Transforma os teus registos em tabelas tipadas e pede uma análise. O assistente escolhe o método e a app calcula-o a sério, por isso uma correlação ou uma regressão é um cálculo, nunca um palpite.`,
+    'v.academicEvidence.t': `Vê onde a literatura diverge`, 'v.academicEvidence.b': `O Nodus confronta afirmações rivais, evidências e cronologia, e transforma ligações em falta em perguntas de investigação explícitas.`,
+    'v.studyPlanner.t': `Todo o ano letivo sob controlo`, 'v.studyPlanner.b': `Organiza materiais por ano, curso e disciplina, e reúne horários, prazos, exames e estudo num calendário com lembretes e progresso.`,
+    'v.genealogyArchive.t': `Cada acontecimento conserva a sua evidência`, 'v.genealogyArchive.b': `Cria um arquivo ligado de registos, censos, cartas e fotografias. Cada nascimento, casamento, residência e parentesco fica rastreável até ao documento exato.`,
+    'v.databaseBuilder.t': `Modela os dados sem os achatar`, 'v.databaseBuilder.b': `Cria campos tipados, relações, fórmulas, rollups e vistas filtradas. Importa CSV, liga tabelas e classifica linhas com IA sem inventar dados.`,
+    'v.teachPlanner.t': `Do ano letivo à aula de amanhã`, 'v.teachPlanner.b': `Planeia cursos, unidades e aulas num calendário ligado, mantendo juntos horários, guias, materiais e marcos de avaliação.`,
     'contrib.kicker': `Código aberto, juntos`, 'contrib.title': `Cada nó conta.`,
     'contrib.lead': `O Nodus cresce uma contribuição de cada vez — como grãos de areia, cada um soma ao todo. Uma só pessoa começou; qualquer um pode juntar o próximo grão.`,
     'contrib.prs': `Ver os pull requests`, 'contrib.repo': `Explorar o código`, 'contrib.builders': `As pessoas que constroem o Nodus`, 'contrib.loading': `A carregar colaboradores…`, 'contrib.cap': `Cada grão, uma contribuição.`, 'contrib.commits': `contribuições`,
@@ -2053,7 +2366,7 @@ const I18N_V2 = {
   tr: {
     'nav.vaults': `Kasalar`, 'nav.contrib': `Katkıda bulun`,
     'vaults.kicker': `Kasalar`, 'vaults.title': `Aynı motor, işine göre biçimlenir.`,
-    'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Altta motor, yerel depolama ve ayarlar her modda aynı kalır. Bugün dört mod kullanılabilir ve her birinin hemen açabileceğiniz bir demosu var.`,
+    'vaults.lead': `Bir kasa, cihazınızda tek bir projeyi tutan tek bir dosyadır. Modu, hangi bölümlerin görüneceğine ve yapay zekâ asistanının nasıl bilgilendirileceğine karar verir. Motor, özel depolama ve ayarlar her modda aynı kalır. Bugün beş mod kullanılabilir; Birincil Kaynaklar, Tanıklıklar ve Prosopografi sırada ne olduğunu gösterir.`,
     'vaults.academic.t': `Akademik`,
     'vaults.academic.b': `Araştırma için. Bir Zotero koleksiyonuna yöneltin; her eseri gerçek iddialarına, bulgularına ve yöntemlerine ayırsın — her biri geldiği birebir pasaj ve sayfayla.`,
     'vaults.academic.f1': `<b>Dosyaların değil fikirlerin grafiği</b>: destekler, çelişir, inceltir, genişletir.`,
@@ -2089,18 +2402,29 @@ const I18N_V2 = {
     'road.worldbuilding.t': `Worldbuilding`, 'road.worldbuilding.b': `Aynı kabuk; araştırma yerine kurgu ve kurulmuş dünyalar için.`,
     'road.primary.t': `Birincil Kaynaklar`, 'road.primary.b': `İkincil literatürün yanında arşiv belgeleri, kaynak-eleştirel çıkarımla.`,
     'road.testimony.t': `Tanıklıklar`, 'road.testimony.b': `Görüşmeler ve sözlü tarih: kim konuşuyor, dökümler ve herkesin tam olarak ne dediği.`,
+    'vaults.status.soon': `Yakında`, 'vaults.roadmap': `Yol haritasında`,
+    'vaults.prosopography.t': `Prosopografi`,
+    'vaults.prosopography.b': `Dağınık kaynaklardan tanımlı bir grubu yeniden kurmak ve ardından örüntülerin ardındaki kişileri kaybetmeden kariyerleri, kurumları, hareketliliği ve iktidar yapılarını incelemek için kolektif biyografi çalışma alanı.`,
+    'vaults.prosopography.f1': `<b>Tanımlı bir kohort için kaynaklara bağlı biyografik bir katalog oluşturun</b>; adlar, makamlar, kariyerler, aidiyetler, yerler ve olaylar için esnek bir araştırma soru formu kullanın.`,
+    'vaults.prosopography.f2': `<b>Şüpheyi gizlemeden ad varyantlarını, adaşları ve belirsiz kimlikleri çözümleyin</b>; yalnızca araştırmacının onaylayabildiği kanıta dayalı birleştirme veya ayırma önerileri kullanın.`,
+    'vaults.prosopography.f3': `<b>Kişiler, kariyerler ve kurumlar arasındaki örüntüleri ortaya çıkarın</b>; kohort karşılaştırması, ağ analizi, zaman çizelgeleri, haritalar ve her kişiye ve kaynağa geri izlenebilen istatistiklerden yararlanın.`,
     'who.research.t': `Araştırıyorsanız`,
-    'who.research.b': `Okumalarınız sorgulayabileceğiniz bir korpusa dönüşür: neyin tartışmalı olduğu, neyin eksik olduğu, kimin neyi savunduğu — ve kaynakları gerçek kayıtlara çıkan taslaklar. <b>Akademik</b>, <b>Soybilim</b>, <b>Veritabanları</b>.`,
+    'who.research.b': `Kaynakları ve verileri sorgulayabileceğiniz, haritalayabileceğiniz ve yazıda kullanabileceğiniz bir korpusa dönüştürün. Bugün <b>Akademik</b>, <b>Soybilim</b> ve <b>Veritabanları</b> kullanılabilir; <b>Birincil Kaynaklar</b>, <b>Tanıklık</b> ve <b>Prosopografi</b> arşiv, sözlü tarih ve kolektif biyografi araştırmaları için geliyor.`,
     'who.teach.t': `Öğretiyorsanız`,
-    'who.teach.b': `Materyali bir kez hazırlayın, sonra ondan soru bankaları, bilgi kartları ve özetler çıkarın — her biri kendini gerekçelendiren alıntıyla, öğrencileriniz görmeden kontrol edebilesiniz diye. Bugün <b>Çalışma</b>; bir Öğretim modu yapılıyor.`,
+    'who.teach.b': `Dersleri, sınıfları, değerlendirmeyi ve geri bildirimi <b>Öğretim</b> içinde planlayın; öğrencilere <b>Çalışma</b> ile kaynaklara dayalı bir alan verin. Gelecek <b>Birincil Kaynaklar</b>, <b>Tanıklık</b> ve <b>Prosopografi</b> kasaları kaynak temelli seminerleri ve araştırma odaklı öğretimi de destekleyecek.`,
     'who.study.t': `Öğreniyorsanız`,
-    'who.study.b': `Dersleriniz, slaytlarınız ve notlarınız tek yerde: kaydedilmiş ve yazıya dökülmüş, saniyesine kadar aranabilir, kavram olarak haritalanmış ve aralıklı tekrarla çalışılabilir. <b>Çalışma</b>.`,
+    'who.study.b': `Materyalleri, programı, alıştırmaları ve ilerlemeyi <b>Çalışma</b> içinde düzenleyin. İleri projeler için <b>Akademik</b>, <b>Soybilim</b> ve <b>Veritabanları</b> hazır; <b>Birincil Kaynaklar</b>, <b>Tanıklık</b> ve <b>Prosopografi</b> arşiv ve sosyal araştırmaya uzmanlaşmış yollar ekleyecek.`,
     'v.study.t': `Ders, tam o saniyeye geri`,
     'v.study.b': `Dersi kaydedin, yerel Whisper ile yazıya dökün; her satır tıklanabilir kalır: sohbetteki yanıt geldiği zaman damgasını gösterir ve kavramlar yalnızca o dersin fikir haritasına dönüşür.`,
     'v.genealogy.t': `Kayıtlardan yeniden kurulan bir aile`,
     'v.genealogy.b': `Kişiler, tarihler ve yerler nüfus sayımlarından, kütüklerden ve mektuplardan çıkar. Asistan bağlantılarını önerir ve ağaca kimse girmeden önce onayınızı bekler.`,
     'v.databases.t': `Veriyi siz getirin, hesabı o yapsın`,
     'v.databases.b': `Kendi kayıtlarınızı tipli tablolara dönüştürün, sonra bir analiz isteyin. Asistan yöntemi seçer, uygulama gerçekten hesaplar, yani bir korelasyon ya da regresyon bir hesaptır, asla bir tahmin değil.`,
+    'v.academicEvidence.t': `Literatürün nerede ayrıştığını görün`, 'v.academicEvidence.b': `Nodus rakip iddiaları kanıtları ve kronolojileriyle karşılaştırır, eksik bağlantıları açık araştırma sorularına dönüştürür.`,
+    'v.studyPlanner.t': `Tüm akademik yıl kontrol altında`, 'v.studyPlanner.b': `Materyalleri yıl, program ve derse göre düzenleyin; takvim, son tarihler, sınavlar ve çalışma oturumlarını hatırlatıcılarla tek takvimde toplayın.`,
+    'v.genealogyArchive.t': `Her yaşam olayı kanıtını korur`, 'v.genealogyArchive.b': `Kütük, sayım, mektup ve fotoğraflardan bağlı bir arşiv kurun. Her doğum, evlilik, ikamet ve akrabalık tam belgesine kadar izlenebilir.`,
+    'v.databaseBuilder.t': `Verileri düzleştirmeden modelleyin`, 'v.databaseBuilder.b': `Alan türleri, ilişkiler, formüller, rollup'lar ve filtreli görünümler oluşturun. CSV içe aktarın, tabloları bağlayın ve veri uydurmadan YZ sütunlarıyla sınıflandırın.`,
+    'v.teachPlanner.t': `Akademik yıldan yarınki derse`, 'v.teachPlanner.b': `Programları, üniteleri ve dersleri bağlı bir takvimde planlayın; ders programını, kılavuzları, materyalleri ve değerlendirme aşamalarını birlikte tutun.`,
     'contrib.kicker': `Açık kaynak, birlikte`, 'contrib.title': `Her düğüm önemlidir.`,
     'contrib.lead': `Nodus her seferinde bir katkıyla büyür — kum taneleri gibi, her biri bütüne eklenir. Onu tek bir kişi başlattı; bir sonraki taneyi herkes ekleyebilir.`,
     'contrib.prs': `Pull request'leri gör`, 'contrib.repo': `Kodu incele`, 'contrib.builders': `Nodus'u inşa edenler`, 'contrib.loading': `Katkıda bulunanlar yükleniyor…`, 'contrib.cap': `Her tane bir katkı.`, 'contrib.commits': `katkı`,
@@ -2108,7 +2432,7 @@ const I18N_V2 = {
   zh: {
     'nav.vaults': `保险库`, 'nav.contrib': `参与贡献`,
     'vaults.kicker': `保险库`, 'vaults.title': `同一引擎，因你的工作而变。`,
-    'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、本地存储和设置在每种模式下都相同。目前有四种模式可用，每一种都有可以立刻打开的演示。`,
+    'vaults.lead': `保险库就是你设备上的一个文件，里面装着一个项目。它的模式决定显示哪些板块、如何设定 AI 助手的身份。底层的引擎、私密存储和设置在每种模式下都相同。目前有五种模式可用；原始档案、口述证言与群体传记研究展示接下来将推出的方向。`,
     'vaults.academic.t': `学术`,
     'vaults.academic.b': `用于研究。把它指向一个 Zotero 分类，它会把每部著作拆解成真实的论断、发现与方法——每一条都附上出处的原文段落与页码。`,
     'vaults.academic.f1': `<b>一张观点的图谱</b>，而不是文件：支持、反驳、修正、延伸。`,
@@ -2144,24 +2468,245 @@ const I18N_V2 = {
     'road.worldbuilding.t': `世界构建`, 'road.worldbuilding.b': `同样的框架，面向虚构与架空世界，而非研究。`,
     'road.primary.t': `原始档案`, 'road.primary.b': `档案文献与二手文献并列，采用来源批判式抽取。`,
     'road.testimony.t': `口述与证言`, 'road.testimony.b': `访谈与口述史：谁在说、转写文本，以及每个人究竟说了什么。`,
+    'vaults.status.soon': `即将推出`, 'vaults.roadmap': `已列入路线图`,
+    'vaults.prosopography.t': `群体传记研究`,
+    'vaults.prosopography.b': `一个集体传记工作空间：从分散史料中重建边界明确的人群，再研究其职业、制度、流动与权力结构，同时不让统计模式遮蔽具体人物。`,
+    'vaults.prosopography.f1': `<b>为明确的研究群体建立与史料相连的传记目录</b>，用灵活的研究问卷记录姓名、职务、职业轨迹、归属、地点与事件。`,
+    'vaults.prosopography.f2': `<b>辨析姓名变体、同名者与不确定身份，同时保留疑点</b>；系统可提出基于证据的合并或拆分建议，但只有研究者能够确认。`,
+    'vaults.prosopography.f3': `<b>揭示人物、职业与制度之间的模式</b>，通过群体比较、网络分析、时间线、地图与统计，让每个结论都可追溯到具体人物和史料。`,
     'who.research.t': `如果你做研究`,
-    'who.research.b': `你的阅读会变成一个可以追问的语料：什么有争议、什么还空着、谁支持什么——以及引用能对应到真实条目的草稿。<b>学术</b>、<b>家谱</b>、<b>数据库</b>。`,
+    'who.research.b': `将史料和数据转化为可追问、可绘制、可用于写作的语料库。现在可使用<b>学术</b>、<b>家谱</b>和<b>数据库</b>；<b>一手资料</b>、<b>证言</b>和<b>人物群体史</b>将服务于档案、口述史和集体传记研究。`,
     'who.teach.t': `如果你教学`,
-    'who.teach.b': `材料准备一次，就能从中得到题库、闪卡与简报——每一条都带着支撑它的原文摘录，让你在学生看到之前先核对。今天是<b>学习</b>模式；教学模式正在建设中。`,
+    'who.teach.b': `在<b>教学</b>中规划课程、课堂、评价与反馈，并用<b>学习</b>为学生提供以材料为依据的空间。未来的<b>一手资料</b>、<b>证言</b>和<b>人物群体史</b> vault 也将支持史料研读课和研究型教学。`,
     'who.study.t': `如果你在学习`,
-    'who.study.b': `课堂、幻灯片与笔记集中一处：录音并转写、可检索到秒、映射成概念，并能用间隔重复来复习。<b>学习</b>。`,
+    'who.study.b': `在<b>学习</b>中整理材料、日程、练习和进度。进阶项目现可使用<b>学术</b>、<b>家谱</b>和<b>数据库</b>；<b>一手资料</b>、<b>证言</b>和<b>人物群体史</b>将添加面向档案与社会研究的专门路径。`,
     'v.study.t': `那堂课，精确回到那一秒`,
     'v.study.b': `录下课程，用本地 Whisper 转写，每一行都仍可点击：聊天中的回答会标出它来自哪个时间点，而其中的概念会汇成只属于这门课的概念图。`,
     'v.genealogy.t': `一个家族，从档案中重建`,
     'v.genealogy.b': `人物、日期与地点从户口、登记簿和书信中被提取出来。助手会提出他们如何相连，并在任何人进入家谱前等待你确认。`,
     'v.databases.t': `你带来数据，它来算`,
     'v.databases.b': `把你的记录变成类型化表格，然后请求分析。助手选择方法，应用真正地计算，所以相关或回归是一次运算，而不是猜测。`,
+    'v.academicEvidence.t': `看见文献在哪里分歧`, 'v.academicEvidence.b': `Nodus 将竞争性论点、证据与时间线对照，再把缺失的联系转成明确的研究问题。`,
+    'v.studyPlanner.t': `整个学年，尽在掌握`, 'v.studyPlanner.b': `按学年、课程和科目整理材料，将课表、截止日期、考试和学习时段汇入带提醒与进度的日历。`,
+    'v.genealogyArchive.t': `每个生命事件都保留证据`, 'v.genealogyArchive.b': `将登记簿、人口调查、书信和照片建成关联档案，使出生、婚姻、居住和亲属关系都可追溯到精确文件。`,
+    'v.databaseBuilder.t': `建模数据，而不是把它压平`, 'v.databaseBuilder.b': `创建类型字段、关系、公式、汇总和过滤视图。导入 CSV、连接表格，并用 AI 列分类行而不编造数据。`,
+    'v.teachPlanner.t': `从学年到明天的课`, 'v.teachPlanner.b': `在关联日历中规划课程、单元和课堂，将课表、教学指南、材料和评价节点集中保存。`,
     'contrib.kicker': `开源，携手同行`, 'contrib.title': `每个节点都重要。`,
     'contrib.lead': `Nodus 每次一个贡献地成长——就像一粒粒沙子，每一粒都汇入整体。它由一个人起步；任何人都能添上下一粒沙。`,
     'contrib.prs': `查看 Pull Request`, 'contrib.repo': `浏览代码`, 'contrib.builders': `参与建设 Nodus 的人`, 'contrib.loading': `正在加载贡献者…`, 'contrib.cap': `每一粒，都是一次贡献。`, 'contrib.commits': `次提交`,
   },
 };
 Object.keys(I18N_V2).forEach((l) => { I18N[l] = Object.assign(I18N[l] || {}, I18N_V2[l]); });
+
+// Japanese, Ukrainian and Russian cover the core landing journey and every vault.
+// Untranslated long-form showcase details continue to use the English source copy.
+Object.assign(I18N, {
+  ja: {
+    'nav.vaults': `Vault`, 'nav.how': `仕組み`, 'nav.views': `画面`, 'nav.contrib': `参加する`, 'nav.demo': `ライブデモを試す`,
+    'hero.h1': `<span class="hw hw1">研究</span>を深く<br/><span class="hw hw2">教育</span>を賢く<br/><span class="hw hw3">学習</span>をより良く`,
+    'hero.sub': `学術活動のためのローカルファーストなデスクトップアプリ。研究ライブラリ、授業と学習、一次資料のアーカイブ、構造化データを、端末から離れない一つのエンジンで扱います。`,
+    'hero.demo': `ライブデモを試す`, 'hero.download': `macOS・Windows・Linux版をダウンロード`,
+    'hero.meta': `<b>完全無料・オープンソース。</b> アカウント、購読、テレメトリはなく、コーパスは端末の外に出ません。`, 'hero.scroll': `スクロール`,
+    'vaults.kicker': `Vault`, 'vaults.title': `同じエンジンを、あなたの仕事の形に。`,
+    'vaults.lead': `Vaultは、端末上の一つのプロジェクトを収める単一ファイルです。モードによって表示される機能とAIアシスタントの役割が変わります。現在5モードを利用でき、一次資料、証言、プロソポグラフィは今後追加予定です。`,
+    'vaults.status.available': `利用可能`, 'vaults.status.soon': `近日公開`, 'vaults.roadmap': `ロードマップ掲載`,
+    'vaults.academic.t': `学術研究`, 'vaults.academic.b': `研究向け。Zoteroライブラリの各文献を、根拠となる箇所とページ付きの主張・知見・手法へ変換します。`,
+    'vaults.academic.f1': `<b>Zoteroライブラリをアイデアのグラフに変換</b>し、主張・知見・手法を原文とページへ結びます。`,
+    'vaults.academic.f2': `<b>論争、矛盾、研究の空白を発見</b>し、意味検索、カバレッジ分析、読書経路で探索します。`,
+    'vaults.academic.f3': `<b>検証可能な引用で調査・執筆</b>。Deep Research、執筆ワークショップ、Word／LibreOffice連携を利用できます。`, 'vaults.academic.cta': `学術研究デモを開く →`,
+    'vaults.study.t': `学習`, 'vaults.study.b': `学ぶ人のために。教材、授業、科目、ノートを整理し、Zoteroもアップロードも不要です。`,
+    'vaults.study.f1': `<b>教材を年度・課程・科目別に整理</b>し、時間割、締切、予定、リマインダーをカレンダーへ追加します。`,
+    'vaults.study.f2': `<b>授業を端末上で録音・文字起こし</b>し、PDFやEPUBを読み、回答から正確なページ・ノート・秒へ戻れます。`,
+    'vaults.study.f3': `<b>自分の教材から問題集、テスト、試験、フラッシュカードを作成</b>し、間隔反復と進捗管理を行います。`, 'vaults.study.cta': `学習デモを開く →`,
+    'vaults.genealogy.t': `系譜研究`, 'vaults.genealogy.b': `一次資料から人物を再構成します。家族史だけでなく、記録を用いる研究で、身元と親族関係を文書が裏づける仮説として扱います。`,
+    'vaults.genealogy.f1': `<b>家系図、年表、地図上で人物を再構成</b>し、GEDCOMを入出力して各出来事を根拠へ結びます。`,
+    'vaults.genealogy.f2': `<b>国勢調査、台帳、書簡、写真をつながるアーカイブに</b>し、人物・場所・出来事へ関連付けます。`,
+    'vaults.genealogy.f3': `<b>身元や親族関係の候補を根拠ある仮説として検討</b>し、表記揺れ、矛盾、不確かな日付を残します。`, 'vaults.genealogy.cta': `系譜研究デモを開く →`,
+    'vaults.databases.t': `データベース`, 'vaults.databases.b': `フィールドワーク、コーパス、目録、コーディング表など、あなた自身の構造化データを扱います。`,
+    'vaults.databases.f1': `<b>実際のフィールド型を持つデータベースを構築</b>し、関係、数式、集計、添付、CSV取込、再利用可能なビューを使えます。`,
+    'vaults.databases.f2': `<b>実データ上で再現可能な分析とグラフを実行</b>し、相関、カイ二乗、ANOVA、回帰を計算します。`,
+    'vaults.databases.f3': `<b>自然言語で質問しAI列で分類を自動化</b>。存在しない項目や値は捏造しません。`, 'vaults.databases.cta': `データベースデモを開く →`,
+    'road.teaching.t': `教育`, 'vaults.teaching.b': `授業計画、教材、評価、進捗を一つのVaultでつなぎ、教員の実際の一週間を支えます。`,
+    'vaults.teaching.f1': `<b>年度、課程、授業を一か所で計画</b>し、時間割、カレンダー、シラバス、単元計画を結びます。`,
+    'vaults.teaching.f2': `<b>自分の教材から学習活動、テスト、試験、ルーブリックを作成</b>し、確認・調整できます。`,
+    'vaults.teaching.f3': `<b>成績、進捗、フィードバックを非公開で管理</b>し、AI利用時は匿名の学習者コードを使います。`, 'vaults.teaching.cta': `Nodusをダウンロードして始める →`, 'vaults.teaching.available': `教育Vaultで利用可能`,
+    'road.primary.t': `一次資料`, 'vaults.primary.b': `公文書、写本、歴史コレクションのための史料批判ワークスペース。解釈を根拠となる文書のそばに保ちます。`,
+    'vaults.primary.f1': `<b>画像、写真、写本から忠実なアーカイブを構築</b>し、OCR、翻刻、来歴、原画像を一体で保持します。`,
+    'vaults.primary.f2': `<b>人物、場所、出来事、主張の抽出時に史料批判を適用</b>し、文書の記述と研究者の推論を分けます。`,
+    'vaults.primary.f3': `<b>資料を年表、地図、研究ファイルへ接続</b>し、版や相反する記述をページ単位の根拠で比較します。`,
+    'road.testimony.t': `証言`, 'vaults.testimony.b': `インタビューとオーラルヒストリーのための慎重な空間。話者の声、文脈、正確な言葉を研究全体で守ります。`,
+    'vaults.testimony.f1': `<b>音声・動画を端末上で文字起こしし話者を分離</b>して、各箇所をクリック可能な時刻へ結びます。`,
+    'vaults.testimony.f2': `<b>話者、役割、同意、アクセス条件を管理</b>し、証言の利用時に倫理的文脈を表示します。`,
+    'vaults.testimony.f3': `<b>テーマをコード化し証言を比較して検索可能なオーラルヒストリー・コーパスを構築</b>し、各知見を元のクリップへ戻します。`,
+    'vaults.prosopography.t': `プロソポグラフィ`, 'vaults.prosopography.b': `散在する資料から定義した集団を再構成し、個人を見失わずに経歴、制度、移動、権力構造を研究する集合伝記ワークスペースです。`,
+    'vaults.prosopography.f1': `<b>対象集団の典拠付き人物目録を構築</b>し、氏名、役職、経歴、所属、場所、出来事を柔軟に記録します。`,
+    'vaults.prosopography.f2': `<b>異名、同名人物、不確かな身元を疑いを隠さず整理</b>し、根拠ある統合・分割候補を研究者だけが確定します。`,
+    'vaults.prosopography.f3': `<b>集団、経歴、制度を横断するパターンを可視化</b>し、ネットワーク、年表、地図、統計を人物と資料へ追跡可能にします。`,
+    'who.research.t': `研究するなら`, 'who.research.b': `資料とデータを、問い、地図化し、執筆に使えるコーパスへ。現在は<b>学術研究</b>、<b>系譜研究</b>、<b>データベース</b>を利用でき、<b>一次資料</b>、<b>証言</b>、<b>プロソポグラフィ</b>も追加予定です。`,
+    'who.teach.t': `教えるなら`, 'who.teach.b': `<b>教育</b>で授業、評価、フィードバックを計画し、<b>学習</b>で根拠ある学習環境を提供。今後の<b>一次資料</b>、<b>証言</b>、<b>プロソポグラフィ</b>は史料演習と研究型教育も支えます。`,
+    'who.study.t': `学ぶなら`, 'who.study.b': `<b>学習</b>で教材、予定、練習、進捗を整理。高度な課題には現在の<b>学術研究</b>、<b>系譜研究</b>、<b>データベース</b>と、今後の<b>一次資料</b>、<b>証言</b>、<b>プロソポグラフィ</b>を活用できます。`,
+    'v.academicEvidence.t': `文献の対立点を見る`, 'v.academicEvidence.b': `Nodusは競合する主張を根拠と年代順で比較し、欠けた接続を明確な研究問題に変えます。`,
+    'v.studyPlanner.t': `学年全体をひとつに管理`, 'v.studyPlanner.b': `教材を年度・課程・科目別に整理し、時間割、締切、試験、学習時間をリマインダーと進捗付きカレンダーにまとめます。`,
+    'v.genealogyArchive.t': `人生の各出来事に根拠を`, 'v.genealogyArchive.b': `台帳、国勢調査、書簡、写真をつなぐアーカイブを作り、出生、結婚、居住、親族関係を正確な文書へ追跡可能にします。`,
+    'v.databaseBuilder.t': `データを平板化せずモデル化`, 'v.databaseBuilder.b': `型付きフィールド、関係、数式、集計、フィルタービューを作成。CSVとテーブルをつなぎ、値を捏造せずAI列で分類します。`,
+    'v.teachPlanner.t': `学年から明日の授業まで`, 'v.teachPlanner.b': `課程、単元、授業を連携カレンダーで計画し、時間割、ガイド、教材、評価日程をまとめます。`,
+    'story.kicker': `仕組み`, 'story.title': `資料から、使えるアイデアへ。`, 'views.kicker': `動くVault`, 'views.title': `各モードでできることを見る。`,
+    'band.kicker': `本当に無料、ローカルファースト`, 'band.title': `完全無料。完全にあなたのもの。`, 'feat.kicker': `すべてを内蔵`, 'feat.title': `一つのアプリで、研究の全工程を。`,
+    'contrib.kicker': `共につくるオープンソース`, 'contrib.title': `すべてのノードに意味がある。`, 'final.title': `あなたのライブラリと出会いませんか？`, 'final.download': `アプリをダウンロード`,
+    'dl.title': `Nodusをダウンロード`, 'dl.fetching': `最新版を確認中…`, 'dl.latest': `最新版`, 'dl.free': `100%無料・オープンソース・アカウント不要`, 'dl.all': `すべての形式と過去の版 →`, 'dl.close': `閉じる`,
+  },
+  uk: {
+    'nav.vaults': `Сховища`, 'nav.how': `Як це працює`, 'nav.views': `Огляди`, 'nav.contrib': `Долучитися`, 'nav.demo': `Спробувати демо`,
+    'hero.h1': `<span class="hw hw1">Досліджуйте</span> глибше<br/><span class="hw hw2">Викладайте</span> розумніше<br/><span class="hw hw3">Навчайтеся</span> краще`,
+    'hero.sub': `Локальний настільний застосунок для академічної роботи: досліджень, викладання, навчання, архівів первинних джерел і структурованих даних — на одному рушії, який не залишає ваш пристрій.`,
+    'hero.demo': `Спробувати демо`, 'hero.download': `Завантажити для macOS, Windows і Linux`, 'hero.meta': `<b>Повністю безкоштовно й з відкритим кодом.</b> Без облікових записів, підписок і телеметрії; корпус не залишає ваш пристрій.`, 'hero.scroll': `гортайте`,
+    'vaults.kicker': `Сховища`, 'vaults.title': `Один рушій, пристосований до вашої роботи.`, 'vaults.lead': `Сховище — це один файл проєкту на вашому пристрої. Режим визначає розділи та інструкції для ШІ-помічника. П’ять режимів доступні зараз; «Первинні джерела», «Свідчення» та «Просопографія» заплановані.`,
+    'vaults.status.available': `Доступно зараз`, 'vaults.status.soon': `Незабаром`, 'vaults.roadmap': `У планах`,
+    'vaults.academic.t': `Академічне`, 'vaults.academic.b': `Для досліджень. Перетворює бібліотеку Zotero на твердження, висновки й методи з точним уривком і сторінкою.`,
+    'vaults.academic.f1': `<b>Перетворюйте бібліотеку Zotero на граф ідей</b>, пов’язуючи твердження, висновки й методи з точними уривками та сторінками.`, 'vaults.academic.f2': `<b>Виявляйте дискусії, суперечності й прогалини</b> за допомогою семантичного пошуку, аналізу охоплення та маршрутів читання.`, 'vaults.academic.f3': `<b>Досліджуйте й пишіть із перевірюваними цитатами</b> у Deep Research, майстерні письма та помічниках для Word і LibreOffice.`, 'vaults.academic.cta': `Відкрити академічне демо →`,
+    'vaults.study.t': `Навчання`, 'vaults.study.b': `Для навчання. Курси, предмети, теми, нотатки й власні матеріали — без Zotero та завантаження у хмару.`, 'vaults.study.f1': `<b>Упорядковуйте матеріали за навчальним роком, курсом і предметом</b>, додавайте розклад, дедлайни та події з нагадуваннями.`, 'vaults.study.f2': `<b>Записуйте й транскрибуйте заняття локально</b>, читайте PDF та EPUB і повертайтеся з відповіді до точної сторінки, нотатки або секунди.`, 'vaults.study.f3': `<b>Створюйте зі своїх матеріалів банки питань, тести, іспити й картки</b> з інтервальним повторенням і відстеженням прогресу.`, 'vaults.study.cta': `Відкрити демо навчання →`,
+    'vaults.genealogy.t': `Генеалогія`, 'vaults.genealogy.b': `Для відтворення людей за первинними джерелами: особа й спорідненість залишаються гіпотезами, доки їх не підтвердять документи.`, 'vaults.genealogy.f1': `<b>Відтворюйте людей у родоводі, хронології та на мапі</b> з імпортом і експортом GEDCOM та доказами для кожної події.`, 'vaults.genealogy.f2': `<b>Створюйте пов’язаний архів переписів, реєстрів, листів і фотографій</b>, прив’язаний до людей, місць і подій.`, 'vaults.genealogy.f3': `<b>Перевіряйте запропоновані особи й спорідненість як доказові гіпотези</b>, не приховуючи суперечностей, давніх написань і непевних дат.`, 'vaults.genealogy.cta': `Відкрити демо генеалогії →`,
+    'vaults.databases.t': `Бази даних`, 'vaults.databases.b': `Для власних даних: польових матеріалів, корпусів, каталогів і кодувальних таблиць із справжніми типами полів.`, 'vaults.databases.f1': `<b>Будуйте структуровані бази з реальними типами полів</b>, зв’язками, формулами, зведеннями, вкладеннями, CSV та збереженими поданнями.`, 'vaults.databases.f2': `<b>Виконуйте відтворюваний аналіз і будуйте графіки</b> — від кореляції та χ² до ANOVA й регресії.`, 'vaults.databases.f3': `<b>Ставте запитання природною мовою й автоматизуйте класифікацію</b>, не вигадуючи полів або значень, яких немає у даних.`, 'vaults.databases.cta': `Відкрити демо баз даних →`,
+    'road.teaching.t': `Викладання`, 'vaults.teaching.b': `Плануйте курси й заняття, створюйте оцінювання та стежте за поступом, не відриваючи матеріал від роботи з ним.`, 'vaults.teaching.f1': `<b>Плануйте навчальні роки, курси й заняття в одному місці</b> з розкладами, календарями, програмами та планами тем.`, 'vaults.teaching.f2': `<b>Створюйте навчальні ситуації, тести, іспити й рубрики зі своїх матеріалів</b>, щоб потім перевірити й адаптувати їх.`, 'vaults.teaching.f3': `<b>Конфіденційно відстежуйте оцінки, поступ і відгуки</b>, використовуючи анонімні коди учнів, коли допомагає ШІ.`, 'vaults.teaching.cta': `Завантажити Nodus і почати →`, 'vaults.teaching.available': `Доступно у сховищі викладання`,
+    'road.primary.t': `Первинні джерела`, 'vaults.primary.b': `Простір для критики архівних документів, рукописів та історичних колекцій, де кожне тлумачення зберігається поруч із джерелом.`, 'vaults.primary.f1': `<b>Створюйте точний архів зі сканів, фотографій і рукописів</b>, зберігаючи разом OCR, транскрипцію, походження та оригінал.`, 'vaults.primary.f2': `<b>Застосовуйте критику джерел під час вилучення осіб, місць, подій і тверджень</b>, відділяючи сказане документом від власних висновків.`, 'vaults.primary.f3': `<b>Поєднуйте джерела у хронологіях, мапах і дослідницьких досьє</b>, зіставляючи версії та суперечливі свідчення на рівні сторінки.`,
+    'road.testimony.t': `Свідчення`, 'vaults.testimony.b': `Простір для інтерв’ю та усної історії, що зберігає голос, контекст і точні слова кожного мовця впродовж дослідження.`, 'vaults.testimony.f1': `<b>Імпортуйте аудіо й відео з локальною транскрипцією та розділенням мовців</b>, прив’язуючи уривки до часових міток.`, 'vaults.testimony.f2': `<b>Керуйте мовцями, ролями, згодою й умовами доступу</b>, щоб етичний контекст завжди був видимим.`, 'vaults.testimony.f3': `<b>Кодуйте теми, порівнюйте розповіді й будуйте пошуковий корпус усної історії</b> з поверненням до точного фрагмента.`,
+    'vaults.prosopography.t': `Просопографія`, 'vaults.prosopography.b': `Простір колективної біографії для відтворення визначеної групи з розпорошених джерел і дослідження кар’єр, установ, мобільності та влади.`, 'vaults.prosopography.f1': `<b>Створюйте пов’язаний із джерелами біографічний каталог когорти</b> з гнучкою анкетою про імена, посади, кар’єри, зв’язки, місця й події.`, 'vaults.prosopography.f2': `<b>Розрізняйте варіанти імен, тезок і непевні особи, не приховуючи сумнівів</b>; об’єднання чи поділ підтверджує лише дослідник.`, 'vaults.prosopography.f3': `<b>Виявляйте закономірності між людьми, кар’єрами й установами</b> через порівняння когорт, мережі, хронології, мапи й статистику з посиланнями на джерела.`,
+    'who.research.t': `Якщо ви досліджуєте`, 'who.research.b': `Перетворюйте джерела й дані на корпус для запитань, мапування та письма. Зараз доступні <b>Академічне</b>, <b>Генеалогія</b> й <b>Бази даних</b>; заплановані <b>Первинні джерела</b>, <b>Свідчення</b> та <b>Просопографія</b>.`, 'who.teach.t': `Якщо ви викладаєте`, 'who.teach.b': `Плануйте курси, оцінювання й відгуки у <b>Викладанні</b>, а учням дайте доказове середовище у <b>Навчанні</b>. Майбутні <b>Первинні джерела</b>, <b>Свідчення</b> й <b>Просопографія</b> підтримають джерелознавчі семінари.`, 'who.study.t': `Якщо ви навчаєтеся`, 'who.study.b': `Упорядковуйте матеріали, розклад, практику й поступ у <b>Навчанні</b>. Для складніших проєктів уже є <b>Академічне</b>, <b>Генеалогія</b> й <b>Бази даних</b>, а <b>Первинні джерела</b>, <b>Свідчення</b> та <b>Просопографія</b> з’являться згодом.`,
+    'v.academicEvidence.t': `Побачте, де література суперечить`, 'v.academicEvidence.b': `Nodus зіставляє конкуруючі твердження, докази й хронологію, а прогалини перетворює на чіткі дослідницькі питання.`,
+    'v.studyPlanner.t': `Увесь навчальний рік під контролем`, 'v.studyPlanner.b': `Упорядкуйте матеріали за роком, курсом і предметом, а розклад, дедлайни, іспити й навчання зберіть у календарі.`,
+    'v.genealogyArchive.t': `Кожна життєва подія зберігає доказ`, 'v.genealogyArchive.b': `Збудуйте пов’язаний архів реєстрів, переписів, листів і світлин, щоб кожну подію можна було простежити до документа.`,
+    'v.databaseBuilder.t': `Моделюйте дані, не сплющуючи їх`, 'v.databaseBuilder.b': `Створюйте типовані поля, зв’язки, формули, агрегації та подання; з’єднуйте таблиці й класифікуйте без вигаданих даних.`,
+    'v.teachPlanner.t': `Від навчального року до завтрашнього уроку`, 'v.teachPlanner.b': `Плануйте курси, теми й заняття у пов’язаному календарі з розкладами, матеріалами й оцінюванням.`,
+    'story.kicker': `Як це працює`, 'story.title': `Від джерел до ідей, якими можна скористатися.`, 'views.kicker': `Кожне сховище в дії`, 'views.title': `Подивіться, що вміє кожен режим.`, 'band.kicker': `Справді безкоштовно й локально`, 'band.title': `Повністю безкоштовно. Повністю ваше.`, 'feat.kicker': `Усе всередині`, 'feat.title': `Один застосунок. Увесь цикл дослідження.`, 'contrib.kicker': `Відкритий код разом`, 'contrib.title': `Кожен вузол важливий.`, 'final.title': `Готові познайомитися зі своєю бібліотекою?`, 'final.download': `Завантажити застосунок`, 'dl.title': `Завантажити Nodus`, 'dl.fetching': `Отримуємо останню версію…`, 'dl.latest': `Остання версія`, 'dl.free': `100% безкоштовно · відкритий код · без реєстрації`, 'dl.all': `Усі формати й попередні версії →`, 'dl.close': `Закрити`,
+  },
+  ru: {
+    'nav.vaults': `Хранилища`, 'nav.how': `Как это работает`, 'nav.views': `Обзоры`, 'nav.contrib': `Участвовать`, 'nav.demo': `Открыть демо`,
+    'hero.h1': `<span class="hw hw1">Исследуйте</span> глубже<br/><span class="hw hw2">Преподавайте</span> умнее<br/><span class="hw hw3">Учитесь</span> лучше`, 'hero.sub': `Локальное настольное приложение для академической работы: исследований, преподавания, учёбы, архивов первичных источников и структурированных данных — на одном движке, который не покидает ваше устройство.`, 'hero.demo': `Открыть демо`, 'hero.download': `Скачать для macOS, Windows и Linux`, 'hero.meta': `<b>Полностью бесплатно и с открытым исходным кодом.</b> Без аккаунтов, подписок и телеметрии; корпус не покидает ваш компьютер.`, 'hero.scroll': `листайте`,
+    'vaults.kicker': `Хранилища`, 'vaults.title': `Один движок, настроенный под вашу работу.`, 'vaults.lead': `Хранилище — один файл проекта на вашем устройстве. Режим определяет разделы и инструкции для ИИ-помощника. Пять режимов доступны сейчас; «Первичные источники», «Свидетельства» и «Просопография» запланированы.`, 'vaults.status.available': `Доступно сейчас`, 'vaults.status.soon': `Скоро`, 'vaults.roadmap': `В планах`,
+    'vaults.academic.t': `Академический`, 'vaults.academic.b': `Для исследований. Превращает библиотеку Zotero в утверждения, выводы и методы с точным фрагментом и страницей.`, 'vaults.academic.f1': `<b>Превратите библиотеку Zotero в граф идей</b>, связывая утверждения, выводы и методы с точными фрагментами и страницами.`, 'vaults.academic.f2': `<b>Находите дискуссии, противоречия и пробелы</b> с помощью семантического поиска, анализа охвата и маршрутов чтения.`, 'vaults.academic.f3': `<b>Исследуйте и пишите с проверяемыми ссылками</b> в Deep Research, мастерской письма и помощниках для Word и LibreOffice.`, 'vaults.academic.cta': `Открыть академическое демо →`,
+    'vaults.study.t': `Учёба`, 'vaults.study.b': `Для обучения. Курсы, предметы, темы, заметки и ваши материалы — без Zotero и загрузки в облако.`, 'vaults.study.f1': `<b>Организуйте материалы по учебному году, курсу и предмету</b>, добавляя расписание, сроки и события с напоминаниями.`, 'vaults.study.f2': `<b>Записывайте и расшифровывайте занятия локально</b>, читайте PDF и EPUB и возвращайтесь от ответа к точной странице, заметке или секунде.`, 'vaults.study.f3': `<b>Создавайте из своих материалов банки вопросов, тесты, экзамены и карточки</b> с интервальным повторением и отслеживанием прогресса.`, 'vaults.study.cta': `Открыть демо учёбы →`,
+    'vaults.genealogy.t': `Генеалогия`, 'vaults.genealogy.b': `Для восстановления людей по первичным источникам: личность и родство остаются гипотезами, пока их не подтвердят документы.`, 'vaults.genealogy.f1': `<b>Восстанавливайте людей в семейном древе, хронологии и на карте</b> с импортом и экспортом GEDCOM и доказательствами каждого события.`, 'vaults.genealogy.f2': `<b>Создавайте связанный архив переписей, реестров, писем и фотографий</b>, привязанный к людям, местам и событиям.`, 'vaults.genealogy.f3': `<b>Проверяйте предполагаемые личности и родство как доказательные гипотезы</b>, сохраняя противоречия, исторические написания и неточные даты.`, 'vaults.genealogy.cta': `Открыть демо генеалогии →`,
+    'vaults.databases.t': `Базы данных`, 'vaults.databases.b': `Для собственных данных: полевых материалов, корпусов, каталогов и кодировочных таблиц с настоящими типами полей.`, 'vaults.databases.f1': `<b>Создавайте структурированные базы с реальными типами полей</b>, связями, формулами, сводками, вложениями, CSV и сохранёнными представлениями.`, 'vaults.databases.f2': `<b>Выполняйте воспроизводимый анализ и строьте графики</b> — от корреляции и χ² до ANOVA и регрессии.`, 'vaults.databases.f3': `<b>Задавайте вопросы на естественном языке и автоматизируйте классификацию</b>, не выдумывая отсутствующих полей или значений.`, 'vaults.databases.cta': `Открыть демо баз данных →`,
+    'road.teaching.t': `Преподавание`, 'vaults.teaching.b': `Планируйте курсы и занятия, создавайте оценивание и отслеживайте прогресс, не отделяя материалы от работы с ними.`, 'vaults.teaching.f1': `<b>Планируйте учебные годы, курсы и занятия в одном месте</b> с расписаниями, календарями, программами и планами тем.`, 'vaults.teaching.f2': `<b>Создавайте учебные ситуации, тесты, экзамены и рубрики из своих материалов</b>, чтобы затем проверить и адаптировать их.`, 'vaults.teaching.f3': `<b>Конфиденциально отслеживайте оценки, прогресс и обратную связь</b>, используя анонимные коды учащихся при работе ИИ.`, 'vaults.teaching.cta': `Скачать Nodus и начать →`, 'vaults.teaching.available': `Доступно в хранилище преподавания`,
+    'road.primary.t': `Первичные источники`, 'vaults.primary.b': `Пространство для критики архивных документов, рукописей и исторических коллекций, где каждое толкование хранится рядом с источником.`, 'vaults.primary.f1': `<b>Создавайте точный архив из сканов, фотографий и рукописей</b>, сохраняя вместе OCR, транскрипцию, происхождение и оригинал.`, 'vaults.primary.f2': `<b>Применяйте критику источников при извлечении людей, мест, событий и утверждений</b>, отделяя сказанное документом от своих выводов.`, 'vaults.primary.f3': `<b>Связывайте источники в хронологиях, картах и исследовательских досье</b>, сопоставляя версии и противоречивые свидетельства на уровне страницы.`,
+    'road.testimony.t': `Свидетельства`, 'vaults.testimony.b': `Пространство для интервью и устной истории, сохраняющее голос, контекст и точные слова каждого говорящего на всём пути исследования.`, 'vaults.testimony.f1': `<b>Импортируйте аудио и видео с локальной расшифровкой и разделением говорящих</b>, связывая фрагменты с временными метками.`, 'vaults.testimony.f2': `<b>Управляйте говорящими, ролями, согласием и условиями доступа</b>, чтобы этический контекст всегда оставался видимым.`, 'vaults.testimony.f3': `<b>Кодируйте темы, сравнивайте рассказы и создавайте поисковый корпус устной истории</b> с возвратом к точному фрагменту.`,
+    'vaults.prosopography.t': `Просопография`, 'vaults.prosopography.b': `Пространство коллективной биографии для восстановления заданной группы по разрозненным источникам и изучения карьер, институтов, мобильности и власти.`, 'vaults.prosopography.f1': `<b>Создавайте связанный с источниками биографический каталог когорты</b> с гибкой анкетой имён, должностей, карьер, связей, мест и событий.`, 'vaults.prosopography.f2': `<b>Различайте варианты имён, тёзок и неясные личности, не скрывая сомнений</b>; объединение или разделение подтверждает только исследователь.`, 'vaults.prosopography.f3': `<b>Выявляйте закономерности между людьми, карьерами и учреждениями</b> через сравнение когорт, сети, хронологии, карты и статистику с трассировкой к источникам.`,
+    'who.research.t': `Если вы исследуете`, 'who.research.b': `Превращайте источники и данные в корпус для вопросов, картирования и письма. Сейчас доступны <b>Академический</b>, <b>Генеалогия</b> и <b>Базы данных</b>; запланированы <b>Первичные источники</b>, <b>Свидетельства</b> и <b>Просопография</b>.`, 'who.teach.t': `Если вы преподаёте`, 'who.teach.b': `Планируйте курсы, оценивание и обратную связь в <b>Преподавании</b>, а учащимся дайте доказательную среду в <b>Учёбе</b>. Будущие <b>Первичные источники</b>, <b>Свидетельства</b> и <b>Просопография</b> поддержат семинары по источникам.`, 'who.study.t': `Если вы учитесь`, 'who.study.b': `Организуйте материалы, расписание, практику и прогресс в <b>Учёбе</b>. Для сложных проектов уже есть <b>Академический</b>, <b>Генеалогия</b> и <b>Базы данных</b>, а <b>Первичные источники</b>, <b>Свидетельства</b> и <b>Просопография</b> появятся позже.`,
+    'v.academicEvidence.t': `Увидьте, где литература расходится`, 'v.academicEvidence.b': `Nodus сопоставляет конкурирующие тезисы, доказательства и хронологию, а пробелы превращает в явные исследовательские вопросы.`,
+    'v.studyPlanner.t': `Весь учебный год под контролем`, 'v.studyPlanner.b': `Организуйте материалы по году, курсу и предмету, а расписание, сроки, экзамены и занятия соберите в календаре.`,
+    'v.genealogyArchive.t': `Каждое событие хранит своё доказательство`, 'v.genealogyArchive.b': `Создайте связанный архив реестров, переписей, писем и фотографий, чтобы каждое событие можно было проследить до документа.`,
+    'v.databaseBuilder.t': `Моделируйте данные, не уплощая их`, 'v.databaseBuilder.b': `Создавайте типизированные поля, связи, формулы, агрегации и представления; связывайте таблицы и классифицируйте без выдуманных данных.`,
+    'v.teachPlanner.t': `От учебного года до завтрашнего урока`, 'v.teachPlanner.b': `Планируйте курсы, темы и занятия в связанном календаре с расписаниями, материалами и этапами оценивания.`,
+    'story.kicker': `Как это работает`, 'story.title': `От источников к идеям, которые можно использовать.`, 'views.kicker': `Каждое хранилище в действии`, 'views.title': `Посмотрите, что умеет каждый режим.`, 'band.kicker': `По-настоящему бесплатно и локально`, 'band.title': `Полностью бесплатно. Полностью ваше.`, 'feat.kicker': `Всё внутри`, 'feat.title': `Одно приложение. Весь цикл исследования.`, 'contrib.kicker': `Открытый код вместе`, 'contrib.title': `Каждый узел важен.`, 'final.title': `Готовы познакомиться со своей библиотекой?`, 'final.download': `Скачать приложение`, 'dl.title': `Скачать Nodus`, 'dl.fetching': `Получаем последнюю версию…`, 'dl.latest': `Последняя версия`, 'dl.free': `100% бесплатно · открытый код · без регистрации`, 'dl.all': `Все форматы и предыдущие версии →`, 'dl.close': `Закрыть`,
+  },
+});
+
+// Portuguese is offered as two real regional variants. The existing translation is
+// the European base; shared replacements cover the long tail, while the overrides
+// below keep the most visible copy and every vault natural in each region.
+function regionalisePortuguese(source, replacements) {
+  return Object.fromEntries(Object.entries(source || {}).map(([key, value]) => {
+    let text = value;
+    replacements.forEach(([from, to]) => { text = text.replace(from, to); });
+    return [key, text];
+  }));
+}
+const PT_PT = {
+  'hero.h1': `<span class="hw hw1">Investiga</span> a fundo<br/><span class="hw hw2">Ensina</span> com critério<br/><span class="hw hw3">Estuda</span> melhor`,
+  'hero.sub': `Uma aplicação de desktop local para o trabalho académico. Cada cofre escolhe um modo — uma biblioteca de investigação que se torna um grafo de ideias, um espaço para as tuas disciplinas e aulas, um arquivo criado a partir de fontes primárias, os teus próprios dados estruturados — sobre um único motor que nunca sai da tua máquina.`,
+  'hero.download': `Descarregar para macOS, Windows e Linux`,
+  'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e o teu corpus nunca sai da tua máquina.`,
+  'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao teu trabalho.`,
+  'vaults.lead': `Um cofre é um único ficheiro no teu dispositivo, com um projeto lá dentro. O seu modo decide que secções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as definições são os mesmos em cada modo. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá a seguir.`,
+  'vaults.academic.t': `Académico`,
+  'vaults.academic.b': `Para investigar. Aponta-o a uma coleção do Zotero e ele decompõe cada obra nas suas afirmações, descobertas e métodos reais — cada um com a passagem literal e a página de onde saiu.`,
+  'vaults.academic.f1': `<b>Transforma a tua biblioteca do Zotero num grafo de ideias</b>, ligando afirmações, descobertas e métodos à passagem e página exatas.`,
+  'vaults.academic.f2': `<b>Revela debates, contradições e lacunas de investigação</b> e explora-os com pesquisa semântica, análise de cobertura e percursos de leitura.`,
+  'vaults.academic.f3': `<b>Investiga e escreve com citações verificáveis</b> através do Deep Research, da oficina de escrita e dos copilotos para Word e LibreOffice.`,
+  'vaults.study.b': `Para aprender — tu ou os teus alunos. Cursos, disciplinas, temas e apontamentos, com os teus próprios materiais por baixo. Sem precisar do Zotero e sem enviar nada.`,
+  'vaults.study.f1': `<b>Organiza os teus materiais por ano letivo, curso e disciplina</b> e acrescenta horários, prazos e eventos ao calendário com lembretes.`,
+  'vaults.study.f2': `<b>Grava e transcreve aulas localmente</b>, lê PDF e EPUB e faz perguntas que regressam à página, ao apontamento ou ao segundo exatos.`,
+  'vaults.study.f3': `<b>Transforma o teu material em bancos de perguntas, testes, exames e cartões</b>, com revisão espaçada e acompanhamento do progresso.`,
+  'vaults.genealogy.f1': `<b>Reconstrói pessoas numa árvore, cronologia e mapa</b>, com importação e exportação GEDCOM e cada acontecimento ligado à sua evidência.`,
+  'vaults.genealogy.f2': `<b>Cria um arquivo ligado de censos, registos, cartas e fotografias</b>, associado às pessoas, lugares e acontecimentos que contêm.`,
+  'vaults.genealogy.f3': `<b>Revê identidades e parentescos sugeridos como hipóteses baseadas em evidência</b>, mantendo visíveis conflitos, grafias da época e datas incertas.`,
+  'vaults.databases.f1': `<b>Cria bases de dados estruturadas com tipos de campo reais</b>, relações, fórmulas, rollups, anexos, importação CSV e vistas filtradas reutilizáveis.`,
+  'vaults.databases.f2': `<b>Executa análises e gráficos reproduzíveis sobre as tuas linhas reais</b>, de correlações e qui-quadrado a ANOVA e regressões.`,
+  'vaults.databases.f3': `<b>Faz perguntas em linguagem natural e automatiza classificações com colunas de IA</b>, sem inventar campos ou valores que não existam nos teus dados.`,
+  'vaults.status.available': `Disponível agora`, 'vaults.status.soon': `Em breve`, 'vaults.roadmap': `No roteiro`,
+  'vaults.teaching.b': `Para a semana real de um docente: planeia cursos, organiza turmas, cria avaliações e acompanha o progresso sem separar os materiais do trabalho que geram.`,
+  'vaults.teaching.cta': `Descarrega o Nodus para começar →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
+  'vaults.teaching.f1': `<b>Planeia anos letivos, cursos e turmas num só lugar</b>, com horários, calendários, guias docentes e planos de unidade ligados.`,
+  'vaults.teaching.f2': `<b>Cria situações de aprendizagem, testes, exames e rubricas a partir dos teus materiais</b>, prontos para rever e adaptar.`,
+  'vaults.teaching.f3': `<b>Acompanha notas, progresso e feedback com privacidade</b>, usando códigos anónimos de alunos sempre que a IA intervém.`,
+  'vaults.primary.b': `Um espaço de crítica de fontes para documentos de arquivo, manuscritos e coleções históricas, mantendo cada interpretação junto do documento que a sustenta.`,
+  'vaults.primary.f1': `<b>Cria um arquivo fiel a partir de digitalizações, fotografias e manuscritos</b>, mantendo OCR, transcrição, proveniência e imagem original juntos.`,
+  'vaults.primary.f2': `<b>Aplica crítica de fontes ao extrair pessoas, lugares, acontecimentos e afirmações</b>, separando o que o documento diz do que tu inferes.`,
+  'vaults.primary.f3': `<b>Liga fontes em cronologias, mapas e dossiês de investigação</b>, comparando versões e relatos em conflito com evidência ao nível da página.`,
+  'vaults.testimony.b': `Um espaço cuidado para entrevistas e história oral, concebido para preservar a voz, o contexto e as palavras exatas de cada pessoa durante toda a investigação.`,
+  'vaults.testimony.f1': `<b>Importa áudio e vídeo com transcrição local e separação de oradores</b>, mantendo cada passagem ligada a uma marca temporal clicável.`,
+  'vaults.testimony.f2': `<b>Gere oradores, papéis, consentimento e condições de acesso</b>, para que o contexto ético permaneça visível onde quer que o testemunho seja usado.`,
+  'vaults.testimony.f3': `<b>Codifica temas, compara relatos e cria um corpus de história oral pesquisável</b> que devolve cada descoberta ao excerto e à conversa exatos.`,
+};
+const PT_BR = {
+  'nav.vaults': `Cofres`, 'nav.contrib': `Contribuir`,
+  'hero.h1': `<span class="hw hw1">Pesquise</span> a fundo<br/><span class="hw hw2">Ensine</span> com critério<br/><span class="hw hw3">Estude</span> melhor`,
+  'hero.sub': `Um aplicativo de desktop local para o trabalho acadêmico. Cada cofre escolhe um modo — uma biblioteca de pesquisa que se torna um grafo de ideias, um espaço para suas disciplinas e aulas, um arquivo criado a partir de fontes primárias, seus próprios dados estruturados — sobre um único motor que nunca sai da sua máquina.`,
+  'hero.download': `Baixar para macOS, Windows e Linux`,
+  'hero.meta': `<b>Totalmente gratuito e de código aberto.</b> Sem contas, sem assinaturas, sem telemetria, e seu corpus nunca sai da sua máquina.`,
+  'story.title': `Das suas fontes a ideias que você pode usar.`,
+  'vaults.kicker': `Os cofres`, 'vaults.title': `O mesmo motor, adaptado ao seu trabalho.`,
+  'vaults.lead': `Um cofre é um único arquivo no seu dispositivo, com um projeto dentro. Seu modo decide quais seções aparecem e como o assistente de IA é instruído. O motor, o armazenamento privado e as configurações são os mesmos em todos os modos. Hoje há cinco modos disponíveis; Fontes primárias, Testemunhos e Prosopografia mostram o que virá depois.`,
+  'vaults.academic.t': `Acadêmico`,
+  'vaults.academic.b': `Para pesquisa. Conecte-o a uma coleção do Zotero e ele decompõe cada obra em suas afirmações, descobertas e métodos reais — cada um com a passagem literal e a página de origem.`,
+  'vaults.academic.f1': `<b>Transforme sua biblioteca do Zotero em um grafo de ideias</b>, conectando afirmações, descobertas e métodos à passagem e página exatas.`,
+  'vaults.academic.f2': `<b>Revele debates, contradições e lacunas de pesquisa</b> e explore tudo com busca semântica, análise de cobertura e percursos de leitura.`,
+  'vaults.academic.f3': `<b>Pesquise e escreva com citações verificáveis</b> usando Deep Research, a oficina de escrita e os copilotos para Word e LibreOffice.`,
+  'vaults.study.b': `Para aprender — você ou seus alunos. Cursos, disciplinas, temas e anotações, com seus próprios materiais por baixo. Sem precisar do Zotero e sem enviar nada.`,
+  'vaults.study.f1': `<b>Organize seus materiais por ano letivo, curso e disciplina</b> e adicione horários, prazos e eventos ao calendário com lembretes.`,
+  'vaults.study.f2': `<b>Grave e transcreva aulas localmente</b>, leia PDF e EPUB e faça perguntas que retornam à página, à anotação ou ao segundo exatos.`,
+  'vaults.study.f3': `<b>Transforme seu material em bancos de questões, testes, provas e cartões</b>, com revisão espaçada e acompanhamento do progresso.`,
+  'vaults.genealogy.b': `Para reconstruir pessoas a partir de fontes primárias — história familiar, embora o método sirva para qualquer pesquisa com registros: identidade e parentesco como hipóteses que os documentos devem provar.`,
+  'vaults.genealogy.f1': `<b>Reconstrua pessoas em uma árvore, linha do tempo e mapa</b>, com importação e exportação GEDCOM e cada acontecimento ligado à sua evidência.`,
+  'vaults.genealogy.f2': `<b>Crie um arquivo conectado de censos, registros, cartas e fotografias</b>, associado às pessoas, lugares e acontecimentos que contêm.`,
+  'vaults.genealogy.f3': `<b>Revise identidades e parentescos sugeridos como hipóteses baseadas em evidências</b>, mantendo visíveis conflitos, grafias de época e datas incertas.`,
+  'vaults.databases.b': `Para seus próprios dados: trabalho de campo, corpora, catálogos e fichas de codificação. Tabelas tipadas que você realmente pode analisar, sem que uma planilha transforme suas categorias em texto.`,
+  'vaults.databases.f1': `<b>Crie bancos de dados estruturados com tipos de campo reais</b>, relações, fórmulas, rollups, anexos, importação CSV e visualizações filtradas reutilizáveis.`,
+  'vaults.databases.f2': `<b>Execute análises e gráficos reproduzíveis sobre suas linhas reais</b>, de correlações e qui-quadrado a ANOVA e regressões.`,
+  'vaults.databases.f3': `<b>Faça perguntas em linguagem natural e automatize classificações com colunas de IA</b>, sem inventar campos ou valores que não existam nos seus dados.`,
+  'vaults.status.available': `Disponível agora`, 'vaults.status.soon': `Em breve`, 'vaults.roadmap': `No roteiro`,
+  'vaults.teaching.b': `Para a semana real de um professor: planeje cursos, organize turmas, crie avaliações e acompanhe o progresso sem separar os materiais do trabalho que eles geram.`,
+  'vaults.teaching.cta': `Baixe o Nodus para começar →`, 'vaults.teaching.available': `Disponível no cofre de Docência`,
+  'vaults.teaching.f1': `<b>Planeje anos letivos, cursos e turmas em um só lugar</b>, com horários, calendários, planos de ensino e unidades conectados.`,
+  'vaults.teaching.f2': `<b>Crie situações de aprendizagem, testes, provas e rubricas a partir dos seus materiais</b>, prontas para revisar e adaptar.`,
+  'vaults.teaching.f3': `<b>Acompanhe notas, progresso e feedback com privacidade</b>, usando códigos anônimos de alunos sempre que a IA participar.`,
+  'vaults.primary.b': `Um espaço de crítica de fontes para documentos de arquivo, manuscritos e coleções históricas, mantendo cada interpretação junto do documento que a sustenta.`,
+  'vaults.primary.f1': `<b>Crie um arquivo fiel a partir de digitalizações, fotografias e manuscritos</b>, mantendo OCR, transcrição, proveniência e imagem original juntos.`,
+  'vaults.primary.f2': `<b>Aplique crítica de fontes ao extrair pessoas, lugares, acontecimentos e afirmações</b>, separando o que o documento diz do que você infere.`,
+  'vaults.primary.f3': `<b>Conecte fontes em linhas do tempo, mapas e dossiês de pesquisa</b>, comparando versões e relatos conflitantes com evidências no nível da página.`,
+  'vaults.testimony.b': `Um espaço cuidadoso para entrevistas e história oral, criado para preservar a voz, o contexto e as palavras exatas de cada pessoa durante toda a pesquisa.`,
+  'vaults.testimony.f1': `<b>Importe áudio e vídeo com transcrição local e separação de falantes</b>, mantendo cada passagem ligada a uma marca de tempo clicável.`,
+  'vaults.testimony.f2': `<b>Gerencie falantes, papéis, consentimento e condições de acesso</b>, para que o contexto ético permaneça visível onde quer que o testemunho seja usado.`,
+  'vaults.testimony.f3': `<b>Codifique temas, compare relatos e crie um corpus pesquisável de história oral</b> que leve cada descoberta de volta ao trecho e à conversa exatos.`,
+  'vaults.prosopography.b': `Um espaço de biografia coletiva para reconstruir um grupo definido a partir de fontes dispersas e depois estudar carreiras, instituições, mobilidade e estruturas de poder sem perder as pessoas por trás dos padrões.`,
+  'vaults.prosopography.f1': `<b>Crie um catálogo biográfico ligado às fontes para uma coorte definida</b>, com um questionário de pesquisa flexível para nomes, cargos, carreiras, afiliações, lugares e acontecimentos.`,
+  'vaults.prosopography.f2': `<b>Resolva variantes de nome, homônimos e identidades incertas sem esconder a dúvida</b>, com propostas de fusão ou separação baseadas em evidências que só o pesquisador pode confirmar.`,
+  'vaults.prosopography.f3': `<b>Revele padrões entre pessoas, carreiras e instituições</b> por meio de comparação de coortes, análise de redes, linhas do tempo, mapas e estatísticas rastreáveis até cada pessoa e fonte.`,
+  'who.research.t': `Se você pesquisa`, 'who.teach.t': `Se você ensina`, 'who.study.t': `Se você estuda`,
+  'who.research.b': `Transforme fontes e dados em um corpus que você pode interrogar, mapear e usar na escrita. Use hoje <b>Acadêmico</b>, <b>Genealogia</b> e <b>Bancos de dados</b>; <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> chegarão para pesquisa em arquivos, história oral e biografia coletiva.`,
+  'who.teach.b': `Planeje cursos, aulas, avaliação e feedback em <b>Docência</b>, e ofereça aos alunos um espaço fundamentado em <b>Estudo</b>. Os futuros cofres de <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> também apoiarão seminários com fontes e ensino orientado pela pesquisa.`,
+  'who.study.b': `Organize materiais, horários, prática e progresso em <b>Estudo</b>. Para projetos avançados, <b>Acadêmico</b>, <b>Genealogia</b> e <b>Bancos de dados</b> já estão disponíveis; <b>Fontes primárias</b>, <b>Testemunhos</b> e <b>Prosopografia</b> acrescentarão percursos especializados de pesquisa arquivística e social.`,
+  'final.title': `Pronto para conhecer sua biblioteca?`, 'final.download': `Baixar o aplicativo`,
+  'dl.title': `Baixar o Nodus`, 'dl.fetching': `Buscando a versão mais recente…`, 'dl.latest': `Versão mais recente`, 'dl.free': `100% grátis · código aberto · sem conta`, 'dl.close': `Fechar`,
+};
+I18N['pt-PT'] = Object.assign(regionalisePortuguese(I18N.pt, [
+  [/acadêmic/gi, 'académic'], [/Baixar/g, 'Descarregar'], [/baixar/g, 'descarregar'], [/seções/g, 'secções'], [/seção/g, 'secção'],
+]), PT_PT);
+I18N['pt-BR'] = Object.assign(regionalisePortuguese(I18N.pt, [
+  [/ficheiros/g, 'arquivos'], [/ficheiro/g, 'arquivo'], [/apontamentos/g, 'anotações'], [/apontamento/g, 'anotação'],
+  [/definições/g, 'configurações'], [/secções/g, 'seções'], [/secção/g, 'seção'], [/investigação/g, 'pesquisa'],
+  [/teus/g, 'seus'], [/tuas/g, 'suas'], [/teu/g, 'seu'], [/tua/g, 'sua'],
+]), PT_BR);
 
 const _orig = new Map();
 document.querySelectorAll('[data-i18n]').forEach((el) => _orig.set(el, el.innerHTML));
@@ -2183,6 +2728,7 @@ window.applyDlVersion = function () {
     : (d['dl.fetching'] || _orig.get(ver) || 'Fetching…');
 };
 function setLang(lang) {
+  if (lang === 'pt') lang = 'pt-PT';
   const dict = I18N[lang] || {};
   window._dict = dict;
   document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -2194,25 +2740,80 @@ function setLang(lang) {
     const h3 = el.querySelector('h3'), p = el.querySelector('p'), tr = el.querySelector('.try');
     if (h3) h3.innerHTML = dict[base + '.t'] != null ? dict[base + '.t'] : _vigOrig[i].t;
     if (p) p.innerHTML = dict[base + '.b'] != null ? dict[base + '.b'] : _vigOrig[i].b;
-    if (tr) tr.innerHTML = dict['v.open'] != null ? dict['v.open'] : _vigOrig[i].o;
+    if (tr) {
+      const key = tr.classList.contains('soon') ? 'vaults.teaching.available' : 'v.open';
+      tr.innerHTML = dict[key] != null ? dict[key] : _vigOrig[i].o;
+    }
   });
   if (window.buildFeatures) window.buildFeatures(dict);
   if (window.renderFaq) window.renderFaq(lang);
   window.applyDlVersion();
   document.documentElement.lang = lang;
   try { localStorage.setItem('nodus.lang', lang); } catch (e) {}
-  const sel = document.getElementById('lang-select'); if (sel) sel.value = lang;
+  const choice = LANGS.find((item) => item.c === lang) || LANGS.find((item) => item.c === 'en');
+  const flag = document.getElementById('lang-current-flag'); if (flag) flag.textContent = choice.f;
+  const name = document.getElementById('lang-current-name'); if (name) name.textContent = choice.n;
+  document.querySelectorAll('.lang-option').forEach((option) => option.setAttribute('aria-selected', String(option.dataset.lang === lang)));
 }
 (function () {
-  const sel = document.getElementById('lang-select');
-  sel.innerHTML = LANGS.map((l) => `<option value="${l.c}">${l.n}</option>`).join('');
-  sel.addEventListener('change', () => setLang(sel.value));
+  const picker = document.getElementById('lang-picker');
+  const trigger = document.getElementById('lang-trigger');
+  const menu = document.getElementById('lang-menu');
+  menu.innerHTML = LANGS.map((lang) => `<button class="lang-option" id="lang-option-${lang.c}" type="button" role="option" aria-selected="false" data-lang="${lang.c}">
+    <span class="lang-flag" aria-hidden="true">${lang.f}</span><span>${lang.n}</span>
+    <svg class="lang-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+  </button>`).join('');
+
+  const options = [...menu.querySelectorAll('.lang-option')];
+  function closeMenu(returnFocus) {
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    if (returnFocus) trigger.focus();
+  }
+  function openMenu() {
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    const selected = menu.querySelector('[aria-selected="true"]') || options[0];
+    requestAnimationFrame(() => selected.focus());
+  }
+  function selectOption(option) {
+    setLang(option.dataset.lang);
+    closeMenu(true);
+  }
+  trigger.addEventListener('click', () => menu.hidden ? openMenu() : closeMenu(false));
+  trigger.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); openMenu(); }
+    if (event.key === 'Escape') closeMenu(false);
+  });
+  options.forEach((option, index) => {
+    option.addEventListener('click', () => selectOption(option));
+    option.addEventListener('keydown', (event) => {
+      let next = null;
+      if (event.key === 'ArrowDown') next = options[(index + 1) % options.length];
+      if (event.key === 'ArrowUp') next = options[(index - 1 + options.length) % options.length];
+      if (event.key === 'Home') next = options[0];
+      if (event.key === 'End') next = options[options.length - 1];
+      if (next) { event.preventDefault(); next.focus(); }
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectOption(option); }
+      if (event.key === 'Escape') { event.preventDefault(); closeMenu(true); }
+    });
+  });
+  document.addEventListener('pointerdown', (event) => { if (!picker.contains(event.target)) closeMenu(false); });
+
+  function browserLanguage(value) {
+    const normalized = (value || 'en').replace('_', '-').toLowerCase();
+    if (normalized.startsWith('pt-br')) return 'pt-BR';
+    if (normalized.startsWith('pt')) return 'pt-PT';
+    const base = normalized.slice(0, 2);
+    return LANGS.some((lang) => lang.c === base) ? base : 'en';
+  }
   let lang = 'en';
   try {
     const s = localStorage.getItem('nodus.lang');
-    if (s) lang = s;
-    else { const n = (navigator.language || 'en').slice(0, 2); if (LANGS.some((l) => l.c === n)) lang = n; }
+    if (s) lang = s === 'pt' ? 'pt-PT' : s;
+    else lang = browserLanguage((navigator.languages && navigator.languages[0]) || navigator.language);
   } catch (e) {}
+  if (!LANGS.some((item) => item.c === lang)) lang = browserLanguage(lang);
   setLang(lang);
 })();
 

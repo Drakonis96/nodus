@@ -1691,9 +1691,13 @@ export function registerIpc(
   h('ai:listImageModels', async () => listImageModels());
   h('ai:nodusLocal:status', async () => getNodusLocalAiStatus());
   h('ai:nodusLocal:installRuntime', async (event, requestId: string) =>
-    installNodusLocalRuntime((fraction) => event.sender.send('ai:nodusLocal:progress', requestId, fraction)));
+    installNodusLocalRuntime((fraction) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
+    }));
   h('ai:nodusLocal:downloadModel', async (event, requestId: string, model: string) =>
-    downloadNodusLocalModel(model, (fraction) => event.sender.send('ai:nodusLocal:progress', requestId, fraction)));
+    downloadNodusLocalModel(model, (fraction) => {
+      if (!event.sender.isDestroyed()) event.sender.send('ai:nodusLocal:progress', requestId, fraction);
+    }));
   h('ai:nodusLocal:deleteModel', async (_event, model: string) => deleteNodusLocalModel(model));
   h('images:get', async (_e, entityKind: DecorativeImageEntityKind, entityId: string) =>
     getDecorativeImage(entityKind, entityId)

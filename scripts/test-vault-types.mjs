@@ -75,9 +75,8 @@ test('the vault picker derives selectable modes from the canonical registry', as
   assert.match(picker, /VAULT_TYPES\.filter\(\(type\) => type\.available\)/);
   assert.match(picker, /const CREATE_VAULT_TYPES: VaultType\[\] = \[\s*'academic', 'primary_sources', 'testimonios',\s*'databases', 'docencia', 'estudio',\s*'genealogy', 'worldbuilding',\s*\]/s);
   assert.doesNotMatch(picker, /COMING_SOON_VAULT_TYPES[^\n]*estudio/);
-  assert.match(picker, /type === 'estudio'\) return 'pre-alpha'/);
-  assert.match(picker, /type === 'genealogy'\) return 'alpha'/);
-  assert.match(picker, /type === 'databases'\) return 'beta'/);
+  assert.match(picker, /type === 'estudio' \|\| type === 'genealogy' \|\| type === 'databases'\) return 'beta'/);
+  assert.doesNotMatch(picker, /type === '(?:estudio|genealogy)'\) return '(?:pre-alpha|alpha)'/);
   assert.match(picker, /data-testid="vault-phase-notice"/);
   assert.match(picker, /data-testid="vault-preview-notice"/);
   assert.match(picker, />PREVIEW<\/span>/);

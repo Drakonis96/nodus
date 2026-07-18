@@ -2292,14 +2292,16 @@ function AiImageCell({
     startDatabaseAiImageCellJob(rowId, column.id);
   };
   const remove = async (att: DatabaseAttachment) => {
-    await window.nodus.deleteDatabaseAttachment(att.id);
-    onChanged();
+    if (await removeStoredAttachment(att)) onChanged();
   };
   const btnBox = large ? 'w-24 h-24' : 'w-7 h-7';
   return (
     <div className={`w-full ${large ? 'flex-wrap py-1' : 'h-full overflow-x-auto'} px-1.5 flex items-center gap-1.5`}>
       {attachments.map((att) => (
-        <AttachmentThumb key={att.id} att={att} large={large} onRemove={() => void remove(att)} />
+        <div key={att.id} className="shrink-0 flex items-center gap-1">
+          <AttachmentThumb att={att} large={large} onRemove={() => void remove(att)} />
+          <AiImageAttachmentActions att={att} large={large} onRemove={() => void remove(att)} />
+        </div>
       ))}
       <button
         className={`shrink-0 ${btnBox} rounded flex items-center justify-center text-indigo-400 border border-dashed border-neutral-700 hover:bg-neutral-800 hover:text-indigo-300 disabled:opacity-40`}
@@ -2308,6 +2310,45 @@ function AiImageCell({
         disabled={busy || !hasPrompt}
       >
         <Icon name={busy ? 'sync' : attachments.length ? 'sync' : 'wand'} size={large ? 18 : 14} className={busy ? 'animate-spin' : ''} />
+      </button>
+    </div>
+  );
+}
+
+/** Visible asset management for generated images; preview actions remain available too. */
+function AiImageAttachmentActions({
+  att,
+  onRemove,
+  large,
+}: {
+  att: DatabaseAttachment;
+  onRemove: () => void;
+  large: boolean;
+}) {
+  const size = large ? 'w-9 h-9' : 'w-7 h-7';
+  return (
+    <div className={`shrink-0 flex ${large ? 'flex-col' : 'items-center'} gap-1`}>
+      <button
+        className={`btn btn-ghost ${size} p-0 text-indigo-400 hover:text-indigo-300`}
+        title={t('Descargar')}
+        aria-label={t('Descargar')}
+        onClick={(event) => {
+          event.stopPropagation();
+          void downloadStoredAttachment(att);
+        }}
+      >
+        <Icon name="download" size={large ? 15 : 13} />
+      </button>
+      <button
+        className={`btn btn-ghost ${size} p-0 text-red-400 hover:text-red-300`}
+        title={t('Eliminar')}
+        aria-label={t('Eliminar')}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove();
+        }}
+      >
+        <Icon name="trash" size={large ? 15 : 13} />
       </button>
     </div>
   );
@@ -3334,6 +3375,25 @@ function formatBytes(bytes: number): string {
   return `${i === 0 ? n : Math.round(n * 10) / 10} ${units[i]}`;
 }
 
+async function downloadStoredAttachment(att: DatabaseAttachment): Promise<void> {
+  const result = await window.nodus.downloadDatabaseAttachment(att.id);
+  if (!result.canceled && result.path) toast(tx('Descargado en {p}', { p: result.path }));
+}
+
+/** One destructive path for both regular and AI-generated attachments. */
+async function removeStoredAttachment(att: DatabaseAttachment): Promise<boolean> {
+  const ok = await confirm({
+    title: t('Eliminar adjunto'),
+    message: att.fileName
+      ? tx('¿Eliminar «{name}»? Esta acción no se puede deshacer.', { name: att.fileName })
+      : t('¿Eliminar este adjunto? Esta acción no se puede deshacer.'),
+    danger: true,
+  });
+  if (!ok) return false;
+  await window.nodus.deleteDatabaseAttachment(att.id);
+  return true;
+}
+
 /** Metadata panel for one attachment: name, size, type, provenance, extracted text. */
 function AttachmentInfoModal({ att, onClose }: { att: DatabaseAttachment; onClose: () => void }) {
   const rows: { label: string; value: string }[] = [
@@ -3386,11 +3446,7 @@ function AttachmentInfoModal({ att, onClose }: { att: DatabaseAttachment; onClos
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-neutral-800">
           <button
             className="btn btn-ghost gap-1.5"
-            onClick={() => {
-              void window.nodus.downloadDatabaseAttachment(att.id).then((r) => {
-                if (!r.canceled && r.path) toast(tx('Descargado en {p}', { p: r.path }));
-              });
-            }}
+            onClick={() => void downloadStoredAttachment(att)}
           >
             <Icon name="download" size={14} /> {t('Descargar')}
           </button>
@@ -3452,8 +3508,8 @@ function AttachmentThumb({ att, onRemove, large = false }: { att: DatabaseAttach
 }
 
 /**
- * Full-size preview of an attachment, and the only place its actions live. Everything is a
- * normal-sized button here, which is what the 14px hover chips could never be.
+ * Full-size preview of an attachment. Normal-sized actions remain here, while AI image
+ * cells also expose their essential actions directly beside the generated thumbnail.
  */
 function AttachmentPreview({ att, onClose, onRemove }: { att: DatabaseAttachment; onClose: () => void; onRemove: () => void }) {
   const url = useAttachmentImageUrl(att, true);
@@ -3466,15 +3522,6 @@ function AttachmentPreview({ att, onClose, onRemove }: { att: DatabaseAttachment
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-  const download = async () => {
-    const r = await window.nodus.downloadDatabaseAttachment(att.id);
-    if (!r.canceled && r.path) toast(tx('Descargado en {p}', { p: r.path }));
-  };
-  const remove = async () => {
-    if (!(await confirm({ title: t('Quitar archivo'), message: tx('¿Quitar «{name}»?', { name: att.fileName ?? '' }), danger: true }))) return;
-    await window.nodus.deleteDatabaseAttachment(att.id);
-    onRemove();
-  };
   return createPortal(
     <div className="fixed inset-0 z-50 flex flex-col bg-black/80 p-6" onClick={onClose}>
       <div className="flex items-center gap-3 text-sm text-neutral-300 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -3484,10 +3531,10 @@ function AttachmentPreview({ att, onClose, onRemove }: { att: DatabaseAttachment
         <button className="btn btn-ghost gap-1.5 text-xs" onClick={() => setInfo(true)}>
           <Icon name="info" size={13} /> {t('Información')}
         </button>
-        <button className="btn btn-ghost gap-1.5 text-xs" onClick={() => void download()}>
+        <button className="btn btn-ghost gap-1.5 text-xs" onClick={() => void downloadStoredAttachment(att)}>
           <Icon name="download" size={13} /> {t('Descargar')}
         </button>
-        <button className="btn btn-ghost gap-1.5 text-xs text-red-400 hover:text-red-300" onClick={() => void remove()}>
+        <button className="btn btn-ghost gap-1.5 text-xs text-red-400 hover:text-red-300" onClick={onRemove}>
           <Icon name="trash" size={13} /> {t('Quitar')}
         </button>
         <button className="text-neutral-400 hover:text-neutral-200 ml-1" onClick={onClose} title={t('Cerrar')}>
@@ -3534,14 +3581,7 @@ function AttachmentCell({
     }
   };
   const remove = async (att: DatabaseAttachment) => {
-    const ok = await confirm({
-      title: t('Eliminar adjunto'),
-      message: att.fileName ? tx('¿Eliminar «{name}»? Esta acción no se puede deshacer.', { name: att.fileName }) : t('¿Eliminar este adjunto? Esta acción no se puede deshacer.'),
-      danger: true,
-    });
-    if (!ok) return;
-    await window.nodus.deleteDatabaseAttachment(att.id);
-    onChanged();
+    if (await removeStoredAttachment(att)) onChanged();
   };
   const addBox = large ? 'w-24 h-24' : 'w-7 h-7';
   return (

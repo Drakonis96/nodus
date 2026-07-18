@@ -68,6 +68,7 @@ export const EN: Record<string, string> = {
   // ── Nodi: quick notes ────────────────────────────────────────────────────
   'Notas rápidas': 'Quick notes',
   'Nueva nota': 'New note',
+  'Título (opcional)': 'Title (optional)',
   'Tachado': 'Strikethrough',
   'Borrar nota': 'Delete note',
   'Escribe tu nota en Markdown…': 'Write your note in Markdown…',

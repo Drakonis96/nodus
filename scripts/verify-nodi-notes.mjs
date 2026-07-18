@@ -1,5 +1,5 @@
 // End-to-end verification of the Nodi quick-notes panel against the real app:
-// create → format → save → search → preview → delete, in dark and light themes.
+// create → format → autosave → search → preview → delete, in dark and light themes.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, mkdtemp } from 'node:fs/promises';
@@ -131,7 +131,7 @@ try {
   // Empty state
   assert.equal(await page.locator('.nodi-notes-panel .nodi-empty').count(), 1, 'expected empty-state copy');
 
-  // ── Create + format + save ─────────────────────────────────────────────────
+  // ── Create + format + autosave ─────────────────────────────────────────────
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Nueva nota"]').click();
   const ta = page.locator('.nodi-note-textarea');
   await ta.waitFor();
@@ -147,15 +147,14 @@ try {
   const afterBold = await ta.inputValue();
   assert.ok(afterBold.includes('**leche**'), `bold did not wrap selection: ${afterBold}`);
   log('bold formatting applied:', JSON.stringify(afterBold));
-  await page.locator('.nodi-note-save').click();
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado');
-  log('note saved');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
+  log('note autosaved');
 
   // ── Back to list: the note shows with derived title + snippet ───────────────
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
   await page.locator('.nodi-note-row').first().waitFor();
   const title = await page.locator('.nodi-note-title').first().innerText();
-  assert.equal(title, 'Lista de la compra', `unexpected list title: ${title}`);
+  assert.equal(title, 'Lista de la', `unexpected three-word fallback title: ${title}`);
   const snippet = await page.locator('.nodi-note-snippet').first().innerText();
   assert.ok(snippet.toLowerCase().includes('comprar leche'), `unexpected snippet: ${snippet}`);
   log('list shows note:', JSON.stringify({ title, snippet }));
@@ -163,9 +162,9 @@ try {
 
   // Add a second note so search has something to filter out.
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Nueva nota"]').click();
-  await ta.fill('Ideas para el proyecto\n\nProbar el modo oscuro');
-  await page.locator('.nodi-note-save').click();
-  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado');
+  await page.locator('.nodi-note-title-input').fill('Ideas para el proyecto');
+  await ta.fill('Probar el modo oscuro con un título manual');
+  await page.waitForFunction(() => document.querySelector('.nodi-note-state')?.textContent === 'Guardado automáticamente');
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Volver"]').click();
   assert.equal(await page.locator('.nodi-note-row').count(), 2, 'expected 2 notes');
 
@@ -179,7 +178,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.nodi-note-row').length === 2);
 
   // ── Preview a note ──────────────────────────────────────────────────────────
-  await page.locator('.nodi-note-row', { hasText: 'Lista de la compra' }).locator('.nodi-note-open').click();
+  await page.locator('.nodi-note-row', { hasText: 'Lista de la' }).locator('.nodi-note-open').click();
   await ta.waitFor();
   await page.locator('.nodi-notes-panel .nodi-panel-head button[title="Vista previa"]').click();
   await page.locator('.nodi-note-preview').waitFor();
@@ -222,10 +221,12 @@ try {
   // open editor in light mode
   await page.locator('.nodi-note-open').first().click();
   await ta.waitFor();
-  const lightSaveBackground = await page.locator('.nodi-note-save').evaluate((button) => getComputedStyle(button).backgroundColor);
-  assert.equal(lightSaveBackground, 'rgb(179, 3, 51)', 'quick notes must use the databases-vault accent');
+  const titleInput = page.locator('.nodi-note-title-input');
+  await titleInput.focus();
+  const lightTitleAccent = await titleInput.evaluate((input) => getComputedStyle(input).borderBottomColor);
+  assert.equal(lightTitleAccent, 'rgb(179, 3, 51)', 'the optional title focus must use the databases-vault accent');
   await page.screenshot({ path: `${shots}/notes-6-editor-light.png` });
-  log('light notes theme verified:', JSON.stringify({ ...lightNotesTheme, save: lightSaveBackground }));
+  log('light notes theme verified:', JSON.stringify({ ...lightNotesTheme, titleAccent: lightTitleAccent }));
 
   // Notifications and chat use the same white surface and vault accent; quick
   // notes is no longer the only light panel.

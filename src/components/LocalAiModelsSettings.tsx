@@ -48,6 +48,15 @@ export function LocalAiModelsSettings({
   };
   useEffect(() => { void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause))); }, []);
 
+  const activeTransfer = Boolean(status?.runtime.downloading || status?.models.some((model) => model.downloading));
+  useEffect(() => {
+    if (!activeTransfer) return;
+    const timer = window.setInterval(() => {
+      void refresh().catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)));
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [activeTransfer]);
+
   const installed = useMemo(() => new Map(status?.models.map((model) => [model.id, model]) ?? []), [status]);
 
   const installRuntime = async () => {
@@ -58,15 +67,11 @@ export function LocalAiModelsSettings({
   };
 
   const download = async (model: NodusLocalModelDefinition) => {
-    const needsRuntime = model.runtime === 'llama_cpp' && !status?.runtime.ready;
-    setBusy(needsRuntime ? `runtime:${model.id}` : model.id); setProgress(0); setError('');
+    setBusy(model.id); setProgress(0); setError('');
     try {
-      if (needsRuntime) {
-        const prepared = await window.nodus.installNodusLocalRuntime((fraction) => setProgress(fraction * 0.2));
-        setStatus(prepared);
-        setBusy(model.id);
-      }
-      const nextStatus = await window.nodus.downloadNodusLocalModel(model.id, (fraction) => setProgress(needsRuntime ? 0.2 + fraction * 0.8 : fraction));
+      // One main-process request owns the runtime dependency and every model asset,
+      // so navigation cannot strand the operation between renderer-side awaits.
+      const nextStatus = await window.nodus.downloadNodusLocalModel(model.id, setProgress);
       setStatus(nextStatus);
       await exposeDownloadedChatModels(nextStatus);
     }
@@ -86,6 +91,11 @@ export function LocalAiModelsSettings({
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
     finally { setBusy(''); }
   };
+
+  const activeModelTransfer = status?.models.find((model) => model.downloading);
+  const transferProgress = activeModelTransfer?.progress
+    ?? (status?.runtime.downloading ? status.runtime.progress : progress);
+  const transferBusy = Boolean(busy || activeTransfer);
 
   const renderModelList = (kind: NodusLocalModelDefinition['kind']) => (
     <SettingsModelList
@@ -110,8 +120,8 @@ export function LocalAiModelsSettings({
               {downloaded ? t('Descargado') : local?.downloadedBytes ? `${formatBytes(local.downloadedBytes)} / ${formatBytes(local.totalBytes)}` : t('No descargado')}
             </span>
             {downloaded
-              ? <button className="btn btn-ghost h-7 px-2 text-[10px] text-red-400" disabled={Boolean(busy)} onClick={() => setDeleting(model)}><Icon name="trash" size={10} />{t('Eliminar')}</button>
-              : <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={Boolean(busy)} onClick={() => void download(model)}><Icon name="download" size={10} />{busy === `runtime:${model.id}` ? t('Preparando motor…') : busy === model.id ? t('Descargando…') : t('Descargar')}</button>}
+              ? <button className="btn btn-ghost h-7 px-2 text-[10px] text-red-400" disabled={transferBusy} onClick={() => setDeleting(model)}><Icon name="trash" size={10} />{t('Eliminar')}</button>
+              : <button className="btn btn-ghost h-7 px-2 text-[10px]" disabled={transferBusy} onClick={() => void download(model)}><Icon name={local?.downloading || busy === model.id ? 'sync' : 'download'} className={local?.downloading || busy === model.id ? 'animate-spin' : ''} size={10} />{local?.downloading && status?.runtime.downloading ? t('Preparando motor…') : local?.downloading || busy === model.id ? t('Descargando…') : t('Descargar')}</button>}
             {downloaded && !runtimeReady && <span className="w-full text-right text-[10px] text-amber-600 dark:text-amber-400">{t('Instala el motor local para poder usar este modelo.')}</span>}
           </div>
         </article>;
@@ -128,7 +138,7 @@ export function LocalAiModelsSettings({
       <div className={`rounded-lg border px-3 py-2 text-xs ${status?.runtime.ready ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300' : 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300'}`}>
         {status?.runtime.ready
           ? `${t('Motor local listo')} · llama.cpp ${status.runtime.version}`
-          : <button className="inline-flex items-center gap-1" disabled={Boolean(busy)} onClick={() => void installRuntime()}><Icon name="download" size={12} />{busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}
+          : <button className="inline-flex items-center gap-1" disabled={transferBusy} onClick={() => void installRuntime()}><Icon name={status?.runtime.downloading || busy === 'runtime' ? 'sync' : 'download'} className={status?.runtime.downloading || busy === 'runtime' ? 'animate-spin' : ''} size={12} />{status?.runtime.downloading || busy === 'runtime' ? t('Instalando motor…') : t('Instalar motor local')}</button>}
       </div>
     </div>
 
@@ -146,7 +156,7 @@ export function LocalAiModelsSettings({
       {renderModelList('chat')}
     </div>
 
-    {busy && progress > 0 && <div className="mt-4 h-1.5 overflow-hidden rounded bg-neutral-800"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(3, progress * 100)}%` }} /></div>}
+    {transferBusy && transferProgress > 0 && <div className="mt-4 h-1.5 overflow-hidden rounded bg-neutral-800" data-testid="nodus-local-download-progress"><div className="h-full bg-indigo-500 transition-all" style={{ width: `${Math.max(3, transferProgress * 100)}%` }} /></div>}
     {error && <p className="mt-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">{error}</p>}
     {deleting && <ConfirmModal
       title={t('Eliminar modelo local')}
