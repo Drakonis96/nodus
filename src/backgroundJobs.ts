@@ -11,6 +11,7 @@ import type {
   ToolkitJobProgress,
   ToolkitJobResult,
 } from '@shared/types';
+import type { DatabaseAttachment } from '@shared/databases';
 
 export type BackgroundJobStatus = 'running' | 'completed' | 'failed';
 
@@ -170,6 +171,41 @@ export type ToolkitConvertJob = BackgroundJob<ToolkitJobRequest, ToolkitJobProgr
 export function startToolkitJob(request: ToolkitJobRequest): ToolkitConvertJob {
   return startBackgroundJob(TOOLKIT_JOB_KEY, request, (currentRequest, onProgress) =>
     window.nodus.runToolkitJob(currentRequest, { onProgress }),
+  );
+}
+
+// ── Database AI cells ───────────────────────────────────────────────────────
+// Each cell has its own renderer-wide key. The actual generation runs through
+// Electron's main process; keeping the promise snapshot here lets any remounted
+// database view re-attach without starting the request again.
+
+export interface DatabaseAiCellJobRequest {
+  rowId: string;
+  columnId: string;
+}
+
+export function databaseAiTextCellJobKey(rowId: string, columnId: string): string {
+  return `database:ai:text:${rowId}:${columnId}`;
+}
+
+export function databaseAiImageCellJobKey(rowId: string, columnId: string): string {
+  return `database:ai:image:${rowId}:${columnId}`;
+}
+
+export type DatabaseAiTextCellJob = BackgroundJob<DatabaseAiCellJobRequest, never, string>;
+export type DatabaseAiImageCellJob = BackgroundJob<DatabaseAiCellJobRequest, never, DatabaseAttachment>;
+
+export function startDatabaseAiTextCellJob(rowId: string, columnId: string): DatabaseAiTextCellJob {
+  const request = { rowId, columnId };
+  return startBackgroundJob(databaseAiTextCellJobKey(rowId, columnId), request, (current) =>
+    window.nodus.runDatabaseAiCell(current.rowId, current.columnId)
+  );
+}
+
+export function startDatabaseAiImageCellJob(rowId: string, columnId: string): DatabaseAiImageCellJob {
+  const request = { rowId, columnId };
+  return startBackgroundJob(databaseAiImageCellJobKey(rowId, columnId), request, (current) =>
+    window.nodus.generateDatabaseAiImage(current.rowId, current.columnId)
   );
 }
 

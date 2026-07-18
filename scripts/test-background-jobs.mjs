@@ -38,6 +38,16 @@ try {
   let immersionCalls = 0;
   let deepCalls = 0;
   let saveCalls = 0;
+  let databaseTextCalls = 0;
+  let databaseImageCalls = 0;
+  let releaseDatabaseText;
+  let releaseDatabaseImage;
+  const databaseTextGate = new Promise((resolve) => {
+    releaseDatabaseText = resolve;
+  });
+  const databaseImageGate = new Promise((resolve) => {
+    releaseDatabaseImage = resolve;
+  });
   const fakeSession = { id: 'imm-1', topic: 'Tema recuperable' };
   const fakeReport = {
     draft: { title: 'Informe recuperable', brief: { kind: 'deep_research' } },
@@ -63,6 +73,17 @@ try {
       saveWritingWorkshopDraft: async () => {
         saveCalls += 1;
         return fakeSaved;
+      },
+      runDatabaseAiCell: async (rowId, columnId) => {
+        databaseTextCalls += 1;
+        if (rowId === 'row-fail') throw new Error('provider unavailable');
+        await databaseTextGate;
+        return `generated:${rowId}:${columnId}`;
+      },
+      generateDatabaseAiImage: async (rowId, columnId) => {
+        databaseImageCalls += 1;
+        await databaseImageGate;
+        return { id: 'image-1', rowId, columnId, fileName: 'generated.png' };
       },
     },
   };
@@ -131,6 +152,45 @@ try {
   assert.equal(jobs.getBackgroundJob(jobs.DEEP_RESEARCH_MAIN_JOB_KEY).request.objective, 'Pregunta principal');
   assert.equal(jobs.getBackgroundJob(dossierKey).request.objective, 'Dossier');
   assert.equal(saveCalls, 2, 'the immersion dossier is also saved automatically');
+
+  // Database cell jobs survive the initiating cell's unmount. A remounted cell
+  // immediately receives the running snapshot, then the retained result, and a
+  // repeated click never creates a second provider call for that same cell.
+  const textKey = jobs.databaseAiTextCellJobKey('row-1', 'column-1');
+  const textJob = jobs.startDatabaseAiTextCellJob('row-1', 'column-1');
+  const duplicateTextJob = jobs.startDatabaseAiTextCellJob('row-1', 'column-1');
+  assert.equal(duplicateTextJob.id, textJob.id, 'duplicate database text generation reuses the running job');
+  await waitFor(() => databaseTextCalls === 1, 'database text request start');
+  let textBeforeUnmount = null;
+  const unsubscribeText = jobs.subscribeBackgroundJob(textKey, (job) => {
+    textBeforeUnmount = job;
+  });
+  assert.equal(textBeforeUnmount.status, 'running');
+  unsubscribeText();
+  releaseDatabaseText();
+  await waitFor(() => jobs.getBackgroundJob(textKey)?.status === 'completed', 'database text completion after unmount');
+  let recoveredText = null;
+  const unsubscribeRecoveredText = jobs.subscribeBackgroundJob(textKey, (job) => {
+    recoveredText = job;
+  });
+  assert.equal(recoveredText.status, 'completed', 'remounted text cell receives completion');
+  assert.equal(recoveredText.result, 'generated:row-1:column-1');
+  assert.equal(databaseTextCalls, 1, 'only one database text provider call runs');
+  unsubscribeRecoveredText();
+
+  const imageKey = jobs.databaseAiImageCellJobKey('row-2', 'column-2');
+  jobs.startDatabaseAiImageCellJob('row-2', 'column-2');
+  await waitFor(() => databaseImageCalls === 1, 'database image request start');
+  const unsubscribeImage = jobs.subscribeBackgroundJob(imageKey, () => {});
+  unsubscribeImage();
+  releaseDatabaseImage();
+  await waitFor(() => jobs.getBackgroundJob(imageKey)?.status === 'completed', 'database image completion after unmount');
+  assert.equal(jobs.getBackgroundJob(imageKey).result.fileName, 'generated.png');
+
+  const failedKey = jobs.databaseAiTextCellJobKey('row-fail', 'column-3');
+  jobs.startDatabaseAiTextCellJob('row-fail', 'column-3');
+  await waitFor(() => jobs.getBackgroundJob(failedKey)?.status === 'failed', 'database text failure retention');
+  assert.equal(jobs.getBackgroundJob(failedKey).error, 'provider unavailable');
 
   console.log('background generation jobs test passed');
 } finally {
